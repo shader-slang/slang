@@ -45,11 +45,13 @@ def runner_id():
     """A stable-per-machine fingerprint. Absolute timings only compare within one
     fingerprint; a change means the history must be re-swept on the new runner."""
     cpu = platform.processor() or platform.machine()
-    if not cpu or cpu == platform.machine():
-        # On Linux, platform.processor() often returns the same string as
-        # platform.machine() (e.g. "x86_64") when the CPU model is unavailable —
-        # a CPython implementation detail. Fall through to /proc/cpuinfo for the
-        # actual model name, which produces a more stable per-machine fingerprint.
+    # On Linux, platform.processor() often returns the architecture string
+    # (e.g. "x86_64") rather than a CPU model name — the same value as
+    # platform.machine(). In that case fall through to /proc/cpuinfo for the
+    # actual model name, which produces a more stable per-machine fingerprint.
+    # Note: `not cpu` is unreachable because the `or platform.machine()` above
+    # ensures cpu is always non-empty.
+    if cpu == platform.machine():
         try:
             with open("/proc/cpuinfo") as fh:
                 for line in fh:

@@ -19,6 +19,7 @@ Examples:
 import argparse
 import json
 import os
+import re
 import shutil
 import statistics
 import subprocess
@@ -167,10 +168,7 @@ def run_once(cmd):
 _BENIGN = ("E00100", "E52002", "spirv-opt", "spirv-dis", "slang-glslang",
            "failed to load downstream", "pass-through compiler not found")
 # Matches both the modern "error[E30015]:" and the legacy "error 30015:" formats.
-# re is imported via __import__ rather than a top-level import to keep every
-# stdlib dependency explicit in one auditable place — this module is designed
-# to run against old Python installations with no third-party packages.
-_ERR_RE = __import__("re").compile(r"error\[|: error:|\berror \d+:")
+_ERR_RE = re.compile(r"error\[|: error:|\berror \d+:")
 
 
 def real_error(text):
@@ -221,7 +219,8 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
         # rc == 0: success; rc == 1: slangc-reported compile error (expected for
         # expect_fail workloads, caught by real_error() for others). rc > 1 or
         # rc < 0: slangc crashed or was killed by a signal (SIGSEGV=139, SIGABRT=134
-        # on Linux; large positive values on Windows). Exit code 2+ from usage errors
+        # on Linux; large negative values on Windows — Python converts NTSTATUS codes
+        # such as 0xC0000005 to signed int: -1073741819). Exit code 2+ from usage errors
         # won't occur here because the bench harness always builds valid invocations.
         # Exclude crashed samples from timing stats; their wall time is meaningless.
         if rc > 1 or rc < 0:

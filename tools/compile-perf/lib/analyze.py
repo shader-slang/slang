@@ -55,28 +55,35 @@ def results_path(results_dir, label):
 
 
 def leaf_deltas(lookup, ptag, tag, wl):
-    """{leaf: delta_ms} across a release boundary, incl. synthetic 'emit'."""
+    """{leaf: delta_ms} across a release boundary.
+
+    Includes a synthetic 'emit_overhead' key (generateOutput − linkAndOptimizeIR)
+    representing target-code emission plus any bundled downstream tool (spirv-opt).
+    Named 'emit_overhead' rather than 'emit' to avoid confusion with the real
+    emitEntryPointsSourceFromIR leaf timer visible in breakdown.py's TREE.
+    """
     out = {}
     for lt in LEAF_TIMERS:
         a, b = lookup.get((ptag, wl, lt)), lookup.get((tag, wl, lt))
         if a is not None and b is not None:
             out[lt] = b - a
-    # emit = generateOutput - linkAndOptimizeIR, on each side
-    def emit(t):
+    # emit_overhead = generateOutput − linkAndOptimizeIR (emission + downstream tool)
+    def _emit(t):
         g, l = lookup.get((t, wl, "generateOutput")), lookup.get((t, wl, "linkAndOptimizeIR"))
         return (g - l) if (g is not None and l is not None) else None
-    ea, eb = emit(ptag), emit(tag)
+    ea, eb = _emit(ptag), _emit(tag)
     if ea is not None and eb is not None:
-        out["emit"] = eb - ea
+        out["emit_overhead"] = eb - ea
     return out
 
 
 def canonical_runs(runs):
-    """One row per workload for per-release/trend views. A `--sweep` enriches a
-    results.json with several sizes for a workload (e.g. complexity_ladder); the
-    trend charts compare like-with-like across releases, so collapse to each
-    workload's default_size (falling back to the first row seen). Scaling
-    analysis reads the full multi-size data separately (ladder_scaling.py)."""
+    """One row per workload for per-release/trend views.
+
+    results.json may contain multiple size rows per workload; collapse to each
+    workload's default_size so history and daily points compare like-with-like.
+    Falls back to the first row seen for workloads not in the manifest.
+    """
     from . import manifest
     best = {}
     for r in runs:

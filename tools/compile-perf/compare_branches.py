@@ -44,8 +44,11 @@ EXE = ".exe" if os.name == "nt" else ""
 _WSL = os.name == "posix" and "microsoft" in platform.uname().release.lower()
 GIT = "git.exe" if _WSL else "git"
 CMAKE = "cmake.exe" if _WSL else "cmake"
-PR_SUBSET = ("minimal,autodiff,dynamic_dispatch,diagnostics_errors,"
-             "diagnostics_clean,specialization,inlining,mdl_dxr")
+# Fast-running subset covering the most regression-prone passes. Used as the
+# default for local branch comparisons; the full suite takes ~5× longer.
+# (A per-PR CI gate using this subset is designed but not yet enabled — see DESIGN.md.)
+QUICK_SUBSET = ("minimal,autodiff,dynamic_dispatch,diagnostics_errors,"
+                "diagnostics_clean,specialization,inlining,mdl_dxr")
 
 
 def run(cmd, cwd=None, check=True):
@@ -102,7 +105,7 @@ def main():
                     help="cmake configure preset (default: default; VS users: vs2022)")
     ap.add_argument("--build-preset", default=None,
                     help="cmake build preset (default: matches --config, e.g. 'release')")
-    ap.add_argument("--only", default=PR_SUBSET, help="comma-separated workload subset")
+    ap.add_argument("--only", default=QUICK_SUBSET, help="comma-separated workload subset")
     ap.add_argument("--samples", type=int, default=5)
     ap.add_argument("--warmup", type=int, default=1)
     ap.add_argument("--threshold", type=float, default=15.0,

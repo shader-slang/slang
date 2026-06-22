@@ -87,13 +87,16 @@ def main():
 
     hist_runner = series.get("runner", "")
     current = pts[-1]
+    # Release points carry no per-point runner field by design: they are all built
+    # by the release-sweep job on the machine recorded in runner.json (hist_runner).
+    # The `or hist_runner` below is not defensive fallback — it is that data-model
+    # invariant: a missing runner field means "this is a release point, use hist_runner".
     cur_runner = current.get("runner") or hist_runner
 
     print(f"trend: current={current['label']} ({current['date']}, {current['kind']})  "
           f"runner={cur_runner or 'unset'}")
 
-    # Restrict the baseline to points on the same runner (release points carry no
-    # per-point runner — they were built on hist_runner by the resync job).
+    # Restrict the baseline to points on the same runner.
     prior = [p for p in pts[:-1] if (p.get("runner") or hist_runner) == cur_runner]
     window = prior[-args.window:]
 
