@@ -305,14 +305,21 @@ def fetch_recent_failures(repo):
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
     from gh_api import gh_api_list
 
+    now = datetime.now(timezone.utc)
+    cutoff_dt = now - timedelta(hours=3)
+    # Query a wider creation window than the displayed update window so a
+    # longer-running CI job that finishes recently is still eligible.
+    created_from = (cutoff_dt - timedelta(hours=6)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    created_to = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     runs, err = gh_api_list(
-        f"repos/{repo}/actions/runs?status=completed&per_page=20",
+        f"repos/{repo}/actions/runs?status=completed&per_page=100"
+        f"&created={created_from}..{created_to}",
         "workflow_runs",
     )
     if err:
         return []
 
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    cutoff = cutoff_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     failures = []
     for run in (runs or []):
         if run.get("name") != "CI":
@@ -341,14 +348,18 @@ def fetch_merge_queue_status(repo):
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
     from gh_api import gh_api_list, parse_merge_queue_pr_number
 
+    now = datetime.now(timezone.utc)
+    cutoff_dt = now - timedelta(hours=24)
+    cutoff = cutoff_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    created_to = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     runs, err = gh_api_list(
-        f"repos/{repo}/actions/runs?event=merge_group&per_page=50",
+        f"repos/{repo}/actions/runs?event=merge_group&per_page=100"
+        f"&created={cutoff}..{created_to}",
         "workflow_runs",
     )
     if err:
         return None
 
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
     recent = []
     counts = {"success": 0, "failure": 0, "cancelled": 0, "in_progress": 0}
     for run in (runs or []):

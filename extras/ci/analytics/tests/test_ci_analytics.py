@@ -20,6 +20,7 @@ import ci_job_collector
 import pr_collector
 import ci_status
 import ci_visualization
+import gh_api
 
 
 def load_queue_status_module():
@@ -426,6 +427,40 @@ class TestGpuQuota(unittest.TestCase):
         html = ci_health.build_history_chart(snapshots)
         # The chart section HTML should not be present (JS guard is fine)
         self.assertNotIn("T4 GPU Usage", html)
+
+
+class TestHealthApiBounds(unittest.TestCase):
+    def test_recent_failures_query_is_bounded_by_created_range(self):
+        calls = []
+
+        def fake_list(endpoint, key):
+            calls.append((endpoint, key))
+            return [], None
+
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=fake_list):
+            ci_health.fetch_recent_failures("shader-slang/slang")
+
+        self.assertEqual(calls[0][1], "workflow_runs")
+        self.assertIn("status=completed", calls[0][0])
+        self.assertIn("per_page=100", calls[0][0])
+        self.assertIn("&created=", calls[0][0])
+        self.assertIn("..", calls[0][0])
+
+    def test_merge_queue_query_is_bounded_by_created_range(self):
+        calls = []
+
+        def fake_list(endpoint, key):
+            calls.append((endpoint, key))
+            return [], None
+
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=fake_list):
+            ci_health.fetch_merge_queue_status("shader-slang/slang")
+
+        self.assertEqual(calls[0][1], "workflow_runs")
+        self.assertIn("event=merge_group", calls[0][0])
+        self.assertIn("per_page=100", calls[0][0])
+        self.assertIn("&created=", calls[0][0])
+        self.assertIn("..", calls[0][0])
 
 
 class TestStatisticsRunnerNamePrefixes(unittest.TestCase):
