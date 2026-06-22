@@ -195,8 +195,12 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
     # fail the workload — otherwise the timed compile runs against missing inputs.
     setup_ok = True
     for c in cmds["setup"]:
-        if subprocess.run(c, stdout=subprocess.DEVNULL,
-                          stderr=subprocess.DEVNULL).returncode != 0:
+        try:
+            rc = subprocess.run(c, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, timeout=600).returncode
+        except subprocess.TimeoutExpired:
+            rc = 1
+        if rc != 0:
             setup_ok = False
 
     timed = cmds["timed"]
