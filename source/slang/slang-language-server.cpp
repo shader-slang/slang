@@ -13,6 +13,7 @@
 #include "../core/slang-char-util.h"
 #include "../core/slang-secure-crt.h"
 #include "../core/slang-string-util.h"
+#include "../core/slang-type-text-util.h"
 #include "slang-ast-print.h"
 #include "slang-check-impl.h"
 #include "slang-com-helper.h"
@@ -211,7 +212,7 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 14)
+                    if (arr.getCount() == 15)
                     {
                         updatePredefinedMacros(arr[0]);
                         updateSearchPaths(arr[1]);
@@ -221,6 +222,7 @@ SlangResult LanguageServer::parseNextMessage()
                         updateInlayHintOptions(arr[10], arr[11]);
                         updateWorkspaceFlavor(arr[12]);
                         updateTraceOptions(arr[13]);
+                        updatePredefinedLanguageVersion(arr[14]);
                     }
                 }
                 break;
@@ -2489,6 +2491,42 @@ void LanguageServer::updateWorkspaceFlavor(const JSONValue& value)
     }
 }
 
+// Apply the `slang.predefinedLanguageVersion` client setting (a version string such as "2025"):
+// map it via the same TypeTextUtil::findLanguageVersion path the `-std`/`-language-version` option
+// uses, store it on the workspace, and refresh open documents if it changed. An empty value clears
+// the setting (UNKNOWN, compiler default); an unrecognized non-empty value is logged and the
+// previously configured version is left in place, so a typo does not silently disable a working
+// configuration.
+void LanguageServer::updatePredefinedLanguageVersion(const JSONValue& value)
+{
+    if (value.isValid())
+    {
+        auto container = m_connection->getContainer();
+        JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
+        String str;
+        if (SLANG_SUCCEEDED(converter.convert(value, &str)))
+        {
+            SlangLanguageVersion version = SLANG_LANGUAGE_VERSION_UNKNOWN;
+            if (str.getLength() != 0)
+            {
+                version = TypeTextUtil::findLanguageVersion(str.getUnownedSlice());
+                if (version == SLANG_LANGUAGE_VERSION_UNKNOWN)
+                {
+                    logMessage(
+                        2 /* warning */,
+                        String("slang.predefinedLanguageVersion: unknown language version '") +
+                            str + "'; keeping the previous setting.");
+                    return;
+                }
+            }
+            if (m_core.m_workspace->updatePredefinedLanguageVersion(version))
+            {
+                sendRefreshRequests(m_connection);
+            }
+        }
+    }
+}
+
 void LanguageServer::sendConfigRequest()
 {
     ConfigurationParams args;
@@ -2520,6 +2558,8 @@ void LanguageServer::sendConfigRequest()
     item.section = "slang.workspaceFlavor";
     args.items.add(item);
     item.section = "slangLanguageServer.trace.server";
+    args.items.add(item);
+    item.section = "slang.predefinedLanguageVersion";
     args.items.add(item);
     m_connection->sendCall(
         ConfigurationParams::methodName,
@@ -3104,6 +3144,10 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         else if (key == "slang.workspaceFlavor")
         {
             updateWorkspaceFlavor(kv.value);
+        }
+        else if (key == "slang.predefinedLanguageVersion")
+        {
+            updatePredefinedLanguageVersion(kv.value);
         }
     }
 }
