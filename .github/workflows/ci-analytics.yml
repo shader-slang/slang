@@ -90,6 +90,9 @@ jobs:
               if git push; then
                 exit 0
               fi
+              if [ "$attempt" -eq 3 ]; then
+                break
+              fi
               echo "Push failed on attempt ${attempt}; rebasing before retry..."
               git pull --rebase || {
                 echo "Failed to rebase CI analytics before retry" >&2
