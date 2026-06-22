@@ -12,6 +12,7 @@ Loads releases/<tag>/results.json for every release in the index
 Also derives the diagnostics path-cost series (errors - clean).
 """
 import json
+import math
 import os
 import re
 
@@ -146,6 +147,63 @@ def classify(values, step_thr=1.4, drift_thr=1.25):
             "up_frac": up_frac, "n_steps": len(steps)}
 
 
+def linfit(xs, ys):
+    """Ordinary least squares y = a + b*x. Returns (a, b, r2)."""
+    n = len(xs)
+    sx, sy = sum(xs), sum(ys)
+    sxx = sum(x * x for x in xs)
+    sxy = sum(x * y for x, y in zip(xs, ys))
+    denom = n * sxx - sx * sx
+    if denom == 0:
+        return ys[0], 0.0, 0.0
+    b = (n * sxy - sx * sy) / denom
+    a = (sy - b * sx) / n
+    ybar = sy / n
+    ss_tot = sum((y - ybar) ** 2 for y in ys) or 1.0
+    ss_res = sum((y - (a + b * x)) ** 2 for x, y in zip(xs, ys))
+    return a, b, 1 - ss_res / ss_tot
+
+
+def powfit(xs, ys):
+    """Power-law fit t = a * N^k via OLS on (log N, log t). Returns (a, k, r2),
+    with r2 measured in log space. k is the honest super-linearity exponent —
+    k≈1 linear, k>1 super-linear, k<1 sub-linear — and unlike the linear floor it
+    never goes negative on a convex curve. Needs positive xs/ys; falls back to
+    (0, 0, 0) otherwise."""
+    pts = [(x, y) for x, y in zip(xs, ys) if x > 0 and y > 0]
+    if len(pts) < 2:
+        return 0.0, 0.0, 0.0
+    lx = [math.log(x) for x, _ in pts]
+    ly = [math.log(y) for _, y in pts]
+    loga, k, r2 = linfit(lx, ly)
+    return math.exp(loga), k, r2
+
+
+def slope_report(results_dir, label, metric):
+    """Decompose compile time into fixed floor + per-element slope from a
+    --sweep run (multiple sizes per workload). A regression in `floor` (heavier
+    stdlib, e.g. PR #9808) is a different bug from a regression in `slope`
+    (a pass got per-element slower) or in scaling (slope rising super-linearly)."""
+    path = results_path(results_dir, label)
+    if not os.path.exists(path):
+        raise SystemExit(f"no results at {path} (run bench.py --sweep --label {label})")
+    by_wl = {}
+    for r in json.load(open(path)):
+        st = r["timers"].get("compileInner")
+        if st and r["size"] > 0:
+            by_wl.setdefault(r["workload"], []).append((r["size"], st[metric]))
+    print(f"Floor + slope fit (compileInner, {metric}) for label '{label}'")
+    print(f"{'workload':18s}{'floor(ms)':>11}{'slope(ms/unit)':>16}{'R^2':>7}   sizes")
+    print("-" * 72)
+    for wl, pts in sorted(by_wl.items()):
+        pts = sorted(set(pts))
+        if len(pts) < 2:
+            continue
+        xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+        a, b, r2 = linfit(xs, ys)
+        print(f"{wl:18s}{a:11.1f}{b:16.4f}{r2:7.3f}   {[x for x in xs]}")
+    print("\nfloor = fixed per-compile cost (core-module load/link); "
+          "slope = marginal cost per generated unit.")
 
 
 def flag_steps(values, rel_thr, abs_floor):

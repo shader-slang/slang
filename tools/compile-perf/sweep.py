@@ -30,6 +30,7 @@ def main():
     ap.add_argument("--samples", type=int, default=5)
     ap.add_argument("--warmup", type=int, default=1)
     ap.add_argument("--only", default=None, help="comma-separated workloads")
+    ap.add_argument("--sweep", action="store_true", help="pass --sweep (scaling sizes)")
     ap.add_argument("--force", action="store_true", help="re-run releases already done")
     args = ap.parse_args()
 
@@ -48,14 +49,33 @@ def main():
         tag = rec["tag"]
         done = analyze.results_path(args.results, tag)
         if os.path.exists(done) and not args.force:
+            # Skip only if the requested workloads are already present AND — when
+            # --sweep is requested — already have multi-size scaling data; a plain
+            # (non-swept) results.json from a prior run must not mask a pending
+            # sweep. Tolerate an unreadable/partial file by re-running.
             try:
                 prev = json.load(open(done))
             except (json.JSONDecodeError, OSError) as e:
                 prev = []
                 print(f"  (note: unreadable {done} ({e}); re-running)")
-            present = {r["workload"] for r in prev if isinstance(r, dict) and "workload" in r}
+            sizes = {}
+            for r in prev if isinstance(prev, list) else []:
+                if isinstance(r, dict) and "workload" in r:
+                    sizes.setdefault(r["workload"], set()).add(r.get("size"))
             need = want or all_wls
-            if need <= present:
+
+            # `complete` closes over `sizes`, `args.sweep`, and `manifest` — all
+            # stable across loop iterations. It does NOT capture the loop variable.
+            def complete(wl):
+                szs = sizes.get(wl)
+                if not szs:
+                    return False
+                spec = manifest.BY_NAME.get(wl)
+                if args.sweep and spec and spec.sweep_sizes:
+                    return len(szs) > 1  # need the scaling curve, not one point
+                return True
+
+            if all(complete(wl) for wl in need):
                 print(f"[{i}/{len(ready)}] {tag}: already has {sorted(need)}, skipping")
                 continue
         print(f"[{i}/{len(ready)}] {tag} ({rec.get('date','?')})")
@@ -65,6 +85,8 @@ def main():
                "--samples", str(args.samples), "--warmup", str(args.warmup)]
         if args.only:
             cmd += ["--only", args.only]
+        if args.sweep:
+            cmd.append("--sweep")
         try:
             rc = subprocess.run(cmd, timeout=3600).returncode
         except subprocess.TimeoutExpired:
