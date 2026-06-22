@@ -20,11 +20,12 @@ sensitivity figure, not a user-facing slowdown; mdl_dxr is the realistic signal.
 import argparse
 import json
 import os
-
-from lib import analyze
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)  # allow running from any directory
+
+from lib import analyze
 
 
 def load(results_dir, label):
