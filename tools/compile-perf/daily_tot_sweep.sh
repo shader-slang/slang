@@ -1,14 +1,35 @@
 #!/usr/bin/env bash
 # Build + bench the post-v2026.10 daily ToT commits against the GitHub ToT repo,
 # writing perf-results/daily/<date>-<sha7>/ in the slang-compile-perf repo format.
-# Builds incrementally (configure once, checkout oldest->newest), so only changed
-# translation units recompile per commit. Idempotent: skips a day already done.
+# Configures once with release-matching flags (LTO on — see CMAKE_FLAGS), then checks
+# out oldest->newest. Idempotent: skips a day that already has results.json.
 set -euo pipefail
 
 SUITE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO=$(cd "$SUITE/../.." && pwd)
 OUT=$SUITE/perf-results
 SAMPLES=5
+
+# Release-matching configure flags (mirrors .github/workflows/release.yml).
+# LTO is the critical one: a plain Release build runs sema ~1.5x slower than the
+# official LTO binaries, producing a build-method step at the release->daily boundary
+# rather than a real regression. SLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF matches
+# release.yml. Unneeded subsystems (DXIL, gfx, tests, …) are disabled to keep
+# configure and build times reasonable; they don't affect the measured timers.
+# NOTE: LTO means every build is a full whole-program link — builds are NOT cheaply
+# incremental across commits.
+CMAKE_FLAGS=(
+  -DSLANG_ENABLE_RELEASE_LTO=ON
+  -DSLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF
+  -DSLANG_ENABLE_DXIL=OFF
+  -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+  -DSLANG_ENABLE_GFX=OFF
+  -DSLANG_ENABLE_SLANG_RHI=OFF
+  -DSLANG_ENABLE_SLANGD=OFF
+  -DSLANG_ENABLE_REPLAYER=OFF
+  -DSLANG_ENABLE_TESTS=OFF
+  -DSLANG_ENABLE_EXAMPLES=OFF
+)
 
 # date<TAB>full-sha, oldest first (EOD first-parent tip per active day after v2026.10)
 COMMITS=(
@@ -27,6 +48,16 @@ COMMITS=(
 )
 
 cd "$REPO" || exit 1
+
+# Configure once with release-matching flags. cmake re-runs configure automatically
+# on later builds if CMakeLists.txt changes, so a single configure suffices.
+echo "=== configure (release-matching: LTO on) ==="
+cmake --preset default "${CMAKE_FLAGS[@]}" >/tmp/daily_configure.log 2>&1 || {
+  echo "CONFIGURE FAILED (see /tmp/daily_configure.log):"
+  tail -15 /tmp/daily_configure.log
+  exit 1
+}
+
 for entry in "${COMMITS[@]}"; do
   date=${entry%% *}
   sha=${entry##* }
@@ -49,7 +80,7 @@ for entry in "${COMMITS[@]}"; do
   # This file is not committed; the measured binary is correct — only its
   # self-reported version tag is fixed.
   printf 'v2026.10\n' >"$REPO/cmake/slang_git_version"
-  echo "--- build slangc (incremental) ---"
+  echo "--- build slangc + slang-glslang (LTO; full optimize per commit) ---"
   if ! cmake --build "$REPO/build" --config Release --target slangc slang-glslang >/tmp/build_$label.log 2>&1; then
     echo "BUILD FAILED for $label (see /tmp/build_$label.log):"
     tail -15 /tmp/build_$label.log

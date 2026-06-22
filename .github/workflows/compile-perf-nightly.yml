@@ -67,7 +67,16 @@ jobs:
 
       - name: Build Slang (tip of tree)
         run: |
-          cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          # Match release.yml flags so daily ToT timings are directly comparable to the
+          # release history. LTO is the critical flag: a plain Release build runs sema
+          # ~1.5x slower than the official LTO binaries, producing a build-method step
+          # at the release->daily boundary rather than a real regression.
+          # SLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF also matches release.yml.
+          cmake --preset default --fresh `
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM `
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=false `
+            -DSLANG_ENABLE_RELEASE_LTO=ON `
+            -DSLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF
           cmake --workflow --preset release
 
       - name: Checkout MDL-SDK corpus
