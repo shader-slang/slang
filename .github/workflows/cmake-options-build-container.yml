@@ -47,7 +47,7 @@ jobs:
     timeout-minutes: 180
     permissions:
       contents: read
-      packages: read # slang-linux-gpu-ci is public, so this is not strictly required; kept for consistency and in case it reverts to private
+      packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
       # Current callers use GitHub-hosted Ubuntu, where the mounted workspace is

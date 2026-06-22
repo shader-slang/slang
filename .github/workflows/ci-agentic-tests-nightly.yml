@@ -33,7 +33,7 @@ jobs:
     permissions:
       id-token: write # Workload Identity for GCS-cached LLVM
       contents: read
-      packages: read # Pull slang-linux-clang-ci container from GHCR
+      packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
     container:
       image: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
       credentials:
