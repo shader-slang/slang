@@ -69,6 +69,36 @@ class TestRunnerTypeCoverage(unittest.TestCase):
         self.assertEqual(group, "Linux SM80Plus GPU (GCP)")
         self.assertTrue(self_hosted)
 
+    def test_shipped_config_classifies_june_2026_runner_labels(self):
+        """The shipped runner_config.json must classify the runner labels
+        introduced by the June 2026 CI refactors, or `classify_group` falls
+        back to ("Other", self_hosted=False) and silently mis-buckets the
+        jobs (under-reporting self-hosted load and corrupting the
+        build-vs-test wait split).
+
+        - `["Windows", "self-hosted", "build"]`: the dedicated Windows build
+          pool that the Falcor/regression/MDL/compile builds were split onto
+          (shader-slang/slang#11562, #11605, #11635, #11640). Must classify
+          as the same group as the `win-build-` runner-name prefix.
+        - `windows-2025` / `windows-2025-vs2026`: GitHub-hosted images used
+          after the windows-latest pin and the VS2026 matrix (#11579).
+        - `ubuntu-24.04`: GitHub-hosted image used by the RHI/test jobs in
+          ci.yml.
+        """
+        config = ci_visualization.load_config()
+
+        cases = [
+            (["Windows", "self-hosted", "build"], "Windows Build (GCP)", True),
+            (["windows-2025"], "Windows (GH)", False),
+            (["windows-2025-vs2026"], "Windows (GH)", False),
+            (["ubuntu-24.04"], "Linux (GH)", False),
+        ]
+        for labels, expected_group, expected_self_hosted in cases:
+            with self.subTest(labels=labels):
+                group, self_hosted = ci_visualization.classify_group(labels, config)
+                self.assertEqual(group, expected_group)
+                self.assertEqual(self_hosted, expected_self_hosted)
+
     def test_record_snapshot_counts_all_gcp_runner_types(self):
         queue_data = {
             "summary": {
