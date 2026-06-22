@@ -15,6 +15,9 @@ on:
   #   - cron: "0 6 * * *" # daily 06:00 UTC
   workflow_dispatch:
     inputs:
+      ref:
+        description: "commit SHA or branch to build (blank = master HEAD)"
+        default: ""
       samples:
         description: "timed samples per run"
         default: "5"
@@ -45,6 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
           persist-credentials: false
           submodules: "recursive"
           fetch-depth: "0"
@@ -94,7 +98,7 @@ jobs:
           SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
           RESULTS="$GITHUB_WORKSPACE/perf-results"
           SLANGC="$GITHUB_WORKSPACE/build/Release/bin/slangc.exe"
-          LABEL="$(date -u +%Y-%m-%d)-$(git rev-parse --short HEAD)"
+          LABEL="$(git log -1 --format=%cs HEAD)-$(git rev-parse --short HEAD)"
           COMMIT="$(git rev-parse HEAD)"
 
           # MDL corpus for the mdl_dxr workload.
