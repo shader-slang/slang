@@ -97,7 +97,7 @@ jobs:
             --since "$SINCE" --until "$UNTIL" "${force[@]}"
           # Sweep every release into the results repo (history baseline).
           python sweep.py --index releases/index.json --results "$RESULTS" \
-            --samples "$SAMPLES" --sweep "${force[@]}"
+            --samples "$SAMPLES" "${force[@]}"
           # Store the release manifest, stamp the runner the history was built on,
           # and rebuild the tracking series.
           cp releases/index.json "$RESULTS/index.json"
