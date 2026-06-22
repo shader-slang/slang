@@ -165,6 +165,11 @@ option(
     ON
 )
 option(
+    SLANG_ENABLE_SLANG_PROXY
+    "Build the legacy slang.dll proxy and libslang symlink backward-compatibility outputs for slang-compiler"
+    ON
+)
+option(
     SLANG_ENABLE_TESTS
     "Enable test targets, some tests may require SLANG_ENABLE_SLANG_RHI, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT"
     ON
