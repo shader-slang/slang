@@ -227,18 +227,31 @@ python3 compare.py base head                # primary-timer Δ%, flags regressio
 
 | Path                                           | What it is                                                          |
 | ---------------------------------------------- | ------------------------------------------------------------------- |
-| `results/releases/<tag>/results.json`          | per-release measurements — source of truth (all timers, all stats)  |
-| `results/daily/<label>/results.json+meta.json` | nightly ToT sweeps                                                  |
-| `results/_tracking/tracking.json`              | derived tracking series (release history ++ daily tail)             |
-| `results/_analysis/series.csv`                 | long-format time-series, one row per `(workload,timer,release)`     |
-| `results/_analysis/flags.csv`                  | ranked step-changes with leaf attribution                           |
-| `results/_analysis/*.svg`                      | charts                                                              |
-| `results/_analysis/report.html`                | cross-release HTML report                                           |
-| `results/_analysis/report_per_workload.html`   | per-workload stacked-area history + drill-down pages                |
-| `results/releases/<tag>/_sweep/`               | complexity-sweep report for swept releases                          |
-| `releases/`                                    | cached prebuilt `slangc` per tag (large, gitignored)                |
-| `corpus/`                                      | fetched real-shader corpora, e.g. MDL (large, gitignored)           |
-| `perf-results.gitignore`                       | copied into the results repo by CI to exclude gen/ and derived HTML |
+The first group is stored in `slang-compile-perf` (the CI results repo). The
+second group is regenerable on demand and is gitignored from that repo — generate
+them locally by pointing the report scripts at a checkout of `slang-compile-perf`
+via `--results <checkout-path>`.
+
+**Stored in `slang-compile-perf`:**
+
+| Path                                           | What it is                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------ |
+| `results/releases/<tag>/results.json`          | per-release measurements — source of truth (all timers, all stats) |
+| `results/daily/<label>/results.json+meta.json` | nightly ToT sweeps                                                 |
+| `results/_tracking/tracking.json`              | derived tracking series (release history ++ daily tail)            |
+
+**Regenerable / local only (gitignored from the results repo):**
+
+| Path                                         | What it is                                                      |
+| -------------------------------------------- | --------------------------------------------------------------- |
+| `results/_analysis/series.csv`               | long-format time-series, one row per `(workload,timer,release)` |
+| `results/_analysis/flags.csv`                | ranked step-changes with leaf attribution                       |
+| `results/_analysis/*.svg`                    | charts                                                          |
+| `results/_analysis/report_per_workload.html` | per-workload stacked-area history + drill-down pages            |
+| `results/releases/<tag>/_sweep/`             | complexity-sweep report for swept releases                      |
+| `releases/`                                  | cached prebuilt `slangc` per tag (large, gitignored)            |
+| `corpus/`                                    | fetched real-shader corpora, e.g. MDL (large, gitignored)       |
+| `perf-results.gitignore`                     | copied into the results repo by CI to keep it data-only         |
 
 ---
 

@@ -129,6 +129,74 @@ jobs:
           git commit -m "nightly ToT $(date -u +%Y-%m-%d) ($(cd "$GITHUB_WORKSPACE" && git rev-parse --short HEAD))"
           git push
 
+      # Generate HTML reports from ALL data in the results repo and deploy to
+      # the gh-pages branch of slang-compile-perf, which is served at
+      # shader-slang.org/slang-compile-perf. continue-on-error so a report
+      # failure never blocks the trend check below.
+      - name: Generate HTML reports
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
+          RESULTS="$GITHUB_WORKSPACE/perf-results"
+          if [ ! -f "$RESULTS/index.json" ]; then
+            echo "No index.json in results repo; skipping report generation"
+            exit 0
+          fi
+          cd "$SUITE"
+          python report.py --results "$RESULTS" --index "$RESULTS/index.json"
+
+      - name: Checkout gh-pages branch
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PERF_RESULTS_REPO }}
+          ref: gh-pages
+          path: perf-pages
+          token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+
+      - name: Deploy HTML reports to GitHub Pages
+        continue-on-error: true
+        shell: bash
+        env:
+          SLANG_COMPILE_PERF_PAT: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+        run: |
+          set -euo pipefail
+          ANALYSIS="$GITHUB_WORKSPACE/perf-results/_analysis"
+          PAGES="$GITHUB_WORKSPACE/perf-pages"
+
+          if [ ! -d "$ANALYSIS" ]; then
+            echo "No _analysis dir; skipping pages deploy"
+            exit 0
+          fi
+
+          if [ -d "$PAGES/.git" ]; then
+            cd "$PAGES"
+            # Remove all tracked files so stale workload pages don't linger
+            git rm -rf . --quiet || true
+          else
+            # gh-pages branch doesn't exist yet — create it as an orphan
+            mkdir -p "$PAGES"
+            cd "$PAGES"
+            git init
+            git checkout --orphan gh-pages
+            git remote add origin "https://x-access-token:${SLANG_COMPILE_PERF_PAT}@github.com/${{ env.PERF_RESULTS_REPO }}.git"
+          fi
+
+          git config user.name "slang-perf-bot"
+          git config user.email "slang-perf-bot@users.noreply.github.com"
+
+          cp -r "$ANALYSIS/." .
+          mv report_per_workload.html index.html
+          # _combined_index.json is a derived intermediate — no need to serve it
+          rm -f _combined_index.json
+
+          git add -A
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "perf report $(date -u +%Y-%m-%d)"
+          git push origin gh-pages
+
       # Runs AFTER the push so the data is stored even when this step fails the
       # job. trend.py exits non-zero (job red + ::error:: annotations) when a
       # primary timer drifts past threshold vs the trailing median.

@@ -46,7 +46,10 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   series), pushes the results repo, then runs `trend.py`. **Manual
   `workflow_dispatch` only right now — the daily `schedule` is commented out;**
   enable it once the suite is validated on the runner and the history is seeded.
-  Inputs: `samples`, `sweep`, `only`.
+  Inputs: `ref` (commit SHA or branch to build; blank = master HEAD, useful for
+  backfilling historical daily points), `samples`, `sweep`, `only`. The run label
+  and `meta.json` date are derived from the checked-out commit's author date, so
+  backfill points sort correctly in the tracking series.
 - **`compile-perf-release-sweep.yml`** (`workflow_dispatch`) — downloads prebuilt
   release `slangc` for the runner's platform, sweeps each into `releases/<tag>/`,
   writes `index.json`, stamps `runner.json`, rebuilds, and pushes. **Run with
@@ -108,6 +111,24 @@ generated sources + compiled outputs (`gen/`) and derived reports (`_analysis/`,
 `_sweep/`, `_breakdown/`, `*.html`, `*.svg`). Both workflows copy
 `perf-results.gitignore` into the checkout before `git add -A`, so scratch never
 gets committed.
+
+## HTML reports — shader-slang.org/slang-compile-perf
+
+Both CI workflows generate and publish an HTML report after each results push.
+`report.py` reads **all** data in the results repo (release history + daily ToT
+points) and writes a self-contained report to `_analysis/` (gitignored from the
+data branch). The deploy step pushes that output to the `gh-pages` branch of
+`shader-slang/slang-compile-perf`, which GitHub Pages serves at
+`https://shader-slang.org/slang-compile-perf/`. `report_per_workload.html` is
+renamed to `index.html` so that URL is the landing page. Per-workload detail
+pages live under `workloads/<name>.html`.
+
+Both steps use `continue-on-error: true` — a report failure never blocks the
+trend check (nightly) or marks the release sweep red.
+
+**One-time setup**: create a `gh-pages` branch on `shader-slang/slang-compile-perf`
+and enable GitHub Pages (Settings → Pages → source: `gh-pages`). The `SLANG_COMPILE_PERF_PAT`
+secret already covers pushes to that repo.
 
 ## Prerequisites before enabling CI
 
