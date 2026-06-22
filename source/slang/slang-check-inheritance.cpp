@@ -986,7 +986,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     auto currentDeclRef = declRef;
     for (; currentDeclRef;)
     {
-        if (currentDeclRef.as<AggTypeDeclBase>() || currentDeclRef.as<ExtensionDecl>())
+        if (currentDeclRef.as<AggTypeDeclBase>() || currentDeclRef.as<CallableDecl>() ||
+            currentDeclRef.as<ExtensionDecl>())
         {
             auto containerDeclRef = currentDeclRef.as<ContainerDecl>();
 
@@ -1896,8 +1897,10 @@ void SharedSemanticsContext::_mergeFacetLists(
                 }
                 else
                 {
-                    // Shouldn't really have a non-struct inherit from a struct...
-                    SLANG_UNEXPECTED("Unexpected witness structure");
+                    // `enum E : uint` gives us an explicit `E -> uint` structural witness, and
+                    // `uint` may have interface facets. Do not infer `E : IFoo` through `uint`;
+                    // that would be the same unsupported conformance/inheritance mix as the
+                    // struct case above.
                 }
             }
             else if (
@@ -1931,7 +1934,6 @@ void SharedSemanticsContext::_mergeFacetLists(
             else if (
                 isDeclRefTypeOf<StructDecl>(baseType) && isDeclRefTypeOf<StructDecl>(facetType))
             {
-                // TODO: Merge with one of the cases above..
                 if (isDeclRefTypeOf<StructDecl>(selfType))
                 {
                     // struct -> struct -> struct is fine, but we'll need to construct a transitive
@@ -1944,8 +1946,10 @@ void SharedSemanticsContext::_mergeFacetLists(
                 }
                 else
                 {
-                    // Shouldn't really have a non-struct inherit from a struct...
-                    SLANG_UNEXPECTED("Unexpected witness structure");
+                    // Enum tag types use inheritance syntax to name the underlying integer type,
+                    // but they should not inherit all structural facets of that integer type. Keep
+                    // enum-to-tag conversion on the explicit conversion path instead of adding
+                    // indirect inheritance facets such as `Enum -> __BuiltinInt32Type`.
                 }
             }
         }

@@ -7353,13 +7353,10 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
         arg = CheckTerm(arg);
     }
 
-    // LEGACY FEATURE: As a backwards-compatibility feature
-    // for HLSL, we will allow for a cast to a `struct` type
-    // from a literal zero, with the semantics of default
-    // initialization.
-    //
     if (auto declRefType = as<DeclRefType>(typeExp.type))
     {
+        // LEGACY FEATURE: As a backwards-compatibility feature for HLSL, we will allow for a cast
+        // to a `struct` type from a literal zero, with the semantics of default initialization.
         if (const auto structDeclRef = as<StructDecl>(declRefType->getDeclRef()))
         {
             if (expr->arguments.getCount() == 1)

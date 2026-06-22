@@ -2849,12 +2849,33 @@ public:
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
 
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, typeInfoWitness};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
     FuncType* getCalculatedDiffFuncType(
         const char* magicCalcName,
         Type* baseFuncAsType,
         Type* operand1)
     {
         Val* args[] = {baseFuncAsType, operand1, getDiffTypeInfoWitness(baseFuncAsType)};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* operand1,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, operand1, typeInfoWitness};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2866,6 +2887,18 @@ public:
         Type* operand2)
     {
         Val* args[] = {baseFuncAsType, operand1, operand2, getDiffTypeInfoWitness(baseFuncAsType)};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* operand1,
+        Type* operand2,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, operand1, operand2, typeInfoWitness};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }

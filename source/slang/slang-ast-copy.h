@@ -179,7 +179,7 @@ public:
     ASTCopier& getASTCopier() { return m_astCopier; }
 
     void copyParameterMembers();
-    Decl* copyConstraintMember(Decl* member);
+    Decl* copyConstraintMember(Decl* member, SubstitutionSet const& sourceToDestSubstitution);
 
 private:
     Expr* createGenericArgExpr(Decl* decl);

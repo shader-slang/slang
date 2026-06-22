@@ -1192,54 +1192,122 @@ Val* HigherOrderDiffTypeTranslationWitness::_resolveImplOverride()
         // Generate higher order diff-type-info witness.
         //
         // This is a little bit of a hack for the fact that diff-type-info witness
-        // only gets the witness for ParamType : IDifferentiable, but during higher-order
-        // autodiff, we may also need the witness for DifferentialPair<ParamType> : IDifferentiable.
+        // only gets the witness for ParamType : IDifferentiable/IDifferentiablePtrType, but
+        // during higher-order autodiff, we may also need the witness for
+        // DifferentialPair<ParamType> : IDifferentiable or
+        // DifferentialPtrPair<ParamType> : IDifferentiablePtrType.
         //
         // Unfortunately, there could be arbitrary number of nesting levels, so it's not tractable
         // to store all of them on the DiffTypeInfoWitness.
         //
         // Technically, this requires storing a higher-rank witness (i.e.
         // a witness of the form: forall T : IDifferentiable . DifferentialPair<T> :
-        // IDifferentiable) but our type (and decl-ref) system does not support this at the moment.
+        // IDifferentiable, and the corresponding pointer-pair form) but our type (and decl-ref)
+        // system does not support this at the moment.
         //
-        // Fortunately, in practice this is the only higher-rank witness we need to handle,
-        // so we'll just manually construct the DifferentialPair<T> : IDifferentiable witness here.
-        // by looking up the InheritanceDecl in the DifferentialPair declaration, and forming
-        // a specialized member-decl-ref to it.
+        // Fortunately, in practice these pair conformances are the only higher-rank witnesses we
+        // need to handle, so we'll manually construct the pair witness here by looking up the
+        // matching InheritanceDecl in the pair declaration, and forming a specialized
+        // member-decl-ref to it.
         //
 
+        auto astBuilder = getCurrentASTBuilder();
         auto diffPairGenericDecl = as<GenericDecl>(
-            getCurrentASTBuilder()->getSharedASTBuilder()->findMagicDecl("DifferentialPairType"));
+            astBuilder->getSharedASTBuilder()->findMagicDecl("DifferentialPairType"));
         SLANG_ASSERT(diffPairGenericDecl);
+        GenericDecl* diffPtrPairGenericDecl = nullptr;
 
-        InheritanceDecl* diffInheritanceDecl = nullptr;
-        for (auto inheritanceDecl : getMembersOfType<InheritanceDecl>(
-                 getCurrentASTBuilder(),
-                 as<ContainerDecl>(diffPairGenericDecl->inner)->getDefaultDeclRef()))
+        auto differentiableInterfaceType = astBuilder->getDifferentiableInterfaceType();
+        auto differentiablePtrInterfaceType = astBuilder->getDifferentiableRefInterfaceType();
+
+        auto findInheritanceDecl = [&](GenericDecl* pairGenericDecl,
+                                       Type* interfaceType) -> InheritanceDecl*
         {
-            if (inheritanceDecl.getDecl()->base.type ==
-                getCurrentASTBuilder()->getDifferentiableInterfaceType())
+            for (auto inheritanceDecl : getMembersOfType<InheritanceDecl>(
+                     astBuilder,
+                     as<ContainerDecl>(pairGenericDecl->inner)->getDefaultDeclRef()))
             {
-                diffInheritanceDecl = inheritanceDecl.getDecl();
-                break;
+                if (inheritanceDecl.getDecl()->base.type == interfaceType)
+                    return inheritanceDecl.getDecl();
             }
-        }
+            return nullptr;
+        };
+
+        InheritanceDecl* diffInheritanceDecl =
+            findInheritanceDecl(diffPairGenericDecl, differentiableInterfaceType);
         SLANG_ASSERT(diffInheritanceDecl);
+        InheritanceDecl* diffPtrInheritanceDecl = nullptr;
+
+        auto ensureDiffPtrPairDecls = [&]()
+        {
+            // Higher-order witnesses for value types can resolve while the core module is still
+            // being compiled. Only require the pointer-pair declaration when the base witness
+            // actually targets IDifferentiablePtrType.
+            if (!diffPtrPairGenericDecl)
+            {
+                diffPtrPairGenericDecl = as<GenericDecl>(
+                    astBuilder->getSharedASTBuilder()->findMagicDecl("DifferentialPtrPairType"));
+                SLANG_ASSERT(diffPtrPairGenericDecl);
+            }
+            if (!diffPtrInheritanceDecl)
+            {
+                diffPtrInheritanceDecl =
+                    findInheritanceDecl(diffPtrPairGenericDecl, differentiablePtrInterfaceType);
+                SLANG_ASSERT(diffPtrInheritanceDecl);
+            }
+        };
+
+        // The base witness determines the pair flavor. For pointer-differentiable `this`, reusing
+        // `DifferentialPairType` would form
+        // DiffPair(DifferentialPtrPair<T>, T:IDifferentiablePtrType), and IR lowering would later
+        // query an IDifferentiablePtrType witness table with IDifferentiable's value-pair
+        // requirement keys.
+        auto makeDiffPairType = [&](Type* baseType, SubtypeWitness* baseWitness) -> Type*
+        {
+            if (baseWitness->getSup() == differentiableInterfaceType)
+                return astBuilder->getDifferentialPairType(baseType, baseWitness);
+            if (baseWitness->getSup() == differentiablePtrInterfaceType)
+                return astBuilder->getDifferentialPtrPairType(baseType, baseWitness);
+
+            SLANG_UNEXPECTED("unsupported diff witness for higher-order diff pair type");
+            UNREACHABLE_RETURN(baseType);
+        };
 
         auto makeDiffPairWitness = [&](Type* baseType,
                                        SubtypeWitness* baseWitness) -> SubtypeWitness*
         {
+            GenericDecl* pairGenericDecl = nullptr;
+            InheritanceDecl* pairInheritanceDecl = nullptr;
+            Type* pairInterfaceType = nullptr;
+            if (baseWitness->getSup() == differentiableInterfaceType)
+            {
+                pairGenericDecl = diffPairGenericDecl;
+                pairInheritanceDecl = diffInheritanceDecl;
+                pairInterfaceType = differentiableInterfaceType;
+            }
+            else if (baseWitness->getSup() == differentiablePtrInterfaceType)
+            {
+                ensureDiffPtrPairDecls();
+                pairGenericDecl = diffPtrPairGenericDecl;
+                pairInheritanceDecl = diffPtrInheritanceDecl;
+                pairInterfaceType = differentiablePtrInterfaceType;
+            }
+            else
+            {
+                SLANG_UNEXPECTED("unsupported diff witness for higher-order diff pair witness");
+                UNREACHABLE_RETURN(baseWitness);
+            }
+
             Val* args[] = {baseType, baseWitness};
-            auto diffPairDeclRef = getCurrentASTBuilder()->getGenericAppDeclRef(
-                diffPairGenericDecl,
-                makeArrayView(args));
+            auto diffPairDeclRef =
+                astBuilder->getGenericAppDeclRef(pairGenericDecl, makeArrayView(args));
 
             auto inheritanceDeclRef =
-                getCurrentASTBuilder()->getMemberDeclRef(diffPairDeclRef, diffInheritanceDecl);
+                astBuilder->getMemberDeclRef(diffPairDeclRef, pairInheritanceDecl);
 
-            return getCurrentASTBuilder()->getDeclaredSubtypeWitness(
-                getCurrentASTBuilder()->getDifferentialPairType(baseType, baseWitness),
-                getCurrentASTBuilder()->getDifferentiableInterfaceType(),
+            return astBuilder->getDeclaredSubtypeWitness(
+                makeDiffPairType(baseType, baseWitness),
+                pairInterfaceType,
                 inheritanceDeclRef);
         };
 
@@ -1249,9 +1317,10 @@ Val* HigherOrderDiffTypeTranslationWitness::_resolveImplOverride()
 
         if (thisParamType && thisDiffWitness)
         {
-            thisParamType =
-                getCurrentASTBuilder()->getDifferentialPairType(thisParamType, thisDiffWitness);
-            thisDiffWitness = makeDiffPairWitness(thisParamType, thisDiffWitness);
+            auto originalThisParamType = thisParamType;
+            auto originalThisDiffWitness = thisDiffWitness;
+            thisParamType = makeDiffPairType(originalThisParamType, originalThisDiffWitness);
+            thisDiffWitness = makeDiffPairWitness(originalThisParamType, originalThisDiffWitness);
         }
 
         SubtypeWitness* resultDiffWitness = diffTypeInfoWitness->getReturnTypeDiffWitness();

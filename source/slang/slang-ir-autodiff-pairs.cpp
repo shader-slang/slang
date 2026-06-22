@@ -276,9 +276,63 @@ struct DifferentialPairTypeBuilder
 
             auto packWitness = pairType->getWitness();
 
-            // Right now we only support concrete witness tables for type packs.
+            if (auto witnessPack = as<IRMakeWitnessPack>(packWitness))
+            {
+                // Variadic autodiff can lower `each T : IDifferentiable` as a pack witness rather
+                // than a concrete witness table. Decompose through the scalar pair path so the
+                // element witness remains the source of truth for value-pair vs pointer-pair
+                // lowering.
+                SLANG_RELEASE_ASSERT(witnessPack->getOperandCount() == typePack->getOperandCount());
+
+                List<IRType*> args;
+                for (UInt i = 0; i < typePack->getOperandCount(); i++)
+                {
+                    auto type = (IRType*)typePack->getOperand(i);
+
+                    if (pairTypeCache.tryGetValue(type, result))
+                    {
+                        args.add((IRType*)result);
+                        continue;
+                    }
+
+                    auto witness = witnessPack->getOperand(i);
+                    auto witnessType = as<IRWitnessTableTypeBase>(witness->getDataType());
+                    if (!witnessType)
+                    {
+                        return result;
+                    }
+
+                    IRType* elemPairType = nullptr;
+                    auto conformanceType = witnessType->getConformanceType();
+                    if (conformanceType == this->sharedContext->differentiableInterfaceType)
+                    {
+                        elemPairType = builder->getDifferentialPairType(type, witness);
+                    }
+                    else if (conformanceType == this->sharedContext->differentiablePtrInterfaceType)
+                    {
+                        elemPairType = builder->getDifferentialPtrPairType(type, witness);
+                    }
+                    else
+                    {
+                        SLANG_UNEXPECTED("unexpected witness in differential pair type pack");
+                    }
+
+                    auto loweredPairType = (IRType*)lowerDiffPairType(builder, elemPairType);
+                    args.add(loweredPairType);
+                }
+
+                auto loweredTypePack = builder->getTypePack(args.getCount(), args.getBuffer());
+                pairTypeCache.add(cacheKey, loweredTypePack);
+
+                return loweredTypePack;
+            }
+
+            // If the pack witness is still generic, specialization has not given this pass enough
+            // information to create per-element pair structs yet. Leave the pair type unchanged,
+            // matching the scalar Param/Specialize cases below.
             auto concretePackWitness = as<IRWitnessTable>(packWitness);
-            SLANG_ASSERT(concretePackWitness);
+            if (!concretePackWitness)
+                return result;
 
             // Get diff type pack.
             IRTypePack* diffTypePack = nullptr;
@@ -509,7 +563,8 @@ struct DiffPairLoweringPass : InstPassBase
                 {
                     if (auto loweredType = lowerPairType(builder, pairType))
                     {
-                        pendingReplacements.add(pairType, loweredType);
+                        if (!pendingReplacements.containsKey(pairType))
+                            pendingReplacements.add(pairType, loweredType);
                         modified = true;
                     }
                 }

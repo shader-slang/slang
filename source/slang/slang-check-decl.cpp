@@ -5503,6 +5503,65 @@ static bool _doesCallableRequirementSignatureTypeMatch(
            requiredCanonicalType->equals(satisfyingCanonicalType);
 }
 
+static Type* _maybeRebuildRequirementDiffFuncTypeWithCurrentWitness(
+    SemanticsVisitor* visitor,
+    Type* type)
+{
+    if (!type)
+        return nullptr;
+
+    auto rebuild = [&](const char* magicCalcName, Index witnessArgIndex) -> Type*
+    {
+        auto declRefType = static_cast<DeclRefType*>(type);
+
+        auto args = findInnerMostGenericArgs(SubstitutionSet(declRefType->getDeclRef()));
+        if (args.getCount() <= witnessArgIndex)
+            return nullptr;
+
+        auto baseFuncType = as<Type>(args[0]);
+        if (!baseFuncType)
+            return nullptr;
+
+        // Interface differentiability requirements are substituted from requirement-side AST:
+        // `IForwardDifferentiable<FType>` carries a hidden `__hasDiffTypeInfo(FType)` proof as a
+        // generic argument. During concrete conformance checking the callable decl-ref is already
+        // substituted to the satisfying member, and this is the source of truth used by ordinary
+        // `[Differentiable]` synthesis. Recompute the proof from that callable type before
+        // resolving `FwdDiffFuncType`/friends, so the proof's parameter list matches the function
+        // signature being compared in `doesSignatureMatchRequirement`.
+        auto witness = visitor->getDiffTypeInfoWitness(baseFuncType);
+        if (!witness)
+            return nullptr;
+
+        List<Val*> newArgs;
+        for (Index i = 0; i < args.getCount(); ++i)
+            newArgs.add(args[i]);
+        newArgs[witnessArgIndex] = witness;
+
+        return as<Type>(getCurrentASTBuilder()->getSpecializedBuiltinType(
+            newArgs.getArrayView(),
+            magicCalcName));
+    };
+
+    switch (type->astNodeType)
+    {
+    case ASTNodeType::FwdDiffFuncType:
+        return rebuild("FwdDiffFuncType", 1);
+    case ASTNodeType::BwdDiffFuncType:
+        return rebuild("BwdDiffFuncType", 1);
+    case ASTNodeType::BwdCallableFuncType:
+        return rebuild("BwdCallableFuncType", 2);
+    case ASTNodeType::ApplyForBwdFuncType:
+        return rebuild("ApplyForBwdFuncType", 2);
+    case ASTNodeType::RematFuncType:
+        return rebuild("RematFuncType", 3);
+    default:
+        break;
+    }
+
+    return nullptr;
+}
+
 bool SemanticsVisitor::doesSignatureMatchRequirement(
     DeclRef<CallableDecl> satisfyingMemberDeclRef,
     DeclRef<CallableDecl> requiredMemberDeclRef,
@@ -5559,9 +5618,14 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         // If the requirement is defined using a funcType, we'll check the effective
         // func-types
         //
-        auto resolvedFuncType = as<Type>(
-            as<Type>(funcType->substitute(m_astBuilder, SubstitutionSet(requiredMemberDeclRef)))
-                ->resolve());
+        auto substitutedFuncType =
+            as<Type>(funcType->substitute(m_astBuilder, SubstitutionSet(requiredMemberDeclRef)));
+        if (auto rebuiltFuncType =
+                _maybeRebuildRequirementDiffFuncTypeWithCurrentWitness(this, substitutedFuncType))
+        {
+            substitutedFuncType = rebuiltFuncType;
+        }
+        auto resolvedFuncType = as<Type>(substitutedFuncType->resolve());
 
         auto targetFuncType = getTypeForDeclRef(
             m_astBuilder,
@@ -7311,7 +7375,7 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
 
         for (auto member : sourceGenericDecl->getDirectMemberDecls())
         {
-            if (!copier.copyConstraintMember(member))
+            if (!copier.copyConstraintMember(member, SubstitutionSet(currentDeclRef)))
                 continue;
 
             // Future constraints in the same generic can depend on proof-bearing members that were
@@ -9444,13 +9508,15 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
             case BuiltinRequirementKind::BwdCallablePropFunc:
             case BuiltinRequirementKind::BwdCallableRematFunc:
             case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
-                // Only synthesize if nothing of the same
-                if (!lookupResult.isValid())
-                    return trySynthesizeDiffFuncRequirementWitness(
-                        context,
-                        requiredFuncDeclRef,
-                        witnessTable,
-                        builtinAttr->kind);
+                // Differentiability associated functions are proof-sensitive: two conformances for
+                // the same callable can need same-named members with different signatures. We only
+                // get here after every lookup result failed signature matching, so synthesize the
+                // exact builtin requirement even when lookup found another proof variant.
+                return trySynthesizeDiffFuncRequirementWitness(
+                    context,
+                    requiredFuncDeclRef,
+                    witnessTable,
+                    builtinAttr->kind);
                 break;
             }
         }
@@ -10705,6 +10771,11 @@ Type* SemanticsVisitor::getBwdCallableBaseType(Type* baseType)
     return m_astBuilder->getBwdCallableBaseType(baseType, diffTypeInfoWitness);
 }
 
+static bool trySynthesizeExactDifferentiabilityConformanceForRequirement(
+    SemanticsVisitor* visitor,
+    Type* constraintSub,
+    Type* constraintSup);
+
 // Walk the witness chain to determine if `targetDecl` appears along the
 // canonical lookup path.  This handles `LookupDeclRef` chains as well as
 // `ExpandSubtypeWitness` / `EachSubtypeWitness` wrappers.
@@ -10837,12 +10908,37 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
         auto constraintSub = getSub(m_astBuilder, requiredConstraintDeclRef);
         auto constraintSup = getSup(m_astBuilder, requiredConstraintDeclRef);
         SubtypeWitness* constraintWitness = nullptr;
+        auto isOptionalConstraint =
+            requiredConstraintDeclRef.getDecl()->findModifier<OptionalConstraintModifier>() !=
+            nullptr;
         if (auto constraintSubDeclRefType = as<DeclRefType>(constraintSub))
         {
             if (auto constraintSubCallableDeclRef =
                     constraintSubDeclRefType->getDeclRef().as<CallableDecl>())
             {
                 ensureDecl(constraintSubCallableDeclRef, DeclCheckState::ReadyForLookup);
+
+                // `IForwardDifferentiable.fwd_diff` is `[MaybeDifferentiable]`, so a witness table
+                // may omit the higher-order derivative of a synthesized forward derivative
+                // function. If we eagerly chase that optional constraint while building the first
+                // `IForwardDifferentiable` witness table, lookup can recurse through the same
+                // synthesized `fwd_diff` conformance. Record absence here; explicit higher-order
+                // differentiation still goes through the hard conformance paths.
+                if (isOptionalConstraint && as<DifferentiableRequirementConstraintDecl>(
+                                                requiredConstraintDeclRef.getDecl()))
+                {
+                    if (auto synFuncDecl =
+                            as<SynthesizedFuncDecl>(constraintSubCallableDeclRef.getDecl()))
+                    {
+                        if (synFuncDecl->irOp == kIROp_ForwardDifferentiate)
+                        {
+                            witnessTable->add(
+                                requiredConstraintDeclRef.getDecl(),
+                                m_astBuilder->getOrCreate<NoneWitness>());
+                            return true;
+                        }
+                    }
+                }
             }
         }
         if (constraintSub && constraintSup)
@@ -10856,9 +10952,19 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
             constraintWitness = nullptr;
         }
 
+        if (!constraintWitness &&
+            as<DifferentiableRequirementConstraintDecl>(requiredConstraintDeclRef.getDecl()) &&
+            trySynthesizeExactDifferentiabilityConformanceForRequirement(
+                this,
+                constraintSub,
+                constraintSup))
+        {
+            constraintWitness = isSubtype(constraintSub, constraintSup, IsSubTypeOptions::None);
+        }
+
         if (!constraintWitness)
         {
-            if (requiredConstraintDeclRef.getDecl()->findModifier<OptionalConstraintModifier>())
+            if (isOptionalConstraint)
             {
                 witnessTable->add(
                     requiredConstraintDeclRef.getDecl(),
@@ -15012,7 +15118,8 @@ static DeclRef<SynthesizedStructDecl> addOrExtendSynthesizedStruct(
     List<Type*> conformances,
     DeclVisibility structVisibility,
     DeclVisibility aliasVisibility,
-    SourceLoc sourceLoc = SourceLoc())
+    SourceLoc sourceLoc = SourceLoc(),
+    String nameSuffix = String())
 {
     auto astBuilder = getCurrentASTBuilder();
     auto synthesizedLoc = sourceLoc.isValid() ? sourceLoc : getDiagnosticPos(parentDecl);
@@ -15020,7 +15127,7 @@ static DeclRef<SynthesizedStructDecl> addOrExtendSynthesizedStruct(
     auto irInfo = getIROpInfo(opCode);
     auto mangledName = visitor->getName(
         "$__syn_" + String(irInfo.name) + "_" +
-        getMangledName(getCurrentASTBuilder(), operands[0]));
+        getMangledName(getCurrentASTBuilder(), operands[0]) + nameSuffix);
 
     DeclRef<SynthesizedStructDecl> synStructDeclRef;
 
@@ -15150,6 +15257,384 @@ static DeclRef<SynthesizedStructDecl> addOrExtendSynthesizedStruct(
     parentDecl->addMember(synContextTypeAliasDecl);
 
     return synStructDeclRef;
+}
+
+enum class DifferentiabilityConformanceKind
+{
+    None,
+    Forward,
+    Backward,
+};
+
+static DifferentiabilityConformanceKind getDifferentiabilityConformanceKind(
+    Type* type,
+    Type** outBaseFuncType,
+    Witness** outTypeInfoWitness)
+{
+    if (outBaseFuncType)
+        *outBaseFuncType = nullptr;
+    if (outTypeInfoWitness)
+        *outTypeInfoWitness = nullptr;
+
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return DifferentiabilityConformanceKind::None;
+
+    auto declRef = declRefType->getDeclRef();
+    auto genericApp = as<GenericAppDeclRef>(declRef.declRefBase);
+    if (!genericApp || genericApp->getArgCount() < 2)
+        return DifferentiabilityConformanceKind::None;
+
+    auto baseFuncType = as<Type>(genericApp->getArg(0));
+    auto typeInfoWitness = as<Witness>(genericApp->getArg(1));
+    if (!baseFuncType || !typeInfoWitness)
+        return DifferentiabilityConformanceKind::None;
+
+    if (outBaseFuncType)
+        *outBaseFuncType = baseFuncType;
+    if (outTypeInfoWitness)
+        *outTypeInfoWitness = typeInfoWitness;
+
+    auto interfaceDecl = declRef.getDecl();
+    if (isKnownBuiltinDecl(interfaceDecl, KnownBuiltinDeclName::IForwardDifferentiable))
+        return DifferentiabilityConformanceKind::Forward;
+    if (isKnownBuiltinDecl(interfaceDecl, KnownBuiltinDeclName::IBackwardDifferentiable))
+        return DifferentiabilityConformanceKind::Backward;
+
+    return DifferentiabilityConformanceKind::None;
+}
+
+static DeclRef<ExtensionDecl> extendCallableDeclRefForDifferentiabilityRequirement(
+    SemanticsVisitor* visitor,
+    DeclRef<FunctionDeclBase> callableDeclRef,
+    Type* differentiabilityInterfaceType,
+    SubstitutionSet& outSubstSet,
+    DeclVisibility extensionVisibility)
+{
+    auto astBuilder = getCurrentASTBuilder();
+    auto callableDecl = callableDeclRef.getDecl();
+    auto synthesizedLoc = getDiagnosticPos(callableDecl);
+
+    auto extensionDecl = astBuilder->create<ExtensionDecl>();
+    extensionDecl->parentDecl = callableDecl;
+    extensionDecl->loc = synthesizedLoc;
+    extensionDecl->nameAndLoc.loc = synthesizedLoc;
+    visitor->addVisibilityModifier(extensionDecl, extensionVisibility);
+
+    // The requirement key already contains the callable decl-ref with the substitutions chosen by
+    // interface conformance (`This.f<T>` -> `Concrete.f<T>`). Preserve that shape when creating the
+    // extension target. Using the callable's default decl-ref here would recreate the ambient
+    // callable proof and miss interface-context differentiability requirements such as
+    // `This.ldot : IForwardDifferentiable<This.ldot>` where `This` is intentionally `no_diff`.
+    SubstitutionSet substSet;
+    auto extDeclRef = visitor->liftDeclFromGenericContainers(extensionDecl, substSet);
+
+    auto targetCallableType = as<Type>(
+        DeclRefType::create(astBuilder, callableDeclRef)->substitute(astBuilder, substSet));
+    extensionDecl->targetType.type = targetCallableType;
+    extensionDecl->targetType.exp = astBuilder->create<SharedTypeExpr>();
+    extensionDecl->targetType.exp->type = astBuilder->getOrCreate<TypeType>(targetCallableType);
+
+    auto inheritanceDecl = astBuilder->create<InheritanceDecl>();
+    inheritanceDecl->loc = synthesizedLoc;
+    inheritanceDecl->base.type =
+        as<Type>(differentiabilityInterfaceType->substitute(astBuilder, substSet));
+    extensionDecl->addMember(inheritanceDecl);
+
+    Decl* outermostDecl = extensionDecl;
+    while (outermostDecl->parentDecl && !as<ModuleDecl>(outermostDecl->parentDecl))
+    {
+        outermostDecl = outermostDecl->parentDecl;
+    }
+
+    auto currentModuleDecl = visitor->getShared()->getModule()->getModuleDecl();
+    currentModuleDecl->addMember(outermostDecl);
+
+    outSubstSet = substSet;
+    return extDeclRef.as<ExtensionDecl>();
+}
+
+static String getDiffTypeInfoWitnessNameSuffix(Witness* witness)
+{
+    auto diffTypeInfoWitness = as<DiffTypeInfoWitness>(witness);
+    if (!diffTypeInfoWitness)
+        return String("_proof_other");
+
+    StringBuilder builder;
+    builder << "_proof";
+    builder << (diffTypeInfoWitness->getThisTypeDiffWitness() ? "t1" : "t0");
+    builder << (diffTypeInfoWitness->getReturnTypeDiffWitness() ? "r1" : "r0");
+    auto paramTypeCount = (Index)diffTypeInfoWitness->getParamTypeCount();
+    builder << "p" << paramTypeCount;
+    for (Index ii = 0; ii < paramTypeCount; ++ii)
+        builder << (diffTypeInfoWitness->getParamTypeDiffWitness(ii) ? "d1" : "d0");
+    return builder.produceString();
+}
+
+static Witness* selectDiffTypeInfoWitnessForExactDifferentiabilityRequirement(
+    Witness* concreteWitness,
+    Witness* requirementWitness)
+{
+    auto concreteDiffTypeInfoWitness = as<DiffTypeInfoWitness>(concreteWitness);
+    auto requirementDiffTypeInfoWitness = as<DiffTypeInfoWitness>(requirementWitness);
+    if (!concreteDiffTypeInfoWitness || !requirementDiffTypeInfoWitness)
+        return concreteWitness;
+
+    if (concreteDiffTypeInfoWitness->getParamTypeCount() !=
+        requirementDiffTypeInfoWitness->getParamTypeCount())
+    {
+        return concreteWitness;
+    }
+
+    if (!requirementDiffTypeInfoWitness->getThisTypeDiffWitness() &&
+        concreteDiffTypeInfoWitness->getThisTypeDiffWitness())
+    {
+        return requirementWitness;
+    }
+
+    if (!requirementDiffTypeInfoWitness->getReturnTypeDiffWitness() &&
+        concreteDiffTypeInfoWitness->getReturnTypeDiffWitness())
+    {
+        return requirementWitness;
+    }
+
+    for (Index ii = 0; ii < Index(concreteDiffTypeInfoWitness->getParamTypeCount()); ++ii)
+    {
+        if (!requirementDiffTypeInfoWitness->getParamTypeDiffWitness(ii) &&
+            concreteDiffTypeInfoWitness->getParamTypeDiffWitness(ii))
+        {
+            return requirementWitness;
+        }
+    }
+
+    return concreteWitness;
+}
+
+static bool trySynthesizeExactDifferentiabilityConformanceForRequirement(
+    SemanticsVisitor* visitor,
+    Type* constraintSub,
+    Type* constraintSup)
+{
+    auto astBuilder = getCurrentASTBuilder();
+    auto constraintSubDeclRefType = as<DeclRefType>(constraintSub);
+    if (!constraintSubDeclRefType)
+        return false;
+
+    auto callableDeclRef = constraintSubDeclRefType->getDeclRef().as<FunctionDeclBase>();
+    if (!callableDeclRef)
+        return false;
+
+    Type* baseFuncType = nullptr;
+    Witness* requirementTypeInfoWitness = nullptr;
+    auto kind = getDifferentiabilityConformanceKind(
+        constraintSup,
+        &baseFuncType,
+        &requirementTypeInfoWitness);
+    if (kind == DifferentiabilityConformanceKind::None || !baseFuncType ||
+        !baseFuncType->equals(constraintSub))
+    {
+        return false;
+    }
+
+    if (auto defaultCallableDeclRef = createDefaultSubstitutionsIfNeeded(
+                                          astBuilder,
+                                          visitor,
+                                          callableDeclRef.getDecl()->getDefaultDeclRef())
+                                          .as<FunctionDeclBase>())
+    {
+        callableDeclRef = defaultCallableDeclRef;
+    }
+
+    visitor->ensureDecl(callableDeclRef, DeclCheckState::ReadyForLookup);
+    switch (kind)
+    {
+    case DifferentiabilityConformanceKind::Forward:
+        if (!visitor->doesCalleeHaveFwdDiff(callableDeclRef))
+            return false;
+        break;
+    case DifferentiabilityConformanceKind::Backward:
+        if (!visitor->doesCalleeHaveBwdDiff(callableDeclRef))
+            return false;
+        break;
+    default:
+        return false;
+    }
+
+    auto visibility = getDeclVisibility(callableDeclRef.getDecl());
+    auto synthesizedVisibility = getSynthesizedExtensionVisibility(visibility);
+    SubstitutionSet substSet;
+    auto diffExtension = extendCallableDeclRefForDifferentiabilityRequirement(
+        visitor,
+        callableDeclRef,
+        constraintSup,
+        substSet,
+        synthesizedVisibility.extensionVisibility);
+
+    auto funcAsTypeFromExtension = as<DeclRefType>(
+        DeclRefType::create(astBuilder, callableDeclRef)->substitute(astBuilder, substSet));
+    if (!funcAsTypeFromExtension)
+        return false;
+
+    // Compute the proof from the concrete callable decl-ref that the synthesized member will
+    // actually target, matching the ordinary `[Differentiable]` extension path. The one exception
+    // is when the requirement-side proof explicitly suppresses a derivative witness that the
+    // concrete callable proof would add, such as the `no_diff This` parameters in
+    // `MyLinearArithmeticType.ldot`; in that case the requirement proof is the coherent source of
+    // the differentiability contract. Do not otherwise import requirement-side positive witnesses:
+    // their generic substitutions can be recursive or stale compared to the synthesized extension.
+    auto typeInfoWitnessFromExtension = visitor->getDiffTypeInfoWitness(funcAsTypeFromExtension);
+    auto requirementTypeInfoWitnessFromExtension =
+        requirementTypeInfoWitness
+            ? as<Witness>(requirementTypeInfoWitness->substitute(astBuilder, substSet))
+            : nullptr;
+    typeInfoWitnessFromExtension = selectDiffTypeInfoWitnessForExactDifferentiabilityRequirement(
+        typeInfoWitnessFromExtension,
+        requirementTypeInfoWitnessFromExtension);
+    if (!typeInfoWitnessFromExtension)
+        return false;
+
+    // Keep the synthesized extension inheritance in the same substituted environment as the
+    // members added below. The requirement-side `constraintSup` can carry a hidden
+    // `__hasDiffTypeInfo` proof that was formed before the callable decl-ref was substituted into
+    // the exact synthesized extension. If the extension inherits from that stale proof shape while
+    // its synthesized `BwdCallable`/`bwd_diff` members use the concrete proof, conformance checking
+    // later asks the context struct for `IBwdCallable<F>` with a different generic argument and
+    // rejects the synthesized witness table. Rebuild the interface type from the callable-as-type
+    // that actually owns the synthesized members.
+    auto differentiabilityInterfaceTypeFromExtension =
+        kind == DifferentiabilityConformanceKind::Forward
+            ? astBuilder->getForwardDiffFuncInterfaceType(
+                  funcAsTypeFromExtension,
+                  typeInfoWitnessFromExtension)
+            : astBuilder->getBackwardDiffFuncInterfaceType(
+                  funcAsTypeFromExtension,
+                  typeInfoWitnessFromExtension);
+    auto inheritanceDecl = diffExtension.getDecl()->getMembersOfType<InheritanceDecl>().getFirst();
+    SLANG_ASSERT(inheritanceDecl);
+    if (inheritanceDecl)
+        inheritanceDecl->base.type = differentiabilityInterfaceTypeFromExtension;
+
+    if (kind == DifferentiabilityConformanceKind::Forward)
+    {
+        auto fwdDiffFuncType = visitor->getCalculatedDiffFuncTypeWithWitness(
+            "FwdDiffFuncType",
+            funcAsTypeFromExtension,
+            typeInfoWitnessFromExtension);
+        if (!fwdDiffFuncType)
+            return false;
+
+        // This helper materializes the exact first-order conformance requested by a sibling
+        // interface differentiability requirement. The ordinary `[Differentiable]` declaration
+        // path already creates higher-order conformances for the callable's ambient mode; doing
+        // that again here would thread the requirement's proof through another layer of
+        // `IForward/IBackwardDifferentiable` and can make builtin-module serialization chase a
+        // recursively substituted `DiffTypeInfoWitness`.
+        addSynthesizedFunc(
+            visitor,
+            diffExtension.getDecl(),
+            visitor->getName("fwd_diff"),
+            kIROp_ForwardDifferentiate,
+            {funcAsTypeFromExtension->getDeclRefBase()},
+            fwdDiffFuncType,
+            true,
+            synthesizedVisibility.memberVisibility);
+    }
+    else
+    {
+        auto synContextStruct = addOrExtendSynthesizedStruct(
+            visitor,
+            diffExtension.getDecl(),
+            visitor->getName("BwdCallable"),
+            kIROp_BackwardDiffIntermediateContextType,
+            {funcAsTypeFromExtension->getDeclRefBase()},
+            {astBuilder->getBwdCallableBaseType(
+                funcAsTypeFromExtension,
+                typeInfoWitnessFromExtension)},
+            synthesizedVisibility.extensionVisibility,
+            synthesizedVisibility.memberVisibility,
+            SourceLoc(),
+            getDiffTypeInfoWitnessNameSuffix(typeInfoWitnessFromExtension));
+
+        auto synMinimalContextStruct = addOrExtendSynthesizedStruct(
+            visitor,
+            diffExtension.getDecl(),
+            visitor->getName("MinimalContext"),
+            kIROp_BackwardDiffMinimalContextType,
+            {funcAsTypeFromExtension->getDeclRefBase()},
+            {},
+            synthesizedVisibility.extensionVisibility,
+            synthesizedVisibility.memberVisibility);
+
+        auto minimalCtxType = DeclRefType::create(astBuilder, synMinimalContextStruct);
+        auto fullCtxType = DeclRefType::create(astBuilder, synContextStruct);
+
+        auto applyBwdDeclRef = addSynthesizedFunc(
+            visitor,
+            diffExtension.getDecl(),
+            visitor->getName("apply_bwd"),
+            kIROp_BackwardDifferentiatePrimal,
+            {funcAsTypeFromExtension->getDeclRefBase()},
+            visitor->getCalculatedDiffFuncTypeWithWitness(
+                "ApplyForBwdFuncType",
+                funcAsTypeFromExtension,
+                minimalCtxType,
+                typeInfoWitnessFromExtension),
+            false,
+            synthesizedVisibility.memberVisibility);
+        applyBwdDeclRef = createDefaultSubstitutionsIfNeeded(astBuilder, visitor, applyBwdDeclRef)
+                              .as<SynthesizedFuncDecl>();
+
+        auto rematDeclRef = addSynthesizedFunc(
+            visitor,
+            diffExtension.getDecl(),
+            visitor->getName("remat"),
+            kIROp_BackwardRemat,
+            {funcAsTypeFromExtension->getDeclRefBase()},
+            visitor->getCalculatedDiffFuncTypeWithWitness(
+                "RematFuncType",
+                funcAsTypeFromExtension,
+                minimalCtxType,
+                fullCtxType,
+                typeInfoWitnessFromExtension),
+            true,
+            synthesizedVisibility.memberVisibility);
+        rematDeclRef = createDefaultSubstitutionsIfNeeded(astBuilder, visitor, rematDeclRef)
+                           .as<SynthesizedFuncDecl>();
+
+        visitor->ensureDecl(synContextStruct, DeclCheckState::ReadyForConformances);
+        auto bwdPropFnLookupResult = lookUpMember(
+            astBuilder,
+            visitor,
+            visitor->getName("()"),
+            fullCtxType,
+            visitor->getScope(diffExtension.getDecl()));
+        bwdPropFnLookupResult = visitor->resolveOverloadedLookup(bwdPropFnLookupResult);
+        if (!bwdPropFnLookupResult.item.declRef)
+            return false;
+        auto bwdPropFnDeclRef = bwdPropFnLookupResult.item.declRef.as<FunctionDeclBase>();
+        if (!bwdPropFnDeclRef)
+            return false;
+
+        auto bwdDiffFuncType = visitor->getCalculatedDiffFuncTypeWithWitness(
+            "BwdDiffFuncType",
+            funcAsTypeFromExtension,
+            typeInfoWitnessFromExtension);
+        if (!bwdDiffFuncType)
+            return false;
+
+        addSynthesizedFunc(
+            visitor,
+            diffExtension.getDecl(),
+            visitor->getName("bwd_diff"),
+            kIROp_LegacyBackwardDifferentiate,
+            {applyBwdDeclRef, rematDeclRef, bwdPropFnDeclRef},
+            bwdDiffFuncType,
+            true,
+            synthesizedVisibility.memberVisibility);
+    }
+
+    visitor->ensureDecl(diffExtension, DeclCheckState::ReadyForLookup);
+    return true;
 }
 
 // Takes two declarations with equivalent generic signatures and returns a decl-ref of
@@ -17972,11 +18457,6 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
     // when they are queried again, without forcing us to iterate the giant global
     // dictionaries up front.
     bumpDeclExtensionEpoch(typeDecl);
-    for (auto parentDecl = typeDecl->parentDecl; parentDecl; parentDecl = parentDecl->parentDecl)
-    {
-        if (auto genericParentDecl = as<GenericDecl>(parentDecl))
-            bumpDeclExtensionEpoch(genericParentDecl);
-    }
 
     if (hasImplicitCastMember)
     {

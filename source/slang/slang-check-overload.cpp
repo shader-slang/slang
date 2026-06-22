@@ -3450,7 +3450,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     {
         if (const auto typeType = as<TypeType>(funcExpr->type))
         {
-            if (isDeclRefTypeOf<AggTypeDeclBase>(typeType->getType()))
+            auto targetType = typeType->getType();
+            if (isDeclRefTypeOf<AggTypeDeclBase>(targetType) ||
+                isDeclRefTypeOf<EnumDecl>(targetType))
             {
                 Expr* resultExpr = nullptr;
                 ConversionCost conversionCost = kConversionCost_None;
@@ -3458,7 +3460,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 auto coerceResult = SemanticsVisitor(withSink(&collectedErrorsSink))
                                         ._coerce(
                                             CoercionSite::ExplicitCoercion,
-                                            typeType->getType(),
+                                            targetType,
                                             &resultExpr,
                                             expr->arguments[0]->type,
                                             expr->arguments[0],

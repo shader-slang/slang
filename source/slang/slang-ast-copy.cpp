@@ -335,7 +335,24 @@ void GenericSignatureCopier::copyParameterMembers()
     }
 }
 
-Decl* GenericSignatureCopier::copyConstraintMember(Decl* member)
+static TypeExp substituteConstraintTypeExp(
+    ASTBuilder* astBuilder,
+    TypeExp const& sourceTypeExp,
+    TypeExp const& copiedTypeExp,
+    SubstitutionSet const& sourceToDestSubstitution)
+{
+    TypeExp result = copiedTypeExp;
+    if (sourceTypeExp.type)
+    {
+        result.type =
+            as<Type>(sourceTypeExp.type->substitute(astBuilder, sourceToDestSubstitution));
+    }
+    return result;
+}
+
+Decl* GenericSignatureCopier::copyConstraintMember(
+    Decl* member,
+    SubstitutionSet const& sourceToDestSubstitution)
 {
     if (auto packCountConstraint = as<GenericVariadicPackCountConstraintDecl>(member))
     {
@@ -346,11 +363,56 @@ Decl* GenericSignatureCopier::copyConstraintMember(Decl* member)
             return nullptr;
     }
 
-    if (!isConstraintDecl(member))
+    if (!isGenericConstraintParameterDecl(member))
         return nullptr;
 
     auto copiedConstraint = m_astCopier.copyDecl(member);
     m_destGenericDecl->addDirectMemberDecl(copiedConstraint);
+
+    // The source constraint's checked `TypeExp::type` can contain declared witnesses and
+    // associated-type lookup paths that are tied to the source generic environment. The syntax copy
+    // above preserves the written expressions, but the checked types must be rebuilt through the
+    // source-to-destination generic decl-ref that `liftDeclFromGenericContainers` is constructing;
+    // otherwise a copied proof can keep the old parent path while naming the new constraint decl.
+    auto astBuilder = m_astCopier.getContext().astBuilder;
+    if (auto sourceTypeConstraint = as<GenericTypeConstraintDecl>(member))
+    {
+        auto destTypeConstraint = as<GenericTypeConstraintDecl>(copiedConstraint);
+        destTypeConstraint->sub = substituteConstraintTypeExp(
+            astBuilder,
+            sourceTypeConstraint->sub,
+            destTypeConstraint->sub,
+            sourceToDestSubstitution);
+        destTypeConstraint->sup = substituteConstraintTypeExp(
+            astBuilder,
+            sourceTypeConstraint->sup,
+            destTypeConstraint->sup,
+            sourceToDestSubstitution);
+    }
+    else if (auto sourceCoercionConstraint = as<TypeCoercionConstraintDecl>(member))
+    {
+        auto destCoercionConstraint = as<TypeCoercionConstraintDecl>(copiedConstraint);
+        destCoercionConstraint->fromType = substituteConstraintTypeExp(
+            astBuilder,
+            sourceCoercionConstraint->fromType,
+            destCoercionConstraint->fromType,
+            sourceToDestSubstitution);
+        destCoercionConstraint->toType = substituteConstraintTypeExp(
+            astBuilder,
+            sourceCoercionConstraint->toType,
+            destCoercionConstraint->toType,
+            sourceToDestSubstitution);
+    }
+    else if (auto sourceHasDiffTypeInfoConstraint = as<HasDiffTypeInfoConstraintDecl>(member))
+    {
+        auto destHasDiffTypeInfoConstraint = as<HasDiffTypeInfoConstraintDecl>(copiedConstraint);
+        destHasDiffTypeInfoConstraint->type = substituteConstraintTypeExp(
+            astBuilder,
+            sourceHasDiffTypeInfoConstraint->type,
+            destHasDiffTypeInfoConstraint->type,
+            sourceToDestSubstitution);
+    }
+
     return copiedConstraint;
 }
 
