@@ -2185,23 +2185,20 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
-    // Disallow converting to a ParameterGroupType.
+    // A coercion whose *target* is a `ParameterGroupType` (e.g. `ConstantBuffer<T>`
+    // or `TextureBuffer<T>`) is handled by the normal conversion machinery below,
+    // exactly as for any other target type. In particular this lets the generated
+    // `__init(DescriptorHandle<This>)` implicit conversion be found, so that a
+    // `DescriptorHandle<ConstantBuffer<T>>` converts to `ConstantBuffer<T>` just as a
+    // `DescriptorHandle<RWStructuredBuffer<T>>` (a non-parameter-group target) already
+    // does -- both are `IOpaqueDescriptor` types and should behave the same. A
+    // genuinely invalid coercion to a parameter-group target is still rejected,
+    // because the conversion search below returns failure when no conversion applies.
     //
-    // TODO(tfoley): Under what circumstances would this check ever be needed?
-    //
-    // The one legitimate conversion *to* a parameter-group type is from a
-    // `DescriptorHandle<P>` that wraps it: such handles carry a generated
-    // `__init(DescriptorHandle<This>)` implicit conversion (the documented
-    // `DescriptorHandle<T> -> T` behavior for any `T : IOpaqueDescriptor`, and
-    // `ConstantBuffer`/`TextureBuffer` are parameter-group types that conform).
-    // That constructor-based conversion is only discovered by the overload
-    // search later in this function, so a `DescriptorHandle` source must be
-    // allowed to fall through rather than be rejected here.
-    //
-    if (as<ParameterGroupType>(toType) && !as<DescriptorHandleType>(fromType))
-    {
-        return _failedCoercion(toType, outToExpr, fromExpr, sink);
-    }
+    // (Historically a blanket guard here rejected *every* coercion to a
+    // `ParameterGroupType` target before that search ran, which created the
+    // asymmetry above. Its own `TODO(tfoley)` already questioned whether it was
+    // ever needed.)
 
     // If the type that we are converting from is a parameter group type
     // (something like `ConstantBuffer<X>` or `ParameterBlock<X>`) and we
