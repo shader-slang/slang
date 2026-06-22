@@ -1826,6 +1826,14 @@ local insts = {
 			{ vulkanCallablePayload = { struct_name = "VulkanCallablePayloadDecoration" } },
 			{ vulkanCallablePayloadIn = { struct_name = "VulkanCallablePayloadInDecoration" } },
 			{ earlyDepthStencil = { struct_name = "EarlyDepthStencilDecoration" } },
+			-- Marks a fragment entry point whose `gl_FragDepth` output is constrained to
+			-- only ever increase / decrease the fixed-function depth (HLSL
+			-- SV_DepthGreaterEqual / SV_DepthLessEqual). Carried on the entry point so the
+			-- GLSL emitter can redeclare `layout(depth_greater)` / `layout(depth_less) out
+			-- float gl_FragDepth;`, which glslang maps to the DepthGreater / DepthLess
+			-- SPIR-V execution mode.
+			{ glslFragDepthGreater = { struct_name = "GLSLFragDepthGreaterDecoration" } },
+			{ glslFragDepthLess = { struct_name = "GLSLFragDepthLessDecoration" } },
 			{ precise = { struct_name = "PreciseDecoration" } },
 			{ public = { struct_name = "PublicDecoration" } },
 			{ hlslExport = { struct_name = "HLSLExportDecoration" } },

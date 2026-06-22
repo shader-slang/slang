@@ -1643,6 +1643,21 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
                 // https://www.khronos.org/opengl/wiki/Early_Fragment_Test
                 m_writer->emit("layout(early_fragment_tests) in;\n");
             }
+            else if (as<IRGLSLFragDepthGreaterDecoration>(decoration))
+            {
+                // Redeclare the `gl_FragDepth` builtin with the conservative-depth
+                // layout qualifier so glslang emits the DepthGreater execution mode
+                // (HLSL SV_DepthGreaterEqual). Requires GL_ARB_conservative_depth
+                // (core since GLSL 4.20).
+                _requireGLSLExtension(UnownedStringSlice("GL_ARB_conservative_depth"));
+                m_writer->emit("layout(depth_greater) out float gl_FragDepth;\n");
+            }
+            else if (as<IRGLSLFragDepthLessDecoration>(decoration))
+            {
+                // As above, for SV_DepthLessEqual -> DepthLess.
+                _requireGLSLExtension(UnownedStringSlice("GL_ARB_conservative_depth"));
+                m_writer->emit("layout(depth_less) out float gl_FragDepth;\n");
+            }
             else if (as<IRRequireFullQuadsDecoration>(decoration))
             {
                 requireQuadControlExtensions();

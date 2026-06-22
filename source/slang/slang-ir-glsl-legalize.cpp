@@ -222,6 +222,8 @@ enum GLSLSystemValueKind
     General,
     PositionOutput,
     PositionInput,
+    FragDepthGreater,
+    FragDepthLess,
 };
 
 struct GLSLSystemValueInfo
@@ -576,19 +578,26 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     }
     else if (semanticName == "sv_depthgreaterequal")
     {
-        // TODO: layout(depth_greater) out float gl_FragDepth;
+        // Same `gl_FragDepth` builtin as `SV_Depth`, but the depth value is constrained
+        // to only ever increase. We record this via `FragDepthGreater` so the GLSL
+        // emitter redeclares `layout(depth_greater) out float gl_FragDepth;` (glslang
+        // maps that to the DepthGreater SPIR-V execution mode).
 
         // Type is 'unknown' in hlsl
         name = "gl_FragDepth";
         requiredType = builder->getBasicType(BaseType::Float);
+        systemValueKind = GLSLSystemValueKind::FragDepthGreater;
     }
     else if (semanticName == "sv_depthlessequal")
     {
-        // TODO: layout(depth_greater) out float gl_FragDepth;
+        // Same `gl_FragDepth` builtin as `SV_Depth`, but constrained to only ever
+        // decrease; recorded via `FragDepthLess` so the GLSL emitter redeclares
+        // `layout(depth_less) out float gl_FragDepth;` (DepthLess execution mode).
 
         // 'unknown' in hlsl, float in glsl
         name = "gl_FragDepth";
         requiredType = builder->getBasicType(BaseType::Float);
+        systemValueKind = GLSLSystemValueKind::FragDepthLess;
     }
     else if (semanticName == "sv_dispatchthreadid")
     {
@@ -1067,6 +1076,16 @@ void createVarLayoutForLegalizedGlobalParam(
             break;
         case GLSLSystemValueKind::PositionInput:
             builder->addGLPositionInputDecoration(globalParam);
+            break;
+        case GLSLSystemValueKind::FragDepthGreater:
+            // The depth-test condition is an execution-mode property of the fragment
+            // entry point (like `early_fragment_tests`), so we mark the entry point
+            // rather than the `gl_FragDepth` builtin var. A fragment shader has a single
+            // depth output, so this runs once per entry point.
+            builder->addDecoration(context->entryPointFunc, kIROp_GLSLFragDepthGreaterDecoration);
+            break;
+        case GLSLSystemValueKind::FragDepthLess:
+            builder->addDecoration(context->entryPointFunc, kIROp_GLSLFragDepthLessDecoration);
             break;
         default:
             break;
