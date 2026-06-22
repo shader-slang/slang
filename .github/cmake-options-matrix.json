@@ -53,7 +53,8 @@
     },
     {
       "option": "SLANG_LIB_TYPE",
-      "value": "STATIC"
+      "value": "STATIC",
+      "install_test": "true"
     },
     {
       "option": "SLANG_ENABLE_ASAN",

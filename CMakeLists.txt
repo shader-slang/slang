@@ -663,29 +663,47 @@ configure_package_config_file(
 # Conditionally handle the case for Emscripten where slang does not create
 # linkable targets. In this case do not export the targets. Otherwise, just
 # export the slang targets.
+#
+# A STATIC build used to be excluded here because slang's internal link
+# dependencies (core, prelude, compiler-core, slang-capability-*,
+# slang-lookup-tables, SPIRV-Headers, ...) leaked onto its public link
+# interface and weren't in any export set, which made install(EXPORT ...) fail
+# (see issue #5821 / PR #6158). slang_add_target now wraps private link deps in
+# $<BUILD_LOCAL_INTERFACE:...> / $<BUILD_INTERFACE:...> (cmake/SlangTarget.cmake),
+# so those targets no longer appear in the install/export interface and a static
+# install exports cleanly. Exporting also for STATIC keeps SlangConfig.cmake's
+# unconditional include() of slangTargets.cmake (cmake/SlangConfig.cmake.in)
+# satisfied, so find_package(slang) works for static installs too.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    if(NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
-        install(
-            EXPORT SlangTargets
-            FILE ${PROJECT_NAME}Targets.cmake
-            NAMESPACE ${PROJECT_NAME}::
-            DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
+    install(
+        EXPORT SlangTargets
+        FILE ${PROJECT_NAME}Targets.cmake
+        NAMESPACE ${PROJECT_NAME}::
+        DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
+    )
+
+    # The pkgconfig file stays gated on non-STATIC builds. Unlike the CMake
+    # export above, extras/pkgconfig/slang-compiler.pc.in cannot describe a
+    # static link: it lists only `-lslang-compiler` and leaves Libs.private
+    # empty (it explicitly documents that `pkg-config --static` is unsupported).
+    # Installing it for a STATIC build would hand downstream users a link line
+    # that omits every transitive internal archive (core, compiler-core,
+    # slang-capability-*, slang-lookup-tables, bundled miniz/lz4, ...), causing
+    # unresolved-symbol errors at link time. Static consumers should use
+    # find_package(slang) instead, which the export above now supports.
+    if(UNIX AND NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
+        configure_file(
+            "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
+            "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+            @ONLY
         )
 
-        if(UNIX)
-            configure_file(
-                "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
-                "${PROJECT_BINARY_DIR}/slang-compiler.pc"
-                @ONLY
-            )
-
-            # TODO: When build system is changed to respect CMAKE_INSTALL_LIBDIR,
-            # update this destination.
-            install(
-                FILES "${PROJECT_BINARY_DIR}/slang-compiler.pc"
-                DESTINATION "lib/pkgconfig"
-            )
-        endif()
+        # TODO: When build system is changed to respect CMAKE_INSTALL_LIBDIR,
+        # update this destination.
+        install(
+            FILES "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+            DESTINATION "lib/pkgconfig"
+        )
     endif()
 endif()
 
