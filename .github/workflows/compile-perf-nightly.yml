@@ -24,7 +24,7 @@ on:
       sweep:
         description: "run the scaling sweep (sweep_sizes), not just default sizes"
         type: boolean
-        default: true
+        default: false
       only:
         description: "comma-separated workload subset (blank = full suite)"
         default: ""
