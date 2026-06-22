@@ -32,10 +32,17 @@ LEAF_TIMERS = ["parseTranslationUnit", "SemanticChecking", "generateIR",
 
 
 def results_dir_for(results_dir, label):
-    """Directory holding a label's results.json (and its derived _sweep/_breakdown).
-    Release sweeps live under releases/<tag>/, nightly ToT under daily/<label>/,
-    ad-hoc/dev builds at <label>/ (top level). Returns the first that exists, else
-    the releases/ path (the canonical location for release tags)."""
+    """Return the directory that holds `label`'s results.json.
+
+    Searches three layout conventions in order:
+      1. ``<results>/releases/<label>/`` — canonical home for release-tag sweeps.
+      2. ``<results>/daily/<label>/``    — nightly ToT sweeps.
+      3. ``<results>/<label>/``          — ad-hoc / dev builds at the top level.
+
+    If none of those directories contains a results.json, returns the
+    ``releases/<label>/`` path so callers can construct a not-yet-created
+    path without a special case.
+    """
     for sub in ("releases", "daily", ""):
         d = os.path.join(results_dir, sub, label) if sub else os.path.join(results_dir, label)
         if os.path.exists(os.path.join(d, "results.json")):
@@ -140,7 +147,7 @@ def classify(values, step_thr=1.4, drift_thr=1.25):
             "up_frac": up_frac, "n_steps": len(steps)}
 
 
-def _linfit(xs, ys):
+def linfit(xs, ys):
     """Ordinary least squares y = a + b*x. Returns (a, b, r2)."""
     n = len(xs)
     sx, sy = sum(xs), sum(ys)
@@ -157,7 +164,7 @@ def _linfit(xs, ys):
     return a, b, 1 - ss_res / ss_tot
 
 
-def _powfit(xs, ys):
+def powfit(xs, ys):
     """Power-law fit t = a * N^k via OLS on (log N, log t). Returns (a, k, r2),
     with r2 measured in log space. k is the honest super-linearity exponent —
     k≈1 linear, k>1 super-linear, k<1 sub-linear — and unlike the linear floor it
@@ -168,7 +175,7 @@ def _powfit(xs, ys):
         return 0.0, 0.0, 0.0
     lx = [math.log(x) for x, _ in pts]
     ly = [math.log(y) for _, y in pts]
-    loga, k, r2 = _linfit(lx, ly)
+    loga, k, r2 = linfit(lx, ly)
     return math.exp(loga), k, r2
 
 
@@ -193,7 +200,7 @@ def slope_report(results_dir, label, metric):
         if len(pts) < 2:
             continue
         xs, ys = [p[0] for p in pts], [p[1] for p in pts]
-        a, b, r2 = _linfit(xs, ys)
+        a, b, r2 = linfit(xs, ys)
         print(f"{wl:18s}{a:11.1f}{b:16.4f}{r2:7.3f}   {[x for x in xs]}")
     print("\nfloor = fixed per-compile cost (core-module load/link); "
           "slope = marginal cost per generated unit.")

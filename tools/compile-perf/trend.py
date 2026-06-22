@@ -37,13 +37,14 @@ def timers_for(workload):
     return timers
 
 
-def gh(line):
-    """Emit a GitHub Actions workflow command if running under Actions."""
+def emit_gha_command(line):
+    """Emit a GitHub Actions workflow command (e.g. ::error::) if running under Actions."""
     if os.environ.get("GITHUB_ACTIONS") == "true":
         print(line)
 
 
-def summary(md):
+def write_step_summary(md):
+    """Append markdown to the GitHub Actions step summary ($GITHUB_STEP_SUMMARY)."""
     path = os.environ.get("GITHUB_STEP_SUMMARY")
     if path:
         with open(path, "a") as fh:
@@ -54,6 +55,17 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
+    # Threshold rationale:
+    # --rel 1.25: flag a 25% rise vs trailing median. The per-PR gate uses 15%;
+    #   25% here catches gradual drift that accumulates across many PRs without
+    #   any single one tripping the per-PR gate.
+    # --abs 2.0: ignore sub-2 ms absolute deltas regardless of ratio — a 50%
+    #   rise in a 3 ms timer is within measurement noise, not a real regression.
+    # --window 7: trailing-7-point median spans ~one week of nightly runs,
+    #   long enough to be stable against one bad night but short enough to track
+    #   genuine drift (a regression from 3 weeks ago is already known).
+    # --min-baseline 3: require at least 3 prior same-runner points before judging,
+    #   so the first few nights after a new runner don't produce false positives.
     ap.add_argument("--window", type=int, default=7, help="trailing points for the median")
     ap.add_argument("--rel", type=float, default=1.25, help="relative regression threshold")
     ap.add_argument("--abs", type=float, default=2.0, help="min absolute ms delta to flag")
@@ -89,13 +101,13 @@ def main():
                f"only; re-run compile-perf-release-sweep (force=true) to resync the "
                f"history to this machine.")
         print(f"WARNING: {msg}")
-        gh(f"::warning title=Perf runner mismatch::{msg}")
+        emit_gha_command(f"::warning title=Perf runner mismatch::{msg}")
 
     if len(window) < args.min_baseline:
         msg = (f"only {len(window)} comparable trailing point(s) "
                f"(need {args.min_baseline}); skipping trend judgement.")
         print(msg)
-        gh(f"::warning title=Perf trend::{msg}")
+        emit_gha_command(f"::warning title=Perf trend::{msg}")
         return
 
     base_labels = f"{window[0]['label']}..{window[-1]['label']}"
@@ -121,7 +133,7 @@ def main():
           f"median per metric; flag at ratio >= {args.rel} and >= {args.abs} ms\n")
     if not regressions:
         print(f"OK — no compile-perf regression in {current['label']} vs trailing median.")
-        summary(f"### Compile-perf trend — {current['label']}\n\n"
+        write_step_summary(f"### Compile-perf trend — {current['label']}\n\n"
                 f"OK — no regression vs trailing {len(window)}-point median "
                 f"(`{base_labels}`).")
         return
@@ -134,11 +146,11 @@ def main():
             "|---|---|--:|--:|--:|--:|"]
     for wl, timer, med, cur, ratio, delta in regressions:
         print(f"{wl:20s}{timer:26s}{med:10.1f}{cur:10.1f}{ratio:7.2f}x{delta:+9.1f}")
-        gh(f"::error title=Perf regression {wl}/{timer}::"
+        emit_gha_command(f"::error title=Perf regression {wl}/{timer}::"
            f"{ratio:.2f}x ({med:.1f} -> {cur:.1f} ms, +{delta:.1f}) vs trailing median")
         rows.append(f"| {wl} | {timer} | {med:.1f} | {cur:.1f} | "
                     f"{ratio:.2f}× | +{delta:.1f} |")
-    summary("\n".join(rows))
+    write_step_summary("\n".join(rows))
 
     print(f"\n{len(regressions)} regression(s) flagged.")
     if not args.no_fail:

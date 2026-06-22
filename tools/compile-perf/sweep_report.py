@@ -78,13 +78,18 @@ def fit(pts, floor=0.0):
     changing across the range (e.g. linear at small N, bending up at large N)."""
     xs, ys = [x for x, _ in pts], [y for _, y in pts]
     work = [y - floor for y in ys]
-    a, k, pow_r2 = analyze._powfit(xs, work)
+    a, k, pow_r2 = analyze.powfit(xs, work)
     top = (ys[-1] / ys[-2]) if (len(ys) >= 2 and ys[-2]) else None
     return {"a": a, "k": k, "pow_r2": pow_r2, "top": top}
 
 
 def superlinear(k):
-    """A power-law exponent meaningfully above 1."""
+    """True when the power-law exponent k is meaningfully above linear (k=1.0).
+
+    The 0.15 buffer above 1.0 absorbs fitting noise from small N ranges — a
+    power-law fit with 3-5 points is noisy and k between 1.0 and 1.15 is not
+    actionable. Raise this threshold if the suite's N ranges are extended.
+    """
     return k is not None and k > 1.15
 
 

@@ -64,6 +64,8 @@ def main():
                     sizes.setdefault(r["workload"], set()).add(r.get("size"))
             need = want or all_wls
 
+            # `complete` closes over `sizes`, `args.sweep`, and `manifest` — all
+            # stable across loop iterations. It does NOT capture the loop variable.
             def complete(wl):
                 szs = sizes.get(wl)
                 if not szs:

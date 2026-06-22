@@ -97,9 +97,12 @@ def buckets(timers):
     Slang's phase timers are not perfectly additive — named sub-timers can sum to
     MORE than their parent (e.g. specializeModule + simplifyIR + … exceed
     linkAndOptimizeIR after the v2026.7 specialization/autodiff work). When that
-    happens the children are scaled proportionally to fit the parent's budget, so
-    the overshoot stays LOCAL instead of propagating up and zeroing an ancestor's
-    self-time (which previously made generateOutput (self) vanish at v2026.7).
+    happens the children are scaled proportionally to fit the parent's budget.
+    Proportional scaling is preferred over clamping because it preserves the
+    relative child proportions, keeping the visual stacked areas meaningful. It
+    also keeps the overshoot LOCAL: without it, a child-sum exceeding its parent
+    would produce a negative self-residual that propagates up and zeroes out an
+    ancestor's self-time (as happened with generateOutput (self) at v2026.7).
     Either way the buckets sum exactly to compileInner."""
     out = {}
 
@@ -122,6 +125,9 @@ def buckets(timers):
                 if v > 0:
                     alloc(c, v)
             self_ms = budget - csum
+            # 0.05 ms: suppress rounding-noise residuals. Timers have 4-decimal-
+            # place ms precision; a self-time below ~0.05 ms is within measurement
+            # noise and would clutter the stacked chart with invisible slivers.
             if self_ms > 0.05:
                 out[f"{name} (self)"] = out.get(f"{name} (self)", 0.0) + self_ms
 
@@ -245,7 +251,10 @@ def render_stacked_svg(runs, label, metric):
             s.append(f'<rect x="{x:.1f}" y="{y}" width="{w:.2f}" height="{bh}" '
                      f'fill="{color}"><title>{esc(wl)} — {esc(name)}: '
                      f'{ms:.1f} ms ({pct:.1f}%)</title></rect>')
-            if w > 34:  # inline % label only if the segment is wide enough
+            if w > 34:  # inline % label only if the segment is wide enough to read
+                # These three pastel backgrounds need dark (#333) text — white (#fff)
+                # is unreadable on them. If BUCKET_ORDER gains more light-colored
+                # entries, add their hex codes here.
                 tc = "#fff" if color not in ("#c7e9c0", "#dadaeb", "#bcbddc") else "#333"
                 s.append(f'<text x="{x+w/2:.1f}" y="{y+bh-5}" text-anchor="middle" '
                          f'fill="{tc}" font-size="9">{pct:.0f}</text>')
@@ -308,7 +317,7 @@ def coarse_buckets(timers):
     if go > 0:
         out["generateOutput"] = go
     resid = ci - fe - go
-    if resid > 0.05:
+    if resid > 0.05:  # suppress measurement-noise residuals (see buckets())
         out["compileInner (self)"] = resid
     return out
 
@@ -369,6 +378,9 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
          f'<rect width="{W}" height="{H}" fill="white"/>',
          f'<text x="12" y="30" font-size="20" font-weight="bold">{title}</text>']
     # x ticks: label every release (capped) + EVERY daily date; daily in orange.
+    # Cap release tick labels at ~16 per panel — more than that at pw=760px with
+    # rotated text causes overlaps. max(1,...) prevents stride=0 when boundary==0
+    # (all points are daily; the release section is empty).
     rel_stride = max(1, boundary // 16)
     tick_idx = sorted(set(range(0, boundary, rel_stride))
                       | {max(boundary - 1, 0)}
@@ -456,12 +468,15 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
 
 
 def _workload_source(spec, head=40, tail=40, ctx=40):
-    """(n, [(filename, display_code)]) — the EXACT compiled Slang at the workload's
-    real size. A long file is shown as three windows — its first `head` lines, the
-    `±ctx` lines around the `computeMain` entry point (which shows how the generated
-    functions are actually invoked), and its last `tail` lines — with the elided
-    gaps marked by a comment. Overlapping windows merge. Even a 2000-function shader
-    stays readable without dumping thousands of lines."""
+    """Return ``(default_size, [(filename, source_snippet)])`` for display.
+
+    ``default_size`` is the workload's ``spec.default_size`` integer (returned
+    alongside the source so callers can show it without re-reading the spec).
+    Each ``source_snippet`` is trimmed to three windows: the first ``head`` lines,
+    the ``±ctx`` lines around the ``computeMain`` entry point, and the last
+    ``tail`` lines, with elided regions marked by a ``// … N lines omitted …``
+    comment. Overlapping windows are merged.
+    """
     n = spec.default_size
     out = []
     for fn, src in spec.gen(n).items():

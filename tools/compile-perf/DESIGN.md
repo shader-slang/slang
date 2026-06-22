@@ -68,8 +68,9 @@ together they cover both.
 
 Absolute compile times are runner-specific, so the series is assembled per machine:
 
-    tracking = [one swept point per release tag]      # the stable baseline
-             ++ [one tip-of-tree point per night, dated after the last release]
+    tracking = [one swept point per release tag]          # the stable baseline
+            + [one tip-of-tree point per night,           # post-release daily tail
+               dated after the last release]
 
 `track.py` owns it: `register` (stamp a daily run + rebuild), `rebuild` (recompute
 `_tracking/tracking.json`), `stamp-runner` (record the fingerprint the history was

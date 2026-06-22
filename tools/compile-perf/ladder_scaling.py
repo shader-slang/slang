@@ -49,7 +49,7 @@ def main():
         if len(pts) < 2:
             continue
         xs, ys = [x for x, _ in pts], [y for _, y in pts]
-        a, b, r2 = analyze._linfit(xs, ys)
+        a, b, r2 = analyze.linfit(xs, ys)
         # super-linearity: ratio of the top doubling's time growth vs 2.0
         slin = (ys[-1] / ys[-2]) if (len(ys) >= 2 and ys[-2]) else None
         rows.append((tag, a, b, r2, xs[0], ys[0], xs[-1], ys[-1], slin))

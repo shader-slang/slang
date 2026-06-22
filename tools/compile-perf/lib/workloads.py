@@ -20,6 +20,11 @@ _CORPUS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 
 def _buf():
+    """Standard output-buffer declaration used by every compilable workload.
+
+    All workload generators write results into `outBuf` so that nothing is
+    dead-code-eliminated before the targeted compiler stage runs.
+    """
     return "RWStructuredBuffer<float> outBuf;\n\n"
 
 

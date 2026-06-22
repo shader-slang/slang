@@ -1,7 +1,8 @@
 """Data-driven description of the perf suite: which workloads exist, how to
 invoke slangc for each, and which phase timers are the primary signal.
 
-A WorkloadSpec drives both generation (Phase 2) and the release sweep (Phase 3).
+A WorkloadSpec describes one workload: how to generate its source, how to invoke
+slangc, and which phase timers are the primary regression signal.
 
 Compile modes:
 - "target"  : single-file compile to a GPU target with an entry point. Triggers

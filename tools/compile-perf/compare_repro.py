@@ -31,7 +31,8 @@ def load(run_dir):
     return out
 
 
-def ci(rec, stat):
+def compile_inner(rec, stat):
+    """Extract the compileInner timer's `stat` value (e.g. "median") from a record."""
     t = rec.get("timers", {}).get("compileInner")
     return t.get(stat) if t else None
 
@@ -59,7 +60,7 @@ def main():
 
     rows = []
     for key in common:
-        b, n = ci(base[key], args.stat), ci(new[key], args.stat)
+        b, n = compile_inner(base[key], args.stat), compile_inner(new[key], args.stat)
         if b is None or n is None or b == 0:
             continue
         drift = (n / b - 1.0) * 100.0

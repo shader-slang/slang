@@ -99,7 +99,12 @@ def build_commands(slangc, spec, gen_dir, files):
         timed = [slangc, PERF_FLAG, "-I", gen_dir,
                  os.path.join(gen_dir, main), *spec.extra_flags, "-o", out]
         return {"setup": setup, "timed": timed}
-    # target mode
+    # "target" mode: single or multi-file compile to a GPU target. For single-file
+    # workloads spec.main_file (or the first file) is the entry point. For corpus
+    # workloads (e.g. mdl_dxr), spec.main_file names the root; -I gen_dir lets
+    # sibling imports resolve without explicit paths. reflection_json attaches a
+    # per-run output path so the layout/reflection serializer is exercised without
+    # polluting the results directory.
     f = spec.main_file or main or list(files)[0]
     out = os.path.join(gen_dir, "out.spv")
     extra = list(spec.extra_flags)
@@ -161,6 +166,9 @@ def run_once(cmd):
 _BENIGN = ("E00100", "E52002", "spirv-opt", "spirv-dis", "slang-glslang",
            "failed to load downstream", "pass-through compiler not found")
 # Matches both the modern "error[E30015]:" and the legacy "error 30015:" formats.
+# re is imported via __import__ rather than a top-level import to keep every
+# stdlib dependency explicit in one auditable place — this module is designed
+# to run against old Python installations with no third-party packages.
 _ERR_RE = __import__("re").compile(r"error\[|: error:|\berror \d+:")
 
 
@@ -200,13 +208,21 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
     walls = []
     rsses = []
     last_text = ""
-    sample_ok = []  # validate EVERY sample, not just the last one
+    # Validate EVERY sample: a workload that fails on 2 of 5 runs but succeeds
+    # on 3 would look valid if only the last sample were checked. When ALL samples
+    # crash, sample_ok is empty and all([]) is True, so ok is decided solely by
+    # crash_codes being non-empty — this is intentional (crash_codes captures it).
+    sample_ok = []
     crash_codes = []
     for _ in range(samples):
         rc, wall, text, rss = run_once(timed)
         last_text = text
-        # rc > 1 or rc < 0: slangc crashed (segfault=139, abort=134, …). Exclude
-        # the crashed sample from timing stats; its wall time is meaningless.
+        # rc == 0: success; rc == 1: slangc-reported compile error (expected for
+        # expect_fail workloads, caught by real_error() for others). rc > 1 or
+        # rc < 0: slangc crashed or was killed by a signal (SIGSEGV=139, SIGABRT=134
+        # on Linux; large positive values on Windows). Exit code 2+ from usage errors
+        # won't occur here because the bench harness always builds valid invocations.
+        # Exclude crashed samples from timing stats; their wall time is meaningless.
         if rc > 1 or rc < 0:
             crash_codes.append(rc)
             sample_ok.append(False)

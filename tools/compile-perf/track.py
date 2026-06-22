@@ -44,7 +44,10 @@ def runner_id():
     fingerprint; a change means the history must be re-swept on the new runner."""
     cpu = platform.processor() or platform.machine()
     if not cpu or cpu == platform.machine():
-        # Linux: platform.processor() is often empty — use the cpuinfo model name.
+        # On Linux, platform.processor() often returns the same string as
+        # platform.machine() (e.g. "x86_64") when the CPU model is unavailable —
+        # a CPython implementation detail. Fall through to /proc/cpuinfo for the
+        # actual model name, which produces a more stable per-machine fingerprint.
         try:
             with open("/proc/cpuinfo") as fh:
                 for line in fh:

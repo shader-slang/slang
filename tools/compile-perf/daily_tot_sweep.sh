@@ -43,6 +43,11 @@ for entry in "${COMMITS[@]}"; do
     continue
   }
   git -C "$REPO" submodule update --init --recursive >/dev/null 2>&1
+  # Pin the build system's git-version file to a fixed string so incremental
+  # builds across commits don't regenerate the core module every time the real
+  # git version changes (which would defeat the "build only changed TUs" goal).
+  # This file is not committed; the measured binary is correct — only its
+  # self-reported version tag is fixed.
   printf 'v2026.10\n' >"$REPO/cmake/slang_git_version"
   echo "--- build slangc (incremental) ---"
   if ! cmake --build "$REPO/build" --config Release --target slangc slang-glslang >/tmp/build_$label.log 2>&1; then
