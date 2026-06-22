@@ -21,10 +21,6 @@ on:
       samples:
         description: "timed samples per run"
         default: "5"
-      sweep:
-        description: "run the scaling sweep (sweep_sizes), not just default sizes"
-        type: boolean
-        default: false
       only:
         description: "comma-separated workload subset (blank = full suite)"
         default: ""
@@ -107,7 +103,6 @@ jobs:
         # value with shell metacharacters can't break out — it's just an argv item.
         env:
           SAMPLES: ${{ github.event.inputs.samples || '5' }}
-          SWEEP_ENABLED: ${{ github.event.inputs.sweep || 'true' }}
           ONLY: ${{ github.event.inputs.only }}
         run: |
           set -euo pipefail
@@ -124,7 +119,6 @@ jobs:
 
           cd "$SUITE"
           args=(--slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" --samples "$SAMPLES" --warmup 1)
-          [ "$SWEEP_ENABLED" = "true" ] && args+=(--sweep)
           [ -n "$ONLY" ] && args+=(--only "$ONLY")
           # Daily ToT sweep -> perf-results/daily/<label>/results.json
           python bench.py "${args[@]}"
@@ -228,6 +222,8 @@ jobs:
         run: |
           git -C "$GITHUB_WORKSPACE/perf-pages" config --unset \
             http."https://github.com/".extraheader 2>/dev/null || true
+          git -C "$GITHUB_WORKSPACE/perf-pages" remote set-url origin \
+            "https://github.com/${{ env.PERF_RESULTS_REPO }}.git" 2>/dev/null || true
 
       # Runs AFTER the push so the data is stored even when this step fails the
       # job. trend.py exits non-zero (job red + ::error:: annotations) when a

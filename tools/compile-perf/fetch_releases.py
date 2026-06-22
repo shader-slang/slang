@@ -162,7 +162,7 @@ def main():
     )
     ap.add_argument("--repo", default=DEFAULT_REPO, help="local slang git checkout")
     ap.add_argument("--since", default="2025-08-01", help="YYYY-MM-DD inclusive")
-    ap.add_argument("--until", default="2026-06-30", help="YYYY-MM-DD inclusive")
+    ap.add_argument("--until", default="2026-12-31", help="YYYY-MM-DD inclusive")
     ap.add_argument("--include-patches", action="store_true")
     ap.add_argument("--tags", default=None, help="comma-separated explicit tags (overrides window)")
     ap.add_argument("--out", default=os.path.join(HERE, "releases"))

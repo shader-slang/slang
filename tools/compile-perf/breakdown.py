@@ -91,6 +91,8 @@ def _t(timers, name):
 
 def buckets(timers):
     """Mutually-exclusive {bucket: ms} that sum to compileInner, allocated TOP-DOWN
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
     from the compileInner budget. Each parent places its measured children within
     its budget; the remainder is '<parent> (self)'.
 

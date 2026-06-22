@@ -196,3 +196,5 @@ jobs:
         run: |
           git -C "$GITHUB_WORKSPACE/perf-pages" config --unset \
             http."https://github.com/".extraheader 2>/dev/null || true
+          git -C "$GITHUB_WORKSPACE/perf-pages" remote set-url origin \
+            "https://github.com/${{ env.PERF_RESULTS_REPO }}.git" 2>/dev/null || true

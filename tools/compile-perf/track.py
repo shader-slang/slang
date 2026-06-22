@@ -37,6 +37,7 @@ import platform
 from lib import analyze
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)  # allow running from any directory
 
 
 def runner_id():

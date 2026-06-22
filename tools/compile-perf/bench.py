@@ -12,9 +12,9 @@ Examples:
     # Run the whole suite at default sizes with the local build:
     python3 bench.py --slangc ../../../build/RelWithDebInfo/bin/slangc --label dev
 
-    # One workload, scaling-curve sizes, more samples:
+    # One workload, more samples:
     python3 bench.py --slangc /path/slangc --label v2026.9 \\
-        --only autodiff --sweep --samples 7
+        --only autodiff --samples 7
 """
 import argparse
 import json
@@ -23,6 +23,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tempfile
 import time
 

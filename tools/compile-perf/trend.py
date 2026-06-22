@@ -26,6 +26,7 @@ import statistics
 from lib import manifest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)  # allow running from any directory
 
 
 def timers_for(workload):

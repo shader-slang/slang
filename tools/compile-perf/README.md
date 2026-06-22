@@ -127,10 +127,8 @@ The single-axis stressors above each isolate **one** pass. `complexity_ladder`
 instead ramps _several_ realistic dimensions together — branchy control flow,
 generic calls, bounded inner loops, resource reads, dynamic dispatch, and
 call-graph depth — so the size knob `N` models a real shader growing from
-**simple to highly complex**. Sweep it (`bench.py --only complexity_ladder
-bench.py --only complexity_ladder`) to measure the holistic
-complexity → compile-time curve, separating the fixed **floor** from the
-per-unit **slope** and surfacing super-linear bends at high complexity.
+**simple to highly complex**. Run it with `bench.py --only complexity_ladder`
+to measure the holistic compile-time curve at the default complexity.
 
 | Test                  | What it generates                                                                                       | Targets                                                             | Primary timer                                             |
 | --------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------- |
@@ -199,8 +197,7 @@ python3 compare.py base head                # primary-timer Δ%, flags regressio
 | `track.py`            | maintains the CI **tracking series** (release history ++ post-release daily ToT points) + runner fingerprint                                                                                                                                                                                                          |
 | `trend.py`            | nightly **drift alert** — latest point vs trailing-median, same-runner; GitHub annotations + non-zero exit on regression                                                                                                                                                                                              |
 | `lib/analyze.py`      | per-`(workload,timer)` series helpers — used as a library by `report.py`, `track.py`, etc. (no standalone CLI yet)                                                                                                                                                                                                    |
-| `breakdown.py`        | **phase attribution** — splits `compileInner` into mutually-exclusive buckets (named leaves + `(self)` residuals); aggregate + per-workload tree; stacked-area **per-release history** (index + per-workload detail pages in `report_per_workload.html`) |
-| `breakdown.py`        | (also) standalone CLI: `breakdown.py --label <tag>` prints aggregate + per-workload phase tables; `--html` writes a stacked-bar SVG/HTML; `--workload <name>` prints the full indented timer tree                                                                                                                     |
+| `breakdown.py`        | **phase attribution** — splits `compileInner` into mutually-exclusive buckets (named leaves + `(self)` residuals); aggregate + per-workload tree; stacked-area **per-release history** (index + per-workload detail pages in `report_per_workload.html`); standalone CLI: `--label <tag>` prints aggregate + per-workload tables; `--html` writes SVG/HTML; `--workload <name>` prints the full indented timer tree |
 | `report.py`           | single self-contained **HTML report**, cross-release (charts inline + tables)                                                                                                                                                                                                                                         |
 
 ### Documents
@@ -231,8 +228,6 @@ via `--results <checkout-path>`.
 
 | Path                                         | What it is                                                      |
 | -------------------------------------------- | --------------------------------------------------------------- |
-| `results/analysis/series.csv`               | long-format time-series, one row per `(workload,timer,release)` |
-| `results/analysis/flags.csv`                | ranked step-changes with leaf attribution                       |
 | `results/analysis/*.svg`                    | charts                                                          |
 | `results/analysis/report_per_workload.html` | per-workload stacked-area history + drill-down pages            |
 | `releases/`                                  | cached prebuilt `slangc` per tag (large, gitignored)            |

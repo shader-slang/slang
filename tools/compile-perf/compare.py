@@ -25,6 +25,7 @@ from lib import analyze
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)  # allow running from any directory
 
 
 def load(results_dir, label):
