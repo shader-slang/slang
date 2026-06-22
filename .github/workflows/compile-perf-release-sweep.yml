@@ -189,3 +189,10 @@ jobs:
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
           git commit -m "perf report $(date -u +%Y-%m-%d)"
           git push origin gh-pages
+
+      - name: Revoke PAT from perf-pages git config
+        if: always()
+        shell: bash
+        run: |
+          git -C "$GITHUB_WORKSPACE/perf-pages" config --unset \
+            http."https://github.com/".extraheader 2>/dev/null || true

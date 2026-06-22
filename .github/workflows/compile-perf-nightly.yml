@@ -222,6 +222,13 @@ jobs:
           git commit -m "perf report $(date -u +%Y-%m-%d)"
           git push origin gh-pages
 
+      - name: Revoke PAT from perf-pages git config
+        if: always()
+        shell: bash
+        run: |
+          git -C "$GITHUB_WORKSPACE/perf-pages" config --unset \
+            http."https://github.com/".extraheader 2>/dev/null || true
+
       # Runs AFTER the push so the data is stored even when this step fails the
       # job. trend.py exits non-zero (job red + ::error:: annotations) when a
       # primary timer drifts past threshold vs the trailing median.
