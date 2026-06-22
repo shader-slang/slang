@@ -147,10 +147,30 @@ jobs:
           ASAN_OPTIONS: detect_leaks=0
         run: cmake --build build --config "$cmake_config"
 
-      # Exercise `cmake --install` for entries that opt in via install_test.
-      # The static-lib build (SLANG_LIB_TYPE=STATIC) used to skip the
-      # install(EXPORT ...) step entirely, so a broken export would not have
-      # been caught by a plain configure+build. See issue #11359.
-      - name: Install Slang (${{ matrix.option }})
+      # Exercise `cmake --install` and a `find_package(slang)` consumer for
+      # entries that opt in via install_test. The static-lib build
+      # (SLANG_LIB_TYPE=STATIC) used to skip the install(EXPORT ...) step
+      # entirely, so a broken export would not have been caught by a plain
+      # configure+build. The find_package smoke test additionally guards the
+      # consumer path that actually broke in #11359: `cmake --install` can
+      # succeed while silently omitting slangTargets.cmake, and that only
+      # surfaces when a downstream calls find_package(slang). See issue #11359.
+      - name: Install Slang and verify find_package (${{ matrix.option }})
         if: matrix.install_test == 'true' && matrix.windows_only != 'true'
-        run: cmake --install build --config "$cmake_config" --prefix install
+        run: |
+          cmake --install build --config "$cmake_config" --prefix install
+          # Minimal consumer that resolves the exported slang::slang target.
+          mkdir -p consumer
+          cat >consumer/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.25)
+          project(slang-find-package-smoke LANGUAGES CXX)
+          find_package(slang CONFIG REQUIRED)
+          if(NOT TARGET slang::slang)
+              message(FATAL_ERROR "find_package(slang) did not define slang::slang")
+          endif()
+          EOF
+          # CMAKE_PREFIX_PATH lets find_package locate the package config under
+          # the install prefix regardless of the OS-specific config dir
+          # (`cmake` on Windows, `${CMAKE_INSTALL_LIBDIR}/cmake/slang`
+          # elsewhere; see SLANG_CMAKE_CONFIG_DIR in CMakeLists.txt).
+          cmake -S consumer -B consumer/build -DCMAKE_PREFIX_PATH="$PWD/install"

@@ -682,7 +682,16 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
         DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
     )
 
-    if(UNIX)
+    # The pkgconfig file stays gated on non-STATIC builds. Unlike the CMake
+    # export above, extras/pkgconfig/slang-compiler.pc.in cannot describe a
+    # static link: it lists only `-lslang-compiler` and leaves Libs.private
+    # empty (it explicitly documents that `pkg-config --static` is unsupported).
+    # Installing it for a STATIC build would hand downstream users a link line
+    # that omits every transitive internal archive (core, compiler-core,
+    # slang-capability-*, slang-lookup-tables, bundled miniz/lz4, ...), causing
+    # unresolved-symbol errors at link time. Static consumers should use
+    # find_package(slang) instead, which the export above now supports.
+    if(UNIX AND NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
         configure_file(
             "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
             "${PROJECT_BINARY_DIR}/slang-compiler.pc"
