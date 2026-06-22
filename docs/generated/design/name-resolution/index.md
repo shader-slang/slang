@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T13:32:12+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 74f38318a36443c037d6981bf35771b5568a81348341a8264dae6148131877f4
+generated_at: 2026-06-12T10:25:56Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 4080bcfcf1b112fa3ace17207ae1272f8aa8c5e9ac63ab53a4746286f7f0d9b4
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -62,10 +62,11 @@ flowchart LR
 ```
 
 The arrows show the rough phases. In the actual compiler some of
-these phases are interleaved — for example, `lookup.md` describes
-how shadowing is enforced *during* the scope walk, and
-`visibility.md` describes how `TryCheckOverloadCandidateVisibility`
-applies a second visibility check *inside* overload resolution. The
+these phases are interleaved — for example, [lookup.md](lookup.md)
+describes how shadowing is enforced *during* the scope walk, and
+[visibility.md](visibility.md) describes how
+`TryCheckOverloadCandidateVisibility` applies a second visibility
+check *inside* [overload-resolution.md](overload-resolution.md). The
 pages have inline cross-references where the boundary is not strict.
 
 ## Where this fits in the pipeline

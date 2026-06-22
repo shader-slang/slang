@@ -463,8 +463,8 @@ struct ByteAddressBuffer
 
     /// Load a value with type `T` from the buffer at the specified location with a known alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
+    ///@param location The input address in bytes, which must be a multiple of `alignment`.
+    ///@param alignment The known alignment of `location` in bytes; a compile-time constant.
     ///@return The value loaded from the buffer.
     ///@remarks
     /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
@@ -472,7 +472,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
-    T LoadAligned<T>(uint location, uint alignment)
+    T LoadAligned<T>(uint location, constexpr uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
@@ -5894,23 +5894,23 @@ uint64_t __asuint64(uint2 i)
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
-T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, uint offset, uint alignment);
+T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, uint offset, constexpr uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, uint offset, uint alignment);
+T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, uint offset, constexpr uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment);
+T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, constexpr uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, uint offset, uint alignment, T value);
+void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, uint offset, constexpr uint alignment, T value);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment, T value);
+void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, constexpr uint alignment, T value);
 
 __intrinsic_op($(kIROp_GetUntypedBufferPtr))
 [require(cpp_cuda, byteaddressbuffer)]
@@ -6442,8 +6442,8 @@ struct $(item.name)
 
     /// Load a value with type `T` from the buffer at the specified location with a known alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
+    ///@param location The input address in bytes, which must be a multiple of `alignment`.
+    ///@param alignment The known alignment of `location` in bytes; a compile-time constant.
     ///@return The value loaded from the buffer.
     ///@remarks
     /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
@@ -6451,7 +6451,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-    T LoadAligned<T>(uint location, uint alignment)
+    T LoadAligned<T>(uint location, constexpr uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
@@ -7142,7 +7142,7 @@ $}
 
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-    void Store<T>(uint address, T value, uint alignment)
+    void Store<T>(uint address, T value, constexpr uint alignment)
     {
         __byteAddressBufferStore(this, address, alignment, value);
     }
@@ -14093,6 +14093,26 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 [require(slangvm)]
 __intrinsic_op($(kIROp_Printf))
 void printf<each T>(NativeString format, expand each T args);
+
+/// Abort shader execution with a debug message (VK_KHR_shader_abort).
+/// @param T The variadic type pack parameter for the arguments to be included in the message.
+/// @param format The format string. Must be a string literal.
+/// @param args (optional) Scalar and vector basic-type arguments to include in the message.
+/// @remarks The function maps to `abortEXT` for GLSL targets and emits `OpAbortKHR` for SPIR-V
+/// targets. When executed, shader execution terminates and the message is surfaced to the host
+/// through the retrieval mechanism defined by the VK_KHR_shader_abort extension (for example,
+/// the Vulkan device fault mechanism). Struct, matrix, array, pointer, resource, cooperative
+/// vector, and cooperative matrix arguments are rejected with diagnostic E55211.
+/// @example
+/// ```cpp
+/// void test(uint val)
+/// {
+///     abort("Unexpected value: %u", val);
+/// }
+/// ```
+[require(abort)]
+__intrinsic_op($(kIROp_Abort))
+void abort<each T>(NativeString format, expand each T args);
 
 // Tessellation factor fixup routines
 /// @category tessellation Tessellation functions
@@ -30205,14 +30225,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         this.copyFrom(other);
     }
 
-    [ForceInline]
-    [require(cooperative_vector)]
-    __init<each U : __BuiltinArithmeticType>(expand each U args)
-    {
-        static_assert(countof(U) == N, "number of arguments to CoopVec constructor must match number of elements");
-        this = __makeCoopVec<T, N>(expand (__arithmetic_cast<T>(each args)));
-    }
-
     [OverloadRank(-10)]
     [ForceInline]
     [require(cooperative_vector)]
@@ -31181,6 +31193,266 @@ ${
 $}
 }
 
+// Only floating-point CoopVec instantiations are differentiable. Integer CoopVec types
+// intentionally do not get this conformance, so they still diagnose in AD entry points.
+__generic<T : __BuiltinFloatingPointType, let N : int>
+extension CoopVec<T, N> : IDifferentiable
+{
+    typealias Differential = CoopVec<T, N>;
+
+    [Differentiable]
+    static Differential dzero()
+    {
+        return __default<Differential>();
+    }
+
+    [Differentiable]
+    static Differential dadd(Differential a, Differential b)
+    {
+        return __internal_add(a, b);
+    }
+}
+
+// Keep the general value-pack constructor as an extension so overload resolution compares it
+// against the floating differentiable constructor using extension-to-extension rules.
+extension<T : __BuiltinArithmeticType, let N : int> CoopVec<T, N>
+{
+    [OverloadRank(-1)]
+    [ForceInline]
+    [require(cooperative_vector)]
+    __init<each U : __BuiltinArithmeticType>(expand each U args)
+    {
+        // This preserves the existing arithmetic constructor behavior while letting the floating
+        // overload below win by overload rank for differentiable element and argument types.
+        static_assert(countof(U) == N, "number of arguments to CoopVec constructor must match number of elements");
+        this = __makeCoopVec<T, N>(expand (__arithmetic_cast<T>(each args)));
+    }
+}
+
+// Keep the differentiable value-pack constructor in the floating CoopVec extension.
+// The general constructor is also an extension, while this overload is only
+// available when both the CoopVec element type and constructor operands are differentiable.
+// The direct [Differentiable] annotation lets autodiff synthesize the constructor derivative.
+extension<T : __BuiltinFloatingPointType, let N : int> CoopVec<T, N>
+{
+    [OverloadRank(1)]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [Differentiable]
+    __init<each U : __BuiltinFloatingPointType>(expand each U args)
+    {
+        static_assert(countof(U) == N, "number of arguments to CoopVec constructor must match number of elements");
+        // Use the direct floating cast intrinsic so autodiff can transpose the constructor
+        // operands through kIROp_FloatCast instead of a wrapper call around __arithmetic_cast.
+        this = __makeCoopVec<T, N>(expand (__real_cast<T>(each args)));
+    }
+}
+
+// These arithmetic witnesses copy the normal CoopVec target-switch implementations.
+// The specialization is only here to satisfy differentiable arithmetic requirements.
+__generic<T : __BuiltinFloatingPointType, let N : int>
+extension CoopVec<T, N> : IDifferentiableArithmetic
+{
+    [Differentiable]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [require(optix_coopvec)]
+    This add(This other)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 + $1";
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecAdd($0, $1)";
+        default: return __pureAdd(other);
+        }
+    }
+
+    [Differentiable]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [require(optix_coopvec)]
+    This sub(This other)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 - $1";
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecSub($0, $1)";
+        default: return __pureSub(other);
+        }
+    }
+
+    [Differentiable]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [require(optix_coopvec)]
+    This mul(This other)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 * $1";
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecMul($0, $1)";
+        default: return __pureMul(other);
+        }
+    }
+
+    [Differentiable]
+    [ForceInline]
+    [require(cooperative_vector)]
+    This div(This other)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 / $1";
+        default: return __pureDiv(other);
+        }
+    }
+
+    [Differentiable]
+    [require(cooperative_vector)]
+    This neg()
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "-$0";
+        default: return __pureNeg(this);
+        }
+    }
+}
+
+// Conditional custom derivatives for floating-point CoopVec arithmetic. Keeping these
+// as __func_extension declarations avoids differentiating the target-switch method bodies.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::add)(
+    DifferentialPair<CoopVec<T, N>> self,
+    DifferentialPair<CoopVec<T, N>> other) -> DifferentialPair<CoopVec<T, N>>
+{
+    return diffPair(self.p.add(other.p), self.d.add(other.d));
+}
+
+// Addition sends the incoming reverse gradient unchanged to both operands.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::add)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    inout DifferentialPair<CoopVec<T, N>> other,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    self = diffPair(self.p, dOut);
+    other = diffPair(other.p, dOut);
+}
+
+// Subtraction is element-wise, so the primal and tangent paths both subtract component-wise.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::sub)(
+    DifferentialPair<CoopVec<T, N>> self,
+    DifferentialPair<CoopVec<T, N>> other) -> DifferentialPair<CoopVec<T, N>>
+{
+    return diffPair(self.p.sub(other.p), self.d.sub(other.d));
+}
+
+// Reverse subtraction flips the contribution flowing to the right operand.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::sub)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    inout DifferentialPair<CoopVec<T, N>> other,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    self = diffPair(self.p, dOut);
+    other = diffPair(other.p, dOut.neg());
+}
+
+// Multiplication applies the product rule component-wise.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::mul)(
+    DifferentialPair<CoopVec<T, N>> self,
+    DifferentialPair<CoopVec<T, N>> other) -> DifferentialPair<CoopVec<T, N>>
+{
+    let d = self.d.mul(other.p).add(self.p.mul(other.d));
+    return diffPair(self.p.mul(other.p), d);
+}
+
+// Reverse multiplication uses the saved primal operands as the local scale factors.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::mul)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    inout DifferentialPair<CoopVec<T, N>> other,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    let selfP = self.p;
+    let otherP = other.p;
+    self = diffPair(selfP, otherP.mul(dOut));
+    other = diffPair(otherP, selfP.mul(dOut));
+}
+
+// Division applies the quotient rule component-wise.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::div)(
+    DifferentialPair<CoopVec<T, N>> self,
+    DifferentialPair<CoopVec<T, N>> other) -> DifferentialPair<CoopVec<T, N>>
+{
+    let numerator = self.d.mul(other.p).sub(self.p.mul(other.d));
+    let denominator = other.p.mul(other.p);
+    return diffPair(self.p.div(other.p), numerator.div(denominator));
+}
+
+// Reverse division keeps primal values before mutating the differential pairs.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::div)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    inout DifferentialPair<CoopVec<T, N>> other,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    let selfP = self.p;
+    let otherP = other.p;
+    let denominator = otherP.mul(otherP);
+    self = diffPair(selfP, dOut.div(otherP));
+    other = diffPair(otherP, selfP.neg().mul(dOut).div(denominator));
+}
+
+// Negation forwards the negated primal and tangent.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::neg)(
+    DifferentialPair<CoopVec<T, N>> self) -> DifferentialPair<CoopVec<T, N>>
+{
+    return diffPair(self.p.neg(), self.d.neg());
+}
+
+// Reverse negation only flips the incoming gradient sign.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::neg)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    self = diffPair(self.p, dOut.neg());
+}
+
 __intrinsic_op($(kIROp_MakeCoopVectorFromValuePack))
 CoopVec<T, N> __makeCoopVec<T : __BuiltinArithmeticType, let N : int, each U>(expand each U args);
 
@@ -31430,6 +31702,48 @@ CoopVec<T, N> step<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> ed
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
             ret[i] = step(edge[i], x[i]);
+        return ret;
+    }
+}
+
+// Provide CoopVec trig overloads needed by common differentiable math. HLSL/SPIR-V
+// lower natively when available; the fallback preserves element-wise semantics.
+[require(cooperative_vector)]
+CoopVec<T, N> sin<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "sin($0)";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$CoopVec<T, N> = OpExtInst glsl450 Sin $x;
+        };
+    default:
+        CoopVec<T, N> ret;
+        for(int i = 0; i < N; ++i)
+            ret[i] = sin(x[i]);
+        return ret;
+    }
+}
+
+[require(cooperative_vector)]
+CoopVec<T, N> cos<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "cos($0)";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$CoopVec<T, N> = OpExtInst glsl450 Cos $x;
+        };
+    default:
+        CoopVec<T, N> ret;
+        for(int i = 0; i < N; ++i)
+            ret[i] = cos(x[i]);
         return ret;
     }
 }

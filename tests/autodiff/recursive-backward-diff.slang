@@ -16,8 +16,6 @@ float recursiveSum(float x, int n)
     return x + recursiveSum(x * 0.5, n - 1);
 //CHECK: E55201
 //CHECK:                   ^ recursion detected in call to 'recursiveSum'
-//CHECK: E55201
-//CHECK:                   ^ recursion detected in call to 'recursiveSum'
 }
 
 RWStructuredBuffer<float> outputBuffer;

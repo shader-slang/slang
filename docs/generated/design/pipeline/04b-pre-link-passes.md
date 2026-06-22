@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T10:25:25+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 18c422c7671f2e36b802b77eaab4617e384c7719e835466116d64fcc7c9bd423
+generated_at: 2026-06-12T10:27:58Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 5d8f0673fff709ba944e2d5a817256dd08a0b0e59062363746d7886db6baead6
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -29,7 +29,7 @@ use the `SLANG_PASS(...)` macro that wraps the post-link passes in
 ## Source
 
 - [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-  — `generateIRForTranslationUnit` (line ~14712) is the orchestrator.
+  — `generateIRForTranslationUnit` (line ~14839) is the orchestrator.
   The function is invoked once per `TranslationUnitRequest` from
   `Module::compile` and friends; its result is cached on
   `Module::m_irModule`.
@@ -75,7 +75,7 @@ the program is composed for a specific target.
 
 ## Phase A: AST walk and IR emission
 
-Spans roughly lines 14734-14843 of
+Spans roughly lines 14861-14970 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
 This phase creates a fresh `IRModule`, optionally attaches
 `kIROp_ExperimentalModuleDecoration` and per-source `DebugSource`
@@ -131,13 +131,13 @@ flowchart TD
 | A9 | `addNVAPISlotDecoration(moduleInst, registerName, spaceName)` | [slang-ir.h](../../../../source/slang/slang-ir.h) | `moduleDecl->findModifier<NVAPISlotModifier>()` | Module-level NVAPI register/space binding. |
 | A10 | `validateIRModuleIfEnabled(compileRequest, module)` | [slang-ir-validate.h](../../../../source/slang/slang-ir-validate.h) | always (no-op unless validation is enabled at the compiler-option level) | Closes Phase A with a structural sanity check on the freshly emitted IR. |
 
-The `#if 0` block at line 14830 (a `dumpIR(module, ..., "GENERATED", ...)`
+The `#if 0` block at line 14957 (a `dumpIR(module, ..., "GENERATED", ...)`
 call) is intentionally disabled in production builds; flip it for
 debugging the pre-mandatory IR shape.
 
 ## Phase B: Mandatory pre-optimization transformations
 
-Spans roughly lines 14865-14892. The block comment at line 14845
+Spans roughly lines 14992-15018. The block comment at line 14972
 states the dual purpose: simplify the IR ahead of backend
 compilation, **and** establish dataflow invariants the
 non-essential validators in Phase D rely on.
@@ -167,7 +167,7 @@ flowchart TD
 
 ## Phase C: Mandatory optimization passes
 
-Spans roughly lines 14898-14979. This phase establishes SSA,
+Spans roughly lines 15025-15106. This phase establishes SSA,
 constant-propagates with `applySparseConditionalConstantPropagation`,
 performs an optional CFG simplification + peephole pair (gated on
 `!minimumOptimizations`), runs a per-function DCE sweep, optionally
@@ -213,7 +213,7 @@ inlining loop.
 
 ## Phase D: Non-essential validation, stripping, and finalization
 
-Spans roughly lines 14981-15098. Phase D first runs a block of
+Spans roughly lines 15108-15225. Phase D first runs a block of
 optional dataflow validators (gated on
 `shouldRunNonEssentialValidation`), then strips front-end-only
 decorations (with an obfuscation sub-gate that also requests a
@@ -274,7 +274,7 @@ flowchart TD
 | D15 | `module->buildMangledNameToGlobalInstMap()` | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) | always | Builds the lookup index `linkIR` later needs. |
 
 Note that the `if (compileRequest->optionSet.shouldDumpIR())` block
-between D14 and D15 (lines 15086-15096) is an optional dump, not a
+between D14 and D15 (lines 15213-15223) is an optional dump, not a
 pipeline step; it does not mutate the module.
 
 ## Conditional gates
@@ -311,7 +311,7 @@ pipeline step; it does not mutate the module.
 
 The pre-link pipeline contains **exactly one** pass-level loop:
 the `performMandatoryEarlyInlining` fixed point at lines
-14953-14979.
+15080-15106.
 
 ```mermaid
 flowchart TD
@@ -351,7 +351,7 @@ its results into `changed` (the trailing `eliminateDeadCode` call
 does not). The loop breaks once this final `changed` value is
 `false`.
 
-The per-function DCE sweep at C5 (line 14914-14918) iterates over
+The per-function DCE sweep at C5 (line 15041-15045) iterates over
 functions but not over passes — it is one pipeline step whose
 effect happens to be per-function, not a loop in the pipeline
 sense. The same applies to A6 (`lowerFrontEndEntryPointToIR` per
@@ -437,7 +437,7 @@ Removes decorations and instructions that are only meaningful to
 the front end — `IRHighLevelDeclDecoration`, optionally
 `IRNameHintDecoration` (when obfuscation is on), and a handful of
 internal book-keeping insts. The intent is documented by the
-comment at line 15024: AST-level information must not flow into
+comment at line 15146: AST-level information must not flow into
 the backend.
 
 ### `obfuscateModuleLocs`
@@ -473,7 +473,7 @@ overall flow.
 
 ### `SpecializedComponentTypeIRGenContext::process`
 
-Lives at line ~15112 of
+Lives at line ~15387 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
 This routine builds a small IR module for a
 `SpecializedComponentType` that records how specialization
@@ -486,7 +486,7 @@ runs.
 
 ### `TargetProgram::createIRModuleForLayout`
 
-Lives at line ~15661 of
+Lives at line ~15788 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
 It produces a separate, per-target IR module whose only contents
 are `IRLayoutDecoration`s on stub globals and entry points; it

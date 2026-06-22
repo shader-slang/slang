@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T10:25:25+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: cbccfa6aafcc9d4307bb48a229affc8e0177c1211a2813463404fd1e5ba4f6be
+generated_at: 2026-06-12T10:17:32Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: d8e32ce634cb5c690185a7348f23f158bf8feb8f41b3a73c73eb75ceb79f8bd5
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -38,8 +38,6 @@ flowchart TD
   NodeBase --> Val
   Val --> Type
   Val --> DeclRefBase
-  Val --> IntVal
-  Val --> Witness
   SyntaxNodeBase --> SyntaxNode
   SyntaxNode --> Expr
   SyntaxNode --> Modifier

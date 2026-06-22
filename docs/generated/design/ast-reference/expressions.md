@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T09:24:37Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 0d26ac1f4551507e46c4f987f6ed9056ef663fb2db265a373049f3b0d384bd13
+generated_at: 2026-06-12T10:15:50Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: cac7e2d9eb8ba3e143943a9ace5008f267481600341257629d6b70ee60b4f3a5
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -161,7 +161,7 @@ flowchart TD
 | `FuncTypeExpr` | `Expr` | `parameters: List<TypeExp>`, `result: TypeExp` | [function type](../syntax-reference/grammar.md#types) | `(T1, T2) -> R` function-type expression. |
 | `TupleTypeExpr` | `Expr` | `members: List<TypeExp>` | [tuple type](../syntax-reference/grammar.md#types) | `(T1, T2, ...)` tuple-type expression. |
 | `PackBranchTypeExpr` | `Expr` | `packOperand: TypeExp`, `emptyType: TypeExp`, `nonEmptyType: TypeExp` | (none) | Pack-conditional type expression. |
-| `PartiallyAppliedGenericExpr` | `Expr` | `baseGenericDeclRef: DeclRef<GenericDecl>`, `knownGenericArgs: List<Val*>` | (none) | A generic applied to some but not all parameters; resolved by overload resolution. |
+| `PartiallyAppliedGenericExpr` | `Expr` | `baseGenericDeclRef: DeclRef<GenericDecl>`, `providedOrdinaryArgs: List<Val*>` | (none) | A generic applied to some but not all parameters; resolved by overload resolution. |
 | `PackExpr` | `Expr` | `args: List<Expr*>` | (none) | Bundle of argument exprs matched to a pack parameter during overload resolution. |
 | `SPIRVAsmExpr` | `Expr` | `insts: List<SPIRVAsmInst>` | [`spirv_asm` block](../syntax-reference/grammar.md#expressions) | Inline-SPIRV assembly expression. |
 

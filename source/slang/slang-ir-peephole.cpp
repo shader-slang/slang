@@ -834,9 +834,7 @@ struct PeepholeContext : InstPassBase
                             j);
                         args.add(e);
                     }
-                    const auto cvt = builder.getCoopVectorType(
-                        args[0]->getDataType(),
-                        builder.getIntValue(builder.getIntType(), args.getCount()));
+                    const auto cvt = inst->getFullType();
                     const auto v = builder.emitMakeCoopVector(cvt, args.getCount(), args.begin());
                     inst->replaceUsesWith(v);
                     inst->removeAndDeallocate();
