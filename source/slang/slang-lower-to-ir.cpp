@@ -14863,30 +14863,30 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
     return info;
 }
 
-// Stamp the entry-point function's required SPIR-V / Metal language-version capability
-// atoms onto `irFunc` as IRRequireCapabilityAtomDecoration. The atoms are taken from the
-// function's inferred capability requirements, which fold in any `[require(...)]`
-// attributes. Both the codegen front-end lowering and the layout/reflection IR module call
-// this, so the codegen module carries the same per-entry-point version requirement the
-// reflection module records; the SPIR-V backend reads these decorations to raise the
-// emitted binary version (see determineSpirvVersion in slang-ir-spirv-legalize.cpp; #11631).
+// Stamp the entry-point function's required language-version capability atoms onto
+// `entryPointInst` as IRRequireCapabilityAtomDecoration. The atoms come from the function's
+// inferred capability requirements, which fold in any `[require(...)]` attributes, and are
+// filtered to the target language-version atoms (SPIR-V `_spirv_1_x`, Metal `metallib_2_x`)
+// via isTargetVersionAtom. Both the codegen front-end lowering and the layout/reflection IR
+// module call this, so the codegen module carries the same per-entry-point version
+// requirement the reflection module records. The SPIR-V backend reads these decorations to
+// raise the emitted binary version (see determineSpirvVersion in slang-ir-spirv-legalize.cpp;
+// #11631). The Metal atoms are carried for parity with the reflection module and currently
+// have no codegen consumer.
 static void addEntryPointRequireCapabilityDecorations(
     IRBuilder* builder,
-    IRInst* irFunc,
+    IRInst* entryPointInst,
     FuncDecl* entryPointFuncDecl)
 {
-    const auto latestSpirvAtom = getLatestSpirvAtom();
-    const auto latestMetalAtom = getLatestMetalAtom();
     CapabilitySet capabilitySet{entryPointFuncDecl->inferredCapabilityRequirements};
     for (auto atomSet : capabilitySet.getAtomSets())
     {
         for (auto atomVal : atomSet)
         {
             auto atom = asAtom(atomVal);
-            if ((atom >= CapabilityAtom::_spirv_1_0 && atom <= latestSpirvAtom) ||
-                (atom >= CapabilityAtom::metallib_2_3 && atom <= latestMetalAtom))
+            if (isTargetVersionAtom(atom))
             {
-                builder->addRequireCapabilityAtomDecoration(irFunc, (CapabilityName)atom);
+                builder->addRequireCapabilityAtomDecoration(entryPointInst, (CapabilityName)atom);
             }
         }
     }
