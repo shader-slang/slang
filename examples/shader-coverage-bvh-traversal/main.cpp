@@ -1,0 +1,1003 @@
+// BVH-traversal coverage demo — raw-Vulkan host driver.
+//
+// Build a BVH over a procedural mesh on CPU, upload to GPU, trace
+// 4096×4096 rays through it via compute shader, read back coverage.
+// Smoke mode uses a clean icosphere with one material; full mode adds
+// extra material kinds + degenerate triangles + a packed cluster.
+// Pass `--batch-size=N` to split the dispatch into fixed-size batches
+// to keep each GPU submission short and avoid OS watchdog resets
+// (Windows TDR / VK_ERROR_DEVICE_LOST) under coverage instrumentation.
+//
+// All GPU-runtime calls go through `vk_compute_demo.h`. See its
+// file-level comment for the swap procedure when slang-rhi PR #739
+// lands.
+
+#include "vk_compute_demo.h"
+
+#include <algorithm>
+#include <array>
+#include <chrono>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <random>
+#include <slang-com-ptr.h>
+#include <slang.h>
+#include <string>
+#include <string_view>
+#include <vector>
+
+using Slang::ComPtr;
+
+namespace
+{
+
+// ---- EXPLICIT / RAW BINDING --------------------------------------------------
+// This demo uses the explicit binding approach: the host dictates the
+// descriptor slot for `__slang_coverage` at compile time (via
+// TraceCoverageBinding below) and then binds the buffer at exactly that
+// slot at runtime.  The slot is a compile-time constant — no post-compile
+// metadata query is needed.
+//
+// To avoid collisions with the application's own resources (set 0), the
+// coverage buffer is placed on a dedicated descriptor set (kCoverageSet=1).
+// Adding or removing application bindings on set 0 can never shift the
+// coverage slot.
+//
+// Compare shader-coverage-image-pipeline, which uses the metadata-derived
+// approach instead: no slot is hardcoded; the compiler picks a free slot
+// and the host discovers it via ISyntheticResourceMetadata.
+// ------------------------------------------------------------------------------
+constexpr uint32_t kCoverageBinding = 0;
+constexpr uint32_t kCoverageSet = 1;
+constexpr uint32_t kRayGridDim = 4096;
+constexpr uint32_t kRayCount = kRayGridDim * kRayGridDim;
+
+struct Vec3
+{
+    float x, y, z;
+    Vec3 operator-(const Vec3& o) const { return {x - o.x, y - o.y, z - o.z}; }
+    Vec3 operator+(const Vec3& o) const { return {x + o.x, y + o.y, z + o.z}; }
+    Vec3 operator*(float s) const { return {x * s, y * s, z * s}; }
+};
+
+Vec3 cross(const Vec3& a, const Vec3& b)
+{
+    return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
+}
+
+float length(const Vec3& v)
+{
+    return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+Vec3 normalize(const Vec3& v)
+{
+    float l = length(v);
+    return l > 0 ? Vec3{v.x / l, v.y / l, v.z / l} : Vec3{0, 0, 0};
+}
+Vec3 vmin(const Vec3& a, const Vec3& b)
+{
+    return {std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z)};
+}
+Vec3 vmax(const Vec3& a, const Vec3& b)
+{
+    return {std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z)};
+}
+
+struct alignas(16) Triangle
+{
+    Vec3 v0;
+    int materialId;
+    Vec3 v1;
+    int pad1;
+    Vec3 v2;
+    int pad2;
+};
+static_assert(sizeof(Triangle) == 48, "Triangle layout mismatch");
+
+struct alignas(16) BVHNode
+{
+    Vec3 bmin;
+    int leftIndex;
+    Vec3 bmax;
+    int rightIndex;
+    int firstTri;
+    int triCount;
+    int pad0;
+    int pad1;
+};
+static_assert(sizeof(BVHNode) == 48, "BVHNode layout mismatch");
+
+struct alignas(16) Ray
+{
+    Vec3 origin;
+    float tMin;
+    Vec3 dir;
+    float tMax;
+};
+static_assert(sizeof(Ray) == 32, "Ray layout mismatch");
+
+struct alignas(16) Globals
+{
+    uint32_t rayCount; // total rays across all batches
+    uint32_t triCount;
+    uint32_t nodeCount;
+    uint32_t rayBatchOffset; // first ray index of the current batch (was: pad)
+};
+
+[[noreturn]] void fail(const std::string& message)
+{
+    std::cerr << "error: " << message << "\n";
+    std::exit(1);
+}
+
+void checkSlang(SlangResult result, const char* what)
+{
+    if (SLANG_FAILED(result))
+        fail(std::string(what) + " failed");
+}
+
+void diagnoseIfNeeded(slang::IBlob* diagnostics)
+{
+    if (diagnostics && diagnostics->getBufferSize())
+    {
+        std::cerr.write(
+            reinterpret_cast<const char*>(diagnostics->getBufferPointer()),
+            diagnostics->getBufferSize());
+        std::cerr << "\n";
+    }
+}
+
+// Set by `main()` from `--demo-dir=<path>` when supplied; otherwise
+// stays empty and `getDemoDirectory()` falls back to its default
+// `__FILE__`-then-CWD discovery. Process-scope (anonymous-namespace)
+// because every caller of `getDemoDirectory()` lives in the same
+// translation unit and threading the override through compileShader
+// and friends would clutter unrelated signatures.
+std::filesystem::path g_demoDirOverride;
+
+// Resolves the directory containing the demo's `.slang` assets.
+// Discovery order:
+//   1. `--demo-dir=<path>` from the CLI, if supplied.
+//   2. The compile-time `__FILE__` parent directory, if the anchor
+//      `bvh_traverse.slang` is still there. Works for the intended
+//      "run from source tree" workflow.
+//   3. The current working directory, as a last-resort fallback for
+//      a user who runs the binary from a directory that happens to
+//      contain the demo shaders (e.g. a CI runner that `cd`s in).
+// If none of these point at the shaders, the subsequent
+// `loadModule` call surfaces a clear path-not-found error.
+std::filesystem::path getDemoDirectory()
+{
+    if (!g_demoDirOverride.empty())
+        return g_demoDirOverride;
+    std::filesystem::path sourceDir = std::filesystem::path(__FILE__).parent_path();
+    if (std::filesystem::exists(sourceDir / "bvh_traverse.slang"))
+        return sourceDir;
+    return std::filesystem::current_path();
+}
+
+void addQuad(std::vector<Triangle>& tris, Vec3 p0, Vec3 p1, Vec3 p2, Vec3 p3, int materialId)
+{
+    Triangle t1 = {};
+    t1.v0 = p0;
+    t1.v1 = p1;
+    t1.v2 = p2;
+    t1.materialId = materialId;
+    Triangle t2 = {};
+    t2.v0 = p0;
+    t2.v1 = p2;
+    t2.v2 = p3;
+    t2.materialId = materialId;
+    tris.push_back(t1);
+    tris.push_back(t2);
+}
+
+std::vector<Triangle> buildIcosphere(int subdivisions, int materialId)
+{
+    const float t = (1.0f + std::sqrt(5.0f)) / 2.0f;
+    std::vector<Vec3> verts = {
+        normalize({-1, t, 0}),
+        normalize({1, t, 0}),
+        normalize({-1, -t, 0}),
+        normalize({1, -t, 0}),
+        normalize({0, -1, t}),
+        normalize({0, 1, t}),
+        normalize({0, -1, -t}),
+        normalize({0, 1, -t}),
+        normalize({t, 0, -1}),
+        normalize({t, 0, 1}),
+        normalize({-t, 0, -1}),
+        normalize({-t, 0, 1}),
+    };
+    std::vector<std::array<int, 3>> faces = {
+        {0, 11, 5},  {0, 5, 1},  {0, 1, 7},  {0, 7, 10}, {0, 10, 11}, {1, 5, 9}, {5, 11, 4},
+        {11, 10, 2}, {10, 7, 6}, {7, 1, 8},  {3, 9, 4},  {3, 4, 2},   {3, 2, 6}, {3, 6, 8},
+        {3, 8, 9},   {4, 9, 5},  {2, 4, 11}, {6, 2, 10}, {8, 6, 7},   {9, 8, 1},
+    };
+    for (int s = 0; s < subdivisions; ++s)
+    {
+        std::vector<std::array<int, 3>> next;
+        next.reserve(faces.size() * 4);
+        for (auto& f : faces)
+        {
+            int a = (int)verts.size();
+            verts.push_back(normalize(verts[f[0]] + verts[f[1]]));
+            int b = (int)verts.size();
+            verts.push_back(normalize(verts[f[1]] + verts[f[2]]));
+            int c = (int)verts.size();
+            verts.push_back(normalize(verts[f[2]] + verts[f[0]]));
+            next.push_back({f[0], a, c});
+            next.push_back({f[1], b, a});
+            next.push_back({f[2], c, b});
+            next.push_back({a, b, c});
+        }
+        faces = std::move(next);
+    }
+    std::vector<Triangle> out;
+    out.reserve(faces.size());
+    for (auto& f : faces)
+    {
+        Triangle t = {};
+        t.v0 = verts[f[0]];
+        t.v1 = verts[f[1]];
+        t.v2 = verts[f[2]];
+        t.materialId = materialId;
+        out.push_back(t);
+    }
+    return out;
+}
+
+std::vector<Triangle> buildSmokeMesh()
+{
+    return buildIcosphere(1, 0);
+}
+
+std::vector<Triangle> buildFullMesh()
+{
+    auto tris = buildIcosphere(2, 0);
+    addQuad(tris, {1.5f, -0.5f, 0}, {2.5f, -0.5f, 0}, {2.5f, 0.5f, 0}, {1.5f, 0.5f, 0}, 1);
+    addQuad(tris, {-2.5f, -0.5f, 0}, {-1.5f, -0.5f, 0}, {-1.5f, 0.5f, 0}, {-2.5f, 0.5f, 0}, 2);
+    addQuad(tris, {-0.5f, 1.5f, 0}, {0.5f, 1.5f, 0}, {0.5f, 2.5f, 0}, {-0.5f, 2.5f, 0}, 3);
+    for (int i = 0; i < 4; ++i)
+    {
+        Triangle t = {};
+        t.v0 = {0.0f, -2.0f - i * 0.2f, 0.0f};
+        t.v1 = {0.0f, -2.0f - i * 0.2f, 0.0f};
+        t.v2 = {0.0f, -2.0f - i * 0.2f, 0.5f};
+        t.materialId = 0;
+        tris.push_back(t);
+    }
+    std::mt19937 rng(42);
+    std::uniform_real_distribution<float> u(0.0f, 0.02f);
+    Vec3 clusterCentre{0.0f, 0.0f, -2.5f};
+    for (int i = 0; i < 64; ++i)
+    {
+        Triangle t = {};
+        t.v0 = clusterCentre + Vec3{u(rng), u(rng), u(rng)};
+        t.v1 = clusterCentre + Vec3{u(rng), u(rng), u(rng)};
+        t.v2 = clusterCentre + Vec3{u(rng), u(rng), u(rng)};
+        t.materialId = 0;
+        tris.push_back(t);
+    }
+    return tris;
+}
+
+struct BuildState
+{
+    std::vector<Triangle>& tris;
+    std::vector<BVHNode>& nodes;
+};
+
+Vec3 triCentroid(const Triangle& t)
+{
+    return (t.v0 + t.v1 + t.v2) * (1.0f / 3.0f);
+}
+Vec3 triMin(const Triangle& t)
+{
+    return vmin(vmin(t.v0, t.v1), t.v2);
+}
+Vec3 triMax(const Triangle& t)
+{
+    return vmax(vmax(t.v0, t.v1), t.v2);
+}
+
+int buildBVHRec(BuildState& s, int triStart, int triEnd)
+{
+    Vec3 bmin = triMin(s.tris[triStart]);
+    Vec3 bmax = triMax(s.tris[triStart]);
+    for (int i = triStart + 1; i < triEnd; ++i)
+    {
+        bmin = vmin(bmin, triMin(s.tris[i]));
+        bmax = vmax(bmax, triMax(s.tris[i]));
+    }
+    const int count = triEnd - triStart;
+    const int kLeafThreshold = 4;
+    if (count <= kLeafThreshold)
+    {
+        BVHNode leaf = {};
+        leaf.bmin = bmin;
+        leaf.bmax = bmax;
+        leaf.leftIndex = -1;
+        leaf.rightIndex = -1;
+        leaf.firstTri = triStart;
+        leaf.triCount = count;
+        s.nodes.push_back(leaf);
+        return (int)s.nodes.size() - 1;
+    }
+    Vec3 extent = bmax - bmin;
+    int axis = 0;
+    if (extent.y > extent.x)
+        axis = 1;
+    if (axis == 0 ? (extent.z > extent.x) : (extent.z > extent.y))
+        axis = 2;
+    auto compareByAxis = [axis](const Triangle& a, const Triangle& b)
+    {
+        Vec3 ca = triCentroid(a);
+        Vec3 cb = triCentroid(b);
+        if (axis == 0)
+            return ca.x < cb.x;
+        if (axis == 1)
+            return ca.y < cb.y;
+        return ca.z < cb.z;
+    };
+    int mid = (triStart + triEnd) / 2;
+    std::nth_element(
+        s.tris.begin() + triStart,
+        s.tris.begin() + mid,
+        s.tris.begin() + triEnd,
+        compareByAxis);
+    int nodeIdx = (int)s.nodes.size();
+    BVHNode internal = {};
+    internal.bmin = bmin;
+    internal.bmax = bmax;
+    s.nodes.push_back(internal);
+    int leftIdx = buildBVHRec(s, triStart, mid);
+    int rightIdx = buildBVHRec(s, mid, triEnd);
+    s.nodes[nodeIdx].leftIndex = leftIdx;
+    s.nodes[nodeIdx].rightIndex = rightIdx;
+    return nodeIdx;
+}
+
+// `buildBVHRec` returns the index of the actual root node, which is
+// not necessarily slot 0 (the recursion appends nodes as it goes).
+// Move that node to slot 0 so the GPU side can assume `nodes[0]` is
+// the root, and remap every child reference accordingly: anything
+// that pointed at the new-root slot now points at the old-slot-0,
+// and anything that pointed at slot 0 now points at the new-root
+// slot. Using an explicit two-value swap lambda keeps the mapping
+// obviously correct — any other arrangement of `if`/`else` branches
+// can silently cascade.
+void rerootNodes(std::vector<BVHNode>& nodes, int rootIndex)
+{
+    if (rootIndex == 0)
+        return;
+    std::swap(nodes[0], nodes[rootIndex]);
+    auto remap = [&](int idx)
+    {
+        if (idx == 0)
+            return rootIndex;
+        if (idx == rootIndex)
+            return 0;
+        return idx;
+    };
+    for (auto& n : nodes)
+    {
+        n.leftIndex = remap(n.leftIndex);
+        n.rightIndex = remap(n.rightIndex);
+    }
+}
+
+std::vector<BVHNode> buildBVH(std::vector<Triangle>& tris)
+{
+    std::vector<BVHNode> nodes;
+    nodes.reserve(tris.size() * 2);
+    BuildState s{tris, nodes};
+    int root = buildBVHRec(s, 0, (int)tris.size());
+    rerootNodes(s.nodes, root);
+    return s.nodes;
+}
+
+std::vector<Ray> generateRays(uint32_t gridDim)
+{
+    std::vector<Ray> rays(gridDim * gridDim);
+    Vec3 camPos{0.0f, 0.0f, 4.0f};
+    float fov = 1.0f;
+    for (uint32_t j = 0; j < gridDim; ++j)
+    {
+        for (uint32_t i = 0; i < gridDim; ++i)
+        {
+            float u = (float(i) / float(gridDim - 1)) * 2.0f - 1.0f;
+            float v = (float(j) / float(gridDim - 1)) * 2.0f - 1.0f;
+            Vec3 dir = normalize({u * fov, v * fov, -1.0f});
+            Ray r = {};
+            r.origin = camPos;
+            r.dir = dir;
+            r.tMin = 0.001f;
+            r.tMax = 100.0f;
+            rays[j * gridDim + i] = r;
+        }
+    }
+    return rays;
+}
+
+struct CompiledShader
+{
+    std::vector<uint8_t> spirv;
+    ComPtr<slang::IMetadata> metadata;
+    slang::ICoverageTracingMetadata* coverageMetadata = nullptr;
+};
+
+// Bundles the demo's compile-time choices so call sites name each
+// option at the call site instead of relying on positional `bool`s.
+// Members:
+//   - `enableCoverage` — toggles `-trace-coverage*` flags so the same
+//     binary can produce a baseline (uncovered) timing measurement.
+//   - `counterWidthBits` — forwarded to `-trace-coverage-counter-width`.
+//     `64` is the default on any Vulkan driver that supports
+//     `VK_KHR_shader_atomic_int64`; pass `32` on runtimes that do not
+//     (most notably MoltenVK on Apple Silicon as of MoltenVK 1.4).
+//   - `booleanMode` — selects between the two coverage recording modes:
+//       false (Count, default): each counter is incremented with an
+//       atomic add per hit; the slot holds an exact execution count.
+//       true (Boolean, opted into via `-trace-coverage-boolean`):
+//       each counter is written non-atomically with `1`; the slot is
+//       `0` if the entry never executed, non-zero otherwise. This
+//       removes all atomic contention (the dominant cost on hot
+//       loops) at the price of losing exact counts. LCOV output is
+//       identical because the converter treats any positive count as
+//       "covered" either way.
+struct CompileOptions
+{
+    bool enableCoverage = true;
+    int counterWidthBits = 32;
+    bool booleanMode = false;
+};
+
+CompiledShader compileShader(const CompileOptions& options)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    checkSlang(slang::createGlobalSession(globalSession.writeRef()), "createGlobalSession");
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+
+    // Renamed from `options` to avoid shadowing the `const
+    // CompileOptions& options` parameter.
+    std::vector<slang::CompilerOptionEntry> optionEntries;
+    auto pushBool = [&](slang::CompilerOptionName name)
+    {
+        slang::CompilerOptionEntry e = {};
+        e.name = name;
+        e.value.kind = slang::CompilerOptionValueKind::Int;
+        e.value.intValue0 = 1;
+        optionEntries.push_back(e);
+    };
+    pushBool(slang::CompilerOptionName::EmitSpirvDirectly);
+    if (options.enableCoverage)
+    {
+        pushBool(slang::CompilerOptionName::TraceCoverage);
+        pushBool(slang::CompilerOptionName::TraceFunctionCoverage);
+        pushBool(slang::CompilerOptionName::TraceBranchCoverage);
+
+        // ---- EXPLICIT / RAW BINDING: tell the compiler the exact slot --------
+        // TraceCoverageBinding pins __slang_coverage to (set=kCoverageSet,
+        // binding=kCoverageBinding). The compiler emits the matching
+        // OpDecorate Binding / DescriptorSet into the SPIR-V.  The host
+        // must then bind the counter buffer to that same slot — there is
+        // no runtime discovery step (contrast metadata-derived binding in
+        // shader-coverage-image-pipeline where this block is absent and
+        // ISyntheticResourceMetadata is queried after compilation instead).
+        slang::CompilerOptionEntry pin = {};
+        pin.name = slang::CompilerOptionName::TraceCoverageBinding;
+        pin.value.kind = slang::CompilerOptionValueKind::Int;
+        pin.value.intValue0 = kCoverageBinding; // Vulkan binding index
+        pin.value.intValue1 = kCoverageSet;     // Vulkan descriptor set / D3D12 space
+        optionEntries.push_back(pin);
+        // -----------------------------------------------------------------------
+
+        // Forward the counter-width selection. The slangc CLI parser
+        // converts `-trace-coverage-counter-width <bits>` to a byte
+        // width (4 or 8); the API option matches that convention.
+        slang::CompilerOptionEntry widthOpt = {};
+        widthOpt.name = slang::CompilerOptionName::TraceCoverageCounterByteWidth;
+        widthOpt.value.kind = slang::CompilerOptionValueKind::Int;
+        widthOpt.value.intValue0 = options.counterWidthBits / 8;
+        optionEntries.push_back(widthOpt);
+
+        // Hit/miss mode opts the coverage pass into non-atomic stores
+        // of `1` instead of atomic adds. Off (count mode) by default.
+        if (options.booleanMode)
+            pushBool(slang::CompilerOptionName::TraceCoverageBoolean);
+    }
+
+    const std::string searchPath = getDemoDirectory().string();
+    const char* searchPaths[] = {searchPath.c_str()};
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.targetCount = 1;
+    sessionDesc.searchPaths = searchPaths;
+    sessionDesc.searchPathCount = 1;
+    sessionDesc.compilerOptionEntries = optionEntries.data();
+    sessionDesc.compilerOptionEntryCount = (uint32_t)optionEntries.size();
+
+    ComPtr<slang::ISession> session;
+    checkSlang(globalSession->createSession(sessionDesc, session.writeRef()), "createSession");
+
+    ComPtr<slang::IBlob> diagnostics;
+    const std::string modulePath = (getDemoDirectory() / "bvh_traverse.slang").string();
+    slang::IModule* loaded = session->loadModule(modulePath.c_str(), diagnostics.writeRef());
+    diagnoseIfNeeded(diagnostics);
+    if (!loaded)
+        fail("loadModule(bvh_traverse.slang)");
+    ComPtr<slang::IModule> module(loaded);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    checkSlang(
+        module->findEntryPointByName("computeMain", entryPoint.writeRef()),
+        "findEntryPointByName");
+
+    slang::IComponentType* parts[] = {module.get(), entryPoint.get()};
+    ComPtr<slang::IComponentType> composed;
+    diagnostics.setNull();
+    checkSlang(
+        session
+            ->createCompositeComponentType(parts, 2, composed.writeRef(), diagnostics.writeRef()),
+        "createCompositeComponentType");
+    diagnoseIfNeeded(diagnostics);
+
+    ComPtr<slang::IComponentType> linked;
+    diagnostics.setNull();
+    checkSlang(composed->link(linked.writeRef(), diagnostics.writeRef()), "link");
+    diagnoseIfNeeded(diagnostics);
+
+    ComPtr<slang::IBlob> code;
+    diagnostics.setNull();
+    checkSlang(
+        linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef()),
+        "getEntryPointCode");
+    diagnoseIfNeeded(diagnostics);
+
+    CompiledShader out;
+    out.spirv.assign(
+        (const uint8_t*)code->getBufferPointer(),
+        (const uint8_t*)code->getBufferPointer() + code->getBufferSize());
+
+    if (options.enableCoverage)
+    {
+        diagnostics.setNull();
+        checkSlang(
+            linked->getEntryPointMetadata(0, 0, out.metadata.writeRef(), diagnostics.writeRef()),
+            "getEntryPointMetadata");
+        diagnoseIfNeeded(diagnostics);
+        out.coverageMetadata = (slang::ICoverageTracingMetadata*)out.metadata->castAs(
+            slang::ICoverageTracingMetadata::getTypeGuid());
+        if (!out.coverageMetadata)
+            fail("expected coverage metadata");
+    }
+    return out;
+}
+
+void writeManifest(slang::ICoverageTracingMetadata* coverage, const std::filesystem::path& path)
+{
+    ComPtr<ISlangBlob> manifestBlob;
+    checkSlang(
+        slang_writeCoverageManifestJson(coverage, manifestBlob.writeRef()),
+        "slang_writeCoverageManifestJson");
+    std::ofstream out(path, std::ios::binary);
+    if (!out)
+        fail("cannot open for writing: " + path.string());
+    out.write(
+        static_cast<const char*>(manifestBlob->getBufferPointer()),
+        (std::streamsize)manifestBlob->getBufferSize());
+}
+
+void writeCountersBinary(const std::vector<uint8_t>& rawBytes, const std::filesystem::path& path)
+{
+    // Writes the raw readback bytes verbatim; this function does not see
+    // the slot width. The caller guarantees the layout by sizing
+    // `rawBytes` as `counterCount * counterByteWidth`, so the resulting
+    // file is N little-endian unsigned integers each of `counterByteWidth`
+    // bytes (mirrored in `manifest.buffer.element_stride`). Downstream
+    // tools (the LCOV converter, the HTML renderer) read the manifest and
+    // this file as a pair.
+    std::ofstream out(path, std::ios::binary);
+    if (!out)
+        fail("cannot open for writing: " + path.string());
+    out.write(reinterpret_cast<const char*>(rawBytes.data()), (std::streamsize)rawBytes.size());
+}
+
+
+struct CoverageSummary
+{
+    uint32_t lineCovered = 0;
+    uint32_t lineTotal = 0;
+    uint32_t functionCovered = 0;
+    uint32_t functionTotal = 0;
+    uint32_t branchCovered = 0;
+    uint32_t branchTotal = 0;
+};
+
+CoverageSummary summarize(
+    slang::ICoverageTracingMetadata* coverage,
+    const std::vector<uint64_t>& hits)
+{
+    CoverageSummary s = {};
+    const uint32_t n = coverage->getCounterCount();
+    for (uint32_t i = 0; i < n; ++i)
+    {
+        slang::CoverageEntryInfo entry = {};
+        if (SLANG_FAILED(coverage->getEntryInfo(i, &entry)))
+            continue;
+        const bool covered = hits[i] > 0;
+        switch (entry.kind)
+        {
+        case slang::CoverageEntryKind::Line:
+            ++s.lineTotal;
+            if (covered)
+                ++s.lineCovered;
+            break;
+        case slang::CoverageEntryKind::Function:
+            ++s.functionTotal;
+            if (covered)
+                ++s.functionCovered;
+            break;
+        case slang::CoverageEntryKind::Branch:
+            ++s.branchTotal;
+            if (covered)
+                ++s.branchCovered;
+            break;
+        default:
+            break;
+        }
+    }
+    return s;
+}
+
+void printSummary(const char* label, const CoverageSummary& s)
+{
+    std::cout << label << ":\n"
+              << "  line     : " << s.lineCovered << " / " << s.lineTotal << "\n"
+              << "  function : " << s.functionCovered << " / " << s.functionTotal << "\n"
+              << "  branch   : " << s.branchCovered << " / " << s.branchTotal << "\n";
+}
+
+} // namespace
+
+int main(int argc, char** argv)
+{
+    // Wrap the demo body in try/catch so a Vulkan/Slang failure (no
+    // device, allocation failure, shader-module rejection, ...) exits
+    // with a diagnostic line instead of letting `std::terminate` fire.
+    // The `vkdemo::check` helper and various Slang call sites throw
+    // `std::runtime_error`, so catching `std::exception` covers both.
+    try
+    {
+        std::string mode = "smoke";
+        bool enableCoverage = true;
+        // This demo intentionally defaults to 32-bit counters even though
+        // the compiler default is 64-bit (see
+        // `CompilerOptionName::TraceCoverageCounterByteWidth`): MoltenVK on
+        // Apple Silicon does not expose `shaderBufferInt64Atomics`, and we
+        // want the demo to run there out of the box. Pass
+        // `--counter-width=64` on any Vulkan driver that does support
+        // `VK_KHR_shader_atomic_int64` to exercise the wider counters and
+        // match the compiler-side default.
+        int counterWidthBits = 32;
+        // `--coverage-mode=count` (default) records exact execution
+        // counts via atomic add; `--coverage-mode=boolean` records
+        // covered-or-not via non-atomic stores of `1`, which removes
+        // all atomic contention and runs roughly an order of
+        // magnitude faster on this demo at the cost of exact counts.
+        // The LCOV report is the same in both modes (any positive
+        // count is "covered").
+        bool coverageBoolean = false;
+        // `--output-dir=<path>`: explicit output location for the three
+        // coverage artifacts (manifest JSON, LCOV, raw counter buffer).
+        // Empty (default) means use `getDemoDirectory()` — source dir
+        // when running from the tree, current working directory as the
+        // robustness fallback. When set, the demo creates the directory
+        // if needed.
+        std::filesystem::path outputDir;
+        // `--demo-dir=<path>`: explicit override for the directory
+        // containing the demo's `.slang` assets. Empty (default) means
+        // `getDemoDirectory()` discovers them itself (`__FILE__`
+        // parent, falling back to CWD). When set, the demo trusts the
+        // override unconditionally and a missing `bvh_traverse.slang`
+        // there surfaces as a `loadModule` error rather than silently
+        // falling back to a different directory.
+        std::filesystem::path demoDir;
+        // `--batch-size=N`: split the ray grid into batches of N rays,
+        // each dispatched as a separate GPU submission. Keeps individual
+        // submissions short to avoid OS watchdog resets (Windows TDR /
+        // VK_ERROR_DEVICE_LOST) under coverage instrumentation. Default
+        // is 0 (all rays in a single dispatch). A value of 262144
+        // (512×512) is a safe starting point on any GPU; reduce if you
+        // observe TDR, increase for fewer submissions on fast hardware.
+        uint32_t batchSize = 0; // 0 = single dispatch
+        constexpr std::string_view kOutputDirFlag = "--output-dir=";
+        constexpr std::string_view kDemoDirFlag = "--demo-dir=";
+        constexpr std::string_view kBatchSizeFlag = "--batch-size=";
+        for (int i = 1; i < argc; ++i)
+        {
+            std::string_view a = argv[i];
+            if (a == "--mode=smoke")
+                mode = "smoke";
+            else if (a == "--mode=full")
+                mode = "full";
+            else if (a == "--no-coverage")
+                enableCoverage = false;
+            else if (a == "--coverage")
+                enableCoverage = true;
+            else if (a == "--counter-width=32")
+                counterWidthBits = 32;
+            else if (a == "--counter-width=64")
+                counterWidthBits = 64;
+            else if (a == "--coverage-mode=count")
+                coverageBoolean = false;
+            else if (a == "--coverage-mode=boolean")
+                coverageBoolean = true;
+            else if (a.substr(0, kOutputDirFlag.size()) == kOutputDirFlag)
+                outputDir = std::string(a.substr(kOutputDirFlag.size()));
+            else if (a.substr(0, kDemoDirFlag.size()) == kDemoDirFlag)
+                demoDir = std::string(a.substr(kDemoDirFlag.size()));
+            else if (a.substr(0, kBatchSizeFlag.size()) == kBatchSizeFlag)
+                batchSize = (uint32_t)std::stoul(std::string(a.substr(kBatchSizeFlag.size())));
+            else
+            {
+                std::cerr << "unknown arg: " << a << "\n";
+                return 1;
+            }
+        }
+
+        // Publish the `--demo-dir` override to file-scope storage so
+        // `getDemoDirectory()` (called from `compileShader` and from
+        // the output-dir resolution below) sees it without each call
+        // site having to thread an override parameter.
+        g_demoDirOverride = demoDir;
+
+        const char* coverageModeLabel = coverageBoolean ? "boolean" : "count";
+        std::cout << "compiling bvh_traverse.slang"
+                  << (enableCoverage ? " (coverage on, " : " (no coverage")
+                  << (enableCoverage ? (std::to_string(counterWidthBits) + "-bit counters, " +
+                                        coverageModeLabel + " mode)\n")
+                                     : ")\n");
+        CompileOptions compileOpts;
+        compileOpts.enableCoverage = enableCoverage;
+        compileOpts.counterWidthBits = counterWidthBits;
+        compileOpts.booleanMode = coverageBoolean;
+        auto shader = compileShader(compileOpts);
+
+        uint32_t counterCount = 0;
+        uint32_t counterByteWidth = 4;
+        if (enableCoverage)
+        {
+            counterCount = shader.coverageMetadata->getCounterCount();
+            // Match the GPU-side buffer's per-slot byte width to whatever
+            // the compiler synthesized (uint64 by default, uint32 under
+            // `-trace-coverage-counter-width 32`). A missing or zero
+            // `elementByteWidth` here is a hard error — silently falling
+            // back to 4 would mis-size the buffer whenever the user
+            // requested 64-bit counters.
+            slang::CoverageBufferInfo bufferInfo = {};
+            if (SLANG_FAILED(shader.coverageMetadata->getBufferInfo(&bufferInfo)) ||
+                bufferInfo.elementByteWidth == 0)
+            {
+                std::cerr << "coverage: getBufferInfo returned no element width; cannot size "
+                             "the readback buffer to match the compiled counter layout\n";
+                return 1;
+            }
+            counterByteWidth = bufferInfo.elementByteWidth;
+            std::cout << "coverage counter count: " << counterCount << " ("
+                      << (counterByteWidth * 8) << "-bit slots)\n";
+        }
+
+        auto tris = (mode == "smoke") ? buildSmokeMesh() : buildFullMesh();
+        std::cout << "mesh: " << tris.size() << " triangles (" << mode << ")\n";
+        auto nodes = buildBVH(tris);
+        std::cout << "BVH: " << nodes.size() << " nodes\n";
+        auto rays = generateRays(kRayGridDim);
+        std::cout << "rays: " << rays.size() << " (" << kRayGridDim << "x" << kRayGridDim << ")\n";
+
+        Globals globalsData = {};
+        globalsData.rayCount = (uint32_t)rays.size();
+        globalsData.triCount = (uint32_t)tris.size();
+        globalsData.nodeCount = (uint32_t)nodes.size();
+
+        vkdemo::Context ctx;
+        // 64-bit counters (8-byte slots) need a device with
+        // shaderBufferInt64Atomics; request that feature so device selection
+        // skips integrated GPUs that only support a 32-bit counter buffer.
+        const bool needsInt64Atomics = enableCoverage && counterByteWidth == 8;
+        ctx.init(needsInt64Atomics);
+
+        // Set 0: application resources (5 bindings in shader order —
+        // rays, tris, nodes, globals, output). Set 1: coverage buffer
+        // at kCoverageBinding, present only when coverage is enabled.
+        // The coverage set is fixed by the TraceCoverageBinding option
+        // passed at compile time; both sides must use the same constants.
+        std::vector<std::vector<VkDescriptorSetLayoutBinding>> setBindings;
+        setBindings.resize(2);
+        auto pushBinding = [](std::vector<VkDescriptorSetLayoutBinding>& v, uint32_t b)
+        {
+            VkDescriptorSetLayoutBinding lb = {};
+            lb.binding = b;
+            lb.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            lb.descriptorCount = 1;
+            lb.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+            v.push_back(lb);
+        };
+        for (uint32_t i = 0; i < 5; ++i)
+            pushBinding(setBindings[0], i); // rays=0, tris=1, nodes=2, globals=3, output=4
+        if (enableCoverage)
+            pushBinding(setBindings[1], kCoverageBinding);
+        else
+            setBindings.pop_back(); // no coverage set when instrumentation is off
+
+        // Slang's SPIR-V emit renames the entry point to "main" by default.
+        auto pipe = ctx.createComputePipeline(
+            shader.spirv.data(),
+            shader.spirv.size(),
+            setBindings,
+            "main");
+
+        // Application buffers — must match the binding order in bvh_traverse.slang.
+        auto rayBuf =
+            ctx.createBuffer(rays.size() * sizeof(Ray), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        ctx.upload(rayBuf, rays.data(), rayBuf.size);
+        auto triBuf =
+            ctx.createBuffer(tris.size() * sizeof(Triangle), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        ctx.upload(triBuf, tris.data(), triBuf.size);
+        auto nodeBuf =
+            ctx.createBuffer(nodes.size() * sizeof(BVHNode), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        ctx.upload(nodeBuf, nodes.data(), nodeBuf.size);
+        auto globalsBuf = ctx.createBuffer(sizeof(Globals), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+        ctx.upload(globalsBuf, &globalsData, sizeof(globalsData));
+        auto outputBuf =
+            ctx.createBuffer(rays.size() * 4 * sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+        // Coverage counter buffer: counterCount slots × counterByteWidth bytes each,
+        // zero-initialised. The GPU atomically increments each slot for every
+        // covered source location reached during the dispatch.
+        vkdemo::Buffer coverageBuf = {};
+        if (enableCoverage)
+        {
+            coverageBuf = ctx.createBuffer(
+                (size_t)counterCount * counterByteWidth,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+            std::vector<uint8_t> zero((size_t)counterCount * counterByteWidth, 0u);
+            ctx.upload(coverageBuf, zero.data(), coverageBuf.size);
+        }
+
+        // Bind application buffers to set 0 in shader binding order.
+        VkDescriptorSet set0 = ctx.allocateDescriptorSet(pipe.setLayouts[0]);
+        ctx.writeStorageBuffer(set0, 0, rayBuf);
+        ctx.writeStorageBuffer(set0, 1, triBuf);
+        ctx.writeStorageBuffer(set0, 2, nodeBuf);
+        ctx.writeStorageBuffer(set0, 3, globalsBuf);
+        ctx.writeStorageBuffer(set0, 4, outputBuf);
+
+        std::vector<VkDescriptorSet> sets = {set0};
+        if (enableCoverage)
+        {
+            // ---- EXPLICIT / RAW BINDING: runtime side ----------------------------
+            // Bind the coverage buffer at (set=kCoverageSet, binding=kCoverageBinding)
+            // — the same constants passed to TraceCoverageBinding at compile time.
+            // No metadata query is needed; the slot is fixed by the constants.
+            VkDescriptorSet set1 = ctx.allocateDescriptorSet(pipe.setLayouts[1]);
+            ctx.writeStorageBuffer(set1, kCoverageBinding, coverageBuf);
+            sets.push_back(set1);
+            // -----------------------------------------------------------------------
+        }
+
+        // Dispatch rays in batches to avoid any single GPU submission running
+        // long enough to trip the OS watchdog (Windows TDR /
+        // VK_ERROR_DEVICE_LOST) under coverage instrumentation. Each batch
+        // re-uploads globals with the new rayBatchOffset; the shader adds that
+        // offset to tid.x to recover the true ray index. The coverage buffer
+        // is NOT reset between batches — counters accumulate across the full
+        // grid so the final readback reflects all rays.
+        //
+        // This is the BVH analogue of the image-pipeline demo's tiled dispatch:
+        // image-pipeline tiles a 2D image by horizontal bands (tileOriginY);
+        // this demo tiles a 1D ray array by flat offset (rayBatchOffset).
+        // Both patterns are the same WAR for GPU watchdog timeouts on
+        // coverage-instrumented kernels.
+        //
+        // `--batch-size=N` sets the rays-per-batch; omitting the flag submits
+        // all rays in a single dispatch (fast, no TDR protection). A value of
+        // 262144 (512×512) is a safe starting point on any GPU.
+        const uint32_t totalRays = (uint32_t)rays.size();
+        // Resolve 0 (the "no flag" sentinel) to the full ray count so the loop
+        // always runs exactly one iteration by default.
+        const uint32_t effectiveBatchSize = (batchSize == 0) ? totalRays : batchSize;
+        uint32_t batchCount = 0;
+        std::cout << "dispatching " << totalRays << " rays";
+        if (effectiveBatchSize < totalRays)
+            std::cout << " in batches of " << effectiveBatchSize;
+        std::cout << " (coverage=" << (enableCoverage ? "on" : "off") << ")\n";
+        const auto renderStart = std::chrono::steady_clock::now();
+        for (uint32_t offset = 0; offset < totalRays; offset += effectiveBatchSize)
+        {
+            globalsData.rayBatchOffset = offset;
+            ctx.upload(globalsBuf, &globalsData, sizeof(globalsData));
+            const uint32_t batchRays = std::min(effectiveBatchSize, totalRays - offset);
+            const uint32_t groups = (batchRays + 63) / 64;
+            ctx.dispatch(pipe, sets, groups, 1, 1);
+            ++batchCount;
+        }
+        const auto renderEnd = std::chrono::steady_clock::now();
+        const double renderMs =
+            std::chrono::duration<double, std::milli>(renderEnd - renderStart).count();
+        if (batchCount > 1)
+            std::cout << "render wall time: " << renderMs << " ms (" << batchCount << " batches, "
+                      << (renderMs / batchCount) << " ms/batch)\n";
+        else
+            std::cout << "render wall time: " << renderMs << " ms\n";
+
+        if (enableCoverage)
+        {
+            // Read the raw counter buffer back from the GPU, then widen each
+            // slot to uint64_t so the summary and LCOV writers are width-agnostic.
+            // The on-disk .counters.bin is written at the original byte width so
+            // downstream tools that read the manifest's element_stride field see
+            // a consistent layout (matches image-pipeline's readback convention).
+            std::vector<uint8_t> rawBytes((size_t)counterCount * counterByteWidth);
+            ctx.download(coverageBuf, rawBytes.data(), coverageBuf.size);
+            std::vector<uint64_t> hits(counterCount, 0);
+            for (uint32_t i = 0; i < counterCount; ++i)
+            {
+                uint64_t value = 0;
+                const uint8_t* slot = rawBytes.data() + (size_t)i * counterByteWidth;
+                for (uint32_t b = 0; b < counterByteWidth; ++b)
+                    value |= (uint64_t)slot[b] << (b * 8); // little-endian reassembly
+                hits[i] = value;
+            }
+
+            auto summary = summarize(shader.coverageMetadata, hits);
+            printSummary(mode.c_str(), summary);
+
+            // Resolve the output directory. When `--output-dir` is
+            // unset, fall back to the demo directory (source tree
+            // during development, current working directory under the
+            // robustness fallback). When set, `create_directories`
+            // makes the path on demand — `fail()` on error so a typo
+            // doesn't silently land artifacts somewhere unexpected.
+            std::filesystem::path outDir = outputDir.empty() ? getDemoDirectory() : outputDir;
+            if (!outputDir.empty())
+            {
+                std::error_code ec;
+                std::filesystem::create_directories(outDir, ec);
+                if (ec)
+                    fail(
+                        "could not create output directory " + outDir.string() + ": " +
+                        ec.message());
+            }
+            writeManifest(shader.coverageMetadata, outDir / (mode + ".coverage-manifest.json"));
+            writeCountersBinary(rawBytes, outDir / (mode + ".counters.bin"));
+            std::cout << "wrote " << (outDir / (mode + ".coverage-manifest.json")) << "\n";
+            std::cout << "wrote " << (outDir / (mode + ".counters.bin")) << "\n";
+        }
+
+        ctx.destroyBuffer(rayBuf);
+        ctx.destroyBuffer(triBuf);
+        ctx.destroyBuffer(nodeBuf);
+        ctx.destroyBuffer(globalsBuf);
+        ctx.destroyBuffer(outputBuf);
+        if (enableCoverage)
+            ctx.destroyBuffer(coverageBuf);
+        ctx.destroyPipeline(pipe);
+        std::cout << "done\n";
+        return 0;
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "fatal: " << e.what() << "\n";
+        return 1;
+    }
+}

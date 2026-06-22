@@ -29,19 +29,21 @@ Add `-trace-coverage` to any compile, in-process or via `slangc`:
 slangc shader.slang -target spirv -stage compute -entry main \
     -trace-coverage -o shader.spv
 # -> shader.spv
-# -> shader.spv.coverage-mapping.json   (optional sidecar; see below)
+# -> shader.spv.coverage-manifest.json   (optional sidecar; see below)
 ```
 
 Every executable statement in the shader gets instrumented to
 increment a counter at runtime. The compiler synthesizes a
-`RWStructuredBuffer<uint> __slang_coverage` directly in the IR
-coverage pass — no AST decl, so it does not appear in Slang's
-public reflection. Hosts discover the hidden resource binding through
+`RWStructuredBuffer<uint64_t> __slang_coverage` directly in the IR
+coverage pass (or `RWStructuredBuffer<uint>` under
+`-trace-coverage-counter-width 32`; see [Counter buffer
+format](#counter-buffer-format)) — no AST decl, so it does not
+appear in Slang's public reflection. Hosts discover the hidden resource binding through
 `slang::ISyntheticResourceMetadata` and use
 `slang::ICoverageTracingMetadata` to learn how many counters to
 allocate and how source coverage entries map to those counters.
 
-The `.coverage-mapping.json` sidecar is **optional** — it's a
+The `.coverage-manifest.json` sidecar is **optional** — it's a
 serialization of the same metadata for cross-process / offline
 workflows where the dispatch happens in a different program from
 the compile (typical for precompiled shader pipelines). In-process
@@ -176,7 +178,9 @@ for (uint32_t i = 0; i < entryCount; ++i) {
 }
 ```
 
-The host allocates a `uint32_t[counterCount]` counter buffer, binds it
+The host allocates a `counterCount`-element counter buffer at the width
+reported by `CoverageBufferInfo::elementByteWidth` (`uint64` by default,
+`uint32` under `-trace-coverage-counter-width 32`), binds it
 using the hidden binding information reported through
 `ISyntheticResourceMetadata`, dispatches the shader, reads the
 counters back, and consumes the source entries however it likes —
@@ -190,7 +194,7 @@ rather than assuming the entry index equals the counter index.
 
 #### Producing the canonical manifest JSON in-process
 
-If a host wants the same `.coverage-mapping.json` bytes that `slangc`
+If a host wants the same `.coverage-manifest.json` bytes that `slangc`
 writes as a sidecar — for example to feed
 [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py) without
 going through a file, or to ship the manifest to a separate
@@ -206,7 +210,7 @@ targets when available.
 ComPtr<ISlangBlob> manifest;
 slang_writeCoverageManifestJson(coverage, manifest.writeRef());
 // manifest->getBufferPointer() / getBufferSize() are the exact
-// bytes slangc would have written to <output>.coverage-mapping.json.
+// bytes slangc would have written to <output>.coverage-manifest.json.
 ```
 
 The output is byte-identical to slangc's sidecar, so anything that
@@ -218,7 +222,7 @@ well.
 
 ```
 shader.slang ── slangc -trace-coverage ──► shader.spv
-                                            shader.spv.coverage-mapping.json
+                                            shader.spv.coverage-manifest.json
                                                        │
                           (ship binary + sidecar — possibly later, possibly
                           on a different machine, possibly without Slang linked)
@@ -236,13 +240,27 @@ shader.slang ── slangc -trace-coverage ──► shader.spv
 For workflows that compile offline and dispatch later — possibly on
 a different machine, possibly without Slang linked: when `slangc`
 writes a compiled artifact to a file with `-trace-coverage` on, it
-also writes `<output>.coverage-mapping.json` next to it.
+also writes `<output>.coverage-manifest.json` next to it.
 
 ```bash
 slangc shader.slang -target spirv -stage compute -entry main \
     -trace-coverage -o shader.spv
 # -> shader.spv
-# -> shader.spv.coverage-mapping.json
+# -> shader.spv.coverage-manifest.json
+```
+
+Use `-coverage-manifest-output <path>` when the compiled artifact is
+written to stdout, or when the build needs a stable manifest path
+instead of the default path derived from `-o`. The flag only controls
+where the coverage manifest is written; it does not enable
+instrumentation by itself, so use it with `-trace-coverage`,
+`-trace-function-coverage`, or `-trace-branch-coverage`.
+
+```bash
+slangc shader.slang -target spirv -stage compute -entry main \
+    -trace-coverage -coverage-manifest-output shader.coverage.json
+# -> SPIR-V binary on stdout
+# -> shader.coverage.json
 ```
 
 Hosts that aren't linked against Slang still get the data: the
@@ -269,32 +287,39 @@ contract.
 
 ## CLI reference
 
-| Flag                                      | Effect                                                                                                                                                                                                                                                                |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `-trace-coverage`                         | Enables per-statement line coverage. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites marker ops to atomic increments, and emits `<output>.coverage-mapping.json` sidecar when writing to a file. |
-| `-trace-function-coverage`                | Adds per-function-entry source entries and counters. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object.                                                                                               |
-| `-trace-branch-coverage`                  | Adds per-branch-arm source entries and counters for `if`/`else`, loop-condition true/false, and source `switch` case/default dispatch arms, including the implicit no-match default path when no `default` label exists. Expression-level short-circuit and ternary branches are not instrumented yet. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object. |
-| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time.                                    |
-| `-trace-coverage-reserved-space <space>`  | Marks a whole Khronos descriptor set as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent.                                                                                                                 |
+| Flag                                      | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-trace-coverage`                         | Enables per-statement line coverage. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites marker ops to atomic increments, and emits `<output>.coverage-manifest.json` sidecar when writing to a file.                                                                                                                                                                         |
+| `-trace-function-coverage`                | Adds per-function-entry source entries and counters. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object.                                                                                                                                                                                                                                                                                        |
+| `-trace-branch-coverage`                  | Adds per-branch-arm source entries and counters for `if`/`else`, loop-condition true/false, and source `switch` case/default dispatch arms, including the implicit no-match default path when no `default` label exists. Expression-level short-circuit and ternary branches are not instrumented yet. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object.                                          |
+| `-coverage-manifest-output <path>`         | Writes the coverage manifest JSON sidecar to an explicit path instead of the default `<output>.coverage-manifest.json`. Use this when the compiled artifact is written to stdout or the build needs a stable manifest path. Requires at least one coverage tracing mode, is rejected for container outputs, and is valid only when exactly one compiled artifact carries coverage metadata.                                                                         |
+| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time.                                                                                                                                                                                                                            |
+| `-trace-coverage-reserved-space <space>`  | Marks a whole Khronos descriptor set as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent.                                                                                                                                                                                                                                                                                                          |
 
 ---
 
 ## Counter buffer format
 
-`uint32_t counters[N]` — flat little-endian array, no header. Indexed
-by `CoverageEntryInfo::counterIndex` / manifest `counter`. Saturates
-at ~4 × 10⁹ hits per slot (see [Current limitations](#current-limitations)).
+Flat little-endian array of `N` counters, no header. Element width is
+`uint64` by default (`uint32` under `-trace-coverage-counter-width 32`),
+reported by `manifest.buffer.element_stride` /
+`CoverageBufferInfo::elementByteWidth`. Indexed by
+`CoverageEntryInfo::counterIndex` / manifest `counter`. uint64 slots
+effectively never wrap; uint32 slots saturate at ~4 × 10⁹ hits per slot
+(see [Current limitations](#current-limitations)).
 
 ---
 
 ## The converter — `slang-coverage-to-lcov.py`
 
 ```
---manifest <file.coverage-mapping.json>  Source entry → counter mapping.
+--manifest <file.coverage-manifest.json>  Source entry → counter mapping.
                                  Produced by slangc alongside the
                                  compiled artifact, or hand-built from
                                  ICoverageTracingMetadata.
---counters <file.bin>            Binary uint32 little-endian
+--counters <file.bin>            Binary little-endian; element width
+                                 (uint32 or uint64) auto-detected from
+                                 the manifest's buffer.element_stride
   OR
 --counters-text <file-or-'->     Whitespace-separated decimal ints
                                  ('-' reads stdin)
@@ -344,9 +369,10 @@ declares the slot in its own pipeline layout / root signature.
   source `switch` case/default dispatch arms, including the implicit
   no-match default path when no `default` label exists.
 - **Column position is dropped.** Only `(file, line)` reaches LCOV.
-- **Counter type is `uint32`.** Saturates at ~4 × 10⁹ hits per
-  slot. Multiple ops on the same source line accumulate
-  independently before LCOV-emit-time aggregation.
+- **Counter width is selectable.** `uint64` by default (effectively
+  never wraps); `-trace-coverage-counter-width 32` opts down to `uint32`,
+  which saturates at ~4 × 10⁹ hits per slot. Multiple ops on the same
+  source line accumulate independently before LCOV-emit-time aggregation.
 
 ## Current limitations
 

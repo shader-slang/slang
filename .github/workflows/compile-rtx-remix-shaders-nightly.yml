@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout Slang repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           submodules: "recursive"
           fetch-depth: 0 # Need full history for version tags
@@ -50,7 +50,7 @@ jobs:
 
       # Python 3.9+ required by Meson
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.11"
 
@@ -64,7 +64,11 @@ jobs:
 
       # Set up MSVC environment (required even for Ninja builds on Windows)
       - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        # msvc-dev-cmd has no Node 24 release yet (upstream ilammy/msvc-dev-cmd#105);
+        # force its node20 runtime onto node24 to clear the deprecation warning.
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       # Build Slang from checked-out source
       # Note: We only need slangc.exe, so skip the packaging step to avoid CPack errors
@@ -114,7 +118,7 @@ jobs:
 
       # Cache packman packages between runs to save ~2-5 minutes
       - name: Cache Packman packages
-        uses: actions/cache@v4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: C:\packman-repo
           key: packman-${{ hashFiles('dxvk-remix/packman-external.xml') }}
@@ -310,7 +314,7 @@ jobs:
       # Upload build logs on failure for debugging
       - name: Upload build logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: rtx-remix-shader-build-logs
           path: |
@@ -339,7 +343,7 @@ jobs:
       - name: Success notification
         id: slack-notify-success
         if: ${{ github.event_name == 'schedule' && success() }}
-        uses: slackapi/slack-github-action@v1.26.0
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
         with:
           payload: |
             {
@@ -351,7 +355,7 @@ jobs:
       - name: Failure notification
         id: slack-notify-failure
         if: ${{ github.event_name == 'schedule' && !success() }}
-        uses: slackapi/slack-github-action@v1.26.0
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
         with:
           payload: |
             {

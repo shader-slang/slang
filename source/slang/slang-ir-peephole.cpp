@@ -834,9 +834,7 @@ struct PeepholeContext : InstPassBase
                             j);
                         args.add(e);
                     }
-                    const auto cvt = builder.getCoopVectorType(
-                        args[0]->getDataType(),
-                        builder.getIntValue(builder.getIntType(), args.getCount()));
+                    const auto cvt = inst->getFullType();
                     const auto v = builder.emitMakeCoopVector(cvt, args.getCount(), args.begin());
                     inst->replaceUsesWith(v);
                     inst->removeAndDeallocate();
@@ -1255,6 +1253,18 @@ struct PeepholeContext : InstPassBase
                 if (auto makeConditional = as<IRMakeConditionalValue>(inst->getOperand(0)))
                 {
                     inst->replaceUsesWith(makeConditional->getValue());
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                else if (!as<IRConditionalType>(inst->getOperand(0)->getDataType()))
+                {
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+
+                    if (inst->getOperand(0)->getDataType() == inst->getDataType())
+                        inst->replaceUsesWith(inst->getOperand(0));
+                    else
+                        inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }
@@ -1870,7 +1880,7 @@ struct PeepholeContext : InstPassBase
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
 
                     builder.setInsertBefore(inst);
-                    auto undef = builder.emitPoison(inst->getDataType());
+                    auto undef = builder.getPoison(inst->getDataType());
                     inst->replaceUsesWith(undef);
                     maybeRemoveOldInst(inst);
                     changed = true;

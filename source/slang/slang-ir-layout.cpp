@@ -269,6 +269,26 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             return SLANG_OK;
         }
         break;
+    case kIROp_MetalPackedVectorType:
+        {
+            // A packed vector has its element's alignment and no padding,
+            // independent of the layout rules in effect (that is its purpose:
+            // MSL `packed_float3` is 12 bytes with 4-byte alignment).
+            auto packedVecType = cast<IRMetalPackedVectorType>(type);
+            IRSizeAndAlignment elementTypeLayout;
+            SLANG_RETURN_ON_FAIL(getSizeAndAlignment(
+                targetReq,
+                this,
+                packedVecType->getElementType(),
+                &elementTypeLayout));
+            auto count = packedVecType->getElementCount();
+            SLANG_RELEASE_ASSERT(count && count->getOp() == kIROp_IntLit);
+            *outSizeAndAlignment = IRSizeAndAlignment(
+                elementTypeLayout.getStride() * getIntegerValueFromInst(count),
+                elementTypeLayout.alignment);
+            return SLANG_OK;
+        }
+        break;
     case kIROp_AnyValueType:
         {
             auto anyValType = cast<IRAnyValueType>(type);

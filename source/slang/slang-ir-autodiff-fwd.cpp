@@ -652,6 +652,145 @@ struct ForwardDiffTranslationContext
         return InstPair(primalStore, nullptr);
     }
 
+    InstPair translateMakeCoopVectorConstruct(
+        IRBuilder* builder,
+        IRInst* origConstruct,
+        IRInst* primalConstruct,
+        IRType* primalConstructType)
+    {
+        // The CoopVec value-pack constructor can be simplified to direct MakeCoopVector before AD
+        // runs. Recursively request each scalar operand's differential so the flattened constructor
+        // still carries tangents back to its original arguments.
+        if (auto diffConstructType = differentiateType(builder, primalConstructType))
+        {
+            List<IRInst*> diffOperands;
+            bool allVoid = true;
+
+            for (UIndex ii = 0; ii < origConstruct->getOperandCount(); ii++)
+            {
+                auto operand = origConstruct->getOperand(ii);
+                if (auto diffInst = findOrTranslateDiffInst(builder, operand))
+                {
+                    diffOperands.add(diffInst);
+                    if (diffInst->getOp() != kIROp_VoidLit)
+                        allVoid = false;
+                }
+                else if (auto operandDiffType = differentiateType(builder, operand->getDataType()))
+                {
+                    SLANG_UNUSED(operandDiffType);
+                    // Missing differentials for differentiable operands are constants with zero
+                    // tangent, matching the generic construct fallback behavior.
+                    auto operandDataType =
+                        (IRType*)findOrTranslatePrimalInst(builder, operand->getDataType());
+                    diffOperands.add(getDifferentialZeroOfType(builder, operandDataType));
+                    allVoid = false;
+                }
+                else
+                {
+                    diffOperands.add(builder->getVoidValue());
+                }
+            }
+
+            if (allVoid)
+                return InstPair(primalConstruct, nullptr);
+
+            return InstPair(
+                primalConstruct,
+                builder->emitIntrinsicInst(
+                    diffConstructType,
+                    origConstruct->getOp(),
+                    diffOperands.getCount(),
+                    diffOperands.getBuffer()));
+        }
+
+        return InstPair(primalConstruct, nullptr);
+    }
+
+    InstPair translateMakeCoopVectorFromValuePackConstruct(
+        IRBuilder* builder,
+        IRInst* origConstruct,
+        IRInst* primalConstruct,
+        IRType* primalConstructType)
+    {
+        // A specialized variadic CoopVec constructor lowers to a value pack feeding this intrinsic.
+        // Synthesize the tangent pack element-by-element so the constructor derivative stays
+        // connected to the original scalar arguments.
+        if (auto diffConstructType = differentiateType(builder, primalConstructType))
+        {
+            auto primalPack = origConstruct->getOperand(0);
+            IRInst* diffPack = nullptr;
+
+            if (auto makePack = as<IRMakeValuePack>(primalPack))
+            {
+                // Always rebuild a concrete value-pack tangent from the element tangents. The pack
+                // itself may already have a conservative zero differential from generic construct
+                // translation, but the CoopVec constructor needs the scalar links.
+                List<IRInst*> diffElements;
+                List<IRType*> diffElementTypes;
+
+                for (UInt ii = 0; ii < makePack->getOperandCount(); ii++)
+                {
+                    auto primalElement = makePack->getOperand(ii);
+                    IRInst* diffElement = findOrTranslateDiffInst(builder, primalElement);
+                    IRType* diffElementType = nullptr;
+
+                    if (diffElement)
+                    {
+                        diffElementType = (IRType*)diffElement->getDataType();
+                    }
+                    else if (
+                        auto translatedElementDiffType =
+                            differentiateType(builder, primalElement->getDataType()))
+                    {
+                        // Missing element differentials still contribute a typed zero, matching the
+                        // generic construct translation behavior.
+                        diffElement =
+                            getDifferentialZeroOfType(builder, primalElement->getDataType());
+                        diffElementType = translatedElementDiffType;
+                    }
+                    else
+                    {
+                        return InstPair(primalConstruct, nullptr);
+                    }
+
+                    diffElements.add(diffElement);
+                    diffElementTypes.add(diffElementType);
+                }
+
+                auto diffPackType = builder->getTypePack(
+                    (UInt)diffElementTypes.getCount(),
+                    diffElementTypes.getBuffer());
+                diffPack = builder->emitMakeValuePack(
+                    diffPackType,
+                    (UInt)diffElements.getCount(),
+                    diffElements.getBuffer());
+                diffTypeContext.markDiffTypeInst(
+                    builder,
+                    diffPack,
+                    (IRType*)primalPack->getDataType());
+            }
+            else
+            {
+                // Non-literal packs still use the normal differential mapping because there are no
+                // visible scalar operands to reconnect here.
+                diffPack = findOrTranslateDiffInst(builder, primalPack);
+            }
+
+            if (diffPack)
+            {
+                return InstPair(
+                    primalConstruct,
+                    builder->emitIntrinsicInst(
+                        diffConstructType,
+                        origConstruct->getOp(),
+                        1,
+                        &diffPack));
+            }
+        }
+
+        return InstPair(primalConstruct, nullptr);
+    }
+
     // Since int/float literals are sometimes nested inside an IRConstructor
     // instruction, we check to make sure that the nested instr is a constant
     // and then return nullptr. Literals do not need to be differentiated.
@@ -665,6 +804,21 @@ struct ForwardDiffTranslationContext
         //
         auto primalConstructType =
             (IRType*)findOrTranslatePrimalInst(builder, origConstruct->getDataType());
+
+        if (origConstruct->getOp() == kIROp_MakeCoopVector)
+            return translateMakeCoopVectorConstruct(
+                builder,
+                origConstruct,
+                primalConstruct,
+                primalConstructType);
+
+        if (origConstruct->getOp() == kIROp_MakeCoopVectorFromValuePack)
+            return translateMakeCoopVectorFromValuePackConstruct(
+                builder,
+                origConstruct,
+                primalConstruct,
+                primalConstructType);
+
         // TODO: Need to update this to generate derivatives on a per-key basis
         if (auto diffConstructType = differentiateType(builder, primalConstructType))
         {
@@ -811,10 +965,17 @@ struct ForwardDiffTranslationContext
         IRBuilder builder(callee);
         auto type = context->resolveType(&builder, callee->getFullType());
         if (auto funcType = as<IRFuncType>(type))
-            return funcType;
+            return maybeExpandConcreteFuncTypePacks(&builder, callee, funcType);
         if (auto specialize = as<IRSpecialize>(callee))
-            return as<IRFuncType>(
-                findGenericReturnVal(as<IRGeneric>(specialize->getBase()))->getFullType());
+        {
+            if (auto generic = as<IRGeneric>(specialize->getBase()))
+            {
+                auto genericReturnType =
+                    context->resolveType(&builder, findGenericReturnVal(generic)->getFullType());
+                if (auto funcType = as<IRFuncType>(genericReturnType))
+                    return maybeExpandConcreteFuncTypePacks(&builder, funcType);
+            }
+        }
         return nullptr;
     }
 
@@ -918,35 +1079,40 @@ struct ForwardDiffTranslationContext
             IRInterfaceType* bwdCallableInterfaceType = cast<IRInterfaceType>(
                 getGenericReturnVal(context->sharedContext->backwardCallableInterfaceType));
 
-            // Key for contextType in IBackwardDifferentiable table
-            auto bwdDiffContextTypeReqKey =
-                cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(0))
-                    ->getRequirementKey();
+            // Requirement keys in the IBackwardDifferentiable / IBwdCallable tables, addressed
+            // by built-in requirement *role* rather than by operand position. Addressing by
+            // role is robust to the order in which requirements (and the relocated
+            // `BwdCallable : IBwdCallable` conformance) appear in the interface.
+            auto bwdDiffContextTypeReqKey = getInterfaceEntryByBuiltinRequirement(
+                                                bwdDiffInterfaceType,
+                                                BuiltinRequirementKind::BwdCallableContextType)
+                                                ->getRequirementKey();
 
-            // Key for minimalContextType in IBackwardDifferentiable table
-            auto bwdDiffMinimalContextTypeReqKey =
-                cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(2))
-                    ->getRequirementKey();
+            auto bwdDiffMinimalContextTypeReqKey = getInterfaceEntryByBuiltinRequirement(
+                                                       bwdDiffInterfaceType,
+                                                       BuiltinRequirementKind::MinimalContextType)
+                                                       ->getRequirementKey();
 
-            // Key for contextType : IBackwardCallable in IBackwardDifferentiable table
             auto bwdDiffContextTypeCallableConformanceReqKey =
-                cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(1))
+                getInterfaceEntryByBuiltinRequirement(
+                    bwdDiffInterfaceType,
+                    BuiltinRequirementKind::BwdCallableContextWitness)
                     ->getRequirementKey();
 
-            // Key for `apply` in IBackwardDifferentiable table
-            auto bwdDiffApplyReqKey =
-                cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(3))
-                    ->getRequirementKey();
+            auto bwdDiffApplyReqKey = getInterfaceEntryByBuiltinRequirement(
+                                          bwdDiffInterfaceType,
+                                          BuiltinRequirementKind::BwdApplyFunc)
+                                          ->getRequirementKey();
 
-            // Key for `remat` in IBackwardDifferentiable table
-            auto bwdDiffRematReqKey =
-                cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(4))
-                    ->getRequirementKey();
+            auto bwdDiffRematReqKey = getInterfaceEntryByBuiltinRequirement(
+                                          bwdDiffInterfaceType,
+                                          BuiltinRequirementKind::BwdCallableRematFunc)
+                                          ->getRequirementKey();
 
-            // Key for 'operator()' (back-prop) in IBackwardCallable table
-            auto bwdCallableOpReqKey =
-                cast<IRInterfaceRequirementEntry>(bwdCallableInterfaceType->getOperand(0))
-                    ->getRequirementKey();
+            auto bwdCallableOpReqKey = getInterfaceEntryByBuiltinRequirement(
+                                           bwdCallableInterfaceType,
+                                           BuiltinRequirementKind::BwdCallablePropFunc)
+                                           ->getRequirementKey();
 
             // Lookup contextType in IBackwardDifferentiable table
             auto higherOrderContextType = _lookupWitness(
@@ -974,8 +1140,13 @@ struct ForwardDiffTranslationContext
 
 
             // Lookup `apply` in IBackwardDifferentiable table
+            auto expandedFwdDiffFuncType = maybeExpandConcreteFuncTypePacks(
+                builder,
+                fwdDiffCallee,
+                cast<IRFuncType>(context->resolveType(builder, fwdDiffCallee->getFullType())));
+
             IRInst* bwdApplyFuncTypeOperands[] = {
-                fwdDiffCallee->getFullType(),
+                expandedFwdDiffFuncType,
                 higherOrderMinimalContextType};
             auto higherOrderBwdDiffFunc = _lookupWitness(
                 builder,
@@ -994,7 +1165,7 @@ struct ForwardDiffTranslationContext
 
             // Lookup `remat` in IBackwardDifferentiable table
             IRInst* bwdRematFuncTypeOperands[] = {
-                fwdDiffCallee->getFullType(),
+                expandedFwdDiffFuncType,
                 higherOrderMinimalContextType,
                 higherOrderContextType};
             auto higherOrderBwdRematFunc = _lookupWitness(
@@ -1029,7 +1200,7 @@ struct ForwardDiffTranslationContext
 
             // Lookup 'operator()' (back-prop) in IBackwardCallable table
             IRInst* bwdCallableFuncTypeOperands[] = {
-                fwdDiffCallee->getFullType(),
+                expandedFwdDiffFuncType,
                 higherOrderContextType};
             auto higherOrderBwdPropFunc = _lookupWitness(
                 builder,
@@ -1198,7 +1369,7 @@ struct ForwardDiffTranslationContext
 
         auto isPointerPairMethod = checkIsPtrPairMethod(calleeType, origCall->sourceLoc);
 
-        auto placeholderCallee = builder->emitPoison(builder->getTypeKind());
+        auto placeholderCallee = builder->getPoison(builder->getTypeKind());
         auto placeholderCall = builder->emitCallInst(nullptr, placeholderCallee, 0, nullptr);
         builder->setInsertBefore(placeholderCall);
         IRBuilder argBuilder = *builder;
@@ -2445,6 +2616,10 @@ struct ForwardDiffTranslationContext
         case kIROp_MakeVectorFromScalar:
         case kIROp_MakeArray:
         case kIROp_MakeArrayFromElement:
+        // CoopVec constructors preserve differentiable element values just like vector
+        // constructors, so forward-mode AD should translate them instead of rejecting them.
+        case kIROp_MakeCoopVector:
+        case kIROp_MakeCoopVectorFromValuePack:
         case kIROp_MakeTuple:
         case kIROp_MakeOptionalValue:
         case kIROp_MakeResultValue:
@@ -2611,8 +2786,7 @@ struct ForwardDiffTranslationContext
         case kIROp_SizeOf:
         case kIROp_AlignOf:
         case kIROp_Printf:
-        case kIROp_MakeCoopVector:
-        case kIROp_MakeCoopVectorFromValuePack:
+        case kIROp_Abort:
         case kIROp_GetCurrentStage:
         case kIROp_GetOffsetPtr:
         case kIROp_IsNullExistential:
@@ -3540,21 +3714,9 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             ->getConformanceType(),
         (IRType*)baseFunc);
 
-    // For now, we're going to hardcode the fact that the IBackwardDifferentiable interface
-    // always contains exactly 3 requirements, the context-type, context-type : IBackwardCallable,
-    // apply and bwd_diff (legacy)
-    //
-    // This will help us catch errors if the interface definition changes.
-    //
-    // IBackwardDifferentiable has 6 requirements:
-    // 0: BwdCallable associated type
-    // 1: BwdCallable : IBwdCallable conformance
-    // 2: MinimalContext associated type
-    // 3: apply_bwd func
-    // 4: remat func
-    // 5: bwd_diff (legacy)
-    //
-    SLANG_ASSERT(baseConformanceType->getRequirementCount() == 6);
+    // The IBackwardDifferentiable requirements are addressed by built-in requirement *role*
+    // rather than by operand position, so this is robust to the order in which the requirements
+    // (and the relocated `BwdCallable : IBwdCallable` conformance) appear in the interface.
     IRInst* typeOperand = baseFunc->getFullType();
 
     auto contextType = builder.emitIntrinsicInst(
@@ -3564,12 +3726,14 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
         &baseFunc);
     builder.createWitnessTableEntry(
         newWitnessTable,
-        as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(0))->getRequirementKey(),
+        getInterfaceEntryByBuiltinRequirement(
+            baseConformanceType,
+            BuiltinRequirementKind::BwdCallableContextType)
+            ->getRequirementKey(),
         contextType);
     {
         auto callableConformanceBaseType = cast<IRInterfaceType>(
             getGenericReturnVal(sharedContext->backwardCallableInterfaceType));
-        SLANG_ASSERT(callableConformanceBaseType->getRequirementCount() == 1);
 
         auto callableConformanceType = builder.emitSpecializeInst(
             builder.getTypeKind(),
@@ -3590,13 +3754,17 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             &baseFunc);
         builder.createWitnessTableEntry(
             callableWitnessTable,
-            as<IRInterfaceRequirementEntry>(callableConformanceBaseType->getOperand(0))
+            getInterfaceEntryByBuiltinRequirement(
+                callableConformanceBaseType,
+                BuiltinRequirementKind::BwdCallablePropFunc)
                 ->getRequirementKey(),
             propFunc);
 
         builder.createWitnessTableEntry(
             newWitnessTable,
-            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(1))
+            getInterfaceEntryByBuiltinRequirement(
+                baseConformanceType,
+                BuiltinRequirementKind::BwdCallableContextWitness)
                 ->getRequirementKey(),
             callableWitnessTable);
     }
@@ -3609,7 +3777,10 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
         &baseFunc);
     builder.createWitnessTableEntry(
         newWitnessTable,
-        as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(2))->getRequirementKey(),
+        getInterfaceEntryByBuiltinRequirement(
+            baseConformanceType,
+            BuiltinRequirementKind::MinimalContextType)
+            ->getRequirementKey(),
         minimalContextType);
 
     // apply_bwd func.
@@ -3625,7 +3796,9 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             baseFunc);
         builder.createWitnessTableEntry(
             newWitnessTable,
-            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(3))
+            getInterfaceEntryByBuiltinRequirement(
+                baseConformanceType,
+                BuiltinRequirementKind::BwdApplyFunc)
                 ->getRequirementKey(),
             applyFunc);
     }
@@ -3645,7 +3818,9 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             &baseFunc);
         builder.createWitnessTableEntry(
             newWitnessTable,
-            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(4))
+            getInterfaceEntryByBuiltinRequirement(
+                baseConformanceType,
+                BuiltinRequirementKind::BwdCallableRematFunc)
                 ->getRequirementKey(),
             rematFunc);
     }
@@ -3654,9 +3829,11 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
         // bwd_diff (legacy) - should never be required, so we just emit a poison value.
         builder.createWitnessTableEntry(
             newWitnessTable,
-            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(5))
+            getInterfaceEntryByBuiltinRequirement(
+                baseConformanceType,
+                BuiltinRequirementKind::LegacyBackwardDerivativeFunc)
                 ->getRequirementKey(),
-            builder.emitPoison(builder.getVoidType()));
+            builder.getPoison(builder.getVoidType()));
     }
 
     return newWitnessTable;

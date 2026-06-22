@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-12T12:06:22+00:00
 target_doc: ir-reference/resources-and-atomics.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: fail
-  style_consistency: partial
+  completeness: pass
+  style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 2
+finding_count: 1
 severity_breakdown:
   critical: 0
-  major: 2
+  major: 1
   minor: 0
   nit: 0
 ---
@@ -24,14 +24,17 @@ severity_breakdown:
 # Review report for ir-reference/resources-and-atomics.md
 
 ## Summary
-The page is structurally lint-clean, but review found 2 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The page has valid front matter, required sections, and resolving relative links. The main issue is a source-alignment error in the sampling table and notable text: `sampleGrad` is described as variadic with `gradY` and optional trailing operands, but the watched Lua declaration exposes only four operands.
 
 ## Items checked
-- Checked atomics children, buffer/image/sampler rows, shader IO, barrier/wave/raytracing/descriptor rows, source clusters, links, and front matter.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show ir-reference/resources-and-atomics.md`.
+- Read `_common.md`, `ir-reference-resources-and-atomics.md`, the target document including front matter, dependency docs, and watched source files.
+- Resolved the document's relative Markdown links and checked peer generated-doc links against the manifest-backed generated docs.
+- Verified every `AtomicOperation` child row against the Lua declarations and checked the `IRMemoryOrder` enum in `slang-ir.h`.
+- Spot-checked more than 10 additional claims across `imageSubscript`, `imageLoad`, `imageStore`, `ImageTexelPointer`, `SubpassLoad`, `sample`, `sampleGrad`, byte-address buffer loads/stores, structured-buffer operations, `nonUniformResourceIndex`, mesh-output ops, barriers, cooperative-vector ops, raytracing payload ops, descriptor-heap ops, and binding queries.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | lines 86-245 | Several resource, synchronization, cooperative, and Torch helper opcodes are omitted. | `source/slang/slang-ir-insts.lua:1503-1576` and `source/slang/slang-ir-insts.lua:2709-2711` define omitted helper and interlock opcodes. | Add rows in resource/cooperative/sync sub-tables or move non-resource helpers to `misc.md`. |
-| F-002 | major | lines 239-245 | `BindingQuery` is listed as an opcode row even though it is only the grouping parent for `getRegisterIndex` and `getRegisterSpace`. | `source/slang/slang-ir-insts.lua:1578-1591` defines `BindingQuery` as a parent entry. | Remove `BindingQuery` from the Opcodes table and keep it in hierarchy/prose only. |
+| F-001 | major | `### Sampling and combined samplers` and `### sample and sampleGrad` | The `sampleGrad` row and notable text claim trailing operands such as `gradY`, offset, and bias, but the Lua schema for this opcode has exactly `texture, sampler, coord, gradX`. This makes the required operand-shape column inaccurate. | `source/slang/slang-ir-insts.lua:1526-1528` declares `sample` and `sampleGrad`, with `sampleGrad` operands limited to `texture`, `sampler`, `coord`, and `gradX`. | Change the `sampleGrad` operand cell and notable paragraph to match the Lua declaration, or add a caveat that additional gradient/offset semantics live in core-module intrinsics rather than as operands on this IR opcode. |

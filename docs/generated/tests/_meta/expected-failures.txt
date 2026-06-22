@@ -38,11 +38,56 @@
 # "operand access out of bounds in constants section" on the second
 # `printf` after a function call that took an `inout` parameter and
 # returned `bool`. Predates PR #11221.
-docs/generated/tests/ast-reference/expressions/logic-and-short-circuit.slang
-docs/generated/tests/ast-reference/expressions/logic-or-short-circuit.slang
-docs/generated/tests/ast-reference/expressions/bwd-differentiate-expr.slang
-docs/generated/tests/ast-reference/statements/ifstmt-predicate-evaluated-once.slang
+docs/generated/tests/design/ast-reference/expressions/logic-and-short-circuit.slang
+docs/generated/tests/design/ast-reference/expressions/logic-or-short-circuit.slang
+docs/generated/tests/design/ast-reference/expressions/bwd-differentiate-expr.slang
+docs/generated/tests/design/ast-reference/statements/ifstmt-predicate-evaluated-once.slang
 
+# https://github.com/shader-slang/slang/issues/11402 — slangi VM
+# treats the bool `false` literal as `true` inside a function body
+# when passed as a bool argument. Frontend HLSL/CPU emit are correct,
+# so the bug is in the bytecode VM. Discovered while writing the
+# language-reference/expressions-literal bundle.
+docs/generated/tests/conformance/expressions-literal/bool-true-false.slang
+
+# https://github.com/shader-slang/slang/issues/11403 — slangi VM
+# short-circuits `?:` contra the language-reference spec. The HLSL
+# emit shows both branches; the VM evaluates only the selected
+# branch. Discovered while writing the
+# language-reference/expressions-operators bundle.
+docs/generated/tests/conformance/expressions-operators/conditional-does-not-short-circuit.slang
+
+# Pending: docs/generated/tests/_meta/findings/slangi-vm-vector-scalar-binary-op-wrong-values.yaml
+# slangi VM computes `int4(1,2,3,4) - 1` as `int4(0,0,0,0)` instead
+# of `int4(0,1,2,3)`. Vector-scalar binary op broadcast appears
+# missing in the VM emitter. (Will become a tracking issue after
+# human triage.)
+docs/generated/tests/conformance/types-vector-and-matrix/vector-binary-scalar-broadcast.slang
+
+# Pending: docs/generated/tests/_meta/findings/slangi-vm-swizzle-assign-bytecode-unimplemented.yaml
+# slangi VM aborts with "unimplemented: VM bytecode gen for inst"
+# when compiling a vector swizzle-assign (v.xz = int2(...)). The
+# doc shows this as a supported construct.
+docs/generated/tests/conformance/types-vector-and-matrix/vector-swizzle-assign.slang
+
+# Pending: docs/generated/tests/_meta/findings/slangi-vm-matrix-mij-swizzle-working-set-oob.yaml
+# slangi VM triggers "operand access out of bounds in working set
+# section" when reading a matrix element via `_mij` swizzle. Doc
+# lists this as supported.
+docs/generated/tests/conformance/expressions-member-access/matrix-mij-zero-based.slang
+
+# Pending: docs/generated/tests/_meta/findings/slangi-vm-colon-colon-static-access-bytecode-unimplemented.yaml
+# slangi VM aborts with "unimplemented: VM bytecode gen for inst"
+# on `EnumType::Name` static-access. Doc states `.` and `::` are
+# equivalent; `.` works in slangi, `::` does not.
+docs/generated/tests/conformance/expressions-member-access/static-dot-vs-colon-colon.slang
+
+# Pending: docs/generated/tests/_meta/findings/slangi-vm-global-var-bytecode-unsupported.yaml
+# slangi VM aborts with "unsupported global inst for vm bytecode
+# emit" when any module-scope global variable is declared (e.g.
+# `static int x = 42;` in an enum extension). Doc Example 1 for
+# enum extensions uses this exact construct.
+docs/generated/tests/conformance/types-extension/enum-extension-static-members.slang
 # Surfaced on nightly run
 # https://github.com/shader-slang/slang/actions/runs/26800499333
 # (no tracking issue filed yet; entries are pending user triage).
@@ -54,32 +99,61 @@ docs/generated/tests/ast-reference/statements/ifstmt-predicate-evaluated-once.sl
 # `OpLogicalAnd` / `OpLogicalOr`); the surrounding module fails SPIR-V
 # validation under the nightly's `SLANG_RUN_SPIRV_VALIDATION=1`.
 # Reproduces cross-platform. Test-content bugs awaiting regeneration.
-docs/generated/tests/target-pipelines/spirv/vector-logical-or.slang
-docs/generated/tests/target-pipelines/spirv/vector-logical-and-or.slang
+docs/generated/tests/design/target-pipelines/spirv/vector-logical-or.slang
+docs/generated/tests/design/target-pipelines/spirv/vector-logical-and-or.slang
 
 # Surfaced on nightly runs
-# https://github.com/shader-slang/slang/actions/runs/26800499333 and
-# https://github.com/shader-slang/slang/actions/runs/26803788699
+# https://github.com/shader-slang/slang/actions/runs/26800499333 ,
+# https://github.com/shader-slang/slang/actions/runs/26803788699 , and
+# https://github.com/shader-slang/slang/actions/runs/26934884546
 # (no tracking issue filed yet; pending user triage).
 #
-# Cluster C — tests that pass locally on macOS (even with the
-# nightly's env vars set) but fail in the slang-linux-clang-ci
-# container. Suspected causes vary by test: glibc-vs-libc printf NaN
-# formatting; stricter Linux spirv-val on OpTypeRuntimeArray /
-# negative GEP indices; `-dump-ir` text differences; multi-target
-# text-emit; and one test-server JSON RPC crash (load with negative
-# literal index — suggests a slangc crash in the Linux build).
+# Cluster C — tests that pass locally on macOS (even with the nightly's
+# env vars set) but fail in the slang-linux-clang-ci container.
+# Suspected causes: glibc-vs-libc printf NaN formatting; stricter Linux
+# spirv-val on OpTypeRuntimeArray; `-dump-ir` / multi-target text-emit
+# differences.
 #
-# Observed flakiness: between runs 26800499333 and 26803788699 (same
-# day, ~1.5h apart, same checkout), 4 of these tests flipped from
-# FAILED to PASS, surfacing as "passing tests that are expected to
-# fail" in the second run. Entries are KEPT in the list (conservative)
-# because they have failed at least once; let multiple consecutive
-# clean runs drive removal, not a single observed pass.
-docs/generated/tests/cross-cutting/core-module/printf-float-nan.slang
-docs/generated/tests/ir-reference/metadata/unorm-attr-on-buffer-element.slang
-docs/generated/tests/ir-reference/resources-and-atomics/rwstructured-buffer-getelementptr-negative-index-literal.slang
-docs/generated/tests/ir-reference/resources-and-atomics/rwstructured-buffer-load-negative-index-literal.slang
-docs/generated/tests/ir-reference/types/array-unsized.slang
-docs/generated/tests/pipeline/06-emit/preludes-included-by-c-and-cuda.slang
-docs/generated/tests/target-pipelines/hlsl/nvapi-guard-with-wave-intrinsic.slang
+# These flip between FAILED and PASS across runs. On run 26934884546 the
+# four negative-index / prelude / nvapi entries passed (the workflow
+# treats a kept-but-passing entry as a failure), so they are removed; the
+# three below failed there and are kept.
+docs/generated/tests/design/cross-cutting/core-module/printf-float-nan.slang
+docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-buffer-element.slang
+docs/generated/tests/design/ir-reference/types/array-unsized.slang
+
+# Surfaced on nightly run 26934884546 (Linux agentic suite):
+# https://github.com/shader-slang/slang/actions/runs/26934884546
+# (no tracking issue filed yet; pending user triage). Both pass locally
+# on macOS but fail in the slang-linux-clang-ci container — same
+# stricter-Linux-spirv-val class as Cluster C.
+#  - pointer-arithmetic-spirv-emission: the `OpPtrAccessChain` CHECK for
+#    local-array pointer arithmetic is not found in the Linux SPIR-V
+#    output (validation/lowering differs). Newly added; test-vs-compiler
+#    cause still to be determined.
+#  - 29106: the `spirv-instruction-with-too-many-operands` diagnostic
+#    test.
+docs/generated/tests/conformance/types-pointer/pointer-arithmetic-spirv-emission.slang
+docs/generated/tests/design/cross-cutting/diagnostics-catalog/29106-spirv-instruction-with-too-many-operands.slang
+
+# Surfaced on nightly run 26936693099 (Linux agentic suite):
+# https://github.com/shader-slang/slang/actions/runs/26936693099
+# (no tracking issue filed yet; pending user triage). The test server
+# dies while running this `-dump-ir`-based test, reported as
+# `JSON RPC failure: waitForResult()` / `hasMessage()`. Only reproduces
+# under the slang-linux-clang-ci container; same `-dump-ir` text-emit
+# class as Cluster C. Test-vs-compiler cause still to be determined.
+docs/generated/tests/design/ir-reference/decorations/struct-with-many-field-decorations.slang
+
+# Re-added after nightly run 26997297493 surfaced this test as FAILED:
+# https://github.com/shader-slang/slang/actions/runs/26997297493
+# (no tracking issue filed yet; pending user triage).
+#
+# This entry was previously listed under Cluster C with a comment noting
+# that the cluster's tests "flip between FAILED and PASS across runs."
+# It was removed after run 26934884546 observed it passing (along with
+# three sibling tests) — a single-pass removal that the cluster's own
+# comment warned against ("let multiple consecutive clean runs drive
+# removal, not a single observed pass"). Re-adding here so the next
+# flip back to FAILED doesn't turn the nightly red again.
+docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buffer-load-negative-index-literal.slang

@@ -8,6 +8,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
 #include "slang-options.h"
+#include "slang-profile.h"
 #include "slang-rich-diagnostics.h"
 
 namespace Slang
@@ -50,9 +51,24 @@ private:
 
     void checkOutputTopologyDecoration(IROutputTopologyDecoration* decoration, Stage stage)
     {
+        const auto outputTopologyType = OutputTopologyType(decoration->getTopologyType());
+        if (stage == Stage::Domain || stage == Stage::Hull)
+        {
+            if (outputTopologyType != OutputTopologyType::Point &&
+                outputTopologyType != OutputTopologyType::Line &&
+                outputTopologyType != OutputTopologyType::TriangleCW &&
+                outputTopologyType != OutputTopologyType::TriangleCCW)
+            {
+                diagnoseInvalidStageOutputTopology(
+                    decoration,
+                    stage,
+                    "'point', 'line', 'triangle_cw', 'triangle_ccw'");
+            }
+            return;
+        }
+
         if (stage == Stage::Mesh)
         {
-            const auto outputTopologyType = OutputTopologyType(decoration->getTopologyType());
             if (isTargetGLSL() || isTargetSPIRV() || isTargetMetal())
             {
                 if (outputTopologyType != OutputTopologyType::Point &&
@@ -77,6 +93,19 @@ private:
                 SLANG_UNEXPECTED("Invalid compilation target for mesh stage");
             }
         }
+    }
+
+    void diagnoseInvalidStageOutputTopology(
+        IROutputTopologyDecoration* decoration,
+        Stage stage,
+        String validTopologies)
+    {
+        auto stageName = getStageName(stage);
+        m_sink->diagnose(Diagnostics::InvalidStageOutputTopology{
+            .topology = String(decoration->getTopology()->getStringSlice()),
+            .stage = String(stageName ? stageName : "unknown"),
+            .validTopologies = validTopologies,
+            .location = decoration->sourceLoc});
     }
 
     void diagnoseInvalidMeshStageOutputTopology(

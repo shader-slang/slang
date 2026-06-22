@@ -1294,10 +1294,24 @@ warning(
 )
 
 err(
+    "discarded-no-discard-result",
+    30059,
+    "result of '[NoDiscard]' function is discarded",
+    span { loc = "expr:Expr", message = "the result of calling '~name:Name' is discarded; this function is marked '[NoDiscard]'." }
+)
+
+err(
+    "no-discard-on-void-function",
+    30069,
+    "'[NoDiscard]' applied to a function returning 'void'",
+    span { loc = "decl:Decl", message = "'[NoDiscard]' is not allowed on a function that returns 'void'; there is no result to discard." }
+)
+
+err(
     "expected-a-type",
     30060,
     "expected a type",
-    span { loc = "expr:Expr", message = "expected a type, got a '~whatWeGot'" }
+    span { loc = "expr:Expr", message = "expected a type, got ~whatWeGot" }
 )
 
 err(
@@ -1842,6 +1856,104 @@ err(
     30416,
     "`nonempty(...)` target must be a generic pack parameter declared in the current generic",
     span { loc = "expr:Expr", message = "this pack parameter is declared outside the current generic" }
+)
+
+err(
+    "invalid-variadic-pack-count-constraint-target",
+    30430,
+    "`countof(...)` pack-count constraint requires a generic type pack or value pack parameter",
+    span { loc = "expr:Expr", message = "expected a direct reference to a generic pack parameter here" }
+)
+
+err(
+    "variadic-pack-count-constraint-target-must-be-from-current-generic",
+    30431,
+    "`countof(...)` pack-count constraint target must be declared in the current generic",
+    span { loc = "expr:Expr", message = "this pack parameter is declared outside the current generic" }
+)
+
+err(
+    "invalid-variadic-pack-count-constraint-count",
+    30432,
+    "`countof(...)` pack-count constraint requires a compile-time integer count",
+    span { loc = "expr:Expr", message = "expected a compile-time integer expression here" }
+)
+
+err(
+    "variadic-pack-count-does-not-match",
+    30433,
+    "pack count does not satisfy `countof(...)` constraint",
+    span { loc = "location", message = "expected ~expectedCount:Int elements, but pack argument has ~actualCount:Int" }
+)
+
+err(
+    "optional-variadic-pack-count-constraint-is-invalid",
+    30434,
+    "`optional countof(...)` pack-count constraint is not meaningful",
+    span { loc = "expr:Expr", message = "remove `optional` from this `countof(...)` constraint" }
+)
+
+err(
+    "variadic-pack-count-proof-unavailable",
+    30435,
+    "`countof(...)` pack-count constraint is not satisfied",
+    span { loc = "expr:Expr", message = "cannot prove the required `countof(...)` pack-count constraint for this specialization" }
+)
+
+err(
+    "variadic-pack-count-constraint-requires-equality",
+    30436,
+    "`countof(...)` pack-count constraint requires '=='",
+    span { loc = "location", message = "use '==' for a `countof(...)` pack-count constraint" }
+)
+
+err(
+    "variadic-pack-count-constraint-requires-countof-on-left",
+    30437,
+    "`countof(...)` pack-count constraint must be written with `countof(...)` on the left side",
+    span { loc = "location", message = "write this constraint as `countof(Pack) == IntExpr`" }
+)
+
+err(
+    "generic-specialization-arity-mismatch",
+    30438,
+    "wrong number of arguments in call to generic function",
+    span { loc = "location", message = "could not specialize generic: it expects ~expectedCount:Int parameter(s) but the call provides ~actualCount:Int argument(s)" }
+)
+
+err(
+    "generic-parameter-could-not-be-inferred",
+    30439,
+    "generic parameter could not be inferred",
+    span { loc = "location", message = "could not infer generic argument for parameter '~paramName:Name'" }
+)
+
+err(
+    "generic-argument-does-not-satisfy-constraint",
+    30440,
+    "generic constraint not satisfied",
+    span { loc = "location", message = "could not satisfy the generic constraint '~constraint:String'" }
+)
+
+standalone_note(
+    "see-generic-constraint-declaration",
+    -1,
+    "see generic constraint declaration",
+    span { loc = "location" }
+)
+
+err(
+    "generic-argument-list-arity-mismatch",
+    30441,
+    "wrong number of generic arguments",
+    span { loc = "location", message = "generic '~generic:Decl' expects ~expectedCount:Int generic argument(s) but ~actualCount:Int were provided" }
+)
+
+err(
+    "generic-parameter-unification-conflict",
+    30442,
+    "cannot deduce generic argument",
+    span { loc = "location", message = "cannot deduce generic argument for '~paramName:Name': conflicting requirements '~firstCandidate:String' and '~secondCandidate:String'" }
 )
 
 -- Float bit cast diagnostics
@@ -2443,7 +2555,7 @@ warning(
     "special-type-member-leaks-from-parameter-group",
     31107,
     "This member cannot be included in the same binding as some other parts of this struct, and will be moved into another parameter binding slot.",
-    span { loc = "member:IRInst", message = "This member will leak into a separate binding slot." }
+    span { loc = "location", message = "This member will leak into a separate binding slot." }
 )
 
 err(
@@ -2986,6 +3098,16 @@ err(
 )
 
 err(
+    "partial-interface-accessor-default-implementation",
+    30318,
+    "partial interface accessor default implementation",
+    span {
+        loc = "decl:Decl",
+        message = "interface accessor default implementation is incomplete; define all accessors or none."
+    }
+)
+
+err(
     "interface-requirement-cannot-be-override",
     30312,
     "interface requirement cannot override",
@@ -3249,6 +3371,13 @@ warning(
     30407,
     "failed to resolve canonical order of generic equality constraint",
     span { loc = "decl:Decl", message = "failed to resolve canonical order of generic equality constraint" }
+)
+
+err(
+    "constraint-subject-cannot-be-this-type",
+    30427,
+    "the subject of a constraint cannot be the 'This' type",
+    span { loc = "typeExp:Expr", message = "constrain an associated type such as 'This.A' here, or use an inheritance clause (e.g. 'interface IFoo : IBar') to give an interface a base" }
 )
 
 --
@@ -3696,6 +3825,13 @@ standalone_note(
     "more-overload-candidates",
     40015,
     "~count:Int more overload candidates",
+    span { loc = "location" }
+)
+
+standalone_note(
+    "overload-candidate-argument-type-mismatch",
+    40018,
+    "argument ~argIndex:Int does not match: expected '~expectedType:Type', got '~actualType:Type'",
     span { loc = "location" }
 )
 
@@ -4475,6 +4611,13 @@ err(
 )
 
 err(
+    "unsupported-assignment-target",
+    40017,
+    "assignment target is not supported",
+    span { loc = "location", message = "this form of assignment is not currently supported; consider assigning to the whole value instead of an individual element" }
+)
+
+err(
     "cannot-unroll-loop",
     40020,
     "loop unrolling failed",
@@ -4572,6 +4715,20 @@ warning(
     41033,
     "use of uninitialized value",
     span { loc = "location", message = "use of uninitialized value of type '~typeName'" }
+)
+
+warning(
+    "possibly-using-uninitialized-variable",
+    41035,
+    "possible use of uninitialized variable",
+    span { loc = "location", message = "variable '~varName' may be uninitialized on some paths; it is only conditionally assigned" }
+)
+
+warning(
+    "possibly-using-uninitialized-value",
+    41036,
+    "possible use of uninitialized value",
+    span { loc = "location", message = "value of type '~typeName' may be uninitialized on some paths; it is only conditionally assigned" }
 )
 
 warning(
@@ -4796,6 +4953,49 @@ warning(
     "`-trace-coverage-reserved-space` does not apply to this target; ignoring reserved spaces"
 )
 
+err(
+    "coverage-manifest-output-without-coverage",
+    45108,
+    "`-coverage-manifest-output` requires a coverage tracing option; use `-trace-coverage`, `-trace-function-coverage`, or `-trace-branch-coverage`"
+)
+
+err(
+    "coverage-manifest-output-multiple-artifacts",
+    45109,
+    "`-coverage-manifest-output` path '~path' is not supported for multiple coverage-instrumented artifacts; use per-artifact `<output>.coverage-manifest.json` sidecars or compile each target separately"
+)
+
+err(
+    "coverage-manifest-output-collides-with-artifact",
+    45110,
+    "`-coverage-manifest-output` path '~path' must differ from any artifact output path emitted by this compile"
+)
+
+err(
+    "coverage-manifest-output-with-container",
+    45111,
+    "`-coverage-manifest-output` is not supported when writing a container output"
+)
+
+err(
+    "coverage-manifest-output-without-coverage-data",
+    45112,
+    "`-coverage-manifest-output` path '~path' was requested, but the selected target did not produce coverage metadata"
+)
+
+err(
+    "coverage-counter-width-invalid",
+    45113,
+    "`-trace-coverage-counter-width` value is invalid",
+    span { loc = "location", message = "option `-trace-coverage-counter-width` accepts only `32` or `64`, but got `~parsedValue:Int`. uint64 (the default) effectively cannot wrap; uint32 wraps silently at 2^32 hits per slot but is needed when the runtime driver does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon)." }
+)
+
+err(
+    "coverage-counter-width-bytes-invalid",
+    45114,
+    "coverage counter width API option value is invalid: the `CompilerOptionName::TraceCoverageCounterByteWidth` API option accepts only `4` (uint32) or `8` (uint64), but got `~byteWidth:Int`. This is the API-path counterpart to `E45113` (the CLI parser, which validates bits 32/64 before storing the byte width here); a host setting the API option directly must pass the byte width (divide bits by 8), not the bit width."
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(
@@ -4895,6 +5095,13 @@ err(
     50060,
     "invalid mesh output topology",
     span { loc = "location", message = "Invalid mesh stage output topology '~topology' for target '~target', must be one of: ~validTopologies" }
+)
+
+err(
+    "invalid-stage-output-topology",
+    50061,
+    "invalid output topology",
+    span { loc = "location", message = "Invalid output topology '~topology' for stage '~stage', must be one of: ~validTopologies" }
 )
 
 err(
@@ -5136,6 +5343,27 @@ err(
 )
 
 err(
+    "abort-format-must-be-string-literal",
+    55210,
+    "abort format string must be a string literal",
+    span { loc = "location", message = "the format string passed to 'abort' must be a string literal." }
+)
+
+err(
+    "abort-argument-type-not-supported",
+    55211,
+    "unsupported abort argument type",
+    span { loc = "location", message = "argument of type '~type:IRInst' is not supported in an abort message; only scalar and vector arguments are allowed." }
+)
+
+err(
+    "abort-not-supported-in-reverse-mode-auto-diff",
+    55212,
+    "abort is not supported in reverse-mode automatic differentiation",
+    span { loc = "location", message = "'abort' cannot currently be used in a function being reverse-differentiated." }
+)
+
+err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
     "CUDA type mapping failed",
@@ -5225,7 +5453,7 @@ err(
     span { loc = "location", message = "SubpassInput cannot be placed inside a ParameterBlock on Metal; framebuffer fetch inputs must be direct entry-point parameters." }
 )
 
--- SPIRV (57001-57004)
+-- SPIRV (57001-57005)
 
 warning(
     "spirv-opt-failed",
@@ -5253,6 +5481,12 @@ err(
     57004,
     "SPIR-V output contains no exported symbols",
     span { loc = "location", message = "output SPIR-V contains no exported symbols. Please make sure to specify at least one entrypoint." }
+)
+
+err(
+    "spirv-resource-heap-stride-too-small",
+    57005,
+    "SPIR-V resource heap stride '~stride:Int' is too small for RaytracingAccelerationStructure descriptor heap entries; expected at least '~minimumStride:Int' bytes."
 )
 
 -- GLSL Compatibility (58001-58003)

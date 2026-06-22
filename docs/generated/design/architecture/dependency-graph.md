@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:30:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 30983b1eac237a20bb36b39636936cb7cb3bc5b003a6f2f819545a3ac80fb871
+model: claude-opus-4.8
+generated_at: 2026-06-05T09:24:37Z
+source_commit: 52339028a2aa703271533454c6b9528a534bac31
+watched_paths_digest: d562c492ff7426404fd8fcd584e73aade50ea9e87ab0386d9d3448c420d06cb9
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -26,8 +26,9 @@ specific subsystem.
 External dependencies (`miniz`, `lz4_static`, `Threads::Threads`,
 `unordered_dense`, `SPIRV-Headers`, `SPIRV-Tools-opt`, `SPIRV-Tools-link`,
 `SPIRV`, `glslang`, `${CMAKE_DL_LIBS}`) are omitted from the diagram
-to keep it focused on internal structure. They are listed in the
-notes per node.
+to keep it focused on internal structure. The most significant ones
+are summarized in the notes per node below; the per-node notes are
+not an exhaustive list of every external link dependency.
 
 ```mermaid
 flowchart TB
@@ -100,7 +101,7 @@ above without ordinary `LINK_WITH_*` edges:
 - **`source/slang-llvm/`** — has no `CMakeLists.txt` of its own.
   `slang-llvm` is produced out-of-tree (or downloaded as a prebuilt
   binary controlled by `SLANG_SLANG_LLVM_FLAVOR` in the root
-  [CMakeLists.txt](../../../../CMakeLists.txt) around line 355); no
+  [CMakeLists.txt](../../../../CMakeLists.txt) around line 366); no
   in-source target links against it directly.
 
 ## Edge citations

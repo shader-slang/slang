@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-28T08:25:09+00:00
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-watched_paths_digest: c14a0f34a0411eb654010a94f1366a4724d201d82e68f7e9547e3782269541fd
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:11:28Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 12225714da6281dfb4ac737612c99f7829fb0cf890341684715ac2d919b445cb
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -44,7 +44,7 @@ Three sources contribute keywords:
    and the resulting decls behave like keywords for purposes of
    parser disambiguation.
 
-## Lexer-recognized symbols
+## Lexer-recognized keywords
 
 The lexer does *not* recognize alphabetic keywords. The only tokens
 spelled out in the lexer / token catalog are punctuation and operators
@@ -52,7 +52,16 @@ spelled out in the lexer / token catalog are punctuation and operators
 `Scope (::)`, `RightArrow (->)`, `DoubleRightArrow (=>)`, all the
 `Op*` operators, etc.).
 
-## Statement keywords
+## Parser-registered syntax keywords
+
+The bulk of Slang's keywords are recognized by the parser rather than
+the lexer. Statement keywords are matched directly by the statement
+parser; declaration, modifier, and expression keywords are registered
+in the parser's syntax-decl table (`g_parseSyntaxEntries[]`) so they
+can be redefined or extended through `syntax` / `attribute_syntax`
+declarations.
+
+### Statement keywords
 
 Recognized in the statement parser by direct identifier comparison.
 Cited line numbers refer to
@@ -61,20 +70,20 @@ Cited line numbers refer to
 
 | Keyword | Where parsed |
 | --- | --- |
-| `if` | line 6358 (`LookAheadToken("if")`); `else` follow at lines 6782, 6819 |
-| `for` | lines 6298, 6340, 6369, 6859 (header parsing and statement entry) |
-| `while` | lines 6371, 6898, 6911, 6958 |
-| `do` | line 6373 |
-| `break` | lines 6375, 6979 |
-| `continue` | lines 6377, 6992 |
-| `return` | lines 6379, 7001 |
-| `switch` | lines 6014, 6388 |
-| `case` | lines 6057, 6087, 6396 |
-| `default` | lines 6063, 6087, 6398 |
-| `discard` | line 6381 |
-| `defer` | line 6406 |
-| `throw` | line 6414 |
-| `catch` | lines 6919-6967 (the `do ... catch` handler form; `catch` does **not** pair with `try` at statement level) |
+| `if` | line 6534 (`LookAheadToken("if")`); `else` handled in `parseIfStatement` (line 6986) at line 6995 |
+| `for` | line 6545 (statement entry); compile-time `for` at lines 6516, 6518 (`parseCompileTimeForStmt`, line 6467) |
+| `while` | line 6547 |
+| `do` | line 6549 |
+| `break` | line 6551 |
+| `continue` | line 6553 |
+| `return` | line 6555 |
+| `switch` | line 6564 |
+| `case` | line 6572 (and in the switch body at lines 6233, 6263) |
+| `default` | line 6574 (and in the switch body at lines 6239, 6263) |
+| `discard` | line 6557 |
+| `defer` | line 6582 |
+| `throw` | line 6590 |
+| `catch` | lines 7121, 7140 (the `do ... catch` handler form; `catch` does **not** pair with `try` at statement level) |
 
 These keywords are not in the syntax-decl table because Slang treats
 control-flow as a closed grammar; they cannot be redefined by user
@@ -82,13 +91,13 @@ code. Note that `try` is an *expression* keyword (see
 `## Expression keywords` below); the statement-level exception
 handler is `do { ... } catch ( ... ) { ... }`, parsed at
 [slang-parser.cpp lines
-6919-6967](../../../../source/slang/slang-parser.cpp).
+7121-7140](../../../../source/slang/slang-parser.cpp).
 
-## Decl keywords
+### Decl keywords
 
 Registered in `g_parseSyntaxEntries[]` at
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line 10170
-through `_makeParseDecl(...)`. Identifiers that begin with double
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line 10461
+through `_makeParseDecl(...)` (defined at line 10432). Identifiers that begin with double
 underscore (`__`) are intentionally namespaced as compiler-internal /
 non-stable.
 
@@ -96,7 +105,8 @@ non-stable.
 | --- | --- |
 | `typedef` | C-style type alias (`parseTypeDef`) |
 | `typealias` | Slang-style type alias (`parseTypeAliasDecl`) |
-| `associatedtype` | Interface associated type (`parseAssocType`) |
+| `associatedtype` | Interface associated type (`parseAssocType`, line 4019) |
+| `__constraint` | Interface-level constraint requirement (`parseInterfaceConstraintDecl`, line 4061) |
 | `__associatedfunc` | Interface associated function (`parseAssocFunc`) |
 | `type_param` | Module-level generic type parameter (`parseGlobalGenericTypeParamDecl`) |
 | `__generic` | Generic-parameter list head (`parseGenericDecl`) |
@@ -129,23 +139,24 @@ non-stable.
 `struct`, `class`, and `enum` are also decl keywords, but they are
 **not** registered through `g_parseSyntaxEntries[]` /
 `_makeParseDecl`. Instead the parser dispatches on them via direct
-identifier lookahead in `parseDecl`
+identifier lookahead in the type-specifier parser
 ([slang-parser.cpp lines
-3118-3134](../../../../source/slang/slang-parser.cpp)) and
-`parseDeclWithModifiers`
-([slang-parser.cpp lines
-10170-10358](../../../../source/slang/slang-parser.cpp)). The dedicated
-parse routines (`parseStructDecl`, `parseClassDecl`,
-`parseEnumDecl`) construct the corresponding AST nodes directly.
+3153-3169](../../../../source/slang/slang-parser.cpp)), reached from
+`ParseDeclWithModifiers`
+([slang-parser.cpp line
+5506](../../../../source/slang/slang-parser.cpp)). The dedicated
+parse routines (`ParseStruct` at line 5976, `ParseClass`
+at line 6047, `parseEnumDecl` at line 6096) construct the
+corresponding AST nodes directly.
 
-## Modifier keywords
+### Modifier keywords
 
 Registered through `_makeParseModifier` in
 [slang-parser.cpp](../../../../source/slang/slang-parser.cpp). Some are
 "simple" (single keyword, single AST node class), others take
 arguments (e.g. `layout`, `__target_intrinsic`).
 
-### Simple modifiers
+#### Simple modifiers
 
 | Keyword | AST node |
 | --- | --- |
@@ -177,7 +188,7 @@ arguments (e.g. `layout`, `__target_intrinsic`).
 | `__prefix`, `__postfix` | Unary-operator placement modifiers |
 | `__exported` | Re-export `import` modifier |
 
-### Complex modifiers (take arguments)
+#### Complex modifiers (take arguments)
 
 | Keyword | Parses |
 | --- | --- |
@@ -205,7 +216,7 @@ arguments (e.g. `layout`, `__target_intrinsic`).
 | `__implicit_conversion` | `parseImplicitConversionModifier` |
 | `__attributeTarget` | `parseAttributeTargetModifier` |
 
-## Expression keywords
+### Expression keywords
 
 Registered through `_makeParseExpr` in
 [slang-parser.cpp](../../../../source/slang/slang-parser.cpp).
@@ -221,7 +232,7 @@ Registered through `_makeParseExpr` in
 | `__fwd_diff`, `fwd_diff` | Forward-mode differentiation (`parseForwardDifferentiate`) |
 | `__bwd_diff`, `bwd_diff` | Reverse-mode differentiation (`parseBackwardDifferentiate`) |
 | `__apply` | Apply-for-backward higher-order expression (`parseApplyForBwd`); used inside `__func_extension` to expose the primal-with-context companion to a custom `bwd_diff`; experimental |
-| `new` | Heap-style allocation expression; parsed specially by `parsePrefixExpr` at [slang-parser.cpp lines 9206-9209](../../../../source/slang/slang-parser.cpp) (not via `_makeParseExpr`) |
+| `new` | Heap-style allocation expression; parsed specially by the `AdvanceIf(parser, "new")` branch of `parsePrefixExpr` at [slang-parser.cpp line 9449](../../../../source/slang/slang-parser.cpp) (`parsePrefixExpr` defined at line 9441; not via `_makeParseExpr`) |
 | `__return_val` | Compiler-internal return-value reference |
 | `__func_as_type` | Function-as-type reflection |
 | `__dispatch_kernel` | Kernel-dispatch primitive |
@@ -230,7 +241,7 @@ Registered through `_makeParseExpr` in
 | `__getAddress` | Compiler-internal address-of |
 | `__floatAsInt` | Compiler-internal bit reinterpretation |
 
-## Core-module-supplied vocabulary
+## Core-module syntax declarations
 
 The four `*.meta.slang` files in
 [source/slang/](../../../../source/slang) contribute additional names
@@ -263,10 +274,11 @@ By convention:
 
 - Names beginning with `__` (e.g. `__intrinsic_op`,
   `__target_intrinsic`, `__init`, `__subscript`, `__import`,
-  `__include`, `__file_decl`) denote compiler-internal vocabulary that
-  user code should not rely on. Many have public spellings without
-  the underscores (`extension`, `import`, `init`, `subscript`,
-  `include`).
+  `__include`, `__constraint`, `__file_decl`) denote compiler-internal vocabulary that
+  user code should not rely on. A few have parser-registered public
+  spellings without the underscores (`extension`, `import`); `__init`,
+  `__subscript`, and `__include` have no underscore-free spelling in
+  `g_parseSyntaxEntries[]`.
 - Names beginning with `gl_` come from the GLSL meta-module and stand
   for shader-stage built-ins.
 - Names beginning with `SV_` (HLSL system-value semantics) appear as

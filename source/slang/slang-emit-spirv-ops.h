@@ -2542,6 +2542,15 @@ SpvInst* emitOpUnreachable(SpvInstParent* parent, IRInst* inst)
     return emitInst(parent, inst, SpvOpUnreachable);
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpAbortKHR (VK_KHR_shader_abort)
+template<typename T, typename U>
+SpvInst* emitOpAbortKHR(SpvInstParent* parent, IRInst* inst, const T& messageType, const U& message)
+{
+    static_assert(isSingular<T>);
+    static_assert(isSingular<U>);
+    return emitInst(parent, inst, SpvOpAbortKHR, messageType, message);
+}
+
 // https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/master/extensions/EXT/SPV_EXT_fragment_shader_interlock.html#shaders-fragment-shader-interlock
 SpvInst* emitOpBeginInvocationInterlockEXT(SpvInstParent* parent, IRInst* inst)
 {
