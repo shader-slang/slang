@@ -100,6 +100,11 @@ with `force=true` to re-measure every release on the new machine and re-stamp
     runner.json                      {fingerprint, label} the history was built on
     tracking/tracking.json          derived series consumed by trend.py / plots
 
+Local / ad-hoc `bench.py` runs (e.g. `bench.py --label dev`) write to a third
+layout — `<results>/<label>/results.json` — at the results root rather than under
+`releases/` or `daily/`. `analyze.results_dir_for()` searches all three
+conventions in order, so local results are handled transparently by all tools.
+
 `results.json` (all of median/min/mean/stdev per timer) is the only measurement
 artifact stored — no CSV; the analysis/report tools read it directly. Transient
 and regenerable outputs (`gen/`, `analysis/`, `breakdown/`, `*.html`,

@@ -475,7 +475,7 @@ def _workload_source(spec, head=40, tail=40, ctx=40):
     ``default_size`` is the workload's ``spec.default_size`` integer (returned
     alongside the source so callers can show it without re-reading the spec).
     Each ``source_snippet`` is trimmed to three windows: the first ``head`` lines,
-    the ``±ctx`` lines around the ``computeMain`` entry point, and the last
+    the ``ctx`` lines before and ``ctx`` lines after ``computeMain`` (2*ctx+1 total), and the last
     ``tail`` lines, with elided regions marked by a ``// … N lines omitted …``
     comment. Overlapping windows are merged.
     """

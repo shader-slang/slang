@@ -31,20 +31,22 @@ CMAKE_FLAGS=(
   -DSLANG_ENABLE_EXAMPLES=OFF
 )
 
-# date<TAB>full-sha, oldest first (EOD first-parent tip per active day after v2026.10)
+# "YYYY-MM-DD full-sha" — EOD first-parent tip per active day after v2026.10,
+# oldest first. Full SHAs are used so track.py register --commit stores a
+# collision-safe identifier regardless of future repo growth.
 COMMITS=(
   "2026-05-29 8aee8c93225292cef638117d9e4061e4810df0c5"
-  "2026-05-30 fb51dcf92"
-  "2026-06-01 aaa5f89dd"
-  "2026-06-02 adc996670"
-  "2026-06-03 eb0dba821"
-  "2026-06-04 564ac9f05"
-  "2026-06-05 5230a81f2"
-  "2026-06-08 6b9f98ff9"
-  "2026-06-09 29e69b0bf"
-  "2026-06-10 b2ec9a4f7"
-  "2026-06-11 45c04170f"
-  "2026-06-12 736e3a242"
+  "2026-05-30 fb51dcf9253eb20b6d98173fb96a6ee5bdb5ed47"
+  "2026-06-01 aaa5f89dd1a8e9ba0ced7c27a7d343ebbc55117c"
+  "2026-06-02 adc996670ec281aa8a4ee131f30b324648cbbe60"
+  "2026-06-03 eb0dba8214c31c54e8d37f440b143ffde1c167b5"
+  "2026-06-04 564ac9f050d6569efd773e2f74e7d067a4e54baa"
+  "2026-06-05 5230a81f2fe68afe5cb8d04a1b09d56476f6b960"
+  "2026-06-08 6b9f98ff90facc35306a0ba643dfecb59a870156"
+  "2026-06-09 29e69b0bf626f87500be73a7fb3764db25658c66"
+  "2026-06-10 b2ec9a4f764b08839fc73350b953eeb2a3d2107c"
+  "2026-06-11 45c04170f21cd797f1b01b010c2f44a2b91896b4"
+  "2026-06-12 736e3a2429223f4173f9afdc03cbd7bd78d7741f"
 )
 
 cd "$REPO" || exit 1

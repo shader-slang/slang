@@ -128,6 +128,18 @@ def classify(values, step_thr=1.4, drift_thr=1.25):
     """Classify a release-ordered [(tag,date,val)] series as 'step', 'drift',
     'faster', or 'flat', separating a single dominant jump from gradual creep.
 
+    Threshold rationale:
+    - step_thr=1.4 (40%): a single release-over-release jump this large is likely
+      a discrete regression introduced in one release, not cumulative drift.
+      Set higher than trend.py's --rel 1.25 because single-step classification
+      needs stronger signal than nightly drift detection.
+    - drift_thr=1.25 (25% total): the end-to-end ratio across all releases
+      exceeds this → labelled "drift" (gradual creep across many releases).
+      Matches trend.py's --rel default since both measure cumulative change.
+    - 1.01 below: 1% noise floor for counting a release-to-release move as
+      genuinely upward (vs run-to-run jitter); distinct from the flagging
+      thresholds above.
+
     Returns dict with total ratio, the largest single-release step (+where), and
     the fraction of release-to-release moves that were increases (a high value on
     a 'drift' series = steady upward creep rather than noise)."""
@@ -138,7 +150,7 @@ def classify(values, step_thr=1.4, drift_thr=1.25):
              for i in range(1, len(vals)) if vals[i - 1] > 0]
     total = vals[-1] / vals[0]
     max_step = max(steps, key=lambda s: s[2]) if steps else (None, None, 1.0)
-    ups = sum(1 for *_, r in steps if r > 1.01)
+    ups = sum(1 for *_, r in steps if r > 1.01)  # 1% noise floor for direction
     up_frac = ups / len(steps) if steps else 0.0
     if max_step[2] >= step_thr:
         kind = "step"

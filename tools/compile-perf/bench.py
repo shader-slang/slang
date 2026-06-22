@@ -209,8 +209,8 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
     last_text = ""
     # Validate EVERY sample: a workload that fails on 2 of 5 runs but succeeds
     # on 3 would look valid if only the last sample were checked. When ALL samples
-    # crash, sample_ok is empty and all([]) is True, so ok is decided solely by
-    # crash_codes being non-empty — this is intentional (crash_codes captures it).
+    # crash, sample_ok is empty (all([]) is True) AND got_timers is False — both
+    # independently make ok=False; crash_codes also fires as a third guard.
     sample_ok = []
     crash_codes = []
     for _ in range(samples):

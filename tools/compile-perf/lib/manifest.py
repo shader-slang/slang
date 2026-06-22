@@ -38,7 +38,9 @@ class WorkloadSpec:
     # the reflection serializer in addition to the layout engine.
     reflection_json: bool = False
     # for multi-file/corpus workloads: the file to compile (imports resolve via
-    # -I <gendir>). If None, bench picks the file containing "main", else first.
+    # -I <gendir>). If None, bench heuristically picks the file whose name
+    # contains "main", or the first file if none does. If set, used directly
+    # as the compile entry point.
     main_file: str = None
 
 

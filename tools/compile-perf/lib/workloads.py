@@ -107,7 +107,9 @@ def gen_loop_unroll(n):
 # --------------------------------------------------------------------------- #
 
 # Call depth within a group. Work scales by *breadth* (number of groups), while
-# nesting stays bounded so we don't hit the compiler's type-nesting recursion cap.
+# nesting stays bounded so we don't hit the compiler's type-nesting recursion cap
+# (~32 levels in practice). 8 gives ~4× margin and is empirically safe up to
+# n=1280 (the largest sweep size used).
 _GROUP_DEPTH = 8
 
 
@@ -438,6 +440,8 @@ def gen_operator_typecheck(n):
     s.append('\n[shader("compute")]\n[numthreads(1,1,1)]\n')
     s.append("void computeMain()\n{\n    float acc = 0.0;\n")
     s.append("    float fx = outBuf[0]; int ix = int(outBuf[0]); uint ux = uint(outBuf[0]);\n")
+    # Cap computeMain call sites at 64: beyond this the entry point itself (not
+    # the per-function checking cost we're measuring) becomes the bottleneck.
     for i in range(min(n, 64)):
         s.append(f"    acc += op_{i}(fx, ix, ux);\n")
     s.append("    outBuf[0] = acc;\n}\n")
@@ -465,6 +469,8 @@ def gen_implicit_conversion(n):
         s.append("\n".join(b) + "\n")
     s.append('\n[shader("compute")]\n[numthreads(1,1,1)]\n')
     s.append("void computeMain()\n{\n    float acc = 0.0;\n")
+    # Cap computeMain call sites at 64: beyond this the entry point itself (not
+    # the per-function checking cost we're measuring) becomes the bottleneck.
     for i in range(min(n, 64)):
         s.append(f"    acc += conv_{i}();\n")
     s.append("    outBuf[0] = acc;\n}\n")
@@ -496,6 +502,8 @@ def gen_overload_resolution(n):
         s.append(f"float call_{i}() {{ return pick({a}) + pick2({p}, {q}); }}\n")
     s.append('\n[shader("compute")]\n[numthreads(1,1,1)]\n')
     s.append("void computeMain()\n{\n    float acc = 0.0;\n")
+    # Cap computeMain call sites at 64: beyond this the entry point itself (not
+    # the per-function checking cost we're measuring) becomes the bottleneck.
     for i in range(min(n, 64)):
         s.append(f"    acc += call_{i}();\n")
     s.append("    outBuf[0] = acc;\n}\n")

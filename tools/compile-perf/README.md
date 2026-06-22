@@ -169,7 +169,7 @@ python3 sweep.py --samples 5                                # -> results/release
 python3 report.py                           # per-workload history + phase breakdown HTML
 python3 breakdown.py --label <tag>          # phase attribution for one label (stdout table)
 
-# 6. check a change for a compile-time regression — build your branch vs master
+# 5. check a change for a compile-time regression — build your branch vs master
 #    and diff, one command (builds both on the SAME machine via a git worktree)
 python3 compare_branches.py --base master --only minimal,autodiff,mdl_dxr --samples 3
 #    ...or A/B two prebuilt slangc binaries yourself:
