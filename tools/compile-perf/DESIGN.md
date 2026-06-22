@@ -14,12 +14,11 @@ on Windows). See `README.md` Quickstart for copy-paste commands.
 - **Benchmark one build** — `bench.py --slangc <path> --label <name>`: run the
   suite (or a `--only` subset) against a slangc binary; writes
   `results/<name>/results.json`.
-- **Branch vs branch — compare a change against a baseline** —
-  `compare_branches.py --base master`: builds your working tree + the base ref (in
-  a throwaway `git worktree`) on the same machine, benches both, and diffs. Or do
-  it by hand with two prebuilt binaries: `bench.py --label base`,
-  `bench.py --label head`, `compare.py base head`. Exits non-zero on a regression
-  past threshold, so it doubles as a pre-push check.
+- **Branch vs branch — compare a change against a baseline** — bench two
+  slangc binaries on the same machine (`bench.py --label base`, then
+  `bench.py --label head`) and diff with `compare.py base head`. A
+  one-command driver (`compare_branches.py`) that builds both sides via a
+  git worktree is planned for a follow-up PR.
 - **Across releases** — `fetch_releases.py` (caches platform-matched release
   binaries) + `sweep.py` to bench them all, then `analyze.py` (ranked
   step-changes, leaf attribution) and `report.py` (self-contained HTML, incl.
@@ -52,13 +51,13 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   `force=true` to re-measure the whole history onto a new runner.** Inputs:
   `since`, `until`, `samples`, `force`.
 
-**Per-PR gate (deferred).** A fast, soft-fail per-PR gate — build the PR head and
-its merge-base on the same runner and diff with `compare.py` (baseline-relative,
-so machine variance cancels; non-blocking, not a required check) — is **designed
-but not part of this phase**. Its engine (`compare.py` / `compare_branches.py`)
-exists for local use today. A per-PR gate catches gross step regressions at
-review; the nightly trend catches the gradual drift no single PR ever trips —
-together they cover both.
+**Per-PR gate and local comparison tools (deferred).** A fast, soft-fail
+per-PR gate — build the PR head and its merge-base on the same runner and diff
+(baseline-relative, so machine variance cancels; non-blocking, not a required
+check) — is **designed but not part of this phase**. `compare.py` and
+`compare_branches.py` will be added in a follow-up PR. A per-PR gate catches
+gross step regressions at review; the nightly trend catches the gradual drift
+no single PR ever trips — together they cover both.
 
 ### Data model — the tracking series
 
