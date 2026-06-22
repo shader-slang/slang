@@ -43,9 +43,6 @@ jobs:
 
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
       options: >-
         --gpus all
         --user root

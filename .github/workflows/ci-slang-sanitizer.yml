@@ -26,9 +26,6 @@ jobs:
 
     container:
       image: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
       options: --user root
 
     env:
