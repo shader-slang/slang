@@ -128,7 +128,7 @@ jobs:
           [ -n "$ONLY" ] && args+=(--only "$ONLY")
           # Daily ToT sweep -> perf-results/daily/<label>/results.json
           python bench.py "${args[@]}"
-          # Stamp meta + rebuild perf-results/_tracking/tracking.json
+          # Stamp meta + rebuild perf-results/tracking/tracking.json
           python track.py register --results "$RESULTS" --index "$RESULTS/index.json" \
             --label "$LABEL" --commit "$COMMIT" --corpus-sha "$CORPUS_SHA"
 
@@ -188,11 +188,11 @@ jobs:
           SLANG_COMPILE_PERF_PAT: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
         run: |
           set -euo pipefail
-          ANALYSIS="$GITHUB_WORKSPACE/perf-results/_analysis"
+          ANALYSIS="$GITHUB_WORKSPACE/perf-results/analysis"
           PAGES="$GITHUB_WORKSPACE/perf-pages"
 
           if [ ! -d "$ANALYSIS" ]; then
-            echo "No _analysis dir; skipping pages deploy"
+            echo "No analysis dir; skipping pages deploy"
             exit 0
           fi
 

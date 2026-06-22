@@ -178,7 +178,7 @@ python3 breakdown.py --label <tag>          # phase attribution for one label (s
 # 5. complexity sweep of one build (compile time vs size N), with HTML report
 python3 bench.py --slangc /path/to/slangc --label dev --sweep \
     --only resource_aggregate,reflection_layout,control_flow_ssa
-python3 sweep_report.py --label dev         # -> results/dev/_sweep/sweep_report.html
+python3 sweep_report.py --label dev         # -> results/dev/sweep/sweep_report.html
 
 # 6. check a change for a compile-time regression — build your branch vs master
 #    and diff, one command (builds both on the SAME machine via a git worktree)
@@ -236,17 +236,17 @@ via `--results <checkout-path>`.
 | ---------------------------------------------- | ------------------------------------------------------------------ |
 | `results/releases/<tag>/results.json`          | per-release measurements — source of truth (all timers, all stats) |
 | `results/daily/<label>/results.json+meta.json` | nightly ToT sweeps                                                 |
-| `results/_tracking/tracking.json`              | derived tracking series (release history ++ daily tail)            |
+| `results/tracking/tracking.json`              | derived tracking series (release history ++ daily tail)            |
 
 **Regenerable / local only (gitignored from the results repo):**
 
 | Path                                         | What it is                                                      |
 | -------------------------------------------- | --------------------------------------------------------------- |
-| `results/_analysis/series.csv`               | long-format time-series, one row per `(workload,timer,release)` |
-| `results/_analysis/flags.csv`                | ranked step-changes with leaf attribution                       |
-| `results/_analysis/*.svg`                    | charts                                                          |
-| `results/_analysis/report_per_workload.html` | per-workload stacked-area history + drill-down pages            |
-| `results/releases/<tag>/_sweep/`             | complexity-sweep report for swept releases                      |
+| `results/analysis/series.csv`               | long-format time-series, one row per `(workload,timer,release)` |
+| `results/analysis/flags.csv`                | ranked step-changes with leaf attribution                       |
+| `results/analysis/*.svg`                    | charts                                                          |
+| `results/analysis/report_per_workload.html` | per-workload stacked-area history + drill-down pages            |
+| `results/releases/<tag>/sweep/`             | complexity-sweep report for swept releases                      |
 | `releases/`                                  | cached prebuilt `slangc` per tag (large, gitignored)            |
 | `corpus/`                                    | fetched real-shader corpora, e.g. MDL (large, gitignored)       |
 

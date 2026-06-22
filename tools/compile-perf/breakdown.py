@@ -278,7 +278,7 @@ def render_stacked_svg(runs, label, metric):
 def write_html(results_dir, label, metric):
     runs = _runs(results_dir, label, metric)
     svg = render_stacked_svg(runs, label, metric)
-    outdir = os.path.join(analyze.results_dir_for(results_dir, label), "_breakdown")
+    outdir = os.path.join(analyze.results_dir_for(results_dir, label), "breakdown")
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "breakdown.svg"), "w") as fh:
         fh.write(svg)
@@ -674,7 +674,7 @@ def main():
     ap.add_argument("--metric", default="median", choices=["min", "median", "mean"])
     ap.add_argument("--workload", default=None, help="show the full tree for one workload")
     ap.add_argument("--html", action="store_true",
-                    help="write a stacked-bar phase breakdown to <label>/_breakdown/")
+                    help="write a stacked-bar phase breakdown to <label>/breakdown/")
     args = ap.parse_args()
 
     if args.html:

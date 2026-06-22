@@ -5,7 +5,7 @@ One panel per workload: frontEndExecute / generateOutput stacked areas across th
 release + daily-ToT history, with per-workload detail pages linked from each panel
 title.
 
-    python3 report.py            # -> results/_analysis/report_per_workload.html
+    python3 report.py            # -> results/analysis/report_per_workload.html
 """
 import argparse
 import json
@@ -59,7 +59,7 @@ def main():
     with open(args.index) as fh:
         index = json.load(fh)
 
-    outdir = os.path.join(args.results, "_analysis")
+    outdir = os.path.join(args.results, "analysis")
     os.makedirs(outdir, exist_ok=True)
 
     # Combined index: releases + daily ToT runs, written to disk so breakdown's

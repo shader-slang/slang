@@ -19,12 +19,12 @@ Layout under --results (a checkout of the perf results repo in CI):
     daily/<label>/results.json   one ToT sweep per night (label = <date>-<shortsha>)
     daily/<label>/meta.json      {date, commit, runner, kind:"daily"}
     runner.json                  {fingerprint, label} the history was built on
-    _tracking/tracking.json      derived series consumed by trend.py / plots
+    tracking/tracking.json      derived series consumed by trend.py / plots
 
 Commands:
     track.py register --label <date>-<sha> --commit <sha> [--date YYYY-MM-DD]
                                  stamp meta.json for a freshly written daily sweep, then rebuild
-    track.py rebuild             recompute _tracking/tracking.json
+    track.py rebuild             recompute tracking/tracking.json
     track.py stamp-runner --label <run>   record runner.json (after a history rebuild)
     track.py runner-id           print this machine's runner fingerprint
     track.py summary             print the assembled tracking series
@@ -127,7 +127,7 @@ def assemble(results_dir, index_path):
 
 def rebuild(results_dir, index_path):
     series = assemble(results_dir, index_path)
-    outdir = os.path.join(results_dir, "_tracking")
+    outdir = os.path.join(results_dir, "tracking")
     os.makedirs(outdir, exist_ok=True)
     out = os.path.join(outdir, "tracking.json")
     with open(out, "w") as fh:

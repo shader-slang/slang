@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Drift alert for the nightly compile-perf tracking series.
 
-Reads the tracking series (track.py's _tracking/tracking.json) and compares the
+Reads the tracking series (track.py's tracking/tracking.json) and compares the
 latest point — tonight's tip-of-tree (ToT) sweep — against the trailing median of
 the previous N points, per (workload, primary-timer). A metric that rises beyond
 both a relative and an absolute threshold is flagged: printed, emitted as a
@@ -74,7 +74,7 @@ def main():
     ap.add_argument("--no-fail", action="store_true", help="report only; always exit 0")
     args = ap.parse_args()
 
-    tpath = os.path.join(args.results, "_tracking", "tracking.json")
+    tpath = os.path.join(args.results, "tracking", "tracking.json")
     if not os.path.exists(tpath):
         raise SystemExit(f"no tracking series at {tpath}; run track.py rebuild first")
     series = json.load(open(tpath))

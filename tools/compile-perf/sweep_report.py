@@ -9,7 +9,7 @@ super-linearity check. Complements ladder_scaling.py (which prints the same fit
 as a cross-release table).
 
     python3 bench.py --slangc <slangc> --label dev --sweep --only <wl,...>
-    python3 sweep_report.py --label dev            # -> results/dev/_sweep/sweep_report.html
+    python3 sweep_report.py --label dev            # -> results/dev/sweep/sweep_report.html
 """
 import argparse
 import html
@@ -275,7 +275,7 @@ def main():
             floor = r["timers"]["compileInner"][args.metric]
             break
 
-    outdir = os.path.join(analyze.results_dir_for(args.results, args.label), "_sweep")
+    outdir = os.path.join(analyze.results_dir_for(args.results, args.label), "sweep")
     os.makedirs(outdir, exist_ok=True)
     # Per-workload pages (stacked sub-counters + analysis + numbers), then the
     # index's compileInner-only curves linking into them.

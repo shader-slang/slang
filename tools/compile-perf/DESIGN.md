@@ -73,7 +73,7 @@ Absolute compile times are runner-specific, so the series is assembled per machi
                dated after the last release]
 
 `track.py` owns it: `register` (stamp a daily run + rebuild), `rebuild` (recompute
-`_tracking/tracking.json`), `stamp-runner` (record the fingerprint the history was
+`tracking/tracking.json`), `stamp-runner` (record the fingerprint the history was
 built on), `runner-id`, `summary`. Points reduce to per-`(workload, timer)` median
 via `analyze.canonical_runs`, so swept multi-size runs collapse to `default_size`
 and history vs daily compare like-with-like.
@@ -103,11 +103,11 @@ with `force=true` to re-measure every release on the new machine and re-stamp
     daily/<date>-<sha>/results.json  one tip-of-tree sweep per night
     daily/<date>-<sha>/meta.json     {date, commit, runner, kind}
     runner.json                      {fingerprint, label} the history was built on
-    _tracking/tracking.json          derived series consumed by trend.py / plots
+    tracking/tracking.json          derived series consumed by trend.py / plots
 
 `results.json` (all of median/min/mean/stdev per timer) is the only measurement
 artifact stored — no CSV; the analysis/report tools read it directly. Transient
-and regenerable outputs (`gen/`, `_analysis/`, `_sweep/`, `_breakdown/`, `*.html`,
+and regenerable outputs (`gen/`, `analysis/`, `sweep/`, `breakdown/`, `*.html`,
 `*.svg`) are excluded via a `.gitignore` committed directly to the
 `slang-compile-perf` repo.
 
@@ -115,7 +115,7 @@ and regenerable outputs (`gen/`, `_analysis/`, `_sweep/`, `_breakdown/`, `*.html
 
 Both CI workflows generate and publish an HTML report after each results push.
 `report.py` reads **all** data in the results repo (release history + daily ToT
-points) and writes a self-contained report to `_analysis/` (gitignored from the
+points) and writes a self-contained report to `analysis/` (gitignored from the
 data branch). The deploy step pushes that output to the `gh-pages` branch of
 `shader-slang/slang-compile-perf`, which GitHub Pages serves at
 `https://shader-slang.org/slang-compile-perf/`. `report_per_workload.html` is
