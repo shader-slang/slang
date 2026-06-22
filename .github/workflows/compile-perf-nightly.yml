@@ -38,6 +38,9 @@ env:
   # pattern). Requires a PAT secret SLANG_COMPILE_PERF_PAT with push access.
   PERF_RESULTS_REPO: shader-slang/slang-compile-perf
 
+permissions:
+  contents: read # GITHUB_TOKEN read-only; writes use SLANG_COMPILE_PERF_PAT
+
 jobs:
   nightly:
     # The quiesced NVIDIA RGFX perf pool (runner group nvrgfx) — the SAME runner
@@ -71,6 +74,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: "shader-slang/MDL-SDK"
+          # Pin to a known-good commit so corpus drift doesn't silently shift
+          # mdl_dxr timings. Update this pin intentionally when refreshing the
+          # corpus, then resync history (compile-perf-release-sweep force=true).
+          ref: "446562493bed1b175e7cf105425ca3596764652f"
           path: "external/MDL-SDK"
           persist-credentials: false
           sparse-checkout: |
@@ -100,6 +107,7 @@ jobs:
           SLANGC="$GITHUB_WORKSPACE/build/Release/bin/slangc.exe"
           LABEL="$(git log -1 --format=%cs HEAD)-$(git rev-parse --short HEAD)"
           COMMIT="$(git rev-parse HEAD)"
+          CORPUS_SHA="$(git -C "$GITHUB_WORKSPACE/external/MDL-SDK" rev-parse HEAD)"
 
           # MDL corpus for the mdl_dxr workload.
           mkdir -p "$SUITE/corpus/mdl"
@@ -113,7 +121,7 @@ jobs:
           python bench.py "${args[@]}"
           # Stamp meta + rebuild perf-results/_tracking/tracking.json
           python track.py register --results "$RESULTS" --index "$RESULTS/index.json" \
-            --label "$LABEL" --commit "$COMMIT"
+            --label "$LABEL" --commit "$COMMIT" --corpus-sha "$CORPUS_SHA"
 
       - name: Push results
         shell: bash
@@ -128,6 +136,16 @@ jobs:
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
           git commit -m "nightly ToT $(date -u +%Y-%m-%d) ($(cd "$GITHUB_WORKSPACE" && git rev-parse --short HEAD))"
           git push
+
+      # Remove the PAT credential that actions/checkout baked into perf-results'
+      # .git/config — on a persistent self-hosted runner this would otherwise
+      # outlive the job and be readable by subsequent jobs.
+      - name: Revoke PAT from perf-results git config
+        if: always()
+        shell: bash
+        run: |
+          git -C "$GITHUB_WORKSPACE/perf-results" config --unset \
+            http."https://github.com/".extraheader 2>/dev/null || true
 
       # Generate HTML reports from ALL data in the results repo and deploy to
       # the gh-pages branch of slang-compile-perf, which is served at

@@ -41,11 +41,10 @@ regression points at a specific release.
   take `--metric` to switch (default `median`).
 - **Memory:** when GNU `/usr/bin/time` is present, peak RSS per compile is also
   captured (`rss_kb`) — a heavier core module inflates memory, not just time.
-- **Floor + slope:** `analyze.py --slope-label <label>` fits `time = floor + k·N`
+- **Floor + slope:** `ladder_scaling.py --label <label>` fits `time = floor + k·N`
   from a `--sweep` (multi-size) run, separating a fixed-cost regression (heavier
   stdlib) from a per-element one (a pass got slower) from a scaling one
-  (super-linear `k`). `analyze.py` also classifies each workload **STEP** vs
-  **DRIFT** (gradual creep) vs **FASTER**.
+  (super-linear `k`).
 
 > **Reading the numbers:** the synthetic workloads are _stress tests built to
 > amplify_ one pass each. A "3.8×" is a sensitivity figure for that pass, **not**
@@ -133,7 +132,7 @@ instead ramps _several_ realistic dimensions together — branchy control flow,
 generic calls, bounded inner loops, resource reads, dynamic dispatch, and
 call-graph depth — so the size knob `N` models a real shader growing from
 **simple to highly complex**. Sweep it (`bench.py --only complexity_ladder
---sweep`) and fit with `analyze.py --slope-label` to get the holistic
+--sweep`) and fit with `ladder_scaling.py --label` to get the holistic
 complexity → compile-time curve, separating the fixed **floor** from the
 per-unit **slope** and surfacing super-linear bends at high complexity.
 
@@ -169,13 +168,12 @@ python3 fetch_corpus.py --name mdl
 python3 bench.py --slangc /path/to/slangc --label dev      # -> results/dev/
 
 # 3. (historical) fetch release binaries and sweep them all
-python3 fetch_releases.py --since 2025-07-01                # v2025.12 .. latest
+python3 fetch_releases.py --since 2025-08-01                # default window start
 python3 sweep.py --samples 5                                # -> results/releases/<tag>/
 
-# 4. analyze + visualize
-python3 analyze.py                          # ranked regressions + series.csv/flags.csv
-python3 plot.py                             # SVG charts
-python3 report.py                           # single self-contained HTML report (cross-release)
+# 4. visualize
+python3 report.py                           # per-workload history + phase breakdown HTML
+python3 breakdown.py --label <tag>          # phase attribution for one label (stdout table)
 
 # 5. complexity sweep of one build (compile time vs size N), with HTML report
 python3 bench.py --slangc /path/to/slangc --label dev --sweep \
@@ -209,9 +207,9 @@ python3 compare.py base head                # primary-timer Δ%, flags regressio
 | `compare_branches.py` | **branch-vs-branch driver** — builds slangc from a base ref (default `master`) + your working tree (throwaway `git worktree`), benches a subset of both, runs `compare.py`; the local one-command form of the per-PR gate                                                                                             |
 | `track.py`            | maintains the CI **tracking series** (release history ++ post-release daily ToT points) + runner fingerprint                                                                                                                                                                                                          |
 | `trend.py`            | nightly **drift alert** — latest point vs trailing-median, same-runner; GitHub annotations + non-zero exit on regression                                                                                                                                                                                              |
-| `analyze.py`          | per-`(workload,timer)` series, leaf-attributed step-change detection, diagnostics path-cost                                                                                                                                                                                                                           |
+| `lib/analyze.py`      | per-`(workload,timer)` series helpers — used as a library by `report.py`, `track.py`, etc. (no standalone CLI yet)                                                                                                                                                                                                    |
 | `breakdown.py`        | **phase attribution** — splits `compileInner` into mutually-exclusive buckets (named leaves + `(self)` residuals); aggregate + per-workload tree; stacked-area **per-release history** (index + per-workload detail pages in `report_per_workload.html`) and **per-sweep** (stacked-area vs N in `sweep_report.html`) |
-| `plot.py`             | self-contained SVG charts (normalized + absolute log)                                                                                                                                                                                                                                                                 |
+| `breakdown.py`        | (also) standalone CLI: `breakdown.py --label <tag>` prints aggregate + per-workload phase tables; `--html` writes a stacked-bar SVG/HTML; `--workload <name>` prints the full indented timer tree                                                                                                                     |
 | `report.py`           | single self-contained **HTML report**, cross-release (charts inline + tables)                                                                                                                                                                                                                                         |
 | `ladder_scaling.py`   | cross-release `floor + slope·N` fit table for any swept workload                                                                                                                                                                                                                                                      |
 | `sweep_report.py`     | **complexity-sweep HTML report** for one build — compileInner scaling curves (index) linking to per-workload pages with the stacked sub-counter-vs-N chart, scaling analysis (floor/k/top-2×), and raw per-size numbers                                                                                               |

@@ -50,7 +50,7 @@ def parse_timers(text):
                 try:
                     out[name] = float(tok[:-2])
                 except ValueError:
-                    pass
+                    sys.stderr.write(f"compile-perf: failed to parse timer value in: {line!r}\n")
                 break
     return out
 
@@ -201,9 +201,16 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
     rsses = []
     last_text = ""
     sample_ok = []  # validate EVERY sample, not just the last one
+    crash_codes = []
     for _ in range(samples):
-        _, wall, text, rss = run_once(timed)
+        rc, wall, text, rss = run_once(timed)
         last_text = text
+        # rc > 1 or rc < 0: slangc crashed (segfault=139, abort=134, …). Exclude
+        # the crashed sample from timing stats; its wall time is meaningless.
+        if rc > 1 or rc < 0:
+            crash_codes.append(rc)
+            sample_ok.append(False)
+            continue
         walls.append(wall)
         if rss is not None:
             rsses.append(rss)
@@ -215,7 +222,7 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
 
     err = real_error(last_text)
     got_timers = bool(per_timer)
-    ok = setup_ok and got_timers and all(sample_ok)
+    ok = setup_ok and got_timers and all(sample_ok) and not crash_codes
 
     return {
         "workload": spec.name,
@@ -234,6 +241,7 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
         "primary_timers": spec.primary_timers,
         "cmd": " ".join(timed),
         "error": err,
+        "crash_codes": crash_codes or None,
     }
 
 

@@ -3,10 +3,10 @@
 # writing perf-results/daily/<date>-<sha7>/ in the slang-compile-perf repo format.
 # Builds incrementally (configure once, checkout oldest->newest), so only changed
 # translation units recompile per commit. Idempotent: skips a day already done.
-set -uo pipefail
+set -euo pipefail
 
-SUITE=/home/jvepsalainen/gitlab/slang/tools/compile-perf
-REPO=/home/jvepsalainen/workspace/jvepsalainen-nv-2/slang
+SUITE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO=$(cd "$SUITE/../.." && pwd)
 OUT=$SUITE/perf-results
 SAMPLES=5
 

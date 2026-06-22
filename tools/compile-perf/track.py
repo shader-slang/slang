@@ -136,7 +136,7 @@ def rebuild(results_dir, index_path):
     return out
 
 
-def register(results_dir, index_path, label, commit, date):
+def register(results_dir, index_path, label, commit, date, corpus_sha=""):
     ddir = os.path.join(results_dir, "daily", label)
     rj = os.path.join(ddir, "results.json")
     if not os.path.exists(rj):
@@ -144,6 +144,8 @@ def register(results_dir, index_path, label, commit, date):
                          f"{os.path.join(results_dir, 'daily')} --label {label} first")
     meta = {"date": date or label[:10], "commit": commit,
             "runner": runner_id(), "kind": "daily"}
+    if corpus_sha:
+        meta["corpus_sha"] = corpus_sha
     with open(os.path.join(ddir, "meta.json"), "w") as fh:
         json.dump(meta, fh, indent=2)
     print(f"registered daily {label} (commit {commit[:9] or '?'}, runner {meta['runner']})")
@@ -176,6 +178,7 @@ def main():
     ap.add_argument("--label", default="")
     ap.add_argument("--commit", default="")
     ap.add_argument("--date", default="")
+    ap.add_argument("--corpus-sha", default="", dest="corpus_sha")
     args = ap.parse_args()
 
     if args.cmd == "runner-id":
@@ -187,7 +190,7 @@ def main():
     elif args.cmd == "register":
         if not args.label:
             ap.error("register needs --label")
-        register(args.results, args.index, args.label, args.commit, args.date)
+        register(args.results, args.index, args.label, args.commit, args.date, args.corpus_sha)
     elif args.cmd == "stamp-runner":
         stamp_runner(args.results, args.label or "manual")
 
