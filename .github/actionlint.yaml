@@ -6,6 +6,7 @@ self-hosted-runner:
     - falcor
     - GCP-T4
     - GPU
+    - nvrgfx-perf
     - perf
     - regression-test
     - SM80Plus
