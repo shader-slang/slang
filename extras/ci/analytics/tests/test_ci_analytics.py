@@ -428,6 +428,85 @@ class TestGpuQuota(unittest.TestCase):
         # The chart section HTML should not be present (JS guard is fine)
         self.assertNotIn("T4 GPU Usage", html)
 
+    def test_gpu_quota_partial_snapshot_renders_chart_gap(self):
+        snapshots = [
+            {
+                "timestamp": "2026-03-03T10:00:00Z",
+                "runner_groups": {},
+                "gpu_quota_by_metric": {
+                    "NVIDIA_T4_GPUS": {
+                        "name": "T4",
+                        "usage": 6,
+                        "limit": 8,
+                        "regions": {"us-central1": {"usage": 6, "limit": 8}},
+                    },
+                },
+            },
+            {
+                "timestamp": "2026-03-03T10:15:00Z",
+                "runner_groups": {},
+                "gpu_quota_partial": True,
+                "gpu_quota_by_metric": {
+                    "NVIDIA_T4_GPUS": {
+                        "name": "T4",
+                        "usage": 0,
+                        "limit": 8,
+                        "regions": {"us-central1": {"usage": 0, "limit": 8}},
+                    },
+                },
+            },
+        ]
+
+        charts = ci_health._build_gpu_quota_charts(snapshots)
+
+        self.assertEqual(charts[0]["regionData"]["us-central1"], [6, None])
+
+
+class TestHealthPartialRendering(unittest.TestCase):
+    def test_recent_failures_partial_does_not_render_false_healthy_empty_state(self):
+        queue_data = {
+            "summary": {
+                "jobs_queued": 0,
+                "jobs_running": 0,
+                "runs_queued": 0,
+                "runs_in_progress": 0,
+            },
+            "self_hosted_runners": [],
+            "queue_by_group": [],
+            "longest_waiting_jobs": [],
+        }
+        failures = {"failures": [], "partial": True, "errors": ["HTTP 502"]}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_health.generate_health_html(queue_data, failures, tmp)
+            with open(os.path.join(tmp, "health.html"), encoding="utf-8") as f:
+                html = f.read()
+
+        self.assertIn("Recent CI failure data unavailable", html)
+        self.assertNotIn("No recent CI failures", html)
+
+    def test_queue_partial_renders_warning(self):
+        queue_data = {
+            "summary": {
+                "jobs_queued": 0,
+                "jobs_running": 0,
+                "runs_queued": 0,
+                "runs_in_progress": 0,
+            },
+            "partial": True,
+            "list_errors": ["HTTP 502"],
+            "self_hosted_runners": [],
+            "queue_by_group": [],
+            "longest_waiting_jobs": [],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_health.generate_health_html(queue_data, [], tmp)
+            with open(os.path.join(tmp, "health.html"), encoding="utf-8") as f:
+                html = f.read()
+
+        self.assertIn("Queue sample is partial", html)
+
 
 class TestHealthApiBounds(unittest.TestCase):
     def test_recent_failures_query_is_bounded_by_created_range(self):
@@ -1084,7 +1163,7 @@ class TestQueueStatusJson(unittest.TestCase):
         with mock.patch.object(
             module,
             "fetch_runs",
-            return_value=[],
+            return_value=([], None),
         ), mock.patch.object(
             module,
             "fetch_runners",
@@ -1105,6 +1184,35 @@ class TestQueueStatusJson(unittest.TestCase):
         self.assertEqual(payload["summary"]["jobs_running"], 0)
         self.assertEqual(payload["queue_by_group"], [])
         self.assertEqual(payload["longest_waiting_jobs"], [])
+
+    def test_json_mode_marks_listing_failures_partial(self):
+        module = load_queue_status_module()
+
+        def fake_runs(repo, status):
+            if status == "queued":
+                return [], "HTTP 502"
+            return [], None
+
+        with mock.patch.object(
+            module,
+            "fetch_runs",
+            side_effect=fake_runs,
+        ), mock.patch.object(
+            module,
+            "fetch_runners",
+            return_value=([], True),
+        ), mock.patch.object(
+            module.sys,
+            "argv",
+            ["ci-queue-status.py", "--json"],
+        ):
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                module.main()
+
+        payload = json.loads(stdout.getvalue())
+        self.assertTrue(payload["partial"])
+        self.assertEqual(payload["list_errors"], ["HTTP 502"])
 
 
 class TestHostedRunnerUsage(unittest.TestCase):
