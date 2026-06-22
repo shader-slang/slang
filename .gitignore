@@ -152,4 +152,3 @@ __pycache__/
 .slang-replays*
 log*.txt
 replay-capture
-tmp/
