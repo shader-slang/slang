@@ -642,6 +642,18 @@ def main():
     all_runs = queued_runs + inprogress_runs
 
     if not all_runs:
+        if args.json:
+            payload = build_json_output(
+                queued_runs,
+                inprogress_runs,
+                [],
+                runners,
+                runners_available,
+                now,
+                repo,
+            )
+            print(json.dumps(payload, indent=2))
+            return
         print("No queued or in-progress runs found.")
         return
 

@@ -1,5 +1,6 @@
 import contextlib
 import io
+import importlib.util
 import json
 import os
 import sys
@@ -19,6 +20,14 @@ import ci_job_collector
 import pr_collector
 import ci_status
 import ci_visualization
+
+
+def load_queue_status_module():
+    path = os.path.join(os.path.dirname(ANALYTICS_DIR), "ci-queue-status.py")
+    spec = importlib.util.spec_from_file_location("ci_queue_status_for_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class TestRunnerTypeCoverage(unittest.TestCase):
@@ -1031,6 +1040,36 @@ class TestCollectionCompleteness(unittest.TestCase):
                     "shader-slang/slang",
                     start,
                 )
+
+
+class TestQueueStatusJson(unittest.TestCase):
+    def test_json_mode_emits_zero_payload_when_no_active_runs(self):
+        module = load_queue_status_module()
+
+        with mock.patch.object(
+            module,
+            "fetch_runs",
+            return_value=[],
+        ), mock.patch.object(
+            module,
+            "fetch_runners",
+            return_value=([], True),
+        ), mock.patch.object(
+            module.sys,
+            "argv",
+            ["ci-queue-status.py", "--json"],
+        ):
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                module.main()
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["summary"]["runs_queued"], 0)
+        self.assertEqual(payload["summary"]["runs_in_progress"], 0)
+        self.assertEqual(payload["summary"]["jobs_queued"], 0)
+        self.assertEqual(payload["summary"]["jobs_running"], 0)
+        self.assertEqual(payload["queue_by_group"], [])
+        self.assertEqual(payload["longest_waiting_jobs"], [])
 
 
 class TestHostedRunnerUsage(unittest.TestCase):
