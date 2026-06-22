@@ -2189,7 +2189,16 @@ bool SemanticsVisitor::_coerce(
     //
     // TODO(tfoley): Under what circumstances would this check ever be needed?
     //
-    if (as<ParameterGroupType>(toType))
+    // The one legitimate conversion *to* a parameter-group type is from a
+    // `DescriptorHandle<P>` that wraps it: such handles carry a generated
+    // `__init(DescriptorHandle<This>)` implicit conversion (the documented
+    // `DescriptorHandle<T> -> T` behavior for any `T : IOpaqueDescriptor`, and
+    // `ConstantBuffer`/`TextureBuffer` are parameter-group types that conform).
+    // That constructor-based conversion is only discovered by the overload
+    // search later in this function, so a `DescriptorHandle` source must be
+    // allowed to fall through rather than be rejected here.
+    //
+    if (as<ParameterGroupType>(toType) && !as<DescriptorHandleType>(fromType))
     {
         return _failedCoercion(toType, outToExpr, fromExpr, sink);
     }
