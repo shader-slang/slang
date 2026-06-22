@@ -16,6 +16,7 @@ if ANALYTICS_DIR not in sys.path:
 import ci_health
 import ci_hosted_runner_usage
 import ci_job_collector
+import pr_collector
 import ci_status
 import ci_visualization
 
@@ -996,6 +997,40 @@ class TestMonthlySplit(unittest.TestCase):
 
             self.assertEqual({j["id"] for j in feb_data}, {1})
             self.assertEqual({j["id"] for j in mar_data}, {2, 3})
+
+
+class TestCollectionCompleteness(unittest.TestCase):
+    def test_run_listing_error_raises_completeness_error(self):
+        start = datetime(2026, 3, 1, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 3, 2, 0, 0, tzinfo=timezone.utc)
+
+        with mock.patch.object(
+            ci_job_collector,
+            "gh_api_list",
+            return_value=(None, "HTTP 502"),
+        ):
+            with self.assertRaises(ci_job_collector.DataCompletenessError):
+                ci_job_collector._fetch_runs_window(
+                    "shader-slang/slang",
+                    start,
+                    end,
+                    set(),
+                    workflow_id=123,
+                )
+
+    def test_pr_search_error_raises_completeness_error(self):
+        start = datetime(2026, 3, 1, 0, 0, tzinfo=timezone.utc)
+
+        with mock.patch.object(
+            pr_collector,
+            "gh_api_list",
+            return_value=(None, "HTTP 502"),
+        ):
+            with self.assertRaises(pr_collector.DataCompletenessError):
+                pr_collector.fetch_merged_prs(
+                    "shader-slang/slang",
+                    start,
+                )
 
 
 class TestHostedRunnerUsage(unittest.TestCase):
