@@ -33,10 +33,6 @@ struct ExtraImpl : IExtra
     float k() { return v; }
 }
 
-// A second, never-instantiated `IExtra` implementation. The witness header in the buffer
-// always selects `ExtraImpl` (seq id 1), so this is never used at runtime — but registering a
-// second conformance keeps `IExtra` dynamic, so `extra.k()` dispatches through the runtime
-// witness rather than being devirtualized. That makes the inner existential's header load-bearing.
 struct ExtraImpl2 : IExtra
 {
     float w;
@@ -96,6 +92,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     let sq = (shapes[0] as Square).value;
     outputBuffer[tid.x] = sq.area() + sq.perimeter() + sq.extra.k();
-    // area = 3*3 = 9, perimeter = 3*4 = 12
+    // area = 3*3 = 9, perimeter = 3*4 = 12, extra.k() = w + 1.0 = 1.0  => 22.0
     // CHECK: 22.0
 }
