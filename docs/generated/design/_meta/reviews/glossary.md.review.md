@@ -1,43 +1,42 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:58:30+00:00
+reviewed_at: 2026-06-12T13:18:05+00:00
 target_doc: glossary.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 3ec0150df965938276956bf39ea384534b1949417b8bac7832d9895d4ccada91
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 8033723409ecbf2551b9a4eb228a4e39356c3fa79164d7d057fb8526b4b0145a
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
   completeness: partial
-  style_consistency: partial
-  source_alignment: partial
+  style_consistency: pass
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 3
+finding_count: 1
 severity_breakdown:
   critical: 0
-  major: 0
-  minor: 3
+  major: 1
+  minor: 0
   nit: 0
 ---
 
 # Review report for glossary.md
 
 ## Summary
-The glossary covers the required term floor and all workspace-relative links resolve, but review found 3 minor issues. The most substantive issue is that the `hoistable instruction` definition overstates placement at module scope, while the source hoists only as far as operands permit. Two additional prompt-contract issues cover adjacent ordering and an `External:` link on a `[Slang]` entry.
+The glossary is mostly aligned with its prompt: entries are tagged, term definitions are source-supported, and the sampled links resolve. One completeness issue remains: the `## Cross-reference index` table omits two peer pipeline documents included by the manifest's watched-path glob.
 
 ## Items checked
-- Ran `regenerate.py show glossary.md` and used the listed prompt, dependencies, and watched files.
-- Verified required front-matter keys, source commit and watched digest shape, first paragraph, size cap, and required sections.
-- Resolved all 190 workspace-relative markdown links at target source commit `52339028a2aa703271533454c6b9528a534bac31`.
-- Checked all 66 glossary entries for exactly one `[Slang]` or `[General]` tag and a mandatory `See:` link.
-- Spot-checked 20 source-alignment claims, including `ASTBuilder`, `NodeBase`, conversion costs, `DeclRef`, `LookupMask`, `LookupResultItem_Breadcrumb`, `generateIRForTranslationUnit`, layout IR, visibility, and `TranslationUnitRequest`.
-- Checked the floor terms, external URL format, language-reference glossary duplication, and cross-reference index coverage.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show glossary.md` and reviewed the per-doc prompt, `_common.md`, resolved watched files, and dependencies `architecture/overview.md`, `pipeline/overview.md`, `cross-cutting/ir-instructions.md`, `syntax-reference/keywords-and-builtins.md`, `name-resolution/index.md`, and `ir-reference/index.md`.
+- Checked front matter for required keys, source commit, watched-path digest, and warning string.
+- Verified the required structure: `## Conventions`, `## Terms`, and `## Cross-reference index`.
+- Checked that the required Slang-specific and general-theory floor terms are present and tagged with exactly one of `[Slang]` or `[General]`.
+- Spot-checked more than 10 source-alignment claims for terms including `ASTBuilder`, `capability atom`, `DiagnosticSink`, `FIDDLE`, `IRInst`, `IROp`, `layout IR module`, `lookup result`, `mandatory optimization pass`, `target`, and `witness table`.
+- Checked relative links and peer links used by the page; no unresolved target was found.
+- Checked that the body has no source line-number citations requiring line-by-line verification.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## Terms` entry `hoistable instruction` | The definition says hoistable instructions are deduplicated globally inside an `IRModule` and live at module scope. The implementation starts from module scope but explicitly backs off when operands are defined in deeper parents, so module scope is not guaranteed. | `source/slang/slang-ir.cpp` lines 1645-1654 say the module-scope assumption may be invalid when operands are nested, and lines 1677-1706 choose the earliest valid point in the selected parent. | Rephrase the entry to say hoistable instructions are deduplicated and moved as far toward module scope as their operands allow. |
-| F-002 | minor | `## Terms` near `target` entries | The glossary is not strictly alphabetically ordered: `target legalization driver` appears before `target intrinsic`, but `target intrinsic` should sort first. | `docs/generated/design/_meta/prompts/glossary.md` lines 7-9 require an alphabetically ordered glossary. | Move the `target intrinsic` entry before `target legalization driver` and re-run the ordering check. |
-| F-003 | minor | `## Terms` entry `scope` | The `scope` entry is tagged `[Slang]` but includes an `External:` link. The glossary prompt allows `External:` only on `[General]` entries. | `docs/generated/design/glossary.md` lines 554-564 show `scope` tagged `[Slang]` with an `External:` line; `docs/generated/design/_meta/prompts/glossary.md` lines 76-83 reserve `External:` for `[General]` entries. | Remove the `External:` line from `scope` or retag the entry as `[General]` if the definition is rewritten as a general compiler term. |
+| F-001 | major | `## Cross-reference index`, lines 757-792 | The prompt requires the cross-reference index to cover every peer doc listed in the manifest entry for `glossary.md`, but the table omits `pipeline/04b-pre-link-passes.md` and `pipeline/04c-layout-ir.md`. Both docs are included by the manifest's `docs/generated/design/pipeline/*.md` watched-path glob and were present in the resolved file list from `regenerate.py show glossary.md`. | `docs/generated/design/_meta/prompts/glossary.md:135` requires the index table to cover every peer doc listed in the manifest entry. `docs/generated/design/_meta/manifest.yaml:754` through `docs/generated/design/_meta/manifest.yaml:757` include the pipeline glob for `glossary.md`; the generated table lists `pipeline/04-ast-to-ir.md`, then jumps to `pipeline/05-ir-passes.md` and `pipeline/06-emit.md`. | Add rows for `pipeline/04b-pre-link-passes.md` and `pipeline/04c-layout-ir.md`, using the existing terms `mandatory optimization pass` and `layout IR module` respectively. |

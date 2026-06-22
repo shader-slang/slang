@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T13:33:02+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 3ec0150df965938276956bf39ea384534b1949417b8bac7832d9895d4ccada91
+generated_at: 2026-06-12T10:36:56Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 8033723409ecbf2551b9a4eb228a4e39356c3fa79164d7d057fb8526b4b0145a
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -769,6 +769,8 @@ quick map of the vocabulary you are about to encounter.
 | [name-resolution/visibility.md](name-resolution/visibility.md) | visibility |
 | [name-resolution/overload-resolution.md](name-resolution/overload-resolution.md) | conversion cost, overload resolution, partial generic application |
 | [pipeline/04-ast-to-ir.md](pipeline/04-ast-to-ir.md) | intermediate representation, IRBuilder, lower-to-IR |
+| [pipeline/04b-pre-link-passes.md](pipeline/04b-pre-link-passes.md) | mandatory optimization pass |
+| [pipeline/04c-layout-ir.md](pipeline/04c-layout-ir.md) | layout IR module |
 | [pipeline/05-ir-passes.md](pipeline/05-ir-passes.md) | control-flow graph, dataflow analysis, dead-code elimination, dominator, inlining, monomorphization, specialization |
 | [pipeline/06-emit.md](pipeline/06-emit.md) | (consult cross-cutting/targets.md and pipeline/04-ast-to-ir.md) |
 | [syntax-reference/tokens.md](syntax-reference/tokens.md) | (consult pipeline/01-lex-preprocess.md) |

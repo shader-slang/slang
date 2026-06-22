@@ -278,6 +278,20 @@ class OperatorExpr : public InvokeExpr
     FIDDLE(...)
 };
 
+// A builtin arithmetic / comparison / bitwise / shift / unary operator on builtin
+// integer/floating-point/bool scalar, vector, or matrix operands, recognized by the fast
+// path during checking (see `convertToBuiltinArithmeticOp`). Unlike a generic `operator OP`
+// call, it carries the resolved `BuiltinOperationKind` directly, so the operator-name ->
+// kind mapping happens exactly once (at creation) and every consumer (constant folding via
+// `BuiltinOperationIntVal`, IR lowering, for-loop trip-count inference) reads the kind rather
+// than re-parsing an operator name. `arguments` holds 1 (unary) or 2 operands.
+FIDDLE()
+class BuiltinOperatorExpr : public ExprWithArgsBase
+{
+    FIDDLE(...)
+    FIDDLE() BuiltinOperationKind op;
+};
+
 FIDDLE()
 class InfixExpr : public OperatorExpr
 {

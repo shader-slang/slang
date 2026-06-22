@@ -694,6 +694,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl);
 
     void visitNonEmptyPackConstraintDecl(NonEmptyPackConstraintDecl* decl);
+    void visitGenericVariadicPackCountConstraintDecl(GenericVariadicPackCountConstraintDecl* decl);
 
     void visitHasDiffTypeInfoConstraintDecl(HasDiffTypeInfoConstraintDecl* decl);
 
@@ -1107,6 +1108,15 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitInvokeExpr(InvokeExpr* expr)
     {
         dispatchIfNotNull(expr->functionExpr);
+        for (auto arg : expr->arguments)
+            dispatchIfNotNull(arg);
+    }
+
+    // A fast-path builtin operator (e.g. `getClock() + 1`) is a `BuiltinOperatorExpr`, not an
+    // `InvokeExpr`, so it needs its own recursion into the operands -- otherwise decl references
+    // inside an operand (and their inferred capability requirements) would be missed.
+    void visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
+    {
         for (auto arg : expr->arguments)
             dispatchIfNotNull(arg);
     }
@@ -3282,8 +3292,18 @@ static bool _initExprIsRuntimeValue(Expr* expr)
         }
         return false;
     }
+    if (auto builtinOpExpr = as<BuiltinOperatorExpr>(expr))
+    {
+        // A builtin-operator fast-path node is a pure builtin operation: it is a runtime
+        // value only when one of its operands is.
+        for (auto arg : builtinOpExpr->arguments)
+            if (_initExprIsRuntimeValue(arg))
+                return true;
+        return false;
+    }
     if (auto invokeExpr = as<InvokeExpr>(expr))
     {
+
         // Determine whether the callee is a "pure" callable whose result depends only
         // on its arguments and cannot read or write arbitrary runtime state. For pure
         // callables, the call is a runtime value only when one of its arguments is.
@@ -4273,6 +4293,83 @@ void SemanticsDeclHeaderVisitor::visitNonEmptyPackConstraintDecl(NonEmptyPackCon
     getSink()->diagnose(Diagnostics::InvalidNonEmptyPackConstraintTarget{.expr = packExpr});
 }
 
+void SemanticsDeclHeaderVisitor::visitGenericVariadicPackCountConstraintDecl(
+    GenericVariadicPackCountConstraintDecl* decl)
+{
+    // `maybeParseGenericConstraints` recognizes only the oriented
+    // `countof(Pack) == CountExpr` spelling. The semantic invariant
+    // established here is stricter: `Pack` must be a direct type/value pack
+    // parameter of this generic, and `CountExpr` must fold to an `IntVal` such
+    // as `3`, `N`, or `countof(OuterPack)`. Witness matching and default
+    // substitution rely on those checked fields instead of reinterpreting
+    // arbitrary syntax or proving algebraically equivalent forms.
+    decl->packExpr = CheckTerm(decl->packExpr);
+    decl->expectedCountExpr = CheckTerm(decl->expectedCountExpr);
+    if (!decl->packExpr || !decl->expectedCountExpr)
+        return;
+
+    struct PackCountTargetInfo
+    {
+        bool sawPackParam = false;
+        bool isCurrentGenericPackParam = false;
+    };
+
+    auto getPackCountTargetInfo = [&](Expr* expr) -> PackCountTargetInfo
+    {
+        PackCountTargetInfo result;
+        auto declRefExpr = as<DeclRefExpr>(expr);
+        if (!declRefExpr)
+            return result;
+
+        auto declRef = getDeclRef(m_astBuilder, declRefExpr);
+        if (auto typePackDeclRef = declRef.as<GenericTypePackParamDecl>())
+        {
+            result.sawPackParam = true;
+            if (typePackDeclRef.getDecl()->parentDecl == decl->parentDecl)
+                result.isCurrentGenericPackParam = true;
+        }
+        else if (auto valuePackDeclRef = declRef.as<GenericValuePackParamDecl>())
+        {
+            result.sawPackParam = true;
+            if (valuePackDeclRef.getDecl()->parentDecl == decl->parentDecl)
+                result.isCurrentGenericPackParam = true;
+        }
+        return result;
+    };
+
+    auto packTargetInfo = getPackCountTargetInfo(decl->packExpr);
+    auto packExpr = decl->packExpr;
+    if (decl->hasModifier<OptionalConstraintModifier>())
+    {
+        getSink()->diagnose(
+            Diagnostics::OptionalVariadicPackCountConstraintIsInvalid{.expr = packExpr});
+    }
+
+    if (!packTargetInfo.isCurrentGenericPackParam)
+    {
+        if (packTargetInfo.sawPackParam)
+        {
+            getSink()->diagnose(
+                Diagnostics::VariadicPackCountConstraintTargetMustBeFromCurrentGeneric{
+                    .expr = packExpr});
+        }
+        else
+        {
+            getSink()->diagnose(
+                Diagnostics::InvalidVariadicPackCountConstraintTarget{.expr = packExpr});
+        }
+    }
+
+    auto countVal =
+        tryConstantFoldExpr(decl->expectedCountExpr, ConstantFoldingKind::CompileTime, nullptr);
+    decl->expectedCountVal = as<IntVal>(countVal);
+    if (!decl->expectedCountVal)
+    {
+        getSink()->diagnose(
+            Diagnostics::InvalidVariadicPackCountConstraintCount{.expr = decl->expectedCountExpr});
+    }
+}
+
 void SemanticsDeclHeaderVisitor::visitHasDiffTypeInfoConstraintDecl(
     HasDiffTypeInfoConstraintDecl* decl)
 {
@@ -4606,7 +4703,8 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
         }
         else if (
             as<GenericTypeConstraintDecl>(m) || as<TypeCoercionConstraintDecl>(m) ||
-            as<NonEmptyPackConstraintDecl>(m) || as<HasDiffTypeInfoConstraintDecl>(m))
+            as<NonEmptyPackConstraintDecl>(m) || as<GenericVariadicPackCountConstraintDecl>(m) ||
+            as<HasDiffTypeInfoConstraintDecl>(m))
         {
             ensureDecl(m, DeclCheckState::ReadyForReference);
         }
@@ -4951,6 +5049,30 @@ void discoverExtensionDecls(List<ExtensionDecl*>& decls, Decl* parent)
     }
 }
 
+// Collect every `namespace` declaration rooted at `parent`. Only module, namespace, and file scopes
+// can lexically contain a nested `namespace`, so recursion descends through exactly those
+// (`NamespaceDeclBase` covers `ModuleDecl` + `NamespaceDecl`; a `FileDecl` carries the decls of an
+// `__include`d/`implementing` module fragment) and not into struct/function/etc. bodies or generic
+// wrappers, where a `namespace` can never appear.
+void discoverNamespaceDecls(List<NamespaceDecl*>& decls, Decl* parent)
+{
+    if (auto namespaceDecl = as<NamespaceDecl>(parent))
+        decls.add(namespaceDecl);
+    // Only recurse into the scopes that can lexically contain a `namespace`:
+    // module/namespace scopes (`NamespaceDeclBase`) and the decls of an
+    // `__include`d/`implementing` fragment (`FileDecl`) -- not struct/function
+    // bodies (also `ContainerDecl`s) or generic wrappers, where a `namespace`
+    // never appears. Both of those gating types derive from `ContainerDecl`, so
+    // the cast is total here.
+    if (as<NamespaceDeclBase>(parent) || as<FileDecl>(parent))
+    {
+        for (auto child : as<ContainerDecl>(parent)->getDirectMemberDecls())
+        {
+            discoverNamespaceDecls(decls, child);
+        }
+    }
+}
+
 void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
 {
     // When we are dealing with code from the core modules,
@@ -5097,9 +5219,44 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
         DeclCheckState::CapabilityChecked,
     };
 
-    // Discover and check all extension decls before anything else.
+    // Drive every namespace in the module to `ScopesWired` before the extension-first pass below.
+    // That pass resolves each extension's target type (and generic signature) by unqualified name
+    // lookup, which reads only the already-wired sibling-scope chain. A `namespace N` reopened
+    // across sibling `__include`/`implementing` fragments is merged into that chain only when its
+    // `NamespaceDecl` reaches `ScopesWired` (SemanticsDeclScopeWiringVisitor::visitNamespaceDecl ->
+    // addSiblingScopeForContainerDecl); driving an extension to `ReadyForLookup` does not advance
+    // any namespace, so without this the header resolves against an unwired scope: the unqualified
+    // name fails to resolve (E30015 "undefined identifier"), which then cascades into E30855
+    // ("generic parameter not referenced by extension target type") because the extension's target
+    // type became `error`.
+    //
+    // Every namespace must be wired, not just each extension's lexically-enclosing one: an
+    // extension's target type may live in a *different* namespace fragment than the extension
+    // itself -- e.g. a file-scope `extension N::T` whose `T` is declared in another fragment's
+    // reopened `namespace N` (#11532). Wiring only the enclosing namespace covers the case where
+    // the extension is lexically inside the reopened namespace (#11531) but not the file-scope
+    // case, so this all-namespaces pass subsumes that narrower walk.
+    //
+    // Restricted to namespaces -- NOT `ensureAllDeclsRec(moduleDecl, ScopesWired)` over every decl:
+    // `ensureDecl` here advances only each `NamespaceDecl` itself (and, via `visitNamespaceDecl`,
+    // the direct `using` decls needed for scope wiring), never its ordinary members or extensions.
+    // The broad alternative regressed core-module checking by prematurely advancing the standard
+    // library's non-namespaced texture extensions (`extension _Texture<...>`), resolving their
+    // target types into `error`. `discoverNamespaceDecls` collects only `NamespaceDecl`s (not
+    // `ModuleDecl`, also a `NamespaceDeclBase`), so the global module scope is left to the regular
+    // pass. Fixes shader-slang/slang#11531 and shader-slang/slang#11532.
+    List<NamespaceDecl*> namespaceDecls;
+    discoverNamespaceDecls(namespaceDecls, moduleDecl);
+    for (auto namespaceDecl : namespaceDecls)
+    {
+        ensureDecl(namespaceDecl, DeclCheckState::ScopesWired);
+    }
+
+    // Discover and check all extension decls (after the namespace pre-pass above, but before
+    // general member checking).
     List<ExtensionDecl*> extensionDecls;
     discoverExtensionDecls(extensionDecls, moduleDecl);
+
     for (auto s : states)
     {
         for (auto extensionDecl : extensionDecls)
@@ -5600,6 +5757,21 @@ bool SemanticsVisitor::doesVarMatchRequirement(
     return true;
 }
 
+static DeclRef<Decl> getPackCountConstraintTargetDeclRef(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& constraintDeclRef)
+{
+    // Pack-count constraint checking accepts only direct pack-parameter
+    // references. Requirement matching and generic-signature equality both
+    // rely on that semantic invariant, so this helper maps the checked
+    // substituted `packExpr` back to the declaration identity that represents
+    // `countof(Pack)` in the proof.
+    auto packExpr = getPackCountConstraintPackExpr(astBuilder, constraintDeclRef);
+    if (auto declRefExpr = packExpr.as<DeclRefExpr>())
+        return getDeclRef(astBuilder, declRefExpr);
+    return DeclRef<Decl>();
+}
+
 bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
     DeclRef<GenericDecl> satisfyingGenericDeclRef,
     DeclRef<GenericDecl> requiredGenericDeclRef,
@@ -5634,6 +5806,8 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
         if (as<TypeCoercionConstraintDecl>(declRef))
             return true;
         if (as<NonEmptyPackConstraintDecl>(declRef))
+            return true;
+        if (as<GenericVariadicPackCountConstraintDecl>(declRef))
             return true;
         if (as<HasDiffTypeInfoConstraintDecl>(declRef))
             return true;
@@ -5776,6 +5950,11 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             else
                 return false;
         }
+        else if (requiredMemberDeclRef.as<GenericVariadicPackCountConstraintDecl>())
+        {
+            if (!satisfyingMemberDeclRef.as<GenericVariadicPackCountConstraintDecl>())
+                return false;
+        }
         else if (
             auto requiredHasDiffTypeInfoConstraintDeclRef =
                 requiredMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>())
@@ -5909,6 +6088,21 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             if (!satisfyingPackVal)
                 satisfyingPackVal = m_astBuilder->getErrorType();
             requiredSubstArgs.add(m_astBuilder->getNonEmptyPackWitness(satisfyingPackVal));
+        }
+        else if (
+            auto requiredPackCountConstraintDeclRef =
+                requiredMemberDeclRef.as<GenericVariadicPackCountConstraintDecl>())
+        {
+            // Requirement matching constructs substitution args for the
+            // required signature from the satisfying signature. A pack-count
+            // constraint contributes a declared witness here, just like
+            // `nonempty(I)`, so the later specialized comparison can read the
+            // required proof under the satisfying generic's parameters.
+            auto satisfyingConstraintDeclRef =
+                satisfyingMemberDeclRef.as<GenericVariadicPackCountConstraintDecl>();
+            SLANG_ASSERT(satisfyingConstraintDeclRef);
+            requiredSubstArgs.add(
+                m_astBuilder->getDeclaredVariadicPackCountWitness(satisfyingConstraintDeclRef));
         }
         else if (
             auto requiredHasDiffTypeInfoConstraintDeclRef =
@@ -6066,6 +6260,43 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             {
                 return false;
             }
+        }
+        else if (
+            auto requiredPackCountConstraintDeclRef =
+                requiredMemberDeclRef.as<GenericVariadicPackCountConstraintDecl>())
+        {
+            auto satisfyingConstraintDeclRef =
+                satisfyingMemberDeclRef.as<GenericVariadicPackCountConstraintDecl>();
+            SLANG_ASSERT(satisfyingConstraintDeclRef);
+
+            auto specializedRequiredConstraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        requiredGenericDeclRef,
+                        requiredSubstArgs.getArrayView(),
+                        requiredPackCountConstraintDeclRef.getDecl())
+                    .as<GenericVariadicPackCountConstraintDecl>();
+            if (!specializedRequiredConstraintDeclRef)
+                return false;
+
+            // A declared pack-count witness proves only the exact substituted
+            // requirement. `countof(I) == N` must not satisfy a callee that
+            // requires `countof(I) == M`, even when both counts are abstract.
+            if (getPackCountConstraintTargetDeclRef(
+                    m_astBuilder,
+                    specializedRequiredConstraintDeclRef) !=
+                getPackCountConstraintTargetDeclRef(m_astBuilder, satisfyingConstraintDeclRef))
+            {
+                return false;
+            }
+
+            auto requiredCount = getPackCountConstraintExpectedCount(
+                m_astBuilder,
+                specializedRequiredConstraintDeclRef);
+            auto satisfyingCount =
+                getPackCountConstraintExpectedCount(m_astBuilder, satisfyingConstraintDeclRef);
+            if (!arePackCountExpectedCountsEqual(m_astBuilder, satisfyingCount, requiredCount))
+                return false;
         }
         else if (
             auto requiredHasDiffTypeInfoConstraintDeclRef =
@@ -6821,7 +7052,12 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             synValParamDecl->parameterIndex = valParamDecl->parameterIndex;
             synValParamDecl->type = valParamDecl->type;
 
-            mapOrigToSynTypeParams.add(valParamDecl, synGenericDecl);
+            // Constraint cloning below uses this map for both the target pack
+            // and the count expression in `where countof(I) == N`. Value
+            // parameters therefore map to their synthesized value declarations,
+            // so a cloned count expression references synthetic `N` rather than
+            // the original requirement's `N`.
+            mapOrigToSynTypeParams.add(valParamDecl, synValParamDecl);
 
             auto synValParamDeclRef = makeDeclRef(synValParamDecl);
 
@@ -6839,7 +7075,10 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             synValPackParamDecl->parameterIndex = valPackParamDecl->parameterIndex;
             synValPackParamDecl->type = valPackParamDecl->type;
 
-            mapOrigToSynTypeParams.add(valPackParamDecl, synGenericDecl);
+            // The same map is used when cloning pack-count constraints. A value
+            // pack target must map to the synthesized pack declaration so
+            // `countof(I)` remains a current-generic constraint after cloning.
+            mapOrigToSynTypeParams.add(valPackParamDecl, synValPackParamDecl);
 
             auto synValPackParamDeclRef = makeDeclRef(synValPackParamDecl);
 
@@ -6942,6 +7181,77 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
                 SLANG_UNEXPECTED("nonempty constraint target must be a direct decl ref");
             }
             synConstraintDecl->packExpr = synPackDeclRefExpr;
+
+            synGenericDecl->addDirectMemberDecl(synConstraintDecl);
+        }
+        else if (
+            auto packCountConstraintDecl =
+                as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
+        {
+            auto synConstraintDecl = m_astBuilder->create<GenericVariadicPackCountConstraintDecl>();
+            synConstraintDecl->nameAndLoc = packCountConstraintDecl->getNameAndLoc();
+            synConstraintDecl->parentDecl = synGenericDecl;
+            synConstraintDecl->whereTokenLoc = packCountConstraintDecl->whereTokenLoc;
+            if (packCountConstraintDecl->findModifier<OptionalConstraintModifier>())
+            {
+                addModifier(synConstraintDecl, m_astBuilder->create<OptionalConstraintModifier>());
+            }
+
+            auto synPackDeclRefExpr = m_astBuilder->create<VarExpr>();
+            if (auto declRefExpr = as<DeclRefExpr>(packCountConstraintDecl->packExpr))
+            {
+                auto origPackDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
+                auto synPackDecl = mapOrigToSynTypeParams.tryGetValue(origPackDecl);
+                SLANG_ASSERT(synPackDecl);
+                synPackDeclRefExpr->declRef = makeDeclRef(*synPackDecl);
+                synPackDeclRefExpr->type =
+                    getTypeForDeclRef(m_astBuilder, synPackDeclRefExpr->declRef, SourceLoc());
+            }
+            else
+            {
+                SLANG_UNEXPECTED("pack-count constraint target must be a direct decl ref");
+            }
+            synConstraintDecl->packExpr = synPackDeclRefExpr;
+
+            // `GenericVariadicPackCountConstraintDecl` stores both the checked
+            // `IntVal` used by witness matching and the source expression used
+            // by declaration checking. When `synthesizeGenericSignatureForRequirementWitness`
+            // clones a requirement such as `where countof(I) == N`, rebuild the
+            // direct `N` expression to reference the synthesized value parameter;
+            // `getDefaultSubstitutionArgs` then creates a declared witness for
+            // the synthesized proof, not for the original requirement.
+            if (auto declRefExpr = as<DeclRefExpr>(packCountConstraintDecl->expectedCountExpr))
+            {
+                auto origExpectedCountDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
+                if (auto synExpectedCountDecl =
+                        mapOrigToSynTypeParams.tryGetValue(origExpectedCountDecl))
+                {
+                    auto synExpectedCountExpr = m_astBuilder->create<VarExpr>();
+                    synExpectedCountExpr->declRef = makeDeclRef(*synExpectedCountDecl);
+                    synExpectedCountExpr->type =
+                        getTypeForDeclRef(m_astBuilder, synExpectedCountExpr->declRef, SourceLoc());
+                    synConstraintDecl->expectedCountExpr = synExpectedCountExpr;
+                }
+                else
+                {
+                    synConstraintDecl->expectedCountExpr =
+                        packCountConstraintDecl->expectedCountExpr;
+                }
+            }
+            else
+            {
+                synConstraintDecl->expectedCountExpr = packCountConstraintDecl->expectedCountExpr;
+            }
+            // Header checking owns the diagnostic for a non-foldable count
+            // expression. Requirement-witness synthesis runs during recovery
+            // too, so skip cloning this proof if that earlier invariant failed.
+            SLANG_ASSERT(packCountConstraintDecl->expectedCountVal);
+            if (!packCountConstraintDecl->expectedCountVal)
+                continue;
+            synConstraintDecl->expectedCountVal =
+                as<IntVal>(packCountConstraintDecl->expectedCountVal->substitute(
+                    m_astBuilder,
+                    SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
 
             synGenericDecl->addDirectMemberDecl(synConstraintDecl);
         }
@@ -8462,6 +8772,16 @@ bool SemanticsVisitor::trySynthesizeSubscriptRequirementWitness(
     // having the exact same information stated twice.
     //
 
+    if (!lookupResult.isValid() && hasDefaultImpl(requiredMemberDeclRef))
+    {
+        // A missing concrete subscript should be satisfied by the interface
+        // default implementation below. The no-lookup synthesis path is for
+        // valid built-in indexing shapes, and applying it here would synthesize
+        // `this[args...]` as the witness for the same requirement, producing a
+        // recursive accessor wrapper.
+        return false;
+    }
+
     List<Expr*> synArgs;
     ThisExpr* synThis;
     auto synSubscriptDecl = synthesizeMethodSignatureForRequirementWitness(
@@ -9747,21 +10067,23 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
     DeclRef<Decl> requiredMemberDeclRef,
     RefPtr<WitnessTable> witnessTable)
 {
-    // Only functions can have default implemnetation at the moment.
-    DeclRef<FuncDecl> requiredFuncDeclRef = requiredMemberDeclRef.as<FuncDecl>();
-    if (!requiredFuncDeclRef)
+    // Interface default implementations are represented as callable stubs over
+    // `This : Interface`; methods and subscripts both use that representation.
+    DeclRef<CallableDecl> requiredCallableDeclRef = requiredMemberDeclRef.as<CallableDecl>();
+    if (!requiredCallableDeclRef)
     {
-        // If requiredMember is a generic func, form a direct declref to the inner func.
+        // If requiredMember is a generic callable, form a direct declref to the inner callable.
         if (auto requiredGenericDeclRef = requiredMemberDeclRef.as<GenericDecl>())
         {
             auto inner = getInner(requiredGenericDeclRef);
-            if (auto func = as<FuncDecl>(inner))
+            if (auto callable = as<CallableDecl>(inner))
             {
-                requiredFuncDeclRef = m_astBuilder->getMemberDeclRef(requiredGenericDeclRef, func);
+                requiredCallableDeclRef =
+                    m_astBuilder->getMemberDeclRef(requiredGenericDeclRef, callable);
             }
         }
     }
-    if (!requiredFuncDeclRef)
+    if (!requiredCallableDeclRef)
         return false;
 
     // If the interface requirement comes with a default impl, it should have a
@@ -9818,36 +10140,16 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
         resultDeclRef.as<GenericDecl>(),
         specArgs.getArrayView());
 
-    if (resultDeclRef.as<GenericDecl>())
-    {
-        // Test signature and register in witness table.
-        bool doesSignatureMatch = doesGenericSignatureMatchRequirement(
-            resultDeclRef.as<GenericDecl>(),
-            requiredFuncDeclRef.getParent().as<GenericDecl>(),
-            witnessTable);
+    // Test the signature and register the witness table entries. Going through
+    // the general requirement matcher is important for subscript defaults,
+    // because their accessor requirements need witness entries too.
+    bool doesSignatureMatch =
+        doesMemberSatisfyRequirement(resultDeclRef, requiredMemberDeclRef, witnessTable);
 
-        // If we try to use a registered default decl and the signature
-        // _doesn't_ match here, then something went wrong well before this
-        //
-        SLANG_ASSERT(doesSignatureMatch);
-        return doesSignatureMatch;
-    }
-    else
-    {
-        // Test signature and register in witness table.
-        bool doesSignatureMatch = doesSignatureMatchRequirement(
-            resultDeclRef.as<CallableDecl>(),
-            requiredFuncDeclRef.as<CallableDecl>(),
-            witnessTable);
-
-        // If we try to use a registered default decl and the signature
-        // _doesn't_ match here, then something went wrong well before this
-        //
-        SLANG_ASSERT(doesSignatureMatch);
-        return doesSignatureMatch;
-    }
-
-    return true;
+    // If we try to use a registered default decl and the signature _doesn't_
+    // match here, then something went wrong well before this.
+    SLANG_ASSERT(doesSignatureMatch);
+    return doesSignatureMatch;
 }
 
 Type* SemanticsVisitor::getForwardDiffFuncInterfaceType(Type* baseType)
@@ -11421,8 +11723,11 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
             continue;
         }
 
+        // `visitLambdaExpr` synthesizes `LambdaDecl` closure structs and constructs them with
+        // captured values. Forcing `IDefaultInitializable` onto those implementation-detail structs
+        // makes the closure construction resolve against the zero-argument default constructor.
         if (this->getOptionSet().getBoolOption(CompilerOptionName::ZeroInitialize) &&
-            !isFromCoreModule(decl))
+            !isFromCoreModule(decl) && !as<LambdaDecl>(decl))
         {
             // Force add IDefaultInitializable to any struct missing (transitively)
             // `IDefaultInitializable`.
@@ -12270,6 +12575,8 @@ void SemanticsVisitor::getGenericParams(
             outConstraints.add(typeCoercionConstraintDecl);
         else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(dd))
             outConstraints.add(nonEmptyConstraintDecl);
+        else if (auto packCountConstraintDecl = as<GenericVariadicPackCountConstraintDecl>(dd))
+            outConstraints.add(packCountConstraintDecl);
         else if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(dd))
             outConstraints.add(hasDiffTypeInfoConstraintDecl);
     }
@@ -12558,6 +12865,38 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
             }
         }
         else if (
+            auto leftPackCountConstraint =
+                as<GenericVariadicPackCountConstraintDecl>(leftConstraints[cc]))
+        {
+            // Generic signature equality uses the same exact proof identity as
+            // witness forwarding: after substituting `right` into `left`'s
+            // parameter space, both the direct pack target and the expected
+            // count `IntVal` must match.
+            auto unspecializedRightConstraintDeclRef = createDefaultSubstitutionsIfNeeded(
+                m_astBuilder,
+                this,
+                makeDeclRef(rightConstraints[cc]));
+            auto rightConstraint =
+                substInnerRightToLeft.substitute(m_astBuilder, unspecializedRightConstraintDeclRef)
+                    .as<GenericVariadicPackCountConstraintDecl>();
+            if (!rightConstraint)
+                return false;
+
+            auto leftConstraintRef =
+                m_astBuilder->getDirectDeclRef<GenericVariadicPackCountConstraintDecl>(
+                    leftPackCountConstraint);
+            if (getPackCountConstraintTargetDeclRef(m_astBuilder, leftConstraintRef) !=
+                getPackCountConstraintTargetDeclRef(m_astBuilder, rightConstraint))
+            {
+                return false;
+            }
+
+            auto leftCount = getPackCountConstraintExpectedCount(m_astBuilder, leftConstraintRef);
+            auto rightCount = getPackCountConstraintExpectedCount(m_astBuilder, rightConstraint);
+            if (!arePackCountExpectedCountsEqual(m_astBuilder, leftCount, rightCount))
+                return false;
+        }
+        else if (
             auto leftHasDiffTypeInfoConstraint =
                 as<HasDiffTypeInfoConstraintDecl>(leftConstraints[cc]))
         {
@@ -12727,6 +13066,11 @@ List<Val*> getDefaultSubstitutionArgs(
             {
                 semantics->ensureDecl(nonEmptyConstraintDecl, DeclCheckState::ReadyForReference);
             }
+            else if (
+                auto packCountConstraintDecl = as<GenericVariadicPackCountConstraintDecl>(member))
+            {
+                semantics->ensureDecl(packCountConstraintDecl, DeclCheckState::ReadyForReference);
+            }
             else if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(member))
             {
                 semantics->ensureDecl(
@@ -12805,6 +13149,22 @@ List<Val*> getDefaultSubstitutionArgs(
                 continue;
             }
             args.add(astBuilder->getNonEmptyPackWitness(packVal));
+        }
+        else if (auto packCountConstraintDecl = as<GenericVariadicPackCountConstraintDecl>(decl))
+        {
+            if (semantics)
+                semantics->ensureDecl(packCountConstraintDecl, DeclCheckState::ReadyForReference);
+            // Default substitution args represent a generic body before any
+            // concrete specialization. For
+            // `foo<let N, each I>() where countof(I) == N { bar<N, I>(); }`,
+            // this declared witness is the proof that `bar` receives while
+            // checking `foo`'s body with abstract `N` and `I`.
+            auto constraintDeclRef = createDefaultSubstitutionsIfNeeded(
+                                         astBuilder,
+                                         semantics,
+                                         packCountConstraintDecl->getDefaultDeclRef())
+                                         .as<GenericVariadicPackCountConstraintDecl>();
+            args.add(astBuilder->getDeclaredVariadicPackCountWitness(constraintDeclRef));
         }
         else if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(decl))
         {
@@ -14633,10 +14993,46 @@ void SemanticsDeclHeaderVisitor::checkCallableConstraints(CallableDecl* decl)
     }
 }
 
+// Return true when a property requirement mixes accessor bodies with body-less accessors.
+// Unlike subscripts, properties do not have an `InterfaceDefaultImplDecl` path here, so
+// semantic checking owns the targeted diagnostic for this partial-default shape.
+static bool isPartialPropertyAccessorDefaultImplementation(AccessorDecl* accessorDecl)
+{
+    auto propertyDecl = as<PropertyDecl>(accessorDecl->parentDecl);
+    if (!propertyDecl)
+        return false;
+
+    bool hasAccessorBody = false;
+    bool hasAccessorWithoutBody = false;
+    for (auto siblingAccessorDecl : propertyDecl->getDirectMemberDeclsOfType<AccessorDecl>())
+    {
+        if (siblingAccessorDecl->body)
+            hasAccessorBody = true;
+        else
+            hasAccessorWithoutBody = true;
+    }
+
+    return hasAccessorBody && hasAccessorWithoutBody;
+}
+
 void SemanticsDeclHeaderVisitor::checkInterfaceRequirement(Decl* decl)
 {
     if (isInterfaceRequirement(decl))
     {
+        if (auto accessorDecl = as<AccessorDecl>(decl))
+        {
+            // Subscript accessor defaults are handled by the parser's
+            // `InterfaceDefaultImplDecl` path. Properties do not have that
+            // representation, but a mixed `get; set {}` property is still a
+            // partial accessor default and should get the targeted diagnostic
+            // before the generic non-method-body check below.
+            if (accessorDecl->body && isPartialPropertyAccessorDefaultImplementation(accessorDecl))
+            {
+                getSink()->diagnose(
+                    Diagnostics::PartialInterfaceAccessorDefaultImplementation{.decl = decl});
+                return;
+            }
+        }
         if (auto funcBase = as<FunctionDeclBase>(decl))
         {
             if (!as<FuncDecl>(decl) && funcBase->body != nullptr)
@@ -14735,6 +15131,16 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
         if (decl->returnType.type && !decl->returnType.type->equals(m_astBuilder->getVoidType()))
         {
             getSink()->diagnose(Diagnostics::CudaKernelMustReturnVoid{.decl = decl});
+        }
+    }
+
+    // `[NoDiscard]` is meaningless on a function with no result to discard, so reject it
+    // on a `void`-returning function.
+    if (decl->findModifier<NoDiscardAttribute>())
+    {
+        if (decl->returnType.type && decl->returnType.type->equals(m_astBuilder->getVoidType()))
+        {
+            getSink()->diagnose(Diagnostics::NoDiscardOnVoidFunction{.decl = decl});
         }
     }
 
@@ -15342,7 +15748,10 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     //   extension<T:IFloat> foo<T> : IForwardDifferentiable<foo<T>> { fwd_diff(...) -> ... { ... }
     //   }
 
-    if (!getOptionSet().getBoolOption(CompilerOptionName::ExperimentalFeature))
+    // Core-module meta code uses __func_extension to attach conditional derivative
+    // witnesses, but user source still needs to opt in to the experimental syntax.
+    if (!getOptionSet().getBoolOption(CompilerOptionName::ExperimentalFeature) &&
+        !isFromCoreModule(decl))
     {
         getSink()->diagnose(
             Diagnostics::FuncExtensionRequiresExperimentalFeature{.location = decl->loc});
@@ -16146,6 +16555,7 @@ void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDec
     if (getText(moduleDecl->getName()) == "glsl")
     {
         getShared()->glslModuleDecl = moduleDecl;
+        getShared()->m_isGLSLModuleImported = true;
     }
 
     importedModulesList.add(moduleDecl);
@@ -19700,6 +20110,30 @@ void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl).freeze(getASTBuilder());
 }
 
+// A `[ForwardDerivative(fn)]` / `[BackwardDerivative(fn)]` attribute references a
+// user-defined derivative function `fn` that is not part of the decorated function's
+// body, so its capability requirements would otherwise be ignored. Resolve the
+// referenced function decl from the (already checked) attribute `funcExpr` so the
+// caller can propagate its capability requirements onto the primal function.
+static FunctionDeclBase* _getUserDefinedDerivativeFuncDecl(UserDefinedDerivativeAttribute* attr)
+{
+    Expr* expr = attr->funcExpr;
+    // The derivative reference may be wrapped in generic-application or
+    // higher-order-invoke nodes; dig down to the underlying decl reference.
+    for (;;)
+    {
+        if (auto genericApp = as<GenericAppExpr>(expr))
+            expr = genericApp->functionExpr;
+        else if (auto higherOrder = as<HigherOrderInvokeExpr>(expr))
+            expr = higherOrder->baseFunction;
+        else
+            break;
+    }
+    if (auto declRefExpr = as<DeclRefExpr>(expr))
+        return as<FunctionDeclBase>(declRefExpr->declRef.getDecl());
+    return nullptr;
+}
+
 void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
 {
     setParentFuncOfVisitor(funcDecl);
@@ -19731,6 +20165,33 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         { _propagateRequirement(this, mutableFuncDeclCapSet, funcDecl, node, nodeCaps, refLoc); },
         [this, funcDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, funcDecl, category); });
+
+    // A user-defined forward/backward derivative function is invoked when this
+    // function is differentiated, so its capability requirements must also be
+    // reflected on this function. These references live on attributes rather than
+    // in the function body, so propagate them explicitly here.
+    for (auto attr : funcDecl->getModifiersOfType<UserDefinedDerivativeAttribute>())
+    {
+        if (auto derivativeFuncDecl = _getUserDefinedDerivativeFuncDecl(attr))
+        {
+            ensureDecl(derivativeFuncDecl, DeclCheckState::CapabilityChecked);
+            // Point the provenance note at the referenced derivative function
+            // inside the attribute (e.g. the 'foo' in [BackwardDerivative(foo)])
+            // rather than the whole attribute, since that is what the user needs
+            // to fix. Fall back to the attribute location if the reference has
+            // no valid location.
+            SourceLoc refLoc = attr->funcExpr ? attr->funcExpr->loc : SourceLoc();
+            if (!refLoc.isValid())
+                refLoc = attr->loc;
+            _propagateRequirement(
+                this,
+                mutableFuncDeclCapSet,
+                funcDecl,
+                derivativeFuncDecl,
+                derivativeFuncDecl->inferredCapabilityRequirements,
+                refLoc);
+        }
+    }
 
     // non-static function join's capabilities with parent
     // to become a superset of the parent.

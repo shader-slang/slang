@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T15:06:52+00:00
+reviewed_at: 2026-06-12T13:17:04+00:00
 target_doc: target-pipelines/wgsl.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: f76d76915e55fca2f6089859682d44515d2961d21271a2b24e0eda6e9187f22f
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: f7ebb6018661b63fb04f0c5c697661718fe7c83752a8fdc750e6914dfeb10700
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -16,25 +16,36 @@ checklist:
 finding_count: 3
 severity_breakdown:
   critical: 1
-  major: 0
-  minor: 2
+  major: 2
+  minor: 0
   nit: 0
 ---
 
 # Review report for target-pipelines/wgsl.md
 
 ## Summary
-The WGSL page has the required sections, distinguishes source-only and Tint downstream paths, and all checked relative links resolve at the recorded source commit. The main issue is that three passes shown in Phase A actually run later in Phase C. Two smaller issues affect source-target line citations and the WGSL-specific gate table.
+
+The WGSL target-pipeline page mostly tracks the ordered `linkAndOptimizeIR` sequence and distinguishes source emit from the Tint downstream path. The most important issue is a contradicted description of `floatNonUniformResourceIndex`: the document says WGSL preserves a textual marker for Tint to forward, while the source says WGSL drops the wrapper because WGSL has no such annotation. I also found two table-contract issues in the phase tables.
 
 ## Items checked
-- Read `regenerate.py show target-pipelines/wgsl.md`, the WGSL prompt, `_common.md`, and dependency docs.
-- Checked front matter, required sections, `WGSL` / `WGSLSPIRV` / `WGSLSPIRVAssembly` handling, `legalizeIRForWGSL`, `specializeAddressSpaceForWGSL`, and Tint downstream handling against `source_commit` `52339028a2aa703271533454c6b9528a534bac31`.
-- Resolved all 147 relative links in the page at the recorded source commit.
-- Spot-checked 13 WGSL claims, including source-target reduction, non-Khronos SSBO lowering, WGSL byte-address-buffer options, `resolveTextureFormat`, `legalizeIRForWGSL`, `floatNonUniformResourceIndex`, `legalizeLogicalAndOr`, address-space specialization, and loop absence.
+
+- Verified the target document front matter against the current digest for `target-pipelines/wgsl.md`.
+- Ran `regenerate.py show target-pipelines/wgsl.md` and checked the listed watched files plus the downstream transition code used by the WGSLSPIRV paths.
+- Spot-checked more than 20 source claims and line-number claims across `slang-emit.cpp`, `slang-ir-wgsl-legalize.cpp`, `slang-emit-wgsl.cpp`, `slang-emit-c-like.cpp`, `slang-code-gen.cpp`, and `slang-global-session.cpp`.
+- Checked the ordered WGSL-reachable `SLANG_PASS` sequence in Phases A-C, the WGSL gates around `legalizeIRForWGSL`, `legalizeLogicalAndOr`, `specializeAddressSpaceForWGSL`, and the source-emission/Tint downstream path.
+- Resolved the relative links used by the target page and checked that the required target-pipeline sections are present.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | critical | `## Phase A: Link and entry-point prep` and `## Phase C: WGSL legalization, lowering, phi elimination` | The Phase A diagram/table place `translateGlobalVaryingVar`, `resolveVaryingInputRef`, and `fixEntryPointCallsites` before uniform collection, but the source runs those passes in Phase C, after `resolveTextureFormat` and before `legalizeIRForWGSL`. This makes the ordered WGSL pipeline materially wrong. | `source/slang/slang-emit.cpp:1955-1962` runs `translateGlobalVaryingVar`, `resolveVaryingInputRef`, and `fixEntryPointCallsites` in the Phase C range, not in the Phase A range around `source/slang/slang-emit.cpp:982-1001`. | Move those three nodes and rows from Phase A to Phase C, placing them after `resolveTextureFormat` and before `legalizeIRForWGSL`; update row numbering and Phase A prose. |
-| F-002 | minor | Intro paragraph | The source-target reduction citation covers `WGSLSPIRV` but not `WGSLSPIRVAssembly`. The assembly target first maps to `WGSLSPIRV`, then the default source-target mapping reduces that intermediate target to `WGSL`. | `source/slang/slang-code-gen.cpp:271-272` maps `WGSLSPIRV` to `WGSL`; `source/slang/slang-code-gen.cpp:1059-1060` maps `WGSLSPIRVAssembly` to `WGSLSPIRV`. | Reword the sentence to describe the two-step assembly path and cite both line ranges. |
-| F-003 | minor | `## Conditional gates`, WGSL-specific runtime predicates | The `isWGPUTarget(targetRequest)` row says that predicate selects the WGSL `legalizeByteAddressBufferOps` options, but those options are selected by an explicit `CodeGenTarget::WGSL`, `WGSLSPIRV`, and `WGSLSPIRVAssembly` switch arm instead. | `source/slang/slang-emit.cpp:1844-1859` sets the WGSL byte-address-buffer options in a target switch; `source/slang/slang-emit.cpp:2038-2040` and `source/slang/slang-emit.cpp:2217-2246` cover different WGSL predicates. | Move `legalizeByteAddressBufferOps` out of the `isWGPUTarget` row or add a separate row for the explicit WGSL target switch. |
+| F-001 | critical | `### floatNonUniformResourceIndex`, lines 739-745 | The page says WGSL preserves a textual `NonUniformResourceIndex(...)` marker because `Tint forwards the marker to the SPIR-V NonUniform decoration`, but the source says the opposite: WGSL has no annotation to carry and the wrapper is dropped at emit time. | `source/slang/slang-ir-float-non-uniform-resource-index.cpp:42-57` states `Metal / WGSL / CUDA / CPU: the wrapper is dropped at emit time` and that WGSL/WebGPU has `no non-uniform annotation`; `source/slang/slang-emit.cpp:2072-2074` is only the Textual-mode call site. | Replace this callout with the source behavior: the pass runs in textual mode for WGSL only to reposition the wrapper, and the emitter drops it because WGSL has no non-uniform resource-indexing syntax. Do not claim Tint forwards it to a SPIR-V decoration. |
+| F-002 | major | `## Phase B`, lines 267-407 | The Phase B diagram includes a `checkStaticAssert` node (`cSA`) after `specializeArrayParameters`, but the companion ordered table stops at `specializeArrayParameters`. The target-pipeline contract requires one table row per pass node in the diagram. | `docs/generated/design/target-pipelines/wgsl.md:267-336` shows `cSA["checkStaticAssert (direct call)"]` and the edge `sRU --> sFBLA1 --> dBL --> sAP --> cSA`; `docs/generated/design/_meta/prompts/_common.md:326-335` requires one ordered-table row per pass node; `source/slang/slang-emit.cpp:1792-1794` calls `checkStaticAssert` after specialization. | Add a final Phase B table row for `checkStaticAssert` with its direct-call gate, or remove the diagram node if direct calls are intentionally excluded from the table. Keep the diagram and table consistent. |
+| F-003 | major | `## Phase D`, lines 607-616 | The Phase D ordered table uses the header `Pass / step` instead of the required `Pass` column. The target-pipeline table contract requires the exact columns `#`, `Pass`, `File`, `Gate`, and `Notes`. | `docs/generated/design/target-pipelines/wgsl.md:607` names the second column `Pass / step`; `docs/generated/design/_meta/prompts/_common.md:329-335` defines the required table columns. | Rename the Phase D table column to `Pass`. If the rows are intentionally steps rather than passes, keep the column contract and explain step-like rows in the `Notes` column. |
+
+## No-issues notes
+
+- The WGSL front matter contains all mandatory generated-document keys, and the recorded digest matches `regenerate.py digest target-pipelines/wgsl.md`.
+- The central WGSL legalizer call is correctly tied to `CodeGenTarget::WGSL`, `WGSLSPIRV`, and `WGSLSPIRVAssembly` in `slang-emit.cpp`.
+- The byte-address-buffer option summary matches the WGSL switch arm in `slang-emit.cpp`.
+- The downstream path correctly identifies Tint for `WGSLSPIRV` and the extra disassembly transition for `WGSLSPIRVAssembly`.

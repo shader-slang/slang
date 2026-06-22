@@ -2998,7 +2998,13 @@ struct IRCompilerDictionaryEntry : IRInst
         {
             if (auto dictValue = as<IRCompilerDictionaryValue>(child))
             {
-                return dictValue->getValue();
+                auto value = dictValue->getValue();
+                // Dictionary values are weak cache references. If DCE collected the cached
+                // result, the weak operand is rewritten to poison. Keep scanning because a later
+                // lookup may already have refreshed this cache row with a live replacement.
+                if (value && value->getOp() == kIROp_Poison)
+                    continue;
+                return value;
             }
         }
 

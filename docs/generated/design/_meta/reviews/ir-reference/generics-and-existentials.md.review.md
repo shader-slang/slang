@@ -1,40 +1,37 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T15:05:36+00:00
+reviewed_at: 2026-06-12T12:06:07+00:00
 target_doc: ir-reference/generics-and-existentials.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
   source_alignment: pass
   front_matter_validity: pass
-finding_count: 2
+finding_count: 0
 severity_breakdown:
   critical: 0
-  major: 1
-  minor: 1
+  major: 0
+  minor: 0
   nit: 0
 ---
 
 # Review report for ir-reference/generics-and-existentials.md
 
 ## Summary
-The page covers the main generic, existential, RTTI, type-flow, and AnyValue rows, and all relative links resolved. Two issues remain: witness-table and witness-fact opcodes are summarized as bullets instead of required opcode-table rows, and the source section omits the later Lua range that owns the type-flow rows.
+No findings were identified. The page now includes table rows for witness-table facts and the type-flow specialization cluster, and sampled operand, flag, and source-origin claims matched the watched files.
 
 ## Items checked
-- Ran `regenerate.py show ir-reference/generics-and-existentials.md` and checked the resolved watched files and dependencies.
-- Verified front matter keys, target source commit, watched-path digest shape, 11 relative links, required IR-reference sections, and table columns.
-- Checked 52 opcode table rows against `slang-ir-insts.lua`, including generic application, witness lookup, existential construction and projection, RTTI, type-flow sets, tag operations, dispatchers, specialization keys, and AnyValue marshalling.
-- Spot-checked more than 10 factual claims about operand counts, hoistable and global flags, wrappers, AST origins, and notable opcode behavior against `slang-ir-insts.lua`, `slang-ir-insts.h`, `slang-ir.h`, `slang-ir.cpp`, and `slang-lower-to-ir.cpp`.
+- Ran `regenerate.py show ir-reference/generics-and-existentials.md` and used its prompt path, watched files, and dependencies.
+- Read `_common.md`, `ir-reference-generics-and-existentials.md`, the full target document, `cross-cutting/ir-instructions.md`, `pipeline/04-ast-to-ir.md`, `ast-reference/declarations.md`, `ir-reference/types.md`, and `ir-reference/structure.md`.
+- Verified front matter keys, target source commit, watched-path digest shape, required IR-reference sections, table columns, and all relative links via source inspection plus pending lint.
+- Checked the documented generic application, witness lookup, existential construction/destructuring, witness-table facts, RTTI, type-flow specialization, tagged-union, dispatcher, specialization-key, and AnyValue rows against `source/slang/slang-ir-insts.lua`.
+- Spot-checked more than 10 factual claims: `specialize` operands and `H` flag, `lookupWitness` wrapper and minimum operands, `makeExistential` operands, existential projection flags, `interface_req_entry` `G` flag, `builtinRequirementKey` operands and `H` flag, `GetSequentialID`, `GetDynamicResourceHeap`, `GetDispatcher` key type, `SpecializeExistentialsInFunc` operands, `WeakUse`, and `packAnyValue`/`unpackAnyValue` behavior.
 
 ## Findings
-
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | major | `### Witness tables and witness facts`, lines 126-141 | The witness-table and witness-fact opcodes are summarized as bullets instead of rows in an opcode table with the required columns. | `source/slang/slang-ir-insts.lua:816-824` defines `key`, `global_generic_param`, `witness_table`, `indexedFieldKey`, `thisTypeWitness`, and `TypeEqualityWitness`; `source/slang/slang-ir-insts.lua:1042-1048` defines `witness_table_entry` and `interface_req_entry`. | Replace the bullet list with a sub-table covering the concrete witness and witness-fact opcodes, using the standard Opcode, C++ wrapper, Operands, Flags, AST origin, and Summary columns. |
-| F-002 | minor | `## Source`, lines 24-41 | The source range list omits the later type-flow specialization range even though the page documents `TypeSet`, dispatcher, tagged-union, tag, and specialization-key opcodes from that range. | `source/slang/slang-ir-insts.lua:2926-2929` defines the set opcodes, `source/slang/slang-ir-insts.lua:2979-2991` defines `GetDispatcher`, and `source/slang/slang-ir-insts.lua:3033-3162` defines tagged-union and specialization-key opcodes. | Add the type-flow specialization range around lines 2916-3162 to the `## Source` range list. |
+(no findings)

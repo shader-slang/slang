@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T10:25:25+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: fd3d948ba51668efc2bdab940c9ced97bfd743835e43a3a4ae3b6a3a358cd405
+generated_at: 2026-06-12T10:17:30Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 26030eb29f1e4941372a37ba0ce2800a984b637cb1b9877ad3dbf32d012bd625
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -74,29 +74,35 @@ session/module setup code is defined in
 
 ### Scope-bearing AST nodes
 
-Every node listed below introduces a fresh `Scope` distinct from its
-parent. Citations point at the concrete class in the header.
+The nodes listed below either own a `Scope` directly (a `ContainerDecl`
+via `ownedScope`) or declare a `ScopeStmt::scopeDecl` field. The
+"How the scope is attached" column distinguishes a node that *always*
+gets a fresh scope from one whose `scopeDecl` field is only populated on
+some parser paths — see the notes after the table and the edge-case
+section for the statements where the parser does not push a fresh scope.
+Citations point at the concrete class in the header.
 
 | Node kind | Header | How the scope is attached |
 | --- | --- | --- |
 | `ModuleDecl` | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) (line 807) | `ContainerDecl::ownedScope` |
 | `NamespaceDecl` | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) (line 799) | `ContainerDecl::ownedScope` |
 | `FileDecl` | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) (line 854) | `ContainerDecl::ownedScope` |
-| `AggTypeDecl` (and `StructDecl`, `ClassDecl`, `InterfaceDecl`, `EnumDecl`, ...) | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) (lines 386-485) | `ContainerDecl::ownedScope` |
+| `AggTypeDecl` and its subclasses `StructDecl`, `ClassDecl`, `InterfaceDecl`, `EnumDecl`, `SynthesizedStructDecl`, `GLSLInterfaceBlockDecl`, `AssocTypeDecl`, `GlobalGenericParamDecl` | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) (lines 386-485, plus `SynthesizedStructDecl` line 725, `GLSLInterfaceBlockDecl` line 567, `AssocTypeDecl` line 420, `GlobalGenericParamDecl` line 434) | `ContainerDecl::ownedScope` |
 | `ExtensionDecl` | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) (line 367) | `ContainerDecl::ownedScope` |
 | `GenericDecl` | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) (line 929) | `ContainerDecl::ownedScope`; the scope contains the generic parameters |
-| `CallableDecl` (and `FuncDecl`, `ConstructorDecl`, `SubscriptDecl`, `AccessorDecl`, ...) | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) (line 612 onward) | `ContainerDecl::ownedScope`; the scope contains the parameter decls |
+| `CallableDecl` and its subclasses `FuncDecl`, `ConstructorDecl`, `SubscriptDecl`, `AccessorDecl`, `FuncAliasDecl` | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) (line 612 onward; `FuncAliasDecl` line 653) | `ContainerDecl::ownedScope`; the scope contains the parameter decls |
 | `PropertyDecl` | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) (line 698) | `ContainerDecl::ownedScope` |
+| `SemanticDecl`, `AttributeDecl` | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) (`SemanticDecl` line 732, `AttributeDecl` line 1102; both direct `ContainerDecl` subclasses) | `ContainerDecl::ownedScope` |
 | `ScopeDecl` | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) (line 590) | `ContainerDecl::ownedScope`; attached to a `ScopeStmt` |
-| `BlockStmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (line 41) | `ScopeStmt::scopeDecl` |
-| `ForStmt`, `UnscopedForStmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (lines 216-231) | `ScopeStmt::scopeDecl`; `UnscopedForStmt` reuses the parent scope for HLSL compatibility |
-| `WhileStmt`, `DoWhileStmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (lines 234-247) | `ScopeStmt::scopeDecl` (via `LoopStmt` -> `BreakableStmt` -> `ScopeStmt`) |
+| `BlockStmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (line 41) | `ScopeStmt::scopeDecl`; the parser always pushes a fresh `ScopeDecl` in `parseBlockStatement` |
+| `ForStmt`, `UnscopedForStmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (lines 216-231) | `ScopeStmt::scopeDecl`; `Parser::ParseForStatement` assigns `scopeDecl` but only pushes it for the scoped `ForStmt` — `UnscopedForStmt` reuses the parent scope for HLSL compatibility |
+| `WhileStmt`, `DoWhileStmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (lines 234-247) | declare `ScopeStmt::scopeDecl` (via `LoopStmt` -> `BreakableStmt` -> `ScopeStmt`), but the parser (`ParseWhileStatement`, `ParseDoWhileStatement`) does **not** create or assign a fresh `ScopeDecl`; the loop body owns its own scope only when it is a `BlockStmt` |
 | `CompileTimeForStmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (line 251) | `ScopeStmt::scopeDecl` |
 | `GpuForeachStmt` | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (line 198) | `ScopeStmt::scopeDecl` |
-| `BreakableStmt` subclasses (`SwitchStmt`, `TargetSwitchStmt`, `StageSwitchStmt`) | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (line 100 onward) | `ScopeStmt::scopeDecl` |
+| `SwitchStmt`, `TargetSwitchStmt`, `StageSwitchStmt` (`BreakableStmt` subclasses) | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (line 100 onward) | declare `ScopeStmt::scopeDecl`, but the parser does not assign it: `ParseSwitchStmt` gives the body a scoped `BlockStmt`, and `parseTargetSwitchStmtImpl` creates a per-case `ScopeDecl` rather than one on the statement |
 | `CatchStmt` (catch handler) | [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) (line 306); a fresh `ScopeDecl` is pushed in `Parser::ParseDoCatchStatement` | indirect, through the surrounding `ScopeDecl` the parser creates |
-| `parseIfLetStatement` (synthetic) | [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) (line 6820) | a fresh `ScopeDecl` is pushed twice (outer + positive branch) |
-| `LambdaDecl` (parameter scope) | [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) (line 682); the parser pushes `lambdaExpr->paramScopeDecl` | dedicated `ScopeDecl` for the parameter list |
+| `parseIfLetStatement` (synthetic) | [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) (line 6897) | a fresh `ScopeDecl` is pushed twice (outer + positive branch) |
+| `LambdaExpr` (parameter scope) | the parser creates and pushes `lambdaExpr->paramScopeDecl` in `parseLambdaExpr` ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines 8159-8160); `LambdaDecl` itself ([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) line 682) is a `StructDecl` and owns a scope as an aggregate | dedicated `ScopeDecl` for the lambda parameter list, owned by the expression, not by `LambdaDecl` |
 
 Several AST nodes do *not* own a fresh scope even though syntactically
 they look like they might:
@@ -105,7 +111,7 @@ they look like they might:
   `BlockStmt`s that own one. `if (let x = ...)`
   is the exception: `Parser::parseIfLetStatement`
   ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
-  6820) synthesizes additional `ScopeDecl`s for the unwrapped
+  6897) synthesizes additional `ScopeDecl`s for the unwrapped
   variable.
 - `SeqStmt`, `DeclStmt`, and other `Stmt` subclasses that are not
   `ScopeStmt` simply live inside the enclosing scope.
@@ -172,7 +178,7 @@ at the same nesting level. The constructor is the free function
 secondary `ContainerDecl`, and splices it into the existing
 `nextSibling` list of the destination scope.
 
-Three concrete uses of sibling scopes are visible in the source:
+Four concrete uses of sibling scopes are visible in the source:
 
 1. **`FileDecl` per source file in a multi-file module.** A module
    that is split across multiple `__include`d files has one
@@ -181,22 +187,31 @@ Three concrete uses of sibling scopes are visible in the source:
    inside the module sees the union of all files'
    members — see
    [slang-session.cpp](../../../../source/slang/slang-session.cpp)
-   line 2239 and
+   line 2239 and `SemanticsVisitor::importFileDeclIntoScope` in
    [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-   line 16027.
+   line 16129.
 2. **Imported modules.** When module B imports module A, the
    checker adds A's scope as a sibling of B's scope so that names
    from A are reachable in B without explicit qualification — see
+   `SemanticsVisitor::importModuleIntoScope` in
    [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-   line 16061.
+   line 16163.
 3. **Multiple `namespace Foo {}` declarations of the same logical
    namespace.** When the same namespace name reappears, the parser
    reuses the existing `NamespaceDecl`
    ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
    4086-4180) so that further declarations are inserted into the same
    container. The semantic checker links siblings in
-   [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-   line 16408 when more than one `NamespaceDecl` exists.
+   `SemanticsDeclScopeWiringVisitor::visitNamespaceDecl`
+   ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+   line 16510) when more than one `NamespaceDecl` exists.
+4. **`using` declarations.** `SemanticsDeclScopeWiringVisitor::visitUsingDecl`
+   ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+   line 16419) checks the `using` argument and, for each
+   namespace-like (`NamespaceDeclBase`) target it names, calls
+   `addSiblingScopeForContainerDecl` (line 16449) to splice that
+   namespace's owned/sibling scopes into the `using` decl's scope, so
+   the namespace's members become reachable without qualification.
 
 ### Implicit scopes
 
@@ -217,10 +232,24 @@ but are still created at parse time:
   for its requirements; the default-impl bodies parse against a
   derived `InterfaceDefaultImplDecl` ([slang-ast-decl.h line
   944](../../../../source/slang/slang-ast-decl.h)) that is itself a
-  `GenericDecl` subclass and thus has its own scope.
+  `GenericDecl` subclass and thus has its own scope. An associated
+  type's constraint clause does *not* go into the
+  `AssocTypeDecl`'s own scope: when `parseAssocType`
+  ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+  4019) sees that the current scope's `containerDecl` is an
+  `InterfaceDecl`, it relocates each `GenericTypeConstraintDecl`
+  ([slang-ast-decl.h line 979](../../../../source/slang/slang-ast-decl.h))
+  produced by `associatedtype A : IBar` or `associatedtype A where A : IBar`
+  into the *enclosing interface* scope, making it a sibling member of
+  the associated type. The dedicated `__constraint` keyword
+  (`parseInterfaceConstraintDecl`,
+  [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
+  4061) inserts a `GenericTypeConstraintDecl` directly into the
+  interface scope the same way. All three surface forms therefore land
+  in one scope as parallel requirement members.
 - **`if (let x = ...)` desugaring.** `parseIfLetStatement`
   ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
-  6820) creates two `ScopeDecl`s: one for the temporary `$OptVar`
+  6897) creates two `ScopeDecl`s: one for the temporary `$OptVar`
   binding and one for the user-visible unwrapped variable inside the
   positive branch.
 
@@ -253,8 +282,8 @@ only states the order in which scopes are consulted.
 - **`UnscopedForStmt`.** When the source language is HLSL,
   `Parser::ParseForStatement`
   ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
-  6928) creates an `UnscopedForStmt` and *skips* the
-  `pushScopeAndSetParent` call (lines 6955-6956), so the `for` loop's
+  7005) creates an `UnscopedForStmt` and *skips* the
+  `pushScopeAndSetParent` call (lines 7031-7032), so the `for` loop's
   initialization variable leaks into the surrounding scope as HLSL
   semantics demand.
 - **Multiple `namespace Foo {}` siblings.** `parseNamespaceDecl`
@@ -269,6 +298,19 @@ only states the order in which scopes are consulted.
   through the inner scope's `parent`, which is the `GenericDecl`'s
   scope. A sibling of the outer decl that mentions `T` cannot reach
   it — its scope chain does not pass through the `GenericDecl`.
+- **`__constraint` subject must not be `This`.** A
+  `GenericTypeConstraintDecl` is only allowed as a child of an
+  `InterfaceDecl` (or of a `GenericDecl`); `isDeclAllowed`
+  ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) lines
+  5110 and 5206) enforces the placement. When the relocated decl lands
+  in the interface scope, the header visitor
+  `SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl`
+  ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+  line 4301) further rejects a `__constraint` whose subject resolves to
+  the bare `This` type — that is the role of the inheritance clause —
+  diagnosing `Diagnostics::ConstraintSubjectCannotBeThisType` and
+  replacing the subject with the error type. Constraints on associated
+  types (e.g. `This.A : IBar`) are permitted.
 - **`ExtensionDecl` members are not in the extension's scope chain.**
   Lookup *into* a type that has an active extension must walk the
   extension's members explicitly; the extension scope is not
@@ -277,13 +319,20 @@ only states the order in which scopes are consulted.
   and is documented in [lookup.md](lookup.md).
 - **`UsingDecl`.** A `using` declaration ([slang-ast-decl.h line
   861](../../../../source/slang/slang-ast-decl.h)) captures
-  `parser->currentScope` at parse time (see
+  `parser->currentScope` at parse time (see `parseUsingDecl` in
   [slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
-  4198). The injection into the surrounding scope happens at check
-  time, not at parse time. The current scope at parse time and the
-  scope into which names are eventually injected may differ if the
-  enclosing decl is later reorganized (e.g. by sibling-namespace
-  collapse).
+  4269). The injection into the surrounding scope happens at check
+  time, not at parse time:
+  `SemanticsDeclScopeWiringVisitor::visitUsingDecl`
+  ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+  line 16419) adds each named namespace/module as a sibling scope via
+  `addSiblingScopeForContainerDecl`. If the argument does not resolve
+  to any namespace-like entity, no sibling is added and the checker
+  diagnoses `Diagnostics::ExpectedANamespace`
+  ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+  line 16478). The current scope at parse time and the scope into which
+  names are eventually injected may differ if the enclosing decl is
+  later reorganized (e.g. by sibling-namespace collapse).
 - **`UnparsedStmt`.** A function body left as an `UnparsedStmt` at
   parse time captures both `currentScope` and `outerScope` ([slang-
   ast-stmt.h](../../../../source/slang/slang-ast-stmt.h) lines 53-61);
