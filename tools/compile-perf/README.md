@@ -156,7 +156,7 @@ so it runs headless / in CI.
 
 ```bash
 # 1. (once) fetch the real-shader corpus
-python3 fetch_corpus.py --name mdl
+cp /path/to/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang corpus/mdl/
 
 # 2. run the whole suite against a slangc build
 python3 bench.py --slangc /path/to/slangc --label dev      # -> results/dev/
@@ -189,7 +189,6 @@ python3 compare.py base head                # primary-timer Δ%, flags regressio
 | `workloads.py`        | deterministic workload generators, `gen_*(n) -> {filename: source}`                                                                                                                                                                                                                                                   |
 | `manifest.py`         | per-workload spec: invocation, compile mode, primary timers                                                                                                                                                                                                                                                           |
 | `bench.py`            | **test runner** — runs slangc, parses all timers, writes `results.json` (merge-on-write); generated sources go to an auto-removed `--gen-dir` scratch, not the results dir                                                                                                                                            |
-| `fetch_corpus.py`     | downloads the MDL real-shader corpus (GitHub contents API)                                                                                                                                                                                                                                                            |
 | `fetch_releases.py`   | downloads + caches prebuilt `slangc` per release tag                                                                                                                                                                                                                                                                  |
 | `sweep.py`            | **release sweep** — runs `bench.py` against every cached release                                                                                                                                                                                                                                                      |
 | `compare.py`          | **local base-vs-head diff** — checks a change for a compile-time regression (bench two slangc on one machine, then diff primary timers)                                                                                                                                                                               |

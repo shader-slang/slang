@@ -590,14 +590,15 @@ def gen_module_link(n):
 
 
 # --------------------------------------------------------------------------- #
-# Real-shader corpus (not generated). Fetch with fetch_corpus.py first.
+# Real-shader corpus (not generated). Copy corpus files into corpus/<name>/
+# before running the suite (CI does this via actions/checkout of MDL-SDK).
 # --------------------------------------------------------------------------- #
 
 def _read_corpus(name):
     d = os.path.join(_CORPUS, name)
     if not os.path.isdir(d):
         raise FileNotFoundError(
-            f"corpus '{name}' missing at {d}; run: python3 fetch_corpus.py --name {name}"
+            f"corpus '{name}' missing at {d}; copy .slang files there before running"
         )
     out = {}
     for fn in sorted(os.listdir(d)):

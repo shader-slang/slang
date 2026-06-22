@@ -23,7 +23,7 @@ Notes:
 - Windows: the default `default` (Ninja) preset needs a compiler in the
   environment (run from a VS Developer prompt). VS users can instead pass
   --configure-preset vs2022 --build-preset vs2022-release.
-- mdl_dxr needs the corpus first (python fetch_corpus.py --name mdl) or drop it
+- mdl_dxr needs the corpus first (copy MDL-SDK slangified/*.slang into corpus/mdl/) or drop it
   from --only.
 - Exit code is compare.py's: non-zero if a workload regressed past --threshold,
   so this doubles as a pre-push check.
