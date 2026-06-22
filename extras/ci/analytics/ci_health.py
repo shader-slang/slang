@@ -352,7 +352,7 @@ def fetch_recent_failures(repo):
 def fetch_merge_queue_status(repo):
     """Fetch recent merge queue CI runs (last 24 hours).
 
-    Returns a dict with 'recent' (list of runs), 'summary' counts.
+    Returns a dict with 'recent' runs, 'summary' counts, and partial status.
     """
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
     from gh_api import gh_api_list, parse_merge_queue_pr_number
@@ -399,7 +399,7 @@ def fetch_merge_queue_status(repo):
             "updated_at": run.get("updated_at", ""),
         })
 
-    return {"recent": recent, "summary": counts}
+    return {"recent": recent, "summary": counts, "partial": False, "errors": []}
 
 
 def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None, hosted_runner_usage=None):

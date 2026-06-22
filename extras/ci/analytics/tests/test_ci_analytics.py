@@ -534,13 +534,15 @@ class TestHealthApiBounds(unittest.TestCase):
             return [], None
 
         with mock.patch.object(gh_api, "gh_api_list", side_effect=fake_list):
-            ci_health.fetch_merge_queue_status("shader-slang/slang")
+            result = ci_health.fetch_merge_queue_status("shader-slang/slang")
 
         self.assertEqual(calls[0][1], "workflow_runs")
         self.assertIn("event=merge_group", calls[0][0])
         self.assertIn("per_page=100", calls[0][0])
         self.assertIn("&created=", calls[0][0])
         self.assertIn("..", calls[0][0])
+        self.assertFalse(result["partial"])
+        self.assertEqual(result["errors"], [])
 
 
 class TestStatisticsRunnerNamePrefixes(unittest.TestCase):
