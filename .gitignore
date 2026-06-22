@@ -89,6 +89,7 @@ prelude/*.h.cpp
 /external/slangpy/
 /external/dxvk-remix/
 /external/SaschaWillems-Vulkan/
+/external/falcor/
 
 build/**/*.tlog
 build/**/*.lastbuildstate

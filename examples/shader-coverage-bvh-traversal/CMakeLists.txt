@@ -3,13 +3,25 @@
 # See the image-pipeline demo's CMakeLists.txt for the rationale on
 # why this example uses raw Vulkan instead of slang-rhi.
 
-find_package(Vulkan)
-if(NOT Vulkan_FOUND)
-    message(
-        STATUS
-        "examples: skipping shader-coverage-bvh-traversal (Vulkan SDK not found)"
-    )
-    return()
+# Vulkan headers come from Slang's bundled Vulkan-Headers submodule (the
+# always-available Vulkan::Headers target, see external/CMakeLists.txt), so
+# this demo only needs to locate the loader library at build time. Prefer the
+# Vulkan SDK's imported target when present; otherwise fall back to the bare
+# runtime loader (e.g. libvulkan.so.1) so the demo still builds on machines
+# that ship only the Vulkan runtime and not a -dev/SDK package.
+find_package(Vulkan QUIET)
+if(TARGET Vulkan::Vulkan)
+    set(_vulkan_loader Vulkan::Vulkan)
+else()
+    find_library(SLANG_VULKAN_LOADER NAMES vulkan vulkan-1 libvulkan.so.1)
+    if(NOT SLANG_VULKAN_LOADER)
+        message(
+            STATUS
+            "examples: skipping shader-coverage-bvh-traversal (Vulkan loader not found)"
+        )
+        return()
+    endif()
+    set(_vulkan_loader ${SLANG_VULKAN_LOADER})
 endif()
 
 set(_asset_files
@@ -53,7 +65,7 @@ target_include_directories(
 )
 target_link_libraries(
     shader-coverage-bvh-traversal
-    PRIVATE Vulkan::Vulkan slang core
+    PRIVATE ${_vulkan_loader} Vulkan::Headers slang core
 )
 target_compile_features(shader-coverage-bvh-traversal PRIVATE cxx_std_17)
 set_target_properties(shader-coverage-bvh-traversal PROPERTIES FOLDER examples)

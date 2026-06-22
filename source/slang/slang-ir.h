@@ -1875,6 +1875,17 @@ void fixUpFuncType(IRFunc* func, IRType* resultType);
 ///
 void fixUpFuncType(IRFunc* func);
 
+/// Return a function type whose concrete type-pack parameters have been flattened.
+///
+/// Specialization can leave a call-site callee with a function type parameterized as
+/// `(TypePack<T0, T1, ...>)` even though the call operands have already been expanded to
+/// `(T0, T1, ...)`. This helper performs only that concrete `IRTypePack` flattening step.
+IRFuncType* maybeExpandConcreteFuncTypePacks(IRBuilder* builder, IRFuncType* funcType);
+IRFuncType* maybeExpandConcreteFuncTypePacks(
+    IRBuilder* builder,
+    IRInst* funcValue,
+    IRFuncType* funcType);
+
 /// If the function has a DebugFuncDecoration, replaces the function type in
 /// that decoration to match the current type of the function.
 ///
@@ -2245,7 +2256,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 20;
+    const static UInt k_maxSupportedModuleVersion = 21;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:

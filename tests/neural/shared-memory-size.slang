@@ -95,6 +95,12 @@ void computeOneLayer<TargetEnum Target, ExecutionMode Mode, T, U, Arr:IRWArray<u
 }
 
 
+// `resBuffer` is fully initialized by the `expand computeOneLayer(...)` call below,
+// which writes one element per pack element via an `out` array parameter. The
+// must-init analysis (41035) cannot track this cross-call indexed initialization and
+// reports a false positive, so it is disabled for this function only.
+#pragma warning(push)
+#pragma warning(disable : 41035)
 uint verifySize<TargetEnum Target, ExecutionMode Mode, each T, each U>(expand each T a, expand each U b)
     where T == uint
     where U == uint
@@ -113,6 +119,7 @@ uint verifySize<TargetEnum Target, ExecutionMode Mode, each T, each U>(expand ea
 
     return maxSize;
 }
+#pragma warning(pop)
 
 // randomly generated layer configurations
 

@@ -194,80 +194,218 @@ struct BasicTypeKeyPair
     HashCode getHashCode() const { return combineHash(type1.getRaw(), type2.getRaw()); }
 };
 
-struct OperatorOverloadCacheKey
+// Focused failure data produced while a generic candidate is still being
+// inferred. The generic solver fills this optional record with the first
+// concrete reason a candidate failed, and `CompleteOverloadCandidate` formats
+// it into a focused diagnostic only if overload resolution selects that failed
+// candidate. Each `Kind` captures just the offending fields (counts, a
+// parameter name, or the substituted sub/super types) at the failure site;
+// the more expensive diagnostic formatting is deferred to the selected-
+// candidate path so speculative candidates never pay for it.
+struct GenericArgumentInferenceFailure
 {
-    int32_t operatorName;
-    bool isGLSLMode;
-    BasicTypeKey args[2];
-    bool operator==(OperatorOverloadCacheKey key) const
+    enum class Kind
     {
-        return operatorName == key.operatorName && args[0] == key.args[0] &&
-               args[1] == key.args[1] && isGLSLMode == key.isGLSLMode;
+        None,
+        VariadicPackCountMismatch,
+        GenericArityMismatch,
+        OrdinaryGenericParamNotInferred,
+        InterfaceConformanceNotSatisfied,
+        GenericConstraintNotSatisfied,
+        GenericParamUnificationConflict,
+    };
+
+    struct VariadicPackCountMismatch
+    {
+        SourceLoc location = SourceLoc();
+        int64_t expectedCount = 0;
+        int64_t actualCount = 0;
+    };
+
+    // The call supplied a number of value arguments that the generic function's
+    // parameter list could not match, so argument-to-parameter matching failed
+    // before any inference could run.
+    struct GenericArityMismatch
+    {
+        SourceLoc location = SourceLoc();
+        Int expectedParamCount = 0;
+        Int actualArgCount = 0;
+    };
+
+    // An ordinary generic parameter (such as a type `T` that appears only in
+    // return position, or a value `N` not mentioned in any parameter) was never
+    // determined from the call, so its solver constraint stayed unsatisfied.
+    // The parameter declaration itself is stored (not just its name) so the
+    // diagnostic can use the full declaration (name, type-vs-value kind, loc).
+    struct OrdinaryGenericParamNotInferred
+    {
+        SourceLoc location = SourceLoc();
+        Decl* member = nullptr;
+    };
+
+    // A source generic constraint `T : IFoo` could not be discharged: the
+    // inferred argument for `T` (`subType`) does not conform to the required
+    // interface (`supType`). The capture site records these only once both are
+    // concrete (its `hasUnreadyDependenciesForVal` guard), so they are always
+    // fully substituted under the current (failed) specialization when read.
+    struct InterfaceConformanceNotSatisfied
+    {
+        SourceLoc location = SourceLoc();
+        Type* subType = nullptr;
+        Type* supType = nullptr;
+    };
+
+    // A source generic constraint that is not an interface conformance could not
+    // be satisfied — the general fallback for every constraint kind handled by
+    // the witness solver other than conformance (today: equality `where T == X`,
+    // type coercion `where U(T)`, non-empty pack `where nonempty(P)`, ...).
+    // `constraintDecl` is the source constraint declaration, rendered to a
+    // readable form (e.g. `T == int`, `T : IFoo`, `int(T)`) by
+    // `ASTPrinter::getGenericConstraintString`; `constraintLoc` anchors a
+    // "see declaration" note. The declaration is captured (not a pre-rendered
+    // string) so formatting stays deferred to `CompleteOverloadCandidate`.
+    struct GenericConstraintNotSatisfied
+    {
+        SourceLoc location = SourceLoc();
+        Decl* constraintDecl = nullptr;
+        SourceLoc constraintLoc = SourceLoc();
+    };
+
+    // Two ordinary constraints inferred conflicting arguments for one generic
+    // parameter (e.g. `foo<T>(T, T)` with unrelated `A`/`B`, or `foo<let N:int>`
+    // required to be both `4` and `8`). Captures the parameter declaration and
+    // both candidate values; `Val*` covers both type parameters (the candidates
+    // are `Type`s) and value parameters (the candidates are `IntVal`s).
+    struct GenericParamUnificationConflict
+    {
+        SourceLoc location = SourceLoc();
+        Decl* paramDecl = nullptr;
+        Val* firstVal = nullptr;
+        Val* secondVal = nullptr;
+    };
+
+    Kind kind = Kind::None;
+    union
+    {
+        VariadicPackCountMismatch variadicPackCountMismatch;
+        GenericArityMismatch genericArityMismatch;
+        OrdinaryGenericParamNotInferred ordinaryGenericParamNotInferred;
+        InterfaceConformanceNotSatisfied interfaceConformanceNotSatisfied;
+        GenericConstraintNotSatisfied genericConstraintNotSatisfied;
+        GenericParamUnificationConflict genericParamUnificationConflict;
+    };
+
+    // Every payload must be trivially destructible: that is what makes the
+    // placement-new in `set*()` / `copyActiveMemberFrom` (which never destroys
+    // the previously active member first) well-defined.
+    static_assert(
+        std::is_trivially_destructible_v<VariadicPackCountMismatch> &&
+            std::is_trivially_destructible_v<GenericArityMismatch> &&
+            std::is_trivially_destructible_v<OrdinaryGenericParamNotInferred> &&
+            std::is_trivially_destructible_v<InterfaceConformanceNotSatisfied> &&
+            std::is_trivially_destructible_v<GenericConstraintNotSatisfied> &&
+            std::is_trivially_destructible_v<GenericParamUnificationConflict>,
+        "GenericArgumentInferenceFailure payloads must be trivially destructible");
+
+    GenericArgumentInferenceFailure()
+        : variadicPackCountMismatch()
+    {
     }
-    HashCode getHashCode() const
+
+    GenericArgumentInferenceFailure(GenericArgumentInferenceFailure const& other)
+        : kind(other.kind)
     {
-        return combineHash(operatorName, args[0].getRaw(), args[1].getRaw(), isGLSLMode ? 1 : 0);
+        copyActiveMemberFrom(other);
     }
-    bool fromOperatorExpr(OperatorExpr* opExpr)
+
+    GenericArgumentInferenceFailure& operator=(GenericArgumentInferenceFailure const& other)
     {
-        // First, lets see if the argument types are ones
-        // that we can encode in our space of keys.
-        args[0] = BasicTypeKey::invalid();
-        args[1] = BasicTypeKey::invalid();
-        if (opExpr->arguments.getCount() > 2)
-            return false;
+        kind = other.kind;
+        copyActiveMemberFrom(other);
+        return *this;
+    }
 
-        for (Index i = 0; i < opExpr->arguments.getCount(); i++)
+    // Select a union variant and return a reference for the caller to populate.
+    // Each setter begins the chosen member's lifetime with placement-new and
+    // updates `kind` in lockstep, so the invariant "`kind` names the live union
+    // member" holds by construction at every capture site. The previously
+    // active member is trivially destructible, so it needs no explicit
+    // destruction before the new member is constructed in place.
+    VariadicPackCountMismatch& setVariadicPackCountMismatch()
+    {
+        kind = Kind::VariadicPackCountMismatch;
+        return *new (&variadicPackCountMismatch) VariadicPackCountMismatch();
+    }
+    GenericArityMismatch& setGenericArityMismatch()
+    {
+        kind = Kind::GenericArityMismatch;
+        return *new (&genericArityMismatch) GenericArityMismatch();
+    }
+    OrdinaryGenericParamNotInferred& setOrdinaryGenericParamNotInferred()
+    {
+        kind = Kind::OrdinaryGenericParamNotInferred;
+        return *new (&ordinaryGenericParamNotInferred) OrdinaryGenericParamNotInferred();
+    }
+    InterfaceConformanceNotSatisfied& setInterfaceConformanceNotSatisfied()
+    {
+        kind = Kind::InterfaceConformanceNotSatisfied;
+        return *new (&interfaceConformanceNotSatisfied) InterfaceConformanceNotSatisfied();
+    }
+    GenericConstraintNotSatisfied& setGenericConstraintNotSatisfied()
+    {
+        kind = Kind::GenericConstraintNotSatisfied;
+        return *new (&genericConstraintNotSatisfied) GenericConstraintNotSatisfied();
+    }
+    GenericParamUnificationConflict& setGenericParamUnificationConflict()
+    {
+        kind = Kind::GenericParamUnificationConflict;
+        return *new (&genericParamUnificationConflict) GenericParamUnificationConflict();
+    }
+
+private:
+    // Begin the lifetime of whichever union member `kind` selects, copy-
+    // constructing it from `other`'s active member. The payloads embed a
+    // `SourceLoc`, which has a user-provided copy constructor and so is not
+    // trivially copyable; assigning into a union member whose lifetime has not
+    // begun would be undefined. Placement-new starts that lifetime correctly
+    // for both copy construction (no member live yet) and copy assignment (the
+    // previously active member is trivially destructible, so it needs no
+    // explicit destruction before the new member is constructed in place).
+    void copyActiveMemberFrom(GenericArgumentInferenceFailure const& other)
+    {
+        switch (other.kind)
         {
-            auto key = makeBasicTypeKey(opExpr->arguments[i]->type, opExpr->arguments[i]);
-            if (key.getRaw() == BasicTypeKey::invalid().getRaw())
-            {
-                return false;
-            }
-            args[i] = key;
+        case Kind::VariadicPackCountMismatch:
+            new (&variadicPackCountMismatch)
+                VariadicPackCountMismatch(other.variadicPackCountMismatch);
+            break;
+        case Kind::GenericArityMismatch:
+            new (&genericArityMismatch) GenericArityMismatch(other.genericArityMismatch);
+            break;
+        case Kind::OrdinaryGenericParamNotInferred:
+            new (&ordinaryGenericParamNotInferred)
+                OrdinaryGenericParamNotInferred(other.ordinaryGenericParamNotInferred);
+            break;
+        case Kind::InterfaceConformanceNotSatisfied:
+            new (&interfaceConformanceNotSatisfied)
+                InterfaceConformanceNotSatisfied(other.interfaceConformanceNotSatisfied);
+            break;
+        case Kind::GenericConstraintNotSatisfied:
+            new (&genericConstraintNotSatisfied)
+                GenericConstraintNotSatisfied(other.genericConstraintNotSatisfied);
+            break;
+        case Kind::GenericParamUnificationConflict:
+            new (&genericParamUnificationConflict)
+                GenericParamUnificationConflict(other.genericParamUnificationConflict);
+            break;
+        case Kind::None:
+            break;
         }
-
-        // Next, lets see if we can find an intrinsic opcode
-        // attached to an overloaded definition (filtered for
-        // definitions that could conceivably apply to us).
-        //
-        // TODO: This should really be parsed on the operator name
-        // plus fixity, rather than the intrinsic opcode...
-        //
-        // We will need to reject postfix definitions for prefix
-        // operators, and vice versa, to ensure things work.
-        //
-        auto prefixExpr = as<PrefixExpr>(opExpr);
-        auto postfixExpr = as<PostfixExpr>(opExpr);
-
-        if (auto overloadedBase = as<OverloadedExpr>(opExpr->functionExpr))
-        {
-            for (auto item : overloadedBase->lookupResult2)
-            {
-                // Look at a candidate definition to be called and
-                // see if it gives us a key to work with.
-                //
-                Decl* funcDecl = item.declRef.getDecl();
-                if (auto genDecl = as<GenericDecl>(funcDecl))
-                    funcDecl = genDecl->inner;
-
-                // Reject definitions that have the wrong fixity.
-                //
-                if (prefixExpr && !funcDecl->findModifier<PrefixModifier>())
-                    continue;
-                if (postfixExpr && !funcDecl->findModifier<PostfixModifier>())
-                    continue;
-
-                if (auto intrinsicOp = funcDecl->findModifier<IntrinsicOpModifier>())
-                {
-                    operatorName = intrinsicOp->op;
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 };
+
+DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal);
+bool arePackCountExpectedCountsEqual(ASTBuilder* astBuilder, IntVal* left, IntVal* right);
 
 struct OverloadCandidate
 {
@@ -334,6 +472,21 @@ struct OverloadCandidate
     // the solver's fixpoint -- the same path used for inferred generic arguments
     // -- rather than a separate linear pass. -1 until computed.
     Index explicitGenericArgCount = -1;
+
+    // When a generic candidate fails before producing a specialized decl-ref,
+    // the solver can record a focused failure reason here. The selected failed
+    // candidate reports this reason instead of falling back to only the generic
+    // "could not specialize" diagnostic.
+    GenericArgumentInferenceFailure genericInferenceFailure;
+
+    // Records the first argument that failed to type-check while trying this
+    // candidate, so a "no applicable overload" diagnostic can point the user at
+    // which argument is wrong (issue #7857). `argMismatchArgIndex` is the 0-based
+    // argument index (-1 until a mismatch is recorded); `argMismatchExpectedType`
+    // is the parameter type and `argMismatchActualType` is the argument type.
+    Index argMismatchArgIndex = -1;
+    Type* argMismatchExpectedType = nullptr;
+    Type* argMismatchActualType = nullptr;
 };
 
 struct ResolvedOperatorOverload
@@ -353,11 +506,7 @@ struct ResolvedOperatorOverload
 
 struct TypeCheckingCache : public RefObject
 {
-    Dictionary<OperatorOverloadCacheKey, ResolvedOperatorOverload> resolvedOperatorOverloadCache;
     Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
-
-    // The version used to invalidate the cached declRefs in ResolvedOperatorOverload entries.
-    int version = 0;
 };
 
 enum class CoercionSite
@@ -2917,6 +3066,13 @@ public:
         // This tracks costs when a type parameter is promoted to satisfy an interface
         // constraint (e.g., int -> float to satisfy __BuiltinFloatingPointType).
         ConversionCost typePromotionCost = kConversionCost_None;
+
+        // Optional channel for a generic-argument solve to explain a focused
+        // failure to overload completion. Solving can run while collecting
+        // speculative candidates, so diagnostics are delayed until overload
+        // resolution selects the failed candidate.
+        GenericArgumentInferenceFailure* failure = nullptr;
+        SourceLoc applicationLoc = SourceLoc();
     };
 
     bool isRelevantGeneric(GenericInferenceContext& system, Decl* generic);
@@ -3406,7 +3562,8 @@ public:
         OverloadResolveContext& context,
         ArrayView<Val*> providedOrdinaryArgs,
         ConversionCost& outBaseCost,
-        List<QualType>* innerParameterTypes = nullptr);
+        List<QualType>* innerParameterTypes = nullptr,
+        GenericArgumentInferenceFailure* outFailure = nullptr);
 
     void AddTypeOverloadCandidates(Type* type, OverloadResolveContext& context);
 
@@ -3848,6 +4005,11 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt);
 
+    // If `expr` is the discarded result of a call to a `[NoDiscard]` function,
+    // emit an error. Used for any context where an expression's result is
+    // ignored (an expression statement, or a `for` loop's side-effect expression).
+    void maybeDiagnoseDiscardedNoDiscardResult(Expr* expr);
+
     // Try to infer the max number of iterations the loop will run.
     void tryInferLoopMaxIterations(ForStmt* stmt);
 
@@ -3992,6 +4154,17 @@ Witness* findNonEmptyPackWitnessForConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
     Val* constrainedArg,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    bool shouldEmitError);
+
+// Return the witness that proves `countof(constrainedArg) == expectedCount`,
+// or `nullptr` if the concrete count or an in-scope declared constraint cannot
+// prove that equality.
+Witness* findVariadicPackCountWitnessForConstraint(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    Val* constrainedArg,
+    IntVal* expectedCount,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError);
 
