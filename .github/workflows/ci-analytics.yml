@@ -5,6 +5,10 @@ on:
     - cron: "0 6 * * *" # Daily at 6 AM UTC
   workflow_dispatch: {} # Manual trigger
 
+concurrency:
+  group: slang-ci-analytics-publish
+  cancel-in-progress: false
+
 jobs:
   collect-and-publish:
     runs-on: ubuntu-latest
@@ -66,7 +70,7 @@ jobs:
 
       - name: Push to analytics repo
         run: |
-          cd ci_analytics_repo
+          cd ci_analytics_repo || exit 1
           # Copy updated monthly data files
           cp /tmp/ci_data/ci_jobs_*.json . 2>/dev/null || true
           if [ -f /tmp/pr_merges.json ]; then
@@ -80,7 +84,18 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || {
-            git commit -m "Update CI analytics $(date -u +%Y-%m-%d)" &&
-            git push
-          }
+          if ! git diff --cached --quiet; then
+            git commit -m "Update CI analytics $(date -u +%Y-%m-%d)"
+            for attempt in 1 2 3; do
+              if git push; then
+                exit 0
+              fi
+              echo "Push failed on attempt ${attempt}; rebasing before retry..."
+              git pull --rebase || {
+                echo "Failed to rebase CI analytics before retry" >&2
+                exit 1
+              }
+            done
+            echo "Failed to push CI analytics after retries" >&2
+            exit 1
+          fi

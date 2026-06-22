@@ -18,6 +18,7 @@ import ci_health
 import ci_hosted_runner_usage
 import ci_job_collector
 import pr_collector
+import ci_post_status
 import ci_status
 import ci_visualization
 import gh_api
@@ -1213,6 +1214,61 @@ class TestQueueStatusJson(unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["partial"])
         self.assertEqual(payload["list_errors"], ["HTTP 502"])
+
+
+class TestStatusPosterPushRetry(unittest.TestCase):
+    def test_commit_and_push_rebases_and_retries_stale_push(self):
+        calls = []
+        push_count = {"value": 0}
+
+        def result(code, stderr="", stdout=""):
+            r = mock.Mock()
+            r.returncode = code
+            r.stdout = stdout
+            r.stderr = stderr
+            return r
+
+        def fake_run_git(args, cwd):
+            calls.append(args)
+            if args == ["config", "user.name"]:
+                return result(0, stdout="Test User\n")
+            if args == ["config", "user.email"]:
+                return result(0, stdout="test@example.com\n")
+            if args[:2] in (["config", "user.name"], ["config", "user.email"]):
+                return result(0)
+            if args == ["add", ci_post_status.STATUS_FILE]:
+                return result(0)
+            if args == ["diff", "--cached", "--quiet"]:
+                return result(1)
+            if args[:1] == ["commit"]:
+                return result(0)
+            if args == ["push"]:
+                push_count["value"] += 1
+                if push_count["value"] == 1:
+                    return result(1, "non-fast-forward")
+                return result(0)
+            if args == ["pull", "--rebase"]:
+                return result(0)
+            return result(0)
+
+        with mock.patch.object(
+            ci_post_status,
+            "get_slang_git_identity",
+            return_value=("Test User", "test@example.com"),
+        ), mock.patch.object(
+            ci_post_status,
+            "get_github_username",
+            return_value=None,
+        ), mock.patch.object(
+            ci_post_status,
+            "run_git",
+            side_effect=fake_run_git,
+        ):
+            ok = ci_post_status.commit_and_push("/tmp/repo", "Status: test")
+
+        self.assertTrue(ok)
+        self.assertEqual(push_count["value"], 2)
+        self.assertIn(["pull", "--rebase"], calls)
 
 
 class TestHostedRunnerUsage(unittest.TestCase):
