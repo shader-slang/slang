@@ -7,7 +7,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 // Stand-in for a texture lookup: differentiable for type-checking, but its own
@@ -65,6 +65,30 @@ float useInout(float x)
     return v;
 }
 
+// The other entry into the trivial-forward synthesis: a function that is
+// backward-differentiable ([BackwardDerivative]) but has *no* forward derivative.
+// Forward-diffing it hits the BackwardDerivativeApply branch in translateCall
+// (distinct from the [TreatAsDifferentiable] branch above), which also synthesizes
+// a trivial forward derivative. Its primal must still be square(x), with a zero
+// differential.
+void square_bwd(inout DifferentialPair<float> dpx, float dy)
+{
+    dpx = diffPair(dpx.p, 2.0 * dpx.p * dy);
+}
+
+[BackwardDerivative(square_bwd)]
+float square(float x)
+{
+    return x * x;
+}
+
+[Differentiable]
+float divAfterSquare(float x)
+{
+    float s = square(x);   // primal must be square(x) == 4, differential is 0
+    return 10.0 / s;
+}
+
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -78,10 +102,16 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // primal preserved (6), inout tangent forced to zero
     var dpInout = __fwd_diff(useInout)(diffPair(2.0, 1.0));
 
+    // square(2) = 4, so divAfterSquare(2) = 10/4 = 2.5
+    // square's forward derivative is trivial (df == 0), so d/dx (10/square) = 0
+    var dpBwd = __fwd_diff(divAfterSquare)(diffPair(2.0, 1.0));
+
     outputBuffer[0] = dp.p;       // CHECK: 2.5
     outputBuffer[1] = dp.d;       // CHECK: -1.25
     outputBuffer[2] = dpIface.p;  // CHECK: 2.5
     outputBuffer[3] = dpIface.d;  // CHECK: -1.25
     outputBuffer[4] = dpInout.p;  // CHECK: 6.0
     outputBuffer[5] = dpInout.d;  // CHECK: 0.0
+    outputBuffer[6] = dpBwd.p;    // CHECK: 2.5
+    outputBuffer[7] = dpBwd.d;    // CHECK: 0.0
 }
