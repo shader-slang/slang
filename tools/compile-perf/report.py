@@ -10,12 +10,13 @@ title.
 import argparse
 import json
 import os
-
-import breakdown
-from lib import analyze
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)  # allow running from any directory
+
+import breakdown
+from lib import analyze
 
 CSS = """
 body{font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;margin:0;color:#1a1a1a;background:#fafafa}

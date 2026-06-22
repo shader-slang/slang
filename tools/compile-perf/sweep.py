@@ -16,10 +16,10 @@ import os
 import subprocess
 import sys
 
-from lib import analyze, manifest
-
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)  # allow running from any directory
+
+from lib import analyze, manifest
 
 
 def main():

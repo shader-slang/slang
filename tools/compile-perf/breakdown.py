@@ -26,10 +26,12 @@ import argparse
 import inspect
 import json
 import os
-
-from lib import analyze, manifest
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)  # allow running from any directory
+
+from lib import analyze, manifest
 
 # (timer, [children]) — the nested timer tree. Each parent gets a synthetic
 # "<parent> (self)" residual = parent − Σ children, so buckets tile compileInner.
@@ -91,8 +93,6 @@ def _t(timers, name):
 
 def buckets(timers):
     """Mutually-exclusive {bucket: ms} that sum to compileInner, allocated TOP-DOWN
-import os as _os, sys as _sys
-_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
     from the compileInner budget. Each parent places its measured children within
     its budget; the remainder is '<parent> (self)'.
 
