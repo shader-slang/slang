@@ -20,10 +20,6 @@ on Windows). See `README.md` Quickstart for copy-paste commands.
   it by hand with two prebuilt binaries: `bench.py --label base`,
   `bench.py --label head`, `compare.py base head`. Exits non-zero on a regression
   past threshold, so it doubles as a pre-push check.
-- **Scaling of one build (compile time vs size N)** — `bench.py … --sweep` then
-  `sweep_report.py --label <name>`: per-workload `floor + k·N` curves + stacked
-  phase breakdown, to tell a fixed-cost regression from a per-element or
-  super-linear one.
 - **Across releases** — `fetch_releases.py` (caches platform-matched release
   binaries) + `sweep.py` to bench them all, then `analyze.py` (ranked
   step-changes, leaf attribution) and `report.py` (self-contained HTML, incl.
@@ -47,7 +43,7 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   `workflow_dispatch` only right now — the daily `schedule` is commented out;**
   enable it once the suite is validated on the runner and the history is seeded.
   Inputs: `ref` (commit SHA or branch to build; blank = master HEAD, useful for
-  backfilling historical daily points), `samples`, `sweep`, `only`. The run label
+  backfilling historical daily points), `samples`, `only`. The run label
   and `meta.json` date are derived from the checked-out commit's author date, so
   backfill points sort correctly in the tracking series.
 - **`compile-perf-release-sweep.yml`** (`workflow_dispatch`) — downloads prebuilt
@@ -75,8 +71,7 @@ Absolute compile times are runner-specific, so the series is assembled per machi
 `track.py` owns it: `register` (stamp a daily run + rebuild), `rebuild` (recompute
 `tracking/tracking.json`), `stamp-runner` (record the fingerprint the history was
 built on), `runner-id`, `summary`. Points reduce to per-`(workload, timer)` median
-via `analyze.canonical_runs`, so swept multi-size runs collapse to `default_size`
-and history vs daily compare like-with-like.
+via `analyze.canonical_runs`, so history and daily points compare like-with-like.
 
 ### Drift alert — `trend.py`
 
@@ -107,7 +102,7 @@ with `force=true` to re-measure every release on the new machine and re-stamp
 
 `results.json` (all of median/min/mean/stdev per timer) is the only measurement
 artifact stored — no CSV; the analysis/report tools read it directly. Transient
-and regenerable outputs (`gen/`, `analysis/`, `sweep/`, `breakdown/`, `*.html`,
+and regenerable outputs (`gen/`, `analysis/`, `breakdown/`, `*.html`,
 `*.svg`) are excluded via a `.gitignore` committed directly to the
 `slang-compile-perf` repo.
 
