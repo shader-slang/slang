@@ -45,7 +45,7 @@ jobs:
       group: nvrgfx
       labels: [Windows, X64, nvrgfx-perf]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           ref: ${{ github.event.inputs.ref || github.ref }}
           persist-credentials: false
@@ -76,7 +76,7 @@ jobs:
           cmake --workflow --preset release
 
       - name: Checkout MDL-SDK corpus
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: "shader-slang/MDL-SDK"
           # Pin to a known-good commit so corpus drift doesn't silently shift
@@ -91,7 +91,7 @@ jobs:
       # NB: persist-credentials stays on (default) here — the "Push results" step
       # below relies on the PAT credential this checkout persists in .git/config.
       - name: Checkout perf results repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: ${{ env.PERF_RESULTS_REPO }}
           path: "perf-results"
@@ -168,7 +168,7 @@ jobs:
 
       - name: Checkout gh-pages branch
         continue-on-error: true
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: ${{ env.PERF_RESULTS_REPO }}
           ref: gh-pages

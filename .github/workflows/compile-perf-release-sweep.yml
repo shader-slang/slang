@@ -45,13 +45,13 @@ jobs:
     steps:
       # No Slang build here — we sweep prebuilt RELEASE binaries. fetch-depth 0
       # is needed so fetch_releases.py can read release tags + dates from git.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
           fetch-depth: "0"
 
       - name: Checkout MDL-SDK corpus
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: "shader-slang/MDL-SDK"
           # Pin to the same commit as compile-perf-nightly.yml so release-history
@@ -66,7 +66,7 @@ jobs:
       # NB: persist-credentials stays on (default) here — the "Push results" step
       # below relies on the PAT credential this checkout persists in .git/config.
       - name: Checkout perf results repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: ${{ env.PERF_RESULTS_REPO }}
           path: "perf-results"
@@ -142,7 +142,7 @@ jobs:
 
       - name: Checkout gh-pages branch
         continue-on-error: true
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: ${{ env.PERF_RESULTS_REPO }}
           ref: gh-pages
