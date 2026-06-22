@@ -249,7 +249,6 @@ via `--results <checkout-path>`.
 | `results/releases/<tag>/_sweep/`             | complexity-sweep report for swept releases                      |
 | `releases/`                                  | cached prebuilt `slangc` per tag (large, gitignored)            |
 | `corpus/`                                    | fetched real-shader corpora, e.g. MDL (large, gitignored)       |
-| `perf-results.gitignore`                     | copied into the results repo by CI to keep it data-only         |
 
 ---
 

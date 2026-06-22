@@ -106,12 +106,10 @@ with `force=true` to re-measure every release on the new machine and re-stamp
     _tracking/tracking.json          derived series consumed by trend.py / plots
 
 `results.json` (all of median/min/mean/stdev per timer) is the only measurement
-artifact stored — no CSV; the analysis/report tools read it directly. **Excluded**
-from the repo (transient or regenerable, enforced by `perf-results.gitignore`):
-generated sources + compiled outputs (`gen/`) and derived reports (`_analysis/`,
-`_sweep/`, `_breakdown/`, `*.html`, `*.svg`). Both workflows copy
-`perf-results.gitignore` into the checkout before `git add -A`, so scratch never
-gets committed.
+artifact stored — no CSV; the analysis/report tools read it directly. Transient
+and regenerable outputs (`gen/`, `_analysis/`, `_sweep/`, `_breakdown/`, `*.html`,
+`*.svg`) are excluded via a `.gitignore` committed directly to the
+`slang-compile-perf` repo.
 
 ## HTML reports — shader-slang.org/slang-compile-perf
 
