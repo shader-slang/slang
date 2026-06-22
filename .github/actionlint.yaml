@@ -1,6 +1,5 @@
 self-hosted-runner:
   labels:
-    - arc
     - benchmark
     - build
     - falcor
