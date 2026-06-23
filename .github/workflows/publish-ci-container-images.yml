@@ -22,19 +22,20 @@ on:
       - "docker/print-env-info.sh"
 
 permissions:
-  contents: read
-  packages: write
+  contents: read # Required for actions/checkout in validation jobs.
 
 concurrency:
   group: publish-ci-container-images-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  publish:
+  validate:
     if: github.repository == 'shader-slang/slang' && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
-    name: Validate/publish ${{ matrix.name }}
+    name: Validate ${{ matrix.name }}
     runs-on: ubuntu-22.04
     timeout-minutes: 120
+    permissions:
+      contents: read # Required for actions/checkout.
 
     strategy:
       fail-fast: false
@@ -97,14 +98,6 @@ jobs:
 
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
           echo "Image inputs changed: $changed"
-
-      - name: Log in to GHCR
-        if: steps.changes.outputs.changed == 'true' && github.event_name != 'pull_request'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
 
       - name: Resolve image tag
         if: steps.changes.outputs.changed == 'true'
@@ -182,8 +175,124 @@ jobs:
             fi
           fi
 
+  publish:
+    needs: validate
+    if: github.repository == 'shader-slang/slang' && github.event_name != 'pull_request'
+    name: Publish ${{ matrix.name }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    permissions:
+      contents: read # Required for actions/checkout.
+      packages: write # Required to push CI container images to GHCR.
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The immutable semver tag comes from each Dockerfile's commented
+          # build command, matching the existing manual release process.
+          - name: linux-clang-ci
+            dockerfile: docker/linux-clang-ci.Dockerfile
+            image: ghcr.io/shader-slang/slang-linux-clang-ci
+            watched_paths: docker/linux-clang-ci.Dockerfile
+          - name: linux-gpu-ci
+            dockerfile: docker/linux-gpu-ci.Dockerfile
+            image: ghcr.io/shader-slang/slang-linux-gpu-ci
+            watched_paths: |
+              docker/linux-gpu-ci.Dockerfile
+              docker/print-env-info.sh
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Report disk space
+        run: df -h
+
+      - name: Check whether image inputs changed
+        id: changes
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          WATCHED_PATHS: ${{ matrix.watched_paths }}
+        run: |
+          set -euo pipefail
+
+          changed=false
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || -z "${BEFORE_SHA:-}" ]]; then
+            changed=true
+          elif [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
+            changed=true
+          else
+            while IFS= read -r path; do
+              [[ -z "$path" ]] && continue
+              if ! git diff --quiet "$BEFORE_SHA" "$GITHUB_SHA" -- "$path"; then
+                changed=true
+                break
+              fi
+            done <<< "$WATCHED_PATHS"
+          fi
+
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "Image inputs changed: $changed"
+
+      - name: Log in to GHCR
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Resolve image tag
+        if: steps.changes.outputs.changed == 'true'
+        id: image
+        env:
+          DOCKERFILE: ${{ matrix.dockerfile }}
+          IMAGE_NAME: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+
+          image_ref="$(sed -nE 's/^#   docker build .* -t ([^[:space:]]+) \.$/\1/p' "$DOCKERFILE" | head -n 1)"
+          if [[ -z "$image_ref" ]]; then
+            echo "::error file=$DOCKERFILE::Could not find Dockerfile build command with image tag"
+            exit 1
+          fi
+
+          case "$image_ref" in
+            "$IMAGE_NAME":*) ;;
+            *)
+              echo "::error file=$DOCKERFILE::Dockerfile tag '$image_ref' does not match expected image '$IMAGE_NAME'"
+              exit 1
+              ;;
+          esac
+
+          echo "image-ref=$image_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Check tag availability
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          ALLOW_EXISTING_TAGS: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_existing_tags }}
+          IMAGE_REF: ${{ steps.image.outputs.image-ref }}
+        run: |
+          set -euo pipefail
+
+          if docker manifest inspect "$IMAGE_REF" >/dev/null 2>&1; then
+            if [[ "$ALLOW_EXISTING_TAGS" == "true" ]]; then
+              echo "::warning::Overwriting existing image tag '$IMAGE_REF'."
+            else
+              echo "::error::Image tag '$IMAGE_REF' already exists in GHCR. Bump the version or rerun manually with allow_existing_tags for recovery."
+              exit 1
+            fi
+          fi
+
       - name: Build image
-        if: steps.changes.outputs.changed == 'true' && github.event_name != 'pull_request'
+        if: steps.changes.outputs.changed == 'true'
         env:
           DOCKERFILE: ${{ matrix.dockerfile }}
           IMAGE_REF: ${{ steps.image.outputs.image-ref }}
@@ -202,7 +311,7 @@ jobs:
             .
 
       - name: Push image
-        if: steps.changes.outputs.changed == 'true' && github.event_name != 'pull_request'
+        if: steps.changes.outputs.changed == 'true'
         env:
           IMAGE_REF: ${{ steps.image.outputs.image-ref }}
         run: |
@@ -210,7 +319,7 @@ jobs:
           docker push "$IMAGE_REF"
 
       - name: Report pushed image
-        if: steps.changes.outputs.changed == 'true' && github.event_name != 'pull_request'
+        if: steps.changes.outputs.changed == 'true'
         env:
           IMAGE_REF: ${{ steps.image.outputs.image-ref }}
         run: |
