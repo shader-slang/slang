@@ -242,7 +242,10 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
 
     err = real_error(last_text)
     got_timers = bool(per_timer)
-    ok = setup_ok and got_timers and all(sample_ok) and not crash_codes
+    # expect_fail workloads exit with compile errors before emitting timers;
+    # treat them as ok if errors were produced as expected (sample_ok) even
+    # when no timer output is present.
+    ok = setup_ok and (got_timers or spec.expect_fail) and all(sample_ok) and not crash_codes
 
     return {
         "workload": spec.name,
