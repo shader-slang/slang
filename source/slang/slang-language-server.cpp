@@ -13,7 +13,7 @@
 #include "../core/slang-char-util.h"
 #include "../core/slang-secure-crt.h"
 #include "../core/slang-string-util.h"
-#include "../core/slang-type-text-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-ast-print.h"
 #include "slang-check-impl.h"
 #include "slang-com-helper.h"
