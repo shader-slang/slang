@@ -1,8 +1,14 @@
 // gui.cpp
+
+// imgui moved its courtesy math operators out of imgui.h in v1.89.4 and guarded
+// them: IMGUI_DEFINE_MATH_OPERATORS must be defined before the first imgui.h
+// include in a translation unit. gui.h includes imgui.h, and this file also
+// unity-includes the imgui .cpp sources at the bottom, so define it here first.
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "gui.h"
 
 #ifdef _WIN32
-#include <examples/imgui_impl_win32.h>
+#include <backends/imgui_impl_win32.h>
 #include <windows.h>
 IMGUI_IMPL_API LRESULT
 ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -162,7 +168,11 @@ GUI::GUI(Window* window, IDevice* inDevice, ICommandQueue* inQueue)
         viewDesc.aspect = TextureAspect::All;
         auto textureView = device->createTextureView(texture, viewDesc);
 
-        io.Fonts->TexID = (void*)textureView.detach();
+        // imgui 1.92 renamed ImFontAtlas::TexID to TexRef (type ImTextureRef) and
+        // changed ImTextureID to a 64-bit integer handle. We stash the backend
+        // texture-view pointer through the legacy SetTexID() path and recover it in
+        // the destructor to release the view.
+        io.Fonts->SetTexID((ImTextureID)(size_t)textureView.detach());
     }
 
     {
@@ -342,7 +352,7 @@ GUI::~GUI()
 
     {
         Slang::ComPtr<ITextureView> textureView;
-        textureView.attach((ITextureView*)io.Fonts->TexID);
+        textureView.attach((ITextureView*)(size_t)io.Fonts->TexRef.GetTexID());
         textureView = nullptr;
     }
 
@@ -357,11 +367,15 @@ GUI::~GUI()
 
 #include <imgui.cpp>
 #include <imgui_draw.cpp>
+// imgui_tables.cpp was split out of imgui_widgets.cpp in v1.80; the table code in
+// imgui.cpp/imgui_widgets.cpp references it, so this unity build must include it.
+#include <imgui_tables.cpp>
 #include <imgui_widgets.cpp>
 #ifdef _WIN32
   // imgui_impl_win32 defines these, so make sure it doesn't error because
 // they're already there
 #undef WIN32_LEAN_AND_MEAN
 #undef NOMINMAX
-#include <examples/imgui_impl_win32.cpp>
+// The backend implementations moved from examples/ to backends/ in v1.80.
+#include <backends/imgui_impl_win32.cpp>
 #endif
