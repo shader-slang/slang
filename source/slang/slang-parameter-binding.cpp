@@ -1183,20 +1183,10 @@ static void addExplicitParameterBindings_GLSL(
     //
     if (isKhronosTarget(context->getTargetRequest()) || isWGPUTarget(context->getTargetRequest()))
     {
-        // `[[vk::location]]` only sets the location of a *varying* (stage
-        // input/output) parameter. On a descriptor-bound resource (a constant
-        // buffer, texture, sampler, etc., which consumes a `DescriptorTableSlot`)
-        // it has no effect and the binding silently auto-allocates in declaration
-        // order, so reject it and point at `[[vk::binding]]`, the correct
-        // attribute. Keying on `DescriptorTableSlot` keeps this hard error narrow
-        // to that misuse and away from every legitimate location-bearing kind:
-        // varying parameters (`VaryingInput`/`VaryingOutput`) and ray-tracing
-        // payload / callable-data / hit-attribute objects
-        // (`RayPayload`/`CallablePayload`/`HitAttributes`) do not consume a
-        // descriptor slot, so they are left untouched. (Under `-fvk-*-shift` a
-        // descriptor resource may instead consume an HLSL-style kind, so that
-        // misuse is currently missed -- a deliberate false negative, since for an
-        // error a missed diagnostic is safer than breaking a build.)
+        // `[[vk::location]]` is varying-only; on a descriptor-bound resource it
+        // is silently ignored, so error and point at `[[vk::binding]]`. Keying on
+        // `DescriptorTableSlot` keeps the error off varying and ray-tracing
+        // parameters, which do not consume a descriptor slot.
         if (auto locationAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
         {
             if (typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
