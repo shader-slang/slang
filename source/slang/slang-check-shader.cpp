@@ -1368,6 +1368,20 @@ static bool _outputDeclHasSemantic(
     return _typeHasSemanticImpl(astBuilder, type, baseName, seenTypes);
 }
 
+static bool _allTargetsSupportVkBindingOnEntryPointParameters(Linkage* linkage)
+{
+    if (linkage->targets.getCount() == 0)
+        return false;
+
+    for (auto targetReq : linkage->targets)
+    {
+        auto target = targetReq->getTarget();
+        if (!isKhronosTarget(target) && !isWGPUTarget(target))
+            return false;
+    }
+    return true;
+}
+
 
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
@@ -1883,17 +1897,20 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
-    // Attribute and keyword diagnostics. Check for the [[vk::binding]] and [[vk::push_constants]]
-    // attributes, and the register() and packoffset() keywords on entry point parameters. Slang
-    // currently ignores these, which can lead to user confusion whenever the output does not
-    // correspond to what was requested. Conversely, Slang silently generating output that just
-    // happens to align with what's requested can also lead to user confusion, with the user
-    // mistakenly believing that the modifiers are working as intended.
+    // Attribute and keyword diagnostics. Check for ignored [[vk::binding]] and
+    // [[vk::push_constant]] attributes, and the register() and packoffset() keywords on entry
+    // point parameters. Slang currently ignores these in the cases diagnosed below, which can lead
+    // to user confusion whenever the output does not correspond to what was requested. Conversely,
+    // Slang silently generating output that just happens to align with what's requested can also
+    // lead to user confusion, with the user mistakenly believing that the modifiers are working as
+    // intended.
     //
     // Note that this only checks when they're used on entry point parameters.
+    bool supportsVkBindingOnEntryPointParameters =
+        _allTargetsSupportVkBindingOnEntryPointParameters(linkage);
     for (const auto& param : entryPointFuncDecl->getParameters())
     {
-        if (param->findModifier<GLSLBindingAttribute>())
+        if (!supportsVkBindingOnEntryPointParameters && param->findModifier<GLSLBindingAttribute>())
         {
             sink->diagnose(Diagnostics::UnhandledModOnEntryPointParameter{
                 .modifier = "attribute '[[vk::binding(...)]]'",

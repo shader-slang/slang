@@ -4,7 +4,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -entry computeMain -target cuda
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -entry computeMain -target metal
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -entry computeMain -target cpp
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -entry computeMain -target spirv
 [shader("compute")]
 [numthreads(1,1,1)]
 void computeMain(

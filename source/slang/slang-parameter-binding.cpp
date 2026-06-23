@@ -363,6 +363,10 @@ struct ParameterInfo : RefObject
     ParameterBindingInfo bindingInfo[kLayoutResourceKindCount];
 };
 
+static void applyBindingInfoToParameter(
+    RefPtr<VarLayout> varLayout,
+    ParameterBindingInfo bindingInfos[kLayoutResourceKindCount]);
+
 struct EntryPointParameterBindingContext
 {
     // What ranges of resources bindings are already claimed for this translation unit
@@ -1367,6 +1371,93 @@ static void addExplicitParameterBindings_GLSL(
         count);
 }
 
+static bool _targetSupportsVkBindingForEntryPointParameters(ParameterBindingContext* context)
+{
+    return isKhronosTarget(context->getTargetRequest()) ||
+           isWGPUTarget(context->getTargetRequest());
+}
+
+static bool _hasSupportedVkBindingOnEntryPointParameter(
+    ParameterBindingContext* context,
+    VarLayout* varLayout)
+{
+    if (!_targetSupportsVkBindingForEntryPointParameters(context))
+        return false;
+
+    if (!varLayout->varDecl)
+        return false;
+
+    auto varDecl = varLayout->varDecl.as<VarDeclBase>();
+    if (!varDecl)
+        return false;
+
+    if (!varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
+        return false;
+
+    return varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot) ||
+           varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace);
+}
+
+static bool _addExplicitVkBindingForEntryPointParameter(
+    ParameterBindingContext* context,
+    RefPtr<VarLayout> varLayout)
+{
+    if (!_hasSupportedVkBindingOnEntryPointParameter(context, varLayout))
+        return false;
+
+    auto varDecl = varLayout->varDecl.as<VarDeclBase>();
+    auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>();
+    SLANG_RELEASE_ASSERT(attr);
+
+    LayoutSemanticInfo semanticInfo;
+    LayoutSize count = 0;
+    if (auto foundDescriptorTableSlot =
+            varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
+    {
+        semanticInfo.kind = LayoutResourceKind::DescriptorTableSlot;
+        semanticInfo.index = attr->binding;
+        semanticInfo.space = attr->set;
+        count = foundDescriptorTableSlot->count;
+    }
+    else if (
+        auto foundSubElementRegisterSpace =
+            varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace))
+    {
+        semanticInfo.kind = LayoutResourceKind::SubElementRegisterSpace;
+        if (attr->binding != 0)
+        {
+            getSink(context)->diagnose(Diagnostics::WholeSpaceParameterRequiresZeroBinding{
+                .paramName = varDecl.getName(),
+                .binding = (int64_t)attr->binding,
+                .location = attr->loc});
+        }
+        semanticInfo.index = attr->set;
+        semanticInfo.space = 0;
+        count = foundSubElementRegisterSpace->count;
+    }
+    else
+    {
+        return false;
+    }
+
+    RefPtr<ParameterInfo> parameterInfo = new ParameterInfo();
+    parameterInfo->varLayout = varLayout;
+    addExplicitParameterBinding(context, parameterInfo, varDecl.getDecl(), semanticInfo, count);
+    applyBindingInfoToParameter(varLayout, parameterInfo->bindingInfo);
+    return true;
+}
+
+static void _addExplicitVkBindingsForEntryPointParameters(
+    ParameterBindingContext* context,
+    EntryPointLayout* entryPointLayout)
+{
+    auto paramsStructLayout = getScopeStructLayout(entryPointLayout);
+    for (auto fieldLayout : paramsStructLayout->fields)
+    {
+        _addExplicitVkBindingForEntryPointParameter(context, fieldLayout);
+    }
+}
+
 // Given a single parameter, collect whatever information we have on
 // how it has been explicitly bound, which may come from multiple declarations
 void _generateParameterBindings(
@@ -1610,9 +1701,26 @@ static void applyBindingInfoToParameter(
             continue;
 
         // Add a record to the variable layout
-        auto varRes = varLayout->AddResourceInfo(kind);
+        auto varRes = varLayout->findOrAddResourceInfo(kind);
         varRes->space = (int)bindingInfo.space;
         varRes->index = bindingInfo.index;
+    }
+}
+
+static void copyExistingBindingInfoFromParameter(
+    RefPtr<VarLayout> varLayout,
+    ParameterBindingInfo bindingInfos[kLayoutResourceKindCount])
+{
+    for (auto resInfo : varLayout->resourceInfos)
+    {
+        auto typeResInfo = varLayout->typeLayout->FindResourceInfo(resInfo.kind);
+        if (!typeResInfo)
+            continue;
+
+        auto& bindingInfo = bindingInfos[(int)resInfo.kind];
+        bindingInfo.count = typeResInfo->count;
+        bindingInfo.index = resInfo.index.getValidValue();
+        bindingInfo.space = resInfo.space;
     }
 }
 
@@ -1638,8 +1746,67 @@ static void completeBindingsForParameter(
     RefPtr<VarLayout> varLayout)
 {
     ParameterBindingInfo bindingInfos[kLayoutResourceKindCount];
+    copyExistingBindingInfoFromParameter(varLayout, bindingInfos);
     completeBindingsForParameterImpl(context, varLayout, bindingInfos);
     applyBindingInfoToParameter(varLayout, bindingInfos);
+}
+
+static bool _entryPointHasSupportedVkBindingParameters(
+    ParameterBindingContext* context,
+    EntryPointLayout* entryPointLayout)
+{
+    auto paramsStructLayout = getScopeStructLayout(entryPointLayout);
+    for (auto fieldLayout : paramsStructLayout->fields)
+    {
+        if (_hasSupportedVkBindingOnEntryPointParameter(context, fieldLayout))
+            return true;
+    }
+    return false;
+}
+
+static bool _isPerEntryPointParameterResourceKind(LayoutResourceKind kind)
+{
+    switch (kind)
+    {
+    case LayoutResourceKind::VaryingInput:
+    case LayoutResourceKind::VaryingOutput:
+    case LayoutResourceKind::ShaderRecord:
+    case LayoutResourceKind::HitAttributes:
+    case LayoutResourceKind::ExistentialObjectParam:
+    case LayoutResourceKind::ExistentialTypeParam:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static void _removeNonExplicitEntryPointParameterOffsets(
+    ParameterBindingContext* context,
+    RefPtr<VarLayout> fieldLayout)
+{
+    if (_hasSupportedVkBindingOnEntryPointParameter(context, fieldLayout))
+        return;
+
+    for (auto typeResInfo : fieldLayout->typeLayout->resourceInfos)
+    {
+        auto kind = typeResInfo.kind;
+        if (kind == LayoutResourceKind::Uniform || _isPerEntryPointParameterResourceKind(kind))
+            continue;
+
+        fieldLayout->removeResourceUsage(kind);
+    }
+}
+
+static void completeBindingsForEntryPointParameters(
+    ParameterBindingContext* context,
+    EntryPointLayout* entryPointLayout)
+{
+    auto paramsStructLayout = getScopeStructLayout(entryPointLayout);
+    for (auto fieldLayout : paramsStructLayout->fields)
+    {
+        _removeNonExplicitEntryPointParameterOffsets(context, fieldLayout);
+        completeBindingsForParameter(context, fieldLayout);
+    }
 }
 
 struct SimpleSemanticInfo
@@ -3675,7 +3842,14 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
         // We mostly treat an entry point like a single shader parameter that
         // uses its `parametersLayout`.
         //
-        completeBindingsForParameter(m_context, globalEntryPointInfo->parametersLayout);
+        if (_entryPointHasSupportedVkBindingParameters(m_context, globalEntryPointInfo))
+        {
+            completeBindingsForEntryPointParameters(m_context, globalEntryPointInfo);
+        }
+        else
+        {
+            completeBindingsForParameter(m_context, globalEntryPointInfo->parametersLayout);
+        }
     }
 
     void visitRenamedEntryPoint(
@@ -4086,9 +4260,10 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
     // Along the way we will issue diagnostics if there appear to
     // be overlapping, conflicting, or inconsistent explicit bindings.
     //
-    // Note that we do *not* support explicit binding annotations
-    // on entry point parameters, so we only consider global shader
-    // parameters here.
+    // Entry-point parameters also support `[[vk::binding(...)]]` for Khronos and WGPU targets.
+    // Those bindings are reserved here, before automatic allocation, for the same reason global
+    // parameter bindings are reserved here: later automatic allocation must not claim an explicitly
+    // requested binding range.
     //
     // (Also note that explicit bindings end up being the main
     // source of complexity in the layout system, and we could greatly
@@ -4098,6 +4273,10 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
     for (auto& parameter : sharedContext.parameters)
     {
         _generateParameterBindings(&context, parameter);
+    }
+    for (auto& entryPoint : sharedContext.programLayout->entryPoints)
+    {
+        _addExplicitVkBindingsForEntryPointParameters(&context, entryPoint);
     }
 
     // It is possible that code has specified an explicit location
