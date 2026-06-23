@@ -1607,15 +1607,19 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpMentionsStdin(unitTestContext)));
 }
 
+SLANG_UNIT_TEST(SlangcCoverageManifestOutputMetalLib)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecarForMetalLibDisassembly(unitTestContext)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testCoverageExplicitSidecarForMetalLibDisassembly(unitTestContext)));
+}
+
 SLANG_UNIT_TEST(SlangcCoverageManifestOutput)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecar(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecarForDisassembly(unitTestContext)));
-    SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecarForMetalLibDisassembly(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecar(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarForDisassembly(unitTestContext)));
-    SLANG_CHECK(
-        SLANG_SUCCEEDED(_testCoverageExplicitSidecarForMetalLibDisassembly(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarWithStdoutArtifact(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteArtifact(unitTestContext)));

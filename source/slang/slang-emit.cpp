@@ -1107,6 +1107,12 @@ Result linkAndOptimizeIR(
             });
             return SLANG_FAIL;
         }
+        // Metal's MSL only supports 32-bit atomic operations;
+        // `atomic_fetch_add_explicit` with `atomic_ulong` is not in the Metal
+        // atomic API and the metal compiler rejects it. Cap to 4 bytes regardless
+        // of the user-specified or default (8-byte) width.
+        if (isMetalTarget(targetRequest) && counterByteWidth > 4)
+            counterByteWidth = 4;
         // Opt-in boolean mode (off by default): record whether each entry
         // executed (non-atomic store of 1) instead of an exact count.
         bool coverageBoolean = false;
