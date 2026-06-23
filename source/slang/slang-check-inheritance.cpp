@@ -477,132 +477,6 @@ bool SharedSemanticsContext::tryResolveConstraintTypes(
     return !mustDefer;
 }
 
-static void _collectGenericAppDeclRefs(DeclRefBase* declRefBase, List<GenericAppDeclRef*>& out)
-{
-    for (auto subst = declRefBase; subst; subst = subst->getBase())
-    {
-        if (auto genericAppDeclRef = as<GenericAppDeclRef>(subst))
-            out.add(genericAppDeclRef);
-    }
-}
-
-static void _collectGenericAppDeclRefs(Type* type, List<GenericAppDeclRef*>& out)
-{
-    if (auto declRefType = as<DeclRefType>(type))
-    {
-        _collectGenericAppDeclRefs(declRefType->getDeclRef().declRefBase, out);
-        return;
-    }
-
-    if (auto eachType = as<EachType>(type))
-    {
-        if (auto elementDeclRefType = eachType->getElementDeclRefType())
-            _collectGenericAppDeclRefs(elementDeclRefType->getDeclRef().declRefBase, out);
-        return;
-    }
-}
-
-static GenericAppDeclRef* _findMatchingGenericAppDeclRef(
-    List<GenericAppDeclRef*> const& genericAppDeclRefs,
-    GenericAppDeclRef* defaultGenericAppDeclRef)
-{
-    for (auto genericAppDeclRef : genericAppDeclRefs)
-    {
-        if (genericAppDeclRef->getGenericDecl() != defaultGenericAppDeclRef->getGenericDecl())
-            continue;
-        if (genericAppDeclRef->getArgCount() != defaultGenericAppDeclRef->getArgCount())
-            continue;
-        return genericAppDeclRef;
-    }
-    return nullptr;
-}
-
-static bool _isDeclDeclaredInGeneric(Decl* decl, GenericDecl* genericDecl)
-{
-    for (auto parent = decl; parent; parent = parent->parentDecl)
-    {
-        if (parent == genericDecl)
-            return true;
-    }
-    return false;
-}
-
-static bool _valMentionsDeclInGeneric(Val* val, GenericDecl* genericDecl, HashSet<Val*>& seenVals);
-
-static bool _declRefMentionsDeclInGeneric(
-    DeclRefBase* declRefBase,
-    GenericDecl* genericDecl,
-    HashSet<Val*>& seenVals)
-{
-    for (auto subst = declRefBase; subst; subst = subst->getBase())
-    {
-        if (_isDeclDeclaredInGeneric(subst->getDecl(), genericDecl))
-            return true;
-
-        if (auto genericAppDeclRef = as<GenericAppDeclRef>(subst))
-        {
-            for (auto arg : genericAppDeclRef->getArgs())
-            {
-                if (_valMentionsDeclInGeneric(arg, genericDecl, seenVals))
-                    return true;
-            }
-        }
-    }
-    return false;
-}
-
-static bool _valMentionsDeclInGeneric(Val* val, GenericDecl* genericDecl, HashSet<Val*>& seenVals)
-{
-    if (!val || !seenVals.add(val))
-        return false;
-
-    if (auto declRefBase = as<DeclRefBase>(val))
-    {
-        if (_declRefMentionsDeclInGeneric(declRefBase, genericDecl, seenVals))
-            return true;
-    }
-
-    for (auto operand : val->m_operands)
-    {
-        switch (operand.kind)
-        {
-        case ValNodeOperandKind::ValNode:
-            if (_valMentionsDeclInGeneric(operand.getVal(), genericDecl, seenVals))
-                return true;
-            break;
-
-        case ValNodeOperandKind::ASTNode:
-            if (auto decl = as<Decl>(operand.values.nodeOperand))
-            {
-                if (_isDeclDeclaredInGeneric(decl, genericDecl))
-                    return true;
-            }
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    return false;
-}
-
-static bool _genericAppArgsMentionAnyWrapperGeneric(
-    GenericAppDeclRef* genericAppDeclRef,
-    List<GenericDecl*> const& wrapperGenericDecls)
-{
-    for (auto arg : genericAppDeclRef->getArgs())
-    {
-        for (auto wrapperGenericDecl : wrapperGenericDecls)
-        {
-            HashSet<Val*> seenVals;
-            if (_valMentionsDeclInGeneric(arg, wrapperGenericDecl, seenVals))
-                return true;
-        }
-    }
-    return false;
-}
-
 static DeclRef<GenericTypeConstraintDecl> _trySpecializeGenericInterfaceConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
@@ -618,10 +492,11 @@ static DeclRef<GenericTypeConstraintDecl> _trySpecializeGenericInterfaceConstrai
     //
     // When computing inheritance for a lookup-derived requirement type such as
     // `SomeThis.f<int>`, the direct constraint scan cannot see the inner
-    // `GenericTypeConstraintDecl`. Build a default looked-up instance of the wrapper
-    // to discover which original method generic the constraint subject mentions, then
-    // re-specialize the wrapper with the actual generic arguments carried by `selfType`.
-    // The ordinary endpoint matching below still decides whether the constraint applies.
+    // `GenericTypeConstraintDecl`. The synthetic differentiability constraint records the
+    // callable it constrains in `callableRequirementDeclRef`, so match that key against
+    // `selfType` and let the generic solver specialize the copied wrapper. This keeps the
+    // inference source to the produced requirement key and lets the solver preserve ordinary
+    // arguments and hidden proof arguments instead of reconstructing a generic-app chain by hand.
     List<GenericDecl*> wrapperGenericDecls;
     Decl* innerDecl = outerGenericDecl;
     for (;;)
@@ -634,7 +509,7 @@ static DeclRef<GenericTypeConstraintDecl> _trySpecializeGenericInterfaceConstrai
         innerDecl = genericDecl->inner;
     }
 
-    auto constraintDecl = as<GenericTypeConstraintDecl>(innerDecl);
+    auto constraintDecl = as<DifferentiableRequirementConstraintDecl>(innerDecl);
     if (!constraintDecl || constraintDecl->checkState.isBeingChecked())
         return DeclRef<GenericTypeConstraintDecl>();
 
@@ -644,6 +519,7 @@ static DeclRef<GenericTypeConstraintDecl> _trySpecializeGenericInterfaceConstrai
     if (!lookedUpGenericDeclRef)
         return DeclRef<GenericTypeConstraintDecl>();
 
+    DeclRef<GenericDecl> innermostGenericDeclRef;
     DeclRef<GenericTypeConstraintDecl> defaultConstraintDeclRef;
     DeclRef<GenericDecl> currentGenericDeclRef = lookedUpGenericDeclRef;
     for (Index ii = 0; ii < wrapperGenericDecls.getCount(); ++ii)
@@ -672,79 +548,50 @@ static DeclRef<GenericTypeConstraintDecl> _trySpecializeGenericInterfaceConstrai
         }
         else
         {
+            innermostGenericDeclRef = currentGenericDeclRef;
             defaultConstraintDeclRef = specializedDeclRef.as<GenericTypeConstraintDecl>();
         }
     }
 
-    if (!defaultConstraintDeclRef)
+    if (!innermostGenericDeclRef || !defaultConstraintDeclRef)
         return DeclRef<GenericTypeConstraintDecl>();
 
     ensureDecl(visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
 
-    List<GenericAppDeclRef*> defaultEndpointGenericApps;
-    if (auto defaultSub = getSub(astBuilder, defaultConstraintDeclRef))
-        _collectGenericAppDeclRefs(defaultSub, defaultEndpointGenericApps);
-    if (constraintDecl->isEqualityConstraint)
-    {
-        if (auto defaultSup = getSup(astBuilder, defaultConstraintDeclRef))
-            _collectGenericAppDeclRefs(defaultSup, defaultEndpointGenericApps);
-    }
-
-    List<GenericAppDeclRef*> selfGenericApps;
-    _collectGenericAppDeclRefs(selfType, selfGenericApps);
-
-    List<GenericAppDeclRef*> matchedSelfGenericApps;
-    for (auto defaultGenericAppDeclRef : defaultEndpointGenericApps)
-    {
-        if (!_genericAppArgsMentionAnyWrapperGeneric(defaultGenericAppDeclRef, wrapperGenericDecls))
-            continue;
-
-        auto selfGenericAppDeclRef =
-            _findMatchingGenericAppDeclRef(selfGenericApps, defaultGenericAppDeclRef);
-        if (selfGenericAppDeclRef)
-            matchedSelfGenericApps.add(selfGenericAppDeclRef);
-    }
-
-    if (matchedSelfGenericApps.getCount() < wrapperGenericDecls.getCount())
+    // Build a looked-up default instance of the callable requirement key, then unify it with the
+    // lookup-derived type whose inheritance is being computed. Unification records constraints for
+    // the copied wrapper parameters; `trySolveGenericArguments` below applies those constraints and
+    // returns the specialized `GenericTypeConstraintDecl` decl-ref.
+    auto defaultCallableDeclRef = substituteDeclRef(
+                                      SubstitutionSet(defaultConstraintDeclRef),
+                                      astBuilder,
+                                      constraintDecl->callableRequirementDeclRef)
+                                      .as<CallableDecl>();
+    if (!defaultCallableDeclRef)
         return DeclRef<GenericTypeConstraintDecl>();
 
-    List<List<Val*>> actualArgsByWrapper;
-    actualArgsByWrapper.setCount(wrapperGenericDecls.getCount());
-    for (Index ii = 0; ii < wrapperGenericDecls.getCount(); ++ii)
+    auto defaultCallableType = DeclRefType::create(astBuilder, defaultCallableDeclRef);
+    SemanticsVisitor::GenericInferenceContext inferenceContext;
+    inferenceContext.genericDecl = innermostGenericDeclRef.getDecl();
+    SemanticsVisitor::UnificationOptions unificationOptions;
+    unificationOptions.equalityConstraint = true;
+    if (!visitor->TryUnifyTypes(
+            inferenceContext,
+            unificationOptions,
+            QualType(defaultCallableType),
+            QualType(selfType)))
     {
-        // Decl-ref substitution chains enumerate generic apps from innermost to outermost,
-        // while the wrapper chain is stored outermost to innermost.
-        auto selfGenericAppDeclRef =
-            matchedSelfGenericApps[wrapperGenericDecls.getCount() - 1 - ii];
-        for (auto arg : selfGenericAppDeclRef->getArgs())
-            actualArgsByWrapper[ii].add(arg);
+        return DeclRef<GenericTypeConstraintDecl>();
     }
 
-    currentGenericDeclRef = lookedUpGenericDeclRef;
-    for (Index ii = 0; ii < wrapperGenericDecls.getCount(); ++ii)
-    {
-        Decl* specializedInnerDecl = ii + 1 < wrapperGenericDecls.getCount()
-                                         ? (Decl*)wrapperGenericDecls[ii + 1]
-                                         : (Decl*)constraintDecl;
-
-        auto specializedDeclRef = astBuilder->getGenericAppDeclRef(
-            currentGenericDeclRef,
-            actualArgsByWrapper[ii].getArrayView(),
-            specializedInnerDecl);
-
-        if (ii + 1 < wrapperGenericDecls.getCount())
-        {
-            currentGenericDeclRef = specializedDeclRef.as<GenericDecl>();
-            if (!currentGenericDeclRef)
-                return DeclRef<GenericTypeConstraintDecl>();
-        }
-        else
-        {
-            return specializedDeclRef.as<GenericTypeConstraintDecl>();
-        }
-    }
-
-    return DeclRef<GenericTypeConstraintDecl>();
+    ConversionCost conversionCost = kConversionCost_None;
+    return visitor
+        ->trySolveGenericArguments(
+            _Move(inferenceContext),
+            innermostGenericDeclRef,
+            ArrayView<Val*>(),
+            conversionCost)
+        .as<GenericTypeConstraintDecl>();
 }
 
 InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
@@ -1284,33 +1131,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                         if (!endpointType)
                             return false;
 
-                        if (endpointType->getCanonicalType()->equals(selfCanonical))
-                            return true;
-
-                        auto parentGenericDecl = as<GenericDecl>(constraintDecl->parentDecl);
-                        if (!parentGenericDecl)
-                            return false;
-
-                        // A generic interface constraint produced for `[Differentiable]`
-                        // carries a cloned generic signature:
-                        //
-                        //     generic<T> This.f<T> : IDiff<This.f<T>>
-                        //
-                        // When matching that schema against a lookup-derived function type
-                        // from a default implementation, the printed endpoint can be
-                        // `This.f<T>` on both sides while the two `T` declarations are
-                        // distinct binders. Unify with the constraint wrapper as the relevant
-                        // generic so the cloned binder is treated as the parameter being
-                        // instantiated, rather than requiring pointer equality.
-                        SemanticsVisitor::GenericInferenceContext inferenceContext;
-                        inferenceContext.genericDecl = parentGenericDecl;
-                        SemanticsVisitor::UnificationOptions unificationOptions;
-                        unificationOptions.equalityConstraint = true;
-                        return visitor.TryUnifyTypes(
-                            inferenceContext,
-                            unificationOptions,
-                            QualType(endpointType),
-                            QualType(selfType));
+                        return endpointType->getCanonicalType()->equals(selfCanonical);
                     };
                     bool matchOnSub = doesEndpointMatchSelfType(lookedUpSub);
                     bool matchOnSup = constraintDecl->isEqualityConstraint &&

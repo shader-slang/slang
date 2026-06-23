@@ -6034,236 +6034,26 @@ static DeclRef<Decl> getPackCountConstraintTargetDeclRef(
     return targetDeclRef;
 }
 
-static bool _areRequirementEndpointValsEquivalent(Val* left, Val* right);
-
-static bool _areRequirementEndpointTypesEquivalent(Type* left, Type* right);
-
-static bool _areRequirementEndpointSubtypeWitnessesEquivalent(
-    SubtypeWitness* left,
-    SubtypeWitness* right);
-
-static bool _areRequirementEndpointDeclRefsEquivalent(DeclRefBase* left, DeclRefBase* right)
+static bool _areRequirementEndpointTypesEqualAfterResolve(Type* left, Type* right)
 {
     if (left == right)
         return true;
     if (!left || !right)
         return false;
-    if (left->getDecl() != right->getDecl())
-        return false;
-
-    if (auto leftLookup = as<LookupDeclRef>(left))
+    auto resolvedLeft = as<Type>(left->resolve());
+    auto resolvedRight = as<Type>(right->resolve());
+    if (resolvedLeft && resolvedRight)
     {
-        auto rightLookup = as<LookupDeclRef>(right);
-        if (!rightLookup)
-            return false;
-        return _areRequirementEndpointTypesEquivalent(
-                   leftLookup->getLookupSource(),
-                   rightLookup->getLookupSource()) &&
-               _areRequirementEndpointSubtypeWitnessesEquivalent(
-                   leftLookup->getWitness(),
-                   rightLookup->getWitness());
-    }
-
-    if (auto leftMember = as<MemberDeclRef>(left))
-    {
-        auto rightMember = as<MemberDeclRef>(right);
-        return rightMember && _areRequirementEndpointDeclRefsEquivalent(
-                                  leftMember->getParent(),
-                                  rightMember->getParent());
-    }
-
-    if (auto leftGenericApp = as<GenericAppDeclRef>(left))
-    {
-        auto rightGenericApp = as<GenericAppDeclRef>(right);
-        if (!rightGenericApp)
-            return false;
-        if (!_areRequirementEndpointDeclRefsEquivalent(
-                leftGenericApp->getGenericDeclRef(),
-                rightGenericApp->getGenericDeclRef()))
-            return false;
-        if (leftGenericApp->getArgs().getCount() != rightGenericApp->getArgs().getCount())
-            return false;
-        for (Index i = 0; i < leftGenericApp->getArgs().getCount(); i++)
-        {
-            if (!_areRequirementEndpointValsEquivalent(
-                    leftGenericApp->getArgs()[i],
-                    rightGenericApp->getArgs()[i]))
-                return false;
-        }
-        return true;
-    }
-
-    // Direct decl-refs with the same declaration have no additional path data.
-    return as<DirectDeclRef>(left) && as<DirectDeclRef>(right);
-}
-
-static bool _areRequirementEndpointSubtypeWitnessesEquivalent(
-    SubtypeWitness* left,
-    SubtypeWitness* right)
-{
-    if (left == right)
-        return true;
-    if (!left || !right)
-        return false;
-    if (left->astNodeType != right->astNodeType)
-        return false;
-
-    if (auto leftDeclared = as<DeclaredSubtypeWitness>(left))
-    {
-        auto rightDeclared = as<DeclaredSubtypeWitness>(right);
-        if (!rightDeclared)
-            return false;
-        if (!_areRequirementEndpointTypesEquivalent(
-                leftDeclared->getSub(),
-                rightDeclared->getSub()))
-            return false;
-        if (!_areRequirementEndpointTypesEquivalent(
-                leftDeclared->getSup(),
-                rightDeclared->getSup()))
-            return false;
-
-        // Generic requirement matching specializes the required signature with proofs from the
-        // satisfying signature. Associated-type projections in later constraints can then rebuild
-        // inherited proofs through equivalent but independently allocated lookup-witness chains,
-        // e.g. `Address.Differential` in `linearTransform` looks up an inheritance proof through
-        // the earlier `Address : IPointerLikeAddress<T>` constraint. For matching signatures, the
-        // semantic proof identity is the certified sub/sup relation plus the declaring constraint
-        // or inheritance declaration; the nested lookup path is not a separate signature
-        // requirement.
-        if (leftDeclared->getDeclRef().getDecl() == rightDeclared->getDeclRef().getDecl())
+        if (resolvedLeft == resolvedRight)
             return true;
-
-        return _areRequirementEndpointDeclRefsEquivalent(
-            leftDeclared->getDeclRef().declRefBase,
-            rightDeclared->getDeclRef().declRefBase);
+        left = resolvedLeft->getCanonicalType();
+        right = resolvedRight->getCanonicalType();
     }
-
-    if (as<TypeEqualityWitness>(left))
-    {
-        auto rightEquality = as<TypeEqualityWitness>(right);
-        return rightEquality &&
-               _areRequirementEndpointTypesEquivalent(left->getSub(), right->getSub()) &&
-               _areRequirementEndpointTypesEquivalent(left->getSup(), right->getSup());
-    }
-
-    if (auto leftEach = as<EachSubtypeWitness>(left))
-    {
-        auto rightEach = as<EachSubtypeWitness>(right);
-        return rightEach && _areRequirementEndpointSubtypeWitnessesEquivalent(
-                                leftEach->getPatternTypeWitness(),
-                                rightEach->getPatternTypeWitness());
-    }
-
-    if (auto leftExpand = as<ExpandSubtypeWitness>(left))
-    {
-        auto rightExpand = as<ExpandSubtypeWitness>(right);
-        return rightExpand && _areRequirementEndpointSubtypeWitnessesEquivalent(
-                                  leftExpand->getPatternTypeWitness(),
-                                  rightExpand->getPatternTypeWitness());
-    }
-
-    if (auto leftPack = as<TypePackSubtypeWitness>(left))
-    {
-        auto rightPack = as<TypePackSubtypeWitness>(right);
-        if (!rightPack || leftPack->getCount() != rightPack->getCount())
-            return false;
-        for (Index i = 0; i < leftPack->getCount(); i++)
-        {
-            if (!_areRequirementEndpointSubtypeWitnessesEquivalent(
-                    leftPack->getWitness(i),
-                    rightPack->getWitness(i)))
-                return false;
-        }
+    if (left == right)
         return true;
-    }
-
-    if (as<NoneWitness>(left) && as<NoneWitness>(right))
-        return true;
-
+    if (!left || !right)
+        return false;
     return left->equals(right);
-}
-
-static bool _areRequirementEndpointTypesEquivalent(Type* left, Type* right)
-{
-    if (left == right)
-        return true;
-    if (!left || !right)
-        return false;
-    if (left->equals(right))
-        return true;
-
-    if (auto leftDeclRefType = as<DeclRefType>(left))
-    {
-        auto rightDeclRefType = as<DeclRefType>(right);
-        return rightDeclRefType && _areRequirementEndpointDeclRefsEquivalent(
-                                       leftDeclRefType->getDeclRef().declRefBase,
-                                       rightDeclRefType->getDeclRef().declRefBase);
-    }
-
-    if (auto leftModifiedType = as<ModifiedType>(left))
-    {
-        auto rightModifiedType = as<ModifiedType>(right);
-        if (!rightModifiedType)
-            return false;
-        if (!_areRequirementEndpointTypesEquivalent(
-                leftModifiedType->getBase(),
-                rightModifiedType->getBase()))
-            return false;
-        if (leftModifiedType->getModifierCount() != rightModifiedType->getModifierCount())
-            return false;
-        for (Index i = 0; i < leftModifiedType->getModifierCount(); i++)
-        {
-            if (!_areRequirementEndpointValsEquivalent(
-                    leftModifiedType->getModifier(i),
-                    rightModifiedType->getModifier(i)))
-                return false;
-        }
-        return true;
-    }
-
-    return false;
-}
-
-static bool _areRequirementEndpointValsEquivalent(Val* left, Val* right)
-{
-    if (left == right)
-        return true;
-    if (!left || !right)
-        return false;
-    if (left->equals(right))
-        return true;
-
-    if (auto leftType = as<Type>(left))
-    {
-        auto rightType = as<Type>(right);
-        return rightType && _areRequirementEndpointTypesEquivalent(leftType, rightType);
-    }
-
-    if (auto leftIntVal = as<DeclRefIntVal>(left))
-    {
-        auto rightIntVal = as<DeclRefIntVal>(right);
-        return rightIntVal && _areRequirementEndpointDeclRefsEquivalent(
-                                  leftIntVal->getDeclRef().declRefBase,
-                                  rightIntVal->getDeclRef().declRefBase);
-    }
-
-    if (auto leftIntVal = as<ConstantIntVal>(left))
-    {
-        auto rightIntVal = as<ConstantIntVal>(right);
-        return rightIntVal && leftIntVal->getValue() == rightIntVal->getValue() &&
-               _areRequirementEndpointTypesEquivalent(
-                   leftIntVal->getType(),
-                   rightIntVal->getType());
-    }
-
-    if (auto leftWitness = as<SubtypeWitness>(left))
-    {
-        auto rightWitness = as<SubtypeWitness>(right);
-        return rightWitness &&
-               _areRequirementEndpointSubtypeWitnessesEquivalent(leftWitness, rightWitness);
-    }
-
-    return false;
 }
 
 bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
@@ -6719,14 +6509,16 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                     .as<GenericTypeConstraintDecl>();
             auto requiredSubType = getSub(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingSubType = getSub(m_astBuilder, satisfyingConstraintDeclRef);
-            if (!_areRequirementEndpointTypesEquivalent(satisfyingSubType, requiredSubType))
+            if (!_areRequirementEndpointTypesEqualAfterResolve(satisfyingSubType, requiredSubType))
             {
                 return false;
             }
 
             auto requiredSuperType = getSup(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingSuperType = getSup(m_astBuilder, satisfyingConstraintDeclRef);
-            if (!_areRequirementEndpointTypesEquivalent(satisfyingSuperType, requiredSuperType))
+            if (!_areRequirementEndpointTypesEqualAfterResolve(
+                    satisfyingSuperType,
+                    requiredSuperType))
             {
                 return false;
             }
@@ -6857,7 +6649,7 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             auto requiredType = getBaseType(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingType = getBaseType(m_astBuilder, satisfyingConstraintDeclRef);
             if (!requiredType || !satisfyingType ||
-                !_areRequirementEndpointTypesEquivalent(satisfyingType, requiredType))
+                !_areRequirementEndpointTypesEqualAfterResolve(satisfyingType, requiredType))
             {
                 return false;
             }
