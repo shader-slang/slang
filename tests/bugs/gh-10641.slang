@@ -33,6 +33,10 @@ groupshared uint groupSharedData[N];
 // neighbour's slot, which only yields the right value if the array is genuinely
 // shared across the group rather than copied per invocation.
 // HLSL: void shiftLeftByOne
+// The parameter must survive as a by-reference `groupshared` array (positive
+// signature check), with no per-thread copy of it in the body, and no illegal
+// `groupshared`+direction-keyword pairing.
+// HLSL: groupshared uint {{.*}}scratch
 // HLSL-NOT: [int({{[0-9]+}})] = {{.*}}scratch
 // HLSL-NOT: groupshared inout
 // HLSL-NOT: inout groupshared
