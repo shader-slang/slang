@@ -1303,6 +1303,17 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
         {
             if (isIllegalGLSLParameterType(param->getDataType()))
                 return true;
+            // A `groupshared` value passed by reference becomes a pointer parameter into
+            // the `Workgroup` storage class, which the Khronos backends cannot represent
+            // as a function parameter (GLSL has no pointers, and a SPIR-V `Workgroup`
+            // pointer cannot legally cross a function boundary without the
+            // `VariablePointers` capability). The `groupshared`-ness lives on the
+            // parameter's rate (`IRGroupSharedRate`), not on its value type, so the
+            // value-type checks above never catch it. Inline the callee so the parameter
+            // disappears and the accesses fall directly on the `Workgroup` global,
+            // mirroring how resource parameters are handled here.
+            if (as<IRGroupSharedRate>(param->getRate()))
+                return true;
             auto outType = as<IROutParamTypeBase>(param->getDataType());
             if (!outType)
                 continue;
