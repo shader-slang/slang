@@ -2184,6 +2184,8 @@ SlangReflection* EndToEndCompileRequest::getReflection()
 {
     auto linkage = getLinkage();
     auto program = getSpecializedGlobalAndEntryPointsComponentType();
+    if (!(linkage && program))
+        return nullptr;
 
     // Note(tfoley): The API signature doesn't let the client
     // specify which target they want to access reflection
@@ -2200,7 +2202,8 @@ SlangReflection* EndToEndCompileRequest::getReflection()
 
     auto targetReq = linkage->targets[targetIndex];
     auto targetProgram = program->getTargetProgram(targetReq);
-
+    if (!targetProgram)
+        return nullptr;
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     auto programLayout = targetProgram->getOrCreateLayout(&sink);
