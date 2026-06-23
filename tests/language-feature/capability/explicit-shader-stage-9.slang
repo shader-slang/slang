@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -allow-glsl -stage raygeneration -profile sm_6_5
 
 // Our code compiles here since 'raygeneration' stage implies 'raygen+raytracing' capabilities
-//CHECK-NOT: warning 36113
+//CHECK-NOT: warning[E36113]
 //CHECK: main
 struct RayPayload
 {

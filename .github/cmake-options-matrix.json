@@ -20,6 +20,7 @@
     { "option": "SLANG_ENABLE_SLANGI" },
     { "option": "SLANG_ENABLE_SLANGRT" },
     { "option": "SLANG_ENABLE_SLANG_GLSLANG" },
+    { "option": "SLANG_ENABLE_SLANG_PROXY" },
     {
       "option": "SLANG_ENABLE_TESTS",
       "extra_cmake_flags": "-DSLANG_ENABLE_EXAMPLES=OFF"
@@ -53,7 +54,8 @@
     },
     {
       "option": "SLANG_LIB_TYPE",
-      "value": "STATIC"
+      "value": "STATIC",
+      "install_test": "true"
     },
     {
       "option": "SLANG_ENABLE_ASAN",

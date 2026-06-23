@@ -16,10 +16,10 @@ struct Functor : IFunc<Array<int,2>>
 [numthreads(1,1,1)]
 func computeMain()->void
 {
-    //CHECK: error[E39999]
+    //CHECK: error[E30439]
     outputBuffer[0] = (int)foo(() => Array<int,2>());
 
-    //CHECK: error[E39999]
+    //CHECK: error[E30439]
     Functor f;
     outputBuffer[2] = (int)foo(f);
 }

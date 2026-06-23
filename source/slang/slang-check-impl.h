@@ -195,15 +195,24 @@ struct BasicTypeKeyPair
 };
 
 // Focused failure data produced while a generic candidate is still being
-// inferred. `inferGenericArguments` fills this optional record, and
-// `CompleteOverloadCandidate` emits it only if overload resolution selects that
-// failed generic candidate.
+// inferred. The generic solver fills this optional record with the first
+// concrete reason a candidate failed, and `CompleteOverloadCandidate` formats
+// it into a focused diagnostic only if overload resolution selects that failed
+// candidate. Each `Kind` captures just the offending fields (counts, a
+// parameter name, or the substituted sub/super types) at the failure site;
+// the more expensive diagnostic formatting is deferred to the selected-
+// candidate path so speculative candidates never pay for it.
 struct GenericArgumentInferenceFailure
 {
     enum class Kind
     {
         None,
         VariadicPackCountMismatch,
+        GenericArityMismatch,
+        OrdinaryGenericParamNotInferred,
+        InterfaceConformanceNotSatisfied,
+        GenericConstraintNotSatisfied,
+        GenericParamUnificationConflict,
     };
 
     struct VariadicPackCountMismatch
@@ -213,11 +222,90 @@ struct GenericArgumentInferenceFailure
         int64_t actualCount = 0;
     };
 
+    // The call supplied a number of value arguments that the generic function's
+    // parameter list could not match, so argument-to-parameter matching failed
+    // before any inference could run.
+    struct GenericArityMismatch
+    {
+        SourceLoc location = SourceLoc();
+        Int expectedParamCount = 0;
+        Int actualArgCount = 0;
+    };
+
+    // An ordinary generic parameter (such as a type `T` that appears only in
+    // return position, or a value `N` not mentioned in any parameter) was never
+    // determined from the call, so its solver constraint stayed unsatisfied.
+    // The parameter declaration itself is stored (not just its name) so the
+    // diagnostic can use the full declaration (name, type-vs-value kind, loc).
+    struct OrdinaryGenericParamNotInferred
+    {
+        SourceLoc location = SourceLoc();
+        Decl* member = nullptr;
+    };
+
+    // A source generic constraint `T : IFoo` could not be discharged: the
+    // inferred argument for `T` (`subType`) does not conform to the required
+    // interface (`supType`). The capture site records these only once both are
+    // concrete (its `hasUnreadyDependenciesForVal` guard), so they are always
+    // fully substituted under the current (failed) specialization when read.
+    struct InterfaceConformanceNotSatisfied
+    {
+        SourceLoc location = SourceLoc();
+        Type* subType = nullptr;
+        Type* supType = nullptr;
+    };
+
+    // A source generic constraint that is not an interface conformance could not
+    // be satisfied — the general fallback for every constraint kind handled by
+    // the witness solver other than conformance (today: equality `where T == X`,
+    // type coercion `where U(T)`, non-empty pack `where nonempty(P)`, ...).
+    // `constraintDecl` is the source constraint declaration, rendered to a
+    // readable form (e.g. `T == int`, `T : IFoo`, `int(T)`) by
+    // `ASTPrinter::getGenericConstraintString`; `constraintLoc` anchors a
+    // "see declaration" note. The declaration is captured (not a pre-rendered
+    // string) so formatting stays deferred to `CompleteOverloadCandidate`.
+    struct GenericConstraintNotSatisfied
+    {
+        SourceLoc location = SourceLoc();
+        Decl* constraintDecl = nullptr;
+        SourceLoc constraintLoc = SourceLoc();
+    };
+
+    // Two ordinary constraints inferred conflicting arguments for one generic
+    // parameter (e.g. `foo<T>(T, T)` with unrelated `A`/`B`, or `foo<let N:int>`
+    // required to be both `4` and `8`). Captures the parameter declaration and
+    // both candidate values; `Val*` covers both type parameters (the candidates
+    // are `Type`s) and value parameters (the candidates are `IntVal`s).
+    struct GenericParamUnificationConflict
+    {
+        SourceLoc location = SourceLoc();
+        Decl* paramDecl = nullptr;
+        Val* firstVal = nullptr;
+        Val* secondVal = nullptr;
+    };
+
     Kind kind = Kind::None;
     union
     {
         VariadicPackCountMismatch variadicPackCountMismatch;
+        GenericArityMismatch genericArityMismatch;
+        OrdinaryGenericParamNotInferred ordinaryGenericParamNotInferred;
+        InterfaceConformanceNotSatisfied interfaceConformanceNotSatisfied;
+        GenericConstraintNotSatisfied genericConstraintNotSatisfied;
+        GenericParamUnificationConflict genericParamUnificationConflict;
     };
+
+    // Every payload must be trivially destructible: that is what makes the
+    // placement-new in `set*()` / `copyActiveMemberFrom` (which never destroys
+    // the previously active member first) well-defined.
+    static_assert(
+        std::is_trivially_destructible_v<VariadicPackCountMismatch> &&
+            std::is_trivially_destructible_v<GenericArityMismatch> &&
+            std::is_trivially_destructible_v<OrdinaryGenericParamNotInferred> &&
+            std::is_trivially_destructible_v<InterfaceConformanceNotSatisfied> &&
+            std::is_trivially_destructible_v<GenericConstraintNotSatisfied> &&
+            std::is_trivially_destructible_v<GenericParamUnificationConflict>,
+        "GenericArgumentInferenceFailure payloads must be trivially destructible");
 
     GenericArgumentInferenceFailure()
         : variadicPackCountMismatch()
@@ -225,15 +313,94 @@ struct GenericArgumentInferenceFailure
     }
 
     GenericArgumentInferenceFailure(GenericArgumentInferenceFailure const& other)
-        : kind(other.kind), variadicPackCountMismatch(other.variadicPackCountMismatch)
+        : kind(other.kind)
     {
+        copyActiveMemberFrom(other);
     }
 
     GenericArgumentInferenceFailure& operator=(GenericArgumentInferenceFailure const& other)
     {
         kind = other.kind;
-        variadicPackCountMismatch = other.variadicPackCountMismatch;
+        copyActiveMemberFrom(other);
         return *this;
+    }
+
+    // Select a union variant and return a reference for the caller to populate.
+    // Each setter begins the chosen member's lifetime with placement-new and
+    // updates `kind` in lockstep, so the invariant "`kind` names the live union
+    // member" holds by construction at every capture site. The previously
+    // active member is trivially destructible, so it needs no explicit
+    // destruction before the new member is constructed in place.
+    VariadicPackCountMismatch& setVariadicPackCountMismatch()
+    {
+        kind = Kind::VariadicPackCountMismatch;
+        return *new (&variadicPackCountMismatch) VariadicPackCountMismatch();
+    }
+    GenericArityMismatch& setGenericArityMismatch()
+    {
+        kind = Kind::GenericArityMismatch;
+        return *new (&genericArityMismatch) GenericArityMismatch();
+    }
+    OrdinaryGenericParamNotInferred& setOrdinaryGenericParamNotInferred()
+    {
+        kind = Kind::OrdinaryGenericParamNotInferred;
+        return *new (&ordinaryGenericParamNotInferred) OrdinaryGenericParamNotInferred();
+    }
+    InterfaceConformanceNotSatisfied& setInterfaceConformanceNotSatisfied()
+    {
+        kind = Kind::InterfaceConformanceNotSatisfied;
+        return *new (&interfaceConformanceNotSatisfied) InterfaceConformanceNotSatisfied();
+    }
+    GenericConstraintNotSatisfied& setGenericConstraintNotSatisfied()
+    {
+        kind = Kind::GenericConstraintNotSatisfied;
+        return *new (&genericConstraintNotSatisfied) GenericConstraintNotSatisfied();
+    }
+    GenericParamUnificationConflict& setGenericParamUnificationConflict()
+    {
+        kind = Kind::GenericParamUnificationConflict;
+        return *new (&genericParamUnificationConflict) GenericParamUnificationConflict();
+    }
+
+private:
+    // Begin the lifetime of whichever union member `kind` selects, copy-
+    // constructing it from `other`'s active member. The payloads embed a
+    // `SourceLoc`, which has a user-provided copy constructor and so is not
+    // trivially copyable; assigning into a union member whose lifetime has not
+    // begun would be undefined. Placement-new starts that lifetime correctly
+    // for both copy construction (no member live yet) and copy assignment (the
+    // previously active member is trivially destructible, so it needs no
+    // explicit destruction before the new member is constructed in place).
+    void copyActiveMemberFrom(GenericArgumentInferenceFailure const& other)
+    {
+        switch (other.kind)
+        {
+        case Kind::VariadicPackCountMismatch:
+            new (&variadicPackCountMismatch)
+                VariadicPackCountMismatch(other.variadicPackCountMismatch);
+            break;
+        case Kind::GenericArityMismatch:
+            new (&genericArityMismatch) GenericArityMismatch(other.genericArityMismatch);
+            break;
+        case Kind::OrdinaryGenericParamNotInferred:
+            new (&ordinaryGenericParamNotInferred)
+                OrdinaryGenericParamNotInferred(other.ordinaryGenericParamNotInferred);
+            break;
+        case Kind::InterfaceConformanceNotSatisfied:
+            new (&interfaceConformanceNotSatisfied)
+                InterfaceConformanceNotSatisfied(other.interfaceConformanceNotSatisfied);
+            break;
+        case Kind::GenericConstraintNotSatisfied:
+            new (&genericConstraintNotSatisfied)
+                GenericConstraintNotSatisfied(other.genericConstraintNotSatisfied);
+            break;
+        case Kind::GenericParamUnificationConflict:
+            new (&genericParamUnificationConflict)
+                GenericParamUnificationConflict(other.genericParamUnificationConflict);
+            break;
+        case Kind::None:
+            break;
+        }
     }
 };
 
