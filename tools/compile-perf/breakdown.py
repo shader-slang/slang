@@ -528,7 +528,7 @@ def write_workload_pages(results_dir, index_path, metric, outdir):
             results_dir, index_path, metric, svgp, BUCKET_ORDER, buckets,
             cols=1, names=[wl], panel=(1040, 440),
             title=f"{esc(wl)} — full phase breakdown across releases ({esc(metric)} ms)")
-        svg = open(svgp).read()
+        svg = open(svgp, encoding="utf-8").read()
 
         desc = (inspect.getdoc(spec.gen) if spec and spec.gen else "") or "(no description)"
         flags = " ".join(spec.extra_flags) if spec and spec.extra_flags else "(none)"
