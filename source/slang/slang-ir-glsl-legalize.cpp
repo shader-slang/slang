@@ -224,7 +224,8 @@ enum GLSLSystemValueKind
     PositionInput,
     // The `FragDepth*` kinds are categorically different from `Position*`: their special
     // treatment decorates the fragment *entry point* (a conservative-depth execution mode),
-    // not the `gl_FragDepth` global var. See the switch in `createVarLayoutForLegalizedGlobalParam`.
+    // not the `gl_FragDepth` global var. See the switch in
+    // `createVarLayoutForLegalizedGlobalParam`.
     FragDepthGreater,
     FragDepthLess,
 };
