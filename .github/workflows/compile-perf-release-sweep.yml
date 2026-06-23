@@ -49,11 +49,6 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\bin"
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\usr\bin"
 
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
-        with:
-          python-version: "3.x"
-
       # No Slang build here — we sweep prebuilt RELEASE binaries. fetch-depth 0
       # is needed so fetch_releases.py can read release tags + dates from git.
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -109,9 +104,9 @@ jobs:
           # Sweep every release into the results repo (history baseline).
           python3 sweep.py --index releases/index.json --results "$RESULTS" \
             --samples "$SAMPLES" "${force[@]}"
-          # Store the release manifest, stamp the runner the history was built on,
-          # and rebuild the tracking series.
-          cp releases/index.json "$RESULTS/index.json"
+          # Merge newly swept releases into the full index (not overwrite) so
+          # report.py uses all historical data, not just the swept window.
+          python3 track.py merge-index --results "$RESULTS" --index releases/index.json
           python3 track.py stamp-runner --results "$RESULTS" --label "release-sweep-$(date -u +%Y-%m-%d)"
           python3 track.py rebuild --results "$RESULTS" --index "$RESULTS/index.json"
 
