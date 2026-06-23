@@ -2,49 +2,49 @@
 //
 // Regression test for shader-slang/slang#6216.
 //
-// `[[vk::location]]` is only meaningful on a varying (stage input/output)
-// parameter. Placing it on a constant buffer used to be silently ignored, so
-// the buffer's binding was auto-allocated in declaration order and the user got
-// a surprising binding. We now emit a warning pointing them at the correct
-// attribute, `[[vk::binding]]`.
+// `[[vk::location(N)]]` only adjusts the location of a *varying* (stage
+// input/output) parameter. Placing it on a constant buffer or resource is
+// silently ignored, so the binding is auto-allocated in declaration order and
+// the user gets a surprising, order-dependent binding (the #6216 report). The
+// compiler now warns (W39021) and points the user at `[[vk::binding(...)]]`.
 //
-// The warning is target-independent across the Vulkan/GLSL family; `-target
-// spirv` (the representative Vulkan target) is used here, matching the other
-// `vk-*` diagnostic tests.
-//
-// (The warning is reported twice because, for an entry-point compile, the
-// global parameter is laid out once for the global scope and once for the
-// entry-point program. This matches the pre-existing behavior of sibling
-// parameter-binding warnings such as `register-without-vulkan-binding`.)
+// The warning is gated to the Khronos/WGSL targets that actually consume
+// binding modifiers; `-target spirv` (the representative Vulkan target) is used
+// here. Non-exhaustive FileCheck is used deliberately so the assertions do not
+// couple to how many parameter-binding passes a referenced global happens to go
+// through.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage fragment
-
-struct DrawParams
-{
-    float4 color;
-};
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main
 
 struct Matrices
 {
     float4x4 mvp;
 };
 
-// Declared first, so without any explicit binding 'drawParams' auto-allocates 0.
-ConstantBuffer<DrawParams> drawParams;
-
-// `[[vk::location]]` on a constant buffer is the misuse from #6216: it does not
-// set the binding (that needs `[[vk::binding]]`), so it is ignored.
+// Misuse: `[[vk::location]]` on a constant buffer. The attribute is dropped and
+// the binding still auto-allocates in declaration order -- warn. (The renderer
+// prints the code and the message on separate lines, so they are matched by
+// separate CHECK directives.)
+// CHECK: warning{{.*}}39021
+// CHECK: is ignored on 'matrices'
 [[vk::location(0)]]
-/*CHECK:
-      ^^^^^^^^ vk::location ignored on non-varying parameter
-      ^^^^^^^^ '[[vk::location(...)]]' is ignored on 'matrices', which is not a varying (stage input/output) parameter; use '[[vk::binding(...)]]' to set the binding of a constant buffer or resource.
-      ^^^^^^^^ vk::location ignored on non-varying parameter
-      ^^^^^^^^ '[[vk::location(...)]]' is ignored on 'matrices', which is not a varying (stage input/output) parameter; use '[[vk::binding(...)]]' to set the binding of a constant buffer or resource.
-*/
 ConstantBuffer<Matrices> matrices;
 
+// The misuse generalizes to any non-varying resource, not just `ConstantBuffer`.
+// CHECK: warning{{.*}}39021
+// CHECK: is ignored on 'tex'
+[[vk::location(1)]]
+Texture2D tex;
+
+// Legitimate varying use: `[[vk::location]]` on a stage input is exactly what
+// the attribute is for, so the `isVaryingParam` guard must NOT warn here. This
+// is the regression guard against re-introducing a false positive on every
+// correct varying use.
+// CHECK-NOT: is ignored on 'uv'
+
 [shader("fragment")]
-float4 main() : SV_Target
+float4 main([[vk::location(0)]] float2 uv : TEXCOORD)
+    : SV_Target
 {
-    return mul(matrices.mvp, drawParams.color);
+    return float4(uv, 0.0, 0.0);
 }

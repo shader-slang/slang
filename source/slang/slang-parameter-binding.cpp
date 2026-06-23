@@ -1174,28 +1174,6 @@ static void addExplicitParameterBindings_GLSL(
             return;
     }
 
-    // A `[[vk::location]]` attribute only adjusts the location of a varying
-    // (stage input/output) parameter; on a constant buffer or resource (which
-    // uses a `DescriptorTableSlot`) it is silently ignored, so the binding ends
-    // up auto-allocated in declaration order. Note that a *varying* parameter
-    // consumes its location in the arms above but still reaches here with the
-    // modifier attached, so we must explicitly check that the parameter has no
-    // varying resource before warning -- otherwise we would warn on every
-    // legitimate varying use. Warn only for the non-varying (misuse) case,
-    // pointing the user at `[[vk::binding]]`.
-    if (auto locationAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
-    {
-        const bool isVaryingParam =
-            typeLayout->FindResourceInfo(LayoutResourceKind::VaryingInput) ||
-            typeLayout->FindResourceInfo(LayoutResourceKind::VaryingOutput);
-        if (!isVaryingParam)
-        {
-            getSink(context)->diagnose(Diagnostics::VkLocationOnNonVaryingParameter{
-                .paramName = varDecl.getName(),
-                .location = locationAttr->loc});
-        }
-    }
-
     // For remaining cases, we only want to apply GLSL-style layout modifers
     // when compiling for Khronos and WGSL targets.
     //
@@ -1205,6 +1183,30 @@ static void addExplicitParameterBindings_GLSL(
     //
     if (isKhronosTarget(context->getTargetRequest()) || isWGPUTarget(context->getTargetRequest()))
     {
+        // `[[vk::location]]` only adjusts the location of a *varying* (stage
+        // input/output) parameter; on a constant buffer or resource it is
+        // silently ignored, so the binding is auto-allocated in declaration
+        // order. Warn and point the user at `[[vk::binding]]`. This lives inside
+        // the Khronos/WGSL gate because those are the only targets that consume
+        // binding modifiers, so `[[vk::binding]]` is the right advice here.
+        //
+        // A *varying* parameter carrying `[[vk::location]]` consumes its
+        // location in the arms above but does not early-return, so it reaches
+        // this point with the modifier still attached; the `isVaryingParam`
+        // check is what stops us from warning on that legitimate use.
+        if (auto locationAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
+        {
+            const bool isVaryingParam =
+                typeLayout->FindResourceInfo(LayoutResourceKind::VaryingInput) ||
+                typeLayout->FindResourceInfo(LayoutResourceKind::VaryingOutput);
+            if (!isVaryingParam)
+            {
+                getSink(context)->diagnose(Diagnostics::VkLocationOnNonVaryingParameter{
+                    .paramName = varDecl.getName(),
+                    .location = locationAttr->loc});
+            }
+        }
+
         // The catch in GLSL is that the expected resource type
         // is implied by the parameter declaration itself, and
         // the `layout` modifier is only allowed to adjust
