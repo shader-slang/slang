@@ -159,6 +159,30 @@ def register(results_dir, index_path, label, commit, date, corpus_sha=""):
     rebuild(results_dir, index_path)
 
 
+def merge_index(results_dir, new_index_path):
+    """Merge newly swept release entries into the results repo index.
+
+    Reads the existing index.json (if any) from results_dir, merges in the
+    entries from new_index_path (new entries override existing ones by tag),
+    and writes the merged result back. This ensures the report is generated
+    from all historical data, not just the releases swept in this run.
+    """
+    dest = os.path.join(results_dir, "index.json")
+    existing = {}
+    if os.path.exists(dest):
+        for r in json.load(open(dest)):
+            existing[r["tag"]] = r
+    n_before = len(existing)
+    for r in json.load(open(new_index_path)):
+        existing[r["tag"]] = r
+    merged = sorted(existing.values(), key=lambda r: r.get("date", ""))
+    with open(dest, "w") as fh:
+        json.dump(merged, fh, indent=2)
+    n_added = len(existing) - n_before
+    print(f"merged index: {len(merged)} releases total "
+          f"({n_added} new, {len(merged) - n_added} existing)")
+
+
 def stamp_runner(results_dir, label):
     rp = os.path.join(results_dir, "runner.json")
     with open(rp, "w") as fh:
@@ -179,7 +203,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=["register", "rebuild", "stamp-runner",
-                                    "runner-id", "summary"])
+                                    "runner-id", "summary", "merge-index"])
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
     ap.add_argument("--index", default=os.path.join(HERE, "releases", "index.json"))
     ap.add_argument("--label", default="")
@@ -198,6 +222,10 @@ def main():
         if not args.label:
             ap.error("register needs --label")
         register(args.results, args.index, args.label, args.commit, args.date, args.corpus_sha)
+    elif args.cmd == "merge-index":
+        if not args.index or not os.path.exists(args.index):
+            ap.error("merge-index needs --index <new-index.json>")
+        merge_index(args.results, args.index)
     elif args.cmd == "stamp-runner":
         stamp_runner(args.results, args.label or "manual")
 

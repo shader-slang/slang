@@ -104,9 +104,9 @@ jobs:
           # Sweep every release into the results repo (history baseline).
           python3 sweep.py --index releases/index.json --results "$RESULTS" \
             --samples "$SAMPLES" "${force[@]}"
-          # Store the release manifest, stamp the runner the history was built on,
-          # and rebuild the tracking series.
-          cp releases/index.json "$RESULTS/index.json"
+          # Merge newly swept releases into the full index (not overwrite) so
+          # report.py uses all historical data, not just the swept window.
+          python3 track.py merge-index --results "$RESULTS" --index releases/index.json
           python3 track.py stamp-runner --results "$RESULTS" --label "release-sweep-$(date -u +%Y-%m-%d)"
           python3 track.py rebuild --results "$RESULTS" --index "$RESULTS/index.json"
 
