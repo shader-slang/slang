@@ -1648,7 +1648,11 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
                 // Redeclare the `gl_FragDepth` builtin with the conservative-depth
                 // layout qualifier so glslang emits the DepthGreater execution mode
                 // (HLSL SV_DepthGreaterEqual). Requires GL_ARB_conservative_depth
-                // (core since GLSL 4.20).
+                // (core since GLSL 4.20). An entry point carries at most one directional
+                // depth qualifier: a param has exactly one of SV_DepthGreaterEqual /
+                // SV_DepthLessEqual, and the producer deduplicates the decoration, so the
+                // two branches here are mutually exclusive (emitting both would redeclare
+                // `gl_FragDepth` twice — invalid GLSL).
                 _requireGLSLExtension(UnownedStringSlice("GL_ARB_conservative_depth"));
                 m_writer->emit("layout(depth_greater) out float gl_FragDepth;\n");
             }

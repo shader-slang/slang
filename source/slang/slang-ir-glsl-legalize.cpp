@@ -222,6 +222,9 @@ enum GLSLSystemValueKind
     General,
     PositionOutput,
     PositionInput,
+    // The `FragDepth*` kinds are categorically different from `Position*`: their special
+    // treatment decorates the fragment *entry point* (a conservative-depth execution mode),
+    // not the `gl_FragDepth` global var. See the switch in `createVarLayoutForLegalizedGlobalParam`.
     FragDepthGreater,
     FragDepthLess,
 };
@@ -586,7 +589,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // Type is 'unknown' in hlsl
         name = "gl_FragDepth";
         requiredType = builder->getBasicType(BaseType::Float);
-        systemValueKind = GLSLSystemValueKind::FragDepthGreater;
+        // The conservative-depth constraint applies to the depth *output* only. The
+        // front-end already rejects a depth semantic used as input (E30702), so this
+        // branch only legalizes the output varying; gating the kind on `VaryingOutput`
+        // (as `sv_position` does for `PositionOutput`) makes that output-only intent
+        // explicit and keeps the kind off any future non-output varying.
+        if (kind == LayoutResourceKind::VaryingOutput)
+            systemValueKind = GLSLSystemValueKind::FragDepthGreater;
     }
     else if (semanticName == "sv_depthlessequal")
     {
@@ -597,7 +606,9 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // 'unknown' in hlsl, float in glsl
         name = "gl_FragDepth";
         requiredType = builder->getBasicType(BaseType::Float);
-        systemValueKind = GLSLSystemValueKind::FragDepthLess;
+        // Output-only, gated as in the `sv_depthgreaterequal` branch above.
+        if (kind == LayoutResourceKind::VaryingOutput)
+            systemValueKind = GLSLSystemValueKind::FragDepthLess;
     }
     else if (semanticName == "sv_dispatchthreadid")
     {
@@ -1080,8 +1091,13 @@ void createVarLayoutForLegalizedGlobalParam(
         case GLSLSystemValueKind::FragDepthGreater:
             // The depth-test condition is an execution-mode property of the fragment
             // entry point (like `early_fragment_tests`), so we mark the entry point
-            // rather than the `gl_FragDepth` builtin var. A fragment shader has a single
-            // depth output, so this runs once per entry point.
+            // rather than the `gl_FragDepth` builtin var. Unlike the other cases here,
+            // this decorates the entry point, not `globalParam`. The decoration is
+            // idempotent by construction: the depth output is unique per entry point, the
+            // front-end rejects depth-as-input (E30702), and these ops are in
+            // `isSimpleDecoration` so `addDecoration` deduplicates a repeat attach
+            // (mirroring the `early_fragment_tests` precedent) — at most one qualifier
+            // reaches emit.
             builder->addDecoration(context->entryPointFunc, kIROp_GLSLFragDepthGreaterDecoration);
             break;
         case GLSLSystemValueKind::FragDepthLess:
