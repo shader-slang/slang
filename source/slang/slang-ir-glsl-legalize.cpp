@@ -1097,7 +1097,9 @@ void createVarLayoutForLegalizedGlobalParam(
             // front-end rejects depth-as-input (E30702), and these ops are in
             // `isSimpleDecoration` so `addDecoration` deduplicates a repeat attach
             // (mirroring the `early_fragment_tests` precedent) — at most one qualifier
-            // reaches emit.
+            // reaches emit. The decoration is consumed only by the GLSL emitter; this
+            // legalization pass also runs for the direct-SPIR-V path, where the decoration
+            // is inert (the SPIR-V emitter derives the mode independently).
             builder->addDecoration(context->entryPointFunc, kIROp_GLSLFragDepthGreaterDecoration);
             break;
         case GLSLSystemValueKind::FragDepthLess:

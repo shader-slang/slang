@@ -838,7 +838,6 @@ return {
 	["builtinRequirementKey"] = 861,
 	["ImageTexelPointer"] = 862,
 	["Type.MetalPackedVec"] = 863,
-	-- 864 is already assigned to "Abort" earlier in this file; 865/866 are the next free values.
 	["Decoration.glslFragDepthGreater"] = 865,
 	["Decoration.glslFragDepthLess"] = 866
 }
