@@ -99,16 +99,16 @@ jobs:
           cd "$SUITE"
           force=(); [ "$FORCE_ENABLED" = "true" ] && force=(--force)
           # Prebuilt slangc for each release, matching THIS runner's platform.
-          python fetch_releases.py --repo "$GITHUB_WORKSPACE" \
+          python3 fetch_releases.py --repo "$GITHUB_WORKSPACE" \
             --since "$SINCE" --until "$UNTIL" "${force[@]}"
           # Sweep every release into the results repo (history baseline).
-          python sweep.py --index releases/index.json --results "$RESULTS" \
+          python3 sweep.py --index releases/index.json --results "$RESULTS" \
             --samples "$SAMPLES" "${force[@]}"
           # Store the release manifest, stamp the runner the history was built on,
           # and rebuild the tracking series.
           cp releases/index.json "$RESULTS/index.json"
-          python track.py stamp-runner --results "$RESULTS" --label "release-sweep-$(date -u +%Y-%m-%d)"
-          python track.py rebuild --results "$RESULTS" --index "$RESULTS/index.json"
+          python3 track.py stamp-runner --results "$RESULTS" --label "release-sweep-$(date -u +%Y-%m-%d)"
+          python3 track.py rebuild --results "$RESULTS" --index "$RESULTS/index.json"
 
       - name: Push results
         shell: bash
@@ -119,7 +119,7 @@ jobs:
           git config user.email "slang-perf-bot@users.noreply.github.com"
           git add -A
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
-          git commit -m "release history resync $(date -u +%Y-%m-%d) (runner $(python "$GITHUB_WORKSPACE/tools/compile-perf/track.py" runner-id))"
+          git commit -m "release history resync $(date -u +%Y-%m-%d) (runner $(python3 "$GITHUB_WORKSPACE/tools/compile-perf/track.py" runner-id))"
           git push
 
       - name: Revoke PAT from perf-results git config
@@ -144,7 +144,7 @@ jobs:
             exit 0
           fi
           cd "$SUITE"
-          python report.py --results "$RESULTS" --index "$RESULTS/index.json"
+          python3 report.py --results "$RESULTS" --index "$RESULTS/index.json"
 
       - name: Checkout gh-pages branch
         continue-on-error: true
