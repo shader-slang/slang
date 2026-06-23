@@ -4511,6 +4511,13 @@ warning(
     span { loc = "location", message = "ignoring '[[vk::index(...)]]` attribute without a corresponding '[[vk::location(...)]]' attribute" }
 )
 
+warning(
+    "vk-location-on-non-varying-parameter",
+    39021,
+    "vk::location ignored on non-varying parameter",
+    span { loc = "location", message = "'[[vk::location(...)]]' is ignored on '~paramName:Name', which is not a varying (stage input/output) parameter; use '[[vk::binding(...)]]' to set the binding of a constant buffer or resource." }
+)
+
 err(
     "mixing-implicit-and-explicit-binding-for-varying-params",
     39023,

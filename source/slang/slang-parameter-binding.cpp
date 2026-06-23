@@ -1174,6 +1174,26 @@ static void addExplicitParameterBindings_GLSL(
             return;
     }
 
+    // A `[[vk::location]]` attribute only adjusts the location of a varying
+    // (stage input/output) parameter. If we reach this point with the attribute
+    // still present, the parameter carries no VaryingInput/VaryingOutput
+    // resource (it is a constant buffer or resource using a DescriptorTableSlot),
+    // so the attribute is silently ignored and the binding ends up auto-allocated
+    // in declaration order. Warn and point the user at `[[vk::binding]]`, which
+    // is the correct attribute for setting such a parameter's binding.
+    if (auto locationAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
+    {
+        const bool isVaryingParam =
+            typeLayout->FindResourceInfo(LayoutResourceKind::VaryingInput) ||
+            typeLayout->FindResourceInfo(LayoutResourceKind::VaryingOutput);
+        if (!isVaryingParam)
+        {
+            getSink(context)->diagnose(Diagnostics::VkLocationOnNonVaryingParameter{
+                .paramName = varDecl.getName(),
+                .location = locationAttr->loc});
+        }
+    }
+
     // For remaining cases, we only want to apply GLSL-style layout modifers
     // when compiling for Khronos and WGSL targets.
     //
