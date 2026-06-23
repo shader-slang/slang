@@ -20,7 +20,7 @@
 // Behavioral lanes on the targets where the bug manifests (run by CI, which has
 // GPUs; skipped where no device is present).
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -use-dxil -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
