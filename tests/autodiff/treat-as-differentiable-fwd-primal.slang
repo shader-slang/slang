@@ -7,7 +7,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 // Stand-in for a texture lookup: differentiable for type-checking, but its own
@@ -65,6 +65,43 @@ float useInout(float x)
     return v;
 }
 
+// A pure `out` parameter exercises a different slot-init path in
+// translateFuncParam than `inout`: the primal slot is default-constructed
+// (not loaded from the caller) and then overwritten by the primal call. The
+// callee's computed output must reach the primal — a non-zero value here would
+// collapse to 0 under the old bug — while the trivial derivative forces the
+// tangent to zero.
+[TreatAsDifferentiable]
+void produceOut(float x, out float r)
+{
+    r = 5.0 * x + 1.0;
+}
+
+[Differentiable]
+float useOut(float x)
+{
+    float r;
+    produceOut(x, r);  // primal r must be 5*x+1, tangent forced to 0
+    return r;
+}
+
+// A non-differentiable return type (int) takes the final `else` arm of
+// generateTrivialFwdDiffFunc: the primal call's result is returned directly
+// rather than wrapped in a differential pair. The real classification must be
+// returned, not a default/zeroed int.
+[TreatAsDifferentiable]
+int classify(float x)
+{
+    return x > 0 ? 1 : -1;
+}
+
+[Differentiable]
+float useClassify(float x)
+{
+    int c = classify(x);  // primal must be the real classification, not 0
+    return float(c);
+}
+
 // The other entry into the trivial-forward synthesis: a function that is
 // backward-differentiable ([BackwardDerivative]) but has *no* forward derivative.
 // Forward-diffing it hits the BackwardDerivativeApply branch in translateCall
@@ -106,6 +143,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // square's forward derivative is trivial (df == 0), so d/dx (10/square) = 0
     var dpBwd = __fwd_diff(divAfterSquare)(diffPair(2.0, 1.0));
 
+    // out param: produceOut(2) writes r = 11; primal preserved, tangent forced to 0
+    var dpOut = __fwd_diff(useOut)(diffPair(2.0, 1.0));
+
+    // non-diff-pair return: classify(0.5) == 1; primal returned directly
+    var dpClassify = __fwd_diff(useClassify)(diffPair(0.5, 1.0));
+
     outputBuffer[0] = dp.p;       // CHECK: 2.5
     outputBuffer[1] = dp.d;       // CHECK: -1.25
     outputBuffer[2] = dpIface.p;  // CHECK: 2.5
@@ -114,4 +157,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[5] = dpInout.d;  // CHECK: 0.0
     outputBuffer[6] = dpBwd.p;    // CHECK: 2.5
     outputBuffer[7] = dpBwd.d;    // CHECK: 0.0
+    outputBuffer[8] = dpOut.p;    // CHECK: 11.0
+    outputBuffer[9] = dpOut.d;    // CHECK: 0.0
+    outputBuffer[10] = dpClassify.p; // CHECK: 1.0
 }
