@@ -29,6 +29,9 @@ DIAGNOSTIC(10003, Error, invalidDigitForBase, "invalid digit for base-$1 literal
 
 DIAGNOSTIC(10004, Error, endOfFileInLiteral, "end of file in literal")
 DIAGNOSTIC(10005, Error, newlineInLiteral, "newline in literal")
+DIAGNOSTIC(10006, Error, invalidUtf8ByteSequence, "invalid UTF-8 byte sequence: $0")
+DIAGNOSTIC(10007, Error, invalidStringEscape, "invalid string escape: '$0'")
+DIAGNOSTIC(10008, Error, invalidUnicodeStringEscape, "invalid string escape: \\$0 must be followed by $1 hex digits")
 DIAGNOSTIC(
     10010,
     Error,

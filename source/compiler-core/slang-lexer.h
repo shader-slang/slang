@@ -190,7 +190,12 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
     UnownedStringSlice* outSuffix = 0);
 
-IntegerLiteralValue getCharLiteralValue(Token const& token);
+// Returns a positive 32-bit code point in range [0, 0xffffffff] on success or
+// -1 on failure. A failure is also diagnosed.
+//
+// See docs/language-reference/expressions-literal.md for the literal format.
+IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink);
+
 } // namespace Slang
 
 #endif

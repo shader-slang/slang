@@ -4,6 +4,9 @@
 #include "slang-basic.h"
 #include "slang-secure-crt.h"
 
+#include <cstdint>
+#include <limits>
+
 namespace Slang
 {
 
@@ -18,24 +21,88 @@ enum class CharEncodeType
 };
 
 template<typename ReadByteFunc>
-Char32 getUnicodePointFromUTF8(const ReadByteFunc& readByte)
+Char32 getUnicodePointFromUTF8(const ReadByteFunc& readByte, bool* outInvalid = 0)
 {
     Char32 codePoint = 0;
-    uint32_t leading = uint32_t(readByte());
-    uint32_t mask = 0x80;
-    Index count = 0;
-    while (leading & mask)
+    uint8_t leading = static_cast<uint8_t>(readByte());
+    bool valid{true};
+
+    if (leading <= 0x7FU)
     {
-        count++;
-        mask >>= 1;
+        // single byte character (ASCII)
+        codePoint = leading;
     }
-    codePoint = (leading & (mask - 1));
-    for (Index i = 1; i <= count - 1; i++)
+    else if (leading <= 0xBFU)
     {
-        codePoint <<= 6;
-        codePoint += (readByte() & 0x3F);
+        // cannot start with continuation byte 0b10xxxxxx
+        valid = false;
     }
-    return codePoint;
+    else if (leading <= 0xFEU)
+    {
+        // The leading byte encodes the number of total bytes as follows:
+        //
+        // 0b110xxxxx - 2 bytes (max payload: 5 + 1*6 = 11 bits, min value: 1 << 7)
+        // 0b1110xxxx - 3 bytes (max payload: 4 + 2*6 = 16 bits, min value: 1 << 11)
+        // 0b11110xxx - 4 bytes (max payload: 3 + 3*6 = 21 bits, min value: 1 << 16)
+        // 0b111110xx - 5 bytes (max payload: 2 + 4*6 = 26 bits, min value: 1 << 21)
+        // 0b1111110x - 6 bytes (max payload: 1 + 5*6 = 31 bits, min value: 1 << 26)
+        // 0b11111110 - 7 bytes (max payload: 0 + 6*6 = 36 bits, min value: 1 << 31)
+        //
+        // Unicode is currently defined to have at most 0x10FFFF code points
+        // (4 bytes in UTF-8). We'll allow the full 32-bit code point range.
+
+        uint64_t value{};
+        uint64_t minValue{0x80U}; // overlong encoding detection
+
+        // count leading ones, start by 2 since we know that the initial byte is at least 0xC0
+        uint8_t mask = 0x20U;
+        uint8_t byteCount = 2U;
+
+        while (mask & leading)
+        {
+            ++byteCount;
+            minValue = uint64_t{1} << (11U + (byteCount - 3U) * 5U);
+            mask >>= 1U;
+        }
+
+        // consume leading byte payload bits
+        value = leading & (mask - 1U);
+
+        // rest of the bytes
+        for (uint8_t i = 1U; i < byteCount; ++i)
+        {
+            uint8_t byte = static_cast<uint8_t>(readByte());
+
+            // check that we have a continuation byte
+            if ((byte & 0xC0U) != 0x80U)
+            {
+                // invalid continuation byte
+                valid = false;
+                break;
+            }
+
+            // add payload bits
+            value <<= 6U;
+            value |= (byte & 0x3FU);
+        }
+
+        // check that the value is not over-encoded
+        if (value < minValue)
+            valid = false;
+
+        // check that the value is within 32 bits
+        if (value > std::numeric_limits<uint32_t>::max())
+            valid = false;
+
+        codePoint = static_cast<Char32>(value);
+    }
+    else
+        valid = false;
+
+    // return
+    if (outInvalid)
+        *outInvalid = !valid;
+    return valid ? codePoint : 0U;
 }
 
 template<typename ReadByteFunc>
