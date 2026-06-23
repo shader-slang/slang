@@ -5322,94 +5322,6 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     // declarations they contain should be fully checked.
 }
 
-static Type* _getCallableRequirementSignatureEndpointTargetType(
-    ASTBuilder* astBuilder,
-    SemanticsVisitor* semantics,
-    Type* type)
-{
-    if (auto namedType = as<NamedExpressionType>(type))
-        return getType(astBuilder, namedType->getDeclRef());
-
-    if (auto declRefType = as<DeclRefType>(type))
-    {
-        if (auto assocType = as<Type>(_tryLookupConcreteAssociatedTypeFromThisTypeSubst(
-                astBuilder,
-                declRefType->getDeclRef())))
-        {
-            return assocType;
-        }
-
-        if (auto assocTypeDeclRef = declRefType->getDeclRef().as<AssocTypeDecl>())
-        {
-            // A substituted requirement endpoint like `ISimple.U.V` can become `Val.V`, where
-            // the decl-ref to `IBase.V` is based on a `LookupDeclRef` carrying the `Val : IBase`
-            // witness. During conformance checking that carried witness can be an early value
-            // whose table has not yet recorded `V -> int`; refreshing the same subtype query
-            // gives the completed witness table and keeps callable signature matching aligned
-            // with ordinary associated-type lookup.
-            if (auto lookupDeclRef = SubstitutionSet(assocTypeDeclRef).findLookupDeclRef())
-            {
-                auto tryGetWitnessType = [&](SubtypeWitness* witness) -> Type*
-                {
-                    auto requirementWitness = tryLookUpRequirementWitness(
-                        astBuilder,
-                        witness,
-                        assocTypeDeclRef.getDecl());
-                    if (requirementWitness.getFlavor() == RequirementWitness::Flavor::val)
-                        return as<Type>(requirementWitness.getVal());
-                    return nullptr;
-                };
-
-                auto witness = lookupDeclRef->getWitness();
-                if (auto assocType = tryGetWitnessType(witness))
-                    return assocType;
-
-                if (auto refreshedWitness =
-                        semantics->tryGetSubtypeWitness(witness->getSub(), witness->getSup()))
-                {
-                    if (auto assocType = tryGetWitnessType(refreshedWitness))
-                        return assocType;
-                }
-            }
-
-            if (auto memberDeclRef = as<MemberDeclRef>(assocTypeDeclRef.declRefBase))
-            {
-                auto sourceType = DeclRefType::create(
-                    astBuilder,
-                    DeclRef<Decl>(memberDeclRef->getParentOperand()));
-                InterfaceDecl* interfaceDecl = nullptr;
-                for (auto parentDecl = assocTypeDeclRef.getDecl()->parentDecl; parentDecl;
-                     parentDecl = parentDecl->parentDecl)
-                {
-                    if ((interfaceDecl = as<InterfaceDecl>(parentDecl)))
-                        break;
-                }
-                auto interfaceType =
-                    interfaceDecl ? DeclRefType::create(astBuilder, makeDeclRef(interfaceDecl))
-                                  : nullptr;
-                if (sourceType && interfaceType)
-                {
-                    auto witness = semantics->tryGetSubtypeWitness(sourceType, interfaceType);
-                    if (witness)
-                    {
-                        auto requirementWitness = tryLookUpRequirementWitness(
-                            astBuilder,
-                            witness,
-                            assocTypeDeclRef.getDecl());
-                        if (requirementWitness.getFlavor() == RequirementWitness::Flavor::val)
-                            return as<Type>(requirementWitness.getVal());
-                    }
-                }
-            }
-        }
-
-        if (auto typeDefDeclRef = declRefType->getDeclRef().as<TypeDefDecl>())
-            return getType(astBuilder, typeDefDeclRef);
-    }
-
-    return nullptr;
-}
-
 static bool _doesCallableRequirementSignatureTypeMatch(
     ASTBuilder* astBuilder,
     SemanticsVisitor* semantics,
@@ -5423,40 +5335,20 @@ static bool _doesCallableRequirementSignatureTypeMatch(
     if (requiredType->equals(satisfyingType))
         return true;
 
-    // Requirement matching substitutes associated-type bindings before comparing callable
-    // signatures. The substituted endpoint can still be spelled as an associated-type projection
-    // such as `ISimple.U.V -> Val.V`, while the implementation-side function type may already
-    // expose the witness value (`int`). Normalize only endpoints backed by existing associated-type
-    // witnesses or explicit type aliases; do not collapse arbitrary lookup paths like `obj1.Data`
-    // and `obj2.Data`.
-    if (auto requiredEndpointTarget =
-            _getCallableRequirementSignatureEndpointTargetType(astBuilder, semantics, requiredType))
-    {
-        if (requiredEndpointTarget != requiredType && _doesCallableRequirementSignatureTypeMatch(
-                                                          astBuilder,
-                                                          semantics,
-                                                          requiredEndpointTarget,
-                                                          satisfyingType))
-        {
-            return true;
-        }
-    }
-
-    if (auto satisfyingEndpointTarget = _getCallableRequirementSignatureEndpointTargetType(
-            astBuilder,
-            semantics,
-            satisfyingType))
-    {
-        if (satisfyingEndpointTarget != satisfyingType &&
-            _doesCallableRequirementSignatureTypeMatch(
-                astBuilder,
-                semantics,
-                requiredType,
-                satisfyingEndpointTarget))
-        {
-            return true;
-        }
-    }
+    // The caller substitutes requirement and satisfying decl refs before signature matching reaches
+    // this point. Once those substitutions are in place, the general type-resolution path is the
+    // source of truth for endpoint aliases and associated-type projections: e.g. `ISimple.U.V`
+    // substitutes to `Val.V`, and `DeclRefType::resolve` looks up the `Val : IBase` witness entry
+    // that maps `V` to `int`. Keep the comparison here as a plain canonical-type comparison instead
+    // of reimplementing associated-type lookup only for callable signatures.
+    requiredType = requiredType->getCanonicalType();
+    satisfyingType = satisfyingType->getCanonicalType();
+    if (requiredType == satisfyingType)
+        return true;
+    if (!requiredType || !satisfyingType)
+        return false;
+    if (requiredType->equals(satisfyingType))
+        return true;
 
     if (auto requiredFuncType = as<FuncType>(requiredType))
     {
@@ -5491,16 +5383,7 @@ static bool _doesCallableRequirementSignatureTypeMatch(
                    satisfyingFuncType->getErrorType());
     }
 
-    // A concrete conformance can spell a member signature through the implementation's
-    // associated-type binding while the requirement is spelled through the interface projection.
-    // For example, `Simple : ISimple` binds `ISimple.U` to `Val`, so the requirement result
-    // `U.V` and the implementation result `Val.V` should compare by their canonical type.
-    // Keep this normalization local to callable signature matching; subtype/facet matching still
-    // needs lookup-path identity so unrelated projections from different objects do not collapse.
-    auto requiredCanonicalType = requiredType->getCanonicalType();
-    auto satisfyingCanonicalType = satisfyingType->getCanonicalType();
-    return requiredCanonicalType && satisfyingCanonicalType &&
-           requiredCanonicalType->equals(satisfyingCanonicalType);
+    return false;
 }
 
 static Type* _maybeRebuildRequirementDiffFuncTypeWithCurrentWitness(
@@ -11355,6 +11238,56 @@ bool SemanticsVisitor::checkInterfaceConformance(
 
     bool result = true;
 
+    auto checkGenericTypeConstraintRequirement = [&](Decl* requiredMemberDecl) -> bool
+    {
+        ensureDecl(requiredMemberDecl, DeclCheckState::ReadyForReference);
+        DeclRef<Decl> requiredMemberDeclRef;
+        if (auto genericDecl = as<GenericDecl>(requiredMemberDecl))
+        {
+            requiredMemberDeclRef =
+                m_astBuilder->getLookupDeclRef(subTypeConformsToSuperInterfaceWitness, genericDecl);
+
+            // Generic interface constraints are requirements, while their direct sibling
+            // constraints are signature proofs. Specialize through the wrapper chain until the
+            // decl-ref names the inner `GenericTypeConstraintDecl`, so
+            // `findWitnessForInterfaceRequirement` records the witness under the real key.
+            while (auto genericRequirementDeclRef = requiredMemberDeclRef.as<GenericDecl>())
+            {
+                auto defaultArgs = getDefaultSubstitutionArgs(
+                    m_astBuilder,
+                    this,
+                    genericRequirementDeclRef.getDecl());
+                auto genericRequirementSubst = SubstitutionSet(genericRequirementDeclRef);
+                List<Val*> substitutedDefaultArgs;
+                for (auto defaultArg : defaultArgs)
+                {
+                    substitutedDefaultArgs.add(
+                        defaultArg->substitute(m_astBuilder, genericRequirementSubst));
+                }
+                auto specializedRequirementDeclRef = m_astBuilder->getGenericAppDeclRef(
+                    genericRequirementDeclRef,
+                    substitutedDefaultArgs.getArrayView());
+                requiredMemberDeclRef = specializedRequirementDeclRef;
+            }
+        }
+        else
+        {
+            requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(
+                subTypeConformsToSuperInterfaceWitness,
+                requiredMemberDecl);
+        }
+
+        return findWitnessForInterfaceRequirement(
+            context,
+            subType,
+            superInterfaceType,
+            inheritanceDecl,
+            superInterfaceDeclRef,
+            requiredMemberDeclRef,
+            witnessTable,
+            subTypeConformsToSuperInterfaceWitness);
+    };
+
     // TODO: If we ever allow for implementation inheritance,
     // then we will need to consider the case where a type
     // declares that it conforms to an interface, but one of
@@ -11403,6 +11336,22 @@ bool SemanticsVisitor::checkInterfaceConformance(
 
         result = result && requirementSatisfied;
     }
+    // Constraints on associated types must be checked before ordinary member signatures. For
+    // example, `interface ISimple { associatedtype U : IBase; U.V add(...); }` first records
+    // `ISimple.U -> Val`, then must check `Val : IBase` so resolving the substituted method result
+    // `Val.V` can look up `IBase.V` in the completed `Val : IBase` witness table. Differentiability
+    // constraints are the opposite: `This.f : IForwardDifferentiable<This.f>` depends on `f`'s
+    // method witness, so those stay in the late constraint pass below.
+    for (auto requiredMemberDecl : getMembers(m_astBuilder, superInterfaceDeclRef))
+    {
+        auto constraintDecl = asGenericTypeConstraintRequirement(requiredMemberDecl.getDecl());
+        if (!constraintDecl)
+            continue;
+        if (as<DifferentiableRequirementConstraintDecl>(constraintDecl))
+            continue;
+
+        result = result && checkGenericTypeConstraintRequirement(requiredMemberDecl.getDecl());
+    }
     for (auto requiredMemberDecl : getMembers(m_astBuilder, superInterfaceDeclRef))
     {
         if (isAssociatedTypeDecl(requiredMemberDecl.getDecl()))
@@ -11433,55 +11382,13 @@ bool SemanticsVisitor::checkInterfaceConformance(
     // were just installed above.
     for (auto requiredMemberDecl : getMembers(m_astBuilder, superInterfaceDeclRef))
     {
-        if (!asGenericTypeConstraintRequirement(requiredMemberDecl.getDecl()))
+        auto constraintDecl = asGenericTypeConstraintRequirement(requiredMemberDecl.getDecl());
+        if (!constraintDecl)
             continue;
-        ensureDecl(requiredMemberDecl, DeclCheckState::ReadyForReference);
-        DeclRef<Decl> requiredMemberDeclRef;
-        if (auto genericDecl = as<GenericDecl>(requiredMemberDecl.getDecl()))
-        {
-            requiredMemberDeclRef =
-                m_astBuilder->getLookupDeclRef(subTypeConformsToSuperInterfaceWitness, genericDecl);
+        if (!as<DifferentiableRequirementConstraintDecl>(constraintDecl))
+            continue;
 
-            // Generic interface constraints are requirements, while their direct sibling
-            // constraints are signature proofs. Specialize through the wrapper chain until the
-            // decl-ref names the inner `GenericTypeConstraintDecl`, so
-            // `findWitnessForInterfaceRequirement` records the witness under the real key.
-            while (auto genericRequirementDeclRef = requiredMemberDeclRef.as<GenericDecl>())
-            {
-                auto defaultArgs = getDefaultSubstitutionArgs(
-                    m_astBuilder,
-                    this,
-                    genericRequirementDeclRef.getDecl());
-                auto genericRequirementSubst = SubstitutionSet(genericRequirementDeclRef);
-                List<Val*> substitutedDefaultArgs;
-                for (auto defaultArg : defaultArgs)
-                {
-                    substitutedDefaultArgs.add(
-                        defaultArg->substitute(m_astBuilder, genericRequirementSubst));
-                }
-                auto specializedRequirementDeclRef = m_astBuilder->getGenericAppDeclRef(
-                    genericRequirementDeclRef,
-                    substitutedDefaultArgs.getArrayView());
-                requiredMemberDeclRef = specializedRequirementDeclRef;
-            }
-        }
-        else
-        {
-            requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(
-                subTypeConformsToSuperInterfaceWitness,
-                requiredMemberDecl.getDecl());
-        }
-        auto requirementSatisfied = findWitnessForInterfaceRequirement(
-            context,
-            subType,
-            superInterfaceType,
-            inheritanceDecl,
-            superInterfaceDeclRef,
-            requiredMemberDeclRef,
-            witnessTable,
-            subTypeConformsToSuperInterfaceWitness);
-
-        result = result && requirementSatisfied;
+        result = result && checkGenericTypeConstraintRequirement(requiredMemberDecl.getDecl());
     }
 
     // Extensions that apply to the interface type can create new conformances
