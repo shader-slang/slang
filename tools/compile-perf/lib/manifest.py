@@ -134,19 +134,6 @@ WORKLOADS = [
                         "legalizeExistentialTypeLayout", "simplifyIR"],
     ),
     WorkloadSpec(
-        name="diagnostics_errors",
-        bucket="diagnostics",
-        gen=workloads.gen_diagnostics_errors,
-        default_size=400,
-        mode="target",
-        extra_flags=SPIRV,
-        # slangc aborts before emitting timer output when there are many
-        # compile errors, so no primary_timers — ok=True requires only that
-        # errors were produced as expected (expect_fail).
-        primary_timers=[],
-        expect_fail=True,
-    ),
-    WorkloadSpec(
         name="diagnostics_clean",
         bucket="diagnostics",
         gen=workloads.gen_diagnostics_clean,
