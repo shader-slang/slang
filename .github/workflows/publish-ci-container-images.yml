@@ -115,12 +115,17 @@ jobs:
           fi
 
           case "$image_ref" in
-            "$IMAGE_NAME":*) ;;
+            "$IMAGE_NAME":*) image_tag="${image_ref#"$IMAGE_NAME:"}" ;;
             *)
               echo "::error file=$DOCKERFILE::Dockerfile tag '$image_ref' does not match expected image '$IMAGE_NAME'"
               exit 1
               ;;
           esac
+
+          if [[ ! "$image_tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+            echo "::error file=$DOCKERFILE::Dockerfile tag '$image_ref' must match '$IMAGE_NAME:vMAJOR.MINOR.PATCH'"
+            exit 1
+          fi
 
           echo "image-ref=$image_ref" >> "$GITHUB_OUTPUT"
 
@@ -166,13 +171,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          if docker manifest inspect "$IMAGE_REF" >/dev/null 2>&1; then
+          manifest_err="$(mktemp)"
+          if docker manifest inspect "$IMAGE_REF" >/dev/null 2>"$manifest_err"; then
             if [[ "$ALLOW_EXISTING_TAGS" == "true" ]]; then
               echo "::warning::Overwriting existing image tag '$IMAGE_REF'."
             else
               echo "::error::Image tag '$IMAGE_REF' already exists in GHCR. Bump the version or rerun manually with allow_existing_tags for recovery."
               exit 1
             fi
+          elif ! grep -Eiq "(manifest unknown|no such manifest|not found|404)" "$manifest_err"; then
+            cat "$manifest_err" >&2
+            echo "::error::Could not verify GHCR tag availability for '$IMAGE_REF'; refusing to continue."
+            exit 1
           fi
 
   publish:
@@ -265,12 +275,17 @@ jobs:
           fi
 
           case "$image_ref" in
-            "$IMAGE_NAME":*) ;;
+            "$IMAGE_NAME":*) image_tag="${image_ref#"$IMAGE_NAME:"}" ;;
             *)
               echo "::error file=$DOCKERFILE::Dockerfile tag '$image_ref' does not match expected image '$IMAGE_NAME'"
               exit 1
               ;;
           esac
+
+          if [[ ! "$image_tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+            echo "::error file=$DOCKERFILE::Dockerfile tag '$image_ref' must match '$IMAGE_NAME:vMAJOR.MINOR.PATCH'"
+            exit 1
+          fi
 
           echo "image-ref=$image_ref" >> "$GITHUB_OUTPUT"
 
@@ -282,13 +297,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          if docker manifest inspect "$IMAGE_REF" >/dev/null 2>&1; then
+          manifest_err="$(mktemp)"
+          if docker manifest inspect "$IMAGE_REF" >/dev/null 2>"$manifest_err"; then
             if [[ "$ALLOW_EXISTING_TAGS" == "true" ]]; then
               echo "::warning::Overwriting existing image tag '$IMAGE_REF'."
             else
               echo "::error::Image tag '$IMAGE_REF' already exists in GHCR. Bump the version or rerun manually with allow_existing_tags for recovery."
               exit 1
             fi
+          elif ! grep -Eiq "(manifest unknown|no such manifest|not found|404)" "$manifest_err"; then
+            cat "$manifest_err" >&2
+            echo "::error::Could not verify GHCR tag availability for '$IMAGE_REF'; refusing to publish."
+            exit 1
           fi
 
       - name: Build image
