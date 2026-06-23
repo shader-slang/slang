@@ -1,0 +1,23 @@
+name: PR Maintenance
+
+# Thin caller for the reusable PR board-sync workflow. Declares the PR event
+# triggers (a reusable workflow cannot declare them itself) and delegates all
+# logic to pr-board-sync.yml. slang consumes its own reusable workflow so there
+# is a single source of truth; other shader-slang repos use the cross-repo form:
+#
+#   uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
+#
+# See .github/workflows/pr-board-sync.yml for the board IDs and required secrets.
+
+on:
+  pull_request_target:
+    types: [opened, reopened, closed, ready_for_review, converted_to_draft, review_requested]
+  pull_request_review:
+    types: [submitted]
+  check_suite:
+    types: [completed]
+
+jobs:
+  board-sync:
+    uses: ./.github/workflows/pr-board-sync.yml
+    secrets: inherit

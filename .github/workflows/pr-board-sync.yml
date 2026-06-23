@@ -1,0 +1,393 @@
+name: PR Board Sync (reusable)
+
+# Reusable workflow that drives an open PR one event-step toward its correct
+# state on the shared "Slang PR Tracking" ProjectsV2 board:
+#   - adds the PR to the board (idempotent),
+#   - classifies + sets its Source (Internal / Community / Bot),
+#   - advances its Status (Revising / Todo / In Progress / Done) on the
+#     event-driven happy path, and
+#   - unrequests auto-assigned reviewers that cannot approve (e.g. bmillsNV).
+#
+# This is the event-driven half of the slang-pr-maintenance state machine. The
+# committer-signal owner/reviewer *assignment* and full drift reconciliation
+# still live in scripts/pr_sweep.py (run on a cadence), which is idempotent and
+# acts as the safety net for events this workflow cannot see (e.g. fork-PR CI,
+# missed webhooks, repos not yet onboarded).
+#
+# Cross-repo reuse: any shader-slang repo adds a thin caller workflow that
+# declares the PR event triggers and calls this one with `secrets: inherit`:
+#
+#   jobs:
+#     board-sync:
+#       uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
+#       secrets: inherit
+#
+# All shader-slang repos feed the SAME board, so every input below already
+# defaults to the shared board's values; callers normally pass nothing but
+# `secrets: inherit`.
+#
+# Required secrets (both are shader-slang **org-level** secrets, already shared
+# org-wide, so `secrets: inherit` from any org repo supplies them — no per-repo
+# setup):
+#   ADD_TO_PROJECT_PAT        - PAT with ProjectV2 read+write on the board.
+#   SLANGBOT_MEMBERS_READONLY - PAT/token that can read org membership (used to
+#                               classify Internal vs Community on opened PRs).
+#
+# Safety: every job runs only on PR metadata / API calls and never checks out or
+# executes PR code, so `pull_request_target` (secrets available for fork PRs) is
+# safe here.
+
+on:
+  workflow_call:
+    inputs:
+      org:
+        description: "GitHub org that owns the board and team membership."
+        type: string
+        default: "shader-slang"
+      project_id:
+        description: "ProjectsV2 board node id (the 'Slang PR Tracking' board)."
+        type: string
+        default: "PVT_kwDOAb2kZs4BSJKy"
+      status_field:
+        description: "Single-select field name for the board Status."
+        type: string
+        default: "Status"
+      status_revising:
+        type: string
+        default: "Revising"
+      status_todo:
+        type: string
+        default: "Todo"
+      status_inprogress:
+        type: string
+        default: "In Progress"
+      status_done:
+        type: string
+        default: "Done"
+      source_field:
+        description: "Single-select field name for the PR Source."
+        type: string
+        default: "Source"
+      source_internal:
+        type: string
+        default: "Internal"
+      source_community:
+        type: string
+        default: "Community"
+      source_bot:
+        type: string
+        default: "Bot"
+      bot_authors:
+        description: "Comma-separated logins always treated as bots."
+        type: string
+        default: "nv-slang-bot,slang-coworker-nanoclaw,Copilot,copilot-swe-agent"
+      ignored_reviewers:
+        description: "Comma-separated auto-assigned reviewers that cannot approve; unrequested on the PR."
+        type: string
+        default: "bmillsNV"
+
+jobs:
+  board-sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # --- Classify Source (org-membership read; opened/reopened only) --------
+      - name: Classify PR Source
+        id: classify
+        if: >-
+          github.event_name == 'pull_request_target' &&
+          (github.event.action == 'opened' || github.event.action == 'reopened')
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          ORG: ${{ inputs.org }}
+          BOT_AUTHORS: ${{ inputs.bot_authors }}
+          SOURCE_INTERNAL: ${{ inputs.source_internal }}
+          SOURCE_COMMUNITY: ${{ inputs.source_community }}
+          SOURCE_BOT: ${{ inputs.source_bot }}
+        with:
+          github-token: ${{ secrets.SLANGBOT_MEMBERS_READONLY }}
+          script: |
+            const user = context.payload.pull_request.user;
+            const login = user.login;
+            const botAuthors = (process.env.BOT_AUTHORS || "")
+              .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+            const isBot = user.type === "Bot" ||
+              botAuthors.includes((login || "").toLowerCase());
+
+            let source;
+            if (isBot) {
+              source = process.env.SOURCE_BOT;
+            } else {
+              let isOrgMember = false;
+              try {
+                await github.rest.orgs.checkMembershipForUser({
+                  org: process.env.ORG,
+                  username: login,
+                });
+                isOrgMember = true;
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
+              }
+              source = isOrgMember
+                ? process.env.SOURCE_INTERNAL
+                : process.env.SOURCE_COMMUNITY;
+              console.log(`PR author ${login}; org member: ${isOrgMember}`);
+            }
+            core.setOutput("source", source);
+
+      # --- Board writes: add + Source + Status (ProjectsV2 PAT) ---------------
+      - name: Reconcile board (add, Source, Status)
+        if: >-
+          github.event_name != 'pull_request_target' ||
+          github.event.action != 'review_requested'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          PROJECT_ID: ${{ inputs.project_id }}
+          STATUS_FIELD: ${{ inputs.status_field }}
+          STATUS_REVISING: ${{ inputs.status_revising }}
+          STATUS_TODO: ${{ inputs.status_todo }}
+          STATUS_INPROGRESS: ${{ inputs.status_inprogress }}
+          STATUS_DONE: ${{ inputs.status_done }}
+          SOURCE_FIELD: ${{ inputs.source_field }}
+          SOURCE_VALUE: ${{ steps.classify.outputs.source }}
+          BOT_AUTHORS: ${{ inputs.bot_authors }}
+        with:
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          script: |
+            const PROJECT_ID = process.env.PROJECT_ID;
+            const STATUS = {
+              field: process.env.STATUS_FIELD,
+              revising: process.env.STATUS_REVISING,
+              todo: process.env.STATUS_TODO,
+              inprogress: process.env.STATUS_INPROGRESS,
+              done: process.env.STATUS_DONE,
+            };
+            const SOURCE_FIELD = process.env.SOURCE_FIELD;
+            const BOT_AUTHORS = (process.env.BOT_AUTHORS || "")
+              .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+
+            // --- ProjectsV2 helpers (mirror Applier in pr_sweep.py) ----------
+            const fieldCache = {};
+            async function field(name) {
+              if (fieldCache[name]) return fieldCache[name];
+              const data = await github.graphql(`
+                query($project: ID!, $name: String!) {
+                  node(id: $project) {
+                    ... on ProjectV2 {
+                      field(name: $name) {
+                        ... on ProjectV2SingleSelectField { id options { id name } }
+                      }
+                    }
+                  }
+                }`, { project: PROJECT_ID, name });
+              const f = data?.node?.field || {};
+              const options = {};
+              for (const o of (f.options || [])) options[o.name] = o.id;
+              fieldCache[name] = { id: f.id, options };
+              return fieldCache[name];
+            }
+
+            // addProjectV2ItemById is idempotent: returns the existing item id
+            // when the PR is already on the board.
+            async function ensureItem(contentId) {
+              if (!contentId) return null;
+              const r = await github.graphql(`
+                mutation($project: ID!, $content: ID!) {
+                  addProjectV2ItemById(input: {projectId: $project, contentId: $content}) {
+                    item { id }
+                  }
+                }`, { project: PROJECT_ID, content: contentId });
+              return r?.addProjectV2ItemById?.item?.id || null;
+            }
+
+            async function setSingleSelect(itemId, fieldName, optionName) {
+              if (!itemId || !optionName) return;
+              const f = await field(fieldName);
+              const optionId = (f.options || {})[optionName];
+              if (!f.id || !optionId) {
+                core.warning(`field ${fieldName} option ${optionName} not found on board`);
+                return;
+              }
+              await github.graphql(`
+                mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $project, itemId: $item, fieldId: $field,
+                    value: { singleSelectOptionId: $option }
+                  }) { projectV2Item { id } }
+                }`, { project: PROJECT_ID, item: itemId, field: f.id, option: optionId });
+              console.log(`set ${fieldName} = ${optionName}`);
+            }
+
+            async function currentStatus(itemId) {
+              const data = await github.graphql(`
+                query($item: ID!, $name: String!) {
+                  node(id: $item) {
+                    ... on ProjectV2Item {
+                      fieldValueByName(name: $name) {
+                        ... on ProjectV2ItemFieldSingleSelectValue { name }
+                      }
+                    }
+                  }
+                }`, { item: itemId, name: STATUS.field });
+              return data?.node?.fieldValueByName?.name || null;
+            }
+
+            // --- CI rollup (mirror summarize_ci / ci_state_from_rollup) -------
+            function summarizeCi(runs) {
+              if (!runs.length) return "none";
+              let pending = false, failed = false;
+              for (const r of runs) {
+                if (r.conclusion === "action_required") return "action_required";
+                if (r.status !== "completed") { pending = true; continue; }
+                if (!["success", "neutral", "skipped"].includes(r.conclusion)) failed = true;
+              }
+              if (pending) return "pending";
+              if (failed) return "failed";
+              return "passed";
+            }
+
+            // One query per PR: node id, draft + author (bot) + CI rollup.
+            async function prInfo(number) {
+              const data = await github.graphql(`
+                query($owner: String!, $name: String!, $n: Int!) {
+                  repository(owner: $owner, name: $name) {
+                    pullRequest(number: $n) {
+                      id isDraft state
+                      author { login __typename }
+                      commits(last: 1) { nodes { commit { statusCheckRollup {
+                        contexts(first: 100) { nodes {
+                          __typename
+                          ... on CheckRun { status conclusion }
+                          ... on StatusContext { state }
+                        } }
+                      } } } }
+                    }
+                  }
+                }`, { owner: context.repo.owner, name: context.repo.repo, n: number });
+              const pr = data?.repository?.pullRequest;
+              if (!pr) return null;
+              const contexts =
+                pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes || [];
+              const runs = [];
+              for (const c of contexts) {
+                if (c.__typename === "CheckRun") {
+                  runs.push({
+                    status: (c.status || "").toLowerCase(),
+                    conclusion: (c.conclusion || "").toLowerCase(),
+                  });
+                } else {
+                  const state = (c.state || "").toUpperCase();
+                  if (state === "SUCCESS") runs.push({ status: "completed", conclusion: "success" });
+                  else if (state === "FAILURE" || state === "ERROR") runs.push({ status: "completed", conclusion: "failure" });
+                  else runs.push({ status: "in_progress", conclusion: null });
+                }
+              }
+              const login = (pr.author?.login || "").toLowerCase();
+              const isBot = pr.author?.__typename === "Bot" || BOT_AUTHORS.includes(login);
+              return { nodeId: pr.id, isDraft: pr.isDraft, isBot, ci: summarizeCi(runs) };
+            }
+
+            // CI-driven transition (mirror _correct_failing_ci + promotion):
+            //   non-bot failing CI in Todo/In Progress  -> Revising (demote)
+            //   gate passed + not draft, in Revising/none -> Todo (promote)
+            async function evaluateCi(number, nodeId) {
+              const info = await prInfo(number);
+              if (!info) return;
+              const itemId = await ensureItem(nodeId || info.nodeId);
+              if (!itemId) return;
+              const status = await currentStatus(itemId);
+              if (info.ci === "failed" && !info.isBot &&
+                  (status === STATUS.todo || status === STATUS.inprogress)) {
+                await setSingleSelect(itemId, STATUS.field, STATUS.revising);
+                return;
+              }
+              const gatePassed = info.isBot ? true : info.ci === "passed";
+              if (gatePassed && !info.isDraft &&
+                  (status === null || status === STATUS.revising)) {
+                await setSingleSelect(itemId, STATUS.field, STATUS.todo);
+              }
+            }
+
+            function isBotUser(user) {
+              return user?.type === "Bot" ||
+                BOT_AUTHORS.includes((user?.login || "").toLowerCase());
+            }
+
+            // --- Dispatch on the triggering event ----------------------------
+            const ev = context.eventName;
+            const action = context.payload.action;
+
+            if (ev === "pull_request_target") {
+              const pr = context.payload.pull_request;
+              const itemId = await ensureItem(pr.node_id);
+              if (!itemId) { core.warning("could not add PR to board"); return; }
+
+              if (action === "opened" || action === "reopened") {
+                const source = process.env.SOURCE_VALUE;
+                if (source) await setSingleSelect(itemId, SOURCE_FIELD, source);
+              }
+
+              if (action === "closed") {
+                await setSingleSelect(itemId, STATUS.field, STATUS.done);
+              } else if (action === "converted_to_draft") {
+                // Human drafts belong in Revising; bot drafts are not exempt.
+                if (!isBotUser(pr.user)) {
+                  await setSingleSelect(itemId, STATUS.field, STATUS.revising);
+                }
+              } else if (action === "opened") {
+                // Entry state; CI / ready_for_review events promote later.
+                const status = await currentStatus(itemId);
+                if (status === null) {
+                  await setSingleSelect(itemId, STATUS.field, STATUS.revising);
+                }
+              } else if (action === "ready_for_review" || action === "reopened") {
+                await evaluateCi(pr.number, pr.node_id);
+              }
+            } else if (ev === "pull_request_review") {
+              if ((context.payload.review?.state || "").toLowerCase() === "changes_requested") {
+                const pr = context.payload.pull_request;
+                const itemId = await ensureItem(pr.node_id);
+                if (itemId) await setSingleSelect(itemId, STATUS.field, STATUS.revising);
+              }
+            } else if (ev === "check_suite") {
+              // Only same-repo PRs are linked here (fork PRs are covered by the
+              // periodic pr_sweep.py reconcile).
+              const prs = context.payload.check_suite?.pull_requests || [];
+              for (const p of prs) {
+                if (p.state && p.state !== "open") continue;
+                await evaluateCi(p.number, null);
+              }
+            }
+
+      # --- Unrequest auto-assigned non-approver reviewers --------------------
+      - name: Unrequest ignored reviewers
+        if: >-
+          github.event_name == 'pull_request_target' &&
+          (github.event.action == 'opened' ||
+           github.event.action == 'reopened' ||
+           github.event.action == 'ready_for_review' ||
+           github.event.action == 'review_requested')
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          IGNORED_REVIEWERS: ${{ inputs.ignored_reviewers }}
+        with:
+          script: |
+            const ignored = (process.env.IGNORED_REVIEWERS || "")
+              .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+            if (!ignored.length) return;
+            const pr = context.payload.pull_request;
+            if (!pr) return;
+            const requested = (pr.requested_reviewers || []).map(r => r.login);
+            const toRemove = requested.filter(l => ignored.includes((l || "").toLowerCase()));
+            if (!toRemove.length) return;
+            await github.rest.pulls.removeRequestedReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              reviewers: toRemove,
+            });
+            console.log(`unrequested: ${toRemove.join(", ")}`);
