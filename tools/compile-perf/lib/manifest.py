@@ -140,7 +140,9 @@ WORKLOADS = [
         default_size=400,
         mode="target",
         extra_flags=SPIRV,
-        primary_timers=["frontEndExecute", "SemanticChecking", "compileInner"],
+        # slangc aborts before emitting timer output when there are many
+        # compile errors, so no primary_timers — ok=True requires only that
+        # errors were produced as expected (expect_fail).
         expect_fail=True,
     ),
     WorkloadSpec(
