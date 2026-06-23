@@ -10417,35 +10417,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         List<IRInst*> entryPoints{};
         for (const auto modifier : decl->modifiers)
         {
-            if (const auto layoutLocalSizeAttr = as<GLSLLayoutLocalSizeAttribute>(modifier))
-            {
-                verifyComputeDerivativeGroupModifier = true;
-                getAllEntryPointsNoOverride(entryPoints);
-
-                LoweredValInfo extents[3];
-
-                for (int i = 0; i < 3; ++i)
-                {
-                    extents[i] = layoutLocalSizeAttr->specConstExtents[i]
-                                     ? emitDeclRef(
-                                           context,
-                                           layoutLocalSizeAttr->specConstExtents[i],
-                                           lowerType(
-                                               context,
-                                               getType(
-                                                   context->astBuilder,
-                                                   layoutLocalSizeAttr->specConstExtents[i])))
-                                     : lowerVal(context, layoutLocalSizeAttr->extents[i]);
-                }
-
-                for (auto d : entryPoints)
-                    as<IRNumThreadsDecoration>(getBuilder()->addNumThreadsDecoration(
-                        d,
-                        getSimpleVal(context, extents[0]),
-                        getSimpleVal(context, extents[1]),
-                        getSimpleVal(context, extents[2])));
-            }
-            else if (as<GLSLLayoutDerivativeGroupQuadAttribute>(modifier))
+            if (as<GLSLLayoutDerivativeGroupQuadAttribute>(modifier))
             {
                 verifyComputeDerivativeGroupModifier = true;
                 getAllEntryPointsNoOverride(entryPoints);

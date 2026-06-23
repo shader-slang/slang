@@ -1677,6 +1677,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         numThreads->extents[i] = glslAttr->extents[i];
                         numThreads->specConstExtents[i] = glslAttr->specConstExtents[i];
                     }
+                    // We attribute the location of the new NumThreadsAttribute
+                    // to the location of the first GLSLLayoutLocalSizeAttribute,
+                    // just to have something there (even if multiple
+                    // attributes get merged to this NumThreadsAttribute).
+                    // numThreads->loc = glslAttr->loc;
                 }
                 else
                 {
