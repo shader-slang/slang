@@ -2761,18 +2761,13 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
         auto foldType = declRef.substitute(m_astBuilder, decl->type.type);
         auto val = WitnessLookupIntVal::tryFold(m_astBuilder, witness, decl, foldType);
 
-        // The associated constant can fail to fold here when this requirement is reached from a
-        // signature-type position (e.g. `float[VALUE::COUNT]`) before the conforming type's
-        // conformance witness tables have been built. In that case `tryFold` leaves a symbolic
-        // `WitnessLookupIntVal` (`int(Data<3>.COUNT)`) that never compares equal to the
-        // literal value the generic-substitution path produces once it folds the same
-        // constant, which then surfaces as spurious array-size type mismatches. Ensure the
-        // conforming type's conformances are checked and retry, so the value returned for the
-        // requirement is the concrete constant rather than a symbolic lookup. When the sub-type is
-        // not a concrete decl (e.g. a generic type parameter) `ReadyForConformances` cannot supply
-        // a concrete witness, the re-fold stays symbolic, and behavior is unchanged.
-        if (witness && as<WitnessLookupIntVal>(val))
+        // A signature-type-position fold (e.g. `float[VALUE::COUNT]`) can run before the
+        // conforming type's witness table is built, leaving a symbolic result; ensure its
+        // conformances and re-fold so the value matches the concrete constant the in-body
+        // path produces.
+        if (as<WitnessLookupIntVal>(val))
         {
+            SLANG_ASSERT(witness);
             if (auto subDeclRefType = as<DeclRefType>(witness->getSub()))
             {
                 ensureDecl(
