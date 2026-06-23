@@ -1,4 +1,9 @@
 // gui.cpp
+
+// imgui moved its courtesy math operators out of imgui.h in v1.89.4 and guarded
+// them: IMGUI_DEFINE_MATH_OPERATORS must be defined before the first imgui.h
+// include in a translation unit. gui.h includes imgui.h, and this file also
+// unity-includes the imgui .cpp sources at the bottom, so define it here first.
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "gui.h"
 
