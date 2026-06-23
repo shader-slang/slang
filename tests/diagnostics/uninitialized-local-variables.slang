@@ -2,7 +2,11 @@
 
 float f(float) { return 1; }
 
-// Should not warn here (unconditionalBranch)
+// k0 and k1 are only conditionally assigned (inside if).
+// Note: this case is optimized away by constexpr propagation before
+// the uninit check runs, so no warning is produced at IR level.
+// The must-init warning (41035) catches this pattern when the variable
+// survives optimization (e.g. structs, out params).
 float3 unconditional(int mode)
 {
     float k0;

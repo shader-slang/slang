@@ -64,7 +64,7 @@ jobs:
         shell: bash
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           submodules: "recursive"
           fetch-depth: "0"
@@ -132,7 +132,7 @@ jobs:
       # Authenticate to Google Cloud (skip for fork PRs - no id-token available)
       - name: Authenticate to Google Cloud
         if: env.IS_FORK_PR != 'true'
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
@@ -235,6 +235,13 @@ jobs:
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
 
+          # Match regular CPU-only CI's #11062 mitigation. Linux coverage runs
+          # CPU/LLVM and synthesized LLVM test paths on GitHub-hosted runners,
+          # so it can hit the same slang-llvm JIT AVX-512 SIGILL.
+          if [[ "${{ inputs.os }}" == "linux" ]]; then
+            export SLANG_DISABLE_AVX512=1
+          fi
+
           # Build slang-test arguments (same as regular CI)
           test_args=(
             "-expected-failure-list" "tests/expected-failure-github.txt"
@@ -249,6 +256,12 @@ jobs:
           # macOS: cross-dylib C++ exception tests fail in-process (server-count=1)
           if [[ "${{ inputs.os }}" == "macos" ]]; then
             test_args+=("-expected-failure-list" "tests/expected-failure-coverage.txt")
+
+            # macOS coverage currently crashes in generated synthetic LLVM runtime tests
+            # under coverage instrumentation (for example, parameter-block.slang.6
+            # syn (llvm)). Keep explicit LLVM tests and the compile-target synthesis
+            # pass, but do not synthesize extra LLVM runtime variants in coverage CI.
+            test_args+=("-synthesizedTestApi" "-llvm")
           fi
 
           # Add test server arguments if server count > 1
@@ -259,10 +272,17 @@ jobs:
 
           # --with-synthesis runs a second pass with -only-synthesized to
           # exercise backend emit paths without a GPU.
+          # --with-agentic-tests rolls the doc-anchored bundles under
+          # docs/generated/tests/ into the merged coverage report.
+          # run-coverage.sh passes -expected-failure-list pointing at
+          # docs/generated/tests/_meta/expected-failures.txt, so the
+          # agentic pass uses the same gate as ci-agentic-tests-nightly
+          # (only unexpected failures surface, and they're tolerated
+          # here so coverage data is collected either way).
           # Retry once on failure to handle intermittent test failures.
-          if ! ./tools/coverage/run-coverage.sh --with-synthesis "${test_args[@]}"; then
+          if ! ./tools/coverage/run-coverage.sh --with-synthesis --with-agentic-tests "${test_args[@]}"; then
             echo "::warning::First coverage run failed. Retrying..."
-            ./tools/coverage/run-coverage.sh --with-synthesis "${test_args[@]}"
+            ./tools/coverage/run-coverage.sh --with-synthesis --with-agentic-tests "${test_args[@]}"
           fi
 
       - name: Run Tests with Coverage (Windows)
@@ -541,7 +561,7 @@ jobs:
 
       - name: Upload Coverage Artifacts for Merging
         if: ${{ !inputs.deploy-pages }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: coverage-${{ inputs.os }}-${{ inputs.platform }}
           # coverage-html-slangc/ and libslang.* are Linux/macOS-only; the
@@ -564,7 +584,7 @@ jobs:
 
       - name: Checkout Coverage Reports Repository
         if: ${{ inputs.deploy-pages }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: "shader-slang/slang-coverage-reports"
           path: "coverage-repo"
@@ -640,7 +660,7 @@ jobs:
 
       - name: Report Coverage in PR
         if: ${{ inputs.pr-comment }}
-        uses: zgosalvez/github-actions-report-lcov@v4
+        uses: zgosalvez/github-actions-report-lcov@eda775f552bfb2bffbdedea26f19dfb8c24a1648 # v4
         with:
           coverage-files: coverage.lcov
           minimum-coverage: 0
@@ -656,7 +676,7 @@ jobs:
           ls -lh coverage.lcov.gz
 
       - name: Upload LCOV Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: coverage-lcov-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}
           path: coverage.lcov.gz
@@ -694,7 +714,7 @@ jobs:
 
       - name: Upload llvm-cov JSON Export (Linux/macOS only)
         if: inputs.os != 'windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: coverage-json-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}
           path: coverage.json.gz

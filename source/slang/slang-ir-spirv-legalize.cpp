@@ -53,6 +53,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     };
     Dictionary<IRType*, LoweredStructuredBufferTypeInfo> m_loweredStructuredBufferTypes;
 
+    struct WrappedCBufferElementInfo
+    {
+        IRStructType* structType;
+        IRStructKey* key;
+        IRParameterGroupType* parameterGroupType;
+    };
+
     IRInst* lowerTextureFootprintType(IRInst* footprintType)
     {
         // Lowers `IRTextureFootprintType` to a struct with the following definition:
@@ -205,13 +212,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
     }
 
-    // Wraps the element type of a constant buffer or parameter block in a struct if it is not
-    // already a struct, returns the newly created struct type.
-    IRType* wrapConstantBufferElement(IRInst* cbParamInst)
+    // Creates the wrapper struct and matching parameter-group type for a non-struct constant
+    // buffer element, preserving layout operands and caching the wrapper layout decorations.
+    WrappedCBufferElementInfo createWrappedConstantBufferElementType(
+        IRParameterGroupType* parameterGroupType)
     {
-        auto innerType = as<IRParameterGroupType>(cbParamInst->getDataType())->getElementType();
-        IRBuilder builder(cbParamInst);
-        builder.setInsertBefore(cbParamInst);
+        auto innerType = parameterGroupType->getElementType();
+        IRBuilder builder(parameterGroupType);
+        builder.setInsertBefore(parameterGroupType);
         auto structType = builder.createStructType();
         builder.addPhysicalTypeDecoration(structType);
         addToWorkList(structType);
@@ -222,14 +230,30 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.addNameHintDecoration(structType, sb.produceString().getUnownedSlice());
         auto key = builder.createStructKey();
         builder.createStructField(structType, key, innerType);
-        builder.setInsertBefore(cbParamInst);
-        auto newCbType = builder.getType(cbParamInst->getDataType()->getOp(), structType);
-        cbParamInst->setFullType(newCbType);
-        auto rules = getTypeLayoutRuleForBuffer(
-            m_sharedContext->m_targetProgram,
-            cbParamInst->getDataType());
+
+        List<IRInst*> bufferTypeOperands;
+        bufferTypeOperands.add(structType);
+        for (UInt i = 1; i < parameterGroupType->getOperandCount(); i++)
+            bufferTypeOperands.add(parameterGroupType->getOperand(i));
+
+        auto newCbType = as<IRParameterGroupType>(builder.getType(
+            parameterGroupType->getOp(),
+            (UInt)bufferTypeOperands.getCount(),
+            bufferTypeOperands.getArrayView().getBuffer()));
+        auto rules = getTypeLayoutRuleForBuffer(m_sharedContext->m_targetProgram, newCbType);
         IRSizeAndAlignment sizeAlignment;
         getSizeAndAlignment(m_sharedContext->m_targetRequest, rules, structType, &sizeAlignment);
+        return WrappedCBufferElementInfo{structType, key, newCbType};
+    }
+
+    // Rewrites value users of a constant-buffer value to read through the single field of the
+    // synthesized wrapper struct.
+    void replaceUsesWithWrappedConstantBufferElement(
+        IRInst* cbParamInst,
+        IRStructKey* key,
+        IRType* innerType)
+    {
+        IRBuilder builder(cbParamInst);
         traverseUses(
             cbParamInst,
             [&](IRUse* use)
@@ -248,7 +272,59 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     key);
                 use->set(addr);
             });
-        return structType;
+    }
+
+    // Wraps the element type of a non-array constant buffer or parameter block in a struct. This
+    // mutates cbParamInst in place by changing its full type to the wrapped parameter-group type
+    // and rewriting existing value uses to field addresses. Returns the wrapper struct type.
+    IRType* wrapConstantBufferElement(IRInst* cbParamInst)
+    {
+        auto parameterGroupType = as<IRParameterGroupType>(cbParamInst->getDataType());
+        auto innerType = parameterGroupType->getElementType();
+        auto wrapped = createWrappedConstantBufferElementType(parameterGroupType);
+        cbParamInst->setFullType(wrapped.parameterGroupType);
+        replaceUsesWithWrappedConstantBufferElement(cbParamInst, wrapped.key, innerType);
+        return wrapped.structType;
+    }
+
+    // Wraps used non-struct IRConstantBufferType globals before SPIR-V type translation. This
+    // handles descriptor-handle operands that refer to the type directly rather than going
+    // through processGlobalParam.
+    void wrapRemainingConstantBufferElementTypes()
+    {
+        List<IRConstantBufferType*> constantBufferTypes;
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto constantBufferType = as<IRConstantBufferType>(globalInst);
+            if (!constantBufferType)
+                continue;
+            if (!constantBufferType->hasUses())
+                continue;
+            if (as<IRStructType>(constantBufferType->getElementType()))
+                continue;
+            constantBufferTypes.add(constantBufferType);
+        }
+
+        for (auto constantBufferType : constantBufferTypes)
+        {
+            List<IRInst*> instsToUnwrap;
+            traverseUses(
+                constantBufferType,
+                [&](IRUse* use)
+                {
+                    auto user = use->getUser();
+                    if (user->getFullType() == constantBufferType)
+                        instsToUnwrap.add(user);
+                });
+
+            auto innerType = constantBufferType->getElementType();
+            auto wrapped = createWrappedConstantBufferElementType(constantBufferType);
+            constantBufferType->replaceUsesWith(wrapped.parameterGroupType);
+            for (auto inst : instsToUnwrap)
+            {
+                replaceUsesWithWrappedConstantBufferElement(inst, wrapped.key, innerType);
+            }
+        }
     }
 
     static void insertLoadAtLatestLocation(
@@ -447,11 +523,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRType* dataLayout = builder.getDefaultBufferLayoutType();
             auto cbufferType = as<IRConstantBufferType>(innerType);
             auto paramBlockType = as<IRParameterBlockType>(innerType);
+            IRStructKey* wrappedArrayElementKey = nullptr;
+            IRType* wrappedArrayElementType = nullptr;
             if (cbufferType || paramBlockType)
             {
                 auto uniformParamGroupType = as<IRUniformParameterGroupType>(innerType);
                 innerType = uniformParamGroupType->getElementType();
                 dataLayout = uniformParamGroupType->getDataLayout();
+                if (!dataLayout)
+                    dataLayout = builder.getDefaultBufferLayoutType();
                 if (addressSpace == AddressSpace::ThreadLocal)
                     addressSpace = AddressSpace::Uniform;
                 // Constant buffer is already treated like a pointer type, and
@@ -463,7 +543,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // a struct.
                 if (!as<IRStructType>(innerType))
                 {
-                    innerType = wrapConstantBufferElement(inst);
+                    if (arrayType)
+                    {
+                        wrappedArrayElementType = innerType;
+                        auto wrapped =
+                            createWrappedConstantBufferElementType(uniformParamGroupType);
+                        innerType = wrapped.structType;
+                        wrappedArrayElementKey = wrapped.key;
+                    }
+                    else
+                    {
+                        innerType = wrapConstantBufferElement(inst);
+                    }
                 }
                 builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBlockDecoration);
 
@@ -577,6 +668,41 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                             // index).
                             IRBuilder builder(getElement);
                             builder.setInsertBefore(user);
+                            auto index = getElement->getIndex();
+
+                            // The non-uniform-ness of this access can be recorded in
+                            // any of three forms, depending on how far prior passes
+                            // got: (1) the index is still a `NonUniformResourceIndex`
+                            // inst, (2) that inst was already lowered away but left
+                            // its decoration on the index, or (3) the decoration is
+                            // on the getElement itself. All three must be detected
+                            // and carried onto the access chain created below,
+                            // because that rewrite drops the `NonUniformResourceIndex`
+                            // -- so without re-attaching the decoration the NonUniform
+                            // requirement (Vulkan VUID-RuntimeSpirv-None-10148) would
+                            // be silently dropped here.
+                            //
+                            // Completeness: the base array (operand 0 of getElement)
+                            // is not checked because the float pass places NonUniform
+                            // on the getElement or its index, never on the base --
+                            // the base is `inst` (the global param being processed),
+                            // a module-level variable that is uniform by construction.
+                            bool isNonUniform =
+                                (index->getOp() == kIROp_NonUniformResourceIndex) ||
+                                index->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                                    nullptr ||
+                                user->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                                    nullptr;
+                            // Unwrap so the access chain indexes with the raw value.
+                            // We decorate the access chain (`newAddr`) below, which
+                            // is the resource-operand precursor the consuming load/
+                            // store will use; per VUID-RuntimeSpirv-None-10148 it is
+                            // that operand, not the raw index, that must carry
+                            // NonUniform, so the unwrapped index is intentionally
+                            // left undecorated here.
+                            if (index->getOp() == kIROp_NonUniformResourceIndex)
+                                index = index->getOperand(0);
+
                             auto newAddr = builder.emitElementAddress(
                                 builder.getPtrType(
                                     innerElementType,
@@ -584,8 +710,22 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                     addressSpace,
                                     dataLayout),
                                 inst,
-                                getElement->getIndex());
-                            user->replaceUsesWith(newAddr);
+                                index);
+                            if (isNonUniform)
+                                builder.addSPIRVNonUniformResourceDecoration(newAddr);
+                            IRInst* replacementAddr = newAddr;
+                            if (wrappedArrayElementKey)
+                            {
+                                replacementAddr = builder.emitFieldAddress(
+                                    builder.getPtrType(
+                                        wrappedArrayElementType,
+                                        AccessQualifier::Read,
+                                        addressSpace,
+                                        dataLayout),
+                                    newAddr,
+                                    wrappedArrayElementKey);
+                            }
+                            user->replaceUsesWith(replacementAddr);
                             user->removeAndDeallocate();
                             return;
                         }
@@ -1021,6 +1161,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     Dictionary<IRInst*, IRInst*> m_mapArrayValueToVar;
 
+    // Cache of `Abort` message struct types, keyed on a tuple type whose element
+    // sequence matches the message field types. This keeps identical payload
+    // signatures on one nominal struct type instead of bloating the module with
+    // a fresh struct type per call site.
+    Dictionary<IRTupleType*, IRStructType*> m_abortMessageTypes;
+
     // Replace getElement(x, i) with, y = store(x); p = getElementPtr(y, i); load(p),
     // when i is not a constant. SPIR-V has no support for dynamic indexing into values like we do.
     // It may be advantageous however to do this further up the pipeline
@@ -1253,6 +1399,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
             else if (auto loadDescriptor = as<IRSPIRVLoadDescriptorFromHeap>(image))
             {
+                // Descriptor heaps and NonUniform:
+                // NonUniform is not propagated onto this heap texel pointer.
+                // SPIRVLoadTexelPointerFromHeap is handled by neither the float
+                // pass nor propagateNonUniformDecorations. Today that is harmless
+                // because image atomics on descriptor-heap resources are rejected
+                // by the atomic-destination validator (E41403, see
+                // validateAtomicOperations in slang-ir-validate.cpp), so this op
+                // never reaches an atomic that would require the decoration. If
+                // heap image atomics are ever enabled, NonUniform handling for
+                // this op must be added in tandem.
                 auto texelPtr = builder.emitSPIRVLoadTexelPointerFromHeap(
                     newPtrType,
                     loadDescriptor->getHeap(),
@@ -1895,6 +2051,158 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         addUsersToWorkList(newInst);
     }
 
+    /// Lower an `Abort` instruction into the form expected by the SPIRV emitter.
+    ///
+    /// The front end produces `Abort(format, args...)`, where `format` must be a
+    /// string literal and the variadic arguments arrive either as a single
+    /// `MakeStruct` (the usual variadic-pack lowering) or as a flat operand list.
+    /// `OpAbortKHR` takes a single message operand: a struct whose first member is
+    /// the format string packed as a `uint` array (little-endian bytes, including
+    /// the null terminator) followed by the argument values. This function builds
+    /// that struct value in IR and rewrites the instruction to `Abort(message)`.
+    ///
+    /// The conversion is done here rather than at emit time so the array and
+    /// struct types go through the regular deduplicated type-emission path
+    /// instead of being created ad hoc per call site. The struct type is marked
+    /// physical so the emitter decorates its members with explicit `Offset`s, and
+    /// the array type carries an explicit stride so it receives an `ArrayStride`
+    /// decoration; both are required for the explicitly laid out message payload.
+    void processAbort(IRInst* inst)
+    {
+        // Skip instructions this function already rewrote: the lowered form has
+        // the single packed message-struct operand instead of a format string.
+        if (inst->getOperandCount() == 1 && as<IRMakeStruct>(inst->getOperand(0)))
+            return;
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+
+        auto formatLit = as<IRStringLit>(inst->getOperand(0));
+        if (!formatLit)
+        {
+            m_sharedContext->m_sink->diagnose(
+                Diagnostics::AbortFormatMustBeStringLiteral{.location = inst->sourceLoc});
+            // Compilation has failed; drop the malformed instruction so that
+            // downstream emit logic does not also trip over its string-typed
+            // operand and report a secondary internal error.
+            inst->replaceUsesWith(builder.getVoidValue());
+            inst->removeAndDeallocate();
+            return;
+        }
+
+        // Pack the format string, including its null terminator, into uint words
+        // (little-endian byte order).
+        auto uintType = builder.getUIntType();
+        auto format = formatLit->getStringSlice();
+        Index wordCount = (format.getLength() + 1 + 3) / 4;
+        List<IRInst*> words;
+        for (Index w = 0; w < wordCount; w++)
+        {
+            uint32_t word = 0;
+            for (Index b = 0; b < 4; b++)
+            {
+                Index byteIndex = w * 4 + b;
+                if (byteIndex < format.getLength())
+                    word |= uint32_t(uint8_t(format[byteIndex])) << (8 * b);
+            }
+            words.add(builder.getIntValue(uintType, word));
+        }
+        auto arrayType = builder.getArrayTypeBase(
+            kIROp_ArrayType,
+            uintType,
+            builder.getIntValue(builder.getIntType(), wordCount),
+            builder.getIntValue(builder.getIntType(), sizeof(uint32_t)));
+        auto formatArray =
+            builder.emitMakeArray(arrayType, (UInt)words.getCount(), words.getBuffer());
+
+        // Flatten the variadic arguments.
+        List<IRInst*> args;
+        collectFlattenedVariadicOperands(inst, 1, args);
+
+        // The message struct uses explicit layout, and `OpTypeBool` has no
+        // physical size in SPIRV, so widen bool arguments (scalar or vector)
+        // to uint before they are added to the physical message payload.
+        // `legalizeAbort` has already diagnosed unsupported payload shapes;
+        // the release assert below defends that explicit-layout invariant.
+        for (auto& arg : args)
+        {
+            auto argType = arg->getDataType();
+            if (as<IRBoolType>(argType))
+            {
+                arg = builder.emitCast(uintType, arg);
+                continue;
+            }
+            auto elementType = argType;
+            if (auto vectorType = as<IRVectorType>(argType))
+            {
+                elementType = vectorType->getElementType();
+                if (as<IRBoolType>(elementType))
+                {
+                    arg = builder.emitCast(
+                        builder.getVectorType(uintType, vectorType->getElementCount()),
+                        arg);
+                    continue;
+                }
+            }
+            SLANG_RELEASE_ASSERT(as<IRBasicType>(elementType));
+        }
+
+        // Build the message struct type `{ uint format[]; args... }` and value,
+        // reusing a previously created struct type when another abort site has
+        // the same payload signature.
+        List<IRType*> fieldTypes;
+        fieldTypes.add(arrayType);
+        for (auto arg : args)
+            fieldTypes.add(arg->getDataType());
+
+        auto typeKey = builder.getTupleType(fieldTypes.getArrayView());
+
+        IRStructType* structType = nullptr;
+        if (!m_abortMessageTypes.tryGetValue(typeKey, structType))
+        {
+            structType = builder.createStructType();
+            builder.addNameHintDecoration(structType, toSlice("AbortMessage"));
+            builder.addPhysicalTypeDecoration(structType);
+            for (auto fieldType : fieldTypes)
+                builder.createStructField(structType, builder.createStructKey(), fieldType);
+            m_abortMessageTypes.add(typeKey, structType);
+        }
+
+        List<IRInst*> fieldValues;
+        fieldValues.add(formatArray);
+        for (auto arg : args)
+            fieldValues.add(arg);
+        auto message = builder.emitMakeStruct(structType, fieldValues);
+
+        IRInst* newAbort =
+            builder.emitIntrinsicInst(builder.getVoidType(), kIROp_Abort, 1, &message);
+        newAbort->sourceLoc = inst->sourceLoc;
+        inst->transferDecorationsTo(newAbort);
+        inst->replaceUsesWith(newAbort);
+        inst->removeAndDeallocate();
+
+        // `OpAbortKHR` is a block terminator: everything after the abort in
+        // this block is unreachable, and the block's original branch must not
+        // survive in the IR — otherwise a successor's phi would still name
+        // this block as a predecessor that never actually branches to it in
+        // the emitted SPIRV. Strip the trailing instructions (including the
+        // terminator) and end the block with `unreachable`, mirroring the
+        // treatment `discard` gets for `OpKill` in
+        // removeUnreachableCodeAfterDiscardForOpKill().
+        List<IRInst*> unreachableInsts;
+        for (auto next = newAbort->getNextInst(); next; next = next->getNextInst())
+            unreachableInsts.add(next);
+        for (auto deadInst : unreachableInsts)
+            deadInst->removeAndDeallocate();
+        builder.setInsertAfter(newAbort);
+        builder.emitUnreachable();
+
+        // Give the new composite values their normal worklist processing (e.g.
+        // hoisting the all-constant format array to the global scope).
+        addToWorkList(formatArray);
+        addToWorkList(message);
+    }
+
     void processStructField(IRStructField* field)
     {
         auto newFieldType = field->getFieldType();
@@ -2075,6 +2383,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_PtrLit:
                 processPtrLit(inst);
                 break;
+            case kIROp_Abort:
+                processAbort(inst);
+                break;
             case kIROp_DefaultConstruct:
                 processDefaultConstruct(inst);
                 break;
@@ -2113,58 +2424,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     addToWorkList(child);
                 }
                 break;
-            }
-        }
-    }
-
-    // Ensure NonUniform decoration is present on both access-chain ops and their index operands.
-    // This fills gaps after legalization where only the access-chain inst was decorated.
-    void propagateNonUniformAccessChainDecorations()
-    {
-        for (auto globalInst : m_module->getGlobalInsts())
-        {
-            auto func = as<IRFunc>(globalInst);
-            if (!func)
-                continue;
-
-            for (auto block : func->getBlocks())
-            {
-                for (auto inst : block->getChildren())
-                {
-                    IRInst* indexOperand = nullptr;
-                    switch (inst->getOp())
-                    {
-                    case kIROp_GetElement:
-                        indexOperand = inst->getOperand(1);
-                        break;
-                    case kIROp_GetElementPtr:
-                        indexOperand = inst->getOperand(1);
-                        break;
-                    case kIROp_RWStructuredBufferGetElementPtr:
-                        indexOperand = inst->getOperand(1);
-                        break;
-                    default:
-                        break;
-                    }
-
-                    if (!indexOperand)
-                        continue;
-
-                    auto indexDecorated =
-                        indexOperand->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
-                        nullptr;
-                    auto instDecorated =
-                        inst->findDecoration<IRSPIRVNonUniformResourceDecoration>() != nullptr;
-                    if (!indexDecorated && !instDecorated)
-                        continue;
-
-                    IRBuilder builder(inst);
-                    builder.setInsertBefore(inst);
-                    if (!indexDecorated)
-                        builder.addSPIRVNonUniformResourceDecoration(indexOperand);
-                    if (!instDecorated)
-                        builder.addSPIRVNonUniformResourceDecoration(inst);
-                }
             }
         }
     }
@@ -2561,8 +2820,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto inst : m_instsToRemove)
             inst->removeAndDeallocate();
 
+        wrapRemainingConstantBufferElementTypes();
+
         // Translate types.
-        List<IRHLSLStructuredBufferTypeBase*> instsToProcess;
+        List<IRType*> instsToProcess;
         List<IRInst*> textureFootprintTypes;
 
         for (auto globalInst : m_module->getGlobalInsts())
@@ -2571,6 +2832,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 instsToProcess.add(t);
             }
+            else if (auto constantBufferType = as<IRConstantBufferType>(globalInst))
+            {
+                if (constantBufferType->hasUses())
+                    instsToProcess.add(constantBufferType);
+            }
             else if (globalInst->getOp() == kIROp_TextureFootprintType)
             {
                 textureFootprintTypes.add(globalInst);
@@ -2578,20 +2844,37 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
         for (auto t : instsToProcess)
         {
-            auto lowered = lowerStructuredBufferType(t);
-
-            AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
-            if (as<IRHLSLStructuredBufferType>(t))
-                accessQualifier = AccessQualifier::Immutable;
-
             IRBuilder builder(t);
 
             builder.setInsertBefore(t);
-            t->replaceUsesWith(builder.getPtrType(
-                lowered.structType,
-                accessQualifier,
-                getStorageBufferAddressSpace(),
-                t->getDataLayout()));
+            if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(t))
+            {
+                auto lowered = lowerStructuredBufferType(structuredBufferType);
+
+                AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+                if (as<IRHLSLStructuredBufferType>(t))
+                    accessQualifier = AccessQualifier::Immutable;
+
+                t->replaceUsesWith(builder.getPtrType(
+                    lowered.structType,
+                    accessQualifier,
+                    getStorageBufferAddressSpace(),
+                    structuredBufferType->getDataLayout()));
+            }
+            else if (auto constantBufferType = as<IRConstantBufferType>(t))
+            {
+                auto elementType = constantBufferType->getElementType();
+                SLANG_ASSERT(as<IRStructType>(elementType));
+                builder.addDecorationIfNotExist(elementType, kIROp_SPIRVBlockDecoration);
+                auto dataLayout = constantBufferType->getDataLayout();
+                if (!dataLayout)
+                    dataLayout = builder.getDefaultBufferLayoutType();
+                t->replaceUsesWith(builder.getPtrType(
+                    elementType,
+                    AccessQualifier::Immutable,
+                    AddressSpace::Uniform,
+                    dataLayout));
+            }
         }
         for (auto t : textureFootprintTypes)
         {
@@ -2643,7 +2926,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // lowering pass.
         performForceInlining(m_module);
 
-        propagateNonUniformAccessChainDecorations();
+        // Phase 2 of NonUniform propagation (defined in
+        // slang-ir-float-non-uniform-resource-index.cpp). Must run here, as the final
+        // legalize step: it decorates the emit-shape access chains / loads / field
+        // accesses / image subscripts produced by the rewrites above (getElementPtr,
+        // buffer-to-pointer lowering, legalizeStructBlocks, force-inlining).
+        propagateNonUniformDecorations(m_module);
 
         // The above step may produce empty struct types, so we need to lower them out of
         // existence.

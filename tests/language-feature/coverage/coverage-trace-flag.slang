@@ -29,6 +29,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // the CPU-prelude atomic helper. This assertion matches both the
 // slot reference AND the real atomic emission so the test would fail
 // if codegen regressed to a non-atomic load-add-store.
-//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(0\)}}
-//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(1\)}}
-//CHECK: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(2\)}}
+//CHECK: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(0\)}}
+//CHECK: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(1\)}}
+//CHECK: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(2\)}}

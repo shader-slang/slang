@@ -13,7 +13,7 @@ concurrency:
 permissions:
   id-token: write # Required for Workload Identity (GCS auth)
   contents: read # Read slang repo
-  packages: read # Pull container images from ghcr.io
+  packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
   pull-requests: write # For PR comments (if needed)
 
 jobs:
@@ -74,13 +74,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           submodules: "recursive"
           fetch-depth: "0"
 
       - name: Download Coverage Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           pattern: coverage-*
           path: coverage-artifacts
@@ -286,7 +286,7 @@ jobs:
         # Lets feature-branch dispatches inspect the merged + new-renderer
         # output without writing to slang-coverage-reports. Always uploads
         # so we can compare the new and existing renderers across runs.
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: coverage-reports-merged
           path: coverage-reports/
@@ -294,7 +294,7 @@ jobs:
 
       - name: Checkout Coverage Reports Repository
         if: github.ref == 'refs/heads/master'
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: "shader-slang/slang-coverage-reports"
           path: "coverage-repo"
