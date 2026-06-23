@@ -15491,43 +15491,6 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                 m_astBuilder,
                 this,
                 funcDecl->getDefaultDeclRef());
-            // Generic subscript accessors are logically specialized by the subscript's generic
-            // signature, the same way a generic function requirement is. The generic default
-            // substitution utility reaches them through the specialized subscript and therefore
-            // produces:
-            //
-            //     MemberDeclRef(GenericAppDeclRef(generic operator[], SubscriptDecl, I),
-            //     GetterDecl)
-            //
-            // For synthesized differentiability extensions, use the requirement-key shape instead:
-            //
-            //     GenericAppDeclRef(generic operator[], GetterDecl, I)
-            //
-            // The conformance check for `[Differentiable]` interface accessors queries
-            // `Test.operator[]<I>.get : IForward/BackwardDifferentiable<Test.operator[]<I>.get>`.
-            // If the extension facet keeps the member form while the requirement keeps the generic
-            // app form, both print identically but fail `Type::equals` on the hidden callable type
-            // argument.
-            if ((funcDecl->astNodeType == ASTNodeType::GetterDecl ||
-                 funcDecl->astNodeType == ASTNodeType::SetterDecl) &&
-                funcDecl->parentDecl &&
-                funcDecl->parentDecl->astNodeType == ASTNodeType::SubscriptDecl)
-            {
-                if (auto memberDeclRef = as<MemberDeclRef>(specializedFuncDeclRef.declRefBase))
-                {
-                    if (auto parentGenericApp =
-                            as<GenericAppDeclRef>(memberDeclRef->getParentOperand()))
-                    {
-                        if (parentGenericApp->getDecl() == funcDecl->parentDecl)
-                        {
-                            specializedFuncDeclRef = m_astBuilder->getGenericAppDeclRef(
-                                DeclRef<GenericDecl>(parentGenericApp->getGenericDeclRef()),
-                                parentGenericApp->getArgs(),
-                                funcDecl);
-                        }
-                    }
-                }
-            }
             return as<DeclRefType>(DeclRefType::create(m_astBuilder, specializedFuncDeclRef));
         };
         if (!isInterfaceRequirement(decl))
@@ -17377,100 +17340,6 @@ GenericDecl* SemanticsVisitor::findNextOuterGeneric(Decl* decl)
     return nullptr;
 }
 
-// The final extension-target check below normally uses `Type::equals` after
-// generic inference has solved the extension parameters.  Some generic-dependent
-// types can still carry equivalent, but not pointer-identical, generic decl refs
-// at that point; those cases need the solver fallback.  Fully concrete requests
-// must not use that fallback, because re-unifying a solved target would admit a
-// different concrete extension target, e.g.
-// `VectorizeGridArgTo<vector<uint, 1>, 1>` for `VectorizeGridArgTo<uint, 1>`.
-static bool _containsGenericDependentVal(Val* val, HashSet<Val*>& seenVals)
-{
-    if (!val || !seenVals.add(val))
-        return false;
-
-    if (as<ThisType>(val))
-        return true;
-
-    if (auto declRefType = as<DeclRefType>(val))
-    {
-        if (isGenericParam(declRefType->getDeclRef().getDecl()))
-            return true;
-    }
-    else if (auto declRefIntVal = as<DeclRefIntVal>(val))
-    {
-        if (isGenericParam(declRefIntVal->getDeclRef().getDecl()))
-            return true;
-    }
-
-    for (auto operand : val->m_operands)
-    {
-        switch (operand.kind)
-        {
-        case ValNodeOperandKind::ValNode:
-            if (_containsGenericDependentVal(operand.getVal(), seenVals))
-                return true;
-            break;
-
-        case ValNodeOperandKind::ASTNode:
-            if (auto decl = as<Decl>(operand.values.nodeOperand))
-            {
-                if (isGenericParam(decl) || as<ThisTypeDecl>(decl))
-                    return true;
-            }
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    return false;
-}
-
-static bool _containsGenericDependentVal(Val* val)
-{
-    HashSet<Val*> seenVals;
-    return _containsGenericDependentVal(val, seenVals);
-}
-
-static bool _isExactExtensionTargetMatch(
-    SemanticsVisitor* visitor,
-    Type* extensionTargetType,
-    Type* appliedType)
-{
-    if (appliedType->equals(extensionTargetType))
-        return true;
-
-    if (!_containsGenericDependentVal(appliedType))
-        return false;
-
-    auto extensionTargetDeclRefType = as<DeclRefType>(extensionTargetType);
-    auto appliedDeclRefType = as<DeclRefType>(appliedType);
-    if (!extensionTargetDeclRefType || !appliedDeclRefType)
-        return false;
-
-    auto extensionTargetDeclRef = extensionTargetDeclRefType->getDeclRef();
-    auto appliedDeclRef = appliedDeclRefType->getDeclRef();
-    if (extensionTargetDeclRef.getDecl() != appliedDeclRef.getDecl())
-        return false;
-
-    if (!SubstitutionSet(extensionTargetDeclRef).findGenericAppDeclRef() &&
-        !SubstitutionSet(appliedDeclRef).findGenericAppDeclRef())
-    {
-        return false;
-    }
-
-    SemanticsVisitor::GenericInferenceContext inferenceContext;
-    return visitor->tryUnifyDeclRef(
-        inferenceContext,
-        SemanticsVisitor::UnificationOptions(),
-        extensionTargetDeclRef.declRefBase,
-        false,
-        appliedDeclRef.declRefBase,
-        false);
-}
-
 DeclRef<ExtensionDecl> SemanticsVisitor::applyExtensionToType(
     ExtensionDecl* extDecl,
     Type* type,
@@ -17560,11 +17429,10 @@ DeclRef<ExtensionDecl> SemanticsVisitor::applyExtensionToType(
 
     // In order for this extension to apply to the given type, we
     // need to have a match on the target types.
-    if (!_isExactExtensionTargetMatch(this, targetType, type))
+    if (!type->equals(targetType))
     {
         return DeclRef<ExtensionDecl>();
     }
-
 
     return extDeclRef;
 }

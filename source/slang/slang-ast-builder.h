@@ -347,6 +347,24 @@ public:
         else if (auto parentGenericAppDeclRef = as<GenericAppDeclRef>(parent.declRefBase))
         {
             auto parentGenericDecl = parentGenericAppDeclRef->getGenericDecl();
+            auto parentSpecializedDecl = parentGenericAppDeclRef->getDecl();
+
+            // A `GenericAppDeclRef` can name an accessor under the generic callable/property
+            // environment, not only the inner storage declaration. Keep accessors in that same
+            // representation so all producers agree on one shape. For example,
+            // `createDefaultSubstitutionsIfNeeded` reaches a generic subscript getter through the
+            // specialized subscript; canonicalizing here gives
+            // `GenericAppDeclRef(generic operator[], GetterDecl, I)`, which is the same callable
+            // type shape used by differentiability requirement keys and extension target matching.
+            if (as<AccessorDecl>(memberDecl) && memberDecl->parentDecl == parentSpecializedDecl)
+            {
+                return getGenericAppDeclRef(
+                           DeclRef<GenericDecl>(parentGenericAppDeclRef->getGenericDeclRef()),
+                           parentGenericAppDeclRef->getArgs(),
+                           memberDecl)
+                    .template as<T>();
+            }
+
             auto isConstraintDecl = as<TypeConstraintDecl>(memberDecl) ||
                                     as<TypeCoercionConstraintDecl>(memberDecl) ||
                                     as<NonEmptyPackConstraintDecl>(memberDecl) ||

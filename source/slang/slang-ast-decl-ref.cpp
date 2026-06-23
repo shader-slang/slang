@@ -447,6 +447,35 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
     return innerDeclRefType;
 }
 
+static Decl* _tryMapGenericAppInnerDeclToResolvedGeneric(Decl* innerDecl, GenericDecl* genericDecl)
+{
+    if (!innerDecl || !genericDecl)
+        return nullptr;
+
+    // A generic subscript/property requirement can be referenced as
+    // `GenericAppDeclRef(Lookup(witness, generic operator[]), args, GetterDecl)`. Resolving the
+    // lookup may replace the requirement generic with a satisfying/default-implementation generic;
+    // the accessor nested under the requirement then needs to be mapped to the corresponding
+    // accessor under the resolved generic's inner storage declaration. This keeps the decl-ref
+    // rooted in the witness-selected declaration instead of leaving a mixed requirement/satisfier
+    // chain for lowering and differentiability annotation lookup.
+    auto innerAccessorDecl = as<AccessorDecl>(innerDecl);
+    if (!innerAccessorDecl)
+        return nullptr;
+
+    auto resolvedStorageDecl = as<ContainerDecl>(getInner(genericDecl));
+    if (!resolvedStorageDecl)
+        return nullptr;
+
+    for (auto accessorDecl : resolvedStorageDecl->getDirectMemberDeclsOfType<AccessorDecl>())
+    {
+        if (accessorDecl->astNodeType == innerAccessorDecl->astNodeType)
+            return accessorDecl;
+    }
+
+    return nullptr;
+}
+
 DeclRefBase* GenericAppDeclRef::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
@@ -468,6 +497,16 @@ DeclRefBase* GenericAppDeclRef::_substituteImplOverride(
             substGenericDeclRef,
             substArgs.getArrayView(),
             getDecl());
+    else if (
+        auto mappedInnerDecl = _tryMapGenericAppInnerDeclToResolvedGeneric(
+            getDecl(),
+            as<GenericDecl>(substGenericDeclRef->getDecl())))
+    {
+        return astBuilder->getGenericAppDeclRef(
+            substGenericDeclRef,
+            substArgs.getArrayView(),
+            mappedInnerDecl);
+    }
     else
     {
         // If decl is no longer the child of the new parent, it's most likely due to
@@ -549,6 +588,16 @@ Val* GenericAppDeclRef::_resolveImplOverride()
                 resolvedGenericDeclRef,
                 resolvedArgs.getArrayView(),
                 getDecl());
+        }
+        else if (
+            auto mappedInnerDecl = _tryMapGenericAppInnerDeclToResolvedGeneric(
+                getDecl(),
+                as<GenericDecl>(resolvedGenericDeclRef->getDecl())))
+        {
+            resolvedVal = astBuilder->getGenericAppDeclRef(
+                resolvedGenericDeclRef,
+                resolvedArgs.getArrayView(),
+                mappedInnerDecl);
         }
         else if (getDecl() == getGenericDecl()->inner)
         {
