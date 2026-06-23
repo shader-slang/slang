@@ -134,7 +134,7 @@ def rebuild(results_dir, index_path):
     outdir = os.path.join(results_dir, "tracking")
     os.makedirs(outdir, exist_ok=True)
     out = os.path.join(outdir, "tracking.json")
-    with open(out, "w") as fh:
+    with open(out, "w", encoding="utf-8") as fh:
         json.dump(series, fh, indent=2)
     n_rel = sum(1 for p in series["points"] if p["kind"] == "release")
     n_day = sum(1 for p in series["points"] if p["kind"] == "daily")
@@ -153,7 +153,7 @@ def register(results_dir, index_path, label, commit, date, corpus_sha=""):
             "runner": runner_id(), "kind": "daily"}
     if corpus_sha:
         meta["corpus_sha"] = corpus_sha
-    with open(os.path.join(ddir, "meta.json"), "w") as fh:
+    with open(os.path.join(ddir, "meta.json"), "w", encoding="utf-8") as fh:
         json.dump(meta, fh, indent=2)
     print(f"registered daily {label} (commit {commit[:9] or '?'}, runner {meta['runner']})")
     rebuild(results_dir, index_path)
@@ -176,7 +176,7 @@ def merge_index(results_dir, new_index_path):
     for r in json.load(open(new_index_path)):
         existing[r["tag"]] = r
     merged = sorted(existing.values(), key=lambda r: r.get("date", ""))
-    with open(dest, "w") as fh:
+    with open(dest, "w", encoding="utf-8") as fh:
         json.dump(merged, fh, indent=2)
     n_added = len(existing) - n_before
     print(f"merged index: {len(merged)} releases total "
@@ -185,7 +185,7 @@ def merge_index(results_dir, new_index_path):
 
 def stamp_runner(results_dir, label):
     rp = os.path.join(results_dir, "runner.json")
-    with open(rp, "w") as fh:
+    with open(rp, "w", encoding="utf-8") as fh:
         json.dump({"fingerprint": runner_id(), "label": label}, fh, indent=2)
     print(f"stamped {rp}: {runner_id()} (built by {label})")
 
