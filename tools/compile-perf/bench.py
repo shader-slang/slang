@@ -220,8 +220,8 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
     for _ in range(samples):
         rc, wall, text, rss = run_once(timed)
         last_text = text
-        # rc == 0: success; rc == 1: slangc-reported compile error (expected for
-        # expect_fail workloads, caught by real_error() for others). rc > 1 or
+        # rc == 0: success; rc == 1: slangc-reported compile error (caught by
+        # real_error(), which marks the sample as failed). rc > 1 or
         # rc < 0: slangc crashed or was killed by a signal (SIGSEGV=139, SIGABRT=134
         # on Linux; large negative values on Windows — Python converts NTSTATUS codes
         # such as 0xC0000005 to signed int: -1073741819). Exit code 2+ from usage errors
@@ -235,8 +235,7 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
         if rss is not None:
             rsses.append(rss)
         err = real_error(text)
-        # expect_fail workloads *want* a real compile error on every run.
-        sample_ok.append(err is not None if spec.expect_fail else err is None)
+        sample_ok.append(err is None)  # ok when no compile error
         for name, ms in parse_timers(text).items():
             per_timer.setdefault(name, []).append(ms)
 
@@ -249,7 +248,6 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
         "bucket": spec.bucket,
         "size": size,
         "mode": spec.mode,
-        "expected_fail": spec.expect_fail,
         "ok": ok,
         "setup_ok": setup_ok,
         "got_timers": got_timers,
