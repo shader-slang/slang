@@ -179,6 +179,42 @@ Follow the principled path, not the minimal-edit-distance path.
   (one fix exposing the next), the fix chosen for each and why it is principled (with a code trace),
   and rejected alternatives. Distill this log into the PR description; do not commit it.
 
+### Self-Review for Unprincipled Changes
+
+Before finalizing a non-trivial compiler change, review the diff for signs that the fix is
+compensating for a bad AST/IR/`Val`/witness representation. Treat the following patterns as
+high-risk until you can prove they are the right layer:
+
+- A new custom equivalence relation over `DeclRef`, `Val`, `Type`, `Witness`, or IR shapes, such as
+  recursive helpers named like `are...Equivalent`, `does...Match`, or `try...Match`. First ask why
+  normal `substitute`, `resolve`, `getCanonicalType`, `equals`, or an existing canonical builder
+  does not already make the two values identical.
+- Code that walks arbitrary operand graphs, substitution chains, witness chains, or lookup paths to
+  rediscover context such as generic arguments, requirement keys, canonical paths, or parent
+  declarations. The producer should usually store or construct the canonical form directly.
+- Lowering, emit, specialization, or typeflow logic that patches a malformed AST/IR shape from an
+  earlier phase. These consumers should be simple; if they need target-specific knowledge of a
+  front-end representation accident, trace the producer instead.
+- Hardcoded knowledge of particular `DeclRef` subclasses, builtin magic type names, generic
+  argument indices, witness-table entry order, or nested-vs-flat specialization shape. Such code
+  needs a strong invariant and should usually live at a canonical construction boundary.
+- Guards that silently return a default value for an "impossible" shape. Use an assertion when the
+  shape is truly out of contract; otherwise explain why the shape is valid input and add coverage.
+
+For every flagged change, write down the input-shape audit before keeping it:
+
+1. What exact shape reaches this code? Include a concrete example and the producing function.
+2. Is that shape canonical and intentionally allowed, or is it an accidental alternative spelling?
+3. If it is accidental, can the producer be fixed so downstream code uses the existing
+   `substitute`/`resolve`/canonicalization path?
+4. Which test fails if this change is removed, and does that test prove this layer is responsible?
+5. Can the special case be replaced by an assertion plus a producer-side fix, or by reusing an
+   existing helper?
+
+Do not keep a flagged change merely because it makes tests pass. If it remains necessary, the PR
+description's Process report must justify why this input shape is valid and why this layer owns the
+logic, with a code trace from producer to consumer.
+
 ## Commit & Pull Request Guidelines
 
 - Use short, imperative commit subjects, for example `Reject invalid descriptor heap access`.

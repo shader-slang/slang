@@ -122,6 +122,48 @@ representation that is robust by construction, even when that means a larger rew
   PR description below. (Keep the log out of the commit — it feeds the PR body, it is not a repo
   artifact.)
 
+#### Self-Review for Unprincipled Changes
+
+Before finalizing a non-trivial compiler change, review the diff for signs that the fix is
+compensating for a bad AST/IR/`Val`/witness representation. Treat these patterns as red flags until
+you can prove they are the right layer:
+
+- **Custom semantic equivalence.** New recursive helpers over `DeclRef`, `Val`, `Type`, `Witness`,
+  or IR shapes (for example `are...Equivalent`, `does...Match`, or `try...Match`) often mean two
+  alternative representations were allowed to survive. First ask why `substitute`, `resolve`,
+  `getCanonicalType`, `equals`, or an existing canonical builder does not already make the values
+  identical.
+- **Context rediscovery by graph walking.** Code that walks arbitrary operand graphs, substitution
+  chains, witness chains, lookup paths, or IR users to recover generic arguments, requirement keys,
+  canonical paths, or parent declarations is usually downstream repair. Prefer storing or building
+  the canonical form at the producer.
+- **Consumer-side patching.** Lowering, emit, specialization, typeflow, and backend code should not
+  patch malformed AST/IR shapes from earlier phases. If these consumers need front-end-specific
+  knowledge of an accidental representation, trace and fix the producer instead.
+- **Hardcoded representation trivia.** Special cases for particular `DeclRef` subclasses, builtin
+  magic type names, generic argument indices, witness-table entry order, or nested-vs-flat
+  specialization shape need a strong invariant and usually belong at a canonical construction
+  boundary.
+- **Silent impossible-shape handling.** A guard that returns a default value for an out-of-contract
+  shape hides bugs. Assert impossible shapes; handle a shape only when you can explain why it is
+  valid input.
+
+For every flagged change, run this audit before keeping it:
+
+1. Name the exact input shape, the producing function, and a concrete source or IR example.
+2. Decide whether that shape is canonical and intentionally allowed, or an accidental alternative
+   spelling that should be eliminated.
+3. If it is accidental, try the producer-side fix first so downstream code can use the normal
+   `substitute`/`resolve`/canonicalization path.
+4. Name the test that fails without the change and explain why that test proves this layer owns the
+   logic.
+5. Prefer replacing the special case with an assertion plus a producer fix, or with an existing
+   helper that already encodes the invariant.
+
+Do not keep a flagged change only because it makes tests pass. If it remains necessary, the PR
+description's Process report must justify why the input shape is valid and why this layer owns the
+logic, with a code trace from producer to consumer.
+
 ### Code Style and Review Conventions
 
 Recurring review feedback distilled into rules — following them avoids review round-trips. (These
