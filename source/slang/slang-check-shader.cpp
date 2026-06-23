@@ -1681,7 +1681,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                     // to the location of the first GLSLLayoutLocalSizeAttribute,
                     // just to have something there (even if multiple
                     // attributes get merged to this NumThreadsAttribute).
-                    // numThreads->loc = glslAttr->loc;
+                    numThreads->loc = glslAttr->loc;
                 }
                 else
                 {
