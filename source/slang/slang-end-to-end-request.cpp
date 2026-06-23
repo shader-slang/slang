@@ -1843,7 +1843,7 @@ SlangResult EndToEndCompileRequest::compile()
     }
 
     auto reflectionPath = getOptionSet().getStringOption(CompilerOptionName::EmitReflectionJSON);
-    if (reflectionPath.getLength() != 0)
+    if (reflectionPath.getLength() != 0 && SLANG_SUCCEEDED(res))
     {
         auto reflection = this->getReflection();
         if (!reflection)
