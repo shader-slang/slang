@@ -7,7 +7,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 // Stand-in for a texture lookup: differentiable for type-checking, but its own
@@ -102,6 +102,26 @@ float useClassify(float x)
     return float(c);
 }
 
+// A non-differentiable `inout` parameter (`no_diff inout int`) threaded through a
+// [TreatAsDifferentiable] callee. The trivial forward body calls the primal
+// directly and only writes back the entries recorded for differential-pair
+// parameters, so the primal call's mutation of `counter` must survive untouched —
+// the pre-fix path explicitly default-constructed (zeroed) *every* out/inout slot,
+// which would have clobbered this to 0. The differential must not perturb it.
+[TreatAsDifferentiable]
+void bumpCounter(no_diff inout int counter, float x)
+{
+    counter += 1;
+}
+
+[Differentiable]
+float useCounter(float x)
+{
+    int n = 2;
+    bumpCounter(n, x);  // primal n must be 3 (was 0 under the old default-construct)
+    return float(n);
+}
+
 // The other entry into the trivial-forward synthesis: a function that is
 // backward-differentiable ([BackwardDerivative]) but has *no* forward derivative.
 // Forward-diffing it hits the BackwardDerivativeApply branch in translateCall
@@ -149,6 +169,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // non-diff-pair return: classify(0.5) == 1; primal returned directly
     var dpClassify = __fwd_diff(useClassify)(diffPair(0.5, 1.0));
 
+    // non-diff inout: bumpCounter increments n 2 -> 3; primal preserved (not zeroed),
+    // tangent forced to 0
+    var dpCounter = __fwd_diff(useCounter)(diffPair(2.0, 1.0));
+
     outputBuffer[0] = dp.p;       // CHECK: 2.5
     outputBuffer[1] = dp.d;       // CHECK: -1.25
     outputBuffer[2] = dpIface.p;  // CHECK: 2.5
@@ -160,4 +184,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[8] = dpOut.p;    // CHECK: 11.0
     outputBuffer[9] = dpOut.d;    // CHECK: 0.0
     outputBuffer[10] = dpClassify.p; // CHECK: 1.0
+    outputBuffer[11] = dpCounter.p;  // CHECK: 3.0
+    outputBuffer[12] = dpCounter.d;  // CHECK: 0.0
 }
