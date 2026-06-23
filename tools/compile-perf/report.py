@@ -84,7 +84,7 @@ def main():
         args.results, cindex_path, args.metric,
         os.path.join(outdir, "perf_per_benchmark_coarse.svg"),
         breakdown.FE_GO_ORDER, breakdown.coarse_buckets, link_for=wl_links)
-    svg_coarse_html = open(svg_pw_coarse).read()
+    svg_coarse_html = open(svg_pw_coarse, encoding="utf-8").read()
 
     PW = ['<!doctype html><meta charset="utf-8">',
           f"<title>Slang compile-perf — per workload</title><style>{CSS}</style>",
