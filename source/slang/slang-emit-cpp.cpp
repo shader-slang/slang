@@ -1352,6 +1352,67 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(");\n");
             return true;
         }
+    case kIROp_AtomicAdd:
+        {
+            // Lower AtomicAdd on a pointer-to-uint/int slot to a call
+            // through the CPU prelude helpers. Matches HLSL/GLSL
+            // semantics: returns the prior value as the inst result.
+            //
+            // This is the general integer-AtomicAdd lowering for the
+            // CPU target, not coverage-specific: any user
+            // `InterlockedAdd` reaches it. Coverage is one client
+            // and only ever emits the unsigned variants (its
+            // synthesized buffer element type is uint/uint64); the
+            // signed variants are reachable from ordinary user code
+            // that calls `InterlockedAdd` on an `int`/`int64_t`
+            // slot, but the CPU target's existing `InterlockedAdd`
+            // tests (e.g. `tests/hlsl-intrinsic/atomic/atomic-
+            // intrinsics.slang`) disable the `-cpu` line, so the
+            // signed CPU paths here are not currently covered by
+            // a regression test.
+            //
+            // 32-bit and 64-bit integer widths are supported via the
+            // matching prelude helper pair
+            // (`_slang_atomic_add_{u,i}{32,64}`). Other widths /
+            // float types fall through to the default unhandled-
+            // opcode diagnostic so the build fails loudly instead
+            // of producing bogus code.
+            auto dataType = inst->getDataType();
+            char const* helper;
+            switch (dataType->getOp())
+            {
+            case kIROp_UIntType:
+                helper = "_slang_atomic_add_u32";
+                break;
+            case kIROp_IntType:
+                helper = "_slang_atomic_add_i32";
+                break;
+            case kIROp_UInt64Type:
+                helper = "_slang_atomic_add_u64";
+                break;
+            case kIROp_Int64Type:
+                helper = "_slang_atomic_add_i64";
+                break;
+            default:
+                return false;
+            }
+            emitInstResultDecl(inst);
+            m_writer->emit(helper);
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            // The value-operand literal's C++ suffix (`U`/`ULL`) is
+            // chosen by `emitOperand` from the IR operand's type, so
+            // the literal width here matches the chosen `helper`
+            // signature automatically.
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            // Operand 2 (memory order) is consumed by the prelude
+            // helpers in `slang-cpp-prelude.h`, not threaded through
+            // here; see those helpers for the per-toolchain ordering
+            // choice.
+            m_writer->emit(");\n");
+            return true;
+        }
     default:
         return false;
     }

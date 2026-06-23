@@ -100,6 +100,18 @@ func TestRunCleanupLoopRunsImmediatePass(t *testing.T) {
 	}
 }
 
+func TestNormalizeOrphanGracePeriod(t *testing.T) {
+	if got := normalizeOrphanGracePeriod(0); got != defaultOrphanGracePeriod {
+		t.Fatalf("zero grace should use default, got %v", got)
+	}
+	if got := normalizeOrphanGracePeriod(-time.Minute); got != -time.Minute {
+		t.Fatalf("negative grace should remain disabled, got %v", got)
+	}
+	if got := normalizeOrphanGracePeriod(5 * time.Minute); got != 5*time.Minute {
+		t.Fatalf("positive grace should be preserved, got %v", got)
+	}
+}
+
 func TestRunCleanupLoopRunsOnTick(t *testing.T) {
 	m := &Manager{}
 	ticks := make(chan time.Time, 1)
@@ -478,5 +490,196 @@ func TestIsZoneResourceExhausted(t *testing.T) {
 	}
 	if isZoneResourceExhausted(errors.New("permission denied")) {
 		t.Fatal("permission denied should not be treated as stockout")
+	}
+}
+
+// fakeClock returns a closure suitable for Manager.now that always
+// returns the same fixed time. Tests use it to drive evictStaleOrphans
+// deterministically without sleeping.
+func fakeClock(t time.Time) func() time.Time {
+	return func() time.Time { return t }
+}
+
+func TestEvictStaleOrphansRemovesIdleVMPastGrace(t *testing.T) {
+	now := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
+	stale := now.Add(-45 * time.Minute)
+
+	deleted := make(map[string]string)
+	m := &Manager{
+		config:  ManagerConfig{OrphanGracePeriod: 30 * time.Minute},
+		nowFunc: fakeClock(now),
+		vms: map[string]*vmInfo{
+			"runner-orphan": {vmName: "linux-test-orphan", zone: "us-east1-c", createdAt: stale},
+		},
+		deleteVMFunc: func(_ context.Context, vmName, zone string) error {
+			deleted[vmName] = zone
+			return nil
+		},
+	}
+
+	m.evictStaleOrphans(context.Background())
+
+	if _, ok := m.vms["runner-orphan"]; ok {
+		t.Fatal("expected stale idle orphan to be evicted from tracking")
+	}
+	if got := deleted["linux-test-orphan"]; got != "us-east1-c" {
+		t.Fatalf("expected delete call for orphan in us-east1-c, got %q", got)
+	}
+}
+
+func TestEvictStaleOrphansSparesFreshAndBusyVMs(t *testing.T) {
+	now := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
+
+	deleted := 0
+	m := &Manager{
+		config:  ManagerConfig{OrphanGracePeriod: 30 * time.Minute},
+		nowFunc: fakeClock(now),
+		vms: map[string]*vmInfo{
+			// Younger than grace period — keep.
+			"runner-fresh": {vmName: "linux-test-fresh", zone: "us-east1-c", createdAt: now.Add(-5 * time.Minute)},
+			// Older than grace period but busy — keep (it's running a job).
+			"runner-busy": {vmName: "linux-test-busy", zone: "us-east1-c", busy: true, createdAt: now.Add(-2 * time.Hour)},
+		},
+		deleteVMFunc: func(context.Context, string, string) error {
+			deleted++
+			return nil
+		},
+	}
+
+	m.evictStaleOrphans(context.Background())
+
+	if _, ok := m.vms["runner-fresh"]; !ok {
+		t.Fatal("fresh VM should not be evicted")
+	}
+	if _, ok := m.vms["runner-busy"]; !ok {
+		t.Fatal("busy VM should not be evicted regardless of age")
+	}
+	if deleted != 0 {
+		t.Fatalf("no VMs should have been deleted, got %d", deleted)
+	}
+}
+
+func TestEvictStaleOrphansDisabledByZeroGrace(t *testing.T) {
+	now := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
+	m := &Manager{
+		// Grace period 0 disables eviction (per the field doc; NewManager
+		// substitutes the default, but the Manager itself respects 0).
+		config:  ManagerConfig{OrphanGracePeriod: 0},
+		nowFunc: fakeClock(now),
+		vms: map[string]*vmInfo{
+			"runner-orphan": {vmName: "linux-test-orphan", zone: "us-east1-c", createdAt: now.Add(-24 * time.Hour)},
+		},
+		deleteVMFunc: func(context.Context, string, string) error {
+			t.Fatal("delete should not be called when grace period is zero")
+			return nil
+		},
+	}
+
+	m.evictStaleOrphans(context.Background())
+
+	if _, ok := m.vms["runner-orphan"]; !ok {
+		t.Fatal("VM should remain tracked when grace period is zero")
+	}
+}
+
+func TestEvictStaleOrphansKeepsTrackingOnDeleteFailure(t *testing.T) {
+	now := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
+	stale := now.Add(-45 * time.Minute)
+
+	m := &Manager{
+		config:  ManagerConfig{OrphanGracePeriod: 30 * time.Minute},
+		nowFunc: fakeClock(now),
+		vms: map[string]*vmInfo{
+			"runner-orphan": {vmName: "linux-test-orphan", zone: "us-east1-c", createdAt: stale},
+		},
+		deleteVMFunc: func(context.Context, string, string) error {
+			return errors.New("transient GCP error")
+		},
+	}
+
+	m.evictStaleOrphans(context.Background())
+
+	if _, ok := m.vms["runner-orphan"]; !ok {
+		t.Fatal("tracking entry must survive a delete failure so the next pass retries")
+	}
+}
+
+func TestEvictStaleOrphansSparesEntriesWithoutCreatedAt(t *testing.T) {
+	now := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
+	m := &Manager{
+		config:  ManagerConfig{OrphanGracePeriod: 30 * time.Minute},
+		nowFunc: fakeClock(now),
+		vms: map[string]*vmInfo{
+			// Zero createdAt simulates legacy entries (pre-#11115 fix).
+			"runner-legacy": {vmName: "linux-test-legacy", zone: "us-east1-c"},
+		},
+		deleteVMFunc: func(context.Context, string, string) error {
+			t.Fatal("delete should not be called for entries with zero createdAt")
+			return nil
+		},
+	}
+
+	m.evictStaleOrphans(context.Background())
+
+	if _, ok := m.vms["runner-legacy"]; !ok {
+		t.Fatal("entry with zero createdAt should be left alone for the next pass")
+	}
+}
+
+func TestEvictStaleOrphansSkipsWhenBusyBeforeDelete(t *testing.T) {
+	now := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
+	stale := now.Add(-45 * time.Minute)
+
+	var m *Manager
+	m = &Manager{
+		config:  ManagerConfig{OrphanGracePeriod: 30 * time.Minute},
+		nowFunc: fakeClock(now),
+		vms: map[string]*vmInfo{
+			"runner-orphan": {vmName: "linux-test-orphan", zone: "us-east1-c", createdAt: stale},
+		},
+		beforeOrphanDelete: func(c orphanCandidate) {
+			m.MarkBusy(c.runnerName)
+		},
+		deleteVMFunc: func(context.Context, string, string) error {
+			t.Fatal("delete should not be called after the runner goes busy")
+			return nil
+		},
+	}
+
+	m.evictStaleOrphans(context.Background())
+
+	if vm, ok := m.vms["runner-orphan"]; !ok {
+		t.Fatal("tracking entry should be retained when the VM raced to busy")
+	} else if !vm.busy {
+		t.Fatal("busy flag should have survived")
+	}
+}
+
+func TestEvictStaleOrphansRetainsTrackingWhenBusyDuringDelete(t *testing.T) {
+	now := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
+	stale := now.Add(-45 * time.Minute)
+
+	m := &Manager{
+		config:  ManagerConfig{OrphanGracePeriod: 30 * time.Minute},
+		nowFunc: fakeClock(now),
+		vms: map[string]*vmInfo{
+			"runner-orphan": {vmName: "linux-test-orphan", zone: "us-east1-c", createdAt: stale},
+		},
+	}
+	m.deleteVMFunc = func(context.Context, string, string) error {
+		// Simulate HandleJobStarted firing between the snapshot and the
+		// delete completing — the runner is now busy.
+		m.mu.Lock()
+		m.vms["runner-orphan"].busy = true
+		m.mu.Unlock()
+		return nil
+	}
+
+	m.evictStaleOrphans(context.Background())
+
+	if vm, ok := m.vms["runner-orphan"]; !ok {
+		t.Fatal("tracking entry should be retained when the VM raced to busy")
+	} else if !vm.busy {
+		t.Fatal("busy flag should have survived")
 	}
 }

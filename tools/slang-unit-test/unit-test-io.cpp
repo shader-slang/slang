@@ -165,3 +165,21 @@ SLANG_UNIT_TEST(ioLargeFileExists)
     SLANG_IGNORE_TEST
 #endif
 }
+
+SLANG_UNIT_TEST(uriGetPathPercentDecode)
+{
+    SLANG_CHECK(URI::fromString(toSlice("file://path%20name")).getPath() == "path name");
+    SLANG_CHECK(URI::fromString(toSlice("file://%20")).getPath() == " ");
+    SLANG_CHECK(URI::fromString(toSlice("file://a%20?x=1")).getPath() == "a ");
+    SLANG_CHECK(URI::fromString(toSlice("file://path%")).getPath() == "path%");
+    SLANG_CHECK(URI::fromString(toSlice("file://path%2")).getPath() == "path%2");
+    SLANG_CHECK(URI::fromString(toSlice("file://path%2g")).getPath() == "path%2g");
+    SLANG_CHECK(URI::fromString(toSlice("file://path%g0")).getPath() == "path%g0");
+    SLANG_CHECK(URI::fromString(toSlice("file://path%gg")).getPath() == "path%gg");
+    SLANG_CHECK(URI::fromString(toSlice("file://path%2?x=1")).getPath() == "path%2");
+    SLANG_CHECK(URI::fromLocalFilePath(toSlice("path\tname")).getPath() == "path\tname");
+
+    const char highBitPath[] = {'h', 'i', (char)0x80, (char)0xff, 0};
+    String highBitRoundTrip = URI::fromLocalFilePath(UnownedStringSlice(highBitPath)).getPath();
+    SLANG_CHECK(highBitRoundTrip.getUnownedSlice() == UnownedStringSlice(highBitPath));
+}

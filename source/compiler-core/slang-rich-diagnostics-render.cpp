@@ -311,9 +311,12 @@ private:
                 if (view)
                 {
                     line.sourceAvailable = true;
+                    // Use the *actual* (non-remapped) line so that a #line
+                    // directive doesn't cause us to display the wrong source.
+                    auto actualLine = view->getHumaneLoc(span.startLoc, SourceLocType::Actual).line;
                     // Get the line content and trim end-of-line characters and trailing whitespace
                     UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
-                        view->getSourceFile()->getLineAtIndex(span.line - 1));
+                        view->getSourceFile()->getLineAtIndex(actualLine - 1));
                     // Trim trailing whitespace but preserve leading whitespace (indentation)
                     line.content = UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
                 }
@@ -783,8 +786,9 @@ String renderDiagnosticMachineReadable(
             SourceView* view = sm->findSourceView(span.range.begin);
             if (view)
             {
+                auto actualLine = view->getHumaneLoc(span.range.begin, SourceLocType::Actual).line;
                 UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
-                    view->getSourceFile()->getLineAtIndex(beginLoc.line - 1));
+                    view->getSourceFile()->getLineAtIndex(actualLine - 1));
                 UnownedStringSlice lineContent =
                     UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
                 if (lineContent.getLength() > 0 && beginLoc.column > 0 &&

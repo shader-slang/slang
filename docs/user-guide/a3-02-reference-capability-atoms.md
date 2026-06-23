@@ -474,6 +474,10 @@ Extensions
 `GL_EXT_samplerless_texture_functions`
 > Represents the GL_EXT_samplerless_texture_functions extension.
 
+`GL_EXT_shader_abort`
+> Represents the GL_EXT_shader_abort extension for GLSL targets, or the
+> corresponding SPV_KHR_shader_abort extension for SPIR-V targets.
+
 `GL_EXT_shader_atomic_float`
 > Represents the GL_EXT_shader_atomic_float extension.
 
@@ -667,6 +671,9 @@ Extensions
 `SPV_KHR_ray_tracing_position_fetch`
 > Represents the SPIR-V extension for ray tracing position fetch.
 > Should be used with either SPV_KHR_ray_query or SPV_KHR_ray_tracing.
+
+`SPV_KHR_shader_abort`
+> Represents the SPIR-V extension for shader abort (VK_KHR_shader_abort).
 
 `SPV_KHR_shader_clock`
 > Represents the SPIR-V extension for shader clock.
@@ -909,6 +916,9 @@ Extensions
 Compound Capabilities
 ----------------------
 *Capabilities to specify capabilities created by other capabilities (`raytracing`, `meshshading`...)*
+
+`abort`
+> Capabilities required to use 'abort'
 
 `amplification_mesh`
 > Collection of shader stages
@@ -1168,6 +1178,9 @@ Compound Capabilities
 `cuda_glsl_metal_spirv_wgsl_llvm`
 > CUDA, GLSL, Metal, SPIRV, WGSL and LLVM code-gen targets
 
+`cuda_glsl_nvapi`
+> CUDA, GLSL, and NVAPI code-gen targets
+
 `cuda_glsl_spirv`
 > CUDA, GLSL, and SPIRV code-gen targets
 
@@ -1370,7 +1383,8 @@ Compound Capabilities
 
 `ser`
 > Capabilities needed for shader-execution-reordering (all paths)
-> Includes NVIDIA-specific (NV), cross-vendor standard (EXT), DXR 1.3 native, and CUDA paths
+> Defaults SPIR-V/GLSL to the cross-vendor standard EXT path; explicit NV still satisfies this
+> through the NV-to-EXT capability hierarchy. Use ser_nv for APIs that require NV opcodes.
 
 `ser_any_closesthit_intersection_miss`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, intersection, and miss.
@@ -1504,7 +1518,14 @@ Compound Capabilities
 > New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 
 `texture_shadowlod`
-> Capabilities required to query shadow texture lod info
+> Capabilities required for shadow texture LOD sampling on types
+> natively supported by GLSL 1.50 (sampler1DShadow, sampler1DArrayShadow,
+> sampler2DShadow).
+
+`texture_shadowlod_ext`
+> Capabilities required for shadow texture LOD sampling on types
+> that need GL_EXT_texture_shadow_lod (sampler2DArrayShadow, samplerCubeShadow,
+> samplerCubeArrayShadow).
 
 `texture_size`
 > Capabilities required to query texture sample info

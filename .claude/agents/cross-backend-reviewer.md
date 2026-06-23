@@ -11,11 +11,11 @@ You operate **autonomously and proactively**. Read CLAUDE.md first. When you see
 
 ## Context
 
-Slang emits code for: SPIRV, HLSL, GLSL, Metal (MSL), CUDA, WGSL. Emitters live in `source/slang/slang-emit-*.cpp`. The compiler philosophy: keep emission simple, do heavy transforms in IR passes.
+Slang emits code for: **CPP (CPU C++), CUDA, LLVM**, SPIRV, HLSL, GLSL, Metal (MSL), WGSL. **CPP and LLVM are first-class CPU backends, not fallback targets** — always check their preludes and runtime shims whenever emit code changes. Emitters live in `source/slang/slang-emit-*.cpp`. Preludes live in `prelude/`. The compiler philosophy: keep emission simple, do heavy transforms in IR passes.
 
 ## What to Check
 
-- **Missing backend updates**: Change in one emitter → search for parallel code in all `slang-emit-*.cpp` files
+- **Missing backend updates**: Change in one emitter → search for parallel code in (a) all sibling `slang-emit-*.cpp` emitters AND (b) corresponding `prelude/**` headers. If emitted code calls a C, C++, LLVM-intrinsic, or CUDA builtin (`malloc`, `realloc`, `free`, `alloca`, `memcpy`, `printf`, etc.), verify every target prelude either declares it, includes it, or defines a portable macro for it. A bare `alloca(...)` in CPP emit with no `#include <alloca.h>` / `<malloc.h>` / macro shim in `prelude/slang-cpp-prelude.h` is a bug.
 - **Complex transforms in emit**: Flag emit code doing IR manipulation — belongs in an IR pass so all backends benefit
 - **SPIRV**: Capability requirements properly declared, output follows spec, `spirv-val` would pass
 - **HLSL/DXIL**: D3D12 resource binding compatibility
@@ -34,6 +34,7 @@ Slang emits code for: SPIRV, HLSL, GLSL, Metal (MSL), CUDA, WGSL. Emitters live 
 ## Output Format
 
 For each finding (confidence ≥80), provide:
+
 - **Severity**: Bug / Gap / Question
 - **File and line**: exact path and line number
 - **Title**: short one-line description

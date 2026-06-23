@@ -21,15 +21,15 @@ struct Nested
 
 StructuredBuffer<WithTexture> bufferWithTexture;
 //CHECK:                      ^^^^^^^^^^^^^^^^^ resource type in StructuredBuffer
-//CHECK:                      ^^^^^^^^^^^^^^^^^ StructuredBuffer element type 'WithTexture' cannot contain resource or opaque handle types
+//CHECK:                      ^^^^^^^^^^^^^^^^^ StructuredBuffer element type 'WithTexture' must not be a resource type or contain an opaque handle type
 
 StructuredBuffer<WithSampler> bufferWithSampler;
 //CHECK:                      ^^^^^^^^^^^^^^^^^ resource type in StructuredBuffer
-//CHECK:                      ^^^^^^^^^^^^^^^^^ StructuredBuffer element type 'WithSampler' cannot contain resource or opaque handle types
+//CHECK:                      ^^^^^^^^^^^^^^^^^ StructuredBuffer element type 'WithSampler' must not be a resource type or contain an opaque handle type
 
 StructuredBuffer<Nested> bufferNested;
 //CHECK:                 ^^^^^^^^^^^^ resource type in StructuredBuffer
-//CHECK:                 ^^^^^^^^^^^^ StructuredBuffer element type 'Nested' cannot contain resource or opaque handle types
+//CHECK:                 ^^^^^^^^^^^^ StructuredBuffer element type 'Nested' must not be a resource type or contain an opaque handle type
 
 RWStructuredBuffer<float4> output;
 

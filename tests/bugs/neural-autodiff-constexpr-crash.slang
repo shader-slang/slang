@@ -19,8 +19,17 @@ import slang.neural;
 static const int SubgroupSize = 32;
 static const int WARPS = 4;
 
-typealias ShMemSize = SharedMemorySize<half, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, WARPS>;
-typealias ShMemSizeLayer = ShMemSize.OfLayer4<2, 128, 128, 128, 3>;
+typealias ShMemSizeLayer = SharedMemorySize<
+    half,
+    TargetEnum.CUDA,
+    ExecutionMode.Training,
+    SubgroupSize,
+    WARPS,
+    2,
+    128,
+    128,
+    128,
+    3>;
 typealias InVec = WaveTangledVector<half, ShMemSizeLayer, 2, SubgroupSize, WARPS>;
 typealias HidVec = WaveTangledVector<half, ShMemSizeLayer, 128, SubgroupSize, WARPS>;
 typealias OutVec = WaveTangledVector<half, ShMemSizeLayer, 3, SubgroupSize, WARPS>;

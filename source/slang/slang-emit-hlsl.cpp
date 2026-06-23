@@ -672,8 +672,7 @@ void HLSLSourceEmitter::ensureCoopVecHlslPreludeForProfile()
 {
     ensurePrelude("#include \"dx/linalg.h\"");
 
-    auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
-    if (targetProfile.getVersion() > ProfileVersion::DX_6_9)
+    if (m_effectiveProfile.getVersion() > ProfileVersion::DX_6_9)
     {
         ensurePrelude(m_CoopVecPrelude_sm610);
     }
@@ -1049,6 +1048,12 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 
 static bool isTargetHLSL2018(HLSLSourceEmitter* emitter, CapabilitySet targetCaps, Stage stage)
 {
+    if (stage == Stage::Unknown)
+    {
+        // Whole-program emission may not have an entry-point stage.
+        return !targetCaps.implies(CapabilitySet(CapabilityName::hlsl_2018));
+    }
+
     auto stageAtom = getAtomFromStage(stage);
 
     // Cache the result of this function for easier lookup.
@@ -1074,6 +1079,23 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
+    case kIROp_SubpassLoad:
+        {
+            auto subpassLoad = as<IRSubpassLoad>(inst);
+            auto outer = getInfo(EmitOp::General);
+            emitOperand(subpassLoad->getSubpassInput(), leftSide(outer, getInfo(EmitOp::Postfix)));
+            if (auto sample = subpassLoad->getSample())
+            {
+                m_writer->emit(".SubpassLoad(");
+                emitOperand(sample, getInfo(EmitOp::General));
+                m_writer->emit(")");
+            }
+            else
+            {
+                m_writer->emit(".SubpassLoad()");
+            }
+            return true;
+        }
     case kIROp_MakeCoopVector:
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
@@ -1146,8 +1168,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         {
             // SM6.0 requires to use `and()` and `or()` functions for the logical-AND and
             // logical-OR, respectively, with non-scalar operands.
-            auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
-            if (targetProfile.getVersion() < ProfileVersion::DX_6_0)
+            if (m_effectiveProfile.getVersion() < ProfileVersion::DX_6_0)
                 return false;
             auto targetCaps = getTargetReq()->getTargetCaps();
             if (!isTargetHLSL2018(this, targetCaps, m_entryPointStage))
@@ -1174,8 +1195,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         {
             // SM6.0 requires to use `select()` instead of the ternary operator "?:" when the
             // operands are non-scalar.
-            auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
-            if (targetProfile.getVersion() < ProfileVersion::DX_6_0)
+            if (m_effectiveProfile.getVersion() < ProfileVersion::DX_6_0)
                 return false;
             auto targetCaps = getTargetReq()->getTargetCaps();
             if (!isTargetHLSL2018(this, targetCaps, m_entryPointStage))
@@ -1555,8 +1575,8 @@ static bool _canEmitExport(const Profile& profile)
 {
     const auto family = profile.getFamily();
     const auto version = profile.getVersion();
-    // Is ita late enough version of shader model to output with 'export'
-    return (family == ProfileFamily::DX && version >= ProfileVersion::DX_6_1);
+    // DXC rejects pre-SM6.3 library profiles for whole-program DXIL output.
+    return (family == ProfileFamily::DX && version >= ProfileVersion::DX_6_3);
 }
 
 /* virtual */ void HLSLSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
@@ -2116,10 +2136,13 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
         }
     }
 
-    if (auto readAccessSemantic = inst->findDecoration<IRStageReadAccessDecoration>())
-        _emitStageAccessSemantic(readAccessSemantic, "read");
-    if (auto writeAccessSemantic = inst->findDecoration<IRStageWriteAccessDecoration>())
-        _emitStageAccessSemantic(writeAccessSemantic, "write");
+    if (_shouldEmitPayloadAccessQualifiers())
+    {
+        if (auto readAccessSemantic = inst->findDecoration<IRStageReadAccessDecoration>())
+            _emitStageAccessSemantic(readAccessSemantic, "read");
+        if (auto writeAccessSemantic = inst->findDecoration<IRStageWriteAccessDecoration>())
+            _emitStageAccessSemantic(writeAccessSemantic, "write");
+    }
 
     if (auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
     {
@@ -2158,21 +2181,19 @@ void HLSLSourceEmitter::_emitStageAccessSemantic(
     m_writer->emit(")");
 }
 
+bool HLSLSourceEmitter::_shouldEmitPayloadAccessQualifiers()
+{
+    if (m_effectiveProfile.getFamily() != ProfileFamily::DX)
+        return false;
+
+    // PAQs are required on [raypayload] struct members starting with SM 6.7.
+    return m_effectiveProfile.getVersion() >= ProfileVersion::DX_6_7;
+}
+
 void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
 {
 
-    // Get the target profile to determine if PAQs are supported
-    bool enablePAQs = false;
-    auto profile = getTargetProgram()->getOptionSet().getProfile();
-    if (profile.getFamily() == ProfileFamily::DX)
-    {
-        // PAQs are default in Shader Model 6.7 and above when called with `--profile lib_6_7`
-
-        auto version = profile.getVersion();
-        enablePAQs = version >= ProfileVersion::DX_6_7;
-    }
-
-    if (enablePAQs)
+    if (_shouldEmitPayloadAccessQualifiers())
     {
         if (const auto payloadDecoration = inst->findDecoration<IRRayPayloadDecoration>();
             payloadDecoration)
@@ -2201,6 +2222,60 @@ void HLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
 
 void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
+    auto emitMeshOutputParam = [&]
+    {
+        auto modifier = param->findDecoration<IRMeshOutputDecoration>();
+        if (!modifier)
+            return false;
+
+        auto func = getParentFunc(param);
+        if (!func || !func->findDecoration<IREntryPointDecoration>())
+            return false;
+
+        // HLSL mesh-output parameter syntax is only valid on mesh entry points.
+        // Helper functions that receive mesh outputs are legalized to ordinary array params.
+        auto paramName = getName(param);
+        auto paramType = param->getDataType();
+
+        if (auto layoutDecoration = param->findDecoration<IRLayoutDecoration>())
+        {
+            auto layout = as<IRVarLayout>(layoutDecoration->getLayout());
+            SLANG_ASSERT(layout);
+
+            if (layout->usesResourceKind(LayoutResourceKind::VaryingInput) ||
+                layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
+            {
+                emitInterpolationModifiers(param, paramType, layout);
+            }
+        }
+
+        const char* prefix = as<IRVerticesDecoration>(modifier)     ? "out vertices "
+                             : as<IRIndicesDecoration>(modifier)    ? "out indices "
+                             : as<IRPrimitivesDecoration>(modifier) ? "out primitives "
+                                                                    : nullptr;
+        SLANG_ASSERT(prefix && "Unhandled type of mesh output decoration");
+
+        auto valueType = paramType;
+        if (auto outType = as<IROutParamTypeBase>(valueType))
+        {
+            valueType = outType->getValueType();
+        }
+        else if (auto refType = as<IRRefParamType>(valueType))
+        {
+            valueType = refType->getValueType();
+        }
+        else if (auto constRefType = as<IRBorrowInParamType>(valueType))
+        {
+            valueType = constRefType->getValueType();
+        }
+
+        m_writer->emit(prefix);
+        emitType(valueType, paramName);
+        emitSemantics(param);
+        emitPostDeclarationAttributesForType(paramType);
+        return true;
+    };
+
     // A mesh shader input payload has it's own weird stuff going on, handled
     // in emitMeshShaderModifiers, skip this bit which will introduce an
     // invalid "groupshared" keyword.
@@ -2231,6 +2306,9 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             break;
         }
     }
+
+    if (emitMeshOutputParam())
+        return;
 
     Super::emitSimpleFuncParamImpl(param);
 }
@@ -2272,16 +2350,6 @@ void HLSLSourceEmitter::emitPackOffsetModifier(
 
 void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 {
-    if (auto modifier = varInst->findDecoration<IRMeshOutputDecoration>())
-    {
-        // DXC requires that mesh payload parameters have "out" specified
-        const char* s = as<IRVerticesDecoration>(modifier)     ? "out vertices "
-                        : as<IRIndicesDecoration>(modifier)    ? "out indices "
-                        : as<IRPrimitivesDecoration>(modifier) ? "out primitives "
-                                                               : nullptr;
-        SLANG_ASSERT(s && "Unhandled type of mesh output decoration");
-        m_writer->emit(s);
-    }
     if (varInst->findDecoration<IRHLSLMeshPayloadDecoration>())
     {
         // DXC requires that mesh payload parameters have "in" specified

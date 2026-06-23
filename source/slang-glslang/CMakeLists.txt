@@ -6,12 +6,18 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         .
         MODULE
         USE_FEWER_WARNINGS
+        SKIP_ASAN
         LINK_WITH_PRIVATE glslang SPIRV SPIRV-Tools-opt SPIRV-Tools-link
         INCLUDE_DIRECTORIES_PRIVATE
             ${slang_SOURCE_DIR}/include
             ${CMAKE_CURRENT_BINARY_DIR}/../slang/slang-version-header
         INSTALL
         EXPORT_SET_NAME SlangTargets
+    )
+    target_compile_definitions(
+        slang-glslang
+        PRIVATE
+            SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=$<BOOL:${SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN}>
     )
     # Our only interface is through what we define in source/slang-glslang, in the
     # interests of hygiene, hide anything else we link in.
@@ -30,11 +36,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
             PROPERTIES OUTPUT_NAME slang-glslang-${SLANG_VERSION_NUMERIC}
         )
     endif()
-    add_supported_cxx_flags(
-        slang-glslang
-        PRIVATE
-        -fno-rtti
-    )
+    add_supported_cxx_flags(slang-glslang PRIVATE -fno-rtti)
     add_supported_cxx_linker_flags(
         slang-glslang
         PRIVATE

@@ -12,6 +12,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
 namespace TestProcess
 {
 using namespace Slang;
@@ -178,6 +182,45 @@ static SlangResult _httpCrash()
     return SLANG_FAIL;
 }
 
+static SlangResult _sleep(int argc, const char* const* argv)
+{
+    Int timeInMs = 30 * 1000;
+    if (argc > 2)
+    {
+        SLANG_RETURN_ON_FAIL(StringUtil::parseInt(UnownedStringSlice(argv[2]), timeInMs));
+        if (timeInMs < 0)
+        {
+            return SLANG_FAIL;
+        }
+    }
+
+    Process::sleepCurrentThread(timeInMs);
+    return SLANG_OK;
+}
+
+#if defined(_WIN32)
+static SlangResult _waitEvent(int argc, const char* const* argv)
+{
+    if (argc < 3)
+    {
+        return SLANG_FAIL;
+    }
+
+    OSString eventName = String(argv[2]).toWString();
+    HANDLE event = OpenEventW(SYNCHRONIZE, FALSE, eventName.begin());
+    if (!event)
+    {
+        return SLANG_FAIL;
+    }
+
+    // Keep the helper bounded so a missed test signal cannot leave a child process around
+    // indefinitely.
+    DWORD waitResult = WaitForSingleObject(event, 60 * 1000);
+    CloseHandle(event);
+    return waitResult == WAIT_OBJECT_0 ? SLANG_OK : SLANG_FAIL;
+}
+#endif
+
 static SlangResult execute(int argc, const char* const* argv)
 {
     if (argc < 2)
@@ -203,6 +246,16 @@ static SlangResult execute(int argc, const char* const* argv)
     {
         return _httpCrash();
     }
+    else if (toolName == "sleep")
+    {
+        return _sleep(argc, argv);
+    }
+#if defined(_WIN32)
+    else if (toolName == "wait-event")
+    {
+        return _waitEvent(argc, argv);
+    }
+#endif
     return SLANG_E_NOT_AVAILABLE;
 }
 

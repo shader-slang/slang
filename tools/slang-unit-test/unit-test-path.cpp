@@ -57,4 +57,20 @@ SLANG_UNIT_TEST(path)
 
         SLANG_CHECK(Path::hasRelativeElement("a:\\what\\..\\.\\..\\is\\.\\..\\this\\.\\"));
     }
+
+    // hasPath: returns true only when the path contains at least one separator.
+    // These cases matter for _getCanonicalOrExecutablePath: bare names must
+    // fall through to the OS-fallback branch even if realpath() would succeed
+    // against cwd.
+    {
+        // Bare names — no separator, no path context.
+        SLANG_CHECK(Path::hasPath(UnownedStringSlice("slang-test")) == false);
+        SLANG_CHECK(Path::hasPath(UnownedStringSlice("slang-test.exe")) == false);
+        SLANG_CHECK(Path::hasPath(UnownedStringSlice("")) == false);
+
+        // Names with explicit path context.
+        SLANG_CHECK(Path::hasPath(UnownedStringSlice("./slang-test")));
+        SLANG_CHECK(Path::hasPath(UnownedStringSlice("/usr/bin/slang-test")));
+        SLANG_CHECK(Path::hasPath(UnownedStringSlice("D:\\foo\\slang-test.exe")));
+    }
 }

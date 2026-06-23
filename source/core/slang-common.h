@@ -358,24 +358,25 @@ public:
 
 //
 // Assertions abort in debug builds, but inform the compiler of true
-// assumptions in release builds
+// assumptions in release builds. __FILE__ / __LINE__ are captured at
+// the call site and prepended (as basename only) to the failure message.
 //
 #ifdef _DEBUG
-#define SLANG_ASSERT(VALUE)                       \
-    do                                            \
-    {                                             \
-        if (!(VALUE)) [[unlikely]]                \
-            ::Slang::handleAssert(#VALUE, false); \
+#define SLANG_ASSERT(VALUE)                                           \
+    do                                                                \
+    {                                                                 \
+        if (!(VALUE)) [[unlikely]]                                    \
+            ::Slang::handleAssert(#VALUE, __FILE__, __LINE__, false); \
     } while (0)
 #else
 #define SLANG_ASSERT(VALUE) SLANG_ASSUME(VALUE)
 #endif
 
-#define SLANG_RELEASE_ASSERT(VALUE)              \
-    do                                           \
-    {                                            \
-        if (!(VALUE)) [[unlikely]]               \
-            ::Slang::handleAssert(#VALUE, true); \
+#define SLANG_RELEASE_ASSERT(VALUE)                                  \
+    do                                                               \
+    {                                                                \
+        if (!(VALUE)) [[unlikely]]                                   \
+            ::Slang::handleAssert(#VALUE, __FILE__, __LINE__, true); \
     } while (0)
 
 template<typename T>

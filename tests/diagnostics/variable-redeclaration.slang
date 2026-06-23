@@ -55,6 +55,7 @@ struct S
 //diag:^ conflicting declaration
 //diag:^ declaration of 'f' conflicts with existing declaration
 //diag:^ see previous declaration of 'f'
+//diag:^ some of the above errors may have been produced while synthesizing method '$init' of 'S'
 {
 	int f;
 /*diag:

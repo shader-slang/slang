@@ -37,16 +37,33 @@ static inline SlangReflectionUserAttribute* convert(Attribute* attrib)
 
 static inline Type* convert(SlangReflectionType* type)
 {
+    // `SlangReflectionType*` is opaque to callers, so every value reaching
+    // this helper originated from `convert(Type*)` below, which already
+    // peels `ModifiedType` / `AtomicType`. No additional unwrap is needed.
     return (Type*)type;
 }
 
 static inline SlangReflectionType* convert(Type* type)
 {
+    // Peel off any modifier wrappers (e.g. `no_diff`, `unorm`, `snorm`).
+    // These can appear on function return/parameter types after generic
+    // specialization (see issue #11277) and on `no_diff`-qualified struct
+    // fields. Without this, every structural query (`getKind`,
+    // `getElementType`, layout, `getFullName`) falls through to its
+    // `UNEXPECTED` path and reports NONE / zero, which downstream consumers
+    // like slangpy treat as an unknown type. Modifier information remains
+    // available via `findModifier()` on the owning variable / function.
+    //
+    // Unwrap up-front so the `AtomicType` check below catches
+    // `ModifiedType(AtomicType(...))`, and re-unwrap the element so it also
+    // catches `AtomicType(ModifiedType(...))`.
+    type = unwrapModifiedType(type);
+
     // Prevent the AtomicType struct from being visible to the user
     // through the reflection API.
     if (auto atomicType = as<AtomicType>(type))
     {
-        return (SlangReflectionType*)atomicType->getElementType();
+        return (SlangReflectionType*)unwrapModifiedType(atomicType->getElementType());
     }
     return (SlangReflectionType*)type;
 }
@@ -2011,6 +2028,16 @@ struct ExtendedTypeLayoutContext
 
         RefPtr<TypeLayout::ExtendedInfo::DescriptorSetInfo> descriptorSet =
             new TypeLayout::ExtendedInfo::DescriptorSetInfo();
+        // Record the (HLSL `space` / Vulkan descriptor set) that this
+        // descriptor set was constructed for. Without this,
+        // `getDescriptorSetSpaceOffset` always returns 0, which causes
+        // slang-rhi backends (D3D12 root-signature builder, Vulkan
+        // descriptor-set allocator, WebGPU bind-group builder) to
+        // place all parameters at space=0 — resulting in
+        // root-signature rejections on D3D12 and silent wrong-binding
+        // on Vulkan/WebGPU when a user has `register(_, spaceN)` or
+        // `[[vk::binding(_, N)]]` with `N != 0`.
+        descriptorSet->spaceOffset = space;
         m_extendedInfo->m_descriptorSets.add(descriptorSet);
 
         return index;
@@ -3329,7 +3356,11 @@ SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inV
 SLANG_API SlangResult
 spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t* rs)
 {
-    auto decl = convert(inVar).getDecl();
+    if (!inVar || !rs)
+        return SLANG_E_INVALID_ARG;
+
+    auto var = convert(inVar);
+    auto decl = var.getDecl();
     if (auto varDecl = as<VarDeclBase>(decl))
     {
         if (auto constantVal = as<ConstantIntVal>(varDecl->val))
@@ -3337,7 +3368,30 @@ spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t*
             *rs = constantVal->getValue();
             return 0;
         }
-        else if (auto cexpr = as<IntegerLiteralExpr>(varDecl->initExpr))
+        if (varDecl->val)
+        {
+            // Substitute specialized generic arguments before resolving semantic values that are
+            // not already concrete integer constants.
+            if (auto module = getModule(varDecl))
+            {
+                if (auto linkage = module->getLinkage())
+                {
+                    auto astBuilder = linkage->getASTBuilder();
+                    SLANG_AST_BUILDER_RAII(astBuilder);
+
+                    if (auto val = varDecl->val->substitute(astBuilder, SubstitutionSet(var)))
+                    {
+                        val = val->resolve();
+                        if (auto constantVal = as<ConstantIntVal>(val))
+                        {
+                            *rs = constantVal->getValue();
+                            return 0;
+                        }
+                    }
+                }
+            }
+        }
+        if (auto cexpr = as<IntegerLiteralExpr>(varDecl->initExpr))
         {
             *rs = cexpr->value;
             return 0;

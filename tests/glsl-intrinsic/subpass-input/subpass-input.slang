@@ -4,6 +4,8 @@
 
 #version 450
 // CHECK_SPV-DAG: OpEntryPoint
+// CHECK_SPV-DAG: OpCapability InputAttachment
+// CHECK_SPV-DAG: OpCapability StorageImageReadWithoutFormat
 
 // CHECK_SPV-DAG: InputAttachmentIndex 0
 // CHECK_SPV-DAG: InputAttachmentIndex 1

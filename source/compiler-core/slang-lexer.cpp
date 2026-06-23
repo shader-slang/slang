@@ -1099,16 +1099,22 @@ String getStringLiteralTokenValue(Token const& token)
 
     char const* cursor = content.begin();
     char const* end = content.end();
-    SLANG_UNREFERENCED_VARIABLE(end);
+
+    // The token's content slice is a precise view of the lexed source text.
+    // For an unterminated literal (newline / EOF inside a string), the lexer
+    // emits a diagnostic but still produces a token whose content slice ends
+    // before any closing quote. Every cursor advance below must therefore be
+    // gated on `cursor < end` to avoid an out-of-bounds read into the
+    // surrounding heap (#11278).
+    if (cursor == end)
+        return String();
 
     auto quote = *cursor++;
     SLANG_ASSERT(quote == '\'' || quote == '"');
 
     StringBuilder valueBuilder;
-    for (;;)
+    while (cursor < end)
     {
-        SLANG_ASSERT(cursor != end);
-
         auto c = *cursor++;
 
         // If we see a closing quote, then we are at the end of the string literal
@@ -1129,6 +1135,8 @@ String getStringLiteralTokenValue(Token const& token)
         // Now we look at another character to figure out the kind of
         // escape sequence we are dealing with:
 
+        if (cursor >= end)
+            break;
         char d = *cursor++;
 
         switch (d)
@@ -1178,6 +1186,8 @@ String getStringLiteralTokenValue(Token const& token)
                 int value = 0;
                 for (int ii = 0; ii < 3; ++ii)
                 {
+                    if (cursor >= end)
+                        break;
                     d = *cursor;
                     if (('0' <= d) && (d <= '7'))
                     {
@@ -1203,6 +1213,8 @@ String getStringLiteralTokenValue(Token const& token)
                 int value = 0;
                 for (;;)
                 {
+                    if (cursor >= end)
+                        break;
                     d = *cursor++;
                     int digitValue = 0;
                     if (('0' <= d) && (d <= '9'))
@@ -1234,6 +1246,11 @@ String getStringLiteralTokenValue(Token const& token)
             // TODO: Unicode escape sequences
         }
     }
+
+    // Unterminated literal: return what we have built so far rather than
+    // continuing to read past `end`. The lexer has already emitted a
+    // diagnostic for the unterminated literal at this point.
+    return valueBuilder.produceString();
 }
 
 String getFileNameTokenValue(Token const& token)
@@ -1328,6 +1345,24 @@ static TokenType _lexTokenImpl(Lexer* lexer)
             switch (_peek(lexer))
             {
             default:
+                // A bare `0` may be followed by either of the two
+                // floating-point continuations recognised elsewhere by the
+                // lexer:
+                //   * the legacy MSVC `#INF` infinity form (so `0#INF`
+                //     matches `1#INF`, which already worked through the
+                //     1-9 → `_lexNumber` → `_maybeLexNumberExponent` path;
+                //     #11276 Case 2),
+                //   * a base-10 exponent `e`/`E` (so `0e10`, `0E5`,
+                //     `0e+1`, `0e-3` lex as `FloatingPointLiteral`,
+                //     matching `1e10` etc.). Without this the bare-`0`
+                //     `default:` arm dropped through `_maybeLexNumberSuffix`
+                //     and the alphanumeric-suffix loop swallowed `e10` as a
+                //     literal suffix, producing an `IntegerLiteral` with
+                //     text `0e10`.
+                // For any other trailing character the `0` is just an
+                // integer literal.
+                if (_maybeLexNumberExponent(lexer, 10))
+                    return _maybeLexNumberSuffix(lexer, TokenType::FloatingPointLiteral);
                 return _maybeLexNumberSuffix(lexer, TokenType::IntegerLiteral);
 
             case '.':

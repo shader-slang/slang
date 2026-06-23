@@ -89,11 +89,105 @@ if (auto foo = as<IRFoo>(inst))
 
 For variables that are set but never read outside an `if` (e.g., a plain local variable), use `SLANG_UNUSED(var)` with a comment explaining why.
 
+### Problem-Solving Methodology
+
+Follow the **principled path**, not the minimal-edit-distance path. The goal is a correct
+representation that is robust by construction, even when that means a larger rework.
+
+- **Fix root causes, not symptoms.** When a bug appears in emit/codegen, the cause is usually
+  upstream (an IR pass, type legalization, specialization, lowering, or the AST/IR representation
+  itself). Trace it there and fix it there.
+- **Question every change.** Before keeping a change, answer: _Why is this change necessary? What
+  test fails without it? Is this the right fix, or is the problem telling me the
+  direction/representation is flawed?_ If you cannot name a test that fails without a change, the
+  change probably should not exist.
+- **Do not mask.** A guard, null-check, or special case that papers over a malformed
+  AST/IR/witness-table is a band-aid that hides a representation bug. A guard that is never hit
+  under correct input is dead code. Prefer making the representation correct so consumers stay
+  simple.
+- **Interrogate the input shape.** Whenever you write or change code that handles a particular
+  shape of input — an AST node, IR inst, witness, type, etc. — always ask: _is that input shape
+  itself correct and principled, or should the upstream producer of it be fixed instead?_ If the
+  shape is wrong or accidental, fix the producer; handle it here only when the shape is genuinely
+  valid input. This is the routine double-check that root-causing was done at the right layer, and
+  its answer is required in the PR description (see the Process report below).
+- **Prefer correct representation over edit distance.** If two surface forms _should_ be
+  equivalent, model them identically. If a consumer reads data by position/index/identity when the
+  data is conceptually an unordered key→value set (e.g. witness-table / interface requirement
+  entries), make the access by role/key, not by position.
+- **Keep a working log/report.** Maintain a scratch markdown document throughout the task that
+  records: the problem and a motivating example, road-blockers encountered, how issues **cascade**
+  (one fix exposing the next), the fix chosen for each and _why it is principled_ (with a concrete
+  code trace), and alternatives that were rejected and why. This log is what you distill into the
+  PR description below. (Keep the log out of the commit — it feeds the PR body, it is not a repo
+  artifact.)
+
+### Code Style and Review Conventions
+
+Recurring review feedback distilled into rules — following them avoids review round-trips. (These
+govern how code reads and is structured; the Problem-Solving Methodology above governs _what_ to
+change.)
+
+- **Write function comments as complete sentences: what, then why.** State what the function does
+  first; then, if the reason it exists isn't obvious from that description, add a brief summary of
+  why. For non-trivial behavior, include a concrete example. Avoid terse fragment- or bullet-only
+  comments on a function. For instance, `substituteElementOfCompositeType` should read like _"Return
+  `target` with its element type replaced by `newElementType`, preserving shape: scalar →
+  newElementType, `vector<T,N>` → `vector<newElementType,N>`, `matrix<T,R,C>` → `matrix<newElementType,R,C>`."_
+  — not _"element coerce target"_.
+
+- **Reuse before you write; then extract non-trivial logic into a named, documented helper.** Before
+  writing a new helper, search for an existing one — what you need is often already provided by a
+  shared header (the AST/IR helpers in `slang-ast-type.h`, `slang-ir-util.h`, and the various
+  `*-util.h` files). For example, to test whether a type is a `DeclRefType` of a particular
+  declaration, use the existing `isDeclRefTypeOf<T>(type)` rather than re-deriving it. When the
+  logic genuinely is new, don't bury a multi-step computation in an inline lambda or a long inline
+  block: give it an intention-revealing name (`coerceOperandsOfBuiltinBinaryExpr`,
+  `substituteElementOfCompositeType`, `unifyBaseType`) and a doc comment, so the caller stays
+  readable and the helper is reusable.
+
+- **Keep one source of truth; delete dead code after a refactor.** Map or classify a given thing in
+  exactly one place — e.g. the operator-name → operation-kind mapping lives only in
+  `getBuiltinOperationKindFromString`, not re-implemented at call sites. When a change makes a
+  branch, fallback, or helper unreachable, remove it rather than leaving it as dead code.
+
+- **One canonical representation per value; assert the invariant.** Don't introduce a second
+  AST/IR/`Val` representation for something that already has one — multiple forms of the same logical
+  value break `equals`/identity checks and deduplication. When an invariant guarantees a
+  representation is never produced for certain inputs (e.g. `+`/`-`/`*` are always a
+  `PolynomialIntVal`, never a `BuiltinOperationIntVal`), `SLANG_ASSERT` it at the construction site
+  so a violation is caught rather than silently producing a divergent form.
+
+- **Fail loudly on out-of-contract input.** When a helper is only valid for a restricted set of
+  inputs, `SLANG_RELEASE_ASSERT` on anything outside that set instead of silently returning a default
+  — e.g. `substituteElementOfCompositeType` asserts its operand is a builtin scalar/vector/matrix.
+
 ### PR Workflow
 
 1. **Format your code**: Run `./extras/formatting.sh` before committing
-2. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking" (for ABI/language breaking changes)
+2. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking change" (for ABI/language breaking changes)
 3. **Include tests**: Add regression tests as `.slang` files under `tests/`
+4. **Write the PR description in this required five-part format:**
+   1. **Motivation** — the problem being solved, with a concrete example / motivating test case.
+   2. **Proposed solution** — the approach, and why it is the principled one.
+   3. **Change summary** — a table or list of the files/areas touched and what each does.
+   4. **Concepts and vocabulary** — a short glossary, placed between the change summary and the
+      process report. Restate only the _codebase-specific or subtle_ terms the report relies on, as
+      a reminder for the reviewer (e.g. witness / `getSub`, facet / `getInheritanceInfo`, the
+      fixpoint solver, or a non-obvious distinction the fix hinges on). Do **not** explain basic,
+      well-known concepts (e.g. interface, associated type) — assume them.
+   5. **Process report** — explain _every_ change with a logical reason. For a change that
+      addresses a **cascading** issue, describe the issue (with its motivating test case) and
+      justify why the fix is correct with a **code trace** (the exact functions/insts involved),
+      not just a description. State explicitly why each change is necessary and principled rather
+      than a workaround. For any change that handles, guards, or special-cases a particular input
+      shape, the report **must** answer the input-shape check from the methodology — _is that shape
+      correct and principled, or should its producer have been fixed instead?_ — so a reviewer can
+      confirm the fix sits at the right layer.
+
+   Write for a reviewer who does not have the full context in their head: ground each abstract claim
+   in a concrete example, and wire explanations to the source — name the function and file (or
+   `file.cpp:line`) — so the reader can navigate from prose to code without searching.
 
 ### Testing
 
@@ -146,8 +240,14 @@ int foo = undefined;
 
 **DO NOT USE** these options as they are unmaintained, unreliable or unnecessary:
 
-- slangc with `-dump-ast`, `-dump-intermediate-prefix`, `-dump-intermediates`, `-dump-ir-ids`, `-serial-ir`, `-dump-repro`, `-load-repro` and `-extract-repro`.
+- slangc with `-dump-ast`, `-dump-intermediate-prefix`, `-dump-intermediates`,
+  `-dump-ir-ids`, `-serial-ir`, and `-dump-repro`.
 - slang-test with `-category` and `-api`
+
+### Repro Tooling
+
+`-load-repro` and `-extract-repro` are specialized repro tools; use them when
+working on repro handling. Inputs are validated before use.
 
 ## Architecture Overview
 

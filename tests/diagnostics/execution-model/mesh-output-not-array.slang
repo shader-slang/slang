@@ -10,6 +10,10 @@ struct VertexOutput
 [outputtopology("triangle")]
 [numthreads(1, 1, 1)]
 void meshMain(
+/*CHECK:
+     ^^^^^^^^ mesh shader missing OutputVertices/OutputIndices output
+     ^^^^^^^^ mesh shader entry point 'meshMain' must declare both an 'OutputVertices' and an 'OutputIndices' output parameter
+*/
     out vertices VertexOutput verts,
     /*CHECK:
                               ^^^^^ mesh output must be array
