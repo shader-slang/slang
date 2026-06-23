@@ -171,7 +171,7 @@ def gen_dynamic_dispatch(n):
 
 
 def gen_diagnostics_clean(n):
-    """N functions with distinct compile-time constants, no errors.
+    """N functions with distinct compile-time constants, no errors."""
     s = [_HEADER, _buf()]
     for i in range(n):
         s.append(f"static const float k_{i} = {i % 7}.0;\n")
