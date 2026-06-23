@@ -236,7 +236,8 @@ via `--results <checkout-path>`.
   (e.g. `simplifyIR`) sum across invocations and the profiler is re-entrant;
   compare such timers version-over-version, not as a fraction of the total.
 - **`diagnostics_errors` exits non-zero by design**; the runner treats "produced
-  real errors + timers" as success and ignores benign missing-`spirv-opt`
-  (`E00100`) messages on hosts without that tool.
+  real errors" as success. slangc aborts before emitting timer output when
+  compilation fails with many errors, so no timing data is collected for this
+  workload — it only validates that the diagnostic path runs without crashing.
 - **Cross-version error formats:** the runner recognizes both modern
   (`error[E30015]:`) and legacy (`error 30015:`) slangc diagnostics.
