@@ -396,6 +396,30 @@ jobs:
             exit 1
           fi
 
+  test-falcor:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/ci-falcor-test.yml
+
+  test-compile-regression:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/ci-compile-test.yml
+
+  test-benchmark:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/ci-benchmark-test.yml
+
   # Aggregate gate required by branch protection / the merge queue.
   #
   # The build jobs must be listed in `needs` even though every test job
@@ -435,6 +459,9 @@ jobs:
         test-materialx-windows-release,
         sanitizer-linux-clang-x86_64,
         check-cmdline-ref,
+        test-falcor,
+        test-compile-regression,
+        test-benchmark,
       ]
     runs-on: ubuntu-latest
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)

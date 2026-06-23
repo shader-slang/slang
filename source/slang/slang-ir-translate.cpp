@@ -4,6 +4,7 @@
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-specialize.h"
 #include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -466,14 +467,22 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
             if (!isSetSpecializedGeneric(instWithCanonicalOperands))
             {
                 auto specInst = cast<IRSpecialize>(instWithCanonicalOperands);
-                auto specResult = specializeGeneric(ctx->getSpecializationContext(), specInst);
+                auto specResult =
+                    specializeGeneric(ctx->getSpecializationContext(), specInst, false);
 
                 if (specResult && as<IRGlobalValueWithCode>(specResult))
                 {
                     // If we ended up with something that has code,
-                    // specialization may have opened up some simplification opportunities.
+                    // specialization may have opened up simplification opportunities.
                     //
 
+                    // Specialize any child instructions. This handles any non-hoistable
+                    // instructions and peephole-style opportunities.
+                    // TODO: Should this just run both specialization and peephole in a loop until
+                    // we reach a fixed point?
+                    specializeChildInsts(ctx->getSpecializationContext(), specResult);
+
+                    // Fold any constants within the specialized code.
                     applySparseConditionalConstantPropagation(
                         specResult,
                         ctx->getTargetProgram(),
@@ -488,8 +497,9 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
                         return nullptr;
                 }
 
-                if (specResult && specResult != specInst)
-                    specInst->replaceUsesWith(specResult);
+                auto currentSpecInst = as<IRSpecialize>(instRef->getOperand(0));
+                if (specResult && currentSpecInst && specResult != currentSpecInst)
+                    currentSpecInst->replaceUsesWith(specResult);
 
                 // No need to memoize since specializeGeneric will already have memoized this.
                 return specResult;
