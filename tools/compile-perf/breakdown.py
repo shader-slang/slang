@@ -282,7 +282,7 @@ def write_html(results_dir, label, metric):
     svg = render_stacked_svg(runs, label, metric)
     outdir = os.path.join(analyze.results_dir_for(results_dir, label), "breakdown")
     os.makedirs(outdir, exist_ok=True)
-    with open(os.path.join(outdir, "breakdown.svg"), "w") as fh:
+    with open(os.path.join(outdir, "breakdown.svg"), "w", encoding="utf-8") as fh:
         fh.write(svg)
     html = (f"<!doctype html><meta charset=utf-8>"
             f"<title>Phase breakdown — {esc(label)}</title>"
@@ -568,7 +568,7 @@ def write_workload_pages(results_dir, index_path, metric, outdir):
                 f"padding-bottom:4px'>Compiled Slang source</h2>"
                 f"<p style='color:#666;font-size:13px'>{esc(size_note)}</p>{code_html}"
                 f"</body>")
-        with open(os.path.join(wdir, f"{wl}.html"), "w") as fh:
+        with open(os.path.join(wdir, f"{wl}.html"), "w", encoding="utf-8") as fh:
             fh.write(html)
         links[wl] = f"workloads/{wl}.html"
     return links
