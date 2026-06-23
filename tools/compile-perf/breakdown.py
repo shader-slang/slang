@@ -292,7 +292,7 @@ def write_html(results_dir, label, metric):
             f"time not covered by a named child (e.g. the autodiff transform sits "
             f"in <code>linkAndOptimizeIR (self)</code>).</p>{svg}</body>")
     out = os.path.join(outdir, "breakdown.html")
-    with open(out, "w") as fh:
+    with open(out, "w", encoding="utf-8") as fh:
         fh.write(html)
     print(f"wrote {out}  ({len(runs)} workloads)")
     return out
@@ -464,7 +464,7 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
         s.append(f'<rect x="{lx}" y="{yy}" width="12" height="12" fill="{color}"/>')
         s.append(f'<text x="{lx+16}" y="{yy+10}" fill="#222">{esc(name)}</text>')
     s.append("</svg>")
-    with open(out, "w") as fh:
+    with open(out, "w", encoding="utf-8") as fh:
         fh.write("\n".join(s))
     return out
 
