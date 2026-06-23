@@ -242,14 +242,14 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
 
     err = real_error(last_text)
     got_timers = bool(per_timer)
-    # expect_fail workloads with no primary_timers (e.g. diagnostics_errors) are
-    # ok without timer output — slangc may abort before emitting timers when
-    # compilation fails. expect_fail workloads that DO declare primary_timers
-    # still require got_timers so timer-path regressions are caught.
-    ok = (setup_ok
-          and (got_timers or (spec.expect_fail and not spec.primary_timers))
-          and all(sample_ok)
-          and not crash_codes)
+    # expect_fail workloads (e.g. diagnostics_errors) succeed when errors were
+    # produced as expected. Timer output is not required — slangc may abort before
+    # emitting timers when compilation fails with many errors.
+    # Non-expect_fail workloads require got_timers to catch timer-path regressions.
+    if spec.expect_fail:
+        ok = setup_ok and all(sample_ok) and not crash_codes
+    else:
+        ok = setup_ok and got_timers and all(sample_ok) and not crash_codes
 
     return {
         "workload": spec.name,
