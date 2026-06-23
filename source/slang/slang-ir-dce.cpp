@@ -660,9 +660,16 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
             return true;
         break;
     case kIROp_CompilerDictionaryEntry:
+        // Dictionary entries use operand 1 as the opcode discriminator for the cached translation.
+        // Keep that single key operand strong so DCE cannot collect and recreate the opcode
+        // literal, while all IR-value keys remain weak cache references.
         if (operandIndex != 1)
             return true;
         break;
+    case kIROp_CompilerDictionaryValue:
+        // Compiler dictionaries cache translation results; their operands should not keep the
+        // cached IR alive after the real uses have been specialized away.
+        return true;
     default:
         break;
     }

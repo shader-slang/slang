@@ -10,6 +10,7 @@
 #include "slang-visitor.h"
 
 #include <assert.h>
+#include <climits>
 #include <float.h>
 #include <optional>
 

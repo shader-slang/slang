@@ -9,8 +9,8 @@
 
 #include "core/slang-basic.h"
 #include "examples/example-base/example-base.h"
-#include "external/slang-rhi/include/slang-rhi.h"
 #include "slang-com-ptr.h"
+#include "slang-rhi.h"
 #include "slang.h"
 
 #include <string>
