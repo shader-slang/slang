@@ -5562,7 +5562,10 @@ static SlangResult runUnitTestModule(
     UnitTestContext unitTestContext;
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
-    unitTestContext.enabledApis = context->options.enabledApis;
+    // Intersect with probed available APIs so unit tests skip instead of fail
+    // when the required device type is not present on the current machine.
+    unitTestContext.enabledApis =
+        context->options.enabledApis & _getAvailableRenderApiFlags(context);
     unitTestContext.enableDebugLayers = context->options.enableDebugLayers;
     unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
     unitTestContext.debugCallback = &rhiDebugBridge;
@@ -5613,7 +5616,7 @@ static SlangResult runUnitTestModule(
             spawnType == SpawnType::UseFullyIsolatedTestServer)
         {
             TestServerProtocol::ExecuteUnitTestArgs args;
-            args.enabledApis = context->options.enabledApis;
+            args.enabledApis = context->options.enabledApis & _getAvailableRenderApiFlags(context);
             args.enableDebugLayers = context->options.enableDebugLayers;
             args.moduleName = moduleName;
             args.testName = test.testName;

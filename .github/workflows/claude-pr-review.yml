@@ -60,7 +60,7 @@ jobs:
       # This ensures we never execute untrusted fork code.
       # Claude reads the PR diff via `gh pr diff` and GitHub MCP tools.
       - name: Checkout repository (base branch only)
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 1
@@ -73,7 +73,7 @@ jobs:
       # Targets both 'claude' (OIDC) and 'github-actions' (fallback) logins.
       - name: Clean up previous Claude reviews
         continue-on-error: true
-        uses: actions/github-script@v7
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const prNumber = context.payload.pull_request?.number
@@ -265,7 +265,7 @@ jobs:
       # that no bot review can affect merge eligibility.
       - name: Dismiss unauthorized bot approvals
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const prNumber = context.payload.pull_request?.number

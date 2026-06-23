@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-12T09:27:46+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 888b3ebf12ef38e6bb0fc5df559baf57ab8779e5db0363605462869416316fca
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:13:30Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 6e50af3ceb4925d38a918b256232bcea84837870228b5ab013c5722f1eb1d9a7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -256,6 +256,7 @@ subclasses; they are helpers that wrap or describe nodes.
 | `QualType` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A `Type*` together with l-value/r-value and qualifier information; the type carried by `Expr`. |
 | `SubstitutionSet` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | The set of generic / existential substitutions used to specialize a `Val`. |
 | `LookupResult`, `LookupResultItem` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Result of a name lookup; can hold zero, one, or several decl-refs together with how each was reached. |
+| `NameLoc` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Pairs a `Name*` with the `SourceLoc` where it appeared; used directly by `Decl::nameAndLoc`. |
 | `TypeExp` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A type expression as written by the user (an `Expr` plus the resolved `Type*`). |
 | `WitnessTable` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A compile-time table of interface-requirement-to-implementation mappings; see the entry in [../glossary.md](../glossary.md). |
 | `SyntaxClass<T>` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Reflection-style handle to a concrete AST class, used by the visitor and `as<T>()` infrastructure. |

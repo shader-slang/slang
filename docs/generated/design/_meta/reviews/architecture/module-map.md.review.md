@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:11:45+00:00
+reviewed_at: 2026-06-12T13:17:33+00:00
 target_doc: architecture/module-map.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 3e84425a669764ca340ed7a1190856897496ac2f667956b0a8228b11c7f4ab35
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: d8643144402b3b5b8e46aca73d7eff5df8942a1b6227b1a92d42854ab8ea8279
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
   factual_accuracy: pass
   cross_references: pass
@@ -24,15 +24,23 @@ severity_breakdown:
 # Review report for architecture/module-map.md
 
 ## Summary
-The source-backed spot checks and relative links look good, but the page is only partially complete against its prompt contract. The remaining issue is structural: several `source/` subdirectories introduced by `overview.md` are collapsed into a two-column catch-all table instead of receiving their own level-2 logical-unit sections.
+The page is broadly accurate and all checked relative links resolve, but it is only partially complete against its prompt contract. The important issue is that several table rows cite files outside this document's watched-path inputs, despite the module-map prompt requiring every table path to be in the watched set.
 
 ## Items checked
-- Ran `regenerate.py show architecture/module-map.md` and reviewed the manifest prompt, watched files, and `depends_on` peer `architecture/overview.md`.
-- Verified front matter, required link style, all 56 markdown links, and prompt-required table shape for the main `source/core`, `source/compiler-core`, `source/slang`, standard-module, and `prelude` sections.
-- Spot-checked 18 symbol/file responsibility claims against commit `52339028a2aa703271533454c6b9528a534bac31`, including `Linkage`, `Session`, `Module`, `DiagnosticSink`, `IRBuilder`, `slang-emit*`, `slang-check*`, `slang-parser*`, and prelude headers.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show architecture/module-map.md` and reviewed the prompt, manifest entry, resolved watched files, and dependency document `architecture/overview.md`.
+- Checked front matter for the required generated-doc keys, source commit, warning string, and 64-character hex watched-path digest.
+- Checked relative links in the document body, including source links, generated-doc peer links, and handwritten-doc links; no dangling links were found in the final lint run.
+- Verified the required module-map structure: level-2 groups, `Logical unit` / `Files` / `Responsibility` tables, source/slang subgrouping, and one-sentence responsibility cells.
+- Spot-checked more than 10 source-alignment claims, including `Linkage`, `Session`, `Module`, `DiagnosticSink`, lexer/token files, `FrontEndCompileRequest`, AST file families, semantic-checking files, IR core files, emit backend files, core/GLSL module embedding, standard-module entries, and all prelude headers.
+- Checked that no body line-number citations needed verification; the document uses file links without source line anchors.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Other source/ subdirectories`, lines 278-288 | The page collapses multiple overview logical-unit groups (`source/slang-llvm/`, `source/slang-glslang/`, `source/slang-dispatcher/`, `source/slang-rt/`, `source/slang-record-replay/`, `source/slang-wasm/`, and `source/slangc/`) into a single two-column table for subdirectory and role. The prompt requires each logical unit group from `overview.md` to have its own level-2 section followed by a table with `Logical unit`, `Files`, and `Responsibility` columns. | `docs/generated/design/_meta/prompts/architecture-module-map.md:23-31` specifies the per-group level-2 heading and required table columns, and `docs/generated/design/_meta/prompts/architecture-module-map.md:66-67` requires every logical unit group in `overview.md` to have its own level-2 section. `docs/generated/design/architecture/overview.md:104-125` introduces the affected downstream, runtime/bindings, and driver groups individually. | Split the catch-all section into one level-2 section per affected `source/` group and give each section the required `Logical unit`, `Files`, and `Responsibility` table, even if a small group only has one row. |
+| F-001 | major | `## source/slang-llvm/` through `## source/slangc/`, lines 278-318 | Several table rows cite concrete source files that are not in this page's watched-path set, such as `source/slang-llvm/slang-llvm.cpp`, `source/slang-glslang/slang-glslang.cpp`, `source/slang-dispatcher/main.cpp`, `source/slang-rt/slang-rt.cpp`, `source/slang-record-replay/replay-context.cpp`, `source/slang-wasm/slang-wasm.cpp`, and `source/slangc/main.cpp`. The links resolve, but the prompt's quality checklist requires every table file path to exist in the watched paths, and the manifest only watches `source/*/CMakeLists.txt` for these sibling subprojects. | `docs/generated/design/_meta/prompts/architecture-module-map.md:58-61` requires every table file path to exist in the watched paths. `docs/generated/design/_meta/manifest.yaml:35-46` watches `source/*/CMakeLists.txt`, `source/slang/slang-*`, `source/compiler-core/slang-*`, `source/core/slang-*`, and `prelude/*.h`, but not the cited sibling-subproject `.cpp` / `.h` files. | Either expand the manifest watched paths to include the cited sibling-subproject source files and regenerate, or revise those rows to cite only files covered by the current watched paths. |
+
+## No-issues notes
+- The front matter matches the generated-document contract and the target document's recorded source commit is the current review HEAD.
+- The `source/core/`, `source/compiler-core/`, and main `source/slang/` responsibility rows matched the representative headers and source files I spot-checked.
+- The prelude table mentions every resolved `prelude/*.h` header.

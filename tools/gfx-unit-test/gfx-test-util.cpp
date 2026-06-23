@@ -213,6 +213,13 @@ Slang::ComPtr<IDevice> createTestingDevice(
     DeviceType deviceType,
     Slang::List<const char*> additionalSearchPaths)
 {
+    // Skip before any device creation attempt so no RHI error messages are
+    // emitted (which would be captured by CoreDebugCallback and override the
+    // Ignored result with Fail regardless of what the caller does afterward).
+    if (!deviceTypeInEnabledApis(deviceType, context->enabledApis))
+    {
+        SLANG_IGNORE_TEST
+    }
     Slang::ComPtr<IDevice> device;
     DeviceDesc deviceDesc = {};
     deviceDesc.deviceType = deviceType;
