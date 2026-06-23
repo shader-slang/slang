@@ -365,7 +365,8 @@ struct ParameterInfo : RefObject
 
 static void applyBindingInfoToParameter(
     RefPtr<VarLayout> varLayout,
-    ParameterBindingInfo bindingInfos[kLayoutResourceKindCount]);
+    ParameterBindingInfo bindingInfos[kLayoutResourceKindCount],
+    bool updateExistingResourceInfo = false);
 
 struct EntryPointParameterBindingContext
 {
@@ -1371,17 +1372,23 @@ static void addExplicitParameterBindings_GLSL(
         count);
 }
 
-static bool _targetSupportsVkBindingForEntryPointParameters(ParameterBindingContext* context)
+static bool isVkBindingEntryPointParameterResourceKind(LayoutResourceKind kind)
 {
-    return isKhronosTarget(context->getTargetRequest()) ||
-           isWGPUTarget(context->getTargetRequest());
+    switch (kind)
+    {
+    case LayoutResourceKind::DescriptorTableSlot:
+    case LayoutResourceKind::SubElementRegisterSpace:
+        return true;
+    default:
+        return false;
+    }
 }
 
-static bool _hasSupportedVkBindingOnEntryPointParameter(
+static bool hasSupportedVkBindingOnEntryPointParameter(
     ParameterBindingContext* context,
     VarLayout* varLayout)
 {
-    if (!_targetSupportsVkBindingForEntryPointParameters(context))
+    if (!doesTargetSupportVkBindingOnEntryPointParameters(context->getTargetRequest()))
         return false;
 
     if (!varLayout->varDecl)
@@ -1394,15 +1401,19 @@ static bool _hasSupportedVkBindingOnEntryPointParameter(
     if (!varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
         return false;
 
-    return varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot) ||
-           varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace);
+    for (auto typeResInfo : varLayout->typeLayout->resourceInfos)
+    {
+        if (isVkBindingEntryPointParameterResourceKind(typeResInfo.kind))
+            return true;
+    }
+    return false;
 }
 
-static bool _addExplicitVkBindingForEntryPointParameter(
+static bool addExplicitVkBindingForEntryPointParameter(
     ParameterBindingContext* context,
     RefPtr<VarLayout> varLayout)
 {
-    if (!_hasSupportedVkBindingOnEntryPointParameter(context, varLayout))
+    if (!hasSupportedVkBindingOnEntryPointParameter(context, varLayout))
         return false;
 
     auto varDecl = varLayout->varDecl.as<VarDeclBase>();
@@ -1443,18 +1454,21 @@ static bool _addExplicitVkBindingForEntryPointParameter(
     RefPtr<ParameterInfo> parameterInfo = new ParameterInfo();
     parameterInfo->varLayout = varLayout;
     addExplicitParameterBinding(context, parameterInfo, varDecl.getDecl(), semanticInfo, count);
-    applyBindingInfoToParameter(varLayout, parameterInfo->bindingInfo);
+    applyBindingInfoToParameter(
+        varLayout,
+        parameterInfo->bindingInfo,
+        /* updateExistingResourceInfo */ true);
     return true;
 }
 
-static void _addExplicitVkBindingsForEntryPointParameters(
+static void addExplicitVkBindingsForEntryPointParameters(
     ParameterBindingContext* context,
     EntryPointLayout* entryPointLayout)
 {
     auto paramsStructLayout = getScopeStructLayout(entryPointLayout);
     for (auto fieldLayout : paramsStructLayout->fields)
     {
-        _addExplicitVkBindingForEntryPointParameter(context, fieldLayout);
+        addExplicitVkBindingForEntryPointParameter(context, fieldLayout);
     }
 }
 
@@ -1689,7 +1703,8 @@ static void completeBindingsForParameterImpl(
 
 static void applyBindingInfoToParameter(
     RefPtr<VarLayout> varLayout,
-    ParameterBindingInfo bindingInfos[kLayoutResourceKindCount])
+    ParameterBindingInfo bindingInfos[kLayoutResourceKindCount],
+    bool updateExistingResourceInfo)
 {
     for (auto k = 0; k < kLayoutResourceKindCount; ++k)
     {
@@ -1700,8 +1715,8 @@ static void applyBindingInfoToParameter(
         if (bindingInfo.count.compare(0) == std::partial_ordering::equivalent)
             continue;
 
-        // Add a record to the variable layout
-        auto varRes = varLayout->findOrAddResourceInfo(kind);
+        auto varRes = updateExistingResourceInfo ? varLayout->findOrAddResourceInfo(kind)
+                                                 : varLayout->AddResourceInfo(kind);
         varRes->space = (int)bindingInfo.space;
         varRes->index = bindingInfo.index;
     }
@@ -1743,57 +1758,44 @@ static void completeBindingsForParameter(
 
 static void completeBindingsForParameter(
     ParameterBindingContext* context,
-    RefPtr<VarLayout> varLayout)
+    RefPtr<VarLayout> varLayout,
+    bool preserveExistingBindingInfo = false)
 {
     ParameterBindingInfo bindingInfos[kLayoutResourceKindCount];
-    copyExistingBindingInfoFromParameter(varLayout, bindingInfos);
+    if (preserveExistingBindingInfo)
+        copyExistingBindingInfoFromParameter(varLayout, bindingInfos);
     completeBindingsForParameterImpl(context, varLayout, bindingInfos);
-    applyBindingInfoToParameter(varLayout, bindingInfos);
+    applyBindingInfoToParameter(
+        varLayout,
+        bindingInfos,
+        /* updateExistingResourceInfo */ preserveExistingBindingInfo);
 }
 
-static bool _entryPointHasSupportedVkBindingParameters(
+static bool entryPointHasSupportedVkBindingParameters(
     ParameterBindingContext* context,
     EntryPointLayout* entryPointLayout)
 {
     auto paramsStructLayout = getScopeStructLayout(entryPointLayout);
     for (auto fieldLayout : paramsStructLayout->fields)
     {
-        if (_hasSupportedVkBindingOnEntryPointParameter(context, fieldLayout))
+        if (hasSupportedVkBindingOnEntryPointParameter(context, fieldLayout))
             return true;
     }
     return false;
 }
 
-static bool _isPerEntryPointParameterResourceKind(LayoutResourceKind kind)
-{
-    switch (kind)
-    {
-    case LayoutResourceKind::VaryingInput:
-    case LayoutResourceKind::VaryingOutput:
-    case LayoutResourceKind::ShaderRecord:
-    case LayoutResourceKind::HitAttributes:
-    case LayoutResourceKind::ExistentialObjectParam:
-    case LayoutResourceKind::ExistentialTypeParam:
-        return true;
-    default:
-        return false;
-    }
-}
-
-static void _removeNonExplicitEntryPointParameterOffsets(
+static void removeNonExplicitEntryPointParameterDescriptorOffsets(
     ParameterBindingContext* context,
     RefPtr<VarLayout> fieldLayout)
 {
-    if (_hasSupportedVkBindingOnEntryPointParameter(context, fieldLayout))
+    if (hasSupportedVkBindingOnEntryPointParameter(context, fieldLayout))
         return;
 
     for (auto typeResInfo : fieldLayout->typeLayout->resourceInfos)
     {
         auto kind = typeResInfo.kind;
-        if (kind == LayoutResourceKind::Uniform || _isPerEntryPointParameterResourceKind(kind))
-            continue;
-
-        fieldLayout->removeResourceUsage(kind);
+        if (isVkBindingEntryPointParameterResourceKind(kind))
+            fieldLayout->removeResourceUsage(kind);
     }
 }
 
@@ -1804,8 +1806,11 @@ static void completeBindingsForEntryPointParameters(
     auto paramsStructLayout = getScopeStructLayout(entryPointLayout);
     for (auto fieldLayout : paramsStructLayout->fields)
     {
-        _removeNonExplicitEntryPointParameterOffsets(context, fieldLayout);
-        completeBindingsForParameter(context, fieldLayout);
+        removeNonExplicitEntryPointParameterDescriptorOffsets(context, fieldLayout);
+        completeBindingsForParameter(
+            context,
+            fieldLayout,
+            /* preserveExistingBindingInfo */ true);
     }
 }
 
@@ -3842,7 +3847,7 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
         // We mostly treat an entry point like a single shader parameter that
         // uses its `parametersLayout`.
         //
-        if (_entryPointHasSupportedVkBindingParameters(m_context, globalEntryPointInfo))
+        if (entryPointHasSupportedVkBindingParameters(m_context, globalEntryPointInfo))
         {
             completeBindingsForEntryPointParameters(m_context, globalEntryPointInfo);
         }
@@ -4276,7 +4281,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
     }
     for (auto& entryPoint : sharedContext.programLayout->entryPoints)
     {
-        _addExplicitVkBindingsForEntryPointParameters(&context, entryPoint);
+        addExplicitVkBindingsForEntryPointParameters(&context, entryPoint);
     }
 
     // It is possible that code has specified an explicit location

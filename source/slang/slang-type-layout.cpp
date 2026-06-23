@@ -3357,6 +3357,16 @@ bool isWGPUTarget(TargetRequest* targetReq)
     return isWGPUTarget(targetReq->getTarget());
 }
 
+bool doesTargetSupportVkBindingOnEntryPointParameters(CodeGenTarget target)
+{
+    return isKhronosTarget(target) || isWGPUTarget(target);
+}
+
+bool doesTargetSupportVkBindingOnEntryPointParameters(TargetRequest* targetReq)
+{
+    return doesTargetSupportVkBindingOnEntryPointParameters(targetReq->getTarget());
+}
+
 bool isKernelTarget(CodeGenTarget codeGenTarget)
 {
     return ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)).style ==

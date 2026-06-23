@@ -1375,8 +1375,7 @@ static bool _allTargetsSupportVkBindingOnEntryPointParameters(Linkage* linkage)
 
     for (auto targetReq : linkage->targets)
     {
-        auto target = targetReq->getTarget();
-        if (!isKhronosTarget(target) && !isWGPUTarget(target))
+        if (!doesTargetSupportVkBindingOnEntryPointParameters(targetReq))
             return false;
     }
     return true;
