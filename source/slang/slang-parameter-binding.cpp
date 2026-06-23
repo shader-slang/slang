@@ -1183,17 +1183,10 @@ static void addExplicitParameterBindings_GLSL(
     //
     if (isKhronosTarget(context->getTargetRequest()) || isWGPUTarget(context->getTargetRequest()))
     {
-        // `[[vk::location]]` only adjusts the location of a *varying* (stage
-        // input/output) parameter; on a constant buffer or resource it is
-        // silently ignored, so the binding is auto-allocated in declaration
-        // order. Warn and point the user at `[[vk::binding]]`. This lives inside
-        // the Khronos/WGSL gate because those are the only targets that consume
-        // binding modifiers, so `[[vk::binding]]` is the right advice here.
-        //
-        // A *varying* parameter carrying `[[vk::location]]` consumes its
-        // location in the arms above but does not early-return, so it reaches
-        // this point with the modifier still attached; the `isVaryingParam`
-        // check is what stops us from warning on that legitimate use.
+        // `[[vk::location]]` is varying-only; on a constant buffer or resource it
+        // is silently ignored, so the binding auto-allocates in declaration order.
+        // Warn and point at `[[vk::binding]]`. The `isVaryingParam` check excludes
+        // legitimate varying parameters, which also reach here with the modifier set.
         if (auto locationAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
         {
             const bool isVaryingParam =
