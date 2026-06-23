@@ -1175,12 +1175,14 @@ static void addExplicitParameterBindings_GLSL(
     }
 
     // A `[[vk::location]]` attribute only adjusts the location of a varying
-    // (stage input/output) parameter. If we reach this point with the attribute
-    // still present, the parameter carries no VaryingInput/VaryingOutput
-    // resource (it is a constant buffer or resource using a DescriptorTableSlot),
-    // so the attribute is silently ignored and the binding ends up auto-allocated
-    // in declaration order. Warn and point the user at `[[vk::binding]]`, which
-    // is the correct attribute for setting such a parameter's binding.
+    // (stage input/output) parameter; on a constant buffer or resource (which
+    // uses a `DescriptorTableSlot`) it is silently ignored, so the binding ends
+    // up auto-allocated in declaration order. Note that a *varying* parameter
+    // consumes its location in the arms above but still reaches here with the
+    // modifier attached, so we must explicitly check that the parameter has no
+    // varying resource before warning -- otherwise we would warn on every
+    // legitimate varying use. Warn only for the non-varying (misuse) case,
+    // pointing the user at `[[vk::binding]]`.
     if (auto locationAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
     {
         const bool isVaryingParam =

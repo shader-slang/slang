@@ -8,6 +8,10 @@
 // a surprising binding. We now emit a warning pointing them at the correct
 // attribute, `[[vk::binding]]`.
 //
+// The warning is target-independent across the Vulkan/GLSL family; `-target
+// spirv` (the representative Vulkan target) is used here, matching the other
+// `vk-*` diagnostic tests.
+//
 // (The warning is reported twice because, for an entry-point compile, the
 // global parameter is laid out once for the global scope and once for the
 // entry-point program. This matches the pre-existing behavior of sibling
