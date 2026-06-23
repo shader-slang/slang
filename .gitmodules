@@ -16,6 +16,12 @@
 [submodule "external/spirv-tools"]
 	path = external/spirv-tools
 	url = https://github.com/KhronosGroup/SPIRV-Tools.git
+	# We routinely pin to a SPIRV-Tools fix that has been upstreamed as a PR but
+	# not yet merged to KhronosGroup main, to avoid a chicken-and-egg wait. Such
+	# a commit deliberately isn't on the tracked branch yet, so skip the branch
+	# check. The SHA is still verified to be fetchable from the official Khronos
+	# URL above, which catches pins that point at a developer fork. See PR #11063.
+	slang-skip-pin-check = true
 [submodule "external/spirv-headers"]
 	path = external/spirv-headers
 	url = https://github.com/KhronosGroup/SPIRV-Headers.git
