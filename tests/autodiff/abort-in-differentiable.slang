@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort
 
 // Verify that abort() is treated as a non-differentiable instruction in
 // forward-mode autodiff, like printf(): differentiating a function that
