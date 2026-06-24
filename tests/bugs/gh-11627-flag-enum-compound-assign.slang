@@ -1,9 +1,9 @@
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu   -entry computeMain -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk    -entry computeMain -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-slang -entry computeMain -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cuda  -entry computeMain -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgsl  -entry computeMain -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-hlsl  -entry computeMain -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu   -entry computeMain -output-using-type
 
 enum MyFlags
 {
