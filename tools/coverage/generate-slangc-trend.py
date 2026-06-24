@@ -182,11 +182,13 @@ def main():
     args = ap.parse_args()
 
     if not os.path.exists(args.history):
-        sys.exit(f"history file not found: {args.history}")
+        print(f"history file not found: {args.history}; skipping trend generation")
+        return
 
     records = json.load(open(args.history, encoding="utf-8"))
     if not records:
-        sys.exit("No records in history file.")
+        print("No records in history file; skipping trend generation")
+        return
 
     body = render(records)
     html = f"""<!doctype html>
