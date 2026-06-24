@@ -18,8 +18,7 @@ namespace Slang
 static bool isLeafUnstorableOpaqueHandleType(IRType* type)
 {
     return as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
-           as<IRSubpassInputType>(type) ||
-           type->getOp() == kIROp_GLSLInputAttachmentType ||
+           as<IRSubpassInputType>(type) || type->getOp() == kIROp_GLSLInputAttachmentType ||
            type->getOp() == kIROp_RaytracingAccelerationStructureType;
 }
 
