@@ -514,7 +514,7 @@ bool SharedSemanticsContext::tryResolveConstraintTypes(
 static DeclRef<GenericTypeConstraintDecl> _trySpecializeGenericInterfaceConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
-    GenericDecl* outerGenericDecl,
+    GenericDecl* genericWrapperDecl,
     SubtypeWitness* anchorIsInterfaceWitness,
     Type* selfType)
 {
@@ -531,63 +531,23 @@ static DeclRef<GenericTypeConstraintDecl> _trySpecializeGenericInterfaceConstrai
     // `selfType` and let the generic solver specialize the copied wrapper. This keeps the
     // inference source to the produced requirement key and lets the solver preserve ordinary
     // arguments and hidden proof arguments instead of reconstructing a generic-app chain by hand.
-    List<GenericDecl*> wrapperGenericDecls;
-    Decl* innerDecl = outerGenericDecl;
-    for (;;)
-    {
-        auto genericDecl = as<GenericDecl>(innerDecl);
-        if (!genericDecl)
-            break;
-
-        wrapperGenericDecls.add(genericDecl);
-        innerDecl = genericDecl->inner;
-    }
-
-    auto constraintDecl = as<DifferentiableRequirementConstraintDecl>(innerDecl);
+    auto constraintDecl = as<DifferentiableRequirementConstraintDecl>(genericWrapperDecl->inner);
     if (!constraintDecl || constraintDecl->checkState.isBeingChecked())
         return DeclRef<GenericTypeConstraintDecl>();
 
     DeclRef<GenericDecl> lookedUpGenericDeclRef =
-        astBuilder->getLookupDeclRef(anchorIsInterfaceWitness, wrapperGenericDecls[0])
+        astBuilder->getLookupDeclRef(anchorIsInterfaceWitness, genericWrapperDecl)
             .as<GenericDecl>();
     if (!lookedUpGenericDeclRef)
         return DeclRef<GenericTypeConstraintDecl>();
 
-    DeclRef<GenericDecl> innermostGenericDeclRef;
-    DeclRef<GenericTypeConstraintDecl> defaultConstraintDeclRef;
-    DeclRef<GenericDecl> currentGenericDeclRef = lookedUpGenericDeclRef;
-    for (Index ii = 0; ii < wrapperGenericDecls.getCount(); ++ii)
-    {
-        auto genericDecl = wrapperGenericDecls[ii];
-        auto defaultArgs = getDefaultSubstitutionArgs(astBuilder, visitor, genericDecl);
-        auto currentGenericSubst = SubstitutionSet(currentGenericDeclRef);
-        List<Val*> substitutedDefaultArgs;
-        for (auto defaultArg : defaultArgs)
-            substitutedDefaultArgs.add(defaultArg->substitute(astBuilder, currentGenericSubst));
-
-        Decl* specializedInnerDecl = ii + 1 < wrapperGenericDecls.getCount()
-                                         ? (Decl*)wrapperGenericDecls[ii + 1]
-                                         : (Decl*)constraintDecl;
-
-        auto specializedDeclRef = astBuilder->getGenericAppDeclRef(
-            currentGenericDeclRef,
-            substitutedDefaultArgs.getArrayView(),
-            specializedInnerDecl);
-
-        if (ii + 1 < wrapperGenericDecls.getCount())
-        {
-            currentGenericDeclRef = specializedDeclRef.as<GenericDecl>();
-            if (!currentGenericDeclRef)
-                return DeclRef<GenericTypeConstraintDecl>();
-        }
-        else
-        {
-            innermostGenericDeclRef = currentGenericDeclRef;
-            defaultConstraintDeclRef = specializedDeclRef.as<GenericTypeConstraintDecl>();
-        }
-    }
-
-    if (!innermostGenericDeclRef || !defaultConstraintDeclRef)
+    auto defaultConstraintDeclRef =
+        createDefaultSubstitutionsIfNeeded(
+            astBuilder,
+            visitor,
+            astBuilder->getMemberDeclRef(lookedUpGenericDeclRef, constraintDecl))
+            .as<GenericTypeConstraintDecl>();
+    if (!defaultConstraintDeclRef)
         return DeclRef<GenericTypeConstraintDecl>();
 
     ensureDecl(visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
@@ -606,7 +566,7 @@ static DeclRef<GenericTypeConstraintDecl> _trySpecializeGenericInterfaceConstrai
 
     auto defaultCallableType = DeclRefType::create(astBuilder, defaultCallableDeclRef);
     SemanticsVisitor::GenericInferenceContext inferenceContext;
-    inferenceContext.genericDecl = innermostGenericDeclRef.getDecl();
+    inferenceContext.genericDecl = lookedUpGenericDeclRef.getDecl();
     SemanticsVisitor::UnificationOptions unificationOptions;
     unificationOptions.equalityConstraint = true;
     if (!visitor->TryUnifyTypes(
@@ -622,7 +582,7 @@ static DeclRef<GenericTypeConstraintDecl> _trySpecializeGenericInterfaceConstrai
     return visitor
         ->trySolveGenericArguments(
             _Move(inferenceContext),
-            innermostGenericDeclRef,
+            lookedUpGenericDeclRef,
             ArrayView<Val*>(),
             conversionCost)
         .as<GenericTypeConstraintDecl>();

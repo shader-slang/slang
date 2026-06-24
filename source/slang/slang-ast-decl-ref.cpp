@@ -892,8 +892,17 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
             break;
         if (lastLookup && lastLookup->getDecl()->isChildOf(dd))
             break;
-        if (isConstraintDecl(declRef) && dd == declRef.getDecl()->parentDecl)
+        if (isGenericConstraintParameterDecl(declRef.getDecl()) &&
+            dd == declRef.getDecl()->parentDecl)
+        {
+            // A generic signature constraint is already represented as a witness argument of the
+            // surrounding generic app, so do not add the immediate generic parent as another
+            // default-substitution layer for the constraint decl itself. A standalone generic
+            // interface requirement has shape `GenericDecl { inner = ConstraintDecl }` and is not a
+            // generic constraint parameter; it must keep the generic parent so callers can form
+            // `constraint<T, proofs...>` through this helper.
             continue;
+        }
         if (auto gen = as<GenericDecl>(dd))
             genericParentDecls.add(gen);
     }
