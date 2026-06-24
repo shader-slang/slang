@@ -348,18 +348,12 @@ public:
         {
             auto parentGenericDecl = parentGenericAppDeclRef->getGenericDecl();
 
-            auto isConstraintDecl = as<TypeConstraintDecl>(memberDecl) ||
-                                    as<TypeCoercionConstraintDecl>(memberDecl) ||
-                                    as<NonEmptyPackConstraintDecl>(memberDecl) ||
-                                    as<GenericVariadicPackCountConstraintDecl>(memberDecl) ||
-                                    as<HasDiffTypeInfoConstraintDecl>(memberDecl);
-
             // Generic signature constraints are direct members of the `GenericDecl`, not of the
             // generic inner declaration. When substitution starts from
             // `MemberDeclRef(GenericAppDeclRef(G, G.inner, args), constraintUnderG)`, keep the
             // constraint under the same specialized generic environment instead of manufacturing a
             // member reference through `G.inner`.
-            if (isConstraintDecl && memberDecl->parentDecl == parentGenericDecl)
+            if (isConstraintDecl(memberDecl) && memberDecl->parentDecl == parentGenericDecl)
             {
                 return getGenericAppDeclRef(
                            DeclRef<GenericDecl>(parentGenericAppDeclRef->getGenericDeclRef()),

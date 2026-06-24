@@ -1326,10 +1326,7 @@ private:
         // final generic application. `T : IFoo`, type coercions, non-empty-pack
         // checks, and differentiability constraints all need compiler-formed
         // witness values.
-        return as<GenericTypeConstraintDecl>(member) || as<TypeCoercionConstraintDecl>(member) ||
-               as<NonEmptyPackConstraintDecl>(member) ||
-               as<GenericVariadicPackCountConstraintDecl>(member) ||
-               as<HasDiffTypeInfoConstraintDecl>(member);
+        return isConstraintDecl(member);
     }
 
     // Add a solver constraint for one default generic argument.

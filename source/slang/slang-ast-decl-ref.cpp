@@ -892,11 +892,7 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
             break;
         if (lastLookup && lastLookup->getDecl()->isChildOf(dd))
             break;
-        if ((as<GenericTypeConstraintDecl>(declRef.getDecl()) ||
-             as<TypeCoercionConstraintDecl>(declRef.getDecl()) ||
-             as<GenericVariadicPackCountConstraintDecl>(declRef.getDecl()) ||
-             as<HasDiffTypeInfoConstraintDecl>(declRef.getDecl())) &&
-            dd == declRef.getDecl()->parentDecl)
+        if (isConstraintDecl(declRef) && dd == declRef.getDecl()->parentDecl)
             continue;
         if (auto gen = as<GenericDecl>(dd))
             genericParentDecls.add(gen);

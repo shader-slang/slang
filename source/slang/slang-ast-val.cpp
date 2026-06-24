@@ -1388,11 +1388,7 @@ Val* HasDiffTypeInfoWitness::_substituteImplOverride(
             Index index = 0;
             for (auto member : genericDecl->getDirectMemberDecls())
             {
-                if (as<GenericTypeConstraintDecl>(member) ||
-                    as<TypeCoercionConstraintDecl>(member) ||
-                    as<NonEmptyPackConstraintDecl>(member) ||
-                    as<GenericVariadicPackCountConstraintDecl>(member) ||
-                    as<HasDiffTypeInfoConstraintDecl>(member))
+                if (isConstraintDecl(member))
                 {
                     if (member == constraintDeclRef.getDecl())
                     {
@@ -1478,11 +1474,7 @@ Val* DeclaredVariadicPackCountWitness::_substituteImplOverride(
             Index index = 0;
             for (auto member : genericDecl->getDirectMemberDecls())
             {
-                if (as<GenericTypeConstraintDecl>(member) ||
-                    as<TypeCoercionConstraintDecl>(member) ||
-                    as<NonEmptyPackConstraintDecl>(member) ||
-                    as<GenericVariadicPackCountConstraintDecl>(member) ||
-                    as<HasDiffTypeInfoConstraintDecl>(member))
+                if (isConstraintDecl(member))
                 {
                     if (member == constraintDeclRef.getDecl())
                     {

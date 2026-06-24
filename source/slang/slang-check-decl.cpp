@@ -4703,10 +4703,7 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
             ensureDecl(valParam, DeclCheckState::ReadyForReference);
             valParam->parameterIndex = parameterIndex++;
         }
-        else if (
-            as<GenericTypeConstraintDecl>(m) || as<TypeCoercionConstraintDecl>(m) ||
-            as<NonEmptyPackConstraintDecl>(m) || as<GenericVariadicPackCountConstraintDecl>(m) ||
-            as<HasDiffTypeInfoConstraintDecl>(m))
+        else if (isConstraintDecl(m))
         {
             ensureDecl(m, DeclCheckState::ReadyForReference);
         }
@@ -5990,21 +5987,6 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
         if (auto declRefExpr = as<DeclRefExpr>(constraintDecl->packExpr))
             return getDeclRef(m_astBuilder, declRefExpr).getDecl();
         return nullptr;
-    };
-
-    auto isConstraintDecl = [&](DeclRef<Decl> declRef) -> bool
-    {
-        if (as<GenericTypeConstraintDecl>(declRef))
-            return true;
-        if (as<TypeCoercionConstraintDecl>(declRef))
-            return true;
-        if (as<NonEmptyPackConstraintDecl>(declRef))
-            return true;
-        if (as<GenericVariadicPackCountConstraintDecl>(declRef))
-            return true;
-        if (as<HasDiffTypeInfoConstraintDecl>(declRef))
-            return true;
-        return false;
     };
 
     auto isParamDecl = [&](DeclRef<Decl> declRef) -> bool

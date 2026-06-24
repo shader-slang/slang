@@ -35,17 +35,9 @@ InterfaceDecl* findParentInterfaceDecl(Decl* decl)
     return nullptr;
 }
 
-static bool _isGenericConstraintDecl(Decl* decl)
-{
-    return as<TypeConstraintDecl>(decl) || as<TypeCoercionConstraintDecl>(decl) ||
-           as<NonEmptyPackConstraintDecl>(decl) ||
-           as<GenericVariadicPackCountConstraintDecl>(decl) ||
-           as<HasDiffTypeInfoConstraintDecl>(decl);
-}
-
 bool isGenericConstraintParameterDecl(Decl* decl)
 {
-    if (!_isGenericConstraintDecl(decl))
+    if (!isConstraintDecl(decl))
         return false;
 
     if (auto parentGenericDecl = as<GenericDecl>(decl->parentDecl))
