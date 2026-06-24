@@ -53,6 +53,16 @@ void ASTCopier::mapDecl(Decl* oldDecl, Decl* newDecl)
     m_context.oldToNewVals.clear();
 }
 
+DeclRef<Decl> getSourceDeclRefWithCopiedGenericArgs(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* semantics,
+    GenericDecl* sourceGenericDecl,
+    GenericDecl* copiedGenericDecl)
+{
+    auto defaultArgs = getDefaultSubstitutionArgs(astBuilder, semantics, copiedGenericDecl);
+    return astBuilder->getGenericAppDeclRef(sourceGenericDecl, defaultArgs.getArrayView());
+}
+
 static void copyNonReflectedDeclFields(Decl* dst, Decl* src)
 {
     // `parameterIndex` is checked metadata rather than syntax, so FIDDLE does not copy it.

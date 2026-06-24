@@ -6588,21 +6588,6 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
     return false;
 }
 
-// Returns `sourceGenericDecl` applied to the copied generic's default arguments.
-//
-// For example, after copying `generic<T>` to `generic<T2>`, this returns a decl-ref for the
-// source generic specialized as `generic<T2>`. The caller uses that substitution to rewrite
-// references from the original generic environment into the standalone copied environment.
-static DeclRef<Decl> getSourceDeclRefWithCopiedGenericArgs(
-    ASTBuilder* astBuilder,
-    SemanticsVisitor* semantics,
-    GenericDecl* sourceGenericDecl,
-    GenericDecl* copiedGenericDecl)
-{
-    auto defaultArgs = getDefaultSubstitutionArgs(astBuilder, semantics, copiedGenericDecl);
-    return astBuilder->getGenericAppDeclRef(sourceGenericDecl, defaultArgs.getArrayView());
-}
-
 // Invalidates cached default-substitution arguments for `genericDecl`.
 //
 // Call this after adding copied constraints because later default arguments may include newly
