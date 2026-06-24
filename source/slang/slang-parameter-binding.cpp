@@ -1807,13 +1807,13 @@ static void removeNonExplicitEntryPointParameterDescriptorOffsets(
     auto explicitResourceInfo = hasSupportedVkBindingOnEntryPointParameter(context, fieldLayout)
                                     ? findVkBindingEntryPointParameterResourceInfo(fieldLayout)
                                     : nullptr;
-    if (!explicitResourceInfo)
-        return;
-
-    auto explicitKind = explicitResourceInfo->kind;
+    auto explicitKind =
+        explicitResourceInfo ? explicitResourceInfo->kind : LayoutResourceKind::None;
 
     for (auto typeResInfo : fieldLayout->typeLayout->resourceInfos)
     {
+        // Drop synthetic field offsets that should be allocated from the global binding context.
+        // The type resource usage remains, so implicit fields still receive descriptor bindings.
         auto kind = typeResInfo.kind;
         if (isVkBindingEntryPointParameterResourceKind(kind) && kind != explicitKind)
             fieldLayout->removeResourceUsage(kind);
