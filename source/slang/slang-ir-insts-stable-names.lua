@@ -838,5 +838,5 @@ return {
 	["builtinRequirementKey"] = 861,
 	["ImageTexelPointer"] = 862,
 	["Type.MetalPackedVec"] = 863,
-	["Decoration.shader64BitIndexing"] = 864
+	["Decoration.shader64BitIndexing"] = 865
 }
