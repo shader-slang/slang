@@ -4348,6 +4348,18 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         }
 
+        // `-spirv-unified-descriptor-heap-stride` and an explicit non-zero
+        // `-spirv-resource-heap-stride` express contradictory strides for the same resource heap,
+        // so reject the combination here, as soon as the options are parsed, rather than waiting
+        // until SPIR-V emission. An explicit stride of 0 selects the default `OpConstantSizeOfEXT`
+        // path that the unified option modifies and is therefore not a conflict.
+        if (linkage->m_optionSet.getBoolOption(
+                CompilerOptionName::SPIRVUnifiedDescriptorHeapStride) &&
+            linkage->m_optionSet.getIntOption(CompilerOptionName::SPIRVResourceHeapStride) != 0)
+        {
+            m_sink->diagnose(Diagnostics::SpirvConflictingDescriptorHeapStrideOptions{});
+        }
+
         // TODO: do we need to require that a target must have a profile specified,
         // or will we continue to allow the profile to be inferred from the target?
 

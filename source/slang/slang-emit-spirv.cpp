@@ -7177,9 +7177,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // Returns whether resource descriptor-heap runtime arrays should advertise a single unified
     // maximum `ArrayStride` (opt-in via `-spirv-unified-descriptor-heap-stride`). This only affects
     // the auto stride path, i.e. when `-spirv-resource-heap-stride` is 0. Combining it with a
-    // non-zero `-spirv-resource-heap-stride` is a conflict (the two express contradictory strides)
-    // and is diagnosed in `diagnoseConflictingDescriptorHeapStrideOptions`; an explicit stride of 0
-    // selects that same auto path and is not a conflict.
+    // non-zero `-spirv-resource-heap-stride` is a conflict (the two express contradictory strides),
+    // rejected up front during option processing for the CLI (`OptionsParser` in
+    // `slang-options.cpp`) and re-checked here by `diagnoseConflictingDescriptorHeapStrideOptions`
+    // for the compile-API path; an explicit stride of 0 selects that same auto path, not a conflict.
     bool isUnifiedResourceHeapStrideEnabled()
     {
         return m_targetProgram->getOptionSet().getBoolOption(
@@ -7311,10 +7312,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return runtimeArrayType;
     }
 
-    // Diagnoses the mutually-exclusive `-spirv-resource-heap-stride` / unified-stride option pair:
-    // a non-zero explicit literal stride and the unified maximum stride contradict, so combining
-    // them is an error rather than letting one silently win. An explicit stride of 0 selects the
-    // same default `OpConstantSizeOfEXT` path the unified option modifies, so it is not a conflict.
+    // Diagnoses the `-spirv-resource-heap-stride` / `-spirv-unified-descriptor-heap-stride` conflict
+    // for the compile-API path. The CLI rejects this at option-parse time (`OptionsParser` in
+    // `slang-options.cpp`), which aborts before emission; but options set directly through the
+    // public compile API do not flow through that parser, so this re-checks at emit time and fails
+    // loudly rather than silently honoring the explicit stride. The condition matches the parser:
+    // unified enabled and a non-zero `SPIRVResourceHeapStride` (an explicit 0 selects the default
+    // `OpConstantSizeOfEXT` path the unified option modifies, so it is not a conflict).
     void diagnoseConflictingDescriptorHeapStrideOptions()
     {
         if (isUnifiedResourceHeapStrideEnabled() &&
