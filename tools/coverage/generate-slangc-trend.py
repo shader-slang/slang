@@ -121,20 +121,15 @@ def render(records):
     latest = records[-1]
     prev   = records[-2] if n > 1 else None
 
-    # ── Panel 1: slangc line coverage, all platforms + combined ──────────────
-    linux_line   = [pct(r.get("linux_slangc_line_coverage"))   for r in records]
-    macos_line   = [pct(r.get("macos_slangc_line_coverage"))   for r in records]
-    windows_line = [pct(r.get("windows_slangc_line_coverage")) for r in records]
-    combined     = [avg(linux_line[i], macos_line[i], windows_line[i])
-                    for i in range(n)]
+    # ── Panel 1: slangc line coverage — Linux and macOS ──────────────────────
+    linux_line = [pct(r.get("linux_slangc_line_coverage")) for r in records]
+    macos_line = [pct(r.get("macos_slangc_line_coverage")) for r in records]
 
     panel1_series = [
-        ("Linux",    "#2563eb", "",    linux_line),
-        ("macOS",    "#16a34a", "6 3", macos_line),
-        ("Windows",  "#dc2626", "3 3", windows_line),
-        ("Combined", "#7c3aed", "1 4", combined),
+        ("Linux", "#2563eb", "",    linux_line),
+        ("macOS", "#16a34a", "6 3", macos_line),
     ]
-    svg1 = build_svg(dates, panel1_series, title="slangc Line Coverage — all platforms")
+    svg1 = build_svg(dates, panel1_series, title="slangc Line Coverage — Linux & macOS")
     leg1 = legend_html([(lbl, c, d) for lbl, c, d, _ in panel1_series])
 
     # ── Panel 2: Linux detail (line / function / branch / region) ─────────────
@@ -170,26 +165,23 @@ def render(records):
     td = 'style="padding:6px 12px;border:1px solid #e5e7eb;font-size:13px"'
     th = 'style="padding:6px 12px;border:1px solid #e5e7eb;background:#f3f4f6;font-size:13px;text-align:left"'
 
-    def row(metric, linux_k, macos_k, win_k):
+    def row(metric, linux_k, macos_k):
         lv = pct(latest.get(linux_k))
         mv = pct(latest.get(macos_k))
-        wv = pct(latest.get(win_k))
         fmt = lambda v, k: (f"<b>{v:.2f}%</b>{delta(k)}" if v is not None else "—")
         return (f'<tr><td {td}>{metric}</td>'
                 f'<td {td}>{fmt(lv, linux_k)}</td>'
-                f'<td {td}>{fmt(mv, macos_k)}</td>'
-                f'<td {td}>{fmt(wv, win_k) if wv is not None else "—"}</td></tr>')
+                f'<td {td}>{fmt(mv, macos_k)}</td></tr>')
 
-    table = f"""<table style="border-collapse:collapse;width:100%;max-width:640px;margin-top:16px">
+    table = f"""<table style="border-collapse:collapse;width:100%;max-width:480px;margin-top:16px">
 <thead><tr>
-  <th {th}>Metric</th><th {th}>Linux</th><th {th}>macOS</th><th {th}>Windows</th>
+  <th {th}>Metric</th><th {th}>Linux</th><th {th}>macOS</th>
 </tr></thead><tbody>
-{row("Line",     "linux_slangc_line_coverage",     "macos_slangc_line_coverage",     "windows_slangc_line_coverage")}
-{row("Function", "linux_slangc_function_coverage", "macos_slangc_function_coverage", None)}
-{row("Branch",   "linux_slangc_branch_coverage",   "macos_slangc_branch_coverage",   None)}
-{row("Region",   "linux_slangc_region_coverage",   "macos_slangc_region_coverage",   None)}
-</tbody></table>""".replace(
-    f'<td {td}>—</td>', f'<td {td} style="color:#aaa">—</td>')
+{row("Line",     "linux_slangc_line_coverage",     "macos_slangc_line_coverage")}
+{row("Function", "linux_slangc_function_coverage", "macos_slangc_function_coverage")}
+{row("Branch",   "linux_slangc_branch_coverage",   "macos_slangc_branch_coverage")}
+{row("Region",   "linux_slangc_region_coverage",   "macos_slangc_region_coverage")}
+</tbody></table>"""
 
     card = 'style="background:#fff;border:1px solid #eee;border-radius:6px;padding:12px;margin-bottom:20px;overflow:auto"'
 
