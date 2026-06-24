@@ -57,6 +57,41 @@ DeclRefBase* _resolveAsDeclRef(DeclRefBase* declRefToResolve)
     return declRefToResolve;
 }
 
+static AccessorDecl* _tryGetCorrespondingAccessorDecl(Decl* memberDecl, Decl* substParentDecl)
+{
+    // Once substitution has resolved the parent requirement to a satisfying declaration, the child
+    // must be selected from that same parent. Accessors are anonymous role declarations (`get` or
+    // `set`) nested under a storage declaration, so a requirement getter can be mapped to the
+    // getter under the selected override/default subscript while preserving the selected parent's
+    // generic substitutions.
+    auto accessorDecl = as<AccessorDecl>(memberDecl);
+    if (!accessorDecl)
+        return nullptr;
+
+    if (accessorDecl->parentDecl == substParentDecl)
+        return accessorDecl;
+
+    auto originalParentDecl = accessorDecl->parentDecl;
+    if (!originalParentDecl || originalParentDecl->astNodeType != substParentDecl->astNodeType)
+        return nullptr;
+
+    auto substParentContainer = as<ContainerDecl>(substParentDecl);
+    if (!substParentContainer)
+        return nullptr;
+
+    AccessorDecl* result = nullptr;
+    for (auto candidateDecl : substParentContainer->getDirectMemberDeclsOfType<AccessorDecl>())
+    {
+        if (candidateDecl->astNodeType != accessorDecl->astNodeType)
+            continue;
+        if (result)
+            return nullptr;
+        result = candidateDecl;
+    }
+
+    return result;
+}
+
 DeclRefBase* MemberDeclRef::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
@@ -68,22 +103,14 @@ DeclRefBase* MemberDeclRef::_substituteImplOverride(
     {
         (*ioDiff)++;
 
-        // We'll special case one specific pattern.
-        if (auto origGenericAppParent = as<GenericAppDeclRef>(substParent))
+        if (!getDecl()->isChildOf(substParent->getDecl()))
         {
-            if (auto origGenericLookedupVal = as<LookupDeclRef>(origGenericAppParent->getBase()))
+            if (auto correspondingAccessor =
+                    _tryGetCorrespondingAccessorDecl(getDecl(), substParent->getDecl()))
             {
-                auto resolvedWitness =
-                    as<SubtypeWitness>(origGenericLookedupVal->getWitness()->resolve());
-                // Otherwise, we need to get the effective inner decl-ref for the generic
-                // app.
-                auto resolvedTargetDecl =
-                    getUnspecializedLookupRec(getCurrentASTBuilder(), getDecl(), resolvedWitness);
-
-                if (resolvedTargetDecl.m_flavor == RequirementWitness::Flavor::declRef)
-                {
-                    return resolvedTargetDecl.getDeclRef();
-                }
+                return astBuilder
+                    ->getMemberDeclRef(DeclRef<Decl>(substParent), correspondingAccessor)
+                    .declRefBase;
             }
         }
 
@@ -112,32 +139,10 @@ Val* MemberDeclRef::_resolveImplOverride()
 
         if (newChild->parentDecl != resolvedParent->getDecl())
         {
-            // We'll special case one specific pattern.
-            if (auto origGenericAppParent = as<GenericAppDeclRef>(getParentOperand()))
+            if (auto correspondingAccessor =
+                    _tryGetCorrespondingAccessorDecl(newChild, resolvedParent->getDecl()))
             {
-                if (auto origGenericLookedupVal =
-                        as<LookupDeclRef>(origGenericAppParent->getBase()))
-                {
-                    auto resolvedWitness =
-                        as<SubtypeWitness>(origGenericLookedupVal->getWitness()->resolve());
-                    // Otherwise, we need to get the effective inner decl-ref for the generic
-                    // app.
-                    auto resolvedTargetDecl = getUnspecializedLookupRec(
-                        getCurrentASTBuilder(),
-                        getDecl(),
-                        resolvedWitness);
-
-                    if (resolvedTargetDecl.m_flavor == RequirementWitness::Flavor::declRef)
-                    {
-                        newChild = resolvedTargetDecl.getDeclRef().getDecl();
-                    }
-                    else if (resolvedTargetDecl.m_flavor == RequirementWitness::Flavor::val)
-                    {
-                        return resolvedTargetDecl.getVal()->substitute(
-                            getCurrentASTBuilder(),
-                            getParentOperand());
-                    }
-                }
+                newChild = correspondingAccessor;
             }
         }
 
@@ -447,35 +452,6 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
     return innerDeclRefType;
 }
 
-static Decl* _tryMapGenericAppInnerDeclToResolvedGeneric(Decl* innerDecl, GenericDecl* genericDecl)
-{
-    if (!innerDecl || !genericDecl)
-        return nullptr;
-
-    // A generic subscript/property requirement can be referenced as
-    // `GenericAppDeclRef(Lookup(witness, generic operator[]), args, GetterDecl)`. Resolving the
-    // lookup may replace the requirement generic with a satisfying/default-implementation generic;
-    // the accessor nested under the requirement then needs to be mapped to the corresponding
-    // accessor under the resolved generic's inner storage declaration. This keeps the decl-ref
-    // rooted in the witness-selected declaration instead of leaving a mixed requirement/satisfier
-    // chain for lowering and differentiability annotation lookup.
-    auto innerAccessorDecl = as<AccessorDecl>(innerDecl);
-    if (!innerAccessorDecl)
-        return nullptr;
-
-    auto resolvedStorageDecl = as<ContainerDecl>(getInner(genericDecl));
-    if (!resolvedStorageDecl)
-        return nullptr;
-
-    for (auto accessorDecl : resolvedStorageDecl->getDirectMemberDeclsOfType<AccessorDecl>())
-    {
-        if (accessorDecl->astNodeType == innerAccessorDecl->astNodeType)
-            return accessorDecl;
-    }
-
-    return nullptr;
-}
-
 DeclRefBase* GenericAppDeclRef::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
@@ -497,16 +473,6 @@ DeclRefBase* GenericAppDeclRef::_substituteImplOverride(
             substGenericDeclRef,
             substArgs.getArrayView(),
             getDecl());
-    else if (
-        auto mappedInnerDecl = _tryMapGenericAppInnerDeclToResolvedGeneric(
-            getDecl(),
-            as<GenericDecl>(substGenericDeclRef->getDecl())))
-    {
-        return astBuilder->getGenericAppDeclRef(
-            substGenericDeclRef,
-            substArgs.getArrayView(),
-            mappedInnerDecl);
-    }
     else
     {
         // If decl is no longer the child of the new parent, it's most likely due to
@@ -588,16 +554,6 @@ Val* GenericAppDeclRef::_resolveImplOverride()
                 resolvedGenericDeclRef,
                 resolvedArgs.getArrayView(),
                 getDecl());
-        }
-        else if (
-            auto mappedInnerDecl = _tryMapGenericAppInnerDeclToResolvedGeneric(
-                getDecl(),
-                as<GenericDecl>(resolvedGenericDeclRef->getDecl())))
-        {
-            resolvedVal = astBuilder->getGenericAppDeclRef(
-                resolvedGenericDeclRef,
-                resolvedArgs.getArrayView(),
-                mappedInnerDecl);
         }
         else if (getDecl() == getGenericDecl()->inner)
         {
@@ -775,10 +731,8 @@ DeclRefBase* DeclRefBase::getParent()
         {
             // A generic application can name a nested declaration under the generic's inner
             // declaration, not only the inner declaration itself. Preserve the same specialization
-            // when asking for such a decl-ref's parent. For example,
-            // `GenericAppDeclRef(generic operator[], GetterDecl, I)` has the specialized
-            // subscript as its parent; dropping the generic app here makes accessor parameter
-            // collection see the source `I` rather than the substituted `I`.
+            // when asking for such a decl-ref's parent so parameter collection and substitution
+            // keep the generic arguments from the original decl-ref chain.
             return astBuilder->getGenericAppDeclRef(
                 genericDeclRef,
                 genericAppDeclRef->getArgs(),

@@ -11028,6 +11028,27 @@ bool SemanticsVisitor::checkInterfaceConformance(
         return as<GenericTypeConstraintDecl>(decl);
     };
 
+    auto doesTypeNameAssociatedTypeRequirement = [](Type* type) -> bool
+    {
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            for (auto declRef = declRefType->getDeclRef().declRefBase; declRef;
+                 declRef = declRef->getBase())
+            {
+                if (isAssociatedTypeDecl(declRef->getDecl()))
+                    return true;
+            }
+        }
+        return false;
+    };
+
+    auto doesConstraintRefineAssociatedTypeRequirement =
+        [&](GenericTypeConstraintDecl* constraintDecl) -> bool
+    {
+        return doesTypeNameAssociatedTypeRequirement(constraintDecl->sub.type) ||
+               doesTypeNameAssociatedTypeRequirement(constraintDecl->sup.type);
+    };
+
     bool result = true;
 
     auto checkGenericTypeConstraintRequirement = [&](Decl* requiredMemberDecl) -> bool
@@ -11128,18 +11149,42 @@ bool SemanticsVisitor::checkInterfaceConformance(
 
         result = result && requirementSatisfied;
     }
-    // Constraints on associated types must be checked before ordinary member signatures. For
-    // example, `interface ISimple { associatedtype U : IBase; U.V add(...); }` first records
-    // `ISimple.U -> Val`, then must check `Val : IBase` so resolving the substituted method result
-    // `Val.V` can look up `IBase.V` in the completed `Val : IBase` witness table. Differentiability
-    // constraints are the opposite: `This.f : IForwardDifferentiable<This.f>` depends on `f`'s
-    // method witness, so those stay in the late constraint pass below.
+    // Inherited-interface entries are witness-table entries too, and constraints can refer to
+    // requirements inherited through those entries. For example, `interface IDerived : IBase {
+    // __constraint DataType == This; }` needs the nested `IBase` witness table populated before
+    // `getSub`/`getSup` can resolve `DataType` for a concrete `IDerived` conformance.
+    for (auto requiredMemberDecl : getMembers(m_astBuilder, superInterfaceDeclRef))
+    {
+        auto requiredInheritanceDecl = as<InheritanceDecl>(requiredMemberDecl.getDecl());
+        if (!requiredInheritanceDecl)
+            continue;
+
+        ensureDecl(requiredMemberDecl, DeclCheckState::ReadyForReference);
+        auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(
+            subTypeConformsToSuperInterfaceWitness,
+            requiredInheritanceDecl);
+        auto requirementSatisfied = findWitnessForInterfaceRequirement(
+            context,
+            subType,
+            superInterfaceType,
+            inheritanceDecl,
+            superInterfaceDeclRef,
+            requiredMemberDeclRef,
+            witnessTable,
+            subTypeConformsToSuperInterfaceWitness);
+
+        result = result && requirementSatisfied;
+    }
+    // Constraints that refine associated-type requirements must be checked before ordinary member
+    // signatures. For example, `interface ISimple { associatedtype U : IBase; U.V add(...); }`
+    // first records `ISimple.U -> Val`, then must check `Val : IBase` so resolving the substituted
+    // method result `Val.V` can look up `IBase.V` in the completed `Val : IBase` witness table.
     for (auto requiredMemberDecl : getMembers(m_astBuilder, superInterfaceDeclRef))
     {
         auto constraintDecl = asGenericTypeConstraintRequirement(requiredMemberDecl.getDecl());
         if (!constraintDecl)
             continue;
-        if (as<DifferentiableRequirementConstraintDecl>(constraintDecl))
+        if (!doesConstraintRefineAssociatedTypeRequirement(constraintDecl))
             continue;
 
         result = result && checkGenericTypeConstraintRequirement(requiredMemberDecl.getDecl());
@@ -11149,6 +11194,8 @@ bool SemanticsVisitor::checkInterfaceConformance(
         if (isAssociatedTypeDecl(requiredMemberDecl.getDecl()))
             continue;
         if (asGenericTypeConstraintRequirement(requiredMemberDecl.getDecl()))
+            continue;
+        if (as<InheritanceDecl>(requiredMemberDecl.getDecl()))
             continue;
         if (as<InterfaceDefaultImplDecl>(requiredMemberDecl.getDecl()))
             continue;
@@ -11168,16 +11215,15 @@ bool SemanticsVisitor::checkInterfaceConformance(
 
         result = result && requirementSatisfied;
     }
-    // Interface-level constraints may refer to other requirements through `This`, for example
-    // the `[Differentiable]` requirement `This.f : IForwardDifferentiable<This.f>`. Check them
-    // after ordinary members so those lookups can resolve through the witness table entries that
-    // were just installed above.
+    // Interface-level constraints may refer to other requirements through `This`. Check them after
+    // ordinary members so `getSub`/`getSup` can resolve through the witness-table entries installed
+    // above.
     for (auto requiredMemberDecl : getMembers(m_astBuilder, superInterfaceDeclRef))
     {
         auto constraintDecl = asGenericTypeConstraintRequirement(requiredMemberDecl.getDecl());
         if (!constraintDecl)
             continue;
-        if (!as<DifferentiableRequirementConstraintDecl>(constraintDecl))
+        if (doesConstraintRefineAssociatedTypeRequirement(constraintDecl))
             continue;
 
         result = result && checkGenericTypeConstraintRequirement(requiredMemberDecl.getDecl());
@@ -14717,15 +14763,18 @@ DeclRef<Decl> SemanticsVisitor::getRequirementAsLookedUpDecl(ASTBuilder* astBuil
             Decl* innerDecl = nullptr;
             if (i == 0 && decl->isChildOf(genericParentDecls[i]))
             {
-                // A generic application can name any declaration under the generic environment,
-                // not just the direct `inner` declaration. For a generic subscript accessor,
-                // represent `This.operator[]<T>.get` as
-                // `GenericAppDeclRef(Lookup(This, operator[]), T, get)` rather than
+                // Accessors belong to their storage declaration, not directly to the generic
+                // environment. A generic subscript requirement such as
+                // `This.operator[]<T>.get` is therefore represented as a member lookup on the
+                // specialized subscript:
                 // `MemberDeclRef(GenericAppDeclRef(Lookup(This, operator[]), T), get)`.
-                // That keeps the accessor requirement key in the lookup path, so conformance
-                // substitution resolves the getter through the witness table entry installed by
+                // `MemberDeclRef::resolve` can then remap the accessor after the subscript
+                // lookup resolves through the witness table entry installed by
                 // `doesSubscriptMatchRequirement`.
-                innerDecl = decl;
+                if (as<AccessorDecl>(decl))
+                    innerDecl = decl->parentDecl;
+                else
+                    innerDecl = decl;
             }
             lookupDeclRef = astBuilder->getGenericAppDeclRef(
                 lookupDeclRef.as<GenericDecl>(),
