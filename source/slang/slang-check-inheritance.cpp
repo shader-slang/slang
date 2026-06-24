@@ -567,39 +567,39 @@ _getSpecializedDifferentiabilityConstraintDeclRefFromSatisfyingMethod(
 
     ensureDecl(visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
 
-    // Build a looked-up default instance of the callable requirement key, then unify it with the
-    // satisfying method type whose inheritance is being computed. Unification records constraints
-    // for the copied wrapper parameters; `trySolveGenericArguments` below applies those constraints
-    // and returns the specialized `GenericTypeConstraintDecl` decl-ref.
-    auto defaultCallableDeclRef = substituteDeclRef(
-                                      SubstitutionSet(defaultConstraintDeclRef),
-                                      astBuilder,
-                                      constraintDecl->callableRequirementDeclRef)
-                                      .as<CallableDecl>();
-    if (!defaultCallableDeclRef)
+    // The differentiability constraint generic is cloned from the satisfying method generic:
+    // `__generic<T> f()` becomes sibling `__generic<T> __constraint f<T> : ...`. The
+    // satisfying method type therefore already carries the declaration-order arguments (ordinary
+    // arguments and hidden proof arguments) that the constraint generic needs.
+    auto satisfyingMethodDeclRef = isDeclRefTypeOf<CallableDecl>(satisfyingMethodType);
+    if (!satisfyingMethodDeclRef)
         return DeclRef<GenericTypeConstraintDecl>();
 
-    auto defaultCallableType = DeclRefType::create(astBuilder, defaultCallableDeclRef);
-    SemanticsVisitor::GenericInferenceContext inferenceContext;
-    inferenceContext.genericDecl = lookedUpGenericRequirementDeclRef.getDecl();
-    SemanticsVisitor::UnificationOptions unificationOptions;
-    unificationOptions.equalityConstraint = true;
-    if (!visitor->TryUnifyTypes(
-            inferenceContext,
-            unificationOptions,
-            QualType(defaultCallableType),
-            QualType(satisfyingMethodType)))
+    auto callableRequirementGenericApp =
+        SubstitutionSet(constraintDecl->callableRequirementDeclRef).findGenericAppDeclRef();
+    if (!callableRequirementGenericApp)
+        return DeclRef<GenericTypeConstraintDecl>();
+
+    auto satisfyingMethodGenericApp =
+        SubstitutionSet(satisfyingMethodDeclRef)
+            .findGenericAppDeclRef(callableRequirementGenericApp->getGenericDecl());
+    if (!satisfyingMethodGenericApp)
+        return DeclRef<GenericTypeConstraintDecl>();
+
+    auto defaultConstraintGenericApp =
+        SubstitutionSet(defaultConstraintDeclRef)
+            .findGenericAppDeclRef(lookedUpGenericRequirementDeclRef.getDecl());
+    if (!defaultConstraintGenericApp ||
+        defaultConstraintGenericApp->getArgCount() != satisfyingMethodGenericApp->getArgCount())
     {
         return DeclRef<GenericTypeConstraintDecl>();
     }
 
-    ConversionCost conversionCost = kConversionCost_None;
-    return visitor
-        ->trySolveGenericArguments(
-            _Move(inferenceContext),
+    return astBuilder
+        ->getGenericAppDeclRef(
             lookedUpGenericRequirementDeclRef,
-            ArrayView<Val*>(),
-            conversionCost)
+            satisfyingMethodGenericApp->getArgs(),
+            constraintDecl)
         .as<GenericTypeConstraintDecl>();
 }
 
