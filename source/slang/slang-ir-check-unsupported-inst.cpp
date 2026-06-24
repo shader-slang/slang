@@ -8,44 +8,78 @@
 namespace Slang
 {
 
-// Find an opaque "handle" type that SPIR-V forbids from being stored to or
-// loaded from (VUID-StandaloneSpirv-OpTypeImage-06924): images/textures,
-// samplers, sampled images, subpass inputs, and acceleration structures. These
-// map to `OpTypeImage`/`OpTypeSampler`/`OpTypeSampledImage`/
+// Returns true if `type` is itself a leaf opaque "handle" type that SPIR-V
+// forbids from being stored to or loaded from
+// (VUID-StandaloneSpirv-OpTypeImage-06924): images/textures, samplers, sampled
+// images, subpass inputs (including GLSL input attachments), and acceleration
+// structures. These map to `OpTypeImage`/`OpTypeSampler`/`OpTypeSampledImage`/
 // `OpTypeAccelerationStructureKHR`, none of which may live in a function-local
-// variable. Recurses into struct fields and array elements since storing an
-// aggregate that contains such a handle has the same problem. Returns the leaf
-// handle type if found (for diagnostics), or null otherwise.
+// variable.
+static bool isLeafUnstorableOpaqueHandleType(IRType* type)
+{
+    return as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
+           as<IRSubpassInputType>(type) ||
+           type->getOp() == kIROp_GLSLInputAttachmentType ||
+           type->getOp() == kIROp_RaytracingAccelerationStructureType;
+}
+
+// Find an opaque handle type (see `isLeafUnstorableOpaqueHandleType`) that cannot
+// live in a function-local variable, recursing into the element/field types of
+// aggregates (arrays, structs, tuples) since storing an aggregate that contains
+// such a handle has the same problem. Returns the leaf handle type if found (for
+// diagnostics), or null otherwise. `visited` guards against cycles in
+// (potentially self-referential) aggregate types, mirroring the peer helper
+// `isOpaqueTypeImpl` in slang-legalize-types.cpp.
 //
 // Note: this is deliberately narrower than `isOpaqueType`. Buffer-backed
 // resources (structured / byte-address buffers) and pointers lower to
 // pointers and *can* be selected through control flow using SPIR-V variable
 // pointers, so they must not be rejected here. `RayQuery`/`HitObject` are also
 // excluded as they are legitimately declared as locals.
-static IRType* findUnstorableOpaqueHandleType(IRType* type)
+static IRType* findUnstorableOpaqueHandleType(IRType* type, HashSet<IRType*>& visited)
 {
     if (!type)
         return nullptr;
 
-    if (as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
-        as<IRSubpassInputType>(type) || type->getOp() == kIROp_RaytracingAccelerationStructureType)
-    {
+    if (isLeafUnstorableOpaqueHandleType(type))
         return type;
-    }
+
+    // Only recurse once per aggregate type to avoid cycling on self-referential
+    // types.
+    if (!visited.add(type))
+        return nullptr;
 
     if (auto arrayType = as<IRArrayTypeBase>(type))
-        return findUnstorableOpaqueHandleType(arrayType->getElementType());
+        return findUnstorableOpaqueHandleType(arrayType->getElementType(), visited);
 
     if (auto structType = as<IRStructType>(type))
     {
         for (auto field : structType->getFields())
         {
-            if (auto found = findUnstorableOpaqueHandleType(field->getFieldType()))
+            if (auto found = findUnstorableOpaqueHandleType(field->getFieldType(), visited))
                 return found;
         }
     }
 
+    if (auto tupleType = as<IRTupleTypeBase>(type))
+    {
+        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+        {
+            if (auto elementType = as<IRType>(tupleType->getOperand(i)))
+            {
+                if (auto found = findUnstorableOpaqueHandleType(elementType, visited))
+                    return found;
+            }
+        }
+    }
+
     return nullptr;
+}
+
+static IRType* findUnstorableOpaqueHandleType(IRType* type)
+{
+    HashSet<IRType*> visited;
+    return findUnstorableOpaqueHandleType(type, visited);
 }
 
 void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
