@@ -895,7 +895,11 @@ static bool _isHexDigit(char c)
     return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
 }
 
-static uint32_t _parseHexNumber(const char*& cursor, const char *const e, size_t maxDigits, bool& outOverflow)
+static uint32_t _parseHexNumber(
+    const char*& cursor,
+    const char* const e,
+    size_t maxDigits,
+    bool& outOverflow)
 {
     uint32_t value{};
     size_t numDigits{};
@@ -925,16 +929,22 @@ static uint32_t _parseHexNumber(const char*& cursor, const char *const e, size_t
     return value;
 }
 
-// Decodes string escape sequence
+// Decodes string escape sequence, returns -1 on failure
 //
-// returns -1 on failure
-static IntegerLiteralValue _decodeStringEscape(const char*& cursor, const char* const e, bool& outUnicode)
+// Preconditions:
+// - cursor != e      -- there must be at least 1 character
+// - *cursor == '\\'  -- first char of escape sequence must be backslash
+static IntegerLiteralValue _decodeStringEscape(
+    const char*& cursor,
+    const char* const e,
+    bool& outUnicode)
 {
     bool unicode{};
     int64_t value{};
 
     // this should have been already checked before we get here
     SLANG_ASSERT(*cursor == '\\');
+    SLANG_ASSERT(cursor != e);
 
     ++cursor;
 
@@ -946,58 +956,58 @@ static IntegerLiteralValue _decodeStringEscape(const char*& cursor, const char* 
         uint8_t byte = *cursor++;
         switch (byte)
         {
-            case '\'':
-                value = '\'';
-                break;
+        case '\'':
+            value = '\'';
+            break;
 
-            case '"':
-                value = '"';
-                break;
+        case '"':
+            value = '"';
+            break;
 
-            case '\\':
-                value = '\\';
-                break;
+        case '\\':
+            value = '\\';
+            break;
 
-            case '?':
-                value = '?';
-                break;
+        case '?':
+            value = '?';
+            break;
 
-            case 'a':
-                value = 7;
-                break;
+        case 'a':
+            value = 7;
+            break;
 
-            case 'b':
-                value = 8;
-                break;
+        case 'b':
+            value = 8;
+            break;
 
-            case 'f':
-                value = 12;
-                break;
+        case 'f':
+            value = 12;
+            break;
 
-            case 'n':
-                value = 10;
-                break;
+        case 'n':
+            value = 10;
+            break;
 
-            case 'r':
-                value = 13;
-                break;
+        case 'r':
+            value = 13;
+            break;
 
-            case 't':
-                value = 9;
-                break;
+        case 't':
+            value = 9;
+            break;
 
-            case 'v':
-                value = 11;
-                break;
+        case 'v':
+            value = 11;
+            break;
 
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
             {
                 value = byte - '0';
                 size_t numChars = 1U;
@@ -1011,7 +1021,7 @@ static IntegerLiteralValue _decodeStringEscape(const char*& cursor, const char* 
                 break;
             }
 
-            case 'x':
+        case 'x':
             {
                 bool overflow{};
 
@@ -1037,7 +1047,7 @@ static IntegerLiteralValue _decodeStringEscape(const char*& cursor, const char* 
                 break;
             }
 
-            case 'u':
+        case 'u':
             {
                 bool overflow{};
 
@@ -1062,11 +1072,11 @@ static IntegerLiteralValue _decodeStringEscape(const char*& cursor, const char* 
                     if (overflow)
                         value = -1;
                 }
-
+                unicode = true;
                 break;
             }
 
-            case 'U':
+        case 'U':
             {
                 bool overflow{};
                 value = _parseHexNumber(cursor, e, 8U, overflow);
@@ -1075,8 +1085,8 @@ static IntegerLiteralValue _decodeStringEscape(const char*& cursor, const char* 
                 break;
             }
 
-            default:
-                value = -1;
+        default:
+            value = -1;
         }
     }
 
@@ -1090,16 +1100,20 @@ String _inputToByteSeq(const char* b, const char* e)
     for (const char* i = b; i != e; ++i)
     {
         if (i == b)
-            StringUtil::appendFormat(byteSeqBuilder, "0x%02X", unsigned{static_cast<unsigned char>(*i)});
+            StringUtil::appendFormat(
+                byteSeqBuilder,
+                "0x%02X",
+                unsigned{static_cast<unsigned char>(*i)});
         else
-            StringUtil::appendFormat(byteSeqBuilder, " 0x%02X", unsigned{static_cast<unsigned char>(*i)});
+            StringUtil::appendFormat(
+                byteSeqBuilder,
+                " 0x%02X",
+                unsigned{static_cast<unsigned char>(*i)});
     }
     return byteSeqBuilder.toString();
 }
 
-IntegerLiteralValue getCharLiteralValue(
-    Token const& token,
-    DiagnosticSink* sink)
+IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink)
 {
     // See docs/language-reference/expressions-literal.md for the literal format.
 
@@ -1139,7 +1153,8 @@ IntegerLiteralValue getCharLiteralValue(
     {
         bool invalid{};
         ret = getUnicodePointFromUTF8(
-            [&cursor, e]() -> unsigned char {
+            [&cursor, e]() -> unsigned char
+            {
                 if (cursor < e)
                     return static_cast<unsigned char>(*cursor++);
                 else
@@ -1148,11 +1163,17 @@ IntegerLiteralValue getCharLiteralValue(
                     // trigger an error in the decoder
                     return 0xFFU;
                 }
-            }, &invalid);
+            },
+            &invalid);
 
         if (invalid)
         {
-            diagnose(sink, token.getLoc(), LexerDiagnostics::invalidUtf8ByteSequence, _inputToByteSeq(b, cursor).getBuffer());
+            diagnose(
+                sink,
+                token.getLoc(),
+                LexerDiagnostics::invalidUtf8ByteSequence,
+                _inputToByteSeq(b, cursor).getBuffer());
+
             ret = -1;
         }
     }
@@ -1270,79 +1291,90 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
             case 'U':
             case 'u':
             case 'x':
-            {
-                // Hexadecimal 'x' escape has any number of digits.
-                //
-                // Unicode 'u' escape has either 4 hex digits or '\u{xxx}' form with
-                // arbitrary number of digits.
-                //
-                // Unicode 'U' escape has either 8 hex digits
-                StringBuilder sb;
-                const char escapeChar = static_cast<char>(_peek(lexer));
-
-                sb.append('\\');
-                sb.append(escapeChar);
-                _advance(lexer);
-
-                bool curlyBraces{};
-                if ((escapeChar != 'U') && (_peek(lexer) == '{'))
                 {
-                    curlyBraces = true;
+                    // Hexadecimal 'x' escape has any number of digits.
+                    //
+                    // Unicode 'u' escape has either 4 hex digits or '\u{xxx}' form with
+                    // arbitrary number of digits.
+                    //
+                    // Unicode 'U' escape has either 8 hex digits
+                    StringBuilder sb;
+                    const char escapeChar = static_cast<char>(_peek(lexer));
+
+                    sb.append('\\');
+                    sb.append(escapeChar);
                     _advance(lexer);
-                    sb.append('{');
-                }
 
-                size_t numDigits{};
-
-                for (;;)
-                {
-                    int d = _peek(lexer);
-                    if (('0' <= d) && (d <= '9') || ('a' <= d) && (d <= 'f') ||
-                        ('A' <= d) && (d <= 'F'))
+                    bool curlyBraces{};
+                    if ((escapeChar != 'U') && (_peek(lexer) == '{'))
                     {
-                        sb.append(static_cast<char>(d));
+                        curlyBraces = true;
                         _advance(lexer);
-                        ++numDigits;
-                        continue;
+                        sb.append('{');
+                    }
+
+                    size_t numDigits{};
+
+                    for (;;)
+                    {
+                        int d = _peek(lexer);
+                        if (('0' <= d) && (d <= '9') || ('a' <= d) && (d <= 'f') ||
+                            ('A' <= d) && (d <= 'F'))
+                        {
+                            sb.append(static_cast<char>(d));
+                            _advance(lexer);
+                            ++numDigits;
+                            continue;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+
+                    if (curlyBraces)
+                    {
+                        if (_peek(lexer) == '}')
+                        {
+                            sb.append('}');
+                            _advance(lexer);
+
+                            // check that there's at least one digit
+                            if (numDigits == 0U)
+                                diagnose(
+                                    lexer->getDiagnosticSink(),
+                                    _getSourceLoc(lexer),
+                                    LexerDiagnostics::invalidStringEscape,
+                                    sb.getBuffer());
+                        }
+                        else
+                            diagnose(
+                                lexer->getDiagnosticSink(),
+                                _getSourceLoc(lexer),
+                                LexerDiagnostics::invalidStringEscape,
+                                sb.getBuffer());
                     }
                     else
                     {
-                        break;
+                        if ((escapeChar == 'u') && (numDigits != 4U))
+                            diagnose(
+                                lexer->getDiagnosticSink(),
+                                _getSourceLoc(lexer),
+                                LexerDiagnostics::invalidUnicodeStringEscape,
+                                "u",
+                                4U);
+
+                        if ((escapeChar == 'U') && (numDigits != 8U))
+                            diagnose(
+                                lexer->getDiagnosticSink(),
+                                _getSourceLoc(lexer),
+                                LexerDiagnostics::invalidUnicodeStringEscape,
+                                "U",
+                                8U);
                     }
+
+                    break;
                 }
-
-                if (curlyBraces)
-                {
-                    if (_peek(lexer) == '}')
-                    {
-                        sb.append('}');
-                        _advance(lexer);
-
-                        // check that there's at least one digit
-                        if (numDigits == 0U)
-                            if (auto sink = lexer->getDiagnosticSink())
-                                diagnose(sink, _getSourceLoc(lexer), LexerDiagnostics::invalidStringEscape, sb.getBuffer());
-                    }
-                    else
-                    {
-                        if (auto sink = lexer->getDiagnosticSink())
-                            diagnose(sink, _getSourceLoc(lexer), LexerDiagnostics::invalidStringEscape, sb.getBuffer());
-                    }
-                }
-                else
-                {
-                    if ((escapeChar == 'u') && (numDigits != 4U))
-                        if (auto sink = lexer->getDiagnosticSink())
-                            diagnose(sink, _getSourceLoc(lexer), LexerDiagnostics::invalidUnicodeStringEscape, "u", 4U);
-
-                    if ((escapeChar == 'U') && (numDigits != 8U))
-                        if (auto sink = lexer->getDiagnosticSink())
-                            diagnose(sink, _getSourceLoc(lexer), LexerDiagnostics::invalidUnicodeStringEscape, "U", 8U);
-                }
-
-                break;
-            }
-
             }
             break;
 
@@ -1419,7 +1451,7 @@ UnownedStringSlice getRawStringLiteralTokenValue(Token const& token)
     return UnownedStringSlice(contentBegin, contentEnd);
 }
 
-String getStringLiteralTokenValue(Token const& token)
+String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
 {
     SLANG_ASSERT(token.type == TokenType::StringLiteral || token.type == TokenType::CharLiteral);
 
@@ -1446,11 +1478,12 @@ String getStringLiteralTokenValue(Token const& token)
     StringBuilder valueBuilder;
     while (cursor < end)
     {
-        auto c = *cursor++;
+        auto c = *cursor;
 
         // If we see a closing quote, then we are at the end of the string literal
         if (c == quote)
         {
+            ++cursor;
             SLANG_ASSERT(cursor == end);
             return valueBuilder.produceString();
         }
@@ -1459,122 +1492,67 @@ String getStringLiteralTokenValue(Token const& token)
         // just append them to the buffer and move on.
         if (c != '\\')
         {
+            ++cursor;
             valueBuilder.append(c);
             continue;
         }
 
-        // Now we look at another character to figure out the kind of
-        // escape sequence we are dealing with:
+        // decode escape sequence
+        bool unicode{};
+        const char* literalStart = cursor;
+        IntegerLiteralValue charValue = _decodeStringEscape(cursor, end, unicode);
 
-        if (cursor >= end)
-            break;
-        char d = *cursor++;
-
-        switch (d)
+        if (charValue >= 0)
         {
-        // Simple characters that just needed to be escaped
-        case '\'':
-        case '\"':
-        case '\\':
-        case '?':
-            valueBuilder.append(d);
-            continue;
-
-        // Traditional escape sequences for special characters
-        case 'a':
-            valueBuilder.append('\a');
-            continue;
-        case 'b':
-            valueBuilder.append('\b');
-            continue;
-        case 'f':
-            valueBuilder.append('\f');
-            continue;
-        case 'n':
-            valueBuilder.append('\n');
-            continue;
-        case 'r':
-            valueBuilder.append('\r');
-            continue;
-        case 't':
-            valueBuilder.append('\t');
-            continue;
-        case 'v':
-            valueBuilder.append('\v');
-            continue;
-
-        // Octal escape: up to 3 characters
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
+            if (!unicode)
             {
-                cursor--;
-                int value = 0;
-                for (int ii = 0; ii < 3; ++ii)
+                // single byte
+                if (charValue <= 255)
                 {
-                    if (cursor >= end)
-                        break;
-                    d = *cursor;
-                    if (('0' <= d) && (d <= '7'))
-                    {
-                        value = value * 8 + (d - '0');
-
-                        cursor++;
-                        continue;
-                    }
-                    else
-                    {
-                        break;
-                    }
+                    valueBuilder.append(static_cast<char>(charValue));
                 }
-
-                // TODO: add support for appending an arbitrary code point?
-                valueBuilder.append((char)value);
+                else
+                {
+                    String hexSB;
+                    hexSB.append(charValue, 16);
+                    diagnose(
+                        sink,
+                        token.getLoc(),
+                        LexerDiagnostics::outOfRangeCodeUnit,
+                        charValue,
+                        hexSB.getBuffer());
+                }
             }
-            continue;
-
-        // Hexadecimal escape: any number of characters
-        case 'x':
+            else
             {
-                int value = 0;
-                for (;;)
+                // TODO: emit UTF-8 sequence matching the character value
+                char buffer[4]{};
+                size_t numBytes = encodeUnicodePointToUTF8(static_cast<Char32>(charValue), buffer);
+                SLANG_ASSERT(numBytes <= 4);
+
+                if (numBytes >= 1)
                 {
-                    if (cursor >= end)
-                        break;
-                    d = *cursor++;
-                    int digitValue = 0;
-                    if (('0' <= d) && (d <= '9'))
-                    {
-                        digitValue = d - '0';
-                    }
-                    else if (('a' <= d) && (d <= 'f'))
-                    {
-                        digitValue = d - 'a';
-                    }
-                    else if (('A' <= d) && (d <= 'F'))
-                    {
-                        digitValue = d - 'A';
-                    }
-                    else
-                    {
-                        cursor--;
-                        break;
-                    }
-
-                    value = value * 16 + digitValue;
+                    valueBuilder.append(buffer, numBytes);
                 }
-
-                // TODO: add support for appending an arbitrary code point?
-                valueBuilder.append((char)value);
+                else
+                {
+                    String hexSB;
+                    hexSB.append(charValue, 16);
+                    diagnose(
+                        sink,
+                        token.getLoc(),
+                        LexerDiagnostics::outOfRangeCodePointForUtf8,
+                        charValue,
+                        hexSB.getBuffer());
+                }
             }
-            continue;
+        }
+        else
+        {
+            StringBuilder sb;
+            sb.append(literalStart, cursor - literalStart);
 
-            // TODO: Unicode escape sequences
+            diagnose(sink, token.getLoc(), LexerDiagnostics::invalidStringEscape, sb.getBuffer());
         }
     }
 

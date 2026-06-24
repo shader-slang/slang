@@ -150,30 +150,32 @@ Char32 getUnicodePointFromUTF32(const ReadByteFunc& readByte)
 }
 
 // Encode functions return the amount of elements output to the buffer
+//
+// Returns 0 if encoding failed (codePoint too big).
 inline int encodeUnicodePointToUTF8(Char32 codePoint, char* outBuffer)
 {
     char* const dst = outBuffer;
-    // TODO(JS): This supports 4 + 6 * 3 = 22 bits.
-    // The standard allows up to 0x10FFFF.
-    if (codePoint <= 0x7F)
+
+    // Note: UTF-8 encoding is defined up to 21-bit code points
+    if (codePoint <= 0x7FU)
     {
         dst[0] = char(codePoint);
         return 1;
     }
-    else if (codePoint <= 0x7FF)
+    else if (codePoint <= 0x7FFU)
     {
         dst[0] = char(0xC0 + (codePoint >> 6));
         dst[1] = char(0x80 + (codePoint & 0x3F));
         return 2;
     }
-    else if (codePoint <= 0xFFFF)
+    else if (codePoint <= 0xFFFFU)
     {
         dst[0] = char(0xE0 + (codePoint >> 12));
         dst[1] = char(0x80 + ((codePoint >> 6) & (0x3F)));
         dst[2] = char(0x80 + (codePoint & 0x3F));
         return 3;
     }
-    else
+    else if (codePoint <= 0x1FFFFFU)
     {
         dst[0] = char(0xF0 + (codePoint >> 18));
         dst[1] = char(0x80 + ((codePoint >> 12) & 0x3F));
@@ -181,6 +183,8 @@ inline int encodeUnicodePointToUTF8(Char32 codePoint, char* outBuffer)
         dst[3] = char(0x80 + (codePoint & 0x3F));
         return 4;
     }
+    else
+        return 0;
 }
 
 inline int encodeUnicodePointToUTF16(Char32 codePoint, Char16* outBuffer)

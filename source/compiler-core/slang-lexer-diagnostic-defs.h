@@ -31,7 +31,16 @@ DIAGNOSTIC(10004, Error, endOfFileInLiteral, "end of file in literal")
 DIAGNOSTIC(10005, Error, newlineInLiteral, "newline in literal")
 DIAGNOSTIC(10006, Error, invalidUtf8ByteSequence, "invalid UTF-8 byte sequence: $0")
 DIAGNOSTIC(10007, Error, invalidStringEscape, "invalid string escape: '$0'")
-DIAGNOSTIC(10008, Error, invalidUnicodeStringEscape, "invalid string escape: \\$0 must be followed by $1 hex digits")
+DIAGNOSTIC(
+    10008,
+    Error,
+    invalidUnicodeStringEscape,
+    "invalid string escape: \\$0 must be followed by $1 hex digits")
+DIAGNOSTIC(
+    10009,
+    Error,
+    outOfRangeCodeUnit,
+    "invalid string escape: code unit $0 (0x$1) is out of range")
 DIAGNOSTIC(
     10010,
     Error,
@@ -45,5 +54,11 @@ DIAGNOSTIC(
     Error,
     integerLiteralTooLargeForAnyType,
     "integer literal is too large to be represented in any integer type")
+
+DIAGNOSTIC(
+    10013,
+    Error,
+    outOfRangeCodePointForUtf8,
+    "invalid string escape: Unicode code point $0 (0x$1) cannot be encoded as UTF-8")
 
 #undef DIAGNOSTIC

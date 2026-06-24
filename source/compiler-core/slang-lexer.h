@@ -171,7 +171,7 @@ struct Lexer
 
 
 // Helper routines for extracting values from tokens
-String getStringLiteralTokenValue(Token const& token);
+String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink);
 String getFileNameTokenValue(Token const& token);
 
 // Note about integer literal values. This is the underlying storage type, but
