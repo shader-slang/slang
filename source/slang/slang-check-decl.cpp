@@ -4295,10 +4295,12 @@ void SemanticsDeclHeaderVisitor::visitGenericVariadicPackCountConstraintDecl(
     // `maybeParseGenericConstraints` recognizes only the oriented
     // `countof(Pack) == CountExpr` spelling. The semantic invariant
     // established here is stricter: `Pack` must be a direct type/value pack
-    // parameter of this generic, and `CountExpr` must fold to an `IntVal` such
-    // as `3`, `N`, or `countof(OuterPack)`. Witness matching and default
-    // substitution rely on those checked fields instead of reinterpreting
-    // arbitrary syntax or proving algebraically equivalent forms.
+    // parameter of this generic and is stored in `packDeclRef`, and `CountExpr`
+    // must fold to an `IntVal` such as `3`, `N`, or `countof(OuterPack)`.
+    // Witness matching and default substitution rely on those checked fields
+    // instead of reinterpreting arbitrary syntax or proving algebraically
+    // equivalent forms.
+    decl->packDeclRef = DeclRef<Decl>();
     decl->packExpr = CheckTerm(decl->packExpr);
     decl->expectedCountExpr = CheckTerm(decl->expectedCountExpr);
     if (!decl->packExpr || !decl->expectedCountExpr)
@@ -4306,6 +4308,7 @@ void SemanticsDeclHeaderVisitor::visitGenericVariadicPackCountConstraintDecl(
 
     struct PackCountTargetInfo
     {
+        DeclRef<Decl> packDeclRef;
         bool sawPackParam = false;
         bool isCurrentGenericPackParam = false;
     };
@@ -4320,12 +4323,14 @@ void SemanticsDeclHeaderVisitor::visitGenericVariadicPackCountConstraintDecl(
         auto declRef = getDeclRef(m_astBuilder, declRefExpr);
         if (auto typePackDeclRef = declRef.as<GenericTypePackParamDecl>())
         {
+            result.packDeclRef = typePackDeclRef;
             result.sawPackParam = true;
             if (typePackDeclRef.getDecl()->parentDecl == decl->parentDecl)
                 result.isCurrentGenericPackParam = true;
         }
         else if (auto valuePackDeclRef = declRef.as<GenericValuePackParamDecl>())
         {
+            result.packDeclRef = valuePackDeclRef;
             result.sawPackParam = true;
             if (valuePackDeclRef.getDecl()->parentDecl == decl->parentDecl)
                 result.isCurrentGenericPackParam = true;
@@ -4354,6 +4359,10 @@ void SemanticsDeclHeaderVisitor::visitGenericVariadicPackCountConstraintDecl(
             getSink()->diagnose(
                 Diagnostics::InvalidVariadicPackCountConstraintTarget{.expr = packExpr});
         }
+    }
+    else
+    {
+        decl->packDeclRef = packTargetInfo.packDeclRef;
     }
 
     auto countVal =
@@ -5986,52 +5995,7 @@ static DeclRef<Decl> getPackCountConstraintTargetDeclRef(
     ASTBuilder* astBuilder,
     DeclRef<GenericVariadicPackCountConstraintDecl> const& constraintDeclRef)
 {
-    // Pack-count constraint checking accepts only direct pack-parameter
-    // references. Requirement matching compares those checked targets after the
-    // required generic signature has been applied to the satisfying generic's
-    // parameters:
-    //
-    //     interface ITensor { f<each I>() where countof(I) == D; }
-    //     struct Tensor    { f<each J>() where countof(J) == N; }
-    //
-    // `GenericAppDeclRef(ITensor.f, J, declared_pack_count_witness(...))`
-    // carries the `I -> J` mapping, but the stored `packExpr` is still the
-    // direct checked expression from the source constraint. Read the direct
-    // source target first, then use the generic application arguments to
-    // recover the substituted target declaration.
-    if (!constraintDeclRef)
-        return DeclRef<Decl>();
-
-    auto packExpr = constraintDeclRef.getDecl()->packExpr;
-    auto declRefExpr = as<DeclRefExpr>(packExpr);
-    if (!declRefExpr)
-        return DeclRef<Decl>();
-
-    auto targetDeclRef = getDeclRef(astBuilder, declRefExpr);
-    auto targetDecl = targetDeclRef.getDecl();
-    auto parentGenericDecl = as<GenericDecl>(targetDecl->parentDecl);
-    if (!parentGenericDecl)
-        return targetDeclRef;
-
-    Index parameterIndex = -1;
-    if (auto typeParamDecl = as<GenericTypeParamDeclBase>(targetDecl))
-        parameterIndex = typeParamDecl->parameterIndex;
-    else if (auto valuePackParamDecl = as<GenericValuePackParamDecl>(targetDecl))
-        parameterIndex = valuePackParamDecl->parameterIndex;
-    else if (auto valueParamDecl = as<GenericValueParamDecl>(targetDecl))
-        parameterIndex = valueParamDecl->parameterIndex;
-
-    auto args = tryGetGenericArguments(SubstitutionSet(constraintDeclRef), parentGenericDecl);
-    if (parameterIndex >= 0 && parameterIndex < args.getCount())
-    {
-        auto arg = args[parameterIndex];
-        if (auto argType = as<DeclRefType>(arg))
-            return argType->getDeclRef();
-        if (auto argIntVal = as<DeclRefIntVal>(arg))
-            return argIntVal->getDeclRef().as<Decl>();
-    }
-
-    return targetDeclRef;
+    return getPackCountConstraintPackDeclRef(astBuilder, constraintDeclRef);
 }
 
 static bool _areRequirementEndpointTypesEqualAfterResolve(Type* left, Type* right)
@@ -7464,28 +7428,31 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             }
 
             auto synPackDeclRefExpr = m_astBuilder->create<VarExpr>();
-            if (auto declRefExpr = as<DeclRefExpr>(packCountConstraintDecl->packExpr))
+            if (packCountConstraintDecl->packDeclRef)
             {
-                auto origPackDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
+                auto origPackDecl = packCountConstraintDecl->packDeclRef.getDecl();
                 auto synPackDecl = mapOrigToSynTypeParams.tryGetValue(origPackDecl);
                 SLANG_ASSERT(synPackDecl);
-                synPackDeclRefExpr->declRef = makeDeclRef(*synPackDecl);
+                auto synPackDeclRef = makeDeclRef(*synPackDecl);
+                synPackDeclRefExpr->declRef = synPackDeclRef;
                 synPackDeclRefExpr->type =
                     getTypeForDeclRef(m_astBuilder, synPackDeclRefExpr->declRef, SourceLoc());
+                synConstraintDecl->packDeclRef = synPackDeclRef;
             }
             else
             {
-                SLANG_UNEXPECTED("pack-count constraint target must be a direct decl ref");
+                SLANG_UNEXPECTED("pack-count constraint target must have a checked decl ref");
             }
             synConstraintDecl->packExpr = synPackDeclRefExpr;
 
-            // `GenericVariadicPackCountConstraintDecl` stores both the checked
-            // `IntVal` used by witness matching and the source expression used
-            // by declaration checking. When `synthesizeGenericSignatureForRequirementWitness`
-            // clones a requirement such as `where countof(I) == N`, rebuild the
-            // direct `N` expression to reference the synthesized value parameter;
-            // `getDefaultSubstitutionArgs` then creates a declared witness for
-            // the synthesized proof, not for the original requirement.
+            // `GenericVariadicPackCountConstraintDecl` stores the checked pack
+            // target in `packDeclRef`, keeps `packExpr` for diagnostics/printing,
+            // and uses `expectedCountVal` for witness matching. When
+            // `synthesizeGenericSignatureForRequirementWitness` clones a requirement
+            // such as `where countof(I) == N`, rebuild the direct `N` expression to
+            // reference the synthesized value parameter; `getDefaultSubstitutionArgs`
+            // then creates a declared witness for the synthesized proof, not for the
+            // original requirement.
             if (auto declRefExpr = as<DeclRefExpr>(packCountConstraintDecl->expectedCountExpr))
             {
                 auto origExpectedCountDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();

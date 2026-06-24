@@ -1040,6 +1040,7 @@ class GenericVariadicPackCountConstraintDecl : public Decl
     FIDDLE(...)
     SourceLoc whereTokenLoc = SourceLoc();
     FIDDLE() Expr* packExpr = nullptr;
+    FIDDLE() DeclRef<Decl> packDeclRef;
     FIDDLE() Expr* expectedCountExpr = nullptr;
     FIDDLE() IntVal* expectedCountVal = nullptr;
 };

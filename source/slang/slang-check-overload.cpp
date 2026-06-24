@@ -1380,26 +1380,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                         packCountConstraintDecl)
                     .as<GenericVariadicPackCountConstraintDecl>();
 
-            DeclRef<Decl> constrainedPackDeclRef;
-            if (auto declRefExpr = getPackCountConstraintPackExpr(m_astBuilder, constraintDeclRef)
-                                       .as<DeclRefExpr>())
-            {
-                constrainedPackDeclRef = getDeclRef(m_astBuilder, declRefExpr);
-            }
-
-            Val* constrainedArg = nullptr;
-            if (auto typePackDeclRef = constrainedPackDeclRef.as<GenericTypePackParamDecl>())
-            {
-                auto typePackDecl = typePackDeclRef.getDecl();
-                if (typePackDecl->parameterIndex < newArgs.getCount())
-                    constrainedArg = newArgs[typePackDecl->parameterIndex];
-            }
-            else if (auto valuePackDeclRef = constrainedPackDeclRef.as<GenericValuePackParamDecl>())
-            {
-                auto valuePackDecl = valuePackDeclRef.getDecl();
-                if (valuePackDecl->parameterIndex < newArgs.getCount())
-                    constrainedArg = newArgs[valuePackDecl->parameterIndex];
-            }
+            auto constrainedArg = getPackCountConstraintPackVal(m_astBuilder, constraintDeclRef);
 
             auto expectedCount =
                 getPackCountConstraintExpectedCount(m_astBuilder, constraintDeclRef);

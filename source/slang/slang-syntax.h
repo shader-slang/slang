@@ -44,6 +44,93 @@ inline SubstExpr<Expr> getPackCountConstraintPackExpr(
     return declRef.substitute(astBuilder, declRef.getDecl()->packExpr);
 }
 
+inline Index getGenericPackParameterIndex(Decl* packDecl)
+{
+    if (auto typePackParamDecl = as<GenericTypePackParamDecl>(packDecl))
+        return typePackParamDecl->parameterIndex;
+    if (auto valuePackParamDecl = as<GenericValuePackParamDecl>(packDecl))
+        return valuePackParamDecl->parameterIndex;
+    return -1;
+}
+
+inline DeclRef<Decl> getGenericPackDeclRefFromVal(Val* val)
+{
+    if (auto type = as<Type>(val))
+    {
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            auto declRef = declRefType->getDeclRef().as<Decl>();
+            if (as<GenericTypePackParamDecl>(declRef.getDecl()))
+                return declRef;
+        }
+    }
+    if (auto declRefIntVal = as<DeclRefIntVal>(val))
+    {
+        auto declRef = declRefIntVal->getDeclRef().as<Decl>();
+        if (as<GenericValuePackParamDecl>(declRef.getDecl()))
+            return declRef;
+    }
+    return DeclRef<Decl>();
+}
+
+inline Val* getPackCountConstraintPackVal(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    if (!declRef)
+        return nullptr;
+
+    auto packDeclRef = declRef.getDecl()->packDeclRef;
+    if (!packDeclRef)
+        return nullptr;
+
+    auto packDecl = packDeclRef.getDecl();
+    auto parentGenericDecl = as<GenericDecl>(packDecl->parentDecl);
+    auto parameterIndex = getGenericPackParameterIndex(packDecl);
+
+    if (parentGenericDecl && parameterIndex >= 0)
+    {
+        auto args = tryGetGenericArguments(SubstitutionSet(declRef), parentGenericDecl);
+        if (parameterIndex < args.getCount())
+            return args[parameterIndex];
+    }
+
+    if (auto typePackDeclRef = packDeclRef.as<GenericTypePackParamDecl>())
+        return DeclRefType::create(astBuilder, typePackDeclRef);
+
+    if (auto valuePackDeclRef = packDeclRef.as<GenericValuePackParamDecl>())
+    {
+        return astBuilder->getOrCreate<DeclRefIntVal>(
+            valuePackDeclRef.getDecl()->getType(),
+            valuePackDeclRef);
+    }
+
+    return nullptr;
+}
+
+inline DeclRef<Decl> getPackCountConstraintPackDeclRef(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    // The declaration checker stores the checked pack target in `packDeclRef`;
+    // `packExpr` remains only as source syntax for diagnostics and printing.
+    // When a requirement signature is viewed through a `GenericAppDeclRef`,
+    // map that source pack parameter to the corresponding specialized pack
+    // parameter so signature matching compares semantic pack identity.
+    if (!declRef)
+        return DeclRef<Decl>();
+
+    if (auto substitutedPackDeclRef =
+            getGenericPackDeclRefFromVal(getPackCountConstraintPackVal(astBuilder, declRef)))
+        return substitutedPackDeclRef;
+
+    auto packDeclRef = declRef.getDecl()->packDeclRef;
+    if (!packDeclRef)
+        return DeclRef<Decl>();
+
+    return substituteDeclRef(SubstitutionSet(declRef), astBuilder, packDeclRef);
+}
+
 inline IntVal* getPackCountConstraintExpectedCount(
     ASTBuilder* astBuilder,
     DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)

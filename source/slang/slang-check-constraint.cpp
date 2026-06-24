@@ -672,13 +672,7 @@ static DeclRef<Decl> _getPackDeclRefForPackCountConstraint(
     ASTBuilder* astBuilder,
     DeclRef<GenericVariadicPackCountConstraintDecl> const& constraintDeclRef)
 {
-    // `visitGenericVariadicPackCountConstraintDecl` accepts only direct pack
-    // parameter references. Keep this helper narrow so witness matching rejects
-    // unsupported symbolic pack expressions instead of treating them as proofs.
-    auto packExpr = getPackCountConstraintPackExpr(astBuilder, constraintDeclRef);
-    if (auto declRefExpr = packExpr.as<DeclRefExpr>())
-        return getDeclRef(astBuilder, declRefExpr);
-    return DeclRef<Decl>();
+    return getPackCountConstraintPackDeclRef(astBuilder, constraintDeclRef);
 }
 
 static DeclRef<GenericVariadicPackCountConstraintDecl> _findDeclaredPackCountConstraintForPackAndCount(
@@ -2329,8 +2323,8 @@ private:
 
         // When either side of `countof(I) == N` changes, the witness proof must
         // be retried under the new argument list. The target pack is stored in
-        // `packExpr`; any value parameters used by the count are stored in the
-        // checked `expectedCountVal`.
+        // `packDeclRef`; any value parameters used by the count are stored in
+        // the checked `expectedCountVal`.
         if (auto packCountConstraintDecl =
                 as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
         {
@@ -2504,9 +2498,9 @@ private:
     DeclRef<Decl> getPackDeclRefForPackCountConstraint(
         GenericVariadicPackCountConstraintDecl* constraintDecl)
     {
-        if (auto declRefExpr = as<DeclRefExpr>(constraintDecl->packExpr))
-            return getDeclRef(m_astBuilder, declRefExpr);
-        return DeclRef<Decl>();
+        auto constraintDeclRef =
+            m_astBuilder->getDirectDeclRef<GenericVariadicPackCountConstraintDecl>(constraintDecl);
+        return getPackCountConstraintPackDeclRef(m_astBuilder, constraintDeclRef);
     }
 
     // Return true if an ordinary or witness argument is ready for substitution.
