@@ -4333,17 +4333,7 @@ void SemanticsDeclHeaderVisitor::visitGenericVariadicPackCountConstraintDecl(
     else
     {
         decl->packDeclRef = packTargetInfo.packDeclRef;
-        Val* packVal = nullptr;
-        if (auto typePackDeclRef = packTargetInfo.packDeclRef.as<GenericTypePackParamDecl>())
-        {
-            packVal = DeclRefType::create(m_astBuilder, typePackDeclRef);
-        }
-        else if (auto valuePackDeclRef = packTargetInfo.packDeclRef.as<GenericValuePackParamDecl>())
-        {
-            packVal = m_astBuilder->getOrCreate<DeclRefIntVal>(
-                valuePackDeclRef.getDecl()->getType(),
-                valuePackDeclRef);
-        }
+        Val* packVal = m_astBuilder->getDeclRefVal(packTargetInfo.packDeclRef);
         if (packVal)
         {
             decl->actualCountVal = as<IntVal>(
@@ -13077,14 +13067,7 @@ static Val* _getNonEmptyConstraintPackVal(
     if (auto declRefExpr = packExpr.as<DeclRefExpr>())
     {
         auto packDeclRef = getDeclRef(astBuilder, declRefExpr);
-        if (auto typePackDeclRef = packDeclRef.as<GenericTypePackParamDecl>())
-            return DeclRefType::create(astBuilder, typePackDeclRef);
-        if (auto valuePackDeclRef = packDeclRef.as<GenericValuePackParamDecl>())
-        {
-            return astBuilder->getOrCreate<DeclRefIntVal>(
-                valuePackDeclRef.getDecl()->getType(),
-                valuePackDeclRef);
-        }
+        return astBuilder->getDeclRefVal(packDeclRef);
     }
     return nullptr;
 }

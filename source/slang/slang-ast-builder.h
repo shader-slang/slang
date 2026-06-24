@@ -450,6 +450,24 @@ public:
         return getOrCreate<TypeCastIntVal>(type, base);
     }
 
+    // Convert a declaration reference to the `Val` form used in generic substitution arguments:
+    // type declarations are represented as `DeclRefType`, while generic value declarations are
+    // represented as `DeclRefIntVal`.
+    Val* getDeclRefVal(DeclRef<Decl> declRef)
+    {
+        if (isGenericValueParam(declRef) || declRef.as<GlobalGenericValueParamDecl>())
+        {
+            auto varDeclRef = declRef.as<VarDeclBase>();
+            return getOrCreate<DeclRefIntVal>(varDeclRef.getDecl()->getType(), varDeclRef);
+        }
+
+        auto decl = declRef.getDecl();
+        if (as<SimpleTypeDecl>(decl) || as<AggTypeDeclBase>(decl))
+            return DeclRefType::create(this, declRef);
+
+        return nullptr;
+    }
+
     DeclRef<Decl> getGenericAppDeclRef(
         DeclRef<GenericDecl> genericDeclRef,
         ConstArrayView<Val*> args,
