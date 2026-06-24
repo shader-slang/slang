@@ -675,8 +675,11 @@ void initCommandOptions(CommandOptions& options)
          "within any practical run; uint32 counters wrap silently at 2^32 hits per "
          "slot. Use `32` when targeting a runtime driver that does not support "
          "64-bit shader atomic add (notably MoltenVK on Apple Silicon, which "
-         "exposes `shaderBufferInt64Atomics = false`). Implies `-trace-coverage` "
-         "is meaningful; ignored when no coverage mode is enabled."},
+         "exposes `shaderBufferInt64Atomics = false`). Metal targets: the Metal "
+         "MSL atomic API only provides 32-bit atomics, so the effective counter "
+         "width is always capped to 32 regardless of this flag. "
+         "Implies `-trace-coverage` is meaningful; ignored when no coverage mode "
+         "is enabled."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
