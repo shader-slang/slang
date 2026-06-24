@@ -932,7 +932,7 @@ err(
     "default-value-on-extension-generic-param",
     20104,
     "default value on extension generic parameter",
-    span { loc = "location", message = "an 'extension' cannot provide a default value for its generic parameter '~name:Name'" }
+    span { loc = "location", message = "an extension's generic parameter '~name:Name' is inferred from its target, so it cannot have a default value" }
 )
 
 err(

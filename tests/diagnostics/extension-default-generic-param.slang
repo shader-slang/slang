@@ -16,7 +16,7 @@ struct Foo<T>
 // Type parameter default.
 extension<T = int> Foo<T>
 //CHECK:      ^^^ default value on extension generic parameter
-//CHECK:      ^^^ an 'extension' cannot provide a default value for its generic parameter 'T'
+//CHECK:      ^^^ an extension's generic parameter 'T' is inferred from its target, so it cannot have a default value
 {
     int getExt() { return 1; }
 }
@@ -29,7 +29,7 @@ struct Bar<let N : int>
 
 extension<let N : int = 4> Bar<N>
 //CHECK:                ^ default value on extension generic parameter
-//CHECK:                ^ an 'extension' cannot provide a default value for its generic parameter 'N'
+//CHECK:                ^ an extension's generic parameter 'N' is inferred from its target, so it cannot have a default value
 {
     int getExt() { return N; }
 }
@@ -43,7 +43,7 @@ struct Baz<T : IFoo>
 
 extension<T : IFoo = Q> Baz<T>
 //CHECK:             ^ default value on extension generic parameter
-//CHECK:             ^ an 'extension' cannot provide a default value for its generic parameter 'T'
+//CHECK:             ^ an extension's generic parameter 'T' is inferred from its target, so it cannot have a default value
 {
     int getExt() { return 1; }
 }
@@ -57,7 +57,7 @@ struct Pair<T, U>
 
 extension<T, U = int> Pair<T, U>
 //CHECK:         ^^^ default value on extension generic parameter
-//CHECK:         ^^^ an 'extension' cannot provide a default value for its generic parameter 'U'
+//CHECK:         ^^^ an extension's generic parameter 'U' is inferred from its target, so it cannot have a default value
 {
     int getExt() { return 1; }
 }
@@ -71,7 +71,7 @@ struct IllFormed<T>
 
 extension<T = ThisNameDoesNotExist> IllFormed<T>
 //CHECK:      ^^^^^^^^^^^^^^^^^^^^ default value on extension generic parameter
-//CHECK:      ^^^^^^^^^^^^^^^^^^^^ an 'extension' cannot provide a default value for its generic parameter 'T'
+//CHECK:      ^^^^^^^^^^^^^^^^^^^^ an extension's generic parameter 'T' is inferred from its target, so it cannot have a default value
 {
     int getExt() { return 1; }
 }

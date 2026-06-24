@@ -22,7 +22,7 @@ struct CubeContext<T : IFloat>
 
 __func_extension<T : IFloat = float> __apply(cube<T>)(T x) -> Tuple<T, CubeContext<T>>
 //CHECK:                      ^^^^^ default value on extension generic parameter
-//CHECK:                      ^^^^^ an 'extension' cannot provide a default value for its generic parameter 'T'
+//CHECK:                      ^^^^^ an extension's generic parameter 'T' is inferred from its target, so it cannot have a default value
     where T.Differential == T
 {
     let sqr = x * x;
