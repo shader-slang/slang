@@ -442,6 +442,12 @@ jobs:
           # Generate data exports (CSV and JSON)
           bash ../tools/coverage/generate-data-export.sh reports/history
 
+          # Generate slangc compiler coverage trend page
+          python3 ../tools/coverage/generate-slangc-trend.py \
+            --data reports/coverage-data.json \
+            --history reports/history \
+            --output reports/slangc-coverage-trend.html
+
           # Commit and push if there are changes
           git add reports/ index.html
           if ! git diff --cached --quiet; then
