@@ -56,6 +56,13 @@
       "source_doc_digest": "ae8070fd1ab0d5de76319dd74a216312586ddb2d6453c752eb3804c16b6c459c",
       "watched_paths_digest": "4f74d91e4cf48490043c25f1aa4fe35ca34e369bae1bba7089a2d3a8a0006cd1"
     },
+    "conformance/generics": {
+      "generated_at": "2026-06-24T09:25:39+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "b25e06aeb8862d207541c3d812c57cb9e381b802",
+      "source_doc_digest": "b0c5e1d5ca87b9ca5bb42dc8ae9e6903730d17bbdfe4e2d476ec8c4508dd3533",
+      "watched_paths_digest": "4f696e65f6279fdb2c4ec609ecf481baca0c06780c4d84fb6e67977b7aeafbbd"
+    },
     "cross-cutting/core-module": {
       "generated_at": "2026-05-21T09:48:21+00:00",
       "model": "claude-opus-4-7",
@@ -97,6 +104,55 @@
       "source_commit": "60db9042207670b39b0524118887efacb7a3d42d",
       "source_doc_digest": "0a58ebcb7a4b213b2393a4f77b6e41ad36b947efc263d168682803ab9ebb2793",
       "watched_paths_digest": "b3de3ffd670269303e9db77d1fbedc16a2dc17a0e84fbcdc40e34406f748d0ab"
+    },
+    "design/ast-reference/base": {
+      "generated_at": "2026-06-24T09:32:02+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "b25e06aeb8862d207541c3d812c57cb9e381b802",
+      "source_doc_digest": "53b4c6dcb821e169604353874d19d5d7ff477874d2617d864790a5f02f3a2dbb",
+      "watched_paths_digest": "791702e985b41a9050e6b69e409b63ea1f55b1413ef661ac84540de37ab58aa2"
+    },
+    "design/ast-reference/declarations": {
+      "generated_at": "2026-06-24T09:32:02+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "b25e06aeb8862d207541c3d812c57cb9e381b802",
+      "source_doc_digest": "6ffec932e9ae47423e1412c6bff54714f67e74166a264c55397ef6a1d8dc3b3f",
+      "watched_paths_digest": "7b05527376dfb8e9f9703344cd583d6830a069a355f532f384cb677864ca9686"
+    },
+    "design/ast-reference/types": {
+      "generated_at": "2026-06-24T09:32:02+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "b25e06aeb8862d207541c3d812c57cb9e381b802",
+      "source_doc_digest": "96d027ebc14e6587c79b9fc193caf4e14df555c094bc0fa134b74eeb193b33ac",
+      "watched_paths_digest": "69b1b4b4ebfd2e31c72694cb96999536c58a4466e09db936fc79e843d50fc2ad"
+    },
+    "design/cross-cutting/ir-instructions": {
+      "generated_at": "2026-06-24T09:32:02+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "b25e06aeb8862d207541c3d812c57cb9e381b802",
+      "source_doc_digest": "af164393bf349ad8677711e3e98c0adb2b0eb8ee975ce34ce088add998e06a3e",
+      "watched_paths_digest": "c3351fc992d46c87a06f127ca50d66a7bda994f571e9dd13985cafde508b726b"
+    },
+    "design/ir-reference/values": {
+      "generated_at": "2026-06-24T09:48:41+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "4d0fd10e73b1c4ccd3d20b39cff137abe87cfd6d",
+      "source_doc_digest": "5b903f7c3f99dbf2d9eeb81923f65a6dad25210a54cab7bb3a514cefd0e35fdd",
+      "watched_paths_digest": "292e76fc13bbd934f7f4d26014bc887e93079dcf75d26cc6e8cd8bf4dc6d4460"
+    },
+    "design/name-resolution/overload-resolution": {
+      "generated_at": "2026-06-24T09:22:44+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "b25e06aeb8862d207541c3d812c57cb9e381b802",
+      "source_doc_digest": "f30d2e1d8317631f0556f7a128cddc81436ff846d442456e3b363935106421f1",
+      "watched_paths_digest": "d606357ce28db9433667caa68de5f6f60871ea978bbead8541c699896349ee67"
+    },
+    "design/pipeline/03-semantic-check": {
+      "generated_at": "2026-06-24T09:32:03+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "b25e06aeb8862d207541c3d812c57cb9e381b802",
+      "source_doc_digest": "366ee8a22cb44ac52f456fe140b2459c1a1c7641270b3f3640b0469adf288beb",
+      "watched_paths_digest": "1518d66204ffac0871e8fa649d099b79239802e98866f8fb2f480da13a4da8ff"
     },
     "glossary": {
       "generated_at": "2026-05-20T17:43:21+00:00",
