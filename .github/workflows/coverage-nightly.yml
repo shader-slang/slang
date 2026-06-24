@@ -318,66 +318,17 @@ jobs:
           mkdir -p "${REPORT_DIR}"/{linux,macos,windows}
           mkdir -p reports/latest/{linux,macos,windows}
 
-          # Copy Linux coverage
-          cp -r ../coverage-reports/linux/coverage-html/* "${REPORT_DIR}/linux/"
-          cp ../coverage-reports/linux/coverage-summary.json "${REPORT_DIR}/linux/"
-          if [ -d "../coverage-reports/linux/coverage-html-slangc" ]; then
-            mkdir -p "${REPORT_DIR}/linux/slangc"
-            cp -r ../coverage-reports/linux/coverage-html-slangc/* "${REPORT_DIR}/linux/slangc/"
-          fi
-
-          # Copy macOS coverage
-          cp -r ../coverage-reports/macos/coverage-html/* "${REPORT_DIR}/macos/"
-          cp ../coverage-reports/macos/coverage-summary.json "${REPORT_DIR}/macos/"
-          if [ -d "../coverage-reports/macos/coverage-html-slangc" ]; then
-            mkdir -p "${REPORT_DIR}/macos/slangc"
-            cp -r ../coverage-reports/macos/coverage-html-slangc/* "${REPORT_DIR}/macos/slangc/"
-          fi
-
-          # Copy Windows coverage. No coverage-html-slangc/ on Windows -- the
-          # full HTML report is the only browseable view; slangc totals come
-          # from coverage-slangc.lcov which we stash next to the summary.
-          if [ -d "../coverage-reports/windows/coverage-html" ]; then
-            cp -r ../coverage-reports/windows/coverage-html/* "${REPORT_DIR}/windows/"
-            cp ../coverage-reports/windows/coverage-summary.json "${REPORT_DIR}/windows/"
-            if [ -f "../coverage-reports/windows/coverage-slangc.lcov" ]; then
-              cp ../coverage-reports/windows/coverage-slangc.lcov "${REPORT_DIR}/windows/"
-            fi
-          fi
-
-          # Copy combined summary
+          # History stores ONLY summary JSONs (a few KB each) — not the full
+          # per-file HTML (~1.6 GB/day). Full HTML is expensive to store and
+          # only needed for the latest report; summaries are sufficient for
+          # trend tracking and the extract_daily_*_coverage.py scripts.
           cp ../coverage-reports/combined-summary.json "${REPORT_DIR}/"
-
-          # Copy new-renderer reports (rendered alongside the existing
-          # llvm-cov / ReportGenerator HTML so the two outputs can be
-          # compared visually). Best-effort: skip silently when missing.
-          for os in linux macos windows; do
-            for view in full slangc; do
-              src="../coverage-reports/$os/new-html/$view/html"
-              dest="${REPORT_DIR}/$os/new/$view"
-              if [ -d "$src" ]; then
-                mkdir -p "$dest"
-                cp -r "$src"/* "$dest/"
-              fi
-            done
-          done
-
-          # Merged cross-OS report (single canonical view that rolls up all
-          # three platforms). The merged LCOV + auth-summary are persisted
-          # next to the HTML so a future diff job can compare two historical
-          # runs without re-merging from scratch.
-          if [ -d ../coverage-reports/merged/full/html ]; then
-            mkdir -p "${REPORT_DIR}/merged/full"
-            cp -r ../coverage-reports/merged/full/html/* "${REPORT_DIR}/merged/full/"
-            cp ../coverage-reports/merged/full/coverage.lcov "${REPORT_DIR}/merged/full/" || true
-            cp ../coverage-reports/merged/full/coverage-report.txt "${REPORT_DIR}/merged/full/" 2>/dev/null || true
-          fi
-          if [ -d ../coverage-reports/merged/slangc/html ]; then
-            mkdir -p "${REPORT_DIR}/merged/slangc"
-            cp -r ../coverage-reports/merged/slangc/html/* "${REPORT_DIR}/merged/slangc/"
-            cp ../coverage-reports/merged/slangc/coverage.lcov "${REPORT_DIR}/merged/slangc/" || true
-            cp ../coverage-reports/merged/slangc/coverage-report.txt "${REPORT_DIR}/merged/slangc/" 2>/dev/null || true
-          fi
+          [ -f "../coverage-reports/linux/coverage-summary.json" ] && \
+            cp ../coverage-reports/linux/coverage-summary.json "${REPORT_DIR}/linux/"
+          [ -f "../coverage-reports/macos/coverage-summary.json" ] && \
+            cp ../coverage-reports/macos/coverage-summary.json "${REPORT_DIR}/macos/"
+          [ -f "../coverage-reports/windows/coverage-summary.json" ] && \
+            cp ../coverage-reports/windows/coverage-summary.json "${REPORT_DIR}/windows/"
 
           # Update latest
           rm -rf reports/latest/{linux,macos,windows}/*
