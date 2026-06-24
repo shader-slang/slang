@@ -7176,10 +7176,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     // Returns whether resource descriptor-heap runtime arrays should advertise a single unified
     // maximum `ArrayStride` (opt-in via `-spirv-unified-descriptor-heap-stride`). This only affects
-    // the auto stride path. Combining it with an explicit `-spirv-resource-heap-stride` is a
-    // conflict (the two express contradictory strides) and is diagnosed in
-    // `diagnoseConflictingDescriptorHeapStrideOptions`, so the two options are never honored
-    // together.
+    // the auto stride path, i.e. when `-spirv-resource-heap-stride` is 0. Combining it with a
+    // non-zero `-spirv-resource-heap-stride` is a conflict (the two express contradictory strides)
+    // and is diagnosed in `diagnoseConflictingDescriptorHeapStrideOptions`; an explicit stride of 0
+    // selects that same auto path and is not a conflict.
     bool isUnifiedResourceHeapStrideEnabled()
     {
         return m_targetProgram->getOptionSet().getBoolOption(
