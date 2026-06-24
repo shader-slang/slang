@@ -29,6 +29,29 @@ __func_extension<T : IFloat = float> __apply(cube<T>)(T x) -> Tuple<T, CubeConte
     return makeTuple(sqr * x, CubeContext<T>(sqr));
 }
 
+// The diagnostic is gated on the FuncExtensionDecl, not on the target shape, so
+// it fires identically for the `fwd_diff` and `bwd_diff` target shapes too.
+T sqr<T : IArithmetic>(T x)
+{
+    return x * x;
+}
+
+__func_extension<T : IFloat = float> fwd_diff(sqr<T>)(DifferentialPair<T> dpx) -> DifferentialPair<T>
+//CHECK:                      ^^^^^ default value on extension generic parameter
+//CHECK:                      ^^^^^ an extension's generic parameter 'T' is inferred from its target, so it cannot have a default value
+    where T.Differential == T
+{
+    return diffPair(dpx.p, dpx.d);
+}
+
+__func_extension<T : IFloat = float> bwd_diff(sqr<T>)(inout DifferentialPair<T> dpx, T dOut) -> void
+//CHECK:                      ^^^^^ default value on extension generic parameter
+//CHECK:                      ^^^^^ an extension's generic parameter 'T' is inferred from its target, so it cannot have a default value
+    where T.Differential == T
+{
+    dpx = diffPair(dpx.p, dOut);
+}
+
 RWStructuredBuffer<float> outputBuffer;
 
 [shader("compute")]

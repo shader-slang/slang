@@ -62,6 +62,22 @@ extension<T, U = int> Pair<T, U>
     int getExt() { return 1; }
 }
 
+// Multiple parameters, both with defaults: the per-parameter visitor flags each
+// independently, so there must be a diagnostic on both `T` and `U`.
+struct Two<T, U>
+{
+    int get() { return 0; }
+}
+
+extension<T = int, U = int> Two<T, U>
+//CHECK:      ^^^ default value on extension generic parameter
+//CHECK:      ^^^ an extension's generic parameter 'T' is inferred from its target, so it cannot have a default value
+//CHECK:               ^^^ default value on extension generic parameter
+//CHECK:               ^^^ an extension's generic parameter 'U' is inferred from its target, so it cannot have a default value
+{
+    int getExt() { return 1; }
+}
+
 // Ill-formed default: only the new diagnostic should fire; the default is dropped
 // so there is no cascade of "undefined identifier" errors against it.
 struct IllFormed<T>
