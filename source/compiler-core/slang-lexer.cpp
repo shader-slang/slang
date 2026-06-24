@@ -1069,9 +1069,12 @@ static IntegerLiteralValue _decodeStringEscape(
                     // \u...
                     value = _parseHexNumber(cursor, e, 4U, overflow);
 
-                    if (overflow)
-                        value = -1;
+                    // note: value cannot overflow here (4 hex digits max), so we'll
+                    // guard this with assert instead of check to avoid unreachable
+                    // branches
+                    SLANG_ASSERT(!overflow);
                 }
+
                 unicode = true;
                 break;
             }
@@ -1080,6 +1083,12 @@ static IntegerLiteralValue _decodeStringEscape(
             {
                 bool overflow{};
                 value = _parseHexNumber(cursor, e, 8U, overflow);
+
+                // note: value cannot overflow here (8 hex digits max), so we'll
+                // guard this with assert instead of check to avoid unreachable
+                // branches
+                SLANG_ASSERT(!overflow);
+
                 unicode = true;
 
                 break;
@@ -1094,7 +1103,7 @@ static IntegerLiteralValue _decodeStringEscape(
     return value;
 }
 
-String _inputToByteSeq(const char* b, const char* e)
+static String _inputToByteSeq(const char* b, const char* e)
 {
     StringBuilder byteSeqBuilder;
     for (const char* i = b; i != e; ++i)
@@ -1271,23 +1280,6 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
                 }
                 break;
 
-                _advance(lexer);
-                for (unsigned ii = 0; ii < 4; ++ii)
-                {
-                    int d = _peek(lexer);
-                    if (('0' <= d) && (d <= '9') || ('a' <= d) && (d <= 'f') ||
-                        ('A' <= d) && (d <= 'F'))
-                    {
-                        _advance(lexer);
-                        continue;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-                break;
-
             case 'U':
             case 'u':
             case 'x':
@@ -1356,6 +1348,13 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
                     }
                     else
                     {
+                        if ((escapeChar == 'x') && (numDigits == 0U))
+                            diagnose(
+                                lexer->getDiagnosticSink(),
+                                _getSourceLoc(lexer),
+                                LexerDiagnostics::invalidStringEscape,
+                                sb.getBuffer());
+
                         if ((escapeChar == 'u') && (numDigits != 4U))
                             diagnose(
                                 lexer->getDiagnosticSink(),
@@ -1525,7 +1524,6 @@ String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
             }
             else
             {
-                // TODO: emit UTF-8 sequence matching the character value
                 char buffer[4]{};
                 size_t numBytes = encodeUnicodePointToUTF8(static_cast<Char32>(charValue), buffer);
                 SLANG_ASSERT(numBytes <= 4);
