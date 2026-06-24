@@ -6,7 +6,7 @@
 
 #if defined(_WIN32)
 #include <windows.h>
-#elif SLANG_LINUX_FAMILY || SLANG_OSX
+#elif SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY
 #include <dlfcn.h>
 #endif
 #include <sys/stat.h>
@@ -146,7 +146,7 @@ String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
     }
     return String::fromWString(filenameBuffer);
 
-#elif SLANG_LINUX_FAMILY || SLANG_OSX
+#elif SLANG_LINUX_FAMILY || SLANG_APPLE_FAMILY
     Dl_info dllInfo;
     if (!dladdr(symbolInLib, &dllInfo))
     {
@@ -155,6 +155,7 @@ String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
     return dllInfo.dli_fname;
 
 #else
+    // Platforms without dlfcn (e.g. WASM/console): no shared-library introspection.
     return String();
 #endif
 }
