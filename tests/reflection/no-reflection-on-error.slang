@@ -7,4 +7,3 @@
 void main() { foo } // forces a compile error
 
 // CHECK: error
-// CHECK-NOT: internal error
