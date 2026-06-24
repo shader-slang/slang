@@ -15,7 +15,7 @@ queue depth. Uses the [GitHub Actions Scale Set Client](https://github.com/actio
 │   --platform=windows                     │
 │       │                                  │
 │  scaler (Linux)                          │
-│   --labels=Linux,self-hosted,GPU         │
+│   --labels=Linux,self-hosted,GPU,GCP     │
 │   --platform=linux                       │
 │       │                                  │
 │  scaler (Linux SM80Plus)                 │
@@ -65,7 +65,7 @@ GOOS=linux GOARCH=amd64 go build -o scaler-linux ./cmd/scaler
   --url=https://github.com/shader-slang/slang \
   --name=linux-gpu-runners \
   --token=ghp_... \
-  --labels=Linux,self-hosted,GPU \
+  --labels=Linux,self-hosted,GPU,GCP \
   --platform=linux \
   --gcp-zones=us-east1-c,us-east1-d,us-central1-a,us-west1-a \
   --gcp-instance-template=linux-gpu-runner \

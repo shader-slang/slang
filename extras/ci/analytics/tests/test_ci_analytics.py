@@ -81,6 +81,32 @@ class TestRunnerTypeCoverage(unittest.TestCase):
         self.assertEqual(group, "Linux SM80Plus GPU (GCP)")
         self.assertTrue(self_hosted)
 
+    def test_classify_group_handles_gcp_pinned_linux_gpu_label(self):
+        """The Linux GPU test jobs request the extra "GCP" label to pin them to
+        the GCP scaler pool and exclude the nvrgfx Colossus hosts (see
+        ci-slang-test-container.yml / ci-rhi-test-container.yml). classify_group
+        matches by subset, so the shipped ["Linux","self-hosted","GPU"] entry
+        still classifies the 4-label set as "Linux GPU (GCP)" without a separate
+        config entry. This regression test locks that in so a future reorder or
+        removal of that entry can't silently bucket the pinned jobs into "Other".
+        """
+        config = ci_visualization.load_config()
+
+        # Job-label path (no runner name) and both runner-name paths must all
+        # resolve to the GCP Linux GPU group.
+        for runner_name in ("", "linux-test-abc123", "2u1g-x570-0558"):
+            group, self_hosted = ci_visualization.classify_group(
+                ["Linux", "self-hosted", "GPU", "GCP"],
+                config,
+                runner_name,
+            )
+            self.assertEqual(
+                group,
+                "Linux GPU (GCP)",
+                msg=f"GCP-pinned Linux GPU job misclassified for runner_name={runner_name!r}",
+            )
+            self.assertTrue(self_hosted)
+
     def test_record_snapshot_counts_all_gcp_runner_types(self):
         queue_data = {
             "summary": {
