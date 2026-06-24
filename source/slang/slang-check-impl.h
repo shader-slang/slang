@@ -3777,8 +3777,12 @@ public:
         ASTBuilder* astBuilder,
         DeclRef<InterfaceDecl> interfaceDeclRef);
 
-    bool doesCalleeHaveFwdDiff(DeclRef<CallableDecl> declRef);
-    bool doesCalleeHaveBwdDiff(DeclRef<CallableDecl> declRef);
+    // Differentiability of a function is represented by conformance of the function-as-type to
+    // `IForwardDifferentiable`/`IBackwardDifferentiable`. Query that conformance directly instead
+    // of probing for the `fwd_diff`/`bwd_diff` associated-function entries; those entries are
+    // witnesses produced by the conformance, not the source of truth.
+    SubtypeWitness* isFuncForwardDifferentiable(DeclRef<CallableDecl> declRef);
+    SubtypeWitness* isFuncBackwardDifferentiable(DeclRef<CallableDecl> declRef);
 };
 
 
