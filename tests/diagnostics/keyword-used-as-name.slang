@@ -24,6 +24,16 @@ struct S
 //CHECK:^^^^^ 'class' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts
 }
 
+// `typedef` alias-name site (reached via the shared declarator machinery).
+typedef int class;
+//CHECK:    ^^^^^ keyword used as a name
+//CHECK:    ^^^^^ 'class' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts
+
+// `typealias` alias-name site (reads the name directly; must warn symmetrically).
+typealias struct = int;
+//CHECK:  ^^^^^^ keyword used as a name
+//CHECK:  ^^^^^^ 'struct' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts
+
 // Parameter declaration site (traditional declarator).
 int useParam(int struct)
 //CHECK:         ^^^^^^ keyword used as a name

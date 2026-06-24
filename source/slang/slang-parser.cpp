@@ -5096,6 +5096,10 @@ static NodeBase* parseTypeAliasDecl(Parser* parser, void* /*userData*/)
 
     parser->FillPosition(decl);
     decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+    // `parseTypeDef` reaches the keyword-name warning via the shared declarator
+    // machinery, but this `typealias` path reads the alias name directly, so warn
+    // here too (e.g. `typealias struct = int;`).
+    maybeDiagnoseKeywordUsedAsName(parser, decl->nameAndLoc);
 
     return parseOptGenericDecl(
         parser,
