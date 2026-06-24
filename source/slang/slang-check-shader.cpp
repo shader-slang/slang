@@ -764,6 +764,31 @@ bool isUniformParameterType(Type* type)
     return false;
 }
 
+bool isVkBindingCompatibleEntryPointParameterType(Type* type)
+{
+    if (as<ResourceType>(type))
+        return true;
+    if (as<HLSLStructuredBufferTypeBase>(type))
+        return true;
+    if (as<UntypedBufferResourceType>(type))
+        return true;
+    if (as<UniformParameterGroupType>(type))
+        return true;
+    if (as<GLSLShaderStorageBufferType>(type))
+        return true;
+    if (as<SamplerStateType>(type))
+        return true;
+    if (as<PtrType>(type))
+        return true;
+    if (as<DynamicResourceType>(type))
+        return true;
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return isVkBindingCompatibleEntryPointParameterType(arrayType->getElementType());
+    if (auto modType = as<ModifiedType>(type))
+        return isVkBindingCompatibleEntryPointParameterType(modType->getBase());
+    return false;
+}
+
 bool isBuiltinParameterType(Type* type)
 {
     if (!as<BuiltinType>(type))
@@ -1370,9 +1395,6 @@ static bool _outputDeclHasSemantic(
 
 static bool _allTargetsSupportVkBindingOnEntryPointParameters(Linkage* linkage)
 {
-    if (linkage->targets.getCount() == 0)
-        return false;
-
     for (auto targetReq : linkage->targets)
     {
         if (!doesTargetSupportVkBindingOnEntryPointParameters(targetReq))
@@ -1909,7 +1931,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         _allTargetsSupportVkBindingOnEntryPointParameters(linkage);
     for (const auto& param : entryPointFuncDecl->getParameters())
     {
-        if (!supportsVkBindingOnEntryPointParameters && param->findModifier<GLSLBindingAttribute>())
+        bool supportsVkBindingOnParameter =
+            supportsVkBindingOnEntryPointParameters &&
+            isVkBindingCompatibleEntryPointParameterType(param->getType());
+        if (!supportsVkBindingOnParameter && param->findModifier<GLSLBindingAttribute>())
         {
             sink->diagnose(Diagnostics::UnhandledModOnEntryPointParameter{
                 .modifier = "attribute '[[vk::binding(...)]]'",

@@ -1384,6 +1384,19 @@ static bool isVkBindingEntryPointParameterResourceKind(LayoutResourceKind kind)
     }
 }
 
+static TypeLayout::ResourceInfo* findVkBindingEntryPointParameterResourceInfo(VarLayout* varLayout)
+{
+    if (auto descriptorTableSlot =
+            varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
+        return descriptorTableSlot;
+
+    if (auto subElementRegisterSpace =
+            varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace))
+        return subElementRegisterSpace;
+
+    return nullptr;
+}
+
 static bool hasSupportedVkBindingOnEntryPointParameter(
     ParameterBindingContext* context,
     VarLayout* varLayout)
@@ -1401,38 +1414,40 @@ static bool hasSupportedVkBindingOnEntryPointParameter(
     if (!varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
         return false;
 
-    for (auto typeResInfo : varLayout->typeLayout->resourceInfos)
-    {
-        if (isVkBindingEntryPointParameterResourceKind(typeResInfo.kind))
-            return true;
-    }
-    return false;
+    return findVkBindingEntryPointParameterResourceInfo(varLayout) != nullptr;
 }
 
 static bool addExplicitVkBindingForEntryPointParameter(
     ParameterBindingContext* context,
     RefPtr<VarLayout> varLayout)
 {
-    if (!hasSupportedVkBindingOnEntryPointParameter(context, varLayout))
+    if (!doesTargetSupportVkBindingOnEntryPointParameters(context->getTargetRequest()))
         return false;
 
     auto varDecl = varLayout->varDecl.as<VarDeclBase>();
+    if (!varDecl)
+        return false;
+
     auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>();
-    SLANG_RELEASE_ASSERT(attr);
+    if (!attr)
+        return false;
+
+    auto explicitResourceInfo = findVkBindingEntryPointParameterResourceInfo(varLayout);
+    if (!explicitResourceInfo)
+    {
+        return false;
+    }
 
     LayoutSemanticInfo semanticInfo;
     LayoutSize count = 0;
-    if (auto foundDescriptorTableSlot =
-            varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
+    if (explicitResourceInfo->kind == LayoutResourceKind::DescriptorTableSlot)
     {
         semanticInfo.kind = LayoutResourceKind::DescriptorTableSlot;
         semanticInfo.index = attr->binding;
         semanticInfo.space = attr->set;
-        count = foundDescriptorTableSlot->count;
+        count = explicitResourceInfo->count;
     }
-    else if (
-        auto foundSubElementRegisterSpace =
-            varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace))
+    else if (explicitResourceInfo->kind == LayoutResourceKind::SubElementRegisterSpace)
     {
         semanticInfo.kind = LayoutResourceKind::SubElementRegisterSpace;
         if (attr->binding != 0)
@@ -1444,10 +1459,11 @@ static bool addExplicitVkBindingForEntryPointParameter(
         }
         semanticInfo.index = attr->set;
         semanticInfo.space = 0;
-        count = foundSubElementRegisterSpace->count;
+        count = explicitResourceInfo->count;
     }
     else
     {
+        SLANG_UNEXPECTED("unexpected vk::binding entry-point parameter resource kind");
         return false;
     }
 
@@ -1788,13 +1804,16 @@ static void removeNonExplicitEntryPointParameterDescriptorOffsets(
     ParameterBindingContext* context,
     RefPtr<VarLayout> fieldLayout)
 {
-    if (hasSupportedVkBindingOnEntryPointParameter(context, fieldLayout))
-        return;
+    auto explicitResourceInfo = hasSupportedVkBindingOnEntryPointParameter(context, fieldLayout)
+                                    ? findVkBindingEntryPointParameterResourceInfo(fieldLayout)
+                                    : nullptr;
+    auto explicitKind =
+        explicitResourceInfo ? explicitResourceInfo->kind : LayoutResourceKind::None;
 
     for (auto typeResInfo : fieldLayout->typeLayout->resourceInfos)
     {
         auto kind = typeResInfo.kind;
-        if (isVkBindingEntryPointParameterResourceKind(kind))
+        if (isVkBindingEntryPointParameterResourceKind(kind) && kind != explicitKind)
             fieldLayout->removeResourceUsage(kind);
     }
 }
@@ -3946,6 +3965,45 @@ static void _completeBindings(ParameterBindingContext* context, ComponentType* p
     _completeBindings(context, program, &counters);
 }
 
+static bool doesEntryPointParameterResourceNeedDefaultSpace(LayoutResourceKind kind)
+{
+    switch (kind)
+    {
+    default:
+        return true;
+    case LayoutResourceKind::PushConstantBuffer:
+    case LayoutResourceKind::RegisterSpace:
+    case LayoutResourceKind::SubElementRegisterSpace:
+    case LayoutResourceKind::VaryingInput:
+    case LayoutResourceKind::VaryingOutput:
+    case LayoutResourceKind::HitAttributes:
+    case LayoutResourceKind::RayPayload:
+        return false;
+    }
+}
+
+static bool isEntryPointParameterResourceExplicitlyBoundByVkBinding(
+    SharedParameterBindingContext& sharedContext,
+    VarLayout* fieldLayout,
+    LayoutResourceKind kind)
+{
+    if (!doesTargetSupportVkBindingOnEntryPointParameters(sharedContext.getTargetRequest()))
+        return false;
+
+    if (!fieldLayout->varDecl)
+        return false;
+
+    auto varDecl = fieldLayout->varDecl.as<VarDeclBase>();
+    if (!varDecl)
+        return false;
+
+    if (!varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
+        return false;
+
+    auto explicitResourceInfo = findVkBindingEntryPointParameterResourceInfo(fieldLayout);
+    return explicitResourceInfo && explicitResourceInfo->kind == kind;
+}
+
 static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
 {
     // Next we will look at the global-scope parameters and see if
@@ -4013,24 +4071,22 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
     //
     for (auto& entryPoint : sharedContext.programLayout->entryPoints)
     {
-        auto paramsLayout = entryPoint->parametersLayout->getTypeLayout();
-        for (auto resInfo : paramsLayout->resourceInfos)
+        auto paramsStructLayout = getScopeStructLayout(entryPoint);
+        for (auto fieldLayout : paramsStructLayout->fields)
         {
-            switch (resInfo.kind)
+            for (auto resInfo : fieldLayout->typeLayout->resourceInfos)
             {
-            default:
-                break;
-            case LayoutResourceKind::PushConstantBuffer:
-            case LayoutResourceKind::RegisterSpace:
-            case LayoutResourceKind::SubElementRegisterSpace:
-            case LayoutResourceKind::VaryingInput:
-            case LayoutResourceKind::VaryingOutput:
-            case LayoutResourceKind::HitAttributes:
-            case LayoutResourceKind::RayPayload:
-                continue;
-            }
+                if (!doesEntryPointParameterResourceNeedDefaultSpace(resInfo.kind))
+                    continue;
 
-            return true;
+                if (isEntryPointParameterResourceExplicitlyBoundByVkBinding(
+                        sharedContext,
+                        fieldLayout,
+                        resInfo.kind))
+                    continue;
+
+                return true;
+            }
         }
     }
 
