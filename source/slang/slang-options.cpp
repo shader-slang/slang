@@ -926,6 +926,15 @@ void initCommandOptions(CommandOptions& options)
          "-spirv-sampler-heap-stride <stride>",
          "Specify the byte stride for the sampler descriptor heap when generating SPIRV with "
          "spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(OpTypeSampler)."},
+        {OptionKind::SPIRVUnifiedDescriptorHeapStride,
+         "-spirv-unified-descriptor-heap-stride",
+         nullptr,
+         "When generating SPIRV with spvDescriptorHeapEXT, emit each resource descriptor-heap "
+         "runtime array's ArrayStride as the maximum of every resource descriptor type's size, so "
+         "a single heap shared by buffers and images is indexed at the device's unified stride. "
+         "Only affects the OpConstantSizeOfEXT default path (when no explicit "
+         "-spirv-resource-heap-stride is given); an explicit stride still overrides it. Does not "
+         "affect the sampler heap or acceleration-structure entries."},
         {OptionKind::EmitSeparateDebug,
          "-separate-debug-info",
          nullptr,
@@ -2724,6 +2733,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::TraceFunctionCoverage:
         case OptionKind::TraceBranchCoverage:
         case OptionKind::TraceCoverageBoolean:
+        case OptionKind::SPIRVUnifiedDescriptorHeapStride:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:
