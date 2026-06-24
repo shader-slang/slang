@@ -12655,16 +12655,8 @@ void SemanticsVisitor::getGenericParams(
             outParams.add(valueParamDecl);
         else if (auto valuePackParamDecl = as<GenericValuePackParamDecl>(dd))
             outParams.add(valuePackParamDecl);
-        else if (auto constraintDecl = as<GenericTypeConstraintDecl>(dd))
-            outConstraints.add(constraintDecl);
-        else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(dd))
-            outConstraints.add(typeCoercionConstraintDecl);
-        else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(dd))
-            outConstraints.add(nonEmptyConstraintDecl);
-        else if (auto packCountConstraintDecl = as<GenericVariadicPackCountConstraintDecl>(dd))
-            outConstraints.add(packCountConstraintDecl);
-        else if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(dd))
-            outConstraints.add(hasDiffTypeInfoConstraintDecl);
+        else if (isConstraintDecl(dd))
+            outConstraints.add(dd);
     }
 }
 
