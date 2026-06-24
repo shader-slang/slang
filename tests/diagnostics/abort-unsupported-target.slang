@@ -1,5 +1,5 @@
 // Verify that calling the variadic abort() on a target that does not support the
-// `abort` capability (which expands to GL_EXT_shader_abort | SPV_KHR_shader_abort,
+// `abort` capability (which expands to GL_EXT_shader_abort,
 // i.e. GLSL and SPIR-V only) produces a clean capability diagnostic instead of an
 // unresolved overload or an internal error. The target exclusion is intentional:
 // VK_KHR_shader_abort has no HLSL/Metal/WGSL/CUDA/CPU counterpart wired up.
