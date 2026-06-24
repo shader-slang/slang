@@ -136,22 +136,6 @@ else()
     set(bootstrap_extra_deps "")
 endif()
 
-set(bootstrap_outdated_inputs "$<TARGET_FILE:slang-bootstrap>")
-if(bootstrap_extra_deps)
-    list(APPEND bootstrap_outdated_inputs "$<TARGET_FILE:slang>")
-endif()
-
-set(core_module_generate_command
-    "$<TARGET_FILE:slang-bootstrap>"
-    -compile-core-module
-    -archive-type
-    riff-lz4
-    -save-core-module
-    ${core_module_archive}
-    -save-core-module-bin-source
-    ${core_module_generated_header}
-)
-
 add_custom_command(
     OUTPUT
         ${core_module_archive}
@@ -159,18 +143,18 @@ add_custom_command(
     ${bootstrap_pre_copy_command}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${core_module_generated_header_dir}
     COMMAND
-        ${CMAKE_COMMAND}
-        "-DSLANG_RUN_IF_OUTDATED_DESCRIPTION=generating core module"
-        "-DSLANG_RUN_IF_OUTDATED_OUTPUTS=${core_module_archive};${core_module_generated_header}"
-        "-DSLANG_RUN_IF_OUTDATED_INPUTS=${bootstrap_outdated_inputs}"
-        "-DSLANG_RUN_IF_OUTDATED_COMMAND=${core_module_generate_command}"
-        -P
-        "${slang_SOURCE_DIR}/cmake/RunIfOutdated.cmake"
+        "$<TARGET_FILE:slang-bootstrap>"
+        -compile-core-module
+        -archive-type
+        riff-lz4
+        -save-core-module
+        ${core_module_archive}
+        -save-core-module-bin-source
+        ${core_module_generated_header}
     DEPENDS
         slang-bootstrap
         slang-without-embedded-core-module
         ${bootstrap_extra_deps}
-        "${slang_SOURCE_DIR}/cmake/RunIfOutdated.cmake"
     VERBATIM
 )
 
@@ -180,34 +164,26 @@ add_custom_target(
 )
 set_target_properties(generate_core_module PROPERTIES FOLDER generated)
 
-set(glsl_module_generate_command
-    "$<TARGET_FILE:slang-bootstrap>"
-    -load-core-module
-    ${core_module_archive}
-    -archive-type
-    riff-lz4
-    -save-glsl-module-bin-source
-    ${glsl_module_generated_header}
-)
-
+# Downstream generator targets depend on generate_core_module instead of the
+# archive file directly. With Visual Studio, a file-level dependency on the
+# byproduct copies the producer command into the dependent utility project, which
+# makes multi-target builds run the core generation command more than once.
 add_custom_command(
     OUTPUT
         ${glsl_module_generated_header}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${glsl_module_generated_header_dir}
     COMMAND
-        ${CMAKE_COMMAND}
-        "-DSLANG_RUN_IF_OUTDATED_DESCRIPTION=generating GLSL module"
-        "-DSLANG_RUN_IF_OUTDATED_OUTPUTS=${glsl_module_generated_header}"
-        "-DSLANG_RUN_IF_OUTDATED_INPUTS=${bootstrap_outdated_inputs};${core_module_archive}"
-        "-DSLANG_RUN_IF_OUTDATED_COMMAND=${glsl_module_generate_command}"
-        -P
-        "${slang_SOURCE_DIR}/cmake/RunIfOutdated.cmake"
+        "$<TARGET_FILE:slang-bootstrap>"
+        -load-core-module
+        ${core_module_archive}
+        -archive-type
+        riff-lz4
+        -save-glsl-module-bin-source
+        ${glsl_module_generated_header}
     DEPENDS
         slang-bootstrap
         slang-without-embedded-core-module
-        ${core_module_archive}
         ${bootstrap_extra_deps}
-        "${slang_SOURCE_DIR}/cmake/RunIfOutdated.cmake"
     VERBATIM
 )
 
@@ -215,6 +191,7 @@ add_custom_target(
     generate_glsl_module_header
     DEPENDS ${glsl_module_generated_header}
 )
+add_dependencies(generate_glsl_module_header generate_core_module)
 set_target_properties(generate_glsl_module_header PROPERTIES FOLDER generated)
 
 # Add a target so that existing dependents can request both generated headers.

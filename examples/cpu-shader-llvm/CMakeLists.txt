@@ -12,12 +12,11 @@ if(SLANG_ENABLE_SLANGC)
             ${CMAKE_CURRENT_BINARY_DIR}/shader.o
         COMMAND_EXPAND_LISTS
         MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/shader.slang
-        DEPENDS ${core_module_archive}
         VERBATIM
     )
     add_custom_target(cpu-shader-llvm-link-shader DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/shader.o)
     # This dependency is added so that the custom command above is able to use
-    # slangc and slang-llvm.
+    # slangc, slang-llvm, and the generated core module archive.
     add_dependencies(cpu-shader-llvm-link-shader slangc slang-llvm generate_core_module)
 
     # Mark shader.o as a generated file before `slang_add_target` consumes it
