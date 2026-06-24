@@ -4427,6 +4427,16 @@ attribute_syntax [instance(count: int)]         : InstanceAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
 
+// SPIR-V 64-bit indexing
+/// Used on a function to require the `SPV_EXT_shader_64bit_indexing` SPIR-V extension.
+/// @remarks When this attribute is applied to a SPIR-V entry point, or to any function in the
+/// entry point's call graph, the emitted SPIR-V entry point requires the `Shader64BitIndexingEXT`
+/// capability, declares `OpExtension "SPV_EXT_shader_64bit_indexing"`, and enables the
+/// `Shader64BitIndexingEXT` execution mode. This permits 64-bit (`int64`/`uint64`) indices into
+/// arrays, buffers, and resources. The requirement propagates up the call graph like `[require()]`.
+__attributeTarget(FuncDecl)
+attribute_syntax [Shader64BitIndexing]  : Shader64BitIndexingAttribute;
+
 // Compute Shader
 
 /// Specifies the size of the thread group a compute shader.

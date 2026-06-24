@@ -6329,6 +6329,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             requireSPIRVCapability(SpvCapabilityQuadControlKHR);
             requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeRequireFullQuadsKHR);
             break;
+        case kIROp_Shader64BitIndexingDecoration:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_shader_64bit_indexing"));
+            requireSPIRVCapability(SpvCapabilityShader64BitIndexingEXT);
+            requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeShader64BitIndexingEXT);
+            break;
         case kIROp_SPIRVBufferBlockDecoration:
             {
                 emitOpDecorate(
