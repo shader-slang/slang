@@ -4793,7 +4793,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     /// decorations (member `Offset`s and `ArrayStride`) the payload requires.
     SpvInst* emitAbort(SpvInstParent* parent, IRInst* inst)
     {
-        ensureExtensionDeclaration(toSlice("SPV_KHR_shader_abort"));
+        ensureExtensionDeclaration(toSlice("SPV_KHR_abort"));
         requireSPIRVCapability(SpvCapabilityAbortKHR);
 
         auto message = inst->getOperand(0);
