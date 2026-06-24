@@ -511,12 +511,12 @@ bool SharedSemanticsContext::tryResolveConstraintTypes(
     return !mustDefer;
 }
 
-static DeclRef<GenericTypeConstraintDecl> _trySpecializeGenericInterfaceConstraint(
+static DeclRef<GenericTypeConstraintDecl> _tryGetDefaultDifferentiabilityConstraintDeclRef(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
-    GenericDecl* genericWrapperDecl,
-    SubtypeWitness* anchorIsInterfaceWitness,
-    Type* selfType)
+    GenericDecl* genericDifferentiabilityRequirementDecl,
+    SubtypeWitness* conformingWitness,
+    DeclRef<GenericDecl>& outLookedUpGenericRequirementDeclRef)
 {
     // `[Differentiable]` on a generic interface requirement is encoded as a sibling
     // generic requirement:
@@ -524,38 +524,53 @@ static DeclRef<GenericTypeConstraintDecl> _trySpecializeGenericInterfaceConstrai
     //     interface IFoo { __generic<T> f(); }
     //     interface IFoo { __generic<T> __constraint This.f<T> : IDiff<This.f<T>>; }
     //
-    // When computing inheritance for a lookup-derived requirement type such as
-    // `SomeThis.f<int>`, the direct constraint scan cannot see the inner
-    // `GenericTypeConstraintDecl`. The synthetic differentiability constraint records the
-    // callable it constrains in `callableRequirementDeclRef`, so match that key against
-    // `selfType` and let the generic solver specialize the copied wrapper. This keeps the
-    // inference source to the produced requirement key and lets the solver preserve ordinary
-    // arguments and hidden proof arguments instead of reconstructing a generic-app chain by hand.
-    auto constraintDecl = as<DifferentiableRequirementConstraintDecl>(genericWrapperDecl->inner);
+    // When computing inheritance for a requirement type such as `SomeThis.f<int>`, the direct
+    // constraint scan cannot see the inner
+    // `GenericTypeConstraintDecl`. This helper re-expresses that generic requirement through the
+    // conformance witness of the source type whose interface facets are being scanned, then
+    // applies default substitutions so the caller can specialize the copied generic requirement
+    // from the satisfying method type.
+    auto constraintDecl =
+        as<DifferentiableRequirementConstraintDecl>(genericDifferentiabilityRequirementDecl->inner);
     if (!constraintDecl || constraintDecl->checkState.isBeingChecked())
         return DeclRef<GenericTypeConstraintDecl>();
 
     DeclRef<GenericDecl> lookedUpGenericDeclRef =
-        astBuilder->getLookupDeclRef(anchorIsInterfaceWitness, genericWrapperDecl)
+        astBuilder->getLookupDeclRef(conformingWitness, genericDifferentiabilityRequirementDecl)
             .as<GenericDecl>();
     if (!lookedUpGenericDeclRef)
         return DeclRef<GenericTypeConstraintDecl>();
+    outLookedUpGenericRequirementDeclRef = lookedUpGenericDeclRef;
 
-    auto defaultConstraintDeclRef =
-        createDefaultSubstitutionsIfNeeded(
-            astBuilder,
-            visitor,
-            astBuilder->getMemberDeclRef(lookedUpGenericDeclRef, constraintDecl))
-            .as<GenericTypeConstraintDecl>();
+    return createDefaultSubstitutionsIfNeeded(
+               astBuilder,
+               visitor,
+               astBuilder->getMemberDeclRef(lookedUpGenericDeclRef, constraintDecl))
+        .as<GenericTypeConstraintDecl>();
+}
+
+static DeclRef<GenericTypeConstraintDecl>
+_getSpecializedDifferentiabilityConstraintDeclRefFromSatisfyingMethod(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    DeclRef<GenericDecl> lookedUpGenericRequirementDeclRef,
+    DeclRef<GenericTypeConstraintDecl> defaultConstraintDeclRef,
+    Type* satisfyingMethodType)
+{
     if (!defaultConstraintDeclRef)
+        return DeclRef<GenericTypeConstraintDecl>();
+
+    auto constraintDecl =
+        as<DifferentiableRequirementConstraintDecl>(defaultConstraintDeclRef.getDecl());
+    if (!constraintDecl)
         return DeclRef<GenericTypeConstraintDecl>();
 
     ensureDecl(visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
 
     // Build a looked-up default instance of the callable requirement key, then unify it with the
-    // lookup-derived type whose inheritance is being computed. Unification records constraints for
-    // the copied wrapper parameters; `trySolveGenericArguments` below applies those constraints and
-    // returns the specialized `GenericTypeConstraintDecl` decl-ref.
+    // satisfying method type whose inheritance is being computed. Unification records constraints
+    // for the copied wrapper parameters; `trySolveGenericArguments` below applies those constraints
+    // and returns the specialized `GenericTypeConstraintDecl` decl-ref.
     auto defaultCallableDeclRef = substituteDeclRef(
                                       SubstitutionSet(defaultConstraintDeclRef),
                                       astBuilder,
@@ -566,14 +581,14 @@ static DeclRef<GenericTypeConstraintDecl> _trySpecializeGenericInterfaceConstrai
 
     auto defaultCallableType = DeclRefType::create(astBuilder, defaultCallableDeclRef);
     SemanticsVisitor::GenericInferenceContext inferenceContext;
-    inferenceContext.genericDecl = lookedUpGenericDeclRef.getDecl();
+    inferenceContext.genericDecl = lookedUpGenericRequirementDeclRef.getDecl();
     SemanticsVisitor::UnificationOptions unificationOptions;
     unificationOptions.equalityConstraint = true;
     if (!visitor->TryUnifyTypes(
             inferenceContext,
             unificationOptions,
             QualType(defaultCallableType),
-            QualType(selfType)))
+            QualType(satisfyingMethodType)))
     {
         return DeclRef<GenericTypeConstraintDecl>();
     }
@@ -582,7 +597,7 @@ static DeclRef<GenericTypeConstraintDecl> _trySpecializeGenericInterfaceConstrai
     return visitor
         ->trySolveGenericArguments(
             _Move(inferenceContext),
-            lookedUpGenericDeclRef,
+            lookedUpGenericRequirementDeclRef,
             ArrayView<Val*>(),
             conversionCost)
         .as<GenericTypeConstraintDecl>();
@@ -958,9 +973,9 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     // A constraint like `__constraint This.DataType == This` is a direct
     // `GenericTypeConstraintDecl` member of an interface that some type in the
     // access chain conforms to. Its subject is written relative to the
-    // interface's `This`, so it constrains a lookup access anchored at any type
+    // interface's `This`, so it constrains a lookup access rooted at any type
     // that conforms to the interface. We therefore walk the lookup chain of
-    // `selfType` and, at each anchor type, enumerate the interfaces it conforms
+    // `selfType` and, at each conforming type, enumerate the interfaces it conforms
     // to and match constraints whose subject (relative to `This`) names exactly
     // the same lookup-derived type as `selfType`. The opposite (`sub`/`sup`) side
     // of a matching constraint is added as a base of `selfType`.
@@ -971,9 +986,9 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     //     interface IDeriv : IBase { __constraint D == This; }
     //     // for some `T : IDeriv`, consider the access `T.D`
     //
-    // Computing the inheritance of `T.D`: the anchor `T` conforms to `IDeriv`,
+    // Computing the inheritance of `T.D`: the conforming type `T` conforms to `IDeriv`,
     // whose member constraint `D == This` has subject `This.D` -- matching the
-    // chain `[D]` leading from anchor `T` down to `T.D`. The other endpoint,
+    // chain `[D]` leading from conforming type `T` down to `T.D`. The other endpoint,
     // `This`, re-expressed through the witness `T : IDeriv`, is `T`. So `T` is
     // added as a base of `T.D`, which is what lets a `T.D` value be used where a
     // `T` is expected. A subtype constraint such as `__constraint D : IFoo`
@@ -991,8 +1006,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     // `registerAssociatedMethods` can record the derivative association before
     // IR differentiability checking.
     //
-    // The constraints are discovered purely from the interfaces each anchor type
-    // conforms to (via `getInheritanceInfo(anchorType).facets`); the relocation
+    // The constraints are discovered purely from the interfaces each conforming type
+    // conforms to (via `getInheritanceInfo(conformingType).facets`); the relocation
     // pass guarantees an `associatedtype`'s trailing bound and `where` clauses
     // also appear as such interface-member `GenericTypeConstraintDecl`s.
     //
@@ -1037,25 +1052,25 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         // equality is useful for member lookup, and it terminates.
         Index selfChainDepth = lookupChainDepth(selfType);
 
-        // Collect the ancestor anchor types along `selfType`'s lookup chain. For
-        // `selfType == T.TA.TB` the anchors are `T.TA` and `T`. Each anchor is a
-        // *conforming type* (not an interface); we scan the interfaces it conforms
-        // to for constraints below, then re-express each constraint through the
-        // anchor's conformance witness and match its endpoints against `selfType`.
-        List<Type*> anchors;
-        enumerateLookupSources(selfType, [&](Type* source) { anchors.add(source); });
+        // Collect the conforming types along `selfType`'s lookup chain. For
+        // `selfType == T.TA.TB` the conforming types are `T.TA` and `T`. Each is
+        // a concrete source type (not an interface); we scan the interfaces it
+        // conforms to for constraints below, then re-express each constraint through
+        // the conforming witness and match its endpoints against `selfType`.
+        List<Type*> conformingTypes;
+        enumerateLookupSources(selfType, [&](Type* source) { conformingTypes.add(source); });
 
-        for (auto anchorType : anchors)
+        for (auto conformingType : conformingTypes)
         {
-            auto anchorInheritanceInfo =
-                getInheritanceInfo(anchorType, circularityInfo, ioSkippedIncompleteFacet);
-            for (auto facet : anchorInheritanceInfo.facets)
+            auto conformingTypeInheritanceInfo =
+                getInheritanceInfo(conformingType, circularityInfo, ioSkippedIncompleteFacet);
+            for (auto facet : conformingTypeInheritanceInfo.facets)
             {
                 auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>();
                 if (!interfaceDeclRef)
                     continue;
-                auto anchorIsInterfaceWitness = facet->subtypeWitness;
-                if (!anchorIsInterfaceWitness)
+                auto conformingWitness = facet->subtypeWitness;
+                if (!conformingWitness)
                     continue;
 
                 auto tryAddConstraintBase =
@@ -1093,12 +1108,12 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     if (!SubstitutionSet(lookedUpConstraint).findLookupDeclRef())
                     {
                         // Re-express the constraint as a lookup through the witness
-                        // that the anchor type conforms to this interface; this
-                        // substitutes the interface's `This` with the anchor type, so
+                        // that the conforming type conforms to this interface; this
+                        // substitutes the interface's `This` with the conforming type, so
                         // both endpoints are expressed as concrete accesses rooted at
-                        // the anchor (e.g. `This.D == This` becomes `T.D == T`).
+                        // that type (e.g. `This.D == This` becomes `T.D == T`).
                         lookedUpConstraint =
-                            astBuilder->getLookupDeclRef(anchorIsInterfaceWitness, constraintDecl)
+                            astBuilder->getLookupDeclRef(conformingWitness, constraintDecl)
                                 .as<GenericTypeConstraintDecl>();
                         if (!lookedUpConstraint)
                             return;
@@ -1198,12 +1213,21 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     if (!genericDecl)
                         continue;
 
-                    auto constraintDeclRef = _trySpecializeGenericInterfaceConstraint(
-                        astBuilder,
-                        &visitor,
-                        genericDecl,
-                        anchorIsInterfaceWitness,
-                        selfType);
+                    DeclRef<GenericDecl> lookedUpGenericRequirementDeclRef;
+                    auto defaultConstraintDeclRef =
+                        _tryGetDefaultDifferentiabilityConstraintDeclRef(
+                            astBuilder,
+                            &visitor,
+                            genericDecl,
+                            conformingWitness,
+                            lookedUpGenericRequirementDeclRef);
+                    auto constraintDeclRef =
+                        _getSpecializedDifferentiabilityConstraintDeclRefFromSatisfyingMethod(
+                            astBuilder,
+                            &visitor,
+                            lookedUpGenericRequirementDeclRef,
+                            defaultConstraintDeclRef,
+                            selfType);
                     if (!constraintDeclRef)
                         continue;
 
