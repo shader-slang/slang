@@ -5,7 +5,7 @@
 // pre-existing secondary error in SPIR-V emit (the same happens with printf), which
 // is not what this test is about.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -capability abort -skip-spirv-validation
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -capability abort
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target glsl -capability abort
 
 void doAbort(NativeString s)
