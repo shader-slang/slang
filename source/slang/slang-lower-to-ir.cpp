@@ -4828,9 +4828,7 @@ void lowerAssociatedVal(IRGenContext* context, IRInst* irKey, SlangInt id, Val* 
     }
 
     if (irAssocVal)
-    {
         context->irBuilder->addAnnotation(irKey, (AnnotationKind)id, irAssocVal);
-    }
 };
 
 void lowerAssociatedVals(IRGenContext* context, Val* val, IRInst* irVal)

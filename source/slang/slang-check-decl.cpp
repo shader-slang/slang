@@ -5295,129 +5295,6 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     // declarations they contain should be fully checked.
 }
 
-static bool _doesCallableRequirementSignatureTypeMatch(
-    ASTBuilder* astBuilder,
-    SemanticsVisitor* semantics,
-    Type* requiredType,
-    Type* satisfyingType)
-{
-    if (requiredType == satisfyingType)
-        return true;
-    if (!requiredType || !satisfyingType)
-        return false;
-    if (requiredType->equals(satisfyingType))
-        return true;
-
-    // The caller substitutes requirement and satisfying decl refs before signature matching reaches
-    // this point. Once those substitutions are in place, the general type-resolution path is the
-    // source of truth for endpoint aliases and associated-type projections: e.g. `ISimple.U.V`
-    // substitutes to `Val.V`, and `DeclRefType::resolve` looks up the `Val : IBase` witness entry
-    // that maps `V` to `int`. Keep the comparison here as a plain canonical-type comparison instead
-    // of reimplementing associated-type lookup only for callable signatures.
-    requiredType = requiredType->getCanonicalType();
-    satisfyingType = satisfyingType->getCanonicalType();
-    if (requiredType == satisfyingType)
-        return true;
-    if (!requiredType || !satisfyingType)
-        return false;
-    if (requiredType->equals(satisfyingType))
-        return true;
-
-    if (auto requiredFuncType = as<FuncType>(requiredType))
-    {
-        auto satisfyingFuncType = as<FuncType>(satisfyingType);
-        if (!satisfyingFuncType)
-            return false;
-
-        if (requiredFuncType->getParamCount() != satisfyingFuncType->getParamCount())
-            return false;
-
-        for (Index i = 0; i < requiredFuncType->getParamCount(); i++)
-        {
-            if (!_doesCallableRequirementSignatureTypeMatch(
-                    astBuilder,
-                    semantics,
-                    requiredFuncType->getParamTypeWithModeWrapper(i),
-                    satisfyingFuncType->getParamTypeWithModeWrapper(i)))
-            {
-                return false;
-            }
-        }
-
-        return _doesCallableRequirementSignatureTypeMatch(
-                   astBuilder,
-                   semantics,
-                   requiredFuncType->getResultType(),
-                   satisfyingFuncType->getResultType()) &&
-               _doesCallableRequirementSignatureTypeMatch(
-                   astBuilder,
-                   semantics,
-                   requiredFuncType->getErrorType(),
-                   satisfyingFuncType->getErrorType());
-    }
-
-    return false;
-}
-
-static Type* _maybeRebuildRequirementDiffFuncTypeWithCurrentWitness(
-    SemanticsVisitor* visitor,
-    Type* type)
-{
-    if (!type)
-        return nullptr;
-
-    auto rebuild = [&](const char* magicCalcName, Index witnessArgIndex) -> Type*
-    {
-        auto declRefType = static_cast<DeclRefType*>(type);
-
-        auto args = findInnerMostGenericArgs(SubstitutionSet(declRefType->getDeclRef()));
-        if (args.getCount() <= witnessArgIndex)
-            return nullptr;
-
-        auto baseFuncType = as<Type>(args[0]);
-        if (!baseFuncType)
-            return nullptr;
-
-        // Interface differentiability requirements are substituted from requirement-side AST:
-        // `IForwardDifferentiable<FType>` carries a hidden `__hasDiffTypeInfo(FType)` proof as a
-        // generic argument. During concrete conformance checking the callable decl-ref is already
-        // substituted to the satisfying member, and this is the source of truth used by ordinary
-        // `[Differentiable]` synthesis. Recompute the proof from that callable type before
-        // resolving `FwdDiffFuncType`/friends, so the proof's parameter list matches the function
-        // signature being compared in `doesSignatureMatchRequirement`.
-        auto witness = visitor->getDiffTypeInfoWitness(baseFuncType);
-        if (!witness)
-            return nullptr;
-
-        List<Val*> newArgs;
-        for (Index i = 0; i < args.getCount(); ++i)
-            newArgs.add(args[i]);
-        newArgs[witnessArgIndex] = witness;
-
-        return as<Type>(getCurrentASTBuilder()->getSpecializedBuiltinType(
-            newArgs.getArrayView(),
-            magicCalcName));
-    };
-
-    switch (type->astNodeType)
-    {
-    case ASTNodeType::FwdDiffFuncType:
-        return rebuild("FwdDiffFuncType", 1);
-    case ASTNodeType::BwdDiffFuncType:
-        return rebuild("BwdDiffFuncType", 1);
-    case ASTNodeType::BwdCallableFuncType:
-        return rebuild("BwdCallableFuncType", 2);
-    case ASTNodeType::ApplyForBwdFuncType:
-        return rebuild("ApplyForBwdFuncType", 2);
-    case ASTNodeType::RematFuncType:
-        return rebuild("RematFuncType", 3);
-    default:
-        break;
-    }
-
-    return nullptr;
-}
-
 bool SemanticsVisitor::doesSignatureMatchRequirement(
     DeclRef<CallableDecl> satisfyingMemberDeclRef,
     DeclRef<CallableDecl> requiredMemberDeclRef,
@@ -5476,11 +5353,6 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         //
         auto substitutedFuncType =
             as<Type>(funcType->substitute(m_astBuilder, SubstitutionSet(requiredMemberDeclRef)));
-        if (auto rebuiltFuncType =
-                _maybeRebuildRequirementDiffFuncTypeWithCurrentWitness(this, substitutedFuncType))
-        {
-            substitutedFuncType = rebuiltFuncType;
-        }
         auto resolvedFuncType = as<Type>(substitutedFuncType->resolve());
 
         auto targetFuncType = getTypeForDeclRef(
@@ -5488,11 +5360,7 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             satisfyingMemberDeclRef,
             satisfyingMemberDeclRef.getLoc());
 
-        if (!_doesCallableRequirementSignatureTypeMatch(
-                m_astBuilder,
-                this,
-                resolvedFuncType,
-                targetFuncType.type))
+        if (!resolvedFuncType->equals(targetFuncType.type))
             return false;
     }
     else
@@ -5518,32 +5386,18 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             auto requiredParamType = getType(m_astBuilder, requiredParam);
             auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
 
-            if (!_doesCallableRequirementSignatureTypeMatch(
-                    m_astBuilder,
-                    this,
-                    requiredParamType,
-                    satisfyingParamType))
-            {
+            if (!requiredParamType->equals(satisfyingParamType))
                 return false;
-            }
         }
 
         auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
         auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
-        if (!_doesCallableRequirementSignatureTypeMatch(
-                m_astBuilder,
-                this,
-                requiredResultType,
-                satisfyingResultType))
+        if (!requiredResultType->equals(satisfyingResultType))
             return false;
 
         auto requiredErrorType = getErrorCodeType(m_astBuilder, requiredMemberDeclRef);
         auto satisfyingErrorType = getErrorCodeType(m_astBuilder, satisfyingMemberDeclRef);
-        if (!_doesCallableRequirementSignatureTypeMatch(
-                m_astBuilder,
-                this,
-                requiredErrorType,
-                satisfyingErrorType))
+        if (!requiredErrorType->equals(satisfyingErrorType))
             return false;
     }
 
@@ -5592,9 +5446,7 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
                     (requiredMemberDeclRef.getDecl()->findModifier<NoDiffThisAttribute>() !=
                      nullptr);
                 if (noDiffThisRequirement != noDiffThisSatisfying)
-                {
                     return false;
-                }
             }
         }
     }
@@ -5715,11 +5567,7 @@ bool SemanticsVisitor::doesPropertyMatchRequirement(
     //
     auto satisfyingType = getType(getASTBuilder(), satisfyingMemberDeclRef);
     auto requiredType = getType(getASTBuilder(), requiredMemberDeclRef);
-    if (!_doesCallableRequirementSignatureTypeMatch(
-            m_astBuilder,
-            this,
-            requiredType,
-            satisfyingType))
+    if (!requiredType->equals(satisfyingType))
         return false;
 
     // Each accessor in the requirement must be accounted for by an accessor
@@ -5822,21 +5670,13 @@ bool SemanticsVisitor::doesSubscriptMatchRequirement(
         auto requiredParamType = getType(m_astBuilder, requiredParam);
         auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
 
-        if (!_doesCallableRequirementSignatureTypeMatch(
-                m_astBuilder,
-                this,
-                requiredParamType,
-                satisfyingParamType))
+        if (!requiredParamType->equals(satisfyingParamType))
             return false;
     }
 
     auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
     auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
-    if (!_doesCallableRequirementSignatureTypeMatch(
-            m_astBuilder,
-            this,
-            requiredResultType,
-            satisfyingResultType))
+    if (!requiredResultType->equals(satisfyingResultType))
         return false;
 
     // Each accessor in the requirement must be accounted for by an accessor
@@ -6024,13 +5864,9 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
 
     // The number of type/value params and constraints must each match.
     if (requiredParams.getCount() != satisfyingParams.getCount())
-    {
         return false;
-    }
     if (requiredConstraints.getCount() != satisfyingConstraints.getCount())
-    {
         return false;
-    }
 
     //
     // We start by performing a superficial "structural" match of the type/value parameters
@@ -6063,14 +5899,10 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             {
                 if ((requiredMemberDeclRef.as<GenericTypePackParamDecl>() != nullptr) !=
                     (satisfyingMemberDeclRef.as<GenericTypePackParamDecl>() != nullptr))
-                {
                     return false;
-                }
             }
             else
-            {
                 return false;
-            }
         }
         else if (auto requiredValueParamDeclRef = requiredMemberDeclRef.as<GenericValueParamDecl>())
         {
@@ -6079,9 +5911,7 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             {
             }
             else
-            {
                 return false;
-            }
         }
         else if (
             auto requiredValuePackParamDeclRef =
@@ -6092,14 +5922,10 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             {
             }
             else
-            {
                 return false;
-            }
         }
         else
-        {
             return false;
-        }
     }
 
     for (Index i = 0; i < requiredConstraints.getCount(); i++)
@@ -6109,66 +5935,40 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
 
         if (as<GenericTypeConstraintDecl>(requiredMemberDeclRef))
         {
-            if (as<GenericTypeConstraintDecl>(satisfyingMemberDeclRef))
-            {
-            }
-            else
-            {
+            if (!as<GenericTypeConstraintDecl>(satisfyingMemberDeclRef))
                 return false;
-            }
         }
         else if (
             auto requiredTypeCoercionConstraintDeclRef =
                 requiredMemberDeclRef.as<TypeCoercionConstraintDecl>())
         {
-            if (auto satisfyingConstraintDeclRef =
-                    satisfyingMemberDeclRef.as<TypeCoercionConstraintDecl>())
-            {
-            }
-            else
-            {
+            if (!satisfyingMemberDeclRef.as<TypeCoercionConstraintDecl>())
                 return false;
-            }
         }
         else if (
             auto requiredNonEmptyConstraintDeclRef =
                 requiredMemberDeclRef.as<NonEmptyPackConstraintDecl>())
         {
-            if (auto satisfyingConstraintDeclRef =
-                    satisfyingMemberDeclRef.as<NonEmptyPackConstraintDecl>())
-            {
-            }
-            else
-            {
+            if (!satisfyingMemberDeclRef.as<NonEmptyPackConstraintDecl>())
                 return false;
-            }
         }
         else if (requiredMemberDeclRef.as<GenericVariadicPackCountConstraintDecl>())
         {
             if (!satisfyingMemberDeclRef.as<GenericVariadicPackCountConstraintDecl>())
-            {
                 return false;
-            }
         }
         else if (
             auto requiredHasDiffTypeInfoConstraintDeclRef =
                 requiredMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>())
         {
-            if (auto satisfyingConstraintDeclRef =
-                    satisfyingMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>())
-            {
-                // The actual constrained type comparison depends on the specialized
-                // substitution environment and is validated below.
-            }
-            else
-            {
+            if (!satisfyingMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>())
                 return false;
-            }
+
+            // The actual constrained type comparison depends on the specialized
+            // substitution environment and is validated below.
         }
         else
-        {
             return false;
-        }
     }
 
     // In order to compare the inner declarations of the two generics, we need to
@@ -6352,9 +6152,7 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             auto requiredParamType = getType(m_astBuilder, requiredValueParamDeclRef);
             auto satisfyingParamType = getType(m_astBuilder, satisfyingValueParamDeclRef);
             if (!satisfyingParamType->equals(requiredParamType))
-            {
                 return false;
-            }
         }
         else if (
             auto requiredValuePackParamDeclRef =
@@ -6367,9 +6165,7 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             auto requiredParamType = getType(m_astBuilder, requiredValuePackParamDeclRef);
             auto satisfyingParamType = getType(m_astBuilder, satisfyingValuePackParamDeclRef);
             if (!satisfyingParamType->equals(requiredParamType))
-            {
                 return false;
-            }
         }
     }
 
@@ -6401,16 +6197,12 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             auto requiredSubType = getSub(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingSubType = getSub(m_astBuilder, satisfyingConstraintDeclRef);
             if (!satisfyingSubType->equals(requiredSubType))
-            {
                 return false;
-            }
 
             auto requiredSuperType = getSup(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingSuperType = getSup(m_astBuilder, satisfyingConstraintDeclRef);
             if (!satisfyingSuperType->equals(requiredSuperType))
-            {
                 return false;
-            }
         }
         else if (
             auto requiredTypeCoercionConstraintDeclRef =
@@ -6430,23 +6222,17 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             auto requiredFromType = getFromType(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingFromType = getFromType(m_astBuilder, satisfyingConstraintDeclRef);
             if (!satisfyingFromType->equals(requiredFromType))
-            {
                 return false;
-            }
 
             auto requiredToType = getToType(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingToType = getToType(m_astBuilder, satisfyingConstraintDeclRef);
             if (!satisfyingToType->equals(requiredToType))
-            {
                 return false;
-            }
 
             if (requiredTypeCoercionConstraintDeclRef.getDecl()
                     ->hasModifier<ImplicitConversionModifier>() !=
                 satisfyingConstraintDeclRef.getDecl()->hasModifier<ImplicitConversionModifier>())
-            {
                 return false;
-            }
         }
         else if (
             auto requiredNonEmptyConstraintDeclRef =
@@ -6464,15 +6250,11 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                         requiredNonEmptyConstraintDeclRef.getDecl())
                     .as<NonEmptyPackConstraintDecl>();
             if (!specializedRequiredConstraintDeclRef)
-            {
                 return false;
-            }
 
             if (getNonEmptyConstraintTargetDecl(specializedRequiredConstraintDeclRef.getDecl()) !=
                 getNonEmptyConstraintTargetDecl(satisfyingConstraintDeclRef.getDecl()))
-            {
                 return false;
-            }
         }
         else if (
             auto requiredPackCountConstraintDeclRef =
@@ -6490,9 +6272,7 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                         requiredPackCountConstraintDeclRef.getDecl())
                     .as<GenericVariadicPackCountConstraintDecl>();
             if (!specializedRequiredConstraintDeclRef)
-            {
                 return false;
-            }
 
             // A declared pack-count witness proves only the exact substituted
             // requirement. `countof(I) == N` must not satisfy a callee that
@@ -6501,9 +6281,7 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                     m_astBuilder,
                     specializedRequiredConstraintDeclRef) !=
                 getPackCountConstraintTargetDeclRef(m_astBuilder, satisfyingConstraintDeclRef))
-            {
                 return false;
-            }
 
             auto requiredCount = getPackCountConstraintExpectedCount(
                 m_astBuilder,
@@ -6511,9 +6289,7 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             auto satisfyingCount =
                 getPackCountConstraintExpectedCount(m_astBuilder, satisfyingConstraintDeclRef);
             if (!arePackCountExpectedCountsEqual(m_astBuilder, satisfyingCount, requiredCount))
-            {
                 return false;
-            }
         }
         else if (
             auto requiredHasDiffTypeInfoConstraintDeclRef =
@@ -6531,19 +6307,14 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                         requiredHasDiffTypeInfoConstraintDeclRef.getDecl())
                     .as<HasDiffTypeInfoConstraintDecl>();
             if (!specializedRequiredConstraintDeclRef)
-            {
                 return false;
-            }
 
             auto requiredType = getBaseType(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingType = getBaseType(m_astBuilder, satisfyingConstraintDeclRef);
             if (!requiredType || !satisfyingType || !satisfyingType->equals(requiredType))
-            {
                 return false;
-            }
         }
     }
-
 
     // Note: the above logic really only applies to the case of an exact match on signature,
     // even down to the way that constraints were declared. We could potentially be more
@@ -7066,72 +6837,6 @@ static void populateParams(
     }
 }
 
-static Expr* tryCreatePackCountExpectedCountExprFromVal(ASTBuilder* astBuilder, IntVal* intVal)
-{
-    if (!intVal)
-        return nullptr;
-
-    // Generic pack-count constraints store both the original expression and
-    // the checked `IntVal`. When a synthesized generic wrapper clones
-    // `where countof(I) == D` from an interface requirement through
-    // `ITensor<T, N>`, the substituted source of truth is the `IntVal`
-    // (`N`), not the old interface expression (`D`). Rebuild the expression
-    // forms that `visitGenericVariadicPackCountConstraintDecl` accepts so
-    // header checking recomputes the same proof that the clone is meant to
-    // carry.
-    while (auto castIntVal = as<TypeCastIntVal>(intVal))
-    {
-        intVal = as<IntVal>(castIntVal->getBase());
-        if (!intVal)
-            return nullptr;
-    }
-
-    if (auto declRefIntVal = as<DeclRefIntVal>(intVal))
-    {
-        auto expr = astBuilder->create<VarExpr>();
-        expr->declRef = declRefIntVal->getDeclRef();
-        expr->type.type = getTypeForDeclRef(astBuilder, expr->declRef, SourceLoc());
-        return expr;
-    }
-
-    if (auto countOfIntVal = as<CountOfIntVal>(intVal))
-    {
-        Expr* packExpr = nullptr;
-        if (auto declRefType = as<DeclRefType>(countOfIntVal->getValArg()))
-        {
-            auto expr = astBuilder->create<VarExpr>();
-            expr->declRef = declRefType->getDeclRef();
-            expr->type.type = getTypeForDeclRef(astBuilder, expr->declRef, SourceLoc());
-            packExpr = expr;
-        }
-        else if (auto declRefIntVal = as<DeclRefIntVal>(countOfIntVal->getValArg()))
-        {
-            auto expr = astBuilder->create<VarExpr>();
-            expr->declRef = declRefIntVal->getDeclRef();
-            expr->type.type = getTypeForDeclRef(astBuilder, expr->declRef, SourceLoc());
-            packExpr = expr;
-        }
-
-        if (packExpr)
-        {
-            auto expr = astBuilder->create<CountOfExpr>();
-            expr->value = packExpr;
-            expr->type.type = countOfIntVal->getType();
-            return expr;
-        }
-    }
-
-    if (auto constantIntVal = as<ConstantIntVal>(intVal))
-    {
-        auto expr = astBuilder->create<IntegerLiteralExpr>();
-        expr->type.type = constantIntVal->getType();
-        expr->value = constantIntVal->getValue();
-        return expr;
-    }
-
-    return nullptr;
-}
-
 GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
     ConformanceCheckingContext* context,
     DeclRef<GenericDecl> requiredMemberDeclRef,
@@ -7409,12 +7114,6 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
                 as<IntVal>(packCountConstraintDecl->expectedCountVal->substitute(
                     m_astBuilder,
                     SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
-            if (auto substitutedExpectedCountExpr = tryCreatePackCountExpectedCountExprFromVal(
-                    m_astBuilder,
-                    synConstraintDecl->expectedCountVal))
-            {
-                synConstraintDecl->expectedCountExpr = substitutedExpectedCountExpr;
-            }
 
             synGenericDecl->addDirectMemberDecl(synConstraintDecl);
         }
@@ -17306,10 +17005,8 @@ DeclRef<ExtensionDecl> SemanticsVisitor::applyExtensionToType(
         // If we see that we are in that case, we can apply the extension declaration as - is,
         // without any additional substitutions.
         if (extDecl->targetType->equals(type))
-        {
             return createDefaultSubstitutionsIfNeeded(m_astBuilder, this, extDeclRef)
                 .as<ExtensionDecl>();
-        }
 
         if (!TryUnifyTypes(inferenceContext, UnificationOptions(), extDecl->targetType.Ptr(), type))
         {
@@ -17370,9 +17067,7 @@ DeclRef<ExtensionDecl> SemanticsVisitor::applyExtensionToType(
     // In order for this extension to apply to the given type, we
     // need to have a match on the target types.
     if (!type->equals(targetType))
-    {
         return DeclRef<ExtensionDecl>();
-    }
 
     return extDeclRef;
 }

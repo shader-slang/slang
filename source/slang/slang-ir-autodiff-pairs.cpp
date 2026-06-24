@@ -298,9 +298,7 @@ struct DifferentialPairTypeBuilder
                     auto witness = witnessPack->getOperand(i);
                     auto witnessType = as<IRWitnessTableTypeBase>(witness->getDataType());
                     if (!witnessType)
-                    {
                         return result;
-                    }
 
                     IRType* elemPairType = nullptr;
                     auto conformanceType = witnessType->getConformanceType();
