@@ -13,7 +13,7 @@ concurrency:
 permissions:
   id-token: write # Required for Workload Identity (GCS auth)
   contents: read # Read slang repo
-  packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
+  packages: read # Pull container images from ghcr.io
   pull-requests: write # For PR comments (if needed)
 
 jobs:
