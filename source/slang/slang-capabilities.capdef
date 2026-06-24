@@ -575,9 +575,9 @@ def SPV_KHR_fragment_shader_barycentric : _spirv_1_0;
 /// [EXT]
 def SPV_KHR_non_semantic_info : _spirv_1_0;
 
-/// Represents the SPIR-V extension for shader abort (VK_KHR_shader_abort).
+/// Represents the SPIR-V extension for shader abort (SPV_KHR_abort).
 /// [EXT]
-def SPV_KHR_shader_abort : _spirv_1_0;
+def SPV_KHR_abort : _spirv_1_0;
 
 /// Represents the SPIR-V extension for device-group information.
 /// [EXT]
@@ -695,6 +695,10 @@ def SPV_KHR_untyped_pointers : _spirv_1_0;
 def SPV_KHR_bfloat16: _spirv_1_0;
 
 // SPIRV Capabilities.
+
+/// Represents the SPIR-V AbortKHR capability for OpAbortKHR.
+/// [EXT]
+def spvAbort : SPV_KHR_abort;
 
 /// Represents the SPIR-V capability for DeviceGroup.
 /// [EXT]
@@ -1050,9 +1054,9 @@ alias GL_EXT_debug_printf = _GL_EXT_debug_printf | SPV_KHR_non_semantic_info;
 /// [EXT]
 def _GL_EXT_shader_abort : glsl;
 /// Represents the GL_EXT_shader_abort extension for GLSL targets, or the
-/// corresponding SPV_KHR_shader_abort extension for SPIR-V targets.
+/// corresponding spvAbort capability for SPIR-V targets.
 /// [EXT]
-alias GL_EXT_shader_abort = _GL_EXT_shader_abort | SPV_KHR_shader_abort;
+alias GL_EXT_shader_abort = _GL_EXT_shader_abort | spvAbort;
 
 /// Represents the GL_EXT_demote_to_helper_invocation extension.
 /// [EXT]
