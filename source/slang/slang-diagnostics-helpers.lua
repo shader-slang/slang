@@ -67,35 +67,40 @@ local allow_duplicate_diagnostic_codes = false
 local allow_severity_conflicts = false
 
 -- Integer diagnostic codes whose multi-binding is intentional, so the
--- cross-catalog collision check below skips them. Keep each entry paired with a
--- comment naming why (or the tracking issue).
-local intentional_shared_codes = {
-  [-1] = true, -- sentinel for notes that decorate another diagnostic
-  [10000] = true, -- `illegalCharacter*` printable/hex variants in slang-lexer-diagnostic-defs.h
-  [39999] = true, -- overload-resolution / lookup umbrella; many keyed templates fan in
-  [99999] = true, -- internal-compiler-error catch-all
+-- uniqueness / cross-catalog collision checks skip them. Keep each entry paired
+-- with a comment naming why (or the tracking issue).
+local intentional_shared_code_list = {
+  10000, -- `illegalCharacter*` printable/hex variants in slang-lexer-diagnostic-defs.h
+  39999, -- overload-resolution / lookup umbrella; many keyed templates fan in
+  99999, -- internal-compiler-error catch-all
   -- TODO: the E20001-E20012 range in slang-json-diagnostic-defs.h collides with
   -- the lua-side names of the same codes (and 20011 is itself double-bound there
   -- as `fieldNotDefinedOnType` / `fieldRequiredOnType`). Renumbering the JSON
   -- side to a free range is a separate follow-up; remove these once it lands.
-  [20001] = true,
-  [20002] = true,
-  [20003] = true,
-  [20004] = true,
-  [20005] = true,
-  [20006] = true,
-  [20007] = true,
-  [20008] = true,
-  [20009] = true,
-  [20010] = true,
-  [20011] = true,
-  [20012] = true,
+  20001,
+  20002,
+  20003,
+  20004,
+  20005,
+  20006,
+  20007,
+  20008,
+  20009,
+  20010,
+  20011,
+  20012,
 }
+
+-- Build a set for O(1) membership lookup from the list above.
+local intentional_shared_codes = {}
+for _, code in ipairs(intentional_shared_code_list) do
+  intentional_shared_codes[code] = true
+end
 
 -- True when an integer code is allowed to be bound to multiple distinct names,
 -- so the uniqueness / cross-catalog collision checks skip it. All negative codes
 -- are internal sentinels (e.g. -1 for decorating notes); named umbrellas are
--- listed in `intentional_shared_codes`.
+-- listed in `intentional_shared_code_list`.
 local function is_intentional_shared(code)
   return code < 0 or intentional_shared_codes[code] == true
 end
@@ -1069,7 +1074,7 @@ local function process_diagnostics(diagnostics_table)
               "diagnostic code " .. diag.code .. " is bound to '" .. tostring(diag.name)
                 .. "' here and to '" .. cpp_name .. "' in " .. cpp_path
                 .. "; every integer code must map to a single name across all catalogs"
-                .. " (add the code to intentional_shared_codes if the multi-binding is"
+                .. " (add the code to intentional_shared_code_list if the multi-binding is"
                 .. " deliberate)"
             )
           end
