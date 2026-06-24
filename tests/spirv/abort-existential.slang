@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort
 
 // End-to-end coverage for abort() inside code using an interface-typed
 // (existential) value: the `t.val()` condition uses dynamic interface dispatch,
