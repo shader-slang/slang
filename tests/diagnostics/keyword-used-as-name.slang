@@ -42,6 +42,30 @@ int useParam(int struct)
     return 0;
 }
 
+// Modern-syntax parameter site (`name: Type`).
+func useModernParam(struct: int) -> int
+//CHECK:            ^^^^^^ keyword used as a name
+//CHECK:            ^^^^^^ 'struct' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts
+{
+    return 0;
+}
+
+// Generic value parameter (traditional `<type name>`).
+int useGenericValueParam<int struct>()
+//CHECK:                     ^^^^^^ keyword used as a name
+//CHECK:                     ^^^^^^ 'struct' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts
+{
+    return 0;
+}
+
+// Generic type parameter.
+int useGenericTypeParam<struct>()
+//CHECK:                ^^^^^^ keyword used as a name
+//CHECK:                ^^^^^^ 'struct' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts
+{
+    return 0;
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()

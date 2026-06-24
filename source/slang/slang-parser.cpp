@@ -1543,6 +1543,10 @@ static void AddMember(Scope* scope, Decl* member)
     }
 }
 
+// Warn if `nameAndLoc` names a type keyword that can't be used as an ordinary
+// name (defined below; forward-declared here for the generic-parameter site).
+static void maybeDiagnoseKeywordUsedAsName(Parser* parser, const NameLoc& nameAndLoc);
+
 static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
 {
     // simple syntax to introduce a value parameter
@@ -1711,6 +1715,12 @@ static void ParseGenericDeclImpl(Parser* parser, GenericDecl* decl, const TFunc&
         auto currentCursor = parser->tokenReader.getCursor();
 
         auto genericParam = ParseGenericParamDecl(parser, decl);
+        // A generic parameter named with a type keyword (e.g. `<int struct>` or
+        // `<struct>`) is just as unreferenceable as any other such name, and the
+        // several `ParseGenericParamDecl` exits read the name directly without
+        // reaching the other hook sites, so warn here at the single shared point.
+        if (genericParam)
+            maybeDiagnoseKeywordUsedAsName(parser, genericParam->nameAndLoc);
         AddMember(decl, genericParam);
 
         // Make sure we make forward progress.
