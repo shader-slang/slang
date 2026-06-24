@@ -7,7 +7,7 @@ void f()
 {
 	int i;
 #pragma warning (disable : 30081)
-	// CHECK-NOT: ([[# @LINE+1]]): warning 30081:
+	// CHECK-NOT: warning[E30081]
 	i = GetValue();
 }
 

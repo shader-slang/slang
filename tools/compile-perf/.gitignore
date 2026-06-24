@@ -1,0 +1,12 @@
+*.html
+*.log
+*.png
+*.pyc
+*.svg
+__pycache__/
+corpus/
+gen/
+releases/
+results/
+results_baseline_orig/
+slang-compile-perf/
