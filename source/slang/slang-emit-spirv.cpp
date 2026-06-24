@@ -7312,8 +7312,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
     // Diagnoses the mutually-exclusive `-spirv-resource-heap-stride` / unified-stride option pair:
-    // an explicit literal stride and the unified maximum stride contradict, so passing both is an
-    // error rather than letting one silently win.
+    // a non-zero explicit literal stride and the unified maximum stride contradict, so combining
+    // them is an error rather than letting one silently win. An explicit stride of 0 selects the
+    // same default `OpConstantSizeOfEXT` path the unified option modifies, so it is not a conflict.
     void diagnoseConflictingDescriptorHeapStrideOptions()
     {
         if (isUnifiedResourceHeapStrideEnabled() &&
