@@ -35,17 +35,20 @@ def main():
     args = ap.parse_args()
 
     if not os.path.exists(args.summary):
-        sys.exit(f"summary not found: {args.summary}")
+        print(f"summary not found: {args.summary}; skipping history update")
+        return
 
     summary = json.load(open(args.summary, encoding="utf-8"))
     linux = summary.get("platforms", {}).get("linux", {})
     if not linux or "slangc_line_coverage" not in linux:
-        sys.exit("no Linux slangc data in summary")
+        print("no Linux slangc data in summary; skipping history update")
+        return
 
     date    = summary.get("date") or ""
     commit  = summary.get("commit") or ""
     if not date:
-        sys.exit("no date in summary")
+        print("no date in summary; skipping history update")
+        return
 
     new_rec = {k: linux[k] for k in FIELDS[2:] if k in linux}
     new_rec["date"]   = date
