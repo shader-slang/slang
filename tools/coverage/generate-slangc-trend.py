@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Generate a self-contained HTML trend page for slangc compiler coverage.
 
-Reads coverage-data.json (all historical records) and supplements with
-summary JSONs from reports/history/ for any dates not yet in the export.
-Outputs a single self-contained HTML file with an inline SVG line chart.
+Reads reports/slangc-coverage-history.json (the canonical per-day record)
+and writes a single self-contained HTML file with an inline SVG line chart.
+
+The history JSON is maintained by update-slangc-coverage-history.py which
+appends each nightly run and is pre-filled from git log.
 
 Usage:
     python3 generate-slangc-trend.py \
-        --data reports/coverage-data.json \
-        --history reports/history \
-        --output reports/slangc-coverage-trend.html
+        --history reports/slangc-coverage-history.json \
+        --output  reports/slangc-coverage-trend.html
 """
 import argparse
 import json
@@ -17,106 +18,11 @@ import os
 import sys
 
 
-def _git_show(commit, path):
-    """Return parsed JSON from a git-show, or None."""
-    import subprocess
-    try:
-        r = subprocess.run(["git", "show", f"{commit}:{path}"],
-                           capture_output=True, text=True, check=True)
-        return json.loads(r.stdout)
-    except Exception:
-        return None
-
-
-def _git_coverage_commits():
-    """Return list of (hash, message) for commits with coverage reports."""
-    import subprocess
-    try:
-        r = subprocess.run(
-            ["git", "log", "--all", "--grep=multi-platform coverage",
-             "--format=%H %s"],
-            capture_output=True, text=True, check=True)
-        return [line.split(" ", 1) for line in r.stdout.strip().splitlines()
-                if line.strip()]
-    except Exception:
-        return []
-
-
-def load_records(data_path, history_dir):
-    """Load all Linux slangc records from every available source.
-
-    Priority (highest first):
-    1. coverage-data.json  — canonical data export, always preferred
-    2. Working-tree history/ summary JSONs  — recent runs not yet in export
-    3. Git history  — backfills dates culled from the working tree
-    """
-    import re
-    records = {}
-
-    # 1. Canonical export
-    if os.path.exists(data_path):
-        for r in json.load(open(data_path, encoding="utf-8")):
-            if r.get("platform") == "linux" and "slangc_line_coverage" in r:
-                records[r["date"]] = r
-
-    # 2. Working-tree history/ entries
-    if os.path.isdir(history_dir):
-        for entry in sorted(os.listdir(history_dir)):
-            combined = os.path.join(history_dir, entry, "combined-summary.json")
-            if not os.path.exists(combined):
-                continue
-            try:
-                d = json.load(open(combined, encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                continue
-            date = d.get("date") or entry[:10]
-            linux = d.get("platforms", {}).get("linux", {})
-            if date not in records and "slangc_line_coverage" in linux:
-                records[date] = {**linux, "date": date,
-                                  "commit": d.get("commit", ""),
-                                  "platform": "linux"}
-
-    # Dates with known bad measurements (instrument failures, 0%/sub-50% readings).
-    EXCLUDE = {"2026-03-13", "2026-03-15", "2026-04-09"}
-
-    # 3. Git history — backfill dates that have been deleted from working tree
-    for parts in _git_coverage_commits():
-        if len(parts) != 2:
-            continue
-        commit_hash, message = parts
-        m = re.search(r"(\d{4}-\d{2}-\d{2})", message)
-        date = m.group(1) if m else None
-        sc = re.search(r"\(([0-9a-f]{7,40})\)", message)
-        slang_commit = sc.group(1) if sc else None
-        if not date or date in records or date in EXCLUDE:
-            continue
-        # Try the combined-summary path first, fall back to linux summary
-        paths = []
-        if slang_commit:
-            paths.append(f"reports/history/{date}-{slang_commit}/combined-summary.json")
-        paths.append("reports/latest/linux/coverage-summary.json")
-        for path in paths:
-            d = _git_show(commit_hash, path)
-            if d is None:
-                continue
-            # combined-summary has platforms.linux; coverage-summary is flat
-            linux = d.get("platforms", {}).get("linux", d)
-            if "slangc_line_coverage" in linux and pct(linux["slangc_line_coverage"]) is not None:
-                records[date] = {**linux, "date": date,
-                                  "commit": slang_commit or commit_hash[:9],
-                                  "platform": "linux"}
-                break
-
-    return sorted(records.values(), key=lambda r: r["date"])
-
-
-def pct(val, vmin=50.0):
-    """Parse percentage string/number; return None for missing or implausibly low values."""
+def pct(val):
     if val is None:
         return None
     try:
-        v = float(str(val).rstrip("%"))
-        return v if v >= vmin else None
+        return float(str(val).rstrip("%"))
     except ValueError:
         return None
 
@@ -156,13 +62,11 @@ def render(records):
             f'<text x="{ml-6}" y="{y+4:.1f}" text-anchor="end" '
             f'fill="#888" font-size="11">{v}</text>')
 
-    # Series polylines + latest dot + label
-    # Build separate segments for contiguous runs to avoid connecting across gaps.
+    # Series — break into contiguous segments to avoid connecting across None gaps
     polylines = []
     for label, (key, color, dash) in series.items():
         vals = [pct(r.get(key)) for r in records]
         da = f' stroke-dasharray="{dash}"' if dash else ""
-        # Split into contiguous segments
         seg, segs = [], []
         for i, v in enumerate(vals):
             if v is not None:
@@ -178,7 +82,7 @@ def render(records):
             polylines.append(
                 f'<polyline points="{pts}" stroke="{color}" stroke-width="2" '
                 f'fill="none"{da}><title>{label} coverage</title></polyline>')
-        # Dot + value label on latest point
+        # Dot + label on latest valid point
         li = next((i for i in reversed(range(n)) if vals[i] is not None), None)
         if li is not None:
             x, y = x_px(li), y_px(vals[li])
@@ -187,32 +91,29 @@ def render(records):
                 f'<text x="{x+6:.1f}" y="{y+4:.1f}" fill="{color}" '
                 f'font-size="11" font-weight="600">{vals[li]:.1f}%</text>')
 
-    # X-axis date labels (rotated, evenly spaced)
+    # X-axis date labels
     stride = max(1, n // 8)
-    x_labels = []
-    for i in range(0, n, stride):
-        x = x_px(i)
-        x_labels.append(
-            f'<text x="{x:.1f}" y="{mt+ph+18}" text-anchor="end" '
-            f'fill="#666" font-size="10" '
-            f'transform="rotate(-45 {x:.1f} {mt+ph+18})">{dates[i]}</text>')
+    x_labels = [
+        f'<text x="{x_px(i):.1f}" y="{mt+ph+18}" text-anchor="end" '
+        f'fill="#666" font-size="10" '
+        f'transform="rotate(-45 {x_px(i):.1f} {mt+ph+18})">{dates[i]}</text>'
+        for i in range(0, n, stride)]
 
-    svg = "\n  ".join([
+    svg = (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
-        f'viewBox="0 0 {W} {H}" font-family="sans-serif">',
-        f'<rect width="{W}" height="{H}" fill="white"/>',
-        "\n  ".join(grid_lines),
-        f'<line x1="{ml}" y1="{mt}" x2="{ml}" y2="{mt+ph}" stroke="#ccc"/>',
-        f'<line x1="{ml}" y1="{mt+ph}" x2="{ml+pw}" y2="{mt+ph}" stroke="#ccc"/>',
-        "\n  ".join(polylines),
-        "\n  ".join(x_labels),
-        f'<text x="{ml-40}" y="{mt+ph//2}" text-anchor="middle" fill="#555" '
-        f'font-size="11" transform="rotate(-90 {ml-40} {mt+ph//2})">Coverage %</text>',
-        "</svg>",
-    ])
+        f'viewBox="0 0 {W} {H}" font-family="sans-serif">'
+        f'<rect width="{W}" height="{H}" fill="white"/>'
+        + "\n".join(grid_lines)
+        + f'<line x1="{ml}" y1="{mt}" x2="{ml}" y2="{mt+ph}" stroke="#ccc"/>'
+        + f'<line x1="{ml}" y1="{mt+ph}" x2="{ml+pw}" y2="{mt+ph}" stroke="#ccc"/>'
+        + "\n".join(polylines)
+        + "\n".join(x_labels)
+        + f'<text x="{ml-40}" y="{mt+ph//2}" text-anchor="middle" fill="#555" '
+        f'font-size="11" transform="rotate(-90 {ml-40} {mt+ph//2})">Coverage %</text>'
+        + "</svg>")
 
     # Legend
-    legend_items = "".join(
+    legend = "".join(
         f'<span style="display:inline-flex;align-items:center;margin-right:16px">'
         f'<svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" '
         f'stroke="{color}" stroke-width="2" stroke-dasharray="{dash}"/></svg>'
@@ -262,12 +163,11 @@ def render(records):
 <div style="margin-bottom:24px">
   <h2 style="font-size:18px;margin:0 0 4px">slangc compiler coverage trend — Linux x86-64</h2>
   <p style="color:#555;font-size:13px;margin:0 0 12px">
-    Latest: <b>{latest["date"]}</b>
-    ({latest.get("commit", "?")})
+    Latest: <b>{latest["date"]}</b> ({latest.get("commit", "?")})
     &nbsp;·&nbsp; {n} data points
   </p>
   <div style="overflow:auto">{svg}</div>
-  <div style="margin-top:8px;font-size:12px;color:#555">{legend_items}</div>
+  <div style="margin-top:8px;font-size:12px;color:#555">{legend}</div>
 </div>
 {table}
 """
@@ -277,14 +177,16 @@ def main():
     ap = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--data",    default="reports/coverage-data.json")
-    ap.add_argument("--history", default="reports/history")
+    ap.add_argument("--history", default="reports/slangc-coverage-history.json")
     ap.add_argument("--output",  default="reports/slangc-coverage-trend.html")
     args = ap.parse_args()
 
-    records = load_records(args.data, args.history)
+    if not os.path.exists(args.history):
+        sys.exit(f"history file not found: {args.history}")
+
+    records = json.load(open(args.history, encoding="utf-8"))
     if not records:
-        sys.exit("No slangc Linux coverage records found.")
+        sys.exit("No records in history file.")
 
     body = render(records)
     html = f"""<!doctype html>
@@ -312,8 +214,7 @@ h1 {{font-size: 22px; margin: 0 0 4px}}
     os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
     with open(args.output, "w", encoding="utf-8") as fh:
         fh.write(html)
-    print(f"wrote {args.output}  ({n} records)" if (n := len(records)) else
-          f"wrote {args.output}")
+    print(f"wrote {args.output}  ({len(records)} records)")
 
 
 if __name__ == "__main__":
