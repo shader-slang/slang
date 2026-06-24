@@ -1,11 +1,12 @@
 // Companion regression for https://github.com/shader-slang/slang/issues/11731.
 //
 // gh-11731.slang covers `__atomic_add` (the `OpAtomicIAdd` path through
-// `emitMemorySemanticMask`). This file covers `Atomic<T>` load/store/exchange,
-// which additionally route through `isAtomicableAddressSpace`: when targeting
-// SPIR-V < 1.4 an SSBO pointer is in the legacy `Uniform` storage class
-// (BufferBlock model), and if that gate does not recognize the `Uniform`
-// spelling the ops silently degrade to non-atomic `OpLoad`/`OpStore`.
+// `emitMemorySemanticMask`). This file covers `Atomic<T>` load/store/exchange/
+// compareExchange, which additionally route through `isAtomicableAddressSpace`:
+// when targeting SPIR-V < 1.4 an SSBO pointer is in the legacy `Uniform` storage
+// class (BufferBlock model), and if that gate does not recognize the `Uniform`
+// spelling load/store degrade to non-atomic `OpLoad`/`OpStore` while exchange
+// aborts the compiler.
 //
 // The `-profile spirv_1_3` target forces the pre-1.4 `Uniform`/`BufferBlock`
 // SSBO model, and every op must still emit its atomic opcode with the
@@ -28,8 +29,13 @@ void computeMain()
     // CHECK: OpAtomicStore {{.*}} %uint_68
     // AcquireRelease(0x8) | UniformMemory(0x40) == 0x48 == 72
     // CHECK: OpAtomicExchange {{.*}} %uint_72
+    // compareExchange is the only atomic that emits TWO Memory Semantics masks
+    // (equal = successOrder, unequal = failOrder); both must carry UniformMemory
+    // so a regression re-breaking only one mask cannot slip the single-mask
+    // cases above. success AcquireRelease(0x8)|0x40 == 72, fail Acquire(0x2)|0x40 == 66
+    // CHECK: OpAtomicCompareExchange {{.*}} %uint_72 %uint_66
     let v = buf[0].load(MemoryOrder.Acquire);
     buf[0].store(v, MemoryOrder.Release);
     let old = buf[0].exchange(v, MemoryOrder.AcquireRelease);
-    buf[1].store(old, MemoryOrder.Release);
+    buf[1].compareExchange(old, v, MemoryOrder.AcquireRelease, MemoryOrder.Acquire);
 }
