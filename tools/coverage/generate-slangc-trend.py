@@ -121,36 +121,25 @@ def render(records):
     latest = records[-1]
     prev   = records[-2] if n > 1 else None
 
-    # ── Panel 1: slangc line coverage — Linux and macOS ──────────────────────
-    linux_line = [pct(r.get("linux_slangc_line_coverage")) for r in records]
-    macos_line = [pct(r.get("macos_slangc_line_coverage")) for r in records]
-
-    panel1_series = [
-        ("Linux", "#2563eb", "",    linux_line),
-        ("macOS", "#16a34a", "6 3", macos_line),
-    ]
-    svg1 = build_svg(dates, panel1_series, title="slangc Line Coverage — Linux & macOS")
-    leg1 = legend_html([(lbl, c, d) for lbl, c, d, _ in panel1_series])
-
-    # ── Panel 2: Linux detail (line / function / branch / region) ─────────────
+    # ── Panel 1 (top): Linux — all metrics ───────────────────────────────────
     linux_series = [
         ("Line",     "#2563eb", "",    [pct(r.get("linux_slangc_line_coverage"))     for r in records]),
         ("Function", "#16a34a", "6 3", [pct(r.get("linux_slangc_function_coverage")) for r in records]),
         ("Branch",   "#dc2626", "3 3", [pct(r.get("linux_slangc_branch_coverage"))   for r in records]),
         ("Region",   "#9333ea", "8 4", [pct(r.get("linux_slangc_region_coverage"))   for r in records]),
     ]
-    svg2 = build_svg(dates, linux_series, title="Linux — all metrics")
-    leg2 = legend_html([(lbl, c, d) for lbl, c, d, _ in linux_series])
+    svg1 = build_svg(dates, linux_series, W=1000, H=360, title="Linux x86-64 — slangc compiler coverage")
+    leg1 = legend_html([(lbl, c, d) for lbl, c, d, _ in linux_series])
 
-    # ── Panel 3: macOS detail ─────────────────────────────────────────────────
+    # ── Panel 2 (bottom): macOS — all metrics ─────────────────────────────────
     macos_series = [
         ("Line",     "#2563eb", "",    [pct(r.get("macos_slangc_line_coverage"))     for r in records]),
         ("Function", "#16a34a", "6 3", [pct(r.get("macos_slangc_function_coverage")) for r in records]),
         ("Branch",   "#dc2626", "3 3", [pct(r.get("macos_slangc_branch_coverage"))   for r in records]),
         ("Region",   "#9333ea", "8 4", [pct(r.get("macos_slangc_region_coverage"))   for r in records]),
     ]
-    svg3 = build_svg(dates, macos_series, title="macOS — all metrics")
-    leg3 = legend_html([(lbl, c, d) for lbl, c, d, _ in macos_series])
+    svg2 = build_svg(dates, macos_series, W=1000, H=360, title="macOS aarch64 — slangc compiler coverage")
+    leg2 = legend_html([(lbl, c, d) for lbl, c, d, _ in macos_series])
 
     # ── Summary table ──────────────────────────────────────────────────────────
     def delta(key):
@@ -196,15 +185,9 @@ def render(records):
   <div style="margin-top:6px">{leg1}</div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-  <div {card}>
-    {svg2}
-    <div style="margin-top:6px">{leg2}</div>
-  </div>
-  <div {card}>
-    {svg3}
-    <div style="margin-top:6px">{leg3}</div>
-  </div>
+<div {card}>
+  {svg2}
+  <div style="margin-top:6px">{leg2}</div>
 </div>
 
 <h3 style="font-size:15px;margin:8px 0 4px">Latest values</h3>
