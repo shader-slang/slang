@@ -6596,7 +6596,8 @@ static Stmt* parseIntrinsicAsmStmt(Parser* parser)
     parser->FillPosition(stmt);
     parser->ReadToken();
 
-    stmt->asmText = getStringLiteralTokenValue(parser->ReadToken(TokenType::StringLiteral), parser->sink);
+    stmt->asmText =
+        getStringLiteralTokenValue(parser->ReadToken(TokenType::StringLiteral), parser->sink);
 
     while (AdvanceIf(parser, TokenType::Comma))
     {
