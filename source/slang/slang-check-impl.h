@@ -405,7 +405,6 @@ private:
 };
 
 DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal);
-bool arePackCountExpectedCountsEqual(ASTBuilder* astBuilder, IntVal* left, IntVal* right);
 
 struct OverloadCandidate
 {

@@ -717,7 +717,7 @@ static DeclRef<GenericVariadicPackCountConstraintDecl> _findDeclaredPackCountCon
 
         auto declaredExpectedCount =
             getPackCountConstraintExpectedCount(astBuilder, constraintDeclRef);
-        if (arePackCountExpectedCountsEqual(astBuilder, declaredExpectedCount, expectedCount))
+        if (declaredExpectedCount == expectedCount)
             return constraintDeclRef;
     }
 
@@ -748,7 +748,7 @@ Witness* findVariadicPackCountWitnessForConstraint(
     if (!resolvedExpectedCount)
         resolvedExpectedCount = expectedCount;
 
-    if (arePackCountExpectedCountsEqual(astBuilder, resolvedActualCount, resolvedExpectedCount))
+    if (resolvedActualCount == resolvedExpectedCount)
     {
         return astBuilder->getConcreteVariadicPackCountWitness(
             resolvedActualCount,
@@ -915,40 +915,6 @@ DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal)
     // integer values such as `4` are already answers, not dependencies on a
     // parameter.
     return as<DeclRefIntVal>(intVal);
-}
-
-static IntVal* coercePackCountExpectedCountToInt(ASTBuilder* astBuilder, IntVal* intVal)
-{
-    // Pack counts are conceptually integer counts, while generic value
-    // arguments can enter this path with different concrete integer types or
-    // with `TypeCastIntVal` wrappers inserted by `TryUnifyIntParam`. Reuse the
-    // normal `TypeCastIntVal` folding/canonicalization path to express both
-    // expected-count operands as `int`, then compare the canonical `Val*`.
-    auto intType = astBuilder->getIntType();
-    if (auto foldedCast =
-            as<IntVal>(TypeCastIntVal::tryFoldImpl(astBuilder, intType, intVal, nullptr)))
-    {
-        return foldedCast;
-    }
-    return astBuilder->getTypeCastIntVal(intType, intVal);
-}
-
-// Compare the expected-count `IntVal`s stored in pack-count witnesses and
-// constraint declarations. The source of truth is the same integer coercion
-// machinery used by constant folding: both operands are coerced to `int`, then
-// their canonical `Val*` identities are compared.
-bool arePackCountExpectedCountsEqual(ASTBuilder* astBuilder, IntVal* left, IntVal* right)
-{
-    if (!left || !right)
-        return left == right;
-    left = as<IntVal>(left->resolve());
-    right = as<IntVal>(right->resolve());
-    if (!left || !right)
-        return left == right;
-
-    left = coercePackCountExpectedCountToInt(astBuilder, left);
-    right = coercePackCountExpectedCountToInt(astBuilder, right);
-    return left == right;
 }
 
 // Return the ordinary-argument merge mode requested by unification.

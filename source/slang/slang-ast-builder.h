@@ -432,11 +432,20 @@ public:
         return getOrCreate<ConstantIntVal>(type, value);
     }
 
-    TypeCastIntVal* getTypeCastIntVal(Type* type, Val* base)
+    IntVal* getTypeCastIntVal(Type* type, Val* base)
     {
         // Unwrap any existing type casts.
         while (auto baseTypeCast = as<TypeCastIntVal>(base))
             base = baseTypeCast->getBase();
+
+        if (auto foldedCast = as<IntVal>(TypeCastIntVal::tryFoldImpl(this, type, base, nullptr)))
+            return foldedCast;
+
+        if (auto baseIntVal = as<IntVal>(base))
+        {
+            if (baseIntVal->getType() == type)
+                return baseIntVal;
+        }
 
         return getOrCreate<TypeCastIntVal>(type, base);
     }
