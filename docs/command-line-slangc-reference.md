@@ -644,6 +644,11 @@ Specify the byte stride for the resource descriptor heap when generating SPIRV w
 Specify the byte stride for the sampler descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(OpTypeSampler). 
 
 
+<a id="spirv-unified-descriptor-heap-stride"></a>
+### -spirv-unified-descriptor-heap-stride
+When generating SPIRV with spvDescriptorHeapEXT, emit each resource descriptor-heap runtime array's ArrayStride as the maximum of image and buffer descriptor sizes, so a single heap shared by buffers and images is indexed at the device's unified stride. Only affects the OpConstantSizeOfEXT default path (when no explicit [-spirv-resource-heap-stride](#spirv-resource-heap-stride) is given); mutually exclusive with [-spirv-resource-heap-stride](#spirv-resource-heap-stride) (supplying both is an error). Does not affect the sampler heap or acceleration-structure entries. 
+
+
 <a id="separate-debug-info"></a>
 ### -separate-debug-info
 Emit debug data to a separate file, and strip it from the main output file. 
