@@ -50,12 +50,13 @@ static IRType* findUnstorableOpaqueHandleType(IRType* type)
 
 void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
 {
-    // SPIR-V cannot place an image/sampler/subpass/acceleration-structure handle
-    // in a function-local variable: it forbids OpStore/OpLoad (and OpPhi) of such
-    // a handle. A local variable of one of those types reaching here is invalid
-    // output we cannot legalize yet (issue #10526, typically from selecting or
-    // returning a resource through control flow); reject it with a diagnostic
-    // rather than emitting invalid SPIR-V.
+    // Khronos targets (SPIR-V and GLSL) cannot place an
+    // image/sampler/subpass/acceleration-structure handle in a function-local
+    // variable: SPIR-V forbids OpStore/OpLoad (and OpPhi) of such a handle, and
+    // GLSL likewise forbids opaque-typed locals. A local variable of one of those
+    // types reaching here is invalid output we cannot legalize yet (issue #10526,
+    // typically from selecting or returning a resource through control flow);
+    // reject it with a diagnostic rather than emitting invalid code.
     const bool rejectOpaqueLocals = isKhronosTarget(target);
 
     for (auto block : func->getBlocks())
@@ -79,7 +80,7 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
                         // fall back to the location of a use.
                         auto loc =
                             inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
-                        sink->diagnose(Diagnostics::OpaqueTypeInLocalVariableNotAllowedOnSpirv{
+                        sink->diagnose(Diagnostics::OpaqueTypeInLocalVariableNotAllowedOnKhronos{
                             .type = handleType,
                             .location = loc});
                     }
