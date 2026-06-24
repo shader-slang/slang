@@ -53,14 +53,15 @@ void ASTCopier::mapDecl(Decl* oldDecl, Decl* newDecl)
     m_context.oldToNewVals.clear();
 }
 
-DeclRef<Decl> getSourceDeclRefWithCopiedGenericArgs(
+DeclRef<Decl> getSpecializedDeclRefWithParamsFromGeneric(
     ASTBuilder* astBuilder,
     SemanticsVisitor* semantics,
-    GenericDecl* sourceGenericDecl,
-    GenericDecl* copiedGenericDecl)
+    GenericDecl* genericDeclToSpecialize,
+    GenericDecl* genericDeclProvidingSpecializationArgs)
 {
-    auto defaultArgs = getDefaultSubstitutionArgs(astBuilder, semantics, copiedGenericDecl);
-    return astBuilder->getGenericAppDeclRef(sourceGenericDecl, defaultArgs.getArrayView());
+    auto defaultArgs =
+        getDefaultSubstitutionArgs(astBuilder, semantics, genericDeclProvidingSpecializationArgs);
+    return astBuilder->getGenericAppDeclRef(genericDeclToSpecialize, defaultArgs.getArrayView());
 }
 
 static void copyNonReflectedDeclFields(Decl* dst, Decl* src)

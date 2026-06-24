@@ -29,16 +29,17 @@ struct ASTCopyContext
     bool allowDroppingWitnessTables = false;
 };
 
-// Returns `sourceGenericDecl` applied to the copied generic's default arguments.
+// Returns `genericDeclToSpecialize` applied to the default arguments from
+// `genericDeclProvidingSpecializationArgs`.
 //
 // For example, after copying `generic<T>` to `generic<T2>`, this returns a decl-ref for the
 // source generic specialized as `generic<T2>`. Callers use that substitution to rewrite references
 // from the original generic environment into the standalone copied environment.
-DeclRef<Decl> getSourceDeclRefWithCopiedGenericArgs(
+DeclRef<Decl> getSpecializedDeclRefWithParamsFromGeneric(
     ASTBuilder* astBuilder,
     SemanticsVisitor* semantics,
-    GenericDecl* sourceGenericDecl,
-    GenericDecl* copiedGenericDecl);
+    GenericDecl* genericDeclToSpecialize,
+    GenericDecl* genericDeclProvidingSpecializationArgs);
 
 // Copies AST syntax nodes while rewriting semantic references through `oldToNewDecls`.
 //
