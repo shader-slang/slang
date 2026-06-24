@@ -933,7 +933,8 @@ void initCommandOptions(CommandOptions& options)
          "runtime array's ArrayStride as the maximum of every resource descriptor type's size, so "
          "a single heap shared by buffers and images is indexed at the device's unified stride. "
          "Only affects the OpConstantSizeOfEXT default path (when no explicit "
-         "-spirv-resource-heap-stride is given); an explicit stride still overrides it. Does not "
+         "-spirv-resource-heap-stride is given); mutually exclusive with "
+         "-spirv-resource-heap-stride (supplying both is an error). Does not "
          "affect the sampler heap or acceleration-structure entries."},
         {OptionKind::EmitSeparateDebug,
          "-separate-debug-info",

@@ -6994,20 +6994,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     Dictionary<DescriptorRuntimeArrayKey, SpvInst*> m_descriptorHeapRuntimeArrayTypes;
     bool m_didDiagnoseAccelerationStructureDescriptorHeapStrideTooSmall = false;
 
-    // A resource descriptor-heap runtime array whose `ArrayStride` is deferred until every
-    // participating resource descriptor type is known, so that all arrays into a heap shared by
-    // multiple resource types advertise the same unified maximum stride. Populated only when
-    // `-spirv-unified-descriptor-heap-stride` is set, and consumed by
-    // `emitUnifiedResourceHeapStrides` after all instructions have been emitted. Note that the
-    // consumer moves each recorded array to the end of the constants section so the shared stride
-    // `<id>` precedes it (required by the `ArrayStrideIdEXT` operand-ordering rule), so callers
-    // must not assume these arrays keep their original emission position.
-    struct UnifiedResourceHeapArray
-    {
-        SpvInst* runtimeArray = nullptr;
-        SpvInst* descriptorElementType = nullptr;
-    };
-    List<UnifiedResourceHeapArray> m_unifiedResourceHeapArrays;
+    // The single fixed `ArrayStrideIdEXT` stride shared by every resource descriptor-heap runtime
+    // array when `-spirv-unified-descriptor-heap-stride` is set. It is the canonical
+    // `max(sizeof(image descriptor), sizeof(buffer descriptor))` sequence from the
+    // SPV_EXT_descriptor_heap proposal (built by `getUnifiedResourceHeapStride`), not a value
+    // derived from the descriptor types a given shader happens to use: the host packs the resource
+    // heap at this stride over every resource descriptor category, so a shader that references only
+    // one category must still advertise the same stride. Emitted lazily on first use and memoized.
+    SpvInst* m_unifiedResourceHeapStride = nullptr;
 
 
     bool isInstUsedInStage(IRInst* inst, Stage s)
@@ -7181,9 +7175,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
     // Returns whether resource descriptor-heap runtime arrays should advertise a single unified
-    // maximum `ArrayStride` (opt-in via `-spirv-unified-descriptor-heap-stride`). This only
-    // affects the auto stride path; an explicit `-spirv-resource-heap-stride` produces a non-zero
-    // stride that bypasses the unified logic entirely (so the explicit value always wins).
+    // maximum `ArrayStride` (opt-in via `-spirv-unified-descriptor-heap-stride`). This only affects
+    // the auto stride path. Combining it with an explicit `-spirv-resource-heap-stride` is a
+    // conflict (the two express contradictory strides) and is diagnosed in
+    // `diagnoseConflictingDescriptorHeapStrideOptions`, so the two options are never honored
+    // together.
     bool isUnifiedResourceHeapStrideEnabled()
     {
         return m_targetProgram->getOptionSet().getBoolOption(
@@ -7206,10 +7202,73 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             CompilerOptionName::SPIRVResourceHeapStride);
     }
 
+    // Emits (once, memoized) the fixed unified resource descriptor-heap stride: the canonical
+    // `max(sizeof(image descriptor), sizeof(buffer descriptor))` sequence from the
+    // SPV_EXT_descriptor_heap proposal. The host packs the resource heap at this stride over every
+    // resource descriptor category regardless of which categories a given shader references, so the
+    // stride is hard-coded to a representative image descriptor and the proposal's buffer descriptor
+    // (`OpTypeImage %float 2D 2 0 0 1 Unknown` and `OpTypeBufferEXT Uniform`) rather than derived
+    // from the descriptor types present in the module. A descriptor's device-defined size is the size
+    // of its heap slot, independent of the image's sampled type and `Sampled` flag, so any image type
+    // that passes Vulkan validation stands in for the image-descriptor size. The proposal's literal
+    // `%void`/`Sampled=0` placeholder is rejected by spirv-val
+    // (`VUID-StandaloneSpirv-OpTypeImage-04656`/`-04657`: the sampled type must be a 32-bit scalar and
+    // `Sampled` must be 1 or 2 for Vulkan), so a 32-bit-float sampled image is used instead.
+    // `OpConstantSizeOfEXT` is a device-defined constant, so the maximum is symbolic:
+    // `max(a, b) = Select(UGreaterThan(a, b), a, b)`. Emitting it lazily before the first resource
+    // array guarantees the stride `<id>` precedes every array it decorates, as the `ArrayStrideIdEXT`
+    // operand-ordering rule requires.
+    SpvInst* getUnifiedResourceHeapStride()
+    {
+        if (m_unifiedResourceHeapStride)
+            return m_unifiedResourceHeapStride;
+
+        IRBuilder builder(m_irModule);
+        builder.setInsertInto(m_irModule->getModuleInst());
+        auto uintType = builder.getUIntType();
+        auto boolType = builder.getBoolType();
+
+        auto imageType = emitOpTypeImage(
+            nullptr,
+            builder.getFloatType(),
+            SpvDim2D,
+            SpvLiteralInteger::from32(ImageOpConstants::unknownDepthImage),
+            SpvLiteralInteger::from32(ImageOpConstants::notArrayed),
+            SpvLiteralInteger::from32(ImageOpConstants::notMultisampled),
+            SpvLiteralInteger::from32(ImageOpConstants::sampledImage),
+            SpvImageFormatUnknown);
+        auto bufferType = ensureDescriptorHeapBufferDescriptorType(SpvStorageClassUniform);
+
+        auto imageSize = emitOpConstantSizeOfEXT(nullptr, uintType, imageType);
+        auto bufferSize = emitOpConstantSizeOfEXT(nullptr, uintType, bufferType);
+        auto imageIsBigger = emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            nullptr,
+            SpvOpSpecConstantOp,
+            boolType,
+            kResultID,
+            SpvOpUGreaterThan,
+            imageSize,
+            bufferSize);
+        m_unifiedResourceHeapStride = emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            nullptr,
+            SpvOpSpecConstantOp,
+            uintType,
+            kResultID,
+            SpvOpSelect,
+            imageIsBigger,
+            imageSize,
+            bufferSize);
+        return m_unifiedResourceHeapStride;
+    }
+
     // Builds or reuses the descriptor runtime array for a specific element type and stride.
-    // A zero stride emits an `ArrayStrideIdEXT` from `OpConstantSizeOfEXT` for descriptor-typed
-    // resources, while acceleration-structure heap entries pass the explicit `uint64` stride
-    // computed by `getAccelerationStructureDescriptorHeapStride`.
+    // A zero stride emits an `ArrayStrideIdEXT`: in unified mode
+    // (`-spirv-unified-descriptor-heap-stride`) every resource heap array shares the single fixed
+    // stride from `getUnifiedResourceHeapStride`; otherwise the stride is this element type's own
+    // `OpConstantSizeOfEXT`. Acceleration-structure heap entries instead pass the explicit `uint64`
+    // stride computed by `getAccelerationStructureDescriptorHeapStride`.
     SpvInst* getDescriptorRuntimeArrayType(SpvInst* descriptorElementType, int arrayStride)
     {
         SLANG_RELEASE_ASSERT(
@@ -7224,14 +7283,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         // In unified mode, every resource descriptor-heap array (anything other than the separate
         // sampler heap; acceleration-structure heaps never reach the auto path because they pass a
-        // non-zero stride) must share one maximum stride. Defer its decoration: the maximum is not
-        // known until every participating resource descriptor type has been seen.
+        // non-zero stride) shares the one fixed maximum stride. Build it before the array so its
+        // `<id>` precedes the array, satisfying the `ArrayStrideIdEXT` operand-ordering rule.
         const bool isResourceElement = descriptorElementType->opcode != SpvOpTypeSampler;
-        const bool deferUnifiedStride =
+        const bool useUnifiedStride =
             arrayStride == 0 && isResourceElement && isUnifiedResourceHeapStrideEnabled();
+        SpvInst* unifiedStride = useUnifiedStride ? getUnifiedResourceHeapStride() : nullptr;
 
         SpvInst* stride = nullptr;
-        if (arrayStride == 0 && !deferUnifiedStride)
+        if (arrayStride == 0 && !useUnifiedStride)
         {
             IRBuilder builder(m_irModule);
             builder.setInsertInto(m_irModule->getModuleInst());
@@ -7242,20 +7302,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto runtimeArrayType = emitOpTypeRuntimeArray(nullptr, descriptorElementType);
         m_descriptorHeapRuntimeArrayTypes[key] = runtimeArrayType;
 
-        if (deferUnifiedStride)
-        {
-            UnifiedResourceHeapArray entry;
-            entry.runtimeArray = runtimeArrayType;
-            entry.descriptorElementType = descriptorElementType;
-            m_unifiedResourceHeapArrays.add(entry);
-        }
-        else if (stride)
+        SpvInst* strideId = useUnifiedStride ? unifiedStride : stride;
+        if (strideId)
         {
             emitOpDecorateArrayStrideIdEXT(
                 getSection(SpvLogicalSectionID::Annotations),
                 nullptr,
                 runtimeArrayType,
-                stride);
+                strideId);
         }
         else
         {
@@ -7268,76 +7322,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return runtimeArrayType;
     }
 
-    // Decorates every resource descriptor-heap runtime array collected by
-    // `getDescriptorRuntimeArrayType` with one shared `ArrayStrideIdEXT` equal to the maximum of
-    // each participating resource descriptor type's `OpConstantSizeOfEXT`, so a heap holding a mix
-    // of buffer and image descriptors is indexed at the device's unified descriptor stride (the
-    // host packs every descriptor at `max(bufferDescriptorSize, imageDescriptorSize, ...)`). The
-    // maximum is an `OpSpecConstantOp` chain `max(a, b) = Select(UGreaterThan(a, b), a, b)` folded
-    // pairwise, because `OpConstantSizeOfEXT` is a device-defined constant that cannot be folded at
-    // compile time. Must run after all instructions are emitted, once every participating type has
-    // been recorded.
-    void emitUnifiedResourceHeapStrides()
+    // Diagnoses the mutually-exclusive `-spirv-resource-heap-stride` / unified-stride option pair.
+    // The unified flag asks the device to pick one maximum stride; an explicit
+    // `-spirv-resource-heap-stride` pins a fixed literal stride. These intents contradict, so rather
+    // than silently letting one win, diagnose the conflict and require the user to drop one. This
+    // runs once per module emit and fires even when no resource heap is present, because the
+    // contradictory option pair is a command-line mistake independent of shader contents. The
+    // unified stride itself is emitted eagerly by `getDescriptorRuntimeArrayType`, so this function
+    // emits no instructions.
+    void diagnoseConflictingDescriptorHeapStrideOptions()
     {
-        if (m_unifiedResourceHeapArrays.getCount() == 0)
-            return;
-
-        IRBuilder builder(m_irModule);
-        builder.setInsertInto(m_irModule->getModuleInst());
-        auto uintType = builder.getUIntType();
-        auto boolType = builder.getBoolType();
-
-        // Each recorded array has a distinct element type (the runtime-array cache is keyed on it),
-        // so this yields the per-type size of every resource descriptor type present in the module.
-        List<SpvInst*> sizes;
-        for (auto& entry : m_unifiedResourceHeapArrays)
-            sizes.add(emitOpConstantSizeOfEXT(nullptr, uintType, entry.descriptorElementType));
-
-        SpvInst* maxStride = sizes[0];
-        for (Index i = 1; i < sizes.getCount(); ++i)
+        if (isUnifiedResourceHeapStrideEnabled() &&
+            m_targetProgram->getOptionSet().getIntOption(
+                CompilerOptionName::SPIRVResourceHeapStride) != 0)
         {
-            auto greater = emitInst(
-                getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                nullptr,
-                SpvOpSpecConstantOp,
-                boolType,
-                kResultID,
-                SpvOpUGreaterThan,
-                maxStride,
-                sizes[i]);
-            maxStride = emitInst(
-                getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                nullptr,
-                SpvOpSpecConstantOp,
-                uintType,
-                kResultID,
-                SpvOpSelect,
-                greater,
-                maxStride,
-                sizes[i]);
-        }
-
-        // The `ArrayStrideIdEXT` validation rule requires the stride <id> to precede in the binary
-        // the array type it decorates. The shared maximum depends on a descriptor type that may
-        // have been emitted only after the first heap array was created (each array is emitted
-        // lazily, right after its element type), so there is no insertion point that is after every
-        // element type yet before every array. Instead, move each collected array to the end of the
-        // constants section, after the maximum: the maximum (and every element type, emitted during
-        // the walk) then precedes every array. This mirrors the forward-declared-pointer fixup.
-        for (auto& entry : m_unifiedResourceHeapArrays)
-        {
-            auto parent = entry.runtimeArray->parent;
-            entry.runtimeArray->removeFromParent();
-            parent->addInst(entry.runtimeArray);
-        }
-
-        for (auto& entry : m_unifiedResourceHeapArrays)
-        {
-            emitOpDecorateArrayStrideIdEXT(
-                getSection(SpvLogicalSectionID::Annotations),
-                nullptr,
-                entry.runtimeArray,
-                maxStride);
+            m_sink->diagnose(Diagnostics::SpirvConflictingDescriptorHeapStrideOptions{});
         }
     }
 
@@ -11990,9 +11989,9 @@ SlangResult emitSPIRVFromIR(
         }
     } while (context.m_forwardDeclaredPointers.getCount() != 0);
 
-    // Now that every descriptor-heap runtime array has been emitted, decorate the resource arrays
-    // collected for unified-stride mode with their shared maximum stride.
-    context.emitUnifiedResourceHeapStrides();
+    // Diagnose the mutually-exclusive descriptor-heap stride options. The unified stride itself is
+    // emitted eagerly as each resource array is created, so nothing is decorated here.
+    context.diagnoseConflictingDescriptorHeapStrideOptions();
 
     // Emit extensions and capabilities for which there are multiple options available.
     // This is delayed to avoid emitting unnecessary extensions and capabilities if

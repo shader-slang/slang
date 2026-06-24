@@ -1207,7 +1207,8 @@ typedef uint32_t SlangSizeT;
             153, // bool: when set, emit each SPIRV resource descriptor-heap runtime array's
                  //   ArrayStride as the maximum of every resource descriptor type's size, so a
                  //   single heap shared by buffers and images is indexed at the device's unified
-                 //   stride. Opt-in; an explicit `-spirv-resource-heap-stride <N>` still wins.
+                 //   stride. Opt-in; mutually exclusive with an explicit
+                 //   `-spirv-resource-heap-stride <N>` (supplying both is an error).
 
         CountOf,
     };
