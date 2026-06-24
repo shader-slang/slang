@@ -1656,18 +1656,6 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     return true;
 }
 
-static GenericDecl* getGenericInterfaceRequirementDeclForConstraint(
-    GenericTypeConstraintDecl* constraintDecl)
-{
-    if (auto parentGenericDecl = as<GenericDecl>(constraintDecl->parentDecl))
-    {
-        if (parentGenericDecl->inner == constraintDecl)
-            return parentGenericDecl;
-    }
-
-    return nullptr;
-}
-
 IRInst* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl)
 {
     // Only specific types of decls are treated as requirements, e.g. methods and asssociated types.
@@ -10847,10 +10835,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             IRInst* irSatisfyingVal = nullptr;
             auto requiredConstraintDecl = as<GenericTypeConstraintDecl>(requiredMemberDecl);
-            auto genericRequirementDecl =
-                requiredConstraintDecl
-                    ? getGenericInterfaceRequirementDeclForConstraint(requiredConstraintDecl)
-                    : nullptr;
+            auto genericRequirementDecl = requiredConstraintDecl
+                                              ? as<GenericDecl>(requiredConstraintDecl->parentDecl)
+                                              : nullptr;
+            if (genericRequirementDecl && genericRequirementDecl->inner != requiredConstraintDecl)
+                genericRequirementDecl = nullptr;
             if (genericRequirementDecl)
             {
                 // A generic interface requirement key lowers to an IR generic, so its satisfying
@@ -11900,8 +11889,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // entry for the associated type's bound.
                 // (Equality constraints, e.g. `__constraint A == B`, are handled by the
                 // generic path below.)
-                if (auto genericParent = getGenericInterfaceRequirementDeclForConstraint(
-                        relocatedSubtypeConstraint.getDecl()))
+                auto genericParent =
+                    as<GenericDecl>(relocatedSubtypeConstraint.getDecl()->parentDecl);
+                if (genericParent && genericParent->inner != relocatedSubtypeConstraint.getDecl())
+                    genericParent = nullptr;
+                if (genericParent)
                 {
                     // `[Differentiable]` on a generic interface requirement is represented as a
                     // sibling `generic { constraint }` requirement. Its `sup` type mentions the
