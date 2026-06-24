@@ -14,8 +14,9 @@
 // Without the flag (control): each heap array carries its own per-type OpConstantSizeOfEXT, no max chain.
 //TEST:SIMPLE(filecheck=DEFAULT): -target spirv-asm -entry computeMain -stage compute -capability spvDescriptorHeapEXT
 
-// Conflict: the explicit literal stride and the unified maximum stride are mutually exclusive, so
-// passing both is a hard error rather than silently letting one win.
+// Conflict: a non-zero explicit literal stride and the unified maximum stride are mutually
+// exclusive, so combining them is a hard error rather than silently letting one win. (An explicit
+// stride of 0 selects the same default path the unified option modifies and is accepted.)
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CONFLICT): -target spirv-asm -entry computeMain -stage compute -capability spvDescriptorHeapEXT -spirv-resource-heap-stride 64 -spirv-unified-descriptor-heap-stride
 
 // Single resource category: a shader that uses ONLY a constant buffer must STILL advertise the
