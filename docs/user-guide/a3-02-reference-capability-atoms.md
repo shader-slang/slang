@@ -474,6 +474,10 @@ Extensions
 `GL_EXT_samplerless_texture_functions`
 > Represents the GL_EXT_samplerless_texture_functions extension.
 
+`GL_EXT_shader_abort`
+> Represents the GL_EXT_shader_abort extension for GLSL targets, or the
+> corresponding spvAbort capability for SPIR-V targets.
+
 `GL_EXT_shader_atomic_float`
 > Represents the GL_EXT_shader_atomic_float extension.
 
@@ -637,6 +641,9 @@ Extensions
 `SPV_GOOGLE_user_type`
 > Represents the SPIR-V extension for SPV_GOOGLE_user_type.
 
+`SPV_KHR_abort`
+> Represents the SPIR-V extension for shader abort (SPV_KHR_abort).
+
 `SPV_KHR_bfloat16`
 > Represents the SPIR-V extension for BFloat16 types.
 
@@ -719,6 +726,9 @@ Extensions
 
 `ser_hlsl_native`
 > DXR 1.3 native SER support (SM 6.9, no NVAPI required)
+
+`spvAbort`
+> Represents the SPIR-V AbortKHR capability for OpAbortKHR.
 
 `spvAtomicFloat16AddEXT`
 > Represents the SPIR-V capability for atomic float 16 add operations.
@@ -915,6 +925,9 @@ Extensions
 Compound Capabilities
 ----------------------
 *Capabilities to specify capabilities created by other capabilities (`raytracing`, `meshshading`...)*
+
+`abort`
+> Capabilities required to use 'abort'
 
 `amplification_mesh`
 > Collection of shader stages

@@ -295,6 +295,7 @@ return {
 	["RequireComputeDerivative"] = 297,
 	["StaticAssert"] = 298,
 	["Printf"] = 299,
+	["Abort"] = 864,
 	["RequireMaximallyReconverges"] = 300,
 	["RequireQuadDerivatives"] = 301,
 	["add"] = 302,
@@ -836,5 +837,6 @@ return {
 	["Decoration.BuiltinRequirementDecoration"] = 860,
 	["builtinRequirementKey"] = 861,
 	["ImageTexelPointer"] = 862,
-	["Decoration.shader64BitIndexing"] = 863
+	["Type.MetalPackedVec"] = 863,
+	["Decoration.shader64BitIndexing"] = 864
 }

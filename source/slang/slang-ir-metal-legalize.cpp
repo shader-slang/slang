@@ -172,7 +172,18 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
         if (auto ptrType = as<IRPtrTypeBase>(type))
         {
             if (ptrType->hasAddressSpace())
-                return ptrType->getAddressSpace();
+            {
+                auto addrSpace = ptrType->getAddressSpace();
+                // Pointers into buffer elements (e.g. produced by
+                // lowerBufferElementTypeToStorageType) carry the abstract
+                // `StorageBuffer` address space. Metal has no distinct
+                // storage-buffer address space — such pointers live in
+                // `device` memory — so map them to `Global`, which the
+                // Metal emitter renders as `device*`.
+                if (addrSpace == AddressSpace::StorageBuffer)
+                    return AddressSpace::Global;
+                return addrSpace;
+            }
             return AddressSpace::Generic;
         }
         return AddressSpace::Generic;

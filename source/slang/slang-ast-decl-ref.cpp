@@ -867,6 +867,7 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
             break;
         if ((as<GenericTypeConstraintDecl>(declRef.getDecl()) ||
              as<TypeCoercionConstraintDecl>(declRef.getDecl()) ||
+             as<GenericVariadicPackCountConstraintDecl>(declRef.getDecl()) ||
              as<HasDiffTypeInfoConstraintDecl>(declRef.getDecl())) &&
             dd == declRef.getDecl()->parentDecl)
             continue;

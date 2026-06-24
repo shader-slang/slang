@@ -2,6 +2,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -line-directive-mode none
 
 struct PartlyDiffable : IDifferentiable
+/*CHECK:
+       ^^^^^^^^^^^^^^ candidate: PartlyDiffable.Differential.init(float)
+*/
 {
     no_diff float noDiffMember;
     float diffMember;

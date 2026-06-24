@@ -915,6 +915,48 @@ SLANG_UNIT_TEST(vtableIMetadata)
 }
 
 // ---------------------------------------------------------------------------
+// IBindlessResourceMetadata : ISlangCastable  (own slot 4)
+// ---------------------------------------------------------------------------
+struct IBindlessResourceMetadataProbe : IBindlessResourceMetadata
+{
+    int lastSlot = -1;
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const&, void**) SLANG_OVERRIDE
+    {
+        lastSlot = 0;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
+    {
+        lastSlot = 1;
+        return 1;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        lastSlot = 2;
+        return 1;
+    }
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID&) SLANG_OVERRIDE
+    {
+        lastSlot = 3;
+        return nullptr;
+    }
+    SLANG_NO_THROW bool SLANG_MCALL usesBindlessResourceHeap() SLANG_OVERRIDE
+    {
+        lastSlot = 4;
+        return false;
+    }
+};
+
+SLANG_UNIT_TEST(vtableIBindlessResourceMetadata)
+{
+    IBindlessResourceMetadataProbe p;
+    callSlot(&p, 3);
+    SLANG_CHECK(p.lastSlot == 3); // castAs
+    callSlot(&p, 4);
+    SLANG_CHECK(p.lastSlot == 4); // usesBindlessResourceHeap
+}
+
+// ---------------------------------------------------------------------------
 // ICoverageTracingMetadata : ISlangCastable  (own slots 4-7)
 // ---------------------------------------------------------------------------
 struct ICoverageTracingMetadataProbe : ICoverageTracingMetadata

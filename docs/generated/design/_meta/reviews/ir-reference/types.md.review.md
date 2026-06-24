@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T15:06:28+00:00
+reviewed_at: 2026-06-12T12:06:22+00:00
 target_doc: ir-reference/types.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: pass
+  factual_accuracy: partial
   cross_references: pass
   completeness: partial
   style_consistency: pass
-  source_alignment: pass
+  source_alignment: partial
   front_matter_validity: pass
 finding_count: 2
 severity_breakdown:
-  critical: 0
-  major: 2
+  critical: 1
+  major: 1
   minor: 0
   nit: 0
 ---
@@ -24,18 +24,18 @@ severity_breakdown:
 # Review report for ir-reference/types.md
 
 ## Summary
-The page is broadly source-aligned: front matter is valid, links resolve, and the Type-family opcode table covers the concrete Lua entries I checked. The remaining issues are prompt-contract gaps: `Enum` is required as a notable opcode but is absent, and many sub-tables do not include the required lowering or builder citation.
+The page has valid front matter, required sections, and resolving links. I found one critical representation error for `interface` and one Type-family coverage gap: two concrete stable Type opcodes are absent from the opcode tables.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show ir-reference/types.md` and verified the prompt, dependency list, watched paths, target source commit, and digest against the document front matter.
-- Read the target doc, `_common.md`, `ir-reference-types.md`, and the dependency docs `cross-cutting/ir-instructions.md`, `pipeline/04-ast-to-ir.md`, and `ast-reference/types.md`.
-- Resolved all 23 relative links in the target document against `52339028a2aa703271533454c6b9528a534bac31`.
-- Checked all required IR-reference sections and extracted 154 opcode rows from the `## Opcodes` tables.
-- Spot-checked more than 10 factual claims against `source/slang/slang-ir-insts.lua`, including `Void`, `Int`, `Array`, `UnsizedArray`, `Func`, `Vec`, `Mat`, `Enum`, `Ptr`, `AnyValueType`, `BindExistentials`, `BoundInterface`, `TextureType`, `witness_table_t`, `RateQualified`, `TaggedUnionType`, and `OptionalNoneType`.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show ir-reference/types.md`.
+- Read `_common.md`, `ir-reference-types.md`, the target document including front matter, dependency docs, and watched source files.
+- Resolved the document's relative Markdown links and checked peer generated-doc links against the generated-doc tree.
+- Checked required Type-family sections, table columns, front matter, hierarchy coverage, notable-opcode coverage, and selected dependency cross-references.
+- Spot-checked more than 10 factual claims against source for `Void`, `Bool`, `Int`, `UIntPtr`, `CapabilitySet`, `AnyValueType`, `RawPointerType`, `Array`, `UnsizedArray`, `Func`, `Vec`, `Mat`, `Enum`, `TextureType`, `interface`, `associated_type`, `Ptr`, `witness_table_t`, `RateQualified`, `TaggedUnionType`, and `OptionalNoneType`.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Notable opcodes`, lines 360-449 | The per-document prompt requires `Enum` to be covered in `## Notable opcodes`, but the section has no `Enum` callout. The table row alone does not explain the parent opcode behavior or case children that the prompt asks to highlight. | `docs/generated/design/_meta/prompts/ir-reference-types.md:61` requires `Enum` coverage; `source/slang/slang-ir-insts.lua:137` defines `Enum` with `tagType` and `parent = true`; `source/slang/slang-ir.cpp:5068-5070` creates `kIROp_EnumType` with the tag type. | Add a `### Enum` notable callout explaining the `tagType` operand and parent relationship to enum case children. |
-| F-002 | major | `## Opcodes`, lines 95-358 | The type prompt requires at least one row in each sub-table to cite a `slang-lower-to-ir.cpp` visitor or `IRBuilder::getXType` helper, but many sub-tables only name AST categories or synthesized origins. For example, the basic scalar rows use `BasicExpressionType(...)`, and the array rows use `ArrayExpressionType`, with no concrete lowering or builder citation in those sub-tables. | `docs/generated/design/_meta/prompts/ir-reference-types.md:84-85` requires one such citation per sub-table; concrete helpers exist in `source/slang/slang-ir.cpp:2943` for `IRBuilder::getVectorType`, `source/slang/slang-ir.cpp:5053-5070` for struct, class, and enum creation, and `source/slang/slang-lower-to-ir.cpp:897` for the `lowerType` family. | Add at least one concrete lowering visitor or `IRBuilder::getXType` helper citation to every type sub-table, either in an AST-origin cell or a short sentence immediately before the table. |
+| F-001 | critical | `### Existentials and interfaces` | The `interface` row says the opcode owns `interface_req_entry` children, but source lowering stores those entries as operands on `IRInterfaceType`, and the Lua declaration is `global`, not `parent`. This can mislead pass authors into traversing children and missing requirements. | `source/slang/slang-ir-insts.lua:656` declares `interface` as `global = true`; `source/slang/slang-lower-to-ir.cpp:11697-11698` creates the interface with an operand count; `source/slang/slang-lower-to-ir.cpp:11915-11919` writes entries with `irInterface->setOperand(entryIndex, constraintEntry)`. | Change the operands cell and summary to say `interface_req_entry` instances are operands of `IRInterfaceType`, and cross-link to `structure.md` for the representation distinction from `witness_table` children. |
+| F-002 | major | `## Opcodes` | The Type-family table omits `AfterBaseType` and `AfterRawPointerTypeBase`. They are concrete stable opcode entries in the Type family even though they look like range sentinels, so the IR-reference coverage rule requires them to be listed or explicitly explained. | `source/slang/slang-ir-insts.lua:42` declares `AfterBaseType`; `source/slang/slang-ir-insts.lua:67` declares `AfterRawPointerTypeBase`; `source/slang/slang-ir-insts-stable-names.lua:22` and `source/slang/slang-ir-insts-stable-names.lua:30` assign both stable opcode names. | Add rows for both sentinel-like Type opcodes, with summaries that explain their range-marker role, or add an explicit note in the table if the prompt is changed to exclude stable sentinel opcodes. |

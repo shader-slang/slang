@@ -13,15 +13,14 @@ on:
       runs-on:
         required: false
         type: string
-        default: '["Linux", "self-hosted", "GPU"]'
+        # Require the "GCP" label so these jobs run only on the GCP
+        # scaler-managed pool, never on the nvrgfx Colossus hosts that share
+        # the "Linux, self-hosted, GPU" label set. See extras/scaler.
+        default: '["Linux", "self-hosted", "GPU", "GCP"]'
       gpu-tier:
         required: false
         type: string
         default: t4
-      run-rhi-tests:
-        required: false
-        type: boolean
-        default: true
       enable-debug-layers:
         required: false
         type: boolean
@@ -43,13 +42,10 @@ jobs:
 
     permissions:
       contents: read
-      packages: read
+      packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
 
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
       options: >-
         --gpus all
         --user root
@@ -77,7 +73,7 @@ jobs:
       - name: Configure Git safe directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           submodules: "recursive"
           fetch-depth: "1"
@@ -86,7 +82,7 @@ jobs:
         uses: ./.github/actions/setup-vulkan-icd
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}
           path: artifacts
@@ -246,179 +242,9 @@ jobs:
       # sensitive in-memory state.
       - name: Upload core dump backtraces
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: cores-test-slang-${{ inputs.config }}-${{ inputs.gpu-tier }}
-          path: backtraces/
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: GPU post-test diagnostics
-        if: failure()
-        run: |
-          gpu_crashed=0
-          echo "=== GPU State ==="
-          if ! nvidia-smi 2>&1; then
-            echo "nvidia-smi FAILED (GPU may have crashed)"
-            echo "::error::GPU crashed during tests — retrying may help."
-            gpu_crashed=1
-          fi
-          echo ""
-          echo "=== GPU Memory & ECC ==="
-          nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
-            --format=csv,noheader 2>&1 || true
-          echo ""
-          echo "=== XID Errors ==="
-          nvidia-smi -q -d XID_ERRORS 2>&1 || true
-          echo ""
-          echo "=== GPU Process State ==="
-          nvidia-smi pmon -c 1 2>&1 || true
-          echo ""
-          echo "=== Kernel GPU Messages ==="
-          dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
-          sudo dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
-          echo "(dmesg not available in container)"
-          if [[ "$gpu_crashed" -eq 1 ]]; then
-            exit 1
-          fi
-
-  test-slang-rhi:
-    if: inputs.run-rhi-tests && inputs.gpu-tier == 't4'
-    runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 30
-
-    permissions:
-      contents: read
-      packages: read
-
-    container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-      options: >-
-        --gpus all
-        --user root
-        --cap-add SYSLOG
-        ${{ inputs.gpu-tier == 't4' && '--device /dev/nvidia-modeset:/dev/nvidia-modeset' || '' }}
-        --device /dev/dri:/dev/dri
-        -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
-        -v /usr/share/nvidia:/usr/share/nvidia:ro
-        -v /var/cores:/var/cores
-
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      - name: GPU health check
-        run: |
-          if ! output=$(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>&1); then
-            echo "nvidia-smi output: $output"
-            echo "::error::GPU health check failed — this VM has a faulty GPU. Re-run to get a new VM."
-            exit 1
-          fi
-          echo "GPU: $output"
-
-      - name: Configure Git safe directory
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-      - uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
-          fetch-depth: "1"
-
-      - name: Setup Vulkan ICD
-        uses: ./.github/actions/setup-vulkan-icd
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}
-          path: artifacts
-
-      - name: Setup test environment
-        run: |
-          if [[ "${{ inputs.config }}" == "release" ]]; then
-            cmake_config="Release"
-          else
-            cmake_config="Debug"
-          fi
-          echo "cmake_config=$cmake_config" >> $GITHUB_ENV
-
-          bin_dir="$PWD/artifacts/${cmake_config}/bin"
-          echo "bin_dir=$bin_dir" >> $GITHUB_ENV
-
-          chmod +x "$bin_dir"/* 2>/dev/null || true
-          echo "LD_LIBRARY_PATH=$PWD/artifacts/${cmake_config}/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-
-          # Display environment configuration
-          print-env-info
-
-      # Cores land in /var/cores via the host's kernel.core_pattern (set in
-      # the scaler's startup.sh on the host). gdb is baked into the container
-      # image so the post-test step can extract backtraces.
-
-      - name: Run slang-rhi tests
-        run: |
-          ulimit -c unlimited
-          export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
-          "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
-
-      - name: Run slang-rhi tests (OptiX 8.0)
-        run: |
-          ulimit -c unlimited
-          "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80000 -tc="ray-tracing-*.cuda"
-
-      - name: Run slang-rhi tests (OptiX 8.1)
-        run: |
-          ulimit -c unlimited
-          "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"
-
-      # Same gdb-extraction logic as the test-slang job; see commentary there.
-      - name: Capture core dump backtraces
-        if: always()
-        shell: bash
-        run: |
-          shopt -s nullglob
-          for benign in test-process gfx-smoke; do
-            rm -f "/var/cores/core.$benign".*
-          done
-          cores=(/var/cores/core.*)
-          if [ "${#cores[@]}" -eq 0 ]; then
-            echo "No interesting core dumps captured."
-            exit 0
-          fi
-          echo "Captured ${#cores[@]} core dump(s):"
-          ls -lh "${cores[@]}"
-          mkdir -p backtraces
-          for c in "${cores[@]}"; do
-            name=$(basename "$c")
-            exe_name=${name#core.}
-            exe_name=${exe_name%.*}
-            exe_path="$bin_dir/$exe_name"
-            if [ ! -x "$exe_path" ]; then
-              exe_path=""
-            fi
-            bt_file="backtraces/$name.bt.txt"
-            echo "=== Backtrace for $name (exe=$exe_path) ===" | tee "$bt_file"
-            gdb -batch \
-              -ex "set pagination off" \
-              -ex "set print pretty on" \
-              -ex "thread apply all bt full" \
-              -ex "info registers" \
-              -ex "x/i \$pc" \
-              -ex "x/16i \$pc-32" \
-              -ex "info sharedlibrary" \
-              -ex "maintenance info sections" \
-              ${exe_path:+"$exe_path"} "$c" 2>&1 | tee -a "$bt_file" || true
-          done
-
-      - name: Upload core dump backtraces
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cores-test-slang-rhi-${{ inputs.config }}
           path: backtraces/
           if-no-files-found: ignore
           retention-days: 7
