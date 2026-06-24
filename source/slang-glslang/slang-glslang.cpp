@@ -190,6 +190,9 @@ extern "C"
 }
 
 // Disassemble the given SPIRV-ASM instructions and return the result as a string.
+//
+// On success, when `outString` is non-null, `*outString` is set to a heap buffer allocated with
+// `new char[]`; the caller takes ownership and must release it with `delete[]` (see #10988).
 extern "C"
 #ifdef _MSC_VER
     _declspec(dllexport)
