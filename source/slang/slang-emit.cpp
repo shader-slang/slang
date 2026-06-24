@@ -1107,20 +1107,20 @@ Result linkAndOptimizeIR(
             });
             return SLANG_FAIL;
         }
-        // Metal's MSL only supports 32-bit atomic operations;
-        // `atomic_fetch_add_explicit` with `atomic_ulong` is not in the Metal
-        // atomic API and the metal compiler rejects it. Cap to 4 bytes regardless
-        // of the user-specified or default (8-byte) width.
-        if (isMetalTarget(targetRequest) && counterByteWidth > 4)
-            counterByteWidth = 4;
-        // Opt-in boolean mode (off by default): record whether each entry
-        // executed (non-atomic store of 1) instead of an exact count.
+        // Metal's MSL atomic API only provides 32-bit atomics; `atomic_ulong`
+        // does not exist and the Metal compiler rejects it. This is a platform
+        // limitation, not a caller error, so we silently cap to 4 bytes rather
+        // than failing — the validated width is already 4 or 8 at this point.
+        // Boolean mode uses non-atomic stores so the width is irrelevant there;
+        // skip the cap to leave counterByteWidth untouched for that path.
         bool coverageBoolean = false;
         if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
         {
             if (values->getCount() > 0)
                 coverageBoolean = (*values)[0].intValue != 0;
         }
+        if (isMetalTarget(targetRequest) && counterByteWidth > 4 && !coverageBoolean)
+            counterByteWidth = 4;
         SLANG_PASS(
             instrumentCoverage,
             sink,
