@@ -173,6 +173,7 @@ def fetch_gpu_quota(metrics=None):
         for region in config.get("regions", []):
             metrics_by_region.setdefault(region, set()).add(config["metric"])
 
+    errors = []
     for region in metrics_by_region:
         cmd = [
             "gcloud", "compute", "regions", "describe", region,
@@ -187,17 +188,21 @@ def fetch_gpu_quota(metrics=None):
             return None
         except subprocess.TimeoutExpired:
             print(f"Warning: timeout fetching GPU quota for {region}", file=sys.stderr)
+            errors.append(f"{region}: timeout")
             continue
         if result.returncode != 0:
+            error = result.stderr.strip() or f"gcloud exited {result.returncode}"
             print(
-                f"Warning: gcloud failed for {region}: {result.stderr.strip()}",
+                f"Warning: gcloud failed for {region}: {error}",
                 file=sys.stderr,
             )
+            errors.append(f"{region}: {error}")
             continue
         try:
             data = json.loads(result.stdout)
         except json.JSONDecodeError:
             print(f"Warning: invalid GPU quota JSON for {region}", file=sys.stderr)
+            errors.append(f"{region}: invalid JSON")
             continue
 
         wanted_metrics = metrics_by_region[region]
@@ -213,6 +218,7 @@ def fetch_gpu_quota(metrics=None):
                     f"Warning: invalid quota values for {metric} in {region}",
                     file=sys.stderr,
                 )
+                errors.append(f"{region}/{metric}: invalid quota values")
                 continue
             bucket = by_metric[metric]
             bucket["regions"][region] = {"usage": usage, "limit": limit}
@@ -228,6 +234,9 @@ def fetch_gpu_quota(metrics=None):
         return None
 
     result = {"by_metric": by_metric}
+    if errors:
+        result["partial"] = True
+        result["errors"] = errors
     legacy = by_metric.get(GPU_QUOTA_METRIC)
     if legacy:
         result.update({
@@ -305,14 +314,21 @@ def fetch_recent_failures(repo):
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
     from gh_api import gh_api_list
 
+    now = datetime.now(timezone.utc)
+    cutoff_dt = now - timedelta(hours=3)
+    # Query a wider creation window than the displayed update window so a
+    # longer-running CI job that finishes recently is still eligible.
+    created_from = (cutoff_dt - timedelta(hours=6)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    created_to = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     runs, err = gh_api_list(
-        f"repos/{repo}/actions/runs?status=completed&per_page=20",
+        f"repos/{repo}/actions/runs?status=completed&per_page=100"
+        f"&created={created_from}..{created_to}",
         "workflow_runs",
     )
     if err:
-        return []
+        return {"failures": [], "partial": True, "errors": [err]}
 
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    cutoff = cutoff_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     failures = []
     for run in (runs or []):
         if run.get("name") != "CI":
@@ -330,25 +346,34 @@ def fetch_recent_failures(repo):
             "created_at": event_time,
             "actor": (run.get("actor") or {}).get("login", ""),
         })
-    return failures[:10]
+    return {"failures": failures[:10], "partial": False, "errors": []}
 
 
 def fetch_merge_queue_status(repo):
     """Fetch recent merge queue CI runs (last 24 hours).
 
-    Returns a dict with 'recent' (list of runs), 'summary' counts.
+    Returns a dict with 'recent' runs, 'summary' counts, and partial status.
     """
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
     from gh_api import gh_api_list, parse_merge_queue_pr_number
 
+    now = datetime.now(timezone.utc)
+    cutoff_dt = now - timedelta(hours=24)
+    cutoff = cutoff_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    created_to = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     runs, err = gh_api_list(
-        f"repos/{repo}/actions/runs?event=merge_group&per_page=50",
+        f"repos/{repo}/actions/runs?event=merge_group&per_page=100"
+        f"&created={cutoff}..{created_to}",
         "workflow_runs",
     )
     if err:
-        return None
+        return {
+            "recent": [],
+            "summary": {"success": 0, "failure": 0, "cancelled": 0, "in_progress": 0},
+            "partial": True,
+            "errors": [err],
+        }
 
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
     recent = []
     counts = {"success": 0, "failure": 0, "cancelled": 0, "in_progress": 0}
     for run in (runs or []):
@@ -374,7 +399,7 @@ def fetch_merge_queue_status(repo):
             "updated_at": run.get("updated_at", ""),
         })
 
-    return {"recent": recent, "summary": counts}
+    return {"recent": recent, "summary": counts, "partial": False, "errors": []}
 
 
 def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None, hosted_runner_usage=None):
@@ -386,6 +411,12 @@ def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None, hosted
     snapshot = {"timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ")}
 
     if queue_data:
+        if queue_data.get("partial"):
+            snapshot["queue_partial"] = True
+            if queue_data.get("list_errors"):
+                snapshot["queue_list_errors"] = queue_data["list_errors"]
+            if queue_data.get("job_fetch_errors"):
+                snapshot["queue_job_fetch_errors"] = queue_data["job_fetch_errors"]
         # Aggregate runner counts by group
         summary = queue_data.get("summary", {})
         snapshot["jobs_queued"] = summary.get("jobs_queued", 0)
@@ -416,6 +447,10 @@ def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None, hosted
 
     # GPU quota per region
     if gpu_quota:
+        if gpu_quota.get("partial"):
+            snapshot["gpu_quota_partial"] = True
+            if gpu_quota.get("errors"):
+                snapshot["gpu_quota_errors"] = gpu_quota["errors"]
         by_metric = _normalize_gpu_quota_by_metric(gpu_quota)
         if by_metric:
             snapshot["gpu_quota_by_metric"] = by_metric
@@ -425,7 +460,12 @@ def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None, hosted
 
     # Merge queue summary
     if mq_data:
-        snapshot["merge_queue"] = mq_data.get("summary", {})
+        if mq_data.get("partial"):
+            snapshot["merge_queue_partial"] = True
+            if mq_data.get("errors"):
+                snapshot["merge_queue_errors"] = mq_data["errors"]
+        else:
+            snapshot["merge_queue"] = mq_data.get("summary", {})
 
     if hosted_runner_usage:
         snapshot["hosted_runner_usage"] = hosted_runner_usage
@@ -557,8 +597,10 @@ def _build_gpu_quota_charts(snapshots):
 
         region_series = {
             region: [
-                quota.get("regions", {}).get(region, {}).get("usage", 0)
-                for quota in metric_snapshots
+                None
+                if snapshots[i].get("gpu_quota_partial")
+                else quota.get("regions", {}).get(region, {}).get("usage", 0)
+                for i, quota in enumerate(metric_snapshots)
             ]
             for region in regions
         }
@@ -715,18 +757,34 @@ def build_history_chart(snapshots):
     gcp_vm_groups = GCP_VM_GROUPS
     palette = GCP_VM_PALETTE
 
-    # Queue depth over time
-    queued_data = [s.get("jobs_queued", 0) for s in snapshots]
-    running_data = [s.get("jobs_running", 0) for s in snapshots]
+    # Queue depth over time. Partial queue samples are known undercounts,
+    # so render them as gaps rather than false-low points.
+    queued_data = [
+        None if s.get("queue_partial") else s.get("jobs_queued", 0)
+        for s in snapshots
+    ]
+    running_data = [
+        None if s.get("queue_partial") else s.get("jobs_running", 0)
+        for s in snapshots
+    ]
 
     # Active CI workflow runs over time
-    runs_in_progress = [s.get("runs_in_progress", 0) for s in snapshots]
-    runs_queued = [s.get("runs_queued", 0) for s in snapshots]
+    runs_in_progress = [
+        None if s.get("queue_partial") else s.get("runs_in_progress", 0)
+        for s in snapshots
+    ]
+    runs_queued = [
+        None if s.get("queue_partial") else s.get("runs_queued", 0)
+        for s in snapshots
+    ]
 
     # Build per-group data series
     group_series = {}
     for g in gcp_vm_groups:
-        group_series[g] = [s.get("runner_groups", {}).get(g, {}).get("total", 0) for s in snapshots]
+        group_series[g] = [
+            None if s.get("queue_partial") else s.get("runner_groups", {}).get(g, {}).get("total", 0)
+            for s in snapshots
+        ]
 
     gpu_quota_charts = _build_gpu_quota_charts(snapshots)
 
@@ -736,9 +794,29 @@ def build_history_chart(snapshots):
 
     # Merge queue cumulative success/failure from snapshots
     # Each snapshot records the running 24h totals; we just plot them over time.
-    mq_success_data = [s.get("merge_queue", {}).get("success", 0) for s in snapshots]
-    mq_failure_data = [s.get("merge_queue", {}).get("failure", 0) for s in snapshots]
+    mq_success_data = [
+        None if s.get("merge_queue_partial") else s.get("merge_queue", {}).get("success", 0)
+        for s in snapshots
+    ]
+    mq_failure_data = [
+        None if s.get("merge_queue_partial") else s.get("merge_queue", {}).get("failure", 0)
+        for s in snapshots
+    ]
     has_mq_snapshots = any(s.get("merge_queue") for s in snapshots)
+    partial_notes = []
+    if any(s.get("queue_partial") for s in snapshots):
+        partial_notes.append("queue")
+    if any(s.get("gpu_quota_partial") for s in snapshots):
+        partial_notes.append("GPU quota")
+    if any(s.get("merge_queue_partial") for s in snapshots):
+        partial_notes.append("merge queue")
+    partial_note_html = ""
+    if partial_notes:
+        partial_note_html = (
+            '<p style="color:#6c757d">Some '
+            + ", ".join(partial_notes)
+            + " samples were partial; affected chart points are rendered as gaps.</p>"
+        )
 
     charts_html = (
         chart_section("runnerHistory", "GCP Runner VMs",
@@ -775,6 +853,7 @@ def build_history_chart(snapshots):
     <option value="24" selected>Last 24 hours</option>
   </select>
 </div>
+{partial_note_html}
 {charts_html}
 <script src="{CHARTJS_CDN}"></script>
 <script>
@@ -1162,6 +1241,12 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_
     queue_html = ""
     if queue_data:
         summary = queue_data.get("summary", {})
+        partial_html = ""
+        if queue_data.get("partial"):
+            partial_html = (
+                '<p style="color:#6c757d">Queue sample is partial and may undercount '
+                "running or queued jobs (GitHub Actions API failure during collection).</p>"
+            )
         queue_html = f"""
 <div>
   <div class="stat-card"><div class="value">{summary.get('jobs_queued', 0)}</div><div class="label">Jobs Queued</div></div>
@@ -1169,6 +1254,7 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_
   <div class="stat-card"><div class="value">{summary.get('runs_queued', 0)}</div><div class="label">Runs Queued</div></div>
   <div class="stat-card"><div class="value">{summary.get('runs_in_progress', 0)}</div><div class="label">Runs In Progress</div></div>
 </div>
+{partial_html}
 """
         # Queue depth by group
         groups = queue_data.get("queue_by_group", [])
@@ -1220,9 +1306,19 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_
 
     # Recent failures section
     failures_html = ""
-    if failures:
+    failures_partial = False
+    failure_entries = failures or []
+    if isinstance(failures, dict):
+        failures_partial = failures.get("partial", False)
+        failure_entries = failures.get("failures", [])
+    if failures_partial:
+        failures_html = (
+            "<p>Recent CI failure data unavailable "
+            "(GitHub Actions API failure during collection).</p>"
+        )
+    elif failure_entries:
         failures_html = '<table><tr><th>Branch</th><th>Actor</th><th>Time</th></tr>\n'
-        for f in failures:
+        for f in failure_entries:
             branch = f.get("branch", "")
             actor = f.get("actor", "")
             url = f.get("url", "")
@@ -1235,7 +1331,12 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_
 
     # Merge queue section
     mq_html = ""
-    if mq_data:
+    if mq_data and mq_data.get("partial"):
+        mq_html = (
+            "<p>Merge queue status unavailable "
+            "(GitHub Actions API failure during collection).</p>"
+        )
+    elif mq_data:
         summary = mq_data.get("summary", {})
         fail_rate = 0
         sf_total = summary.get("success", 0) + summary.get("failure", 0)
@@ -1317,12 +1418,21 @@ def main():
     if gpu_quota:
         for quota in _normalize_gpu_quota_by_metric(gpu_quota).values():
             print(f"  {quota.get('name', 'GPU')} GPUs: {quota['usage']}/{quota['limit']} in use")
+        if gpu_quota.get("partial"):
+            print(
+                f"  Warning: GPU quota sample is partial "
+                f"({len(gpu_quota.get('errors', []))} region errors); "
+                f"chart points will render as gaps.",
+                file=sys.stderr,
+            )
     else:
         print("  GPU quota unavailable (gcloud not configured or not accessible)")
 
     print("Fetching merge queue status...")
     mq_data = fetch_merge_queue_status(args.repo)
-    if mq_data:
+    if mq_data and mq_data.get("partial"):
+        print("  Merge queue data unavailable")
+    elif mq_data:
         s = mq_data["summary"]
         print(f"  24h: {s['success']} passed, {s['failure']} failed, {s['cancelled']} cancelled, {s['in_progress']} in progress")
     else:
