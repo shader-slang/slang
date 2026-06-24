@@ -4353,6 +4353,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                 case AddressSpace::StorageBuffer:
                 case AddressSpace::UserPointer:
+                // `Uniform` is the legacy SSBO/UBO storage class emitted when
+                // targeting SPIR-V < 1.4 (before `StorageBuffer` existed); its
+                // atomics likewise belong to the UniformMemory semantics class.
+                case AddressSpace::Uniform:
                     memoryClass = SpvMemorySemanticsUniformMemoryMask;
                     break;
                 case AddressSpace::Image:
