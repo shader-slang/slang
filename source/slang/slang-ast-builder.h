@@ -743,7 +743,7 @@ public:
     DeclaredVariadicPackCountWitness* getDeclaredVariadicPackCountWitness(
         DeclRef<GenericVariadicPackCountConstraintDecl> declRef);
     ConcreteVariadicPackCountWitness* getConcreteVariadicPackCountWitness(
-        Val* pack,
+        IntVal* actualCount,
         IntVal* expectedCount);
     HasDiffTypeInfoWitness* getHasDiffTypeInfoWitness(
         DeclRef<HasDiffTypeInfoConstraintDecl> declRef);

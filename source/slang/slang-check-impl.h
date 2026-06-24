@@ -4201,13 +4201,13 @@ Witness* findNonEmptyPackWitnessForConstraint(
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError);
 
-// Return the witness that proves `countof(constrainedArg) == expectedCount`,
-// or `nullptr` if the concrete count or an in-scope declared constraint cannot
-// prove that equality.
+// Return the witness that proves `actualCount == expectedCount`, or `nullptr`
+// if the concrete count or an in-scope declared constraint cannot prove that
+// equality.
 Witness* findVariadicPackCountWitnessForConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
-    Val* constrainedArg,
+    IntVal* actualCount,
     IntVal* expectedCount,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError);

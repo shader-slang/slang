@@ -1518,8 +1518,8 @@ Val* DeclaredVariadicPackCountWitness::_substituteImplOverride(
 void ConcreteVariadicPackCountWitness::_toTextOverride(StringBuilder& out)
 {
     out.append("pack_count_witness(");
-    if (auto pack = getPack())
-        pack->toText(out);
+    if (auto actualCount = getActualCount())
+        actualCount->toText(out);
     else
         out.append("<null>");
     out.append(", ");
@@ -1532,12 +1532,13 @@ void ConcreteVariadicPackCountWitness::_toTextOverride(StringBuilder& out)
 
 Val* ConcreteVariadicPackCountWitness::_resolveImplOverride()
 {
-    auto resolvedPack = getPack() ? getPack()->resolve() : nullptr;
-    auto resolvedCount = getExpectedCount() ? as<IntVal>(getExpectedCount()->resolve()) : nullptr;
-    if (resolvedPack != getPack() || resolvedCount != getExpectedCount())
+    auto resolvedActualCount = getActualCount() ? as<IntVal>(getActualCount()->resolve()) : nullptr;
+    auto resolvedExpectedCount =
+        getExpectedCount() ? as<IntVal>(getExpectedCount()->resolve()) : nullptr;
+    if (resolvedActualCount != getActualCount() || resolvedExpectedCount != getExpectedCount())
         return getCurrentASTBuilder()->getConcreteVariadicPackCountWitness(
-            resolvedPack,
-            resolvedCount);
+            resolvedActualCount,
+            resolvedExpectedCount);
     return this;
 }
 
@@ -1546,20 +1547,23 @@ Val* ConcreteVariadicPackCountWitness::_substituteImplOverride(
     SubstitutionSet subst,
     int* ioDiff)
 {
-    // Concrete witnesses are proof-only values, but the pack and count operands
-    // still participate in specialization. Substituting both operands keeps
-    // serialized/lowered witnesses tied to the exact specialized
-    // `countof(pack) == count` fact that the checker validated.
+    // Concrete witnesses are proof-only values, but both count operands still
+    // participate in specialization. Substituting them keeps serialized/lowered
+    // witnesses tied to the exact specialized `countof(pack) == count` fact
+    // that the checker validated.
     int diff = 0;
-    auto substPack = getPack() ? getPack()->substituteImpl(astBuilder, subst, &diff) : nullptr;
-    auto substCount = getExpectedCount()
-                          ? as<IntVal>(getExpectedCount()->substituteImpl(astBuilder, subst, &diff))
-                          : nullptr;
+    auto substActualCount =
+        getActualCount() ? as<IntVal>(getActualCount()->substituteImpl(astBuilder, subst, &diff))
+                         : nullptr;
+    auto substExpectedCount =
+        getExpectedCount()
+            ? as<IntVal>(getExpectedCount()->substituteImpl(astBuilder, subst, &diff))
+            : nullptr;
     if (!diff)
         return this;
 
     (*ioDiff)++;
-    return astBuilder->getConcreteVariadicPackCountWitness(substPack, substCount);
+    return astBuilder->getConcreteVariadicPackCountWitness(substActualCount, substExpectedCount);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NonEmptyPackWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

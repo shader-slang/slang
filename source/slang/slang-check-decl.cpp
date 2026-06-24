@@ -4262,12 +4262,14 @@ void SemanticsDeclHeaderVisitor::visitGenericVariadicPackCountConstraintDecl(
     // `maybeParseGenericConstraints` recognizes only the oriented
     // `countof(Pack) == CountExpr` spelling. The semantic invariant
     // established here is stricter: `Pack` must be a direct type/value pack
-    // parameter of this generic and is stored in `packDeclRef`, and `CountExpr`
-    // must fold to an `IntVal` such as `3`, `N`, or `countof(OuterPack)`.
+    // parameter of this generic and is stored in `packDeclRef`, `countof(Pack)`
+    // is stored in `actualCountVal`, and `CountExpr` must fold to an `IntVal`
+    // such as `3`, `N`, or `countof(OuterPack)`.
     // Witness matching and default substitution rely on those checked fields
     // instead of reinterpreting arbitrary syntax or proving algebraically
     // equivalent forms.
     decl->packDeclRef = DeclRef<Decl>();
+    decl->actualCountVal = nullptr;
     decl->packExpr = CheckTerm(decl->packExpr);
     decl->expectedCountExpr = CheckTerm(decl->expectedCountExpr);
     if (!decl->packExpr || !decl->expectedCountExpr)
@@ -4330,6 +4332,22 @@ void SemanticsDeclHeaderVisitor::visitGenericVariadicPackCountConstraintDecl(
     else
     {
         decl->packDeclRef = packTargetInfo.packDeclRef;
+        Val* packVal = nullptr;
+        if (auto typePackDeclRef = packTargetInfo.packDeclRef.as<GenericTypePackParamDecl>())
+        {
+            packVal = DeclRefType::create(m_astBuilder, typePackDeclRef);
+        }
+        else if (auto valuePackDeclRef = packTargetInfo.packDeclRef.as<GenericValuePackParamDecl>())
+        {
+            packVal = m_astBuilder->getOrCreate<DeclRefIntVal>(
+                valuePackDeclRef.getDecl()->getType(),
+                valuePackDeclRef);
+        }
+        if (packVal)
+        {
+            decl->actualCountVal = as<IntVal>(
+                CountOfIntVal::tryFold(m_astBuilder, m_astBuilder->getIntType(), packVal));
+        }
     }
 
     auto countVal =
@@ -5795,13 +5813,6 @@ bool SemanticsVisitor::doesVarMatchRequirement(
     return true;
 }
 
-static DeclRef<Decl> getPackCountConstraintTargetDeclRef(
-    ASTBuilder* astBuilder,
-    DeclRef<GenericVariadicPackCountConstraintDecl> const& constraintDeclRef)
-{
-    return getPackCountConstraintPackDeclRef(astBuilder, constraintDeclRef);
-}
-
 bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
     DeclRef<GenericDecl> satisfyingGenericDeclRef,
     DeclRef<GenericDecl> requiredGenericDeclRef,
@@ -6275,12 +6286,19 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                 return false;
 
             // A declared pack-count witness proves only the exact substituted
-            // requirement. `countof(I) == N` must not satisfy a callee that
-            // requires `countof(I) == M`, even when both counts are abstract.
-            if (getPackCountConstraintTargetDeclRef(
+            // requirement. Both the checked `countof(pack)` value and the
+            // expected count must match, so `countof(I) == N` cannot satisfy a
+            // callee that requires `countof(I) == M`, even when both counts
+            // are abstract.
+            auto requiredActualCount = getPackCountConstraintActualCount(
+                m_astBuilder,
+                specializedRequiredConstraintDeclRef);
+            auto satisfyingActualCount =
+                getPackCountConstraintActualCount(m_astBuilder, satisfyingConstraintDeclRef);
+            if (!arePackCountExpectedCountsEqual(
                     m_astBuilder,
-                    specializedRequiredConstraintDeclRef) !=
-                getPackCountConstraintTargetDeclRef(m_astBuilder, satisfyingConstraintDeclRef))
+                    satisfyingActualCount,
+                    requiredActualCount))
                 return false;
 
             auto requiredCount = getPackCountConstraintExpectedCount(
@@ -7074,14 +7092,15 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             }
             synConstraintDecl->packExpr = synPackDeclRefExpr;
 
-            // `GenericVariadicPackCountConstraintDecl` stores the checked pack
-            // target in `packDeclRef`, keeps `packExpr` for diagnostics/printing,
-            // and uses `expectedCountVal` for witness matching. When
-            // `synthesizeGenericSignatureForRequirementWitness` clones a requirement
-            // such as `where countof(I) == N`, rebuild the direct `N` expression to
-            // reference the synthesized value parameter; `getDefaultSubstitutionArgs`
-            // then creates a declared witness for the synthesized proof, not for the
-            // original requirement.
+            // `GenericVariadicPackCountConstraintDecl` stores the checked
+            // `countof(pack)` value in `actualCountVal`, keeps `packExpr` for
+            // diagnostics/printing, and uses `expectedCountVal` for witness
+            // matching. When `synthesizeGenericSignatureForRequirementWitness`
+            // clones a requirement such as `where countof(I) == N`, rebuild
+            // the direct `N` expression to reference the synthesized value
+            // parameter; `getDefaultSubstitutionArgs` then creates a declared
+            // witness for the synthesized proof, not for the original
+            // requirement.
             if (auto declRefExpr = as<DeclRefExpr>(packCountConstraintDecl->expectedCountExpr))
             {
                 auto origExpectedCountDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
@@ -7107,6 +7126,14 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             // Header checking owns the diagnostic for a non-foldable count
             // expression. Requirement-witness synthesis runs during recovery
             // too, so skip cloning this proof if that earlier invariant failed.
+            SLANG_ASSERT(packCountConstraintDecl->actualCountVal);
+            if (!packCountConstraintDecl->actualCountVal)
+                continue;
+            synConstraintDecl->actualCountVal =
+                as<IntVal>(packCountConstraintDecl->actualCountVal->substitute(
+                    m_astBuilder,
+                    SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
+
             SLANG_ASSERT(packCountConstraintDecl->expectedCountVal);
             if (!packCountConstraintDecl->expectedCountVal)
                 continue;
@@ -12948,8 +12975,8 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
         {
             // Generic signature equality uses the same exact proof identity as
             // witness forwarding: after substituting `right` into `left`'s
-            // parameter space, both the direct pack target and the expected
-            // count `IntVal` must match.
+            // parameter space, both the checked `countof(pack)` value and the
+            // expected count `IntVal` must match.
             auto unspecializedRightConstraintDeclRef = createDefaultSubstitutionsIfNeeded(
                 m_astBuilder,
                 this,
@@ -12963,8 +12990,11 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
             auto leftConstraintRef =
                 m_astBuilder->getDirectDeclRef<GenericVariadicPackCountConstraintDecl>(
                     leftPackCountConstraint);
-            if (getPackCountConstraintTargetDeclRef(m_astBuilder, leftConstraintRef) !=
-                getPackCountConstraintTargetDeclRef(m_astBuilder, rightConstraint))
+            auto leftActualCount =
+                getPackCountConstraintActualCount(m_astBuilder, leftConstraintRef);
+            auto rightActualCount =
+                getPackCountConstraintActualCount(m_astBuilder, rightConstraint);
+            if (!arePackCountExpectedCountsEqual(m_astBuilder, leftActualCount, rightActualCount))
             {
                 return false;
             }

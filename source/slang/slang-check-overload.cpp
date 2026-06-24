@@ -1370,8 +1370,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
             // `TryCheckOverloadCandidateConstraints` runs after ordinary
             // overload checks have selected a generic candidate. Rebuild the
             // constraint decl-ref with the candidate's current argument list so
-            // the shared proof helper sees the same substituted `(pack, count)`
-            // pair that lowering will later receive as a hidden witness arg.
+            // the shared proof helper sees the same substituted
+            // `(actualCount, expectedCount)` pair that lowering will later
+            // receive as a hidden witness arg.
             DeclRef<GenericVariadicPackCountConstraintDecl> constraintDeclRef =
                 m_astBuilder
                     ->getGenericAppDeclRef(
@@ -1380,14 +1381,13 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                         packCountConstraintDecl)
                     .as<GenericVariadicPackCountConstraintDecl>();
 
-            auto constrainedArg = getPackCountConstraintPackVal(m_astBuilder, constraintDeclRef);
-
+            auto actualCount = getPackCountConstraintActualCount(m_astBuilder, constraintDeclRef);
             auto expectedCount =
                 getPackCountConstraintExpectedCount(m_astBuilder, constraintDeclRef);
             auto packCountWitness = findVariadicPackCountWitnessForConstraint(
                 m_astBuilder,
                 this,
-                constrainedArg,
+                actualCount,
                 expectedCount,
                 &context,
                 context.mode != OverloadResolveContext::Mode::JustTrying);
