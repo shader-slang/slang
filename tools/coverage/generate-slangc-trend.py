@@ -76,6 +76,9 @@ def load_records(data_path, history_dir):
                                   "commit": d.get("commit", ""),
                                   "platform": "linux"}
 
+    # Dates with known bad measurements (instrument failures, 0%/sub-50% readings).
+    EXCLUDE = {"2026-03-13", "2026-03-15", "2026-04-09"}
+
     # 3. Git history — backfill dates that have been deleted from working tree
     for parts in _git_coverage_commits():
         if len(parts) != 2:
@@ -85,7 +88,7 @@ def load_records(data_path, history_dir):
         date = m.group(1) if m else None
         sc = re.search(r"\(([0-9a-f]{7,40})\)", message)
         slang_commit = sc.group(1) if sc else None
-        if not date or date in records:
+        if not date or date in records or date in EXCLUDE:
             continue
         # Try the combined-summary path first, fall back to linux summary
         paths = []
