@@ -1397,9 +1397,14 @@ struct OptionsParser
     void addOutputPath(String const& path, CodeGenTarget impliedFormat);
 
     void addOutputPath(char const* inPath);
+
+    // Adds a built-in module save request to be written after optional core-module compilation.
     SlangResult addPendingBuiltinModuleSave(
         slang::BuiltinModuleName moduleName,
         bool writeAsSourceBytes);
+
+    // Writes deferred built-in module saves, compiling each requested module if needed.
+    // For example, GLSL serialization after loading core reuses that archive.
     SlangResult writePendingBuiltinModuleSaves();
     RawEntryPoint* getCurrentEntryPoint();
 
