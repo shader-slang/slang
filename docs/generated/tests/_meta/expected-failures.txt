@@ -160,40 +160,22 @@ docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buff
 
 # Surfaced on nightly run 28004033987 (Linux agentic suite):
 # https://github.com/shader-slang/slang/actions/runs/28004033987
-# Awaiting regeneration — tracked in
-# https://github.com/shader-slang/slang/issues/11700
+# Tracked in https://github.com/shader-slang/slang/issues/11700
 #
-# Stale auto-generated bundles whose annotations predate recent compiler
-# diagnostic improvements; the compiler is now correct/better and the
-# generated CHECK / IR-LABEL lines need regenerating (hand-editing is
-# discouraged by the per-file warning). Platform-independent — reproduces
-# on macOS too. Three sub-clusters:
-#
-# Group 1 — PR #11656 ("Focused diagnostics for failed generic
-# specialization") replaced the generic `E39999` / "could not specialize
-# generic for arguments of type (...)" with focused messages such as
-# "cannot deduce generic argument for 'T': conflicting requirements" and
-# "could not infer generic argument for parameter 'T'".
-docs/generated/tests/conformance/generics/ambiguous-type-arg-negative.slang
-docs/generated/tests/conformance/generics/ambiguous-value-arg-negative.slang
-docs/generated/tests/conformance/generics/constraint-not-satisfied-negative.slang
-docs/generated/tests/conformance/generics/type-equality-constraint-negative.slang
-docs/generated/tests/design/ast-reference/declarations/generic-constraint-violation-rejected.slang
-docs/generated/tests/design/ast-reference/types/andtype-missing-conformance-rejected.slang
-docs/generated/tests/design/name-resolution/overload-resolution/generic-argument-inference-failed-diagnostic.slang
-#
-# Group 2 — PR #11576 ("Show argument type mismatch per candidate in
-# overload errors") added per-candidate notes ("candidate: func ...",
-# "argument N does not match: expected X, got Y"). These bundles use
-# exhaustive DIAGNOSTIC_TEST mode, so the new unannotated notes fail.
-docs/generated/tests/design/ast-reference/base/expr-type-mismatch-diagnoses.slang
-docs/generated/tests/design/cross-cutting/ir-instructions/negative-arithmetic-add-struct-no-overload.slang
-docs/generated/tests/design/name-resolution/overload-resolution/no-applicable-overload-diagnostic.slang
-docs/generated/tests/design/pipeline/03-semantic-check/no-applicable-overload-zero-candidate-rejected.slang
-#
-# Group 3 — coopvector init IR lowering changed; the
-# `IR-LABEL: func %CoopVecx5Fx24init` no longer matches (compile succeeds,
-# result code = 0). Confirm the new IR is intended before regenerating.
+# Group 3 — coopvector construction IR representation changed (NOT
+# diagnostic-wording drift). Two changes vs. the test's expectations:
+#   1. the synthesized init function is now `func %x24init` ($init), no
+#      longer `func %CoopVecx5Fx24init` (CoopVec.$init); and
+#   2. the opcode is now `makeCoopVectorFromValuePack(<pack>)` (one
+#      value-pack operand), not `makeCoopVector(%a, %b, %c, %d)` (one
+#      operand per element) — almost certainly the variadic value-pack
+#      lowering (cf. #11571). `makeCoopVector*` is still emitted, so the
+#      construction itself is intact.
+# Held pending human confirmation that the value-pack form is the
+# intended lowering before regenerating the IR-LABEL/CHECK (if intended)
+# or filing a finding (if a regression). The Group 1 (#11656) and Group 2
+# (#11576) diagnostic-drift bundles from this run have been regenerated
+# and removed from this list.
 docs/generated/tests/design/ir-reference/values/aggregate-makecoopvector.slang
 
 # Surfaced on nightly run 28004033987 (Linux agentic suite):
