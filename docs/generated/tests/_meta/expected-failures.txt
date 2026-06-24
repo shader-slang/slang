@@ -160,26 +160,6 @@ docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buff
 
 # Surfaced on nightly run 28004033987 (Linux agentic suite):
 # https://github.com/shader-slang/slang/actions/runs/28004033987
-# Tracked in https://github.com/shader-slang/slang/issues/11700
-#
-# Group 3 — coopvector construction IR representation changed (NOT
-# diagnostic-wording drift). Two changes vs. the test's expectations:
-#   1. the synthesized init function is now `func %x24init` ($init), no
-#      longer `func %CoopVecx5Fx24init` (CoopVec.$init); and
-#   2. the opcode is now `makeCoopVectorFromValuePack(<pack>)` (one
-#      value-pack operand), not `makeCoopVector(%a, %b, %c, %d)` (one
-#      operand per element) — almost certainly the variadic value-pack
-#      lowering (cf. #11571). `makeCoopVector*` is still emitted, so the
-#      construction itself is intact.
-# Held pending human confirmation that the value-pack form is the
-# intended lowering before regenerating the IR-LABEL/CHECK (if intended)
-# or filing a finding (if a regression). The Group 1 (#11656) and Group 2
-# (#11576) diagnostic-drift bundles from this run have been regenerated
-# and removed from this list.
-docs/generated/tests/design/ir-reference/values/aggregate-makecoopvector.slang
-
-# Surfaced on nightly run 28004033987 (Linux agentic suite):
-# https://github.com/shader-slang/slang/actions/runs/28004033987
 # (no tracking issue filed yet; pending user triage). Test-server flake,
 # NOT a content bug: passes locally both standalone and under
 # `-use-test-server`. The CI "JSON RPC failure: waitForResult() /

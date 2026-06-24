@@ -133,6 +133,13 @@
       "source_doc_digest": "af164393bf349ad8677711e3e98c0adb2b0eb8ee975ce34ce088add998e06a3e",
       "watched_paths_digest": "c3351fc992d46c87a06f127ca50d66a7bda994f571e9dd13985cafde508b726b"
     },
+    "design/ir-reference/values": {
+      "generated_at": "2026-06-24T09:48:41+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "4d0fd10e73b1c4ccd3d20b39cff137abe87cfd6d",
+      "source_doc_digest": "5b903f7c3f99dbf2d9eeb81923f65a6dad25210a54cab7bb3a514cefd0e35fdd",
+      "watched_paths_digest": "292e76fc13bbd934f7f4d26014bc887e93079dcf75d26cc6e8cd8bf4dc6d4460"
+    },
     "design/name-resolution/overload-resolution": {
       "generated_at": "2026-06-24T09:22:44+00:00",
       "model": "claude-opus-4-8",
