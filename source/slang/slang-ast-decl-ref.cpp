@@ -64,6 +64,17 @@ static AccessorDecl* _tryGetCorrespondingAccessorDecl(Decl* memberDecl, Decl* su
     // `set`) nested under a storage declaration, so a requirement getter can be mapped to the
     // getter under the selected override/default subscript while preserving the selected parent's
     // generic substitutions.
+    //
+    // Conceptually this is not quite an ordinary static `MemberDeclRef`; it is projecting an
+    // accessor role from the resolved storage declaration:
+    //
+    //     MemberDeclRef(GenericAppDeclRef(Lookup(This, operator[]), TIndex), get)
+    //
+    // behaves more like a possible future
+    // `AccessorProjectionDeclRef(parentStorageDeclRef, AccessorKind::Get)`. We encode that
+    // projection here to avoid adding a new decl-ref kind and the corresponding lookup/cache
+    // machinery on storage declarations. If this pattern grows beyond accessors, consider making
+    // that projection explicit instead of extending this remap.
     auto accessorDecl = as<AccessorDecl>(memberDecl);
     if (!accessorDecl)
         return nullptr;
