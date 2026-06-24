@@ -369,10 +369,39 @@ void SharedSemanticsContext::getDependentGenericParentImpl(
             currentParent = newParent;
     };
 
-    if (declRef.as<GenericTypeParamDeclBase>())
+    auto addDependentGenericParentsFromVal = [&](auto& self, Val* val) -> void
     {
-        if (!genericParent)
-            mergeParent(genericParent, declRef.getParent().as<GenericDecl>());
+        if (!val)
+            return;
+
+        if (auto declRefType = as<DeclRefType>(val))
+        {
+            getDependentGenericParentImpl(genericParent, declRefType->getDeclRef());
+            return;
+        }
+
+        if (auto declRefIntVal = as<DeclRefIntVal>(val))
+        {
+            getDependentGenericParentImpl(genericParent, declRefIntVal->getDeclRef());
+            return;
+        }
+
+        if (as<Witness>(val) || as<DeclRefBase>(val))
+            return;
+
+        // Generic value arguments can be expressions such as `N + 1` or `countof(T)`.
+        // Walk their operands so a generic application is still recognized as dependent
+        // on the generic parameters referenced inside those expressions.
+        for (auto operand : val->m_operands)
+        {
+            if (operand.kind == ValNodeOperandKind::ValNode)
+                self(self, operand.getVal());
+        }
+    };
+
+    if (isGenericParam(declRef))
+    {
+        mergeParent(genericParent, declRef.getParent().as<GenericDecl>());
         return;
     }
     else if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
@@ -380,15 +409,20 @@ void SharedSemanticsContext::getDependentGenericParentImpl(
         if (auto lookupSourceDeclRef = isDeclRefTypeOf<Decl>(lookupDeclRef->getLookupSource()))
             getDependentGenericParentImpl(genericParent, lookupSourceDeclRef);
     }
+    else if (auto memberDeclRef = as<MemberDeclRef>(declRef.declRefBase))
+    {
+        // A member/accessor can be the endpoint of a generic lookup path, e.g.
+        // `MemberDeclRef(GenericAppDeclRef(Lookup(This, operator[]), TIndex), get)`.
+        // The leaf accessor is not owned by the generic, but the parent path still carries
+        // `TIndex`, so dependency queries must continue through the parent decl-ref.
+        getDependentGenericParentImpl(genericParent, DeclRef<Decl>(memberDeclRef->getParent()));
+    }
     else if (auto genericAppDeclRef = as<GenericAppDeclRef>(declRef.declRefBase))
     {
         for (Index i = 0; i < genericAppDeclRef->getArgCount(); i++)
-        {
-            if (auto argDeclRef = isDeclRefTypeOf<Decl>(genericAppDeclRef->getArg(i)))
-            {
-                getDependentGenericParentImpl(genericParent, argDeclRef);
-            }
-        }
+            addDependentGenericParentsFromVal(
+                addDependentGenericParentsFromVal,
+                genericAppDeclRef->getArg(i));
     }
 }
 

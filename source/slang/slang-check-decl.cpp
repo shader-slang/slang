@@ -4036,37 +4036,6 @@ static bool isKnownBuiltinDecl(Decl* decl, KnownBuiltinDeclName name)
     return constantName && constantName->getValue() == (IntegerLiteralValue)name;
 }
 
-static bool isDifferentiabilityRequirementConstraint(GenericTypeConstraintDecl* decl, Type* subType)
-{
-    if (auto differentiableRequirementDecl = as<DifferentiableRequirementConstraintDecl>(decl))
-    {
-        auto subDeclRefType = as<DeclRefType>(subType);
-        return subDeclRefType && subDeclRefType->getDeclRef().equals(
-                                     differentiableRequirementDecl->callableRequirementDeclRef);
-    }
-
-    if (!isInterfaceRequirement(decl))
-        return false;
-
-    auto subDeclRefType = as<DeclRefType>(subType);
-    if (!subDeclRefType)
-        return false;
-
-    auto subDecl = subDeclRefType->getDeclRef().getDecl();
-    if (auto genericSubDecl = as<GenericDecl>(subDecl))
-        subDecl = getInner(genericSubDecl);
-    if (!as<CallableDecl>(subDecl))
-        return false;
-
-    auto supDeclRefType = as<DeclRefType>(decl->sup.type);
-    if (!supDeclRefType)
-        return false;
-
-    auto supDecl = supDeclRefType->getDeclRef().getDecl();
-    return isKnownBuiltinDecl(supDecl, KnownBuiltinDeclName::IForwardDifferentiable) ||
-           isKnownBuiltinDecl(supDecl, KnownBuiltinDeclName::IBackwardDifferentiable);
-}
-
 bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
     GenericTypeConstraintDecl* decl,
     TypeExp type,
@@ -4091,8 +4060,6 @@ bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
     };
     // Validate that the sub type of a constraint is in valid form.
     //
-    if (isDifferentiabilityRequirementConstraint(decl, type.type))
-        return true;
     if (auto subDeclRef = isDeclRefTypeOf<Decl>(type.type))
     {
         if (subDeclRef.getDecl()->parentDecl == decl->parentDecl)
@@ -5998,28 +5965,6 @@ static DeclRef<Decl> getPackCountConstraintTargetDeclRef(
     return getPackCountConstraintPackDeclRef(astBuilder, constraintDeclRef);
 }
 
-static bool _areRequirementEndpointTypesEqualAfterResolve(Type* left, Type* right)
-{
-    if (left == right)
-        return true;
-    if (!left || !right)
-        return false;
-    auto resolvedLeft = as<Type>(left->resolve());
-    auto resolvedRight = as<Type>(right->resolve());
-    if (resolvedLeft && resolvedRight)
-    {
-        if (resolvedLeft == resolvedRight)
-            return true;
-        left = resolvedLeft->getCanonicalType();
-        right = resolvedRight->getCanonicalType();
-    }
-    if (left == right)
-        return true;
-    if (!left || !right)
-        return false;
-    return left->equals(right);
-}
-
 bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
     DeclRef<GenericDecl> satisfyingGenericDeclRef,
     DeclRef<GenericDecl> requiredGenericDeclRef,
@@ -6473,16 +6418,14 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                     .as<GenericTypeConstraintDecl>();
             auto requiredSubType = getSub(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingSubType = getSub(m_astBuilder, satisfyingConstraintDeclRef);
-            if (!_areRequirementEndpointTypesEqualAfterResolve(satisfyingSubType, requiredSubType))
+            if (!satisfyingSubType->equals(requiredSubType))
             {
                 return false;
             }
 
             auto requiredSuperType = getSup(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingSuperType = getSup(m_astBuilder, satisfyingConstraintDeclRef);
-            if (!_areRequirementEndpointTypesEqualAfterResolve(
-                    satisfyingSuperType,
-                    requiredSuperType))
+            if (!satisfyingSuperType->equals(requiredSuperType))
             {
                 return false;
             }
@@ -6612,8 +6555,7 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
 
             auto requiredType = getBaseType(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingType = getBaseType(m_astBuilder, satisfyingConstraintDeclRef);
-            if (!requiredType || !satisfyingType ||
-                !_areRequirementEndpointTypesEqualAfterResolve(satisfyingType, requiredType))
+            if (!requiredType || !satisfyingType || !satisfyingType->equals(requiredType))
             {
                 return false;
             }
