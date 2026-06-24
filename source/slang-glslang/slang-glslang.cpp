@@ -250,7 +250,9 @@ extern "C"
     auto succ = glslang_disassembleSPIRVWithResult(contents, contentsSize, &result);
     if (result)
         fprintf(stdout, "%s\n", result);
-    delete result;
+    // `result` is allocated with `new char[len]` in glslang_disassembleSPIRVWithResult, so it
+    // must be released with array-delete to avoid an alloc-dealloc-mismatch (see #10988).
+    delete[] result;
     return succ;
 }
 
