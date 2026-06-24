@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort
 
 // OpAbortKHR is a block terminator. When abort() is called on one arm of a
 // branch, the SPIRV legalization pass must strip the abort block's original
