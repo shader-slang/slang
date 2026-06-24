@@ -7180,7 +7180,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // non-zero `-spirv-resource-heap-stride` is a conflict (the two express contradictory strides),
     // rejected up front during option processing for the CLI (`OptionsParser` in
     // `slang-options.cpp`) and re-checked here by `diagnoseConflictingDescriptorHeapStrideOptions`
-    // for the compile-API path; an explicit stride of 0 selects that same auto path, not a conflict.
+    // for the compile-API path; an explicit stride of 0 selects that same auto path, not a
+    // conflict.
     bool isUnifiedResourceHeapStrideEnabled()
     {
         return m_targetProgram->getOptionSet().getBoolOption(
@@ -7312,9 +7313,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return runtimeArrayType;
     }
 
-    // Diagnoses the `-spirv-resource-heap-stride` / `-spirv-unified-descriptor-heap-stride` conflict
-    // for the compile-API path. The CLI rejects this at option-parse time (`OptionsParser` in
-    // `slang-options.cpp`), which aborts before emission; but options set directly through the
+    // Diagnoses the `-spirv-resource-heap-stride` / `-spirv-unified-descriptor-heap-stride`
+    // conflict for the compile-API path. The CLI rejects this at option-parse time (`OptionsParser`
+    // in `slang-options.cpp`), which aborts before emission; but options set directly through the
     // public compile API do not flow through that parser, so this re-checks at emit time and fails
     // loudly rather than silently honoring the explicit stride. The condition matches the parser:
     // unified enabled and a non-zero `SPIRVResourceHeapStride` (an explicit 0 selects the default
