@@ -1369,6 +1369,14 @@ struct OptionsParser
         bool redundantProfileSet = false;
     };
 
+    struct PendingBuiltinModuleSave
+    {
+        slang::BuiltinModuleName moduleName = slang::BuiltinModuleName::Core;
+        SlangArchiveType archiveType = SLANG_ARCHIVE_TYPE_RIFF_LZ4;
+        String fileName;
+        bool writeAsSourceBytes = false;
+    };
+
     int addTranslationUnit(SlangSourceLanguage language, Stage impliedStage);
 
     void addInputSlangPath(String const& path);
@@ -1389,6 +1397,10 @@ struct OptionsParser
     void addOutputPath(String const& path, CodeGenTarget impliedFormat);
 
     void addOutputPath(char const* inPath);
+    SlangResult addPendingBuiltinModuleSave(
+        slang::BuiltinModuleName moduleName,
+        bool writeAsSourceBytes);
+    SlangResult writePendingBuiltinModuleSaves();
     RawEntryPoint* getCurrentEntryPoint();
 
     void setStage(RawEntryPoint* rawEntryPoint, Stage stage);
@@ -1513,7 +1525,8 @@ struct OptionsParser
     bool m_stdinConsumed = false;
     bool m_hasLoadedRepro = false;
     bool m_compileCoreModule = false;
-    slang::CompileCoreModuleFlags m_compileCoreModuleFlags;
+    slang::CompileCoreModuleFlags m_compileCoreModuleFlags = 0;
+    List<PendingBuiltinModuleSave> m_pendingBuiltinModuleSaves;
 
     SlangArchiveType m_archiveType = SLANG_ARCHIVE_TYPE_RIFF_LZ4;
 
@@ -1822,6 +1835,63 @@ void OptionsParser::addOutputPath(char const* inPath)
         // from another argument.
         addOutputPath(path, CodeGenTarget(target));
     }
+}
+
+SlangResult OptionsParser::addPendingBuiltinModuleSave(
+    slang::BuiltinModuleName moduleName,
+    bool writeAsSourceBytes)
+{
+    CommandLineArg fileName;
+    SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
+
+    PendingBuiltinModuleSave save;
+    save.moduleName = moduleName;
+    save.archiveType = m_archiveType;
+    save.fileName = fileName.value;
+    save.writeAsSourceBytes = writeAsSourceBytes;
+    m_pendingBuiltinModuleSaves.add(save);
+    return SLANG_OK;
+}
+
+SlangResult OptionsParser::writePendingBuiltinModuleSaves()
+{
+    for (const auto& save : m_pendingBuiltinModuleSaves)
+    {
+        ComPtr<ISlangBlob> blob;
+        SlangResult saveResult =
+            m_session->saveBuiltinModule(save.moduleName, save.archiveType, blob.writeRef());
+        if (SLANG_FAILED(saveResult))
+        {
+            SLANG_RETURN_ON_FAIL(m_session->compileBuiltinModule(
+                save.moduleName,
+                save.moduleName == slang::BuiltinModuleName::Core ? m_compileCoreModuleFlags : 0));
+            SLANG_RETURN_ON_FAIL(
+                m_session->saveBuiltinModule(save.moduleName, save.archiveType, blob.writeRef()));
+        }
+
+        if (!save.writeAsSourceBytes)
+        {
+            SLANG_RETURN_ON_FAIL(File::writeAllBytes(
+                save.fileName,
+                blob->getBufferPointer(),
+                blob->getBufferSize()));
+            continue;
+        }
+
+        StringBuilder builder;
+        StringWriter writer(&builder, 0);
+
+        SLANG_RETURN_ON_FAIL(HexDumpUtil::dumpSourceBytes(
+            (const uint8_t*)blob->getBufferPointer(),
+            blob->getBufferSize(),
+            16,
+            &writer));
+
+        SLANG_RETURN_ON_FAIL(
+            File::writeNativeText(save.fileName, builder.getBuffer(), builder.getLength()));
+    }
+
+    return SLANG_OK;
 }
 
 OptionsParser::RawEntryPoint* OptionsParser::getCurrentEntryPoint()
@@ -2740,48 +2810,16 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 break;
             }
         case OptionKind::SaveCoreModule:
-            {
-                CommandLineArg fileName;
-                SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
-
-                ComPtr<ISlangBlob> blob;
-
-                SLANG_RETURN_ON_FAIL(m_session->saveCoreModule(m_archiveType, blob.writeRef()));
-                SLANG_RETURN_ON_FAIL(File::writeAllBytes(
-                    fileName.value,
-                    blob->getBufferPointer(),
-                    blob->getBufferSize()));
-                break;
-            }
+            SLANG_RETURN_ON_FAIL(
+                addPendingBuiltinModuleSave(slang::BuiltinModuleName::Core, false));
+            break;
         case OptionKind::SaveCoreModuleBinSource:
         case OptionKind::SaveGLSLModuleBinSource:
             {
-                CommandLineArg fileName;
-                SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
-
-                ComPtr<ISlangBlob> blob;
-
-                if (optionKind == OptionKind::SaveCoreModuleBinSource)
-                {
-                    SLANG_RETURN_ON_FAIL(m_session->saveCoreModule(m_archiveType, blob.writeRef()));
-                }
-                else
-                {
-                    SLANG_RETURN_ON_FAIL(m_session->saveBuiltinModule(
-                        slang::BuiltinModuleName::GLSL,
-                        m_archiveType,
-                        blob.writeRef()));
-                }
-                StringBuilder builder;
-                StringWriter writer(&builder, 0);
-
-                SLANG_RETURN_ON_FAIL(HexDumpUtil::dumpSourceBytes(
-                    (const uint8_t*)blob->getBufferPointer(),
-                    blob->getBufferSize(),
-                    16,
-                    &writer));
-
-                File::writeNativeText(fileName.value, builder.getBuffer(), builder.getLength());
+                const auto moduleName = optionKind == OptionKind::SaveCoreModuleBinSource
+                                            ? slang::BuiltinModuleName::Core
+                                            : slang::BuiltinModuleName::GLSL;
+                SLANG_RETURN_ON_FAIL(addPendingBuiltinModuleSave(moduleName, true));
                 break;
             }
         case OptionKind::DumpIrIds:
@@ -3880,6 +3918,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
     {
         SLANG_RETURN_ON_FAIL(m_session->compileCoreModule(m_compileCoreModuleFlags));
     }
+    SLANG_RETURN_ON_FAIL(writePendingBuiltinModuleSaves());
 
     // TODO(JS): This is a restriction because of how setting of state works for load repro
     // If a repro has been loaded, then many of the following options will overwrite

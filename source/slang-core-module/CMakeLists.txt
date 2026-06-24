@@ -98,6 +98,7 @@ set(core_module_generated_header_dir ${CMAKE_CURRENT_BINARY_DIR})
 set(core_module_generated_header
     ${core_module_generated_header_dir}/slang-core-module-generated.h
 )
+set(core_module_archive ${CMAKE_CURRENT_BINARY_DIR}/slang-core-module.bin)
 set(glsl_module_generated_header_dir
     ${CMAKE_CURRENT_BINARY_DIR}/../slang-glsl-module
 )
@@ -112,6 +113,7 @@ set(glsl_module_generated_header_dir
     PARENT_SCOPE
 )
 set(glsl_module_generated_header ${glsl_module_generated_header} PARENT_SCOPE)
+set(core_module_archive ${core_module_archive} PARENT_SCOPE)
 
 # When SLANG_EMBED_CORE_MODULE=OFF, slang-without-embedded-core-module is an ALIAS
 # for slang, whose DLL (slang-compiler.dll) is placed in bin/ rather than generators/.
@@ -134,26 +136,91 @@ else()
     set(bootstrap_extra_deps "")
 endif()
 
+set(bootstrap_outdated_inputs "$<TARGET_FILE:slang-bootstrap>")
+if(bootstrap_extra_deps)
+    list(APPEND bootstrap_outdated_inputs "$<TARGET_FILE:slang>")
+endif()
+
+set(core_module_generate_command
+    "$<TARGET_FILE:slang-bootstrap>"
+    -compile-core-module
+    -archive-type
+    riff-lz4
+    -save-core-module
+    ${core_module_archive}
+    -save-core-module-bin-source
+    ${core_module_generated_header}
+)
+
 add_custom_command(
     OUTPUT
+        ${core_module_archive}
         ${core_module_generated_header}
-        ${glsl_module_generated_header}
-        ${bootstrap_pre_copy_command}
+    ${bootstrap_pre_copy_command}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${core_module_generated_header_dir}
     COMMAND
-        slang-bootstrap -archive-type riff-lz4 -save-core-module-bin-source
-        ${core_module_generated_header} -save-glsl-module-bin-source
-        ${glsl_module_generated_header}
+        ${CMAKE_COMMAND}
+        "-DSLANG_RUN_IF_OUTDATED_DESCRIPTION=generating core module"
+        "-DSLANG_RUN_IF_OUTDATED_OUTPUTS=${core_module_archive};${core_module_generated_header}"
+        "-DSLANG_RUN_IF_OUTDATED_INPUTS=${bootstrap_outdated_inputs}"
+        "-DSLANG_RUN_IF_OUTDATED_COMMAND=${core_module_generate_command}"
+        -P
+        "${slang_SOURCE_DIR}/cmake/RunIfOutdated.cmake"
     DEPENDS
         slang-bootstrap
         slang-without-embedded-core-module
         ${bootstrap_extra_deps}
+        "${slang_SOURCE_DIR}/cmake/RunIfOutdated.cmake"
     VERBATIM
 )
-# Add a target so that we can depend on the above step when we create the glsl
-# module
+
+add_custom_target(
+    generate_core_module
+    DEPENDS ${core_module_archive} ${core_module_generated_header}
+)
+set_target_properties(generate_core_module PROPERTIES FOLDER generated)
+
+set(glsl_module_generate_command
+    "$<TARGET_FILE:slang-bootstrap>"
+    -load-core-module
+    ${core_module_archive}
+    -archive-type
+    riff-lz4
+    -save-glsl-module-bin-source
+    ${glsl_module_generated_header}
+)
+
+add_custom_command(
+    OUTPUT
+        ${glsl_module_generated_header}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${glsl_module_generated_header_dir}
+    COMMAND
+        ${CMAKE_COMMAND}
+        "-DSLANG_RUN_IF_OUTDATED_DESCRIPTION=generating GLSL module"
+        "-DSLANG_RUN_IF_OUTDATED_OUTPUTS=${glsl_module_generated_header}"
+        "-DSLANG_RUN_IF_OUTDATED_INPUTS=${bootstrap_outdated_inputs};${core_module_archive}"
+        "-DSLANG_RUN_IF_OUTDATED_COMMAND=${glsl_module_generate_command}"
+        -P
+        "${slang_SOURCE_DIR}/cmake/RunIfOutdated.cmake"
+    DEPENDS
+        slang-bootstrap
+        slang-without-embedded-core-module
+        ${core_module_archive}
+        ${bootstrap_extra_deps}
+        "${slang_SOURCE_DIR}/cmake/RunIfOutdated.cmake"
+    VERBATIM
+)
+
+add_custom_target(
+    generate_glsl_module_header
+    DEPENDS ${glsl_module_generated_header}
+)
+set_target_properties(generate_glsl_module_header PROPERTIES FOLDER generated)
+
+# Add a target so that existing dependents can request both generated headers.
 add_custom_target(
     generate_core_module_headers
-    DEPENDS ${core_module_generated_header} ${glsl_module_generated_header}
+    DEPENDS generate_core_module generate_glsl_module_header
 )
 set_target_properties(generate_core_module_headers PROPERTIES FOLDER generated)
 
@@ -177,7 +244,7 @@ set(core_module_common_args
 slang_add_target(
     ${core_module_common_args}
     TARGET_NAME slang-embedded-core-module
-    REQUIRES generate_core_module_headers
+    REQUIRES generate_core_module
     EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_EMBED_CORE_MODULE
     INCLUDE_DIRECTORIES_PRIVATE ${core_module_generated_header_dir}
 )
