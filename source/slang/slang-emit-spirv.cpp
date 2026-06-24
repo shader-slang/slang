@@ -4353,10 +4353,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                 case AddressSpace::StorageBuffer:
                 case AddressSpace::UserPointer:
-                // `Uniform` is the legacy SSBO storage class (BufferBlock model)
-                // emitted when targeting SPIR-V < 1.4, before `StorageBuffer`
-                // existed; its atomics likewise belong to the UniformMemory
-                // semantics class.
+                // For SPIR-V < 1.4 Slang emits an SSBO in the `Uniform` storage
+                // class with a `BufferBlock` decoration (`StorageBuffer` is the
+                // 1.4+ spelling). Atomics on such a buffer belong to the same
+                // UniformMemory semantics class as the `StorageBuffer` form.
                 case AddressSpace::Uniform:
                     memoryClass = SpvMemorySemanticsUniformMemoryMask;
                     break;
@@ -4684,6 +4684,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
         case AddressSpace::Global:
         case AddressSpace::StorageBuffer:
+        // `Uniform` is how Slang spells an SSBO pointer when targeting
+        // SPIR-V < 1.4 (the `BufferBlock` model); it is just as atomicable as
+        // the `StorageBuffer` (1.4+) spelling. Omitting it here makes
+        // `AtomicLoad`/`Store`/`Exchange` fall back to non-atomic loads/stores.
+        case AddressSpace::Uniform:
         case AddressSpace::UserPointer:
         case AddressSpace::GroupShared:
         case AddressSpace::Image:
