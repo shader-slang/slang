@@ -9,7 +9,10 @@ on:
       runs-on:
         required: false
         type: string
-        default: '["Linux", "self-hosted", "GPU"]'
+        # Require the "GCP" label so these jobs run only on the GCP
+        # scaler-managed pool, never on the nvrgfx Colossus hosts that share
+        # the "Linux, self-hosted, GPU" label set. See extras/scaler.
+        default: '["Linux", "self-hosted", "GPU", "GCP"]'
 
 jobs:
   test-slang-rhi:
@@ -18,13 +21,10 @@ jobs:
 
     permissions:
       contents: read
-      packages: read
+      packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
 
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
       options: >-
         --gpus all
         --user root

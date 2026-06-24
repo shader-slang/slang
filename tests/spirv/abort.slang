@@ -1,7 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -capability abort -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -capability abort
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -capability abort
-// Note: -skip-spirv-validation is required because the bundled spirv-val does not yet
-// know about SPV_KHR_shader_abort. Remove this flag once the validator is updated.
 
 // Verify that abort() emits OpAbortKHR for SPIR-V with the required capability and
 // extension, packaging the format string + args into an explicitly laid out struct,
@@ -24,7 +22,7 @@
 // - packed format words are emitted little-endian and include the null terminator
 
 // CHECK_SPIRV: OpCapability AbortKHR
-// CHECK_SPIRV: OpExtension "SPV_KHR_shader_abort"
+// CHECK_SPIRV: OpExtension "SPV_KHR_abort"
 
 // CHECK_SPIRV: OpDecorate {{.*}} ArrayStride 4
 // CHECK_SPIRV: OpMemberDecorate %AbortMessage 0 Offset 0

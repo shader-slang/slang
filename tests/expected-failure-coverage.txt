@@ -25,3 +25,12 @@
 # escalates that failure into a SIGSEGV inside the slang-test
 # orchestrator, which kills the rest of the suite.
 docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-buffer-element.slang
+
+# Coverage metadata is not propagated from the upstream Slang IR artifact
+# through the Metal downstream compilation chain (xcrun metallib-asm path),
+# so _maybeWriteCoverageManifest finds no ICoverageTracingMetadata on the
+# final artifact and writes no manifest file. The two MetalLib sub-checks
+# inside this unit test therefore always fail on macOS coverage CI where the
+# Metal toolchain is present. Tracked in: https://github.com/shader-slang/slang/issues/11629
+# On non-Apple CI the sub-checks are skipped via _isMetalLibDownstreamUnavailable.
+slang-unit-test-tool/SlangcCoverageManifestOutput.internal
