@@ -210,6 +210,10 @@ struct UTF8Util
     /// Given a slice in UTF8, calculate the number of UTF16 characters needed to represent the
     /// string.
     static Index calcUTF16CharCount(const UnownedStringSlice& in);
+
+    /// Given a UTF-8 string and a 0-based code-point index, return the byte offset of that code
+    /// point within the string. Returns in.getLength() if codePointIndex is out of range.
+    static Index codePointIndexToByteOffset(const UnownedStringSlice& in, Index codePointIndex);
 };
 
 } // namespace Slang

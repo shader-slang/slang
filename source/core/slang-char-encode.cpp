@@ -220,6 +220,26 @@ CharEncoding* CharEncoding::UTF32 = &_utf32Encoding;
     return count;
 }
 
+/* static */ Index UTF8Util::codePointIndexToByteOffset(
+    const UnownedStringSlice& in,
+    Index codePointIndex)
+{
+    const int8_t* cur = (const int8_t*)in.begin();
+    const int8_t* const end = (const int8_t*)in.end();
+
+    for (Index i = 0; i < codePointIndex && cur < end; ++i)
+    {
+        const auto c = *cur++;
+        if (c < 0)
+        {
+            while (cur < end && (*cur & 0xc0) == 0x80)
+                cur++;
+        }
+    }
+
+    return Index((const char*)cur - in.begin());
+}
+
 Index UTF8Util::calcUTF16CharCount(const UnownedStringSlice& in)
 {
     Index count = 0;
