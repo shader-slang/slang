@@ -4501,6 +4501,9 @@ attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
 /// capability, declares `OpExtension "SPV_EXT_shader_64bit_indexing"`, and enables the
 /// `Shader64BitIndexingEXT` execution mode. This permits 64-bit (`int64`/`uint64`) indices into
 /// arrays, buffers, and resources. The requirement propagates up the call graph like `[require()]`.
+/// @remarks This attribute is a pure opt-in marker: the requirement is honored only where the
+/// programmer applies it. The compiler does not infer it from the use of 64-bit indices, nor does
+/// it diagnose 64-bit indexing performed without the attribute.
 __attributeTarget(FuncDecl)
 attribute_syntax [Shader64BitIndexing]  : Shader64BitIndexingAttribute;
 

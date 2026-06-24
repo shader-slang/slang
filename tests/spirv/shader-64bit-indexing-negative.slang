@@ -3,8 +3,8 @@
 // Negative gate (issue #11538).
 //
 // Without `[Shader64BitIndexing]` (and without the `spvShader64BitIndexingEXT` capability anywhere
-// in the call graph), none of the capability, extension, or execution mode may appear. Guards that
-// Half B is opt-in and does not emit the extension unconditionally.
+// in the call graph), none of the capability, extension, or execution mode may appear. This guards
+// that the emission is opt-in and is not produced unconditionally for every SPIR-V entry point.
 
 RWStructuredBuffer<int> outputBuffer;
 

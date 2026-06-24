@@ -1,11 +1,11 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
-// Entry-point-attributed (issue #11538, Approach Y).
+// `[Shader64BitIndexing]` applied directly to the entry point (issue #11538).
 //
-// `[Shader64BitIndexing]` on the entry point itself injects the `spvShader64BitIndexingEXT`
-// capability requirement (Half A) and lifts an `IRShader64BitIndexingDecoration` onto the entry
-// point (Half B), which the SPIR-V back-end lowers to the capability, extension, and execution
-// mode below. No 64-bit index needs to actually appear in the body: the attribute is the marker.
+// The attribute on `computeMain` unions the `spvShader64BitIndexingEXT` capability into the entry
+// point's inferred requirement set; entry-point lowering then attaches a decoration that the
+// SPIR-V back-end emits as the capability, extension, and execution mode checked below. No 64-bit
+// index needs to appear in the body — the attribute alone is the opt-in marker.
 
 RWStructuredBuffer<int> outputBuffer;
 

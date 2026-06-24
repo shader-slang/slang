@@ -14933,6 +14933,10 @@ static void lowerFrontEndEntryPointToIR(
     {
         CapabilitySet caps{inferredCaps};
         bool requiresShader64BitIndexing = false;
+        // Scan for membership of the atom in *any* alternative of the capability set. We iterate
+        // `getAtomSets()` rather than calling `caps.implies(spvShader64BitIndexingEXT)` because
+        // `implies()` is AND-across-all-alternatives: it would only report the atom when *every*
+        // target alternative requires it, which is too strict for a presence test.
         for (auto atomSet : caps.getAtomSets())
         {
             for (auto atomVal : atomSet)

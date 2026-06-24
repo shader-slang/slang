@@ -959,10 +959,6 @@ def spvDescriptorHeapEXT : SPV_EXT_descriptor_heap + SPV_KHR_untyped_pointers;
 /// Represents the SPIR-V capability for 64-bit integer indexing of resources and arrays.
 /// [EXT]
 def spvShader64BitIndexingEXT : SPV_EXT_shader_64bit_indexing;
-// This atom ships inert (no emit wiring). A future consumer that wires it into emit must NOT
-// gate lowering on targetCaps.implies(SPV_EXT_shader_64bit_indexing): fresh extension atoms are
-// added on-demand at emit, so the implies-check silently elides. Gate on the target family
-// (isSPIRV(...)) instead.
 
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core

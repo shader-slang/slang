@@ -1,12 +1,11 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
-// Callee-attributed call-graph lift (issue #11538, Approach Y, mechanism B-i).
+// `[Shader64BitIndexing]` on a callee, not on the entry point (issue #11538).
 //
-// `[Shader64BitIndexing]` sits on a helper, NOT the entry point. Half A propagates the
-// `spvShader64BitIndexingEXT` requirement up the call graph to `computeMain`; the entry-point
-// lowering loop then lifts the decoration onto `computeMain` (a decoration left on the callee
-// would be inert, since SPIR-V execution modes are entry-point scoped). The capability, extension,
-// and execution mode must therefore land on the entry point.
+// The attribute sits on `helper`. The `spvShader64BitIndexingEXT` requirement propagates up the
+// call graph to `computeMain`, and entry-point lowering attaches the decoration to `computeMain`
+// (attaching it to the callee would be inert, since SPIR-V execution modes are entry-point scoped).
+// The capability, extension, and execution mode must therefore land on the entry point.
 
 RWStructuredBuffer<int> outputBuffer;
 

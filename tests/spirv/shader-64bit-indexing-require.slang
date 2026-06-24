@@ -1,10 +1,11 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute -capability spvShader64BitIndexingEXT
 
-// Capability-atom-driven emission (issue #11538).
+// Emission driven by the capability atom rather than the attribute (issue #11538).
 //
-// Half B keys off the `spvShader64BitIndexingEXT` capability atom in the entry point's inferred
-// requirement set, not off the `[Shader64BitIndexing]` attribute specifically. So requesting the
-// atom directly with `[require(spvShader64BitIndexingEXT)]` on a callee drives the same
+// Entry-point lowering decides whether to attach the decoration by checking for the
+// `spvShader64BitIndexingEXT` atom in the entry point's inferred requirement set, not by looking
+// for the `[Shader64BitIndexing]` attribute specifically. Requesting the atom directly with
+// `[require(spvShader64BitIndexingEXT)]` on a callee therefore drives the same
 // capability/extension/execution-mode emission on the entry point. This also guards the atom's
 // existence in slang-capabilities.capdef: removing it makes `[require(...)]` an unknown-capability
 // error and this file fails to compile. `-capability` keeps the `[require]` from tripping the
