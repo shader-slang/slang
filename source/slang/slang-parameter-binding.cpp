@@ -1807,8 +1807,10 @@ static void removeNonExplicitEntryPointParameterDescriptorOffsets(
     auto explicitResourceInfo = hasSupportedVkBindingOnEntryPointParameter(context, fieldLayout)
                                     ? findVkBindingEntryPointParameterResourceInfo(fieldLayout)
                                     : nullptr;
-    auto explicitKind =
-        explicitResourceInfo ? explicitResourceInfo->kind : LayoutResourceKind::None;
+    if (!explicitResourceInfo)
+        return;
+
+    auto explicitKind = explicitResourceInfo->kind;
 
     for (auto typeResInfo : fieldLayout->typeLayout->resourceInfos)
     {

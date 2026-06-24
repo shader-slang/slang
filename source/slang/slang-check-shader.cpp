@@ -768,6 +768,8 @@ bool isVkBindingCompatibleEntryPointParameterType(Type* type)
 {
     if (as<ResourceType>(type))
         return true;
+    if (as<SubpassInputType>(type))
+        return true;
     if (as<HLSLStructuredBufferTypeBase>(type))
         return true;
     if (as<UntypedBufferResourceType>(type))
