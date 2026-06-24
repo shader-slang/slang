@@ -51,7 +51,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: relwithdebinfo
-      runs-on: '["windows-latest"]'
+      runs-on: '["windows-2025"]'
       build-llvm: true
       deploy-pages: false
       server-count: 1

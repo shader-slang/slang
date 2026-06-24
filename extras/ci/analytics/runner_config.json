@@ -94,6 +94,11 @@
       "labels": ["windows-2022"],
       "name": "Windows (GH)",
       "self_hosted": false
+    },
+    {
+      "labels": ["windows-2025"],
+      "name": "Windows (GH)",
+      "self_hosted": false
     }
   ],
   "runner_name_prefixes": [
