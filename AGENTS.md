@@ -189,6 +189,13 @@ high-risk until you can prove they are the right layer:
   recursive helpers named like `are...Equivalent`, `does...Match`, or `try...Match`. First ask why
   normal `substitute`, `resolve`, `getCanonicalType`, `equals`, or an existing canonical builder
   does not already make the two values identical.
+- A new helper, fallback, or "try..." function that exists only to make one failing test pass. Audit
+  every new helper, even small ones: if it redoes substitution, resolution, AST copy, generic
+  solving, lookup, or lowering, it is probably hiding the actual invariant break.
+- Code that converts checked semantic data back into syntax, such as rebuilding an `Expr` or
+  `TypeExp` from a `Val`, `Type`, `DeclRef`, or witness. The checked semantic field should usually
+  remain the source of truth; reconstructing syntax is a strong signal that a producer or copier is
+  storing the wrong representation.
 - Code that walks arbitrary operand graphs, substitution chains, witness chains, or lookup paths to
   rediscover context such as generic arguments, requirement keys, canonical paths, or parent
   declarations. The producer should usually store or construct the canonical form directly.
@@ -201,19 +208,25 @@ high-risk until you can prove they are the right layer:
 - Guards that silently return a default value for an "impossible" shape. Use an assertion when the
   shape is truly out of contract; otherwise explain why the shape is valid input and add coverage.
 
-For every flagged change, write down the input-shape audit before keeping it:
+Start each review by making a short inventory of every new helper/fallback/special case in the
+diff. For each entry, record whether it survives, is reverted, or needs a producer-side fix. For
+every flagged change, write down the input-shape audit before keeping it:
 
 1. What exact shape reaches this code? Include a concrete example and the producing function.
 2. Is that shape canonical and intentionally allowed, or is it an accidental alternative spelling?
 3. If it is accidental, can the producer be fixed so downstream code uses the existing
    `substitute`/`resolve`/canonicalization path?
-4. Which test fails if this change is removed, and does that test prove this layer is responsible?
-5. Can the special case be replaced by an assertion plus a producer-side fix, or by reusing an
+4. What semantic source of truth already exists, and is this code rebuilding syntax or structural
+   shape from it instead of preserving it?
+5. Which test fails if this change is removed, and does that test prove this layer is responsible?
+   Do the revert drill when practical: remove the helper/special case, run the smallest failing
+   test, and use the failure to identify the real producer-consumer break.
+6. Can the special case be replaced by an assertion plus a producer-side fix, or by reusing an
    existing helper?
 
-Do not keep a flagged change merely because it makes tests pass. If it remains necessary, the PR
-description's Process report must justify why this input shape is valid and why this layer owns the
-logic, with a code trace from producer to consumer.
+Do not keep a flagged change merely because it makes tests pass. If it remains necessary, the
+`Process report` section of the PR description must justify why this input shape is valid and why
+this layer owns the logic, with a code trace from producer to consumer.
 
 ## Commit & Pull Request Guidelines
 

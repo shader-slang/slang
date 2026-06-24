@@ -122,7 +122,7 @@ representation that is robust by construction, even when that means a larger rew
   PR description below. (Keep the log out of the commit — it feeds the PR body, it is not a repo
   artifact.)
 
-#### Self-Review for Unprincipled Changes
+### Self-Review for Unprincipled Changes
 
 Before finalizing a non-trivial compiler change, review the diff for signs that the fix is
 compensating for a bad AST/IR/`Val`/witness representation. Treat these patterns as red flags until
@@ -133,6 +133,15 @@ you can prove they are the right layer:
   alternative representations were allowed to survive. First ask why `substitute`, `resolve`,
   `getCanonicalType`, `equals`, or an existing canonical builder does not already make the values
   identical.
+- **Unaudited helper growth.** Treat every new helper, fallback, and `try...` function as a review
+  target, not only large or complicated ones. A helper that exists to make one failing test pass,
+  or that reimplements part of substitution, resolution, AST copy, generic solving, lookup, or
+  lowering, is often the place where an unprincipled fix hides.
+- **Semantic-to-syntax reconstruction.** Code that turns checked semantic data (`Val`, `Type`,
+  `DeclRef`, witness, lowered IR value) back into syntax (`Expr`, `TypeExp`, parser-shaped AST) is
+  a strong smell. The checked semantic field should usually be the source of truth; rebuilding
+  surface syntax, as in a helper that recreates an expression from an `IntVal`, usually means the
+  producer/copier/substitution path is preserving the wrong representation.
 - **Context rediscovery by graph walking.** Code that walks arbitrary operand graphs, substitution
   chains, witness chains, lookup paths, or IR users to recover generic arguments, requirement keys,
   canonical paths, or parent declarations is usually downstream repair. Prefer storing or building
@@ -148,21 +157,28 @@ you can prove they are the right layer:
   shape hides bugs. Assert impossible shapes; handle a shape only when you can explain why it is
   valid input.
 
-For every flagged change, run this audit before keeping it:
+Begin the review with a "suspect helpers" inventory: list every new helper/fallback/special case,
+what existing mechanism it overlaps with, the test that fails without it, and whether it survived,
+was reverted, or was replaced by a producer-side fix. For every flagged change, run this audit
+before keeping it:
 
 1. Name the exact input shape, the producing function, and a concrete source or IR example.
 2. Decide whether that shape is canonical and intentionally allowed, or an accidental alternative
    spelling that should be eliminated.
 3. If it is accidental, try the producer-side fix first so downstream code can use the normal
    `substitute`/`resolve`/canonicalization path.
-4. Name the test that fails without the change and explain why that test proves this layer owns the
-   logic.
-5. Prefer replacing the special case with an assertion plus a producer fix, or with an existing
+4. Name the semantic source of truth that already exists. If the change rebuilds syntax or a
+   parallel structural form from that source of truth, justify why the stored representation cannot
+   be fixed instead.
+5. Name the test that fails without the change and explain why that test proves this layer owns the
+   logic. When practical, do the revert drill: remove the helper/special case, run the smallest
+   failing test, and use the failure to trace the real producer-consumer break.
+6. Prefer replacing the special case with an assertion plus a producer fix, or with an existing
    helper that already encodes the invariant.
 
-Do not keep a flagged change only because it makes tests pass. If it remains necessary, the PR
-description's Process report must justify why the input shape is valid and why this layer owns the
-logic, with a code trace from producer to consumer.
+Do not keep a flagged change only because it makes tests pass. If it remains necessary, the
+`Process report` section of the PR description must justify why the input shape is valid and why
+this layer owns the logic, with a code trace from producer to consumer.
 
 ### Code Style and Review Conventions
 
