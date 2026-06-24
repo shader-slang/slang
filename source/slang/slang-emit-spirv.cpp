@@ -7202,22 +7202,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             CompilerOptionName::SPIRVResourceHeapStride);
     }
 
-    // Emits (once, memoized) the fixed unified resource descriptor-heap stride: the canonical
-    // `max(sizeof(image descriptor), sizeof(buffer descriptor))` sequence from the
-    // SPV_EXT_descriptor_heap proposal. The host packs the resource heap at this stride over every
-    // resource descriptor category regardless of which categories a given shader references, so the
-    // stride is hard-coded to a representative image descriptor and the proposal's buffer descriptor
-    // (`OpTypeImage %float 2D 2 0 0 1 Unknown` and `OpTypeBufferEXT Uniform`) rather than derived
-    // from the descriptor types present in the module. A descriptor's device-defined size is the size
-    // of its heap slot, independent of the image's sampled type and `Sampled` flag, so any image type
-    // that passes Vulkan validation stands in for the image-descriptor size. The proposal's literal
-    // `%void`/`Sampled=0` placeholder is rejected by spirv-val
-    // (`VUID-StandaloneSpirv-OpTypeImage-04656`/`-04657`: the sampled type must be a 32-bit scalar and
-    // `Sampled` must be 1 or 2 for Vulkan), so a 32-bit-float sampled image is used instead.
-    // `OpConstantSizeOfEXT` is a device-defined constant, so the maximum is symbolic:
-    // `max(a, b) = Select(UGreaterThan(a, b), a, b)`. Emitting it lazily before the first resource
-    // array guarantees the stride `<id>` precedes every array it decorates, as the `ArrayStrideIdEXT`
-    // operand-ordering rule requires.
+    // Emits (once, memoized) the fixed unified resource descriptor-heap stride from the
+    // SPV_EXT_descriptor_heap proposal: the canonical
+    // `max(sizeof(image descriptor), sizeof(buffer descriptor))`, emitted regardless of which
+    // descriptor categories the shader uses. `OpConstantSizeOfEXT` is device-defined, so the
+    // maximum is symbolic: `max(a, b) = Select(UGreaterThan(a, b), a, b)`.
     SpvInst* getUnifiedResourceHeapStride()
     {
         if (m_unifiedResourceHeapStride)
@@ -7322,14 +7311,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return runtimeArrayType;
     }
 
-    // Diagnoses the mutually-exclusive `-spirv-resource-heap-stride` / unified-stride option pair.
-    // The unified flag asks the device to pick one maximum stride; an explicit
-    // `-spirv-resource-heap-stride` pins a fixed literal stride. These intents contradict, so rather
-    // than silently letting one win, diagnose the conflict and require the user to drop one. This
-    // runs once per module emit and fires even when no resource heap is present, because the
-    // contradictory option pair is a command-line mistake independent of shader contents. The
-    // unified stride itself is emitted eagerly by `getDescriptorRuntimeArrayType`, so this function
-    // emits no instructions.
+    // Diagnoses the mutually-exclusive `-spirv-resource-heap-stride` / unified-stride option pair:
+    // an explicit literal stride and the unified maximum stride contradict, so passing both is an
+    // error rather than letting one silently win.
     void diagnoseConflictingDescriptorHeapStrideOptions()
     {
         if (isUnifiedResourceHeapStrideEnabled() &&
@@ -11989,8 +11973,6 @@ SlangResult emitSPIRVFromIR(
         }
     } while (context.m_forwardDeclaredPointers.getCount() != 0);
 
-    // Diagnose the mutually-exclusive descriptor-heap stride options. The unified stride itself is
-    // emitted eagerly as each resource array is created, so nothing is decorated here.
     context.diagnoseConflictingDescriptorHeapStrideOptions();
 
     // Emit extensions and capabilities for which there are multiple options available.

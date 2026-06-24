@@ -930,7 +930,7 @@ void initCommandOptions(CommandOptions& options)
          "-spirv-unified-descriptor-heap-stride",
          nullptr,
          "When generating SPIRV with spvDescriptorHeapEXT, emit each resource descriptor-heap "
-         "runtime array's ArrayStride as the maximum of every resource descriptor type's size, so "
+         "runtime array's ArrayStride as the maximum of image and buffer descriptor sizes, so "
          "a single heap shared by buffers and images is indexed at the device's unified stride. "
          "Only affects the OpConstantSizeOfEXT default path (when no explicit "
          "-spirv-resource-heap-stride is given); mutually exclusive with "
