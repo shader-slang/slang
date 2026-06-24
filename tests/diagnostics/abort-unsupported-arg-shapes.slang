@@ -1,6 +1,6 @@
 // Verify that non-scalar/ordinary-vector abort payload shapes are rejected with E55211.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -capability abort -capability cooperative_vector -capability cooperative_matrix -capability subgroup_basic -skip-spirv-validation
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -capability abort -capability cooperative_vector -capability cooperative_matrix -capability subgroup_basic
 
 Texture2D gTexture;
 uniform uint* gPointer;
