@@ -98,7 +98,7 @@ def load_records(data_path, history_dir):
                 continue
             # combined-summary has platforms.linux; coverage-summary is flat
             linux = d.get("platforms", {}).get("linux", d)
-            if "slangc_line_coverage" in linux:
+            if "slangc_line_coverage" in linux and pct(linux["slangc_line_coverage"]) is not None:
                 records[date] = {**linux, "date": date,
                                   "commit": slang_commit or commit_hash[:9],
                                   "platform": "linux"}
@@ -107,11 +107,13 @@ def load_records(data_path, history_dir):
     return sorted(records.values(), key=lambda r: r["date"])
 
 
-def pct(val):
+def pct(val, vmin=50.0):
+    """Parse percentage string/number; return None for missing or implausibly low values."""
     if val is None:
         return None
     try:
-        return float(str(val).rstrip("%"))
+        v = float(str(val).rstrip("%"))
+        return v if v >= vmin else None
     except ValueError:
         return None
 
@@ -152,18 +154,27 @@ def render(records):
             f'fill="#888" font-size="11">{v}</text>')
 
     # Series polylines + latest dot + label
+    # Build separate segments for contiguous runs to avoid connecting across gaps.
     polylines = []
     for label, (key, color, dash) in series.items():
         vals = [pct(r.get(key)) for r in records]
-        pts = " ".join(
-            f"{x_px(i):.1f},{y_px(v):.1f}"
-            for i, v in enumerate(vals) if v is not None)
-        if not pts:
-            continue
         da = f' stroke-dasharray="{dash}"' if dash else ""
-        polylines.append(
-            f'<polyline points="{pts}" stroke="{color}" stroke-width="2" '
-            f'fill="none"{da}><title>{label} coverage</title></polyline>')
+        # Split into contiguous segments
+        seg, segs = [], []
+        for i, v in enumerate(vals):
+            if v is not None:
+                seg.append((i, v))
+            else:
+                if len(seg) >= 2:
+                    segs.append(seg)
+                seg = []
+        if len(seg) >= 2:
+            segs.append(seg)
+        for seg in segs:
+            pts = " ".join(f"{x_px(i):.1f},{y_px(v):.1f}" for i, v in seg)
+            polylines.append(
+                f'<polyline points="{pts}" stroke="{color}" stroke-width="2" '
+                f'fill="none"{da}><title>{label} coverage</title></polyline>')
         # Dot + value label on latest point
         li = next((i for i in reversed(range(n)) if vals[i] is not None), None)
         if li is not None:
