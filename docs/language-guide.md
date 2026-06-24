@@ -165,7 +165,7 @@ M gMaterial;
 Conceptually, you can think of this syntax as wrapping your entire shader program in a generic with parameter `<M : IMaterial>`.
 This isn't beautiful syntax, but it may help when incrementally porting an existing HLSL codebase to use Slang's features.
 
-A global-scope generic parameter must be given a concrete argument before the program can be compiled to a target — for example via the `-specialize` command-line option, by embedding the argument in the entry-point name (`-entry "main<Concrete>"`), or programmatically through `IComponentType::specialize`.
+A global-scope generic parameter must be given a concrete argument before the program can be compiled to a target — for example by passing `-specialize <typename>` (after the corresponding `-entry <name>`) on the command line, or programmatically through `IComponentType::specialize`.
 Using such a parameter directly in shader code that is then compiled without a binding is an error (`E38207`); these declarations are intended for reflection and external specialization, not for direct use in an unspecialized shader body.
 
 ### Associated Types

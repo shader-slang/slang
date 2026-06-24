@@ -16,14 +16,24 @@
 //  - `mainValueParam`: a `__generic_value_param`, which lowers to a *non*
 //    type-kind `IRGlobalGenericParam`; it must also be diagnosed (otherwise the
 //    leftover-use release assert in specialization would fire).
+//  - `mainConjunction`: a *multi-constraint* `type_param TT : IFoo & IBar`,
+//    which lowers to a type-kind param plus *two* witness-table params. A plain
+//    FileCheck directive pins that exactly one E38207 is reported (not one per
+//    witness param), guarding the dedup.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv-asm -entry main -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKU,non-exhaustive):-target spirv-asm -entry mainUnconstrained -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKV,non-exhaustive):-target spirv-asm -entry mainValueParam -stage compute
+//TEST:SIMPLE(filecheck=CHECKC):-target spirv-asm -entry mainConjunction -stage compute
 
 interface IFoo
 {
     int get();
+}
+
+interface IBar
+{
+    int bar();
 }
 
 RWStructuredBuffer<int> outputBuffer;
@@ -62,3 +72,17 @@ void mainValueParam()
 //CHECKV: E38207
 //CHECKV: cannot be used in shader code without a concrete binding
 }
+
+type_param TT : IFoo & IBar;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void mainConjunction()
+{
+    TT t;
+    outputBuffer[0] = t.get() + t.bar();
+}
+// The conjunction lowers to one type-kind param plus two witness-table params,
+// but the dedup must collapse them to exactly one E38207.
+//CHECKC-COUNT-1: error{{.*}}38207
+//CHECKC-NOT: error{{.*}}38207
