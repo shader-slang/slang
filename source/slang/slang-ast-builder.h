@@ -349,12 +349,12 @@ public:
             auto parentGenericDecl = parentGenericAppDeclRef->getGenericDecl();
 
             // Generic signature constraints are direct members of the `GenericDecl`, not of the
-            // generic inner declaration. Full source shape:
+            // generic inner declaration. Consider this example:
             //
             //     void f<T>(T value) where T : IBar;
             //
-            // AST trace: the `where T : IBar` proof is stored under the `GenericDecl` for `f<T>`,
-            // while the callable declaration is `GenericDecl.inner`. If substitution starts from
+            // The `where T : IBar` proof is stored under the `GenericDecl` for `f<T>`, while the
+            // callable declaration is `GenericDecl.inner`. If substitution starts from
             // `MemberDeclRef(GenericAppDeclRef(G, G.inner, args), constraintUnderG)`, keep the
             // constraint under the same specialized generic environment instead of manufacturing a
             // member reference through `G.inner`, because the constraint is not a member of the

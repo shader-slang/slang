@@ -44,7 +44,7 @@ bool isGenericConstraintParameterDecl(Decl* decl)
     {
         // A `GenericDecl` can either own signature constraints for its inner declaration, or
         // wrap a `GenericTypeConstraintDecl` that is itself a standalone interface requirement.
-        // Full source shape after expanding `[Differentiable]` on a generic requirement:
+        // Consider this example after expanding `[Differentiable]` on a generic requirement:
         //
         //     interface IFoo
         //     {
@@ -53,11 +53,11 @@ bool isGenericConstraintParameterDecl(Decl* decl)
         //         __constraint bar<T> : IForwardDifferentiableFunc<bar<T>>;
         //     }
         //
-        // AST trace: the method requirement is `GenericDecl { inner = CallableDecl bar }`, and the
-        // differentiability requirement is a separate
-        // `GenericDecl { inner = GenericTypeConstraintDecl }`. Because the constraint is the
-        // generic's `inner`, it does not occupy a hidden generic argument slot for another
-        // declaration; it is the standalone interface requirement for `bar<T>`.
+        // The method requirement is `GenericDecl { inner = CallableDecl bar }`, and the
+        // differentiability requirement is a separate `GenericDecl { inner =
+        // GenericTypeConstraintDecl }`. Because the constraint is the generic's `inner`, it does
+        // not occupy a hidden generic argument slot for another declaration; it is the standalone
+        // interface requirement for `bar<T>`.
         return parentGenericDecl->inner != decl;
     }
 

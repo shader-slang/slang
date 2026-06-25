@@ -1005,7 +1005,7 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
 
 // A synthesized interface requirement that constrains a callable requirement as a type.
 //
-// Full source-to-AST shape:
+// Consider this example:
 //
 //     interface IFoo
 //     {

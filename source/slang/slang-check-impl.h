@@ -3107,7 +3107,7 @@ public:
         ShortList<SolverConstraint, 8> discoveredConstraints;
 
         // Hidden witness arguments discovered while unifying full generic-app
-        // decl-refs. Full source shape:
+        // decl-refs. Consider this example:
         //
         //     interface ITensor<T, int D>
         //     {

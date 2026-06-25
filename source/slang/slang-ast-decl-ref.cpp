@@ -66,7 +66,7 @@ static AccessorDecl* _tryGetCorrespondingAccessorDecl(Decl* memberDecl, Decl* su
     // generic substitutions.
     //
     // Conceptually this is not quite an ordinary static `MemberDeclRef`; it is projecting an
-    // accessor role from the resolved storage declaration. Full source shape:
+    // accessor role from the resolved storage declaration. Consider this example:
     //
     //     interface ITensor<T, int D>
     //     {

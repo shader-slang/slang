@@ -517,7 +517,7 @@ static DeclRef<GenericTypeConstraintDecl> _tryGetDefaultDifferentiabilityConstra
     SubtypeWitness* conformingWitness,
     DeclRef<GenericDecl>& outLookedUpGenericRequirementDeclRef)
 {
-    // Full source-to-AST shape:
+    // Consider this example:
     //
     //     interface IFoo
     //     {
@@ -529,11 +529,11 @@ static DeclRef<GenericTypeConstraintDecl> _tryGetDefaultDifferentiabilityConstra
     // differentiability annotation contributes a sibling
     // `GenericDecl { inner = FuncConstraintDecl(This.f<T> : IDiff<This.f<T>>) }`.
     //
-    // Inheritance trace: when computing inheritance for a looked-up method type, the direct
-    // constraint scan sees the outer generic requirement but cannot use the inner
-    // `FuncConstraintDecl` until it is expressed through the source type's conformance witness.
-    // This helper forms that looked-up generic requirement and applies default
-    // substitutions so the caller can copy the satisfying method's generic arguments onto it.
+    // When computing inheritance for a looked-up method type, the direct constraint scan sees the
+    // outer generic requirement but cannot use the inner `FuncConstraintDecl` until it is expressed
+    // through the source type's conformance witness. This helper forms that looked-up generic
+    // requirement and applies default substitutions so the caller can copy the satisfying method's
+    // generic arguments onto it.
     auto constraintDecl = as<FuncConstraintDecl>(genericDifferentiabilityRequirementDecl->inner);
     if (!constraintDecl || constraintDecl->checkState.isBeingChecked())
         return DeclRef<GenericTypeConstraintDecl>();

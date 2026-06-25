@@ -693,7 +693,7 @@ static DeclRef<GenericVariadicPackCountConstraintDecl> _findDeclaredPackCountCon
     IntVal* actualCount,
     IntVal* expectedCount)
 {
-    // Full nested-call source shape:
+    // Consider this example:
     //
     //     void bar<let M, each J>(J values)
     //         where countof(J) == M;

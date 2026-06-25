@@ -5446,7 +5446,7 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
 
         // The signature requirement and its sibling `FuncConstraintDecl` are both about the
         // requirement-side callable contract, not necessarily the satisfying method's ambient
-        // differentiability proof. Motivating source shape from
+        // differentiability proof. Consider this example from
         // tests/autodiff/generic-jvp-trivial.slang:
         //
         //     interface MyLinearArithmeticType
@@ -5466,15 +5466,14 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         //     [Differentiable]
         //     T f<T>(T x) where T : MyLinearArithmeticType, IDifferentiable { ... }
         //
-        // Type-check trace: checking `myvector<3> : MyLinearArithmeticType` compares the
-        // concrete `myvector<3>.ldot` against the requirement `This.ldot`. At the interface
-        // declaration, `This` is not constrained to `IDifferentiable`, so the hidden
-        // `DiffTypeInfoWitness` for `This.ldot(This, This)` marks both `This` parameters
-        // `no_diff`. In the later generic function `f<T>`, the same concrete type is also visible
-        // through `T : IDifferentiable`, so the concrete callable's ambient diff proof may include
-        // differentiable parameters. Filter overload candidates against the requirement-side proof
-        // here so signature matching agrees with the sibling `FuncConstraintDecl` witness that the
-        // conformance loop checks next.
+        // Checking `myvector<3> : MyLinearArithmeticType` compares the concrete
+        // `myvector<3>.ldot` against the requirement `This.ldot`. At the interface declaration,
+        // `This` is not constrained to `IDifferentiable`, so the hidden `DiffTypeInfoWitness` for
+        // `This.ldot(This, This)` marks both `This` parameters `no_diff`. In the later generic
+        // function `f<T>`, the same concrete type is also visible through `T : IDifferentiable`, so
+        // the concrete callable's ambient diff proof may include differentiable parameters. Filter
+        // overload candidates against the requirement-side proof here so signature matching agrees
+        // with the sibling `FuncConstraintDecl` witness that the conformance loop checks next.
         auto requiredDifferentiabilityInterfaceType =
             isBackward ? m_astBuilder->getBackwardDiffFuncInterfaceType(
                              satisfyingFuncAsType,
@@ -7119,7 +7118,7 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             // `GenericVariadicPackCountConstraintDecl` stores the checked
             // `countof(pack)` value in `actualCountVal`, keeps `packExpr` for
             // diagnostics/printing, and uses `expectedCountVal` for witness
-            // matching. Full source shape:
+            // matching. Consider this example:
             //
             //     interface ITensor<T, int D>
             //     {
@@ -7128,11 +7127,11 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             //             where countof(I) == D;
             //     }
             //
-            // Clone trace: `synthesizeGenericSignatureForRequirementWitness` creates a fresh
-            // generic signature for a satisfying `load<each I2>` requirement. Rebuild the direct
-            // expected-count expression `D` to reference the synthesized value parameter in that
-            // cloned signature; `getDefaultSubstitutionArgs` then creates a declared witness for
-            // the synthesized `countof(I2) == D2` proof, not for the original requirement proof.
+            // `synthesizeGenericSignatureForRequirementWitness` creates a fresh generic signature
+            // for a satisfying `load<each I2>` requirement. Rebuild the direct expected-count
+            // expression `D` to reference the synthesized value parameter in that cloned signature;
+            // `getDefaultSubstitutionArgs` then creates a declared witness for the synthesized
+            // `countof(I2) == D2` proof, not for the original requirement proof.
             if (auto declRefExpr = as<DeclRefExpr>(packCountConstraintDecl->expectedCountExpr))
             {
                 auto origExpectedCountDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
@@ -10187,8 +10186,8 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // resolved to the actual satisfying decl, in which case we simply return
     // true without any further lookup.
     // A generic-wrapped interface requirement has its `GenericDecl` as the immediate parent in the
-    // decl-ref chain, even though the wrapped declaration is still an interface requirement. Full
-    // source shape:
+    // decl-ref chain, even though the wrapped declaration is still an interface requirement.
+    // Consider this example:
     //
     //     interface IFoo
     //     {
@@ -10819,7 +10818,7 @@ bool SemanticsVisitor::checkInterfaceConformance(
         result = result && requirementSatisfied;
     }
     // Inherited-interface entries are witness-table entries too, and constraints can refer to
-    // requirements inherited through those entries. Full source shape:
+    // requirements inherited through those entries. Consider this example:
     //
     //     interface IBase
     //     {
@@ -10831,8 +10830,8 @@ bool SemanticsVisitor::checkInterfaceConformance(
     //         __constraint DataType == This;
     //     }
     //
-    // Conformance trace: a concrete `S : IDerived` table needs a nested `S : IBase` witness-table
-    // entry before `getSub`/`getSup` can resolve `DataType` in the `IDerived` equality constraint.
+    // A concrete `S : IDerived` table needs a nested `S : IBase` witness-table entry before
+    // `getSub`/`getSup` can resolve `DataType` in the `IDerived` equality constraint.
     for (auto requiredMemberDecl : getMembers(m_astBuilder, superInterfaceDeclRef))
     {
         auto requiredInheritanceDecl = as<InheritanceDecl>(requiredMemberDecl.getDecl());
@@ -10856,7 +10855,7 @@ bool SemanticsVisitor::checkInterfaceConformance(
         result = result && requirementSatisfied;
     }
     // Constraints that refine associated-type requirements must be checked before ordinary member
-    // signatures. Full source shape:
+    // signatures. Consider this example:
     //
     //     interface IBase
     //     {
@@ -10869,9 +10868,9 @@ bool SemanticsVisitor::checkInterfaceConformance(
     //         U.V add(U left, U right);
     //     }
     //
-    // Conformance trace: if a concrete type maps `ISimple.U -> Val`, this loop checks `Val : IBase`
-    // before the ordinary method loop compares `add`. Resolving the substituted method result
-    // `Val.V` then has a completed `Val : IBase` witness table to query.
+    // If a concrete type maps `ISimple.U -> Val`, this loop checks `Val : IBase` before the
+    // ordinary method loop compares `add`. Resolving the substituted method result `Val.V` then
+    // has a completed `Val : IBase` witness table to query.
     for (auto requiredMemberDecl : getMembers(m_astBuilder, superInterfaceDeclRef))
     {
         auto constraintDecl = asGenericTypeConstraintRequirement(requiredMemberDecl.getDecl());
@@ -14431,7 +14430,7 @@ DeclRef<Decl> SemanticsVisitor::getRequirementAsLookedUpDecl(ASTBuilder* astBuil
             if (i == 0 && decl->isChildOf(genericParentDecls[i]))
             {
                 // Accessors belong to their storage declaration, not directly to the generic
-                // environment. Full source shape:
+                // environment. Consider this example:
                 //
                 //     interface ITensor<T, int D>
                 //     {
@@ -15079,7 +15078,7 @@ static Decl* _moveInterfaceDifferentiabilityRequirementToInterface(
     GenericTypeConstraintDecl* constraintDecl,
     DeclRef<Decl>& ioCallableRequirementDeclRef)
 {
-    // Full source shape:
+    // Consider this example:
     //
     //     interface IFoo
     //     {

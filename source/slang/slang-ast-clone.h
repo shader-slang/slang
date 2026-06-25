@@ -32,7 +32,7 @@ struct ASTCloneContext
 // Returns `genericDeclToSpecialize` applied to the default arguments from
 // `genericDeclProvidingSpecializationArgs`.
 //
-// Full source shape:
+// Consider this example:
 //
 //     interface IFoo
 //     {

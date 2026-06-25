@@ -10815,8 +10815,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (genericRequirementDecl)
             {
                 // A generic interface requirement key lowers to an IR generic, so its satisfying
-                // witness has to be lowered under the requirement-local generic parameters. Full
-                // source shape:
+                // witness has to be lowered under the requirement-local generic parameters.
+                // Consider this example:
                 //
                 //     interface IVector<T>
                 //     {
@@ -10830,7 +10830,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 //         T f<U>(U value) where U : IThing<T> { ... }
                 //     }
                 //
-                // AST-to-IR trace: header checking creates a sibling generic requirement for
+                // Header checking creates a sibling generic requirement for
                 // `This.f<U> : IForwardDifferentiable<This.f<U>>`. While lowering the witness table
                 // for `InlineVector<T> : IVector<T>`, `witnessTableBaseDeclRef` is
                 // `IVector<InlineVector<T>.T>`. Forming
@@ -11881,7 +11881,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     genericParent = nullptr;
                 if (genericParent)
                 {
-                    // Full source shape:
+                    // Consider this example:
                     //
                     //     interface IFoo
                     //     {
@@ -14497,7 +14497,7 @@ bool canDeclLowerToAGeneric(Decl* decl)
         {
             if (parentGenericDecl->inner == genericTypeConstraintDecl)
             {
-                // Full source-to-AST shape:
+                // Consider this example:
                 //
                 //     interface IFoo
                 //     {
