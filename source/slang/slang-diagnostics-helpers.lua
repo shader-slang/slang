@@ -73,10 +73,13 @@ local intentional_shared_code_list = {
   10000, -- `illegalCharacter*` printable/hex variants in slang-lexer-diagnostic-defs.h
   39999, -- overload-resolution / lookup umbrella; many keyed templates fan in
   99999, -- internal-compiler-error catch-all
-  -- TODO: the E20001-E20012 range in slang-json-diagnostic-defs.h collides with
-  -- the lua-side names of the same codes (and 20011 is itself double-bound there
-  -- as `fieldNotDefinedOnType` / `fieldRequiredOnType`). Renumbering the JSON
-  -- side to a free range is a separate follow-up; remove these once it lands.
+  -- TODO(#11318 follow-up): the E20001-E20012 range in
+  -- slang-json-diagnostic-defs.h collides with the lua-side names of the same
+  -- codes. Worse, 20011 is *itself* double-bound within that one catalog
+  -- (`fieldNotDefinedOnType` and `fieldRequiredOnType`), so even an
+  -- intra-catalog check would flag it. Renumbering the JSON catalog to a free
+  -- range (and splitting the 20011 pair) is tracked under the #11318 catalog-
+  -- hygiene effort; remove these suppressions once that lands.
   20001,
   20002,
   20003,
@@ -105,11 +108,21 @@ local function is_intentional_shared(code)
   return code < 0 or intentional_shared_codes[code] == true
 end
 
--- The C++ diagnostic catalogs that live outside this Lua file. Each uses the
+-- The C++ diagnostic catalogs that share the compiler's diagnostic code space
+-- (the same space as the Lua catalog here). Each uses the
 -- `DIAGNOSTIC(code, severity, name, messageFormat)` multi-include pattern. Paths
--- are relative to this helper file's directory (source/slang/). New
--- `*-diagnostic-defs.h` catalogs under source/ should be added here so their
--- codes participate in the cross-catalog collision check.
+-- are relative to this helper file's directory (source/slang/).
+--
+-- Only the `source/compiler-core/` catalogs are listed: those feed the unified
+-- compiler `DiagnosticInfo` catalog where a code clash is a real bug (this is
+-- the space the E29104 collision lived in). The `*-diagnostic-defs.h` files under
+-- `tools/` (slang-capability-generator, slang-fiddle, test-server) are
+-- deliberately excluded — each is a *separate*, self-contained enumeration for
+-- its own tool, numbered from ~0 and reusing values like 1/2/20001 independently,
+-- so they neither clash with nor are comparable to the compiler catalog.
+--
+-- A new `*-diagnostic-defs.h` that joins the compiler code space must be added
+-- here so its codes participate in the cross-catalog collision check.
 local cpp_diagnostic_defs_files = {
   "../compiler-core/slang-misc-diagnostic-defs.h",
   "../compiler-core/slang-lexer-diagnostic-defs.h",
