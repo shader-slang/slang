@@ -53,7 +53,7 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Diagnose MSVC version (before update)
+      - name: Diagnose MSVC version
         shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -67,18 +67,6 @@ jobs:
           } else {
             Write-Host "vswhere not found"
           }
-
-      - name: Update Visual Studio Build Tools
-        shell: pwsh
-        run: |
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $installPath = (& $vswhere -latest -format json | ConvertFrom-Json).installationPath
-          $installer   = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
-          Write-Host "Updating Visual Studio at: $installPath"
-          $proc = Start-Process -FilePath $installer `
-            -ArgumentList "update", "--passive", "--norestart", "--installPath", $installPath `
-            -Wait -PassThru
-          Write-Host "VS installer exit code: $($proc.ExitCode)"
 
       - name: Common setup
         uses: ./.github/actions/common-setup
