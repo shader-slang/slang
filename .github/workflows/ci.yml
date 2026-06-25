@@ -52,6 +52,14 @@ jobs:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build-container.yml
+    # id-token is never part of the default GITHUB_TOKEN even when the repo
+    # default is "write"; it must be requested explicitly for the reusable
+    # workflow's GCP Workload Identity auth step. Set it on the caller so the
+    # token actually carries id-token:write rather than relying on the default.
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
     with:
       config: debug
       runs-on: '["Linux", "self-hosted", "build", "GCP"]'
@@ -61,6 +69,10 @@ jobs:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build-container.yml
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
     with:
       config: release
       runs-on: '["Linux", "self-hosted", "build", "GCP"]'
