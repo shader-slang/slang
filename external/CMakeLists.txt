@@ -165,6 +165,15 @@ target_include_directories(
     INTERFACE "${CMAKE_CURRENT_LIST_DIR}/metal-cpp"
 )
 
+# fast_float headers (header-only). Mark as a system include so the
+# bundled headers don't trip Slang's extra warnings / -Werror.
+add_library(fast_float INTERFACE)
+target_include_directories(
+    fast_float
+    ${system}
+    INTERFACE "${CMAKE_CURRENT_LIST_DIR}/fast_float/include"
+)
+
 # SPIRV-Headers
 # Avoid using ${system} intentionally in `add_subdirectory`, because if we do, it will end up using
 # spirv.h installed in the system directory on MacOS.
@@ -319,6 +328,7 @@ if(
             INTERFACE "${SLANG_OVERRIDE_IMGUI_PATH}/imgui"
         )
     endif()
+    add_supported_cxx_flags(imgui INTERFACE -Wno-nontrivial-memcall)
 
     # stb
     add_library(stb INTERFACE)
@@ -340,6 +350,12 @@ if(SLANG_ENABLE_SLANG_RHI)
     set(SLANG_RHI_SLANG_INCLUDE_DIR ${slang_SOURCE_DIR}/include)
     set(SLANG_RHI_SLANG_BINARY_DIR ${CMAKE_BINARY_DIR})
     set(SLANG_RHI_ENABLE_NVAPI ${SLANG_ENABLE_NVAPI})
+    set(SLANG_RHI_ENABLE_WGPU ${SLANG_HAS_WEBGPU_SUPPORT})
+    if(SLANG_ENABLE_DXIL AND NOT DEFINED SLANG_RHI_FETCH_DXC)
+        # Slang's FetchDXC.cmake owns DXC download/build/deployment in this
+        # configuration, so prevent slang-rhi from fetching its own copy.
+        set(SLANG_RHI_FETCH_DXC OFF)
+    endif()
 
     # CoopVec requires the preview Agility SDK that supports SM 6.10
     #set(SLANG_RHI_AGILITY_SDK_VERSION D3D12_PREVIEW_SDK_VERSION)
@@ -349,9 +365,6 @@ if(SLANG_ENABLE_SLANG_RHI)
 
     if(SLANG_ENABLE_DX_ON_VK)
         set(SLANG_RHI_HAS_D3D12 ON)
-    endif()
-    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        set(SLANG_RHI_ENABLE_WGPU OFF)
     endif()
     if(MINGW)
         set(SLANG_RHI_ENABLE_D3D11 OFF)

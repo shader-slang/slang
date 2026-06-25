@@ -89,8 +89,8 @@ def fetch_runs(repo, status):
     )
     if err:
         print(f"Warning: Failed to fetch {status} runs: {err}", file=sys.stderr)
-        return []
-    return data if isinstance(data, list) else []
+        return [], err
+    return data if isinstance(data, list) else [], None
 
 
 def fetch_jobs_for_run(repo, run_id):
@@ -100,8 +100,9 @@ def fetch_jobs_for_run(repo, run_id):
         "jobs",
     )
     if err:
-        return []
-    return data if isinstance(data, list) else []
+        print(f"Warning: Failed to fetch jobs for run {run_id}: {err}", file=sys.stderr)
+        return [], err
+    return data if isinstance(data, list) else [], None
 
 
 def fetch_runners(repo):
@@ -456,7 +457,18 @@ def print_runner_status(runners, all_jobs, runners_available):
             print(line)
 
 
-def build_json_output(queued_runs, inprogress_runs, all_jobs, runners, runners_available, now, repo):
+def build_json_output(
+    queued_runs,
+    inprogress_runs,
+    all_jobs,
+    runners,
+    runners_available,
+    now,
+    repo,
+    partial=False,
+    list_errors=None,
+    job_fetch_errors=0,
+):
     """Build JSON output structure for programmatic consumption."""
     queued_jobs = [j for j in all_jobs if j["status"] in ("queued", "waiting")]
     running_jobs = [j for j in all_jobs if j["status"] == "in_progress"]
@@ -585,7 +597,7 @@ def build_json_output(queued_runs, inprogress_runs, all_jobs, runners, runners_a
                 }
             runner_status.append(entry)
 
-    return {
+    payload = {
         "fetched_at": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
         "repo": repo,
         "summary": {
@@ -601,6 +613,13 @@ def build_json_output(queued_runs, inprogress_runs, all_jobs, runners, runners_a
         "self_hosted_runners": runner_status,
         "runners_available": runners_available,
     }
+    if partial:
+        payload["partial"] = True
+    if list_errors:
+        payload["list_errors"] = list_errors
+    if job_fetch_errors:
+        payload["job_fetch_errors"] = job_fetch_errors
+    return payload
 
 
 def main():
@@ -635,13 +654,28 @@ def main():
         inprogress_future = executor.submit(fetch_runs, repo, "in_progress")
         runners_future = executor.submit(fetch_runners, repo)
 
-        queued_runs = queued_future.result()
-        inprogress_runs = inprogress_future.result()
+        queued_runs, queued_err = queued_future.result()
+        inprogress_runs, inprogress_err = inprogress_future.result()
         runners, runners_available = runners_future.result()
 
     all_runs = queued_runs + inprogress_runs
+    list_errors = [e for e in (queued_err, inprogress_err) if e]
 
     if not all_runs:
+        if args.json:
+            payload = build_json_output(
+                queued_runs,
+                inprogress_runs,
+                [],
+                runners,
+                runners_available,
+                now,
+                repo,
+                partial=bool(list_errors),
+                list_errors=list_errors,
+            )
+            print(json.dumps(payload, indent=2))
+            return
         print("No queued or in-progress runs found.")
         return
 
@@ -652,6 +686,7 @@ def main():
         flush=True,
     )
 
+    job_fetch_errors = 0
     with ThreadPoolExecutor(max_workers=8) as executor:
         futures = {
             executor.submit(fetch_jobs_for_run, repo, r["id"]): r
@@ -660,7 +695,9 @@ def main():
         }
         for future in as_completed(futures):
             run = futures[future]
-            jobs = future.result()
+            jobs, err = future.result()
+            if err:
+                job_fetch_errors += 1
             # Annotate jobs with parent run info for display
             for job in jobs:
                 job["_branch"] = run.get("head_branch", "")
@@ -684,6 +721,9 @@ def main():
             runners_available,
             now,
             repo,
+            partial=bool(list_errors or job_fetch_errors),
+            list_errors=list_errors,
+            job_fetch_errors=job_fetch_errors,
         )
         payload["longest_waiting_jobs"] = payload["longest_waiting_jobs"][
             : args.top_waiting

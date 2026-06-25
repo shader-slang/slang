@@ -92,7 +92,7 @@ TestReporter* TestContext::getTestReporter()
     return m_reporters[slangTestThreadIndex];
 }
 
-SlangResult TestContext::locateFileCheck()
+SlangResult TestContext::locateLLVMFileCheck()
 {
     DefaultSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
 
@@ -121,8 +121,6 @@ Result TestContext::init(const char* inExePath)
     exePath = inExePath;
     SLANG_RETURN_ON_FAIL(TestToolUtil::getExeDirectoryPath(inExePath, exeDirectoryPath));
     SLANG_RETURN_ON_FAIL(TestToolUtil::getDllDirectoryPath(inExePath, dllDirectoryPath));
-
-    SLANG_RETURN_ON_FAIL(locateFileCheck());
 
     return SLANG_OK;
 }
@@ -228,6 +226,21 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
     {
         CommandLine cmdLine;
         cmdLine.setExecutableLocation(ExecutableLocation(exeDirectoryPath, "test-server"));
+        cmdLine.addArg("-parent-pid");
+        cmdLine.addArg(String(Process::getId()));
+
+#if defined(_WIN32)
+        // Hidden integration-test hook. stdout is the JSON-RPC channel, so the test-server parent
+        // monitor test uses a named event instead of emitting a sentinel line.
+        StringBuilder parentMonitorReadyEventName;
+        if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice::fromLiteral("SLANG_TEST_PARENT_MONITOR_READY_EVENT"),
+                parentMonitorReadyEventName)))
+        {
+            cmdLine.addArg("-parent-monitor-ready-event");
+            cmdLine.addArg(parentMonitorReadyEventName.produceString());
+        }
+#endif
 
         SLANG_RETURN_ON_FAIL(Process::create(
             cmdLine,

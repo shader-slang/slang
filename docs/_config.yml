@@ -1,1 +1,9 @@
 theme: jekyll-theme-tactile
+
+defaults:
+  - scope:
+      path: "generated/design"
+    values:
+      layout: "generated-design"
+include:
+  - _meta

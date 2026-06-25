@@ -15,6 +15,23 @@ if(SLANG_ENABLE_SLANGC)
     # slangc and slang-llvm.
     add_dependencies(cpu-shader-llvm-link-shader slangc slang-llvm)
 
+    # Mark shader.o as a generated file before `slang_add_target` consumes it
+    # via `EXPLICIT_SOURCE` below. `slang_add_target` is a function (separate
+    # variable scope from this CMakeLists.txt), and without an explicit
+    # GENERATED property the `add_executable` inside the function treats the
+    # file as a plain pre-existing input. That gives Ninja only the order-only
+    # target-level edge from `REQUIRES cpu-shader-llvm-link-shader`, which under
+    # high-parallelism builds (notably slangpy CI building slang as a
+    # subproject) races the link step ahead of the slangc invocation that
+    # produces shader.o. Setting GENERATED here makes CMake emit a proper
+    # file-level Ninja edge from the link's input list to the custom-command
+    # producer rule, so the link must wait for shader.o regardless of build
+    # scheduling.
+    set_source_files_properties(
+        ${CMAKE_CURRENT_BINARY_DIR}/shader.o
+        PROPERTIES GENERATED TRUE
+    )
+
     # Normally, you would use the below three lines:
     #add_executable(cpu-shader-llvm-link link.cpp ${CMAKE_CURRENT_BINARY_DIR}/shader.o)
     #add_dependencies(cpu-shader-llvm-link cpu-shader-llvm-link-shader)

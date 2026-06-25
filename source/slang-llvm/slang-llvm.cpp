@@ -1071,7 +1071,7 @@ createLLVMDownstreamCompiler_V4(const SlangUUID& intfGuid, Slang::IDownstreamCom
     return SLANG_E_NO_INTERFACE;
 }
 
-extern "C" SLANG_DLL_EXPORT SlangResult getLLVMTargetBuiltinTypeLayoutInfo_V1(
+extern "C" SLANG_DLL_EXPORT SlangResult getLLVMTargetBuiltinTypeLayoutInfo_V2(
     Slang::CharSlice targetTripleSlice,
     Slang::TargetBuiltinTypeLayoutInfo* out)
 {
@@ -1090,6 +1090,8 @@ extern "C" SLANG_DLL_EXPORT SlangResult getLLVMTargetBuiltinTypeLayoutInfo_V1(
     unsigned pointerBits = targetTriple.getArchPointerBitWidth();
 
     out->genericPointerSize = pointerBits / 8;
+    out->stringSize = out->genericPointerSize;
+    out->stringAlignment = out->genericPointerSize;
 
     return SLANG_OK;
 }

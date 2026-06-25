@@ -200,6 +200,14 @@ If multiple source files are passed to `slangc`, they will be grouped into trans
 
 * Each `.slang-module` file forms its own translation unit.
 
+To read source from standard input, pass `-` as an input after `--` and specify the source language with `-lang`, because the language cannot be inferred from a file extension:
+
+```bash
+slangc -lang slang -target spirv -entry computeMain -- - < hello-world.slang
+```
+
+Standard input can be used once per invocation and is limited to 256 MiB. Diagnostics for source read from standard input use `<stdin>` as the source path. When `-lang slang` is used, standard input is grouped into the same translation unit as `.slang` files. Other source languages, such as `-lang hlsl`, are grouped into their own translation unit, matching the file-based rules above.
+
 ### `slangc` Entry Points
 
 When using `slangc`, you will typically want to identify which entry point(s) you intend to compile.
@@ -1081,7 +1089,7 @@ meanings of their `CompilerOptionValue` encodings.
 | GenerateWholeProgram | When set will emit target code for the entire program instead of for a specific entry point. `intValue0` specifies a bool value for the setting. |
 | UseUpToDateBinaryModule | When set, the compiler verifies that a precompiled `.slang-module` is up-to-date with its source before loading it; out-of-date binaries are recompiled from source. Standalone binaries whose primary source is not on the search path are still loaded (compiler-version and option-set validation are skipped in that path). `intValue0` specifies a bool value for the setting. |
 | ValidateUniformity | When set will perform [uniformity analysis](a1-05-uniformity.md).|
-| SPIRVResourceHeapStride | Specifies the byte stride for the resource descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
+| SPIRVResourceHeapStride | Specifies the byte stride for the resource descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to emit `OpConstantSizeOfEXT(ResourceType)` as the default stride. For `RaytracingAccelerationStructure` entries, the 0 default emits a literal 8-byte `ArrayStride` for the `uint64` device address elements; explicit stride values still override these defaults, but must be at least 8 bytes for acceleration-structure entries. |
 | SPIRVSamplerHeapStride | Specifies the byte stride for the sampler descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
 | ForceDXLayout | When set forces the compiler to use DirectX-compatible (HLSL register packing) rules when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |
 | ForceCLayout | When set forces the compiler to use C struct layout rules (natural alignment, no HLSL/GLSL padding) when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |

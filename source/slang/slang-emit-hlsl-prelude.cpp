@@ -46,7 +46,10 @@ vector<OutElTy, MatM> __slang_linalg_Mul(
         dx::linalg::MatrixUse::A,
         dx::linalg::MatrixScope::Thread>;
     MatTy mat = MatTy::template Load<LoadLayout>(matBuf, matOff, matStr);
-    return dx::linalg::Multiply<OutElTy>(mat, input);
+    return dx::linalg::MultiplyAdd<OutElTy>(
+        mat,
+        dx::linalg::MakeInterpretedVector<InputDT>(input),
+        (vector<OutElTy, MatM>)0);
 }
 
 template<
@@ -79,7 +82,10 @@ vector<OutElTy, MatM> __slang_linalg_MulAdd(
     MatTy mat = MatTy::template Load<LoadLayout>(matBuf, matOff, matStr);
     using BiasVecTy = vector<BiasElTy, BiasVecDim>;
     BiasVecTy biasVec = biasBuf.template Load<BiasVecTy>(biasOff);
-    return dx::linalg::MultiplyAdd<OutElTy>(mat, input, biasVec);
+    return dx::linalg::MultiplyAdd<OutElTy>(
+        mat,
+        dx::linalg::MakeInterpretedVector<InputDT>(input),
+        biasVec);
 }
 
 template<
@@ -109,13 +115,7 @@ void __slang_linalg_OuterProductAccumulate(
 template<typename ElTy, uint N, typename BufTy>
 void __slang_linalg_VectorAccumulate(vector<ElTy, N> inputVec, BufTy buffer, uint offset)
 {
-    // No dx::linalg wrapper for cooperative-vector reduce-sum yet; approximate with per-lane load/add/store
-    for (uint i = 0; i < N; ++i)
-    {
-        uint byteOffset = offset + i * uint(sizeof(ElTy));
-        ElTy cur = buffer.template Load<ElTy>(byteOffset);
-        buffer.template Store<ElTy>(byteOffset, cur + inputVec[i]);
-    }
+    dx::linalg::InterlockedAccumulate(inputVec, buffer, offset);
 }
 )";
 
@@ -390,9 +390,9 @@ __slang_cm_muladd(
         switch (slangValue)
         {
         case SLANG_SCALAR_TYPE_INT8:
-            return UnownedStringSlice(sm610OrAbove ? "PackedS8x32" : "DATA_TYPE_SINT8_T4_PACKED");
+            return UnownedStringSlice(sm610OrAbove ? "I8" : "DATA_TYPE_SINT8_T4_PACKED");
         case SLANG_SCALAR_TYPE_UINT8:
-            return UnownedStringSlice(sm610OrAbove ? "PackedU8x32" : "DATA_TYPE_UINT8_T4_PACKED");
+            return UnownedStringSlice(sm610OrAbove ? "U8" : "DATA_TYPE_UINT8_T4_PACKED");
         default:
             SLANG_UNEXPECTED(
                 "Unsupported packed cooperative vector input interpretation for HLSL emission");

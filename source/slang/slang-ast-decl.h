@@ -370,6 +370,7 @@ class ExtensionDecl : public AggTypeDeclBase
     FIDDLE() TypeExp targetType;
 };
 
+
 enum class TypeTag
 {
     None = 0,
@@ -769,6 +770,23 @@ class NamespaceDeclBase : public ContainerDecl
     FIDDLE(...)
 };
 
+// A shorthand for defining a function extension (e.g. custom derivative)
+// that desugars into an ExtensionDecl during semantic checking.
+// Example:
+// __func_extension fwd_diff(foo)(DifferentialPair<float> x) -> DifferentialPair<float> { ... }
+FIDDLE()
+class FuncExtensionDecl : public Decl
+{
+    FIDDLE(...)
+
+    // The higher-order expression targeting the function
+    // (e.g. ForwardDifferentiateExpr wrapping foo<T>)
+    FIDDLE() Expr* targetExpr = nullptr;
+
+    // The user-written function body with parameters, return type, and body.
+    FIDDLE() FuncDecl* innerFunc = nullptr;
+};
+
 // A `namespace` declaration inside some module, that provides
 // a named scope for declarations inside it.
 //
@@ -1000,6 +1018,16 @@ class NonEmptyPackConstraintDecl : public Decl
     FIDDLE(...)
     SourceLoc whereTokenLoc = SourceLoc();
     FIDDLE() Expr* packExpr = nullptr;
+};
+
+FIDDLE()
+class GenericVariadicPackCountConstraintDecl : public Decl
+{
+    FIDDLE(...)
+    SourceLoc whereTokenLoc = SourceLoc();
+    FIDDLE() Expr* packExpr = nullptr;
+    FIDDLE() Expr* expectedCountExpr = nullptr;
+    FIDDLE() IntVal* expectedCountVal = nullptr;
 };
 
 FIDDLE()

@@ -3,6 +3,7 @@
 public struct Visibility
 {
   internal int x = 1;
+//CHECK:       ^ member 'x' is internal, but 'Visibility' is public
   public int y = 5;
   // Mixed visibility: internal x != public struct.
   // A synthesized public constructor is created for the public member only: __init(int y = 5).

@@ -12,6 +12,7 @@
 // * `slang-check-conversion.cpp` is responsible for the logic of handling type conversion/coercion
 
 #include "../core/slang-math.h"
+#include "../core/slang-string-util.h"
 #include "core/slang-char-util.h"
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
@@ -187,9 +188,15 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
         expr,
         [&](DeclRef<VarDeclBase> varDeclRef)
         {
+            // The interface type stored on the `ExtractExistentialType` should
+            // be the bare interface, not a `ModifiedType` wrapping it (e.g. the
+            // `no_diff` modifier that `[Differentiable]` adds to non-
+            // differentiable return types). Otherwise downstream consumers that
+            // look at the cached "original interface type" by `DeclRefType`
+            // would not recognize it as an interface.
             ExtractExistentialType* openedType = m_astBuilder->getOrCreate<ExtractExistentialType>(
                 varDeclRef,
-                expr->type.type,
+                unwrapModifiedType(expr->type.type),
                 interfaceDeclRef);
 
             ExtractExistentialValueExpr* openedValue =
@@ -232,7 +239,13 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
 ///
 Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
 {
-    auto exprType = expr->type.type;
+    // Look through `ModifiedType` (e.g. an interface return wrapped in
+    // `no_diff` by the `[Differentiable]` checker) so the interface check
+    // below succeeds. If we miss this, member lookup never produces an
+    // `ExtractExistentialValueExpr`, the IR never emits the standard
+    // existential-dispatch idiom, and a raw `this_type(...)` leaks all the
+    // way to codegen.
+    auto exprType = unwrapModifiedType(expr->type.type);
 
     if (auto declRefType = as<DeclRefType>(exprType))
     {
@@ -2331,6 +2344,14 @@ Expr* SemanticsExprVisitor::visitIntegerLiteralExpr(IntegerLiteralExpr* expr)
     if (!expr->type.type)
     {
         expr->type = m_astBuilder->getBuiltinType(expr->suffixType);
+
+        // Check if we have an overflow diagnostics pending
+        if (expr->signedMinimumIntException &&
+            (expr->suffixType == BaseType::UInt64 || expr->suffixType == BaseType::UIntPtr) &&
+            (expr->value == INT64_MIN))
+        {
+            getSink()->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = expr->loc});
+        }
     }
     return expr;
 }
@@ -2370,11 +2391,15 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     if (!funcDeclRefExpr)
         return nullptr;
 
+    // The builtin-operator fast path produces a `BuiltinOperatorExpr` (folded separately by
+    // `tryConstantFoldBuiltinOperatorExpr`), so anything reaching here is an ordinary call:
+    // it must resolve to a decl carrying an intrinsic-op or implicit-conversion modifier.
     auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
     if (!funcDeclRef)
         return nullptr;
     auto intrinsicMod = funcDeclRef.getDecl()->findModifier<IntrinsicOpModifier>();
-    auto implicitCast = funcDeclRef.getDecl()->findModifier<ImplicitConversionModifier>();
+    ImplicitConversionModifier* implicitCast =
+        funcDeclRef.getDecl()->findModifier<ImplicitConversionModifier>();
     if (!intrinsicMod && !implicitCast)
     {
         // We can't constant fold anything that doesn't map to a builtin
@@ -2466,24 +2491,26 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
                 return PolynomialIntVal::mul(m_astBuilder, argVals[0], argVals[1]);
             }
         }
-        else if (
-            opName == getName("/") || opName == getName("==") || opName == getName(">=") ||
-            opName == getName("<=") || opName == getName("!=") || opName == getName(">") ||
-            opName == getName("<") || opName == getName("&&") || opName == getName("||") ||
-            opName == getName("!") || opName == getName("|") || opName == getName("&") ||
-            opName == getName("^") || opName == getName("~") || opName == getName("%") ||
-            opName == getName("?:") || opName == getName("<<") || opName == getName(">>"))
+        else
         {
-            auto result = m_astBuilder->getOrCreate<FuncCallIntVal>(
+            // A symbolic builtin operator from a *resolved* operator call (one the fast path
+            // doesn't rewrite to a `BuiltinOperatorExpr`: `?:`/`&&`/`||`, or operators on
+            // operands like enums/generic `T` that aren't builtin scalar/vector/matrix) folds
+            // via the decl-free `BuiltinOperationIntVal`, keyed on the operator enum, which
+            // re-evaluates once its operands become concrete. This is the same representation
+            // the fast path's `BuiltinOperatorExpr` folds to, so there is exactly one `IntVal`
+            // form per operator regardless of which path reached it.
+            auto opKind = getBuiltinOperationKindFromString(
+                getText(opName).getUnownedSlice(),
+                argCount == 1 ? OperatorArity::Unary : OperatorArity::Binary);
+            if (opKind == BuiltinOperationKind::Unknown)
+                return nullptr;
+            return m_astBuilder->getOrCreate<BuiltinOperationIntVal>(
                 invokeExpr.getExpr()->type.type,
-                funcDeclRef,
-                as<Type>(funcDeclRefExpr.getExpr()->type->substitute(
-                    m_astBuilder,
-                    funcDeclRefExpr.getSubsts())),
+                opKind,
                 makeArrayView(argVals, argCount));
-            SLANG_RELEASE_ASSERT(result->getFuncType());
-            return result;
         }
+        // A `+`/`-`/`*` with an unexpected argument count falls through to here.
         return nullptr;
     }
 
@@ -2746,6 +2773,60 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
     ensureDecl(declRef.getDecl(), DeclCheckState::DefinitionChecked);
     ConstantFoldingCircularityInfo newCircularityInfo(declRef, circularityInfo);
     return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), kind, &newCircularityInfo);
+}
+
+IntVal* SemanticsVisitor::tryConstantFoldBuiltinOperatorExpr(
+    SubstExpr<BuiltinOperatorExpr> expr,
+    ConstantFoldingKind kind,
+    ConstantFoldingCircularityInfo* circularityInfo)
+{
+    auto e = expr.getExpr();
+    const Index argCount = e->arguments.getCount();
+    List<IntVal*> argVals;
+    for (Index a = 0; a < argCount; ++a)
+    {
+        auto argVal = tryFoldIntegerConstantExpression(
+            SubstExpr<Expr>(e->arguments[a], expr.getSubsts()),
+            kind,
+            circularityInfo);
+        if (!argVal)
+            return nullptr;
+        argVals.add(argVal);
+    }
+    auto resultType = as<Type>(e->type.type->substitute(m_astBuilder, expr.getSubsts()));
+    auto op = e->op;
+
+    // If all operands are concrete, fold to a constant directly. Pass the operator expression's
+    // location so a divide-by-zero diagnostic points at the offending operator (`1 / 0`) rather
+    // than being location-less.
+    if (auto folded = as<IntVal>(BuiltinOperationIntVal::tryFoldImpl(
+            m_astBuilder,
+            resultType,
+            op,
+            argVals,
+            getSink(),
+            e->loc)))
+        return folded;
+
+    // Otherwise the result is symbolic. `+`/`-`/`*`/unary-`-` use `PolynomialIntVal` so value
+    // unification can canonicalize (e.g. `N+1` == `1+N`); the rest use the decl-free
+    // `BuiltinOperationIntVal`, which re-folds once its operands become concrete.
+    switch (op)
+    {
+    case BuiltinOperationKind::Add:
+        return PolynomialIntVal::add(m_astBuilder, argVals[0], argVals[1]);
+    case BuiltinOperationKind::Sub:
+        return PolynomialIntVal::sub(m_astBuilder, argVals[0], argVals[1]);
+    case BuiltinOperationKind::Mul:
+        return PolynomialIntVal::mul(m_astBuilder, argVals[0], argVals[1]);
+    case BuiltinOperationKind::Neg:
+        return PolynomialIntVal::neg(m_astBuilder, argVals[0]);
+    default:
+        return m_astBuilder->getOrCreate<BuiltinOperationIntVal>(
+            resultType,
+            op,
+            argVals.getArrayView());
+    }
 }
 
 IntVal* SemanticsVisitor::tryConstantFoldExpr(
@@ -3105,6 +3186,10 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             auto result = m_astBuilder->getTypeCastIntVal(substType, val);
             return result;
         }
+    }
+    else if (auto builtinOpExpr = expr.as<BuiltinOperatorExpr>())
+    {
+        return tryConstantFoldBuiltinOperatorExpr(builtinOpExpr, kind, circularityInfo);
     }
     else if (auto invokeExpr = expr.as<InvokeExpr>())
     {
@@ -3819,6 +3904,10 @@ static Expr* convertHigherOrderExprToLookup(
     {
         lookupName = visitor->getName("bwd_diff");
     }
+    else if (as<ApplyForBwdExpr>(resultExpr))
+    {
+        lookupName = visitor->getName("apply_bwd");
+    }
     else
     {
         visitor->getSink()->diagnose(
@@ -3905,6 +3994,161 @@ static Expr* convertHigherOrderExprToLookup(
         visitor->getSink()->diagnose(
             Diagnostics::InternalCompilerError{.location = resultExpr->loc});
         return resultExpr;
+    }
+}
+
+// Peel implicit casts and parentheses from an expression.
+static Expr* _peelCastsAndParens(Expr* expr)
+{
+    for (;;)
+    {
+        if (!expr)
+            return nullptr;
+        // Peel any single-argument TypeCastExpr: this covers
+        // ImplicitCastExpr, OutImplicitCastExpr, InOutImplicitCastExpr,
+        // and LValueImplicitCastExpr which wrap the original argument
+        // during overload resolution for out/inout coercion.
+        if (auto castExpr = as<TypeCastExpr>(expr))
+        {
+            if (castExpr->arguments.getCount() == 1)
+            {
+                expr = castExpr->arguments[0];
+                continue;
+            }
+        }
+        if (auto parenExpr = as<ParenExpr>(expr))
+        {
+            expr = parenExpr->base;
+            continue;
+        }
+        return expr;
+    }
+}
+
+// Check whether two expressions refer to the same storage location by
+// comparing their structure in lockstep. Handles bare variable
+// references, member accesses (s.x == s.x, but not s.x == s.y), and
+// subscripts with matching constant indices (arr[0] == arr[0], but not
+// arr[0] == arr[1]). Returns false for anything it can't prove equal.
+static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
+{
+    a = _peelCastsAndParens(a);
+    b = _peelCastsAndParens(b);
+    if (!a || !b)
+        return false;
+
+    // Same declaration reference.
+    if (auto aDeclRef = as<DeclRefExpr>(a))
+    {
+        auto bDeclRef = as<DeclRefExpr>(b);
+        return bDeclRef && aDeclRef->declRef.getDecl() == bDeclRef->declRef.getDecl();
+    }
+
+    // Same member of the same base: s.x vs s.x.
+    if (auto aMember = as<MemberExpr>(a))
+    {
+        auto bMember = as<MemberExpr>(b);
+        if (!bMember)
+            return false;
+        if (aMember->declRef.getDecl() != bMember->declRef.getDecl())
+            return false;
+        return _exprsDefinitelyAlias(aMember->baseExpression, bMember->baseExpression);
+    }
+
+    // Same element of the same base: arr[0] vs arr[0].
+    if (auto aIndex = as<IndexExpr>(a))
+    {
+        auto bIndex = as<IndexExpr>(b);
+        if (!bIndex)
+            return false;
+        if (aIndex->indexExprs.getCount() != 1 || bIndex->indexExprs.getCount() != 1)
+            return false;
+        // Only compare constant integer indices; dynamic indices are
+        // conservatively treated as non-aliasing (may be different).
+        auto aLit = as<IntegerLiteralExpr>(aIndex->indexExprs[0]);
+        auto bLit = as<IntegerLiteralExpr>(bIndex->indexExprs[0]);
+        if (!aLit || !bLit || aLit->value != bLit->value)
+            return false;
+        return _exprsDefinitelyAlias(aIndex->baseExpression, bIndex->baseExpression);
+    }
+
+    return false;
+}
+
+static bool _isOutInOutOrRefParam(FuncType* funcType, Index paramIndex)
+{
+    auto paramType = funcType->getParamTypeWithModeWrapper(paramIndex);
+    return as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType);
+}
+
+static const char* _getDirectionString(FuncType* funcType, Index paramIndex)
+{
+    auto paramType = funcType->getParamTypeWithModeWrapper(paramIndex);
+    if (as<OutParamType>(paramType))
+        return "out";
+    if (as<BorrowInOutParamType>(paramType))
+        return "inout";
+    if (as<RefParamType>(paramType))
+        return "ref";
+    return "in";
+}
+
+void SemanticsVisitor::_checkAliasedOutArguments(
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    FunctionDeclBase* funcDeclBase)
+{
+    // Operator expressions (compound assignments like `a += a`, prefix/postfix
+    // `++a`, etc.) desugar into function calls with `inout` parameters but have
+    // well-defined semantics even when the operand appears on both sides.
+    // Skip the aliasing check for those.
+    if (as<OperatorExpr>(invoke))
+        return;
+
+    Index argCount = invoke->arguments.getCount();
+    Index paramCount = funcType->getParamCount();
+    Index checkCount = Math::Min(argCount, paramCount);
+
+    // For each pair of arguments, check if they refer to the same storage
+    // and at least one parameter is out/inout/ref. We compare expressions
+    // structurally: bare variables (a == a), member accesses (s.x == s.x
+    // but not s.x == s.y), and constant-index subscripts (arr[0] == arr[0]
+    // but not arr[0] == arr[1]).
+    for (Index i = 0; i < checkCount; ++i)
+    {
+        bool iIsOut = _isOutInOutOrRefParam(funcType, i);
+
+        for (Index j = i + 1; j < checkCount; ++j)
+        {
+            // At least one of the two must be out/inout/ref.
+            bool jIsOut = _isOutInOutOrRefParam(funcType, j);
+            if (!iIsOut && !jIsOut)
+                continue;
+
+            if (!_exprsDefinitelyAlias(invoke->arguments[i], invoke->arguments[j]))
+                continue;
+
+            // Both arguments refer to the same variable and at least
+            // one is out/inout/ref. Put the out/inout/ref parameter
+            // first in the diagnostic for clarity.
+            Index first = iIsOut ? i : j;
+            Index second = iIsOut ? j : i;
+
+            Name* paramNameFirst = nullptr;
+            Name* paramNameSecond = nullptr;
+            if (funcDeclBase && funcDeclBase->getParameters().getCount() > first)
+                paramNameFirst = funcDeclBase->getParameters()[first]->getName();
+            if (funcDeclBase && funcDeclBase->getParameters().getCount() > second)
+                paramNameSecond = funcDeclBase->getParameters()[second]->getName();
+
+            getSink()->diagnose(Diagnostics::PotentiallyAliasedOutParameter{
+                .direction1 = _getDirectionString(funcType, first),
+                .param1 = paramNameFirst,
+                .direction2 = _getDirectionString(funcType, second),
+                .param2 = paramNameSecond,
+                .firstArg = invoke->arguments[first]});
+            break; // One warning per outer index i is enough.
+        }
     }
 }
 
@@ -4140,6 +4384,12 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 }
             }
 
+            // Check for potentially aliased out/inout/ref arguments.
+            // If two arguments refer to the same root variable and at
+            // least one of them is out/inout/ref, the behavior is
+            // undefined (issue #10699).
+            _checkAliasedOutArguments(invoke, funcType, funcDeclBase);
+
             if (!IsErrorExpr(invoke))
             {
                 if (auto higherOrderInvoke = as<DifferentiateExpr>(invoke->functionExpr))
@@ -4187,6 +4437,471 @@ Expr* SemanticsExprVisitor::visitSelectExpr(SelectExpr* expr)
         getSink()->diagnose(Diagnostics::UseOfNonShortCircuitingOperator{.location = expr->loc});
     }
     return result;
+}
+
+bool SemanticsExprVisitor::isGLSLOperatorScope()
+{
+    return getShared()->isGLSLOperatorScope();
+}
+
+// Decompose a builtin numeric type into (base element type, shape). `outRows`/`outCols`
+// describe the shape: both null => scalar, rows set & cols null => vector<rows>, both set =>
+// matrix<rows,cols>. Returns false if `type` is not a builtin scalar/vector/matrix.
+static bool _getBuiltinCompositeTypeShape(
+    Type* type,
+    BaseType& outBase,
+    IntVal*& outRows,
+    IntVal*& outCols)
+{
+    outRows = nullptr;
+    outCols = nullptr;
+    Type* elementType = type;
+    if (auto vecType = as<VectorExpressionType>(type))
+    {
+        outRows = vecType->getElementCount();
+        elementType = vecType->getElementType();
+    }
+    else if (auto matType = as<MatrixExpressionType>(type))
+    {
+        outRows = matType->getRowCount();
+        outCols = matType->getColumnCount();
+        elementType = matType->getElementType();
+    }
+    auto basic = as<BasicExpressionType>(elementType);
+    if (!basic)
+        return false;
+    outBase = basic->getBaseType();
+    return true;
+}
+
+// When both bitwise/shift operands are builtin scalar/vector/matrix types and at least one has a
+// floating-point element type, return that floating-point operand's type (such an operation has no
+// integer interpretation and is rejected with a dedicated diagnostic). Returns null when either
+// operand is non-builtin -- so user-defined `operator OP` (e.g. `operator|(float, MyType)`) and
+// generics fall through to overload resolution -- or when neither is floating-point (`int << uint`,
+// `bool | bool`).
+static Type* _isBuiltinFloatingPointBitwiseOperands(Type* left, Type* right)
+{
+    BaseType leftBase, rightBase;
+    IntVal *leftRows, *leftCols, *rightRows, *rightCols;
+    if (!_getBuiltinCompositeTypeShape(left, leftBase, leftRows, leftCols))
+        return nullptr;
+    if (!_getBuiltinCompositeTypeShape(right, rightBase, rightRows, rightCols))
+        return nullptr;
+    if ((BaseTypeInfo::getInfo(leftBase).flags & BaseTypeInfo::Flag::FloatingPoint) != 0)
+        return left;
+    if ((BaseTypeInfo::getInfo(rightBase).flags & BaseTypeInfo::Flag::FloatingPoint) != 0)
+        return right;
+    return nullptr;
+}
+
+// Compute the common element base type for `a OP b`, following the "usual arithmetic
+// conversions": float beats int; among floats the larger size wins; among ints the larger
+// size wins and on a size tie the unsigned type wins; bool promotes to the other operand.
+static BaseType unifyBaseType(BaseType a, BaseType b)
+{
+    if (a == b)
+        return a;
+    if (a == BaseType::Bool)
+        return b; // bool promotes to the other operand's type
+    if (b == BaseType::Bool)
+        return a;
+    const auto& ia = BaseTypeInfo::getInfo(a);
+    const auto& ib = BaseTypeInfo::getInfo(b);
+    bool aFloat = (ia.flags & BaseTypeInfo::Flag::FloatingPoint) != 0;
+    bool bFloat = (ib.flags & BaseTypeInfo::Flag::FloatingPoint) != 0;
+    if (aFloat && bFloat)
+        return (ia.sizeInBytes >= ib.sizeInBytes) ? a : b;
+    if (aFloat)
+        return a; // float beats int
+    if (bFloat)
+        return b;
+    // Both are integers.
+    if (ia.sizeInBytes != ib.sizeInBytes)
+        return (ia.sizeInBytes > ib.sizeInBytes) ? a : b; // larger size wins (keeps its sign)
+    // Same size, differing signedness: the unsigned type wins.
+    bool aSigned = (ia.flags & BaseTypeInfo::Flag::Signed) != 0;
+    return aSigned ? b : a;
+}
+
+Type* SemanticsExprVisitor::substituteElementOfCompositeType(Type* target, Type* newElementType)
+{
+    if (auto v = as<VectorExpressionType>(target))
+        return createVectorType(newElementType, v->getElementCount());
+    if (auto m = as<MatrixExpressionType>(target))
+        return m_astBuilder
+            ->getMatrixType(newElementType, m->getRowCount(), m->getColumnCount(), m->getLayout());
+    // Otherwise `target` must be a builtin scalar, whose element is the type itself. This
+    // function is only ever called with builtin scalar/vector/matrix operand types; anything
+    // else is a caller bug.
+    SLANG_RELEASE_ASSERT(as<BasicExpressionType>(target));
+    return newElementType;
+}
+
+Type* SemanticsExprVisitor::coerceOperandsOfBuiltinBinaryExpr(
+    Expr* leftArg,
+    Expr* rightArg,
+    Expr*& outLeftArg,
+    Expr*& outRightArg)
+{
+    outLeftArg = leftArg;
+    outRightArg = rightArg;
+
+    // Same builtin type on both sides: nothing to coerce.
+    if (leftArg->type.type->equals(rightArg->type.type))
+        return leftArg->type.type;
+
+    // The broadcast result type with the common element base, matching the candidate overload
+    // resolution would have selected. Null => not a fast-pathable pair of builtin numeric
+    // scalar/vector/matrix operands.
+    Type* commonType = getBuiltinArithmeticCommonType(leftArg->type.type, rightArg->type.type);
+    if (!commonType)
+        return nullptr;
+    BaseType commonBase;
+    IntVal *cRows, *cCols;
+    _getBuiltinCompositeTypeShape(commonType, commonBase, cRows, cCols);
+    Type* commonElementType = m_astBuilder->getBuiltinType(commonBase);
+
+    // Coerce each operand to its *own* shape with the common element base, converting only the
+    // element type and never the shape. Keeping the operands in their mixed vector/scalar (or
+    // matrix/scalar) form preserves the canonical IR that backends optimize -- e.g. a
+    // `vector * scalar` stays a two-shape `mul`, which SPIR-V lowers to `OpVectorTimesScalar`
+    // rather than a splat followed by a component-wise multiply. Because the common element base
+    // is the wider / no-narrowing one, the conversions here are not narrowing, so they do not
+    // emit the "implicit conversion not recommended" warning (which would break the
+    // warning-fatal core module bootstrap).
+    Type* leftTarget = substituteElementOfCompositeType(leftArg->type.type, commonElementType);
+    Type* rightTarget = substituteElementOfCompositeType(rightArg->type.type, commonElementType);
+    if (!leftArg->type.type->equals(leftTarget))
+    {
+        auto c = coerce(CoercionSite::Argument, leftTarget, leftArg, getSink());
+        if (IsErrorExpr(c))
+            return nullptr;
+        outLeftArg = c;
+    }
+    if (!rightArg->type.type->equals(rightTarget))
+    {
+        auto c = coerce(CoercionSite::Argument, rightTarget, rightArg, getSink());
+        if (IsErrorExpr(c))
+            return nullptr;
+        outRightArg = c;
+    }
+    return commonType;
+}
+
+Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
+{
+    // Recognize a builtin arithmetic (`+ - * / %`), comparison (`< > <= >=`), equality
+    // (`== !=`), bitwise/shift (`& | ^ << >>`), or unary (`- ! ~`) operator on builtin
+    // integer/floating-point/bool scalar, vector, or matrix operands, and rewrite it to a
+    // `BuiltinOperatorExpr` (carrying the resolved `BuiltinOperationKind`) for direct IR
+    // lowering / constant folding, skipping generic `operator OP` overload resolution. Returns
+    // null to leave the expression for normal resolution. The operator-name is mapped to a
+    // `BuiltinOperationKind` once (here), and everything downstream keys off the kind.
+
+    // Unary prefix operators: `-x` (negate), `!x` (logical-not, bool), `~x` (bitwise-not, int).
+    if (as<PrefixExpr>(expr) && expr->arguments.getCount() == 1)
+    {
+        auto uVarExpr = as<VarExpr>(expr->functionExpr);
+        if (!uVarExpr || !uVarExpr->name)
+            return nullptr;
+        auto uKind = getBuiltinOperationKindFromString(
+            getText(uVarExpr->name).getUnownedSlice(),
+            OperatorArity::Unary);
+        bool isNeg = (uKind == BuiltinOperationKind::Neg);
+        bool isLogicalNot = (uKind == BuiltinOperationKind::Not);
+        bool isBitNot = (uKind == BuiltinOperationKind::BitNot);
+        if (!isNeg && !isLogicalNot && !isBitNot)
+            return nullptr;
+
+        auto arg = expr->arguments[0];
+        if (!arg->type.type)
+            return nullptr;
+        Type* uOperandType = arg->type.type;
+        // In GLSL operator scope the `glsl` module owns matrix operator semantics, so leave
+        // matrix operands to normal resolution (see the binary case for the full rationale).
+        if (isGLSLOperatorScope() && as<MatrixExpressionType>(uOperandType))
+            return nullptr;
+        Type* uElementType = uOperandType;
+        if (auto v = as<VectorExpressionType>(uOperandType))
+            uElementType = v->getElementType();
+        else if (auto m = as<MatrixExpressionType>(uOperandType))
+            uElementType = m->getElementType();
+        auto uBasic = as<BasicExpressionType>(uElementType);
+        if (!uBasic)
+            return nullptr;
+        auto uBaseType = uBasic->getBaseType();
+        auto uFlags = BaseTypeInfo::getInfo(uBaseType).flags;
+        bool uInt = (uFlags & BaseTypeInfo::Flag::Integer) != 0;
+        bool uFloat = (uFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
+        bool uBool = (uBaseType == BaseType::Bool);
+        // `-` => signed/float negate; `~` => integer bitwise-not; `!` => bool logical-not.
+        bool uEligible = isNeg ? (uInt || uFloat) : (isBitNot ? uInt : /*isLogicalNot*/ uBool);
+        if (!uEligible)
+        {
+            // `~` on a builtin floating-point operand has no integer interpretation; diagnose it
+            // with the same error as the binary case (issue #11648) instead of a confusing "no
+            // overload for 'operator~'". Non-builtin operands already returned above.
+            if (isBitNot && uFloat)
+            {
+                getSink()->diagnose(Diagnostics::BitwiseOperatorRequiresIntegerOperands{
+                    .name = uVarExpr->name,
+                    .type = uOperandType,
+                    .expr = expr});
+                return CreateErrorExpr(expr);
+            }
+            return nullptr;
+        }
+
+        auto node = m_astBuilder->create<BuiltinOperatorExpr>();
+        node->op = uKind;
+        node->arguments.add(arg);
+        node->type = QualType(uOperandType);
+        node->loc = expr->loc;
+        // Register the operand/result types in a differentiable scope regardless of the operator
+        // (matching the breadth of the pre-fast-path `visitInvokeExpr`): the operand of a `!`/`~`
+        // is not itself differentiable, but `maybeRegisterDifferentiableType` is a no-op for
+        // non-differentiable types, so registering unconditionally just preserves the prior
+        // behavior for any differentiable operand without special-casing the operator.
+        if (m_parentDifferentiableAttr)
+        {
+            maybeRegisterDifferentiableType(m_astBuilder, arg->type.type, arg->loc);
+            maybeRegisterDifferentiableType(m_astBuilder, uOperandType, expr->loc);
+        }
+        return node;
+    }
+
+    // Only an infix binary operator `a OP b`.
+    if (!as<InfixExpr>(expr) || expr->arguments.getCount() != 2)
+        return nullptr;
+    auto varExpr = as<VarExpr>(expr->functionExpr);
+    if (!varExpr || !varExpr->name)
+        return nullptr;
+    auto kind = getBuiltinOperationKindFromString(
+        getText(varExpr->name).getUnownedSlice(),
+        OperatorArity::Binary);
+
+    // Classify the operator by kind (enum, not text). `Unknown` covers operators with no
+    // builtin fast-path form, notably the short-circuiting `&&`/`||`.
+    bool isArithmetic = kind == BuiltinOperationKind::Add || kind == BuiltinOperationKind::Sub ||
+                        kind == BuiltinOperationKind::Mul || kind == BuiltinOperationKind::Div ||
+                        kind == BuiltinOperationKind::Mod;
+    bool isComparison = kind == BuiltinOperationKind::Eql || kind == BuiltinOperationKind::Neq ||
+                        kind == BuiltinOperationKind::Less ||
+                        kind == BuiltinOperationKind::Greater ||
+                        kind == BuiltinOperationKind::Leq || kind == BuiltinOperationKind::Geq;
+    bool isBitwise = kind == BuiltinOperationKind::BitAnd || kind == BuiltinOperationKind::BitOr ||
+                     kind == BuiltinOperationKind::BitXor || kind == BuiltinOperationKind::Lsh ||
+                     kind == BuiltinOperationKind::Rsh;
+    if (!isArithmetic && !isComparison && !isBitwise)
+        return nullptr;
+    bool isEquality = kind == BuiltinOperationKind::Eql || kind == BuiltinOperationKind::Neq;
+    bool isShift = kind == BuiltinOperationKind::Lsh || kind == BuiltinOperationKind::Rsh;
+
+    auto leftArg = expr->arguments[0];
+    auto rightArg = expr->arguments[1];
+    if (!leftArg->type.type || !rightArg->type.type)
+        return nullptr;
+
+    // GLSL operator scope only overrides matrix operators (algebraic products) and vector
+    // equality (`vec == vec` / `!=` -> scalar `bool`); bail to normal resolution for those so
+    // the glsl module's overloads apply. Everything else is identical to HLSL and stays
+    // fast-pathed.
+    if (isGLSLOperatorScope())
+    {
+        bool leftMat = as<MatrixExpressionType>(leftArg->type.type) != nullptr;
+        bool rightMat = as<MatrixExpressionType>(rightArg->type.type) != nullptr;
+        bool anyVec = as<VectorExpressionType>(leftArg->type.type) != nullptr ||
+                      as<VectorExpressionType>(rightArg->type.type) != nullptr;
+        if (leftMat || rightMat)
+            return nullptr;
+        if (isEquality && anyVec)
+            return nullptr;
+    }
+
+    // A bitwise/shift operator with a builtin floating-point operand has no integer interpretation.
+    // Reject it here -- before the mixed-shift early return and common-type coercion below -- so
+    // mixed-type shifts (`float << int`, `int << float`), which skip common-type promotion, are
+    // caught too rather than falling through to a confusing "ambiguous"/"no overload" error
+    // (issue #11648). The both-builtin predicate leaves user `operator OP` and generics untouched.
+    if (isBitwise)
+    {
+        if (Type* floatOperandType =
+                _isBuiltinFloatingPointBitwiseOperands(leftArg->type.type, rightArg->type.type))
+        {
+            getSink()->diagnose(Diagnostics::BitwiseOperatorRequiresIntegerOperands{
+                .name = varExpr->name,
+                .type = floatOperandType,
+                .expr = expr});
+            return CreateErrorExpr(expr);
+        }
+    }
+
+    // Shift operators do not promote to a common type: `a << b` keeps the type of `a` (the
+    // shift amount `b` is converted independently). That asymmetry is not modeled by the
+    // common-type rule, so leave mixed-type shifts to overload resolution.
+    if (isShift && !leftArg->type.type->equals(rightArg->type.type))
+        return nullptr;
+    // Promote mixed-type operands to the common operand type (and carry the coerced operands
+    // back onto the expression). Null => not a fast-pathable pair of builtin numeric operands.
+    Type* operandType = coerceOperandsOfBuiltinBinaryExpr(leftArg, rightArg, leftArg, rightArg);
+    if (!operandType)
+        return nullptr;
+    expr->arguments[0] = leftArg;
+    expr->arguments[1] = rightArg;
+
+    Type* elementType = operandType;
+    VectorExpressionType* vecType = nullptr;
+    MatrixExpressionType* matType = nullptr;
+    if ((vecType = as<VectorExpressionType>(operandType)))
+        elementType = vecType->getElementType();
+    else if ((matType = as<MatrixExpressionType>(operandType)))
+        elementType = matType->getElementType();
+    auto basicElementType = as<BasicExpressionType>(elementType);
+    if (!basicElementType)
+        return nullptr;
+    auto baseType = basicElementType->getBaseType();
+    auto baseFlags = BaseTypeInfo::getInfo(baseType).flags;
+    bool isIntegerBase = (baseFlags & BaseTypeInfo::Flag::Integer) != 0;
+    bool isFloatBase = (baseFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
+    bool isBoolBase = (baseType == BaseType::Bool);
+    // Some operators do not apply to every element type. For example, it is invalid to apply a
+    // bitwise operator to a floating-point operand, and arithmetic does not apply to `bool`. When
+    // the element type is not valid for the operator family we return null, so the expression
+    // falls back to normal overload resolution (which will either find a user-provided overload
+    // or produce the appropriate diagnostic) instead of being lowered as a builtin operation.
+    // (Floating-point bitwise/shift operands are rejected earlier with a dedicated diagnostic, so
+    // a non-integer bitwise operand reaching here is `bool`, which still resolves via `ILogical`.)
+    //   - bitwise/shift (`& | ^ << >> ~`): integer only;
+    //   - equality (`== !=`): integer, floating-point, or bool;
+    //   - arithmetic (`+ - * / %`) and ordering comparison (`< > <= >=`): integer or float.
+    bool eligible;
+    if (isBitwise)
+        eligible = isIntegerBase;
+    else if (isEquality)
+        eligible = isIntegerBase || isFloatBase || isBoolBase;
+    else
+        eligible = isIntegerBase || isFloatBase;
+    if (!eligible)
+        return nullptr;
+
+    // Result type: arithmetic/bitwise preserve the operand type; comparison yields a
+    // boolean of matching shape (scalar -> bool, vector<T,N> -> vector<bool,N>,
+    // matrix<T,R,C> -> matrix<bool,R,C>).
+    QualType resultType;
+    if (isComparison)
+    {
+        Type* boolType = m_astBuilder->getBoolType();
+        if (vecType)
+            resultType = QualType(createVectorType(boolType, vecType->getElementCount()));
+        else if (matType)
+            resultType = QualType(m_astBuilder->getMatrixType(
+                boolType,
+                matType->getRowCount(),
+                matType->getColumnCount(),
+                matType->getLayout()));
+        else
+            resultType = QualType(boolType);
+    }
+    else
+    {
+        resultType = QualType(operandType);
+    }
+
+    // Produce a dedicated `BuiltinOperatorExpr` carrying the `kind` resolved at the top of this
+    // function. Every downstream consumer (IR lowering, constant folding via
+    // `BuiltinOperationIntVal`, for-loop trip-count inference) reads the kind from the node
+    // rather than re-parsing the operator name. The original `InvokeExpr`'s (already-checked,
+    // possibly element-coerced) operands are carried over verbatim.
+    auto node = m_astBuilder->create<BuiltinOperatorExpr>();
+    node->op = kind;
+    node->arguments.add(leftArg);
+    node->arguments.add(rightArg);
+    node->type = resultType;
+    node->loc = expr->loc;
+
+    // Register the operand/result types in a differentiable scope, regardless of the operator
+    // family, matching the breadth of the pre-fast-path `visitInvokeExpr` (which walked all
+    // operands for every operator). A comparison's boolean result and an integer bitwise
+    // operand are not differentiable, but `maybeRegisterDifferentiableType` is a no-op for
+    // non-differentiable types, so registering unconditionally just ensures a differentiable
+    // operand type (e.g. comparing two `IDifferentiable` values to gate a branch) still has its
+    // conformance registered, without special-casing the operator family.
+    if (m_parentDifferentiableAttr)
+    {
+        maybeRegisterDifferentiableType(m_astBuilder, leftArg->type.type, leftArg->loc);
+        maybeRegisterDifferentiableType(m_astBuilder, rightArg->type.type, rightArg->loc);
+        maybeRegisterDifferentiableType(m_astBuilder, resultType.type, expr->loc);
+    }
+    return node;
+}
+
+// See the declaration in slang-check-impl.h: computes the common operand type that overload
+// resolution would converge on for `left OP right` (the usual arithmetic conversions, with
+// scalar/vector/matrix broadcast), or null when the operands are not both builtin numeric
+// scalar/vector/matrix types or are not broadcast-compatible.
+Type* SemanticsExprVisitor::getBuiltinArithmeticCommonType(Type* left, Type* right)
+{
+    BaseType leftBase, rightBase;
+    IntVal *leftRows, *leftCols, *rightRows, *rightCols;
+    if (!_getBuiltinCompositeTypeShape(left, leftBase, leftRows, leftCols))
+        return nullptr;
+    if (!_getBuiltinCompositeTypeShape(right, rightBase, rightRows, rightCols))
+        return nullptr;
+
+    // Only well-known numeric base types are handled here; anything else (Void and other
+    // exotic kinds) falls back to overload resolution.
+    auto isHandledBase = [](BaseType bt)
+    {
+        const auto& info = BaseTypeInfo::getInfo(bt);
+        return bt == BaseType::Bool || (info.flags & (BaseTypeInfo::Flag::Integer |
+                                                      BaseTypeInfo::Flag::FloatingPoint)) != 0;
+    };
+    if (!isHandledBase(leftBase) || !isHandledBase(rightBase))
+        return nullptr;
+
+    BaseType commonBase = unifyBaseType(leftBase, rightBase);
+    Type* commonElementType = m_astBuilder->getBuiltinType(commonBase);
+
+    bool leftIsScalar = (leftRows == nullptr);
+    bool rightIsScalar = (rightRows == nullptr);
+    bool leftIsMatrix = (leftCols != nullptr);
+    bool rightIsMatrix = (rightCols != nullptr);
+
+    // Resolve the common shape, broadcasting scalars against vectors/matrices.
+    if (leftIsScalar && rightIsScalar)
+    {
+        return commonElementType;
+    }
+    if (leftIsMatrix || rightIsMatrix)
+    {
+        // matrix OP matrix (extents must match), or matrix OP scalar / scalar OP matrix.
+        if (leftIsMatrix && rightIsMatrix)
+        {
+            if (!leftRows->equals(rightRows) || !leftCols->equals(rightCols))
+                return nullptr;
+        }
+        else if (!leftIsScalar && !rightIsScalar)
+        {
+            // matrix mixed with a vector is not a builtin component-wise operation.
+            return nullptr;
+        }
+        MatrixExpressionType* matSource = as<MatrixExpressionType>(leftIsMatrix ? left : right);
+        return m_astBuilder->getMatrixType(
+            commonElementType,
+            matSource->getRowCount(),
+            matSource->getColumnCount(),
+            matSource->getLayout());
+    }
+    // At least one is a vector and neither is a matrix.
+    if (!leftIsScalar && !rightIsScalar)
+    {
+        // vector OP vector: extents must match.
+        if (!leftRows->equals(rightRows))
+            return nullptr;
+    }
+    IntVal* elementCount = leftIsScalar ? rightRows : leftRows;
+    return createVectorType(commonElementType, elementCount);
 }
 
 Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
@@ -4247,6 +4962,13 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
     return newExpr;
 }
 
+Expr* SemanticsExprVisitor::visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
+{
+    // Already produced fully-checked (operator kind, operands, and result type resolved) by
+    // `convertToBuiltinArithmeticOp`; there is nothing further to check.
+    return expr;
+}
+
 Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
 {
     // check the base expression first
@@ -4264,6 +4986,13 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     // to use short-circuit evaluation.
     if (auto newExpr = convertToLogicOperatorExpr(expr))
         return newExpr;
+
+    // Fast path: a builtin arithmetic/comparison/bitwise/shift/unary operator on
+    // scalar/vector/matrix operands (`a + b`, `a < b`, `v * s`, `-x`, etc.; same or mixed
+    // builtin type) is rewritten to a `BuiltinOperatorExpr` and skips generic operator
+    // overload resolution.
+    if (auto builtinOp = convertToBuiltinArithmeticOp(expr))
+        return builtinOp;
 
     // Check for comma operator usage and emit warning if not in for-loop side effect context
     // Skip warning in Slang 2026+ mode where parentheses create tuples
@@ -4379,6 +5108,127 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     return checkedExpr;
 }
 
+// Find the in-scope identifier whose spelling is closest to `name`, to power a
+// "did you mean ...?" suggestion when `name` failed to resolve. Walks the scope
+// chain (and each scope's sibling chain) collecting the names of direct members,
+// computes the case-insensitive Levenshtein distance to each, and returns the
+// single closest candidate within a small distance threshold. Returns nullptr if
+// nothing is close enough (so the caller can simply omit the suggestion), or if
+// two candidates tie at the closest distance (so the output never depends on
+// import/scope-walk order).
+//
+// Only direct members of the lexical scope chain are considered; inherited and
+// extension members reached via the `this`-parameter breadcrumb in real lookup
+// are deliberately not searched, to keep this off the hot path of successful
+// lookups. `semantics` is used to skip candidates the user could not access.
+static Name* findClosestInScopeName(
+    SemanticsVisitor* semantics,
+    Name* name,
+    Scope* scope,
+    Decl* declToExclude)
+{
+    if (!name)
+        return nullptr;
+
+    const UnownedStringSlice target = getUnownedStringSliceText(name);
+
+    // Scale the allowed edit distance with the identifier length and cap it, so
+    // that we only offer genuinely-close names (e.g. `lenght` -> `length`, or
+    // `f_a` -> `f_b`) and never a wildly different one (e.g. the keyword `case`
+    // -> the module `core`, a distance-2 edit on a 4-char name). The heuristic is
+    // roughly one edit per three characters with a floor of one. Names shorter
+    // than 3 chars are too short to suggest against; and we also refuse
+    // pathologically long names, since suggestions are advisory and not worth an
+    // O(N*M) Levenshtein DP per candidate on an adversarial multi-kilobyte
+    // identifier.
+    if (target.getLength() < 3 || target.getLength() > 256)
+        return nullptr;
+    const Index maxDistance = Math::Min<Index>(3, Math::Max<Index>(1, target.getLength() / 3));
+
+    Index bestDistance = maxDistance + 1;
+    // The *distinct* candidate names sharing the current best distance. Names are
+    // deduped (the "nub" of the candidate list) so that, e.g., two overloads
+    // both called `length` count once: they would print the identical
+    // suggestion, so they are not a genuine ambiguity. A suggestion is offered
+    // only when this set ends up with exactly one name.
+    HashSet<Name*> bestNames;
+
+    for (Scope* s = scope; s; s = s->parent)
+    {
+        for (Scope* sib = s; sib; sib = sib->nextSibling)
+        {
+            auto containerDecl = sib->containerDecl;
+            if (!containerDecl)
+                continue;
+
+            // Don't suggest names from the core module. Its global scope holds
+            // thousands of builtins, so almost any identifier finds a spurious
+            // close match there (e.g. `instance` -> `distance`); restricting to
+            // user-written declarations keeps suggestions quiet and relevant.
+            // Skipping the whole container here (rather than per-member) also
+            // avoids iterating — and, for any on-demand-deserialized core
+            // module, materializing — its members via `getDirectMemberDecls()`.
+            if (isFromCoreModule(containerDecl))
+                continue;
+
+            for (auto candidateDecl : containerDecl->getDirectMemberDecls())
+            {
+                Name* candidateName = candidateDecl->getName();
+                if (!candidateName || candidateName == name)
+                    continue;
+
+                // Skip the declaration currently being checked, mirroring the
+                // `getDeclToExcludeFromLookup()` exclusion that real lookup
+                // applies: suggesting it would name something the same lookup
+                // path still cannot resolve.
+                if (candidateDecl == declToExclude)
+                    continue;
+
+                const UnownedStringSlice candidateText = getUnownedStringSliceText(candidateName);
+                if (candidateText.getLength() == 0)
+                    continue;
+
+                // Cheap length pre-filter: |lenA - lenB| is a lower bound on the
+                // edit distance, so skip candidates that cannot possibly be
+                // within `maxDistance` before paying for the O(lenA*lenB) DP (and
+                // before forcing any lazy member materialization downstream).
+                if (Math::Abs(candidateText.getLength() - target.getLength()) > maxDistance)
+                    continue;
+
+                // Don't suggest a declaration the user could not have referenced:
+                // real lookup already filtered inaccessible (`private`/`internal`)
+                // candidates, so offering one as a "did you mean" would name a
+                // forbidden symbol (and leak imported module contents via typos).
+                if (!semantics->isDeclVisibleFromScope(makeDeclRef(candidateDecl), scope))
+                    continue;
+
+                const Index distance =
+                    StringUtil::calcLevenshteinDistanceCaseInsensitive(target, candidateText);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    bestNames.clear();
+                    bestNames.add(candidateName);
+                }
+                else if (distance == bestDistance)
+                {
+                    bestNames.add(candidateName);
+                }
+            }
+        }
+    }
+
+    // Offer a suggestion only when there is a single, unambiguous closest name.
+    // Multiple distinct names at the best distance would make the chosen one
+    // depend on import/scope-walk order, so suppress the suggestion instead.
+    if (bestDistance > maxDistance || bestNames.getCount() != 1)
+        return nullptr;
+    Name* best = nullptr;
+    for (auto n : bestNames)
+        best = n;
+    return best;
+}
+
 Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
 {
     // If we've already resolved this expression, don't try again.
@@ -4423,8 +5273,19 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
     }
 
     if (!diagnosed)
-        getSink()->diagnose(
-            Diagnostics::UndefinedIdentifier{.name = expr->name, .location = expr->loc});
+    {
+        // If a similarly-spelled identifier is in scope, attach a "did you mean
+        // 'length'?" note to the error; this turns a bare "undefined identifier
+        // 'lenght'" into an actionable hint. The note only renders when
+        // `suggestionLocation` is valid, so a null suggestion is harmless.
+        auto suggestion =
+            findClosestInScopeName(this, expr->name, expr->scope, getDeclToExcludeFromLookup());
+        getSink()->diagnose(Diagnostics::UndefinedIdentifier{
+            .name = expr->name,
+            .suggestion = suggestion,
+            .location = expr->loc,
+            .suggestionLocation = suggestion ? expr->loc : SourceLoc{}});
+    }
 
     return resultExpr;
 }
@@ -4729,7 +5590,7 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType 
     return diffType;
 }
 
-Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
+Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType thisQualType)
 {
     // Resolve backward diff type here.
     // Note that this type checking needs to be in sync with
@@ -4743,6 +5604,26 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
     // No support for differentiating function that throw errors, for now.
     SLANG_ASSERT(originalType->getErrorType()->equals(m_astBuilder->getBottomType()));
     auto errorType = originalType->getErrorType();
+
+    // Handle implicit `this` parameter for non-static member methods.
+    if (thisQualType.type)
+    {
+        if (auto diffPairType = tryGetDifferentialPairType(thisQualType.type))
+        {
+            paramTypes.add(
+                thisQualType.isLeftValue ? m_astBuilder->getBorrowInOutParamType(diffPairType)
+                                         : diffPairType);
+        }
+        else
+        {
+            auto noDiffThisType = m_astBuilder->getModifiedType(
+                thisQualType.type,
+                {m_astBuilder->getNoDiffModifierVal()});
+            paramTypes.add(
+                thisQualType.isLeftValue ? m_astBuilder->getBorrowInOutParamType(noDiffThisType)
+                                         : noDiffThisType);
+        }
+    }
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
     {
@@ -4858,6 +5739,42 @@ struct HigherOrderInvokeExprCheckingActions
         }
         return nullptr;
     }
+
+    // Extract the implicit `this` type for a statically-referenced non-static
+    // member method (e.g. `Type::method`).  Returns a null QualType for free
+    // functions, static methods, constructors, and member methods referenced
+    // by name within their own type (e.g. `[BackwardDerivativeOf(f)]`).
+    QualType getThisTypeForBaseFunc(SemanticsVisitor* semantics, Expr* funcExpr)
+    {
+        auto innerExpr = getInnerMostExprFromHigherOrderExpr(funcExpr);
+        // Only produce a this-type when the method is accessed via Type::method
+        // (StaticMemberExpr). When referenced by name within the same struct
+        // (plain DeclRefExpr), the derivative is itself a member method and
+        // the this parameter is handled implicitly.
+        if (!as<StaticMemberExpr>(innerExpr))
+            return QualType();
+        if (auto declRefExpr = as<DeclRefExpr>(innerExpr))
+        {
+            auto declRef = declRefExpr->declRef;
+            // Unwrap GenericDecl to get to the inner callable.
+            if (auto genDecl = as<GenericDecl>(declRef.getDecl()))
+            {
+                declRef = semantics->getASTBuilder()->getMemberDeclRef(
+                    declRef.as<GenericDecl>(),
+                    genDecl->inner);
+            }
+            if (auto callableDeclRef = declRef.as<FunctionDeclBase>())
+            {
+                auto callableDecl = callableDeclRef.getDecl();
+                if (!callableDecl->hasModifier<HLSLStaticModifier>() &&
+                    !as<ConstructorDecl>(callableDecl))
+                {
+                    return getTypeForThisExpr(semantics, callableDeclRef);
+                }
+            }
+        }
+        return QualType();
+    }
 };
 
 struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingActions
@@ -4879,7 +5796,8 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, nullptr);
+        auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
+        resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, thisType);
         if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
         {
             auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
@@ -4889,6 +5807,8 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             }
             if (funcDecl)
             {
+                if (thisType.type)
+                    resultDiffExpr->newParameterNames.add(semantics->getName("this"));
                 for (auto param : funcDecl->getParameters())
                 {
                     resultDiffExpr->newParameterNames.add(param->getName());
@@ -4917,7 +5837,8 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        resultDiffExpr->type = semantics->getBackwardDiffFuncType(baseFuncType);
+        auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
+        resultDiffExpr->type = semantics->getBackwardDiffFuncType(baseFuncType, thisType);
         if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
         {
             auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
@@ -4927,6 +5848,8 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             }
             if (funcDecl)
             {
+                if (thisType.type)
+                    resultDiffExpr->newParameterNames.add(semantics->getName("this"));
                 for (auto param : funcDecl->getParameters())
                 {
                     if (param->findModifier<NoDiffModifier>())
@@ -5051,6 +5974,82 @@ Expr* SemanticsExprVisitor::visitForwardDifferentiateExpr(ForwardDifferentiateEx
 Expr* SemanticsExprVisitor::visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
 {
     BackwardDifferentiateExprCheckingActions actions;
+    return _checkHigherOrderInvokeExpr(this, expr, &actions);
+}
+
+struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
+{
+    virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) override
+    {
+        return semantics->getASTBuilder()->create<ApplyForBwdExpr>();
+    }
+    void fillHigherOrderInvokeExpr(
+        HigherOrderInvokeExpr* resultExpr,
+        SemanticsVisitor* semantics,
+        Expr* funcExpr) override
+    {
+        resultExpr->baseFunction = funcExpr;
+        auto baseFuncType = getBaseFunctionType(semantics, funcExpr);
+        if (!baseFuncType)
+        {
+            resultExpr->type = semantics->getASTBuilder()->getErrorType();
+            semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
+            return;
+        }
+        // __apply(fn) takes the same params as fn (not wrapped in DifferentialPair).
+        // Give it the base function type so overload resolution works with original args.
+        auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
+        if (thisType.type)
+        {
+            List<Type*> paramTypes;
+            paramTypes.add(
+                thisType.isLeftValue
+                    ? semantics->getASTBuilder()->getBorrowInOutParamType(thisType.type)
+                    : thisType.type);
+            for (Index i = 0; i < baseFuncType->getParamCount(); i++)
+                paramTypes.add(baseFuncType->getParamTypeWithModeWrapper(i));
+
+            resultExpr->type = semantics->getASTBuilder()->getFuncType(
+                paramTypes.getArrayView(),
+                baseFuncType->getResultType(),
+                baseFuncType->getErrorType());
+        }
+        else
+        {
+            resultExpr->type = baseFuncType;
+        }
+
+        if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
+        {
+            auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
+            if (auto genDecl = as<GenericDecl>(declRefExpr->declRef.getDecl()))
+                funcDecl = as<CallableDecl>(genDecl->inner);
+            if (funcDecl)
+            {
+                if (thisType.type)
+                    resultExpr->newParameterNames.add(semantics->getName("this"));
+                for (auto param : funcDecl->getParameters())
+                    resultExpr->newParameterNames.add(param->getName());
+            }
+        }
+    }
+};
+
+Expr* SemanticsExprVisitor::visitApplyForBwdExpr(ApplyForBwdExpr* expr)
+{
+    if (!getOptionSet().getBoolOption(CompilerOptionName::ExperimentalFeature))
+    {
+        getSink()->diagnose(Diagnostics::ApplyForBwdRequiresExperimentalFeature{.expr = expr});
+
+        // Warnings allow compilation to continue; a non-callable placeholder prevents later
+        // stages from treating the gated syntax as an apply expression.
+        auto placeholderExpr = getASTBuilder()->create<DefaultConstructExpr>();
+        placeholderExpr->loc = expr->loc;
+        placeholderExpr->type = getASTBuilder()->getVoidType();
+        return placeholderExpr;
+    }
+
+    ApplyForBwdExprCheckingActions actions;
     return _checkHigherOrderInvokeExpr(this, expr, &actions);
 }
 
@@ -6564,6 +7563,8 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     auto valueType = expr->value->type.type;
     if (auto typeType = as<TypeType>(valueType))
         valueType = typeType->getType();
+    auto unwrappedValueType = unwrapModifiedType(valueType);
+    auto valueInterfaceType = isInterfaceType(unwrappedValueType) ? unwrappedValueType : valueType;
 
     // If value is a subtype of `type`, then this expr is always true.
     auto witness = isSubtype(valueType, expr->typeExpr.type, IsSubTypeOptions::None);
@@ -6594,11 +7595,12 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     // subtype witness for runtime checks.
 
     expr->value = maybeOpenExistential(originalVal);
-    expr->witnessArg = witness ? witness : tryGetSubtypeWitness(expr->typeExpr.type, valueType);
+    expr->witnessArg =
+        witness ? witness : tryGetSubtypeWitness(expr->typeExpr.type, valueInterfaceType);
     if (expr->witnessArg)
     {
         // For now we can only support the scenario where `expr->value` is an interface type.
-        if (!optionalWitness && !isInterfaceType(originalVal->type))
+        if (!optionalWitness && !isInterfaceType(valueInterfaceType))
         {
             getSink()->diagnose(Diagnostics::IsOperatorValueMustBeInterfaceType{.expr = expr});
         }
@@ -6611,8 +7613,8 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     // Note: _isTypeParametric only handles DeclRefType-based types (incl. recursive generic args).
     // Builtin composite types like arrays or vectors with embedded generic params are not checked,
     // but these are unlikely to appear in `is`/`as` expressions in practice.
-    if (!as<ErrorType>(valueType) && !as<ErrorType>(expr->typeExpr.type) &&
-        !isInterfaceType(valueType) && !_isTypeParametric(valueType) &&
+    if (!as<ErrorType>(valueInterfaceType) && !as<ErrorType>(expr->typeExpr.type) &&
+        !isInterfaceType(valueInterfaceType) && !_isTypeParametric(valueInterfaceType) &&
         !_isTypeParametric(expr->typeExpr.type))
     {
         getSink()->diagnose(Diagnostics::IsAsOnUnrelatedConcreteTypes{.expr = expr});
@@ -6635,6 +7637,9 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     }
 
     expr->value = CheckTerm(expr->value);
+    auto valueType = expr->value->type.type;
+    auto unwrappedValueType = unwrapModifiedType(valueType);
+    auto valueInterfaceType = isInterfaceType(unwrappedValueType) ? unwrappedValueType : valueType;
 
     // Reject `expr as OpaqueType` (and structs containing opaque fields) because
     // Optional<T> cannot wrap resource/opaque types.
@@ -6650,7 +7655,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     expr->type = optType;
 
     // If value is a subtype of `type`, then this expr is equivalent to a CastToSuperTypeExpr.
-    if (auto witness = tryGetSubtypeWitness(expr->value->type.type, typeExpr.type))
+    if (auto witness = tryGetSubtypeWitness(valueType, typeExpr.type))
     {
         auto castToSuperType = createCastToSuperTypeExpr(typeExpr.type, expr->value, witness);
         auto makeOptional = m_astBuilder->create<MakeOptionalExpr>();
@@ -6664,11 +7669,11 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
 
     // If target type is an interface type, we will obtain the witness here for
     // runtime casting.
-    expr->witnessArg = tryGetSubtypeWitness(typeExpr.type, expr->value->type.type);
+    expr->witnessArg = tryGetSubtypeWitness(typeExpr.type, valueInterfaceType);
     if (expr->witnessArg)
     {
         // For now we can only support the scenario where `expr->value` is an interface type.
-        if (!isInterfaceType(expr->value->type.type))
+        if (!isInterfaceType(valueInterfaceType))
         {
             getSink()->diagnose(Diagnostics::IsOperatorValueMustBeInterfaceType{.expr = expr});
         }
@@ -6679,9 +7684,8 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     // If we reach here with no witness and both the value type and target type are concrete
     // (not generic type parameters, associated types, or ThisType), the `as` cast always
     // fails and the user is using `as` incorrectly on unrelated concrete types.
-    auto asValueType = expr->value->type.type;
-    if (!as<ErrorType>(asValueType) && !as<ErrorType>(typeExpr.type) &&
-        !isInterfaceType(asValueType) && !_isTypeParametric(asValueType) &&
+    if (!as<ErrorType>(valueInterfaceType) && !as<ErrorType>(typeExpr.type) &&
+        !isInterfaceType(valueInterfaceType) && !_isTypeParametric(valueInterfaceType) &&
         !_isTypeParametric(typeExpr.type))
     {
         getSink()->diagnose(Diagnostics::IsAsOnUnrelatedConcreteTypes{.expr = expr});
@@ -7933,6 +8937,47 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
             else if (funcDeclBase->hasModifier<RefAttribute>())
             {
                 expr->type.isLeftValue = true;
+            }
+
+            // When a function has been reparented into an AggTypeDeclBase
+            // (e.g., a __func_extension's inner function moved into a
+            // synthesized ExtensionDecl), its parentDecl is the extension
+            // even though the parsing scope chain doesn't include it.
+            // Resolve `this` from the parent extension in this case.
+            if (auto parentExtDecl = as<ExtensionDecl>(funcDeclBase->parentDecl))
+            {
+                if (!funcDeclBase->hasModifier<HLSLStaticModifier>())
+                {
+                    // For func_extension apply on a member method, the extension's
+                    // target is a function-as-type. We want `this` to be the parent
+                    // struct type of that member function, not the function type itself.
+                    // Use the target function's DeclRef to get the correctly
+                    // substituted parent type (e.g., MyVec<float> not MyVec<T>).
+                    if (auto targetDeclRefType = as<DeclRefType>(parentExtDecl->targetType.type))
+                    {
+                        auto targetDeclRef = targetDeclRefType->getDeclRef();
+                        if (auto targetFuncDecl = as<FunctionDeclBase>(targetDeclRef.getDecl()))
+                        {
+                            if (auto parentTypeDecl =
+                                    as<AggTypeDeclBase>(targetFuncDecl->parentDecl))
+                            {
+                                auto thisType = calcThisType(makeDeclRef(parentTypeDecl));
+                                // Apply the target function's substitutions to get
+                                // the specialized parent type.
+                                if (thisType)
+                                {
+                                    expr->type.type = as<Type>(thisType->substitute(
+                                        m_astBuilder,
+                                        SubstitutionSet(targetDeclRef)));
+                                }
+                                return expr;
+                            }
+                        }
+                    }
+                    // Fallback: use the extension's this type directly.
+                    expr->type.type = calcThisType(makeDeclRef(parentExtDecl));
+                    return expr;
+                }
             }
         }
         else if (auto typeOrExtensionDecl = as<AggTypeDeclBase>(containerDecl))

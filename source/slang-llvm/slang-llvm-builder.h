@@ -326,6 +326,12 @@ public:
         int64_t alignment,
         LLVMDebugNode* file,
         int line) = 0;
+
+    virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
+    getDebugForwardDeclareType(CharSlice name, LLVMDebugNode* file, int line) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+    replaceDebugForwardDeclareType(LLVMDebugNode* replace, LLVMDebugNode* with) = 0;
+
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
     getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes) = 0;
     virtual SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunction(

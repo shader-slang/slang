@@ -1,5 +1,6 @@
 import contextlib
 import io
+import importlib.util
 import json
 import os
 import sys
@@ -14,9 +15,21 @@ if ANALYTICS_DIR not in sys.path:
     sys.path.insert(0, ANALYTICS_DIR)
 
 import ci_health
+import ci_hosted_runner_usage
 import ci_job_collector
+import pr_collector
+import ci_post_status
 import ci_status
 import ci_visualization
+import gh_api
+
+
+def load_queue_status_module():
+    path = os.path.join(os.path.dirname(ANALYTICS_DIR), "ci-queue-status.py")
+    spec = importlib.util.spec_from_file_location("ci_queue_status_for_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class TestRunnerTypeCoverage(unittest.TestCase):
@@ -67,6 +80,60 @@ class TestRunnerTypeCoverage(unittest.TestCase):
 
         self.assertEqual(group, "Linux SM80Plus GPU (GCP)")
         self.assertTrue(self_hosted)
+
+    def test_classify_group_handles_gcp_pinned_linux_gpu_label(self):
+        """The Linux GPU test jobs request the extra "GCP" label to pin them to
+        the GCP scaler pool and exclude the nvrgfx Colossus hosts (see
+        ci-slang-test-container.yml / ci-rhi-test-container.yml). classify_group
+        matches by subset, so the shipped ["Linux","self-hosted","GPU"] entry
+        still classifies the 4-label set as "Linux GPU (GCP)" without a separate
+        config entry. This regression test locks that in so a future reorder or
+        removal of that entry can't silently bucket the pinned jobs into "Other".
+        """
+        config = ci_visualization.load_config()
+
+        # Job-label path (no runner name) and both runner-name paths must all
+        # resolve to the GCP Linux GPU group.
+        for runner_name in ("", "linux-test-abc123", "2u1g-x570-0558"):
+            group, self_hosted = ci_visualization.classify_group(
+                ["Linux", "self-hosted", "GPU", "GCP"],
+                config,
+                runner_name,
+            )
+            self.assertEqual(
+                group,
+                "Linux GPU (GCP)",
+                msg=f"GCP-pinned Linux GPU job misclassified for runner_name={runner_name!r}",
+            )
+            self.assertTrue(self_hosted)
+
+    def test_classify_group_handles_gcp_build_and_analytics_pools(self):
+        """The CPU-only Linux build and analytics scaler pools carry the labels
+        ["Linux","self-hosted","build","GCP"] and
+        ["Linux","self-hosted","analytics","GCP"], and their VMs are named
+        linux-build-* / linux-analytics-*. Both the job-label path and the
+        scale-set runner-name-prefix path (empty labels) must classify into
+        their own GCP groups rather than falling through to "Other". Locks in
+        the shipped config so these pools stay visible in CI analytics.
+        """
+        config = ci_visualization.load_config()
+
+        cases = [
+            (["Linux", "self-hosted", "build", "GCP"], "linux-build-abc123", "Linux Build (GCP)"),
+            (["Linux", "self-hosted", "analytics", "GCP"], "linux-analytics-abc123", "Linux Analytics (GCP)"),
+        ]
+        for labels, runner_name, expected in cases:
+            # Job-label path (no runner name) and the scale-set name-prefix path
+            # (empty labels) must both resolve to the expected GCP group.
+            for name in ("", runner_name):
+                lbls = labels if name == "" else []
+                group, self_hosted = ci_visualization.classify_group(lbls, config, name)
+                self.assertEqual(
+                    group,
+                    expected,
+                    msg=f"misclassified for labels={lbls} runner_name={name!r}",
+                )
+                self.assertTrue(self_hosted)
 
     def test_record_snapshot_counts_all_gcp_runner_types(self):
         queue_data = {
@@ -415,6 +482,121 @@ class TestGpuQuota(unittest.TestCase):
         html = ci_health.build_history_chart(snapshots)
         # The chart section HTML should not be present (JS guard is fine)
         self.assertNotIn("T4 GPU Usage", html)
+
+    def test_gpu_quota_partial_snapshot_renders_chart_gap(self):
+        snapshots = [
+            {
+                "timestamp": "2026-03-03T10:00:00Z",
+                "runner_groups": {},
+                "gpu_quota_by_metric": {
+                    "NVIDIA_T4_GPUS": {
+                        "name": "T4",
+                        "usage": 6,
+                        "limit": 8,
+                        "regions": {"us-central1": {"usage": 6, "limit": 8}},
+                    },
+                },
+            },
+            {
+                "timestamp": "2026-03-03T10:15:00Z",
+                "runner_groups": {},
+                "gpu_quota_partial": True,
+                "gpu_quota_by_metric": {
+                    "NVIDIA_T4_GPUS": {
+                        "name": "T4",
+                        "usage": 0,
+                        "limit": 8,
+                        "regions": {"us-central1": {"usage": 0, "limit": 8}},
+                    },
+                },
+            },
+        ]
+
+        charts = ci_health._build_gpu_quota_charts(snapshots)
+
+        self.assertEqual(charts[0]["regionData"]["us-central1"], [6, None])
+
+
+class TestHealthPartialRendering(unittest.TestCase):
+    def test_recent_failures_partial_does_not_render_false_healthy_empty_state(self):
+        queue_data = {
+            "summary": {
+                "jobs_queued": 0,
+                "jobs_running": 0,
+                "runs_queued": 0,
+                "runs_in_progress": 0,
+            },
+            "self_hosted_runners": [],
+            "queue_by_group": [],
+            "longest_waiting_jobs": [],
+        }
+        failures = {"failures": [], "partial": True, "errors": ["HTTP 502"]}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_health.generate_health_html(queue_data, failures, tmp)
+            with open(os.path.join(tmp, "health.html"), encoding="utf-8") as f:
+                html = f.read()
+
+        self.assertIn("Recent CI failure data unavailable", html)
+        self.assertNotIn("No recent CI failures", html)
+
+    def test_queue_partial_renders_warning(self):
+        queue_data = {
+            "summary": {
+                "jobs_queued": 0,
+                "jobs_running": 0,
+                "runs_queued": 0,
+                "runs_in_progress": 0,
+            },
+            "partial": True,
+            "list_errors": ["HTTP 502"],
+            "self_hosted_runners": [],
+            "queue_by_group": [],
+            "longest_waiting_jobs": [],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_health.generate_health_html(queue_data, [], tmp)
+            with open(os.path.join(tmp, "health.html"), encoding="utf-8") as f:
+                html = f.read()
+
+        self.assertIn("Queue sample is partial", html)
+
+
+class TestHealthApiBounds(unittest.TestCase):
+    def test_recent_failures_query_is_bounded_by_created_range(self):
+        calls = []
+
+        def fake_list(endpoint, key):
+            calls.append((endpoint, key))
+            return [], None
+
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=fake_list):
+            ci_health.fetch_recent_failures("shader-slang/slang")
+
+        self.assertEqual(calls[0][1], "workflow_runs")
+        self.assertIn("status=completed", calls[0][0])
+        self.assertIn("per_page=100", calls[0][0])
+        self.assertIn("&created=", calls[0][0])
+        self.assertIn("..", calls[0][0])
+
+    def test_merge_queue_query_is_bounded_by_created_range(self):
+        calls = []
+
+        def fake_list(endpoint, key):
+            calls.append((endpoint, key))
+            return [], None
+
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=fake_list):
+            result = ci_health.fetch_merge_queue_status("shader-slang/slang")
+
+        self.assertEqual(calls[0][1], "workflow_runs")
+        self.assertIn("event=merge_group", calls[0][0])
+        self.assertIn("per_page=100", calls[0][0])
+        self.assertIn("&created=", calls[0][0])
+        self.assertIn("..", calls[0][0])
+        self.assertFalse(result["partial"])
+        self.assertEqual(result["errors"], [])
 
 
 class TestStatisticsRunnerNamePrefixes(unittest.TestCase):
@@ -995,6 +1177,772 @@ class TestMonthlySplit(unittest.TestCase):
 
             self.assertEqual({j["id"] for j in feb_data}, {1})
             self.assertEqual({j["id"] for j in mar_data}, {2, 3})
+
+
+class TestCollectionCompleteness(unittest.TestCase):
+    def test_run_listing_error_raises_completeness_error(self):
+        start = datetime(2026, 3, 1, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 3, 2, 0, 0, tzinfo=timezone.utc)
+
+        with mock.patch.object(
+            ci_job_collector,
+            "gh_api_list",
+            return_value=(None, "HTTP 502"),
+        ):
+            with self.assertRaises(ci_job_collector.DataCompletenessError):
+                ci_job_collector._fetch_runs_window(
+                    "shader-slang/slang",
+                    start,
+                    end,
+                    set(),
+                    workflow_id=123,
+                )
+
+    def test_pr_search_error_raises_completeness_error(self):
+        start = datetime(2026, 3, 1, 0, 0, tzinfo=timezone.utc)
+
+        with mock.patch.object(
+            pr_collector,
+            "gh_api_list",
+            return_value=(None, "HTTP 502"),
+        ):
+            with self.assertRaises(pr_collector.DataCompletenessError):
+                pr_collector.fetch_merged_prs(
+                    "shader-slang/slang",
+                    start,
+                )
+
+
+class TestQueueStatusJson(unittest.TestCase):
+    def test_json_mode_emits_zero_payload_when_no_active_runs(self):
+        module = load_queue_status_module()
+
+        with mock.patch.object(
+            module,
+            "fetch_runs",
+            return_value=([], None),
+        ), mock.patch.object(
+            module,
+            "fetch_runners",
+            return_value=([], True),
+        ), mock.patch.object(
+            module.sys,
+            "argv",
+            ["ci-queue-status.py", "--json"],
+        ):
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                module.main()
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["summary"]["runs_queued"], 0)
+        self.assertEqual(payload["summary"]["runs_in_progress"], 0)
+        self.assertEqual(payload["summary"]["jobs_queued"], 0)
+        self.assertEqual(payload["summary"]["jobs_running"], 0)
+        self.assertEqual(payload["queue_by_group"], [])
+        self.assertEqual(payload["longest_waiting_jobs"], [])
+
+    def test_json_mode_marks_listing_failures_partial(self):
+        module = load_queue_status_module()
+
+        def fake_runs(repo, status):
+            if status == "queued":
+                return [], "HTTP 502"
+            return [], None
+
+        with mock.patch.object(
+            module,
+            "fetch_runs",
+            side_effect=fake_runs,
+        ), mock.patch.object(
+            module,
+            "fetch_runners",
+            return_value=([], True),
+        ), mock.patch.object(
+            module.sys,
+            "argv",
+            ["ci-queue-status.py", "--json"],
+        ):
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                module.main()
+
+        payload = json.loads(stdout.getvalue())
+        self.assertTrue(payload["partial"])
+        self.assertEqual(payload["list_errors"], ["HTTP 502"])
+
+
+class TestStatusPosterPushRetry(unittest.TestCase):
+    def test_commit_and_push_rebases_and_retries_stale_push(self):
+        calls = []
+        push_count = {"value": 0}
+
+        def result(code, stderr="", stdout=""):
+            r = mock.Mock()
+            r.returncode = code
+            r.stdout = stdout
+            r.stderr = stderr
+            return r
+
+        def fake_run_git(args, cwd):
+            calls.append(args)
+            if args == ["config", "user.name"]:
+                return result(0, stdout="Test User\n")
+            if args == ["config", "user.email"]:
+                return result(0, stdout="test@example.com\n")
+            if args[:2] in (["config", "user.name"], ["config", "user.email"]):
+                return result(0)
+            if args == ["add", ci_post_status.STATUS_FILE]:
+                return result(0)
+            if args == ["diff", "--cached", "--quiet"]:
+                return result(1)
+            if args[:1] == ["commit"]:
+                return result(0)
+            if args == ["push"]:
+                push_count["value"] += 1
+                if push_count["value"] == 1:
+                    return result(1, "non-fast-forward")
+                return result(0)
+            if args == ["pull", "--rebase"]:
+                return result(0)
+            return result(0)
+
+        with mock.patch.object(
+            ci_post_status,
+            "get_slang_git_identity",
+            return_value=("Test User", "test@example.com"),
+        ), mock.patch.object(
+            ci_post_status,
+            "get_github_username",
+            return_value=None,
+        ), mock.patch.object(
+            ci_post_status,
+            "run_git",
+            side_effect=fake_run_git,
+        ):
+            ok = ci_post_status.commit_and_push("/tmp/repo", "Status: test")
+
+        self.assertTrue(ok)
+        self.assertEqual(push_count["value"], 2)
+        self.assertIn(["pull", "--rebase"], calls)
+
+
+class TestHostedRunnerUsage(unittest.TestCase):
+    def test_classify_hosted_label_picks_first_hosted(self):
+        self.assertEqual(
+            ci_hosted_runner_usage.classify_hosted_label(["ubuntu-latest"]),
+            "ubuntu-latest",
+        )
+        self.assertEqual(
+            ci_hosted_runner_usage.classify_hosted_label(
+                ["ubuntu-22.04", "x64"]
+            ),
+            "ubuntu-22.04",
+        )
+
+    def test_classify_hosted_label_rejects_self_hosted(self):
+        # Self-hosted runners often carry an `ubuntu-*` *image* label too,
+        # but the `self-hosted` marker disqualifies them from the cap.
+        self.assertIsNone(
+            ci_hosted_runner_usage.classify_hosted_label(
+                ["self-hosted", "Linux", "SM80Plus"]
+            )
+        )
+        self.assertIsNone(
+            ci_hosted_runner_usage.classify_hosted_label(
+                ["self-hosted", "ubuntu-22.04"]
+            )
+        )
+
+    def test_classify_hosted_label_returns_none_for_no_hosted(self):
+        self.assertIsNone(ci_hosted_runner_usage.classify_hosted_label([]))
+        self.assertIsNone(ci_hosted_runner_usage.classify_hosted_label(["custom"]))
+
+    def test_classify_hosted_label_recognizes_all_three_pools(self):
+        for label in ("ubuntu-24.04-arm", "macos-latest", "windows-2022"):
+            self.assertEqual(
+                ci_hosted_runner_usage.classify_hosted_label([label]), label
+            )
+
+    def test_summarize_groups_and_sorts(self):
+        jobs = [
+            {"workflow_name": "CI", "job_name": "filter", "hosted_label": "ubuntu-latest"},
+            {"workflow_name": "CI", "job_name": "label", "hosted_label": "ubuntu-latest"},
+            {"workflow_name": "CMake Options", "job_name": "m1", "hosted_label": "ubuntu-22.04"},
+            {"workflow_name": "CI", "job_name": "mac", "hosted_label": "macos-latest"},
+        ]
+        s = ci_hosted_runner_usage.summarize(jobs)
+        self.assertEqual(s["total"], 4)
+        # Sorted by count desc, then name asc.
+        self.assertEqual(s["by_workflow"][0], {"name": "CI", "count": 3})
+        self.assertEqual(s["by_workflow"][1], {"name": "CMake Options", "count": 1})
+        self.assertEqual(s["by_label"][0], {"label": "ubuntu-latest", "count": 2})
+
+    def test_summarize_handles_empty(self):
+        s = ci_hosted_runner_usage.summarize([])
+        self.assertEqual(s, {"total": 0, "by_workflow": [], "by_label": []})
+
+    def test_collect_hosted_jobs_filters_status_and_self_hosted(self):
+        run = {"id": 1, "name": "CI"}
+
+        def fake_fetch(repo, run_id):
+            return (
+                [
+                    # hosted, in_progress — kept
+                    {"status": "in_progress", "labels": ["ubuntu-latest"], "name": "a"},
+                    # hosted, queued — filtered out by status_filter
+                    {"status": "queued", "labels": ["ubuntu-latest"], "name": "b"},
+                    # self-hosted — filtered out by classifier
+                    {"status": "in_progress", "labels": ["self-hosted", "Linux", "GPU"], "name": "c"},
+                    # hosted windows, in_progress — kept
+                    {"status": "in_progress", "labels": ["windows-latest"], "name": "d"},
+                ],
+                None,
+            )
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_fetch
+        ):
+            jobs, errors = ci_hosted_runner_usage.collect_hosted_jobs(
+                "shader-slang/slang", [run], "in_progress"
+            )
+        self.assertEqual(len(jobs), 2)
+        self.assertEqual(errors, 0)
+        labels = sorted(j["hosted_label"] for j in jobs)
+        self.assertEqual(labels, ["ubuntu-latest", "windows-latest"])
+        for j in jobs:
+            self.assertEqual(j["workflow_name"], "CI")
+
+    def test_collect_hosted_jobs_counts_fetch_errors(self):
+        """Fetch failures must be surfaced, not silently undercounted."""
+        runs = [{"id": 1, "name": "CI"}, {"id": 2, "name": "CI"}]
+
+        def fake_fetch(repo, run_id):
+            if run_id == 1:
+                return (
+                    [{"status": "in_progress", "labels": ["ubuntu-latest"], "name": "a"}],
+                    None,
+                )
+            return (None, "HTTP 502")
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_fetch
+        ):
+            jobs, errors = ci_hosted_runner_usage.collect_hosted_jobs(
+                "shader-slang/slang", runs, "in_progress"
+            )
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(errors, 1)
+
+    def test_sample_counts_queued_jobs_inside_in_progress_runs(self):
+        """A run whose top-level status is `in_progress` can still carry
+        `queued` jobs waiting on a hosted runner. That is exactly the
+        cap-exhaustion leading edge we need to surface — make sure those
+        queued jobs land in the snapshot's `queued` bucket and not in
+        the void.
+        """
+        in_progress_run = {"id": 42, "name": "CI"}
+
+        def fake_in_progress(repo):
+            return [in_progress_run], None
+
+        def fake_queued(repo):
+            # No workflow runs have top-level status=queued yet —
+            # the queueing is happening *inside* an in_progress run.
+            return [], None
+
+        def fake_jobs(repo, run_id):
+            assert run_id == 42
+            return (
+                [
+                    {"status": "in_progress", "labels": ["ubuntu-latest"], "name": "early"},
+                    {"status": "queued", "labels": ["ubuntu-latest"], "name": "stuck-1"},
+                    {"status": "queued", "labels": ["windows-latest"], "name": "stuck-2"},
+                ],
+                None,
+            )
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage(
+                "shader-slang/slang", cap=20
+            )
+
+        self.assertEqual(snap["in_progress"]["total"], 1)
+        self.assertEqual(snap["queued"]["total"], 2)
+        queued_labels = {x["label"]: x["count"] for x in snap["queued"]["by_label"]}
+        self.assertEqual(queued_labels, {"ubuntu-latest": 1, "windows-latest": 1})
+
+    def test_sample_dedupes_runs_listed_in_both_endpoints(self):
+        """A run transitioning queued -> in_progress can appear in both
+        list endpoints during sampling. Its jobs must not be counted
+        twice.
+        """
+        run = {"id": 7, "name": "CI"}
+
+        def fake_in_progress(repo):
+            return [run], None
+
+        def fake_queued(repo):
+            return [run], None
+
+        call_count = {"n": 0}
+
+        def fake_jobs(repo, run_id):
+            call_count["n"] += 1
+            return (
+                [{"status": "in_progress", "labels": ["ubuntu-latest"], "name": "a"}],
+                None,
+            )
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage(
+                "shader-slang/slang", cap=20
+            )
+
+        self.assertEqual(call_count["n"], 1)
+        self.assertEqual(snap["in_progress"]["total"], 1)
+
+    def test_sample_hosted_runner_usage_marks_partial_on_errors(self):
+        run = {"id": 99, "name": "CI"}
+
+        def fake_in_progress(repo):
+            return [run], None
+
+        def fake_queued(repo):
+            return [], None
+
+        def fake_jobs(repo, run_id):
+            return (None, "HTTP 500")
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage(
+                "shader-slang/slang", cap=20
+            )
+
+        self.assertTrue(snap.get("partial"))
+        self.assertEqual(snap.get("fetch_errors"), 1)
+
+    def test_sample_marks_partial_on_listing_endpoint_failure(self):
+        """A 5xx on the runs-listing endpoint must surface as partial,
+        not as a false-healthy zero. Otherwise a transient API error
+        masks the very incident this sampler exists to detect.
+        """
+
+        def fake_in_progress(repo):
+            return [], "HTTP 502 listing in_progress runs"
+
+        def fake_queued(repo):
+            return [], None
+
+        def fake_jobs(repo, run_id):
+            return ([], None)
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage(
+                "shader-slang/slang", cap=20
+            )
+
+        self.assertTrue(snap.get("partial"))
+        self.assertEqual(snap["in_progress"]["total"], 0)
+        self.assertEqual(snap["queued"]["total"], 0)
+        self.assertIn("HTTP 502 listing in_progress runs", snap.get("list_errors", []))
+
+    def test_format_summary_surfaces_partial(self):
+        """`--json` and the human-readable summary must carry the same
+        degraded signal — the text mode previously printed `0 / cap`
+        without any indication the sample was undercounted.
+        """
+        snapshot = {
+            "cap": 20,
+            "in_progress": {"total": 0, "by_workflow": [], "by_label": []},
+            "queued": {"total": 0, "by_workflow": [], "by_label": []},
+            "partial": True,
+            "fetch_errors": 2,
+            "list_errors": ["HTTP 502 listing in_progress runs"],
+        }
+        out = ci_hosted_runner_usage.format_summary(snapshot)
+        self.assertIn("WARNING", out)
+        self.assertIn("partial", out.lower())
+        self.assertIn("job fetch failures: 2", out)
+        self.assertIn("HTTP 502 listing in_progress runs", out)
+
+    def test_sample_dedupe_skips_runs_with_missing_id(self):
+        """Don't collapse multiple `id: None` runs into one entry."""
+
+        def fake_in_progress(repo):
+            return [{"name": "broken-1"}, {"name": "broken-2"}], None
+
+        def fake_queued(repo):
+            return [], None
+
+        call_count = {"n": 0}
+
+        def fake_jobs(repo, run_id):
+            call_count["n"] += 1
+            return ([], None)
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage(
+                "shader-slang/slang", cap=20
+            )
+
+        # Both malformed runs must be dropped (not merged into a single
+        # None-id entry and dispatched to fetch_jobs_for_run).
+        self.assertEqual(call_count["n"], 0)
+        self.assertEqual(snap["in_progress"]["total"], 0)
+
+    def test_sample_hosted_runner_usage_shape(self):
+        in_progress_run = {"id": 10, "name": "CI"}
+        queued_run = {"id": 11, "name": "CMake Options"}
+
+        def fake_in_progress(repo):
+            return [in_progress_run], None
+
+        def fake_queued(repo):
+            return [queued_run], None
+
+        def fake_jobs(repo, run_id):
+            if run_id == 10:
+                return (
+                    [
+                        {"status": "in_progress", "labels": ["ubuntu-latest"], "name": "filter"},
+                        {"status": "in_progress", "labels": ["self-hosted", "Linux", "GPU"], "name": "gpu"},
+                    ],
+                    None,
+                )
+            if run_id == 11:
+                return (
+                    [
+                        {"status": "queued", "labels": ["ubuntu-latest"], "name": "matrix-0"},
+                        {"status": "queued", "labels": ["ubuntu-latest"], "name": "matrix-1"},
+                    ],
+                    None,
+                )
+            return ([], None)
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_jobs_for_run", side_effect=fake_jobs
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage(
+                "shader-slang/slang", cap=20
+            )
+
+        self.assertEqual(snap["cap"], 20)
+        self.assertEqual(snap["in_progress"]["total"], 1)
+        self.assertEqual(snap["in_progress"]["by_label"], [{"label": "ubuntu-latest", "count": 1}])
+        self.assertEqual(snap["queued"]["total"], 2)
+        self.assertEqual(snap["queued"]["by_workflow"], [{"name": "CMake Options", "count": 2}])
+
+
+class TestHostedLabelPalette(unittest.TestCase):
+    """Regression: variants must yield valid 6-digit `#RRGGBB` colors.
+
+    The original implementation appended an alpha suffix (`"BB"`), then
+    the chart code appended another `"55"` for the background fill,
+    producing invalid 10-digit hex like `#0d6efdBB55`.
+    """
+
+    def _is_six_digit_hex(self, color):
+        return (
+            isinstance(color, str)
+            and len(color) == 7
+            and color.startswith("#")
+            and all(c in "0123456789abcdefABCDEF" for c in color[1:])
+        )
+
+    def test_palette_returns_six_digit_hex_for_all_variants(self):
+        labels = [
+            "ubuntu-latest",
+            "ubuntu-22.04",
+            "ubuntu-24.04",
+            "ubuntu-24.04-arm",
+            "ubuntu-22.04-arm",
+            "windows-latest",
+            "windows-2022",
+            "macos-latest",
+            "macos-13",
+            "self-hosted-fallback",
+        ]
+        palette = ci_health._hosted_label_palette(labels)
+        for lbl, color in palette.items():
+            self.assertTrue(
+                self._is_six_digit_hex(color),
+                msg=f"{lbl!r} → {color!r} is not a 6-digit #RRGGBB",
+            )
+
+    def test_palette_handles_unknown_prefix_without_keyerror(self):
+        """If HOSTED_LABEL_PREFIXES gains a new entry not mirrored in
+        HOSTED_LABEL_PALETTE, palette construction must fall back to a
+        neutral color rather than raising KeyError mid-snapshot."""
+        original = ci_hosted_runner_usage.HOSTED_LABEL_PREFIXES
+        with mock.patch.object(
+            ci_health,
+            "HOSTED_LABEL_ORDER",
+            original + ("freebsd-",),
+        ):
+            palette = ci_health._hosted_label_palette(["freebsd-14"])
+        self.assertTrue(
+            self._is_six_digit_hex(palette["freebsd-14"]),
+            msg=f"unknown-prefix label got invalid color {palette['freebsd-14']!r}",
+        )
+
+    def test_variants_under_same_pool_get_distinct_colors(self):
+        palette = ci_health._hosted_label_palette(
+            ["ubuntu-latest", "ubuntu-22.04", "ubuntu-24.04"]
+        )
+        colors = list(palette.values())
+        self.assertEqual(len(set(colors)), 3)
+
+
+class TestHostedRunnerRender(unittest.TestCase):
+    def _snapshot(self, in_use, cap=20, queued=0, by_workflow=None):
+        return {
+            "cap": cap,
+            "in_progress": {
+                "total": in_use,
+                "by_workflow": by_workflow or [],
+                "by_label": [],
+            },
+            "queued": {"total": queued, "by_workflow": [], "by_label": []},
+        }
+
+    def test_render_banner_ok_under_threshold(self):
+        html = ci_health.render_hosted_runner_usage(self._snapshot(in_use=10))
+        self.assertIn("OK", html)
+        self.assertIn("10 / 20", html)
+
+    def test_render_banner_high_at_or_above_80pct(self):
+        html = ci_health.render_hosted_runner_usage(self._snapshot(in_use=16))
+        self.assertIn("HIGH", html)
+
+    def test_render_banner_at_cap_with_queue_is_alarm(self):
+        html = ci_health.render_hosted_runner_usage(
+            self._snapshot(in_use=20, queued=5)
+        )
+        self.assertIn("AT CAP", html)
+
+    def test_render_banner_at_cap_with_no_queue_is_high_not_alarm(self):
+        # 100% in-use is uncomfortable but not the smoking-gun signature
+        # of starvation — that's 100% with backlog queued behind.
+        html = ci_health.render_hosted_runner_usage(self._snapshot(in_use=20))
+        self.assertIn("HIGH", html)
+        self.assertNotIn("AT CAP", html)
+
+    def test_render_handles_missing_snapshot(self):
+        html = ci_health.render_hosted_runner_usage(None)
+        self.assertIn("unavailable", html.lower())
+
+    def test_render_banner_partial_overrides_severity(self):
+        """A partial sample is a known undercount — render PARTIAL
+        instead of computing OK/HIGH/AT CAP from numbers we know are
+        low. Otherwise the dashboard reads false-healthy during an
+        Actions API failure.
+        """
+        snap = self._snapshot(in_use=2, queued=0)
+        snap["partial"] = True
+        html = ci_health.render_hosted_runner_usage(snap)
+        self.assertIn("PARTIAL", html)
+        self.assertNotIn("OK", html)
+        self.assertIn("partial", html.lower())
+
+    def test_build_hosted_runner_chart_none_when_no_data(self):
+        snapshots = [{"timestamp": "2026-05-13T10:00:00Z"}]
+        self.assertIsNone(ci_health._build_hosted_runner_chart(snapshots))
+
+    def test_build_hosted_runner_chart_stacks_by_label(self):
+        snapshots = [
+            {
+                "timestamp": "2026-05-13T10:00:00Z",
+                "hosted_runner_usage": {
+                    "cap": 20,
+                    "in_progress": {
+                        "total": 4,
+                        "by_label": [
+                            {"label": "ubuntu-latest", "count": 3},
+                            {"label": "macos-latest", "count": 1},
+                        ],
+                        "by_workflow": [],
+                    },
+                    "queued": {"total": 2, "by_workflow": [], "by_label": []},
+                },
+            },
+            {
+                "timestamp": "2026-05-13T10:15:00Z",
+                "hosted_runner_usage": {
+                    "cap": 20,
+                    "in_progress": {
+                        "total": 6,
+                        "by_label": [
+                            {"label": "ubuntu-latest", "count": 4},
+                            {"label": "windows-latest", "count": 2},
+                        ],
+                        "by_workflow": [],
+                    },
+                    "queued": {"total": 0, "by_workflow": [], "by_label": []},
+                },
+            },
+        ]
+        chart = ci_health._build_hosted_runner_chart(snapshots)
+        self.assertIsNotNone(chart)
+        # Ordering: ubuntu, then macos, then windows.
+        self.assertEqual(chart["labels"], ["ubuntu-latest", "macos-latest", "windows-latest"])
+        self.assertEqual(chart["cap"], 20)
+        # macos absent in the 2nd snapshot collapses to 0, not None.
+        self.assertEqual(chart["label_series"]["ubuntu-latest"], [3, 4])
+        self.assertEqual(chart["label_series"]["macos-latest"], [1, 0])
+        self.assertEqual(chart["label_series"]["windows-latest"], [0, 2])
+        self.assertEqual(chart["queued_series"], [2, 0])
+        self.assertEqual(chart["total_series"], [4, 6])
+
+    def test_build_hosted_runner_chart_partial_renders_as_gap(self):
+        """A partial sample is a known undercount; the history chart
+        must plot None (a gap) rather than the false-low number.
+        """
+        snapshots = [
+            {
+                "timestamp": "2026-05-13T10:00:00Z",
+                "hosted_runner_usage": {
+                    "cap": 20,
+                    "in_progress": {
+                        "total": 5,
+                        "by_label": [{"label": "ubuntu-latest", "count": 5}],
+                        "by_workflow": [],
+                    },
+                    "queued": {"total": 0, "by_workflow": [], "by_label": []},
+                },
+            },
+            {
+                "timestamp": "2026-05-13T10:15:00Z",
+                "hosted_runner_usage": {
+                    "cap": 20,
+                    "partial": True,
+                    "in_progress": {
+                        "total": 0,
+                        "by_label": [],
+                        "by_workflow": [],
+                    },
+                    "queued": {"total": 0, "by_workflow": [], "by_label": []},
+                },
+            },
+        ]
+        chart = ci_health._build_hosted_runner_chart(snapshots)
+        self.assertIsNotNone(chart)
+        self.assertEqual(chart["total_series"], [5, None])
+        self.assertEqual(chart["queued_series"], [0, None])
+        self.assertEqual(chart["label_series"]["ubuntu-latest"], [5, None])
+
+    def test_build_hosted_runner_chart_marks_missing_snapshots_as_gap(self):
+        # Older snapshots without the new field should be rendered as
+        # None gaps so the chart begins on the first real data point.
+        snapshots = [
+            {"timestamp": "2026-05-13T09:00:00Z"},
+            {
+                "timestamp": "2026-05-13T09:15:00Z",
+                "hosted_runner_usage": {
+                    "cap": 20,
+                    "in_progress": {
+                        "total": 1,
+                        "by_label": [{"label": "ubuntu-latest", "count": 1}],
+                        "by_workflow": [],
+                    },
+                    "queued": {"total": 0, "by_workflow": [], "by_label": []},
+                },
+            },
+        ]
+        chart = ci_health._build_hosted_runner_chart(snapshots)
+        self.assertEqual(chart["label_series"]["ubuntu-latest"], [None, 1])
+        self.assertEqual(chart["queued_series"], [None, 0])
+        self.assertEqual(chart["total_series"], [None, 1])
+
+    def test_build_history_chart_includes_hosted_runner_section_when_data_present(self):
+        snapshots = [
+            {
+                "timestamp": "2026-05-13T10:00:00Z",
+                "jobs_queued": 0,
+                "jobs_running": 0,
+                "runs_queued": 0,
+                "runs_in_progress": 0,
+                "runner_groups": {},
+                "hosted_runner_usage": {
+                    "cap": 20,
+                    "in_progress": {
+                        "total": 1,
+                        "by_label": [{"label": "ubuntu-latest", "count": 1}],
+                        "by_workflow": [],
+                    },
+                    "queued": {"total": 0, "by_workflow": [], "by_label": []},
+                },
+            }
+        ]
+        html = ci_health.build_history_chart(snapshots)
+        self.assertIn("hostedRunnerHistory", html)
+        self.assertIn("GitHub-Hosted Runner Usage", html)
+
+    def test_build_history_chart_omits_hosted_runner_section_when_no_data(self):
+        snapshots = [
+            {
+                "timestamp": "2026-05-13T10:00:00Z",
+                "jobs_queued": 0,
+                "jobs_running": 0,
+                "runs_queued": 0,
+                "runs_in_progress": 0,
+                "runner_groups": {},
+            }
+        ]
+        html = ci_health.build_history_chart(snapshots)
+        # The <canvas id="hostedRunnerHistory_canvas"> is what gates the
+        # client-side chart render. When no hosted-runner data exists,
+        # the section header must be absent so the canvas isn't emitted.
+        self.assertNotIn('id="hostedRunnerHistory_canvas"', html)
+        self.assertNotIn("GitHub-Hosted Runner Usage", html)
+
+    def test_record_snapshot_persists_hosted_runner_usage(self):
+        usage = {
+            "cap": 20,
+            "in_progress": {"total": 7, "by_workflow": [], "by_label": []},
+            "queued": {"total": 0, "by_workflow": [], "by_label": []},
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_health.record_snapshot(
+                {"summary": {}}, tmp, hosted_runner_usage=usage
+            )
+            with open(os.path.join(tmp, ci_health.SNAPSHOTS_FILE), encoding="utf-8") as f:
+                snapshot = json.loads(f.readline())
+        self.assertEqual(snapshot["hosted_runner_usage"], usage)
 
 
 if __name__ == "__main__":
