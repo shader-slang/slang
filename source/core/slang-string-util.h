@@ -198,6 +198,20 @@ struct StringUtil
     /// Modifies pos to the position where parsing ends.
     /// Returns parsed integer.
     static int parseIntAndAdvancePos(UnownedStringSlice text, Index& pos);
+
+    /// Compute the Levenshtein edit distance between `a` and `b`: the minimum number of
+    /// single-character insertions, deletions, or substitutions needed to turn one string
+    /// into the other. Used, for example, to suggest the closest known identifier for a
+    /// misspelled name ("did you mean ...?"). The comparison is case-sensitive; use
+    /// `calcLevenshteinDistanceCaseInsensitive` (or lower-case the inputs beforehand) for a
+    /// case-insensitive distance.
+    static Index calcLevenshteinDistance(const UnownedStringSlice& a, const UnownedStringSlice& b);
+
+    /// Like `calcLevenshteinDistance`, but folds characters with `CharUtil::toLower` during
+    /// the comparison, so it does not allocate lower-cased copies of the inputs.
+    static Index calcLevenshteinDistanceCaseInsensitive(
+        const UnownedStringSlice& a,
+        const UnownedStringSlice& b);
 };
 
 /* A helper class that allows parsing of lines from text with iteration. Uses

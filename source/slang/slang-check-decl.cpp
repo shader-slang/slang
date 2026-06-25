@@ -1787,6 +1787,11 @@ QualType getTypeForDeclRef(
         // TODO: This code could break if we ever go down this path with
         // an identifier that doesn't have a name.
         //
+        // Note: unlike the `VarExpr` lookup path, we do not attach a "did you
+        // mean ...?" suggestion here. This site is reached for a name that
+        // already resolved to a contextual keyword (not an ordinary in-scope
+        // lookup), so a Levenshtein match against the lexical scope would be
+        // misleading.
         sink->diagnose(
             Diagnostics::UndefinedIdentifier{.name = declRef.getName(), .location = loc});
     }
