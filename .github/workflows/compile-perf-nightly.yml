@@ -248,16 +248,16 @@ jobs:
             echo "SLACK_WEBHOOK_COMPILE_PERF not set; skipping Slack notification"
             exit 0
           fi
-          DATE=$(date -u +%Y-%m-%d)
+          export DATE=$(date -u +%Y-%m-%d)
           if [ "$TREND_OUTCOME" = "success" ]; then
-            ICON=":white_check_mark:"
-            STATUS="No regressions detected"
+            export ICON=":white_check_mark:"
+            export STATUS="No regressions detected"
           elif [ "$TREND_OUTCOME" = "failure" ]; then
-            ICON=":warning:"
-            STATUS="Regression detected — see CI run for details"
+            export ICON=":warning:"
+            export STATUS="Regression detected — see CI run for details"
           else
-            ICON=":x:"
-            STATUS="Nightly job failed — see CI run for details"
+            export ICON=":x:"
+            export STATUS="Nightly job failed — see CI run for details"
           fi
           python -c "
           import json, os, urllib.request

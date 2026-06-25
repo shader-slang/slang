@@ -131,11 +131,12 @@ def classify(values, step_thr=1.4, drift_thr=1.25):
     Threshold rationale:
     - step_thr=1.4 (40%): a single release-over-release jump this large is likely
       a discrete regression introduced in one release, not cumulative drift.
-      Set higher than trend.py's --rel 1.25 because single-step classification
-      needs stronger signal than nightly drift detection.
+      Set higher than trend.py's --rel 1.10 because single-step classification
+      on release history is noisier than nightly drift detection.
     - drift_thr=1.25 (25% total): the end-to-end ratio across all releases
       exceeds this → labelled "drift" (gradual creep across many releases).
-      Matches trend.py's --rel default since both measure cumulative change.
+      Intentionally higher than trend.py's --rel 1.10: release-over-release
+      drift is expected to be larger before it becomes actionable.
     - 1.01 below: 1% noise floor for counting a release-to-release move as
       genuinely upward (vs run-to-run jitter); distinct from the flagging
       thresholds above.
