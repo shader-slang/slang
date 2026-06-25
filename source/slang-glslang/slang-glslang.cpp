@@ -190,9 +190,6 @@ extern "C"
 }
 
 // Disassemble the given SPIRV-ASM instructions and return the result as a string.
-//
-// On success, when `outString` is non-null, `*outString` is set to a heap buffer allocated with
-// `new char[]`; the caller takes ownership and must release it with `delete[]` (see #10988).
 extern "C"
 #ifdef _MSC_VER
     _declspec(dllexport)
@@ -253,8 +250,6 @@ extern "C"
     auto succ = glslang_disassembleSPIRVWithResult(contents, contentsSize, &result);
     if (result)
         fprintf(stdout, "%s\n", result);
-    // `result` is allocated with `new char[len]` in glslang_disassembleSPIRVWithResult, so it
-    // must be released with array-delete to avoid an alloc-dealloc-mismatch (see #10988).
     delete[] result;
     return succ;
 }
