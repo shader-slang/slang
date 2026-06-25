@@ -1543,6 +1543,10 @@ static void AddMember(Scope* scope, Decl* member)
     }
 }
 
+// Warn if `nameAndLoc` names a type keyword that can't be used as an ordinary
+// name (defined below; forward-declared here for the generic-parameter site).
+static void maybeDiagnoseKeywordUsedAsName(Parser* parser, const NameLoc& nameAndLoc);
+
 static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
 {
     // simple syntax to introduce a value parameter
@@ -1711,6 +1715,12 @@ static void ParseGenericDeclImpl(Parser* parser, GenericDecl* decl, const TFunc&
         auto currentCursor = parser->tokenReader.getCursor();
 
         auto genericParam = ParseGenericParamDecl(parser, decl);
+        // A generic parameter named with a type keyword (e.g. `<int struct>` or
+        // `<struct>`) is just as unreferenceable as any other such name, and the
+        // several `ParseGenericParamDecl` exits read the name directly without
+        // reaching the other hook sites, so warn here at the single shared point.
+        if (genericParam)
+            maybeDiagnoseKeywordUsedAsName(parser, genericParam->nameAndLoc);
         AddMember(decl, genericParam);
 
         // Make sure we make forward progress.
@@ -2448,6 +2458,49 @@ enum
 
 static RefPtr<Declarator> parseDeclarator(Parser* parser, DeclaratorParseOptions options);
 
+// Returns true if `name` is a type-introducing keyword that is problematic to
+// use as the name of a variable, parameter, or field.
+//
+// This is deliberately *very* conservative. Slang makes almost all keywords
+// contextual so that they can be shadowed by user-defined names: things like
+// `triangle`, `sample`, `point`, and even most declaration keywords (`func`,
+// `let`, `var`, `interface`, `extension`, `import`, ...) work perfectly well as
+// ordinary identifiers and must keep doing so. The keywords below are different:
+// the parser treats them as the start of a type specifier, so using one as a
+// name leads to surprising failures — most notably a statement-leading use such
+// as `struct = ...;` is parsed as a (malformed) declaration rather than an
+// assignment, so the name cannot be referenced there at all. We warn rather than
+// error because the name is still usable in some expression contexts.
+static bool isReservedKeywordName(const UnownedStringSlice& name)
+{
+    static const char* const kReservedKeywordNames[] = {
+        "struct",
+        "class",
+        "enum",
+        "typealias",
+        "typedef",
+    };
+    for (auto keyword : kReservedKeywordNames)
+    {
+        if (name == UnownedStringSlice(keyword))
+            return true;
+    }
+    return false;
+}
+
+// Emit a warning if the just-parsed declarator name is a reserved keyword that
+// would be impossible to reference. See `isReservedKeywordName`.
+static void maybeDiagnoseKeywordUsedAsName(Parser* parser, const NameLoc& nameAndLoc)
+{
+    if (!nameAndLoc.name)
+        return;
+    if (isReservedKeywordName(getUnownedStringSliceText(nameAndLoc.name)))
+    {
+        parser->sink->diagnose(
+            Diagnostics::KeywordUsedAsName{.name = nameAndLoc.name, .location = nameAndLoc.loc});
+    }
+}
+
 static RefPtr<Declarator> parseDirectAbstractDeclarator(
     Parser* parser,
     DeclaratorParseOptions options)
@@ -2461,6 +2514,7 @@ static RefPtr<Declarator> parseDirectAbstractDeclarator(
             auto nameDeclarator = new NameDeclarator();
             nameDeclarator->flavor = Declarator::Flavor::name;
             nameDeclarator->nameAndLoc = ParseDeclName(parser);
+            maybeDiagnoseKeywordUsedAsName(parser, nameDeclarator->nameAndLoc);
             declarator = nameDeclarator;
         }
         break;
@@ -4874,6 +4928,7 @@ static void parseModernVarDeclBaseCommon(Parser* parser, VarDeclBase* decl)
 {
     parser->FillPosition(decl);
     decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+    maybeDiagnoseKeywordUsedAsName(parser, decl->nameAndLoc);
 
     if (AdvanceIf(parser, TokenType::Colon))
     {
@@ -5051,6 +5106,10 @@ static NodeBase* parseTypeAliasDecl(Parser* parser, void* /*userData*/)
 
     parser->FillPosition(decl);
     decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+    // `parseTypeDef` reaches the keyword-name warning via the shared declarator
+    // machinery, but this `typealias` path reads the alias name directly, so warn
+    // here too (e.g. `typealias struct = int;`).
+    maybeDiagnoseKeywordUsedAsName(parser, decl->nameAndLoc);
 
     return parseOptGenericDecl(
         parser,

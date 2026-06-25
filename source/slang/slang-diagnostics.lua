@@ -928,6 +928,13 @@ err(
     span { loc = "location", message = "unexpected function body after signature declaration, is this ';' a typo?" }
 )
 
+warning(
+    "keyword-used-as-name",
+    20103,
+    "keyword used as a name",
+    span { loc = "location", message = "'~name:Name' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts" }
+)
+
 err(
     "decl-not-allowed",
     30102,
