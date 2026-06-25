@@ -706,7 +706,7 @@ return {
 	["Type.MetalParameterBlockLayout"] = 729,
 	["Type.CUDALayout"] = 730,
 	["Type.LLVMLayout"] = 731,
-  	["makeCombinedTextureSampler"] = 732,
+	["makeCombinedTextureSampler"] = 732,
 	["SPIRVResourceHeap"] = 733,
 	["SPIRVSamplerHeap"] = 734,
 	["SPIRVLoadDescriptorFromHeap"] = 735,
@@ -837,5 +837,6 @@ return {
 	["Decoration.BuiltinRequirementDecoration"] = 860,
 	["builtinRequirementKey"] = 861,
 	["ImageTexelPointer"] = 862,
-	["Type.MetalPackedVec"] = 863
+	["Type.MetalPackedVec"] = 863,
+	["Decoration.AlignmentDecoration"] = 865
 }

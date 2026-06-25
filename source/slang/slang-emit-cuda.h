@@ -85,6 +85,7 @@ protected:
     virtual void emitEntryPointAttributesImpl(
         IRFunc* irFunc,
         IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE;
+    virtual void emitPostKeywordTypeAttributesImpl(IRInst* inst) SLANG_OVERRIDE;
 
     virtual void emitRateQualifiersAndAddressSpaceImpl(IRRate* rate, AddressSpace addressSpace)
         SLANG_OVERRIDE;

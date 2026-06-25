@@ -12,6 +12,6 @@ for better performance.
 struct IRModule;
 class TargetProgram;
 
-void lowerImmutableBufferLoadForCUDA(IRModule* module, TargetProgram* targetProgram);
+void lowerImmutableOrAlignedBufferLoadForCUDA(IRModule* module, TargetProgram* targetProgram);
 
 } // namespace Slang
