@@ -1335,9 +1335,15 @@ Result linkAndOptimizeIR(
     // into a `ConstantBuffer<GlobalParams>` so they emit as `__constant__` (pointer + global
     // backing) instead of a serial dynamic-address `ld.param` chain. Must run after generic
     // specialization (so the param types are concrete structs) and before resource-type
-    // legalization.
-    if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader)
+    // legalization. Gate on the whole CUDA family (CUDASource/CUDAHeader/PTX) since all three
+    // share the CUDA source emitter where the `.param` slowdown manifests.
+    if (isCUDATarget(targetRequest))
+    {
         SLANG_PASS(hoistCUDAResourceArrayParamsToParameterGroup);
+        // The hoist performs invasive IR restructuring (new global param, rewritten uniform uses,
+        // rewritten entry-point function type), so validate the module at the pass boundary.
+        validateIRModuleIfEnabled(codeGenContext, irModule);
+    }
 
     // Lower DiffTypeInfo instructions to MakeTuple.
     // This must happen after specialization since DiffTypeInfo is hoistable.

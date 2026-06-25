@@ -8,6 +8,7 @@
 
 #include "slang-ir-entry-point-pass.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
@@ -23,10 +24,13 @@ static bool _typeIsOrContainsResource(IRType* type)
         return false;
     if (isResourceType(type))
         return true;
-    // Some hosts (e.g. SlangPy) specialize tensor/buffer storage to a raw pointer on CUDA rather
-    // than a structured-buffer resource; a fixed-size array of such pointer-backed elements packed
-    // into the `.param` bank exhibits the same dynamic-addressing slowdown as a resource array.
-    if (as<IRPtrTypeBase>(type))
+    // Some hosts (e.g. SlangPy) specialize tensor/buffer storage to a plain data pointer on CUDA
+    // rather than a structured-buffer resource; a fixed-size array of such pointer-backed elements
+    // packed into the `.param` bank exhibits the same dynamic-addressing slowdown as a resource
+    // array. Match only the first-class data pointer `IRPtrType` here, not the `IRPtrTypeBase`
+    // umbrella, which also covers the out/inout/ref parameter-direction wrappers (those are not
+    // resource-backing storage and must not divert ordinary kernels onto this path).
+    if (as<IRPtrType>(type))
         return true;
     if (auto arrayType = as<IRArrayTypeBase>(type))
         return _typeIsOrContainsResource(arrayType->getElementType());
@@ -74,6 +78,26 @@ static bool _typeContainsFixedSizeResourceArray(IRType* type)
 
 struct HoistCUDAResourceArrayParams : PerEntryPointPass
 {
+    // CUDA emits a single hardcoded `SLANG_globalParams` symbol, so a module can hold only one
+    // hoisted global parameter group; this tracks whether we have already created it.
+    bool m_moduleAlreadyHoisted = false;
+
+    // Returns true if the module already contains a module-scope uniform parameter group global
+    // (e.g. one created by `collectGlobalUniformParameters`, or our own from a prior entry point).
+    // Emitting a second would collide on the hardcoded `SLANG_globalParams` symbol in NVRTC.
+    static bool _moduleHasUniformParameterGroupGlobal(IRModule* module)
+    {
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (auto globalParam = as<IRGlobalParam>(inst))
+            {
+                if (as<IRUniformParameterGroupType>(globalParam->getDataType()))
+                    return true;
+            }
+        }
+        return false;
+    }
+
     void processEntryPointImpl(EntryPointInfo const& info) SLANG_OVERRIDE
     {
         auto entryPointFunc = info.func;
@@ -120,12 +144,21 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
         if (!shouldHoist)
             return;
 
+        // CUDA emits a single hardcoded `SLANG_globalParams` symbol per module
+        // (`CUDASourceEmitter::emitParameterGroupImpl`), so a module can have only one global
+        // parameter group. Hoist at most one qualifying compute entry point per module, and never
+        // when a module-scope uniform parameter group already exists (e.g. one that
+        // `collectGlobalUniformParameters` created): a second `__constant__ SLANG_globalParams`
+        // would be a duplicate-symbol error in NVRTC. Any other qualifying kernels keep the default
+        // (correct, if slower) entry-point `.param` path. A full multi-kernel merge is future work.
+        if (m_moduleAlreadyHoisted || _moduleHasUniformParameterGroupGlobal(m_module))
+            return;
+
         IRBuilder builderStorage(m_module);
         auto builder = &builderStorage;
 
         // Build a `GlobalParams` struct and a module-scope `ConstantBuffer<GlobalParams>` global
-        // parameter. Attaching the entry point's params layout makes the reflected/bound shape
-        // match what an explicit parameter-group wrapper produces.
+        // parameter to hold the hoisted uniforms. Its layout is attached after the field loop.
         builder->setInsertBefore(entryPointFunc);
         auto paramStructType = builder->createStructType();
         builder->addNameHintDecoration(
@@ -137,13 +170,16 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
             paramStructType,
             builder->getType(kIROp_DefaultBufferLayoutType));
         auto collectedParam = builder->createGlobalParam(constantBufferType);
-        builder->addLayoutDecoration(collectedParam, entryPointParamsLayout);
         builder->addNameHintDecoration(
             collectedParam,
             UnownedTerminatedStringSlice("globalParams"));
 
         // Move every uniform parameter into the struct and rematerialize its value at each use site
-        // as a load from the constant buffer.
+        // as a load from the constant buffer. A fresh `IRStructTypeLayout` is built in lock-step
+        // with the field insertion so the synthesized global carries a layout shape that matches
+        // its `ConstantBuffer` type (see the parameter-group layout construction below).
+        IRStructTypeLayout::Builder structLayoutBuilder(builder);
+        HashSet<LayoutResourceKind> resourceKinds;
         IRParam* nextParam = nullptr;
         UInt paramCounter = 0;
         for (IRParam* param = entryPointFunc->getFirstParam(); param; param = nextParam)
@@ -151,24 +187,28 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
             nextParam = param->getNextParam();
             UInt paramIndex = paramCounter++;
 
+            // Once hoisting, every uniform parameter must carry layout information; a missing
+            // layout would leave a half-hoisted ABI, so fail loudly rather than silently continue.
             auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
-            SLANG_ASSERT(layoutDecoration);
-            if (!layoutDecoration)
-                continue;
+            SLANG_RELEASE_ASSERT(layoutDecoration);
             auto paramLayout = as<IRVarLayout>(layoutDecoration->getLayout());
-            SLANG_ASSERT(paramLayout);
-            if (!paramLayout)
-                continue;
+            SLANG_RELEASE_ASSERT(paramLayout);
 
             // Leave varying parameters (system values, stage I/O) on the entry point.
             if (isVaryingParameter(paramLayout))
                 continue;
+
+            for (auto offsetAttr : paramLayout->getOffsetAttrs())
+                resourceKinds.add(offsetAttr->getResourceKind());
 
             auto paramType = param->getFullType();
 
             builder->setInsertBefore(paramStructType);
             auto paramFieldKey = cast<IRStructKey>(
                 entryPointParamsStructLayout->getFieldLayoutAttrs()[paramIndex]->getFieldKey());
+            structLayoutBuilder.addField(
+                paramFieldKey,
+                entryPointParamsStructLayout->getFieldLayout(paramIndex));
             builder->createStructField(paramStructType, paramFieldKey, paramType);
 
             // Move decorations (name hint, etc.) onto the field key for downstream emit.
@@ -188,7 +228,66 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
             param->removeAndDeallocate();
         }
 
+        // Construct and attach the global parameter's layout. When the entry point's params layout
+        // is itself a parameter group (the common case), mirror its container/element split with
+        // unrelated (e.g. varying) offsets filtered out so the result is a parameter-group layout
+        // whose type matches the `ConstantBuffer`-typed global; otherwise fall back to the bare
+        // struct layout. Modeled on `moveEntryPointUniformParamsToGlobalScope`.
+        IRTypeLayout* collectedTypeLayout = nullptr;
+        if (auto originalParamGroupLayout =
+                as<IRParameterGroupTypeLayout>(entryPointParamsLayout->getTypeLayout()))
+        {
+            for (auto offsetAttr :
+                 originalParamGroupLayout->getContainerVarLayout()->getOffsetAttrs())
+                resourceKinds.add(offsetAttr->getResourceKind());
+
+            auto structTypeLayout = structLayoutBuilder.build();
+            auto originalElementVarLayout = originalParamGroupLayout->getElementVarLayout();
+            IRVarLayout::Builder elementVarLayoutBuilder(builder, structTypeLayout);
+            elementVarLayoutBuilder.cloneEverythingButOffsetsFrom(originalElementVarLayout);
+            for (auto resKind : resourceKinds)
+            {
+                auto originalOffset = originalElementVarLayout->findOffsetAttr(resKind);
+                if (!originalOffset)
+                    continue;
+                auto resInfo = elementVarLayoutBuilder.findOrAddResourceInfo(resKind);
+                resInfo->offset = originalOffset->getOffset();
+                resInfo->space = originalOffset->getSpace();
+            }
+            auto newElementVarLayout = elementVarLayoutBuilder.build();
+
+            IRParameterGroupTypeLayout::Builder paramGroupTypeLayoutBuilder(builder);
+            for (auto resKind : resourceKinds)
+            {
+                if (auto sizeAttr = originalParamGroupLayout->findSizeAttr(resKind))
+                    paramGroupTypeLayoutBuilder.addResourceUsage(sizeAttr);
+            }
+            paramGroupTypeLayoutBuilder.setContainerVarLayout(
+                originalParamGroupLayout->getContainerVarLayout());
+            paramGroupTypeLayoutBuilder.setElementVarLayout(newElementVarLayout);
+            paramGroupTypeLayoutBuilder.setOffsetElementTypeLayout(
+                applyOffsetToTypeLayout(builder, structTypeLayout, newElementVarLayout));
+            collectedTypeLayout = paramGroupTypeLayoutBuilder.build();
+        }
+        else
+        {
+            collectedTypeLayout = structLayoutBuilder.build();
+        }
+
+        IRVarLayout::Builder varLayoutBuilder(builder, collectedTypeLayout);
+        varLayoutBuilder.cloneEverythingButOffsetsFrom(entryPointParamsLayout);
+        for (auto offsetAttr : entryPointParamsLayout->getOffsetAttrs())
+        {
+            if (!resourceKinds.contains(offsetAttr->getResourceKind()))
+                continue;
+            auto resInfo = varLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
+            resInfo->offset = offsetAttr->getOffset();
+            resInfo->space = offsetAttr->getSpace();
+        }
+        builder->addLayoutDecoration(collectedParam, varLayoutBuilder.build());
+
         fixUpFuncType(entryPointFunc);
+        m_moduleAlreadyHoisted = true;
     }
 };
 
