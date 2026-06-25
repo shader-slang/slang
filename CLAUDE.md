@@ -194,6 +194,14 @@ change.)
   newElementType, `vector<T,N>` → `vector<newElementType,N>`, `matrix<T,R,C>` → `matrix<newElementType,R,C>`."_
   — not _"element coerce target"_.
 
+- **Use conversational examples for code comments and PR explanations.** When explaining a subtle
+  compiler path, prefer "Consider this example:" followed by the relevant user code. Do not use
+  abstract labels such as "Full source shape", "AST trace", or "IR trace" as a substitute for
+  explanation. After the code, describe what happens step by step in natural prose: which parser,
+  checker, copier, lowering pass, or IR pass creates the shape; what invariant the local code
+  preserves; and which downstream consumer depends on that invariant. Include enough of the user's
+  original code for the example to make sense on its own.
+
 - **Reuse before you write; then extract non-trivial logic into a named, documented helper.** Before
   writing a new helper, search for an existing one — what you need is often already provided by a
   shared header (the AST/IR helpers in `slang-ast-type.h`, `slang-ir-util.h`, and the various
@@ -243,9 +251,13 @@ change.)
       correct and principled, or should its producer have been fixed instead?_ — so a reviewer can
       confirm the fix sits at the right layer.
 
-   Write for a reviewer who does not have the full context in their head: ground each abstract claim
-   in a concrete example, and wire explanations to the source — name the function and file (or
-   `file.cpp:line`) — so the reader can navigate from prose to code without searching.
+   Write for a reviewer who does not have the full context in their head. Use the same
+   conversational style required for code comments: start from a concrete user-code example, include
+   the full relevant snippet instead of just naming a type or function, and explain the logical
+   steps in order. Say what the compiler builds, how that representation flows through named
+   functions or IR instructions, and why the chosen fix preserves the invariant. Avoid terse labels
+   such as "AST trace"; make the prose read like an explanation to a reviewer who is learning the
+   scenario for the first time.
 
 ### Testing
 

@@ -128,6 +128,12 @@ Review conventions (recurring review feedback — following them avoids review r
 
 - Comment functions in complete sentences: what it does first, then why if non-obvious; include a
   concrete example for non-trivial logic.
+- Write explanatory comments in a conversational style. Prefer "Consider this example:" followed
+  by the relevant user code over abstract labels such as "Full source shape", "AST trace", or
+  "IR trace". After the example, explain what happens step by step in natural prose: which
+  producer creates the AST/IR/value shape, what invariant this code is preserving, and which
+  downstream consumer relies on it. Include enough of the original user code for the example to be
+  understood without reconstructing the surrounding program from memory.
 - Reuse before you write: check shared headers (`slang-ast-type.h`, `slang-ir-util.h`, the `*-util.h`
   files) for an existing helper (e.g. `isDeclRefTypeOf<T>`) before adding one. When the logic is
   genuinely new, extract it into a named, documented helper rather than an inline lambda/long block.
@@ -255,5 +261,9 @@ Write the PR description in this five-part format:
    correct and principled, or should its producer have been fixed instead? — so a reviewer can
    confirm the fix sits at the right layer.
 
-Write for a reviewer without the full context in their head: ground each abstract claim in a
-concrete example, and wire explanations to the source (function name and file, or `file.cpp:line`).
+Write for a reviewer without the full context in their head. Use the same conversational style
+expected in code comments: start from a concrete user-code example, include the full relevant
+snippet rather than just a type or function name, and explain the logical steps in order. Say what
+the compiler builds, how that representation flows through named functions or IR instructions, and
+why the chosen fix preserves the invariant. Avoid terse headings like "AST trace"; make the prose
+read like an explanation to a reviewer who is learning the scenario for the first time.
