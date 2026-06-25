@@ -93,6 +93,7 @@
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-lower-result-type.h"
 #include "slang-ir-lower-tuple-types.h"
+#include "slang-ir-hoist-cuda-resource-array-params.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-metal-legalize.h"
 #include "slang-ir-missing-return.h"
@@ -1329,6 +1330,14 @@ Result linkAndOptimizeIR(
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
     SLANG_PASS(finalizeSpecialization);
+
+    // On CUDA, hoist compute entry-point uniform params that contain a fixed-size resource array
+    // into a `ConstantBuffer<GlobalParams>` so they emit as `__constant__` (pointer + global
+    // backing) instead of a serial dynamic-address `ld.param` chain. Must run after generic
+    // specialization (so the param types are concrete structs) and before resource-type
+    // legalization.
+    if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader)
+        SLANG_PASS(hoistCUDAResourceArrayParamsToParameterGroup);
 
     // Lower DiffTypeInfo instructions to MakeTuple.
     // This must happen after specialization since DiffTypeInfo is hoistable.
