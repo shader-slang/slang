@@ -1138,6 +1138,98 @@ static SyntaxDecl* tryLookUpSyntaxDecl(
     }
 }
 
+// Names that are ambiguous in declaration position even though they
+// are not registered through the `kSyntaxDecls[]` syntax-decl table —
+// they are special-cased earlier in the parser (`_parseSimpleTypeSpec`
+// for `struct` / `class` / `enum` / `functype` / `__func_as_type` at
+// line ~3174). Kept in sync with the special-cased branches in
+// `_parseSimpleTypeSpec`; if a new special-case is added there, add
+// the keyword here too. Entries must match the literal token text.
+static bool _isContextualKeywordName(UnownedStringSlice const& text)
+{
+    static const char* const kKeywords[] = {
+        "struct",
+        "class",
+        "enum",
+        "functype",
+        "__func_as_type",
+    };
+    for (auto kw : kKeywords)
+    {
+        if (text == UnownedStringSlice(kw))
+            return true;
+    }
+    return false;
+}
+
+// Warn when a variable binding name (`int extension = 0;`,
+// `let extension = 5;`, struct field) collides with a contextual
+// keyword registered as a decl-introducer in `kSyntaxDecls[]`
+// (`extension`, `struct`, `interface`, `func`, `var`, `let`, `enum`,
+// `namespace`, `typealias`, etc.). These tokens lex as
+// `TokenType::Identifier` and are dispatched via
+// `tryParseUsingSyntaxDecl` only when they appear at a decl-start
+// position; in any other position the lookup never runs and the
+// keyword is silently accepted as a name. Subsequent uses of the
+// "variable" then surprise the user — `int extension = 0;` parses
+// fine, but `extension = 1;` (assignment) re-dispatches to
+// `parseExtensionDecl` and fails (#11347). Surfacing the collision
+// at the binding site lets the user rename eagerly. Stays a warning
+// so existing source that happens to use these names keeps building.
+//
+// **Scope** (call sites): hooked at three variable-binding read sites
+// only — `parseModernVarDeclBaseCommon` (modern `let`/`var`/`property`
+// and modern-style parameters via `parseModernParamDecl`) and the two
+// branches of `ParseDeclaratorDecl` that build a traditional `<type>
+// <name>` variable (covers globals, locals, and struct fields). The
+// following positions are intentionally *not* covered:
+//
+// - **Function names** (`int interface() {}`). The corpus uses `func`
+//   widely as a method name; the parser is already in member-decl
+//   context so the keyword is unambiguous in practice.
+// - **Traditional-style parameters** (`void f(int extension)`).
+//   `_parseTraditionalParamDeclCommonBase` calls
+//   `parseInitDeclarator` + `UnwrapDeclarator` + `CompleteVarDecl`
+//   directly without going through `ParseDeclaratorDecl`.
+// - **Generic parameter names** (`struct Foo<extension> {}`).
+// - **Type-alias names** (`typealias extension = int;`).
+//
+// Each is a separate scope decision deferred to a follow-up change.
+//
+// **Lookup mask**: `LookupMask::SyntaxDecl` (not `Default`). With the
+// default mask, looking up `property` after a previous `let property`
+// has been added to scope returns an *overloaded* result (the global
+// `SyntaxDecl` plus the user `LetDecl`). `tryLookUpSyntaxDecl` rejects
+// overloaded results and returns null, which would silently drop the
+// warning on every binding after the first. Restricting to
+// `SyntaxDecl` filters non-syntax decls out of the candidate set
+// before the overload check.
+//
+// **Filter**: syntax classes that produce a `Decl` only, so we don't
+// flag modifier-style contextual keywords (`in`, `out`, `payload`,
+// `const`, ...) which are only ambiguous in modifier position and
+// commonly appear as parameter / field names in `core.meta.slang`
+// itself.
+static void _maybeWarnNameShadowsKeyword(Parser* parser, NameLoc const& nameAndLoc)
+{
+    if (!nameAndLoc.name)
+        return;
+    bool isKeyword = false;
+    if (auto syntaxDecl =
+            tryLookUpSyntaxDecl(parser, nameAndLoc.name, LookupMask::SyntaxDecl))
+    {
+        isKeyword = syntaxDecl->syntaxClass.isSubClassOf<Decl>();
+    }
+    if (!isKeyword)
+        isKeyword = _isContextualKeywordName(nameAndLoc.name->text.getUnownedSlice());
+    if (!isKeyword)
+        return;
+    parser->sink->diagnose(
+        Diagnostics::KeywordAsIdentifierName{
+            .name = nameAndLoc.name,
+            .location = nameAndLoc.loc});
+}
+
 template<typename T>
 bool tryParseUsingSyntaxDeclImpl(Parser* parser, SyntaxDecl* syntaxDecl, T** outSyntax)
 {
@@ -3310,6 +3402,11 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     // closing `}` is at the end of its line, as a bit of a special case
     // to allow the common idiom.
     //
+    // NOTE: keywords matched below (`struct`, `class`, `enum`, `functype`)
+    // are also listed in `_isContextualKeywordName` (above) so the
+    // shadow-keyword warning (#11347) flags `int struct = 0;` etc. If a
+    // new keyword is added here, mirror it there.
+    //
     if (parser->LookAheadToken("struct"))
     {
         auto decl = parser->ParseStruct();
@@ -3594,6 +3691,7 @@ static DeclBase* ParseDeclaratorDecl(
     {
         // easy case: we only had a single declaration!
         UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
+        _maybeWarnNameShadowsKeyword(parser, declaratorInfo.nameAndLoc);
         VarDeclBase* firstDecl = CreateVarDeclForContext(parser->astBuilder, containerDecl);
         CompleteVarDecl(parser, firstDecl, declaratorInfo);
 
@@ -3616,6 +3714,7 @@ static DeclBase* ParseDeclaratorDecl(
     {
         declaratorInfo.typeSpec = sharedTypeSpec;
         UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
+        _maybeWarnNameShadowsKeyword(parser, declaratorInfo.nameAndLoc);
 
         VarDeclBase* varDecl = CreateVarDeclForContext(parser->astBuilder, containerDecl);
         CompleteVarDecl(parser, varDecl, declaratorInfo);
@@ -4874,6 +4973,7 @@ static void parseModernVarDeclBaseCommon(Parser* parser, VarDeclBase* decl)
 {
     parser->FillPosition(decl);
     decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+    _maybeWarnNameShadowsKeyword(parser, decl->nameAndLoc);
 
     if (AdvanceIf(parser, TokenType::Colon))
     {
