@@ -1,5 +1,6 @@
 #include "slang-rich-diagnostics-render.h"
 
+#include "../core/slang-char-encode.h"
 #include "../core/slang-dictionary.h"
 #include "../core/slang-list.h"
 #include "../core/slang-string-util.h"
@@ -35,6 +36,98 @@ namespace
 // specifics of pasting characters and that) using 'createLayout'. From there we call
 // 'renderFromLayout' which actually puts the lines and characters together
 //
+
+// Return the number of terminal columns occupied by a single Unicode code
+// point. This is a coarse approximation of POSIX `wcwidth`: zero-width
+// combining marks count as 0, the common East-Asian "wide" and "fullwidth"
+// ranges count as 2, and everything else counts as 1. It exists so caret/
+// underline rows line up under multi-byte and wide characters in source
+// snippets (e.g. CJK text), which a naive byte- or code-point count gets wrong.
+Int64 codePointDisplayWidth(Char32 c)
+{
+    // A tab advances by an indeterminate amount, but since the renderer emits
+    // the source line verbatim (tabs are not expanded), counting it as a single
+    // column keeps the caret line consistent with the rest of this code, which
+    // also treats one tab as one column (e.g. indent detection). This matches
+    // the pre-existing behavior before display-width handling was introduced.
+    if (c == '\t')
+        return 1;
+
+    // Other control characters (NUL, the C0 range, and the C1 range) have no
+    // sensible width; treat as zero so they don't shift the underline.
+    if (c == 0 || c < 0x20 || (c >= 0x7f && c < 0xa0))
+        return 0;
+
+    // Zero-width combining marks and joiners.
+    if ((c >= 0x0300 && c <= 0x036f) || // combining diacritical marks
+        (c >= 0x1ab0 && c <= 0x1aff) || // combining diacritical marks extended
+        (c >= 0x1dc0 && c <= 0x1dff) || // combining diacritical marks supplement
+        (c >= 0x20d0 && c <= 0x20ff) || // combining diacritical marks for symbols
+        (c >= 0xfe20 && c <= 0xfe2f) || // combining half marks
+        c == 0x200b ||                  // zero-width space
+        c == 0x200d)                    // zero-width joiner
+        return 0;
+
+    // East-Asian wide and fullwidth ranges (subset covering the common cases).
+    if ((c >= 0x1100 && c <= 0x115f) || // Hangul Jamo
+        (c >= 0x2e80 && c <= 0x303e) || // CJK radicals, Kangxi, symbols
+        (c >= 0x3041 && c <= 0x33ff) || // Hiragana, Katakana, CJK symbols
+        (c >= 0x3400 && c <= 0x4dbf) || // CJK Unified Ideographs Extension A
+        (c >= 0x4e00 && c <= 0x9fff) || // CJK Unified Ideographs
+        (c >= 0xa000 && c <= 0xa4cf) || // Yi
+        (c >= 0xac00 && c <= 0xd7a3) || // Hangul Syllables
+        (c >= 0xf900 && c <= 0xfaff) || // CJK Compatibility Ideographs
+        (c >= 0xfe30 && c <= 0xfe4f) || // CJK Compatibility Forms
+        (c >= 0xff00 && c <= 0xff60) || // Fullwidth Forms
+        (c >= 0xffe0 && c <= 0xffe6) || // Fullwidth signs
+        (c >= 0x20000 && c <= 0x3fffd)) // CJK Unified Ideographs Extension B+
+        return 2;
+
+    return 1;
+}
+
+// Decode a single UTF-8 code point from `[cur, end)`, advancing `cur`. The
+// reader handed to `getUnicodePointFromUTF8` returns 0 once `cur` reaches `end`,
+// so a truncated multi-byte sequence at the end of the buffer terminates the
+// decode rather than reading past `end` (the trailing continuation bytes a
+// well-formed sequence would supply are simply treated as zero).
+Char32 decodeCodePoint(const char*& cur, const char* const end)
+{
+    // Read through `unsigned char` so bytes >= 0x80 aren't sign-extended into
+    // the decoder, which would corrupt multi-byte sequences on platforms where
+    // `char` is signed.
+    return getUnicodePointFromUTF8(
+        [&]() -> Byte { return cur < end ? Byte(static_cast<unsigned char>(*cur++)) : 0; });
+}
+
+// Return the number of terminal columns occupied by a UTF-8 slice, summing the
+// display width of each code point.
+Int64 displayWidth(const UnownedStringSlice& text)
+{
+    Int64 width = 0;
+    const char* cur = text.begin();
+    const char* const end = text.end();
+    while (cur < end)
+        width += codePointDisplayWidth(decodeCodePoint(cur, end));
+    return width;
+}
+
+// Given a line of UTF-8 source and a 1-based code-point column (as produced by
+// the source manager), return the corresponding 0-based *byte* offset into the
+// line. A non-positive column is treated as the start of the line, and columns
+// past the end clamp to the end of the line.
+Int64 byteOffsetForCodePointColumn(const UnownedStringSlice& line, Int64 codePointColumn)
+{
+    const char* cur = line.begin();
+    const char* const end = line.end();
+    Int64 column = 1;
+    while (cur < end && column < codePointColumn)
+    {
+        decodeCodePoint(cur, end);
+        ++column;
+    }
+    return Int64(cur - line.begin());
+}
 
 struct DiagnosticRenderer
 {
@@ -321,10 +414,32 @@ private:
                     line.content = UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
                 }
             }
-            if (m_lexer && span.length <= 0 && line.content.getLength() > 0 && span.col > 0 &&
-                span.col - 1 < line.content.getLength())
-                span.length = m_lexer(line.content.tail(span.col - 1)).getLength();
-            line.spans.add({span.col, span.length, span.label, span.isPrimary});
+            // `span.col` is a 1-based *code-point* column and `span.length` is a
+            // *byte* length, but the renderer lays out carets/underlines in
+            // terminal *display* columns. Translate both into display-column
+            // space here, using the actual source bytes, so that multi-byte and
+            // wide (e.g. CJK) characters in the source line don't shift or
+            // shrink the underline. See issue #5219.
+            //
+            // When the source line is unavailable (e.g. built-in modules) we
+            // keep the raw column/length; only the label is rendered in that
+            // case (see renderOrphanedLabels).
+            Int64 column = span.col;
+            Int64 length = span.length;
+            if (line.content.getLength() > 0 && span.col > 0)
+            {
+                Int64 byteOffset = byteOffsetForCodePointColumn(line.content, span.col);
+                if (m_lexer && length <= 0 && byteOffset < line.content.getLength())
+                    length = m_lexer(line.content.tail(byteOffset)).getLength();
+
+                Int64 underlineEnd = std::min(
+                    (Int64)line.content.getLength(),
+                    byteOffset + std::max(Int64{0}, length));
+                column = 1 + displayWidth(line.content.head(byteOffset));
+                length =
+                    displayWidth(line.content.subString(byteOffset, underlineEnd - byteOffset));
+            }
+            line.spans.add({column, length, span.label, span.isPrimary});
         }
 
         List<Int64> lineNumbers;
@@ -394,23 +509,40 @@ private:
             return;
         }
 
-        Int64 cursor = 1;
+        // Spans are positioned in display columns (see buildSectionLayout), but
+        // `content` is a byte slice, so map each display column to a byte offset
+        // before slicing to avoid splitting multi-byte UTF-8 sequences.
+        auto byteOffsetForDisplayColumn = [&](Int64 displayColumn) -> Int64
+        {
+            const char* cur = content.begin();
+            const char* const end = content.end();
+            Int64 col = 1;
+            while (cur < end && col < displayColumn)
+                col += codePointDisplayWidth(decodeCodePoint(cur, end));
+            return Int64(cur - content.begin());
+        };
+
+        Int64 cursorByte = 0;
         for (const auto& span : line.spans)
         {
             Int64 start = span.column - indent;
-            if (start > cursor && cursor - 1 < content.getLength())
-                ss << content.subString(cursor - 1, start - cursor);
+            Int64 startByte = byteOffsetForDisplayColumn(start);
+            Int64 endByte = byteOffsetForDisplayColumn(start + span.length);
+
+            // Emit any plain (uncolored) text between the previous span and this
+            // one, then the colored region. Clamp to `cursorByte` so overlapping
+            // spans don't re-emit (and duplicate) bytes already written.
+            if (startByte > cursorByte)
+                ss << content.subString(cursorByte, startByte - cursorByte);
+            startByte = std::max(startByte, cursorByte);
 
             TerminalColor c = span.isPrimary ? TerminalColor::Red : TerminalColor::Cyan;
-            Int64 startIdx = std::max(Int64{0}, start - 1);
-            Int64 safeLen =
-                std::max(Int64{0}, std::min(span.length, content.getLength() - startIdx));
-            if (safeLen > 0)
-                ss << color(c, String(content.subString(startIdx, safeLen)));
-            cursor = start + span.length;
+            if (endByte > startByte)
+                ss << color(c, String(content.subString(startByte, endByte - startByte)));
+            cursorByte = std::max(cursorByte, endByte);
         }
-        if (cursor - 1 >= 0 && cursor - 1 < content.getLength())
-            ss << content.tail(cursor - 1);
+        if (cursorByte < content.getLength())
+            ss << content.tail(cursorByte);
     }
 
     //
