@@ -4410,6 +4410,13 @@ err(
 )
 
 err(
+    "unspecialized-global-generic-param-with-uses",
+    38207,
+    "global generic parameter used in code without a concrete binding",
+    span { loc = "location", message = "a global generic parameter ('type_param' / '__generic_value_param') cannot be used in shader code without a concrete binding; such global-scope declarations are intended for reflection and external specialization, not direct use in shader bodies" }
+)
+
+err(
     "cannot-use-resource-type-in-structured-buffer",
     38204,
     "resource type in StructuredBuffer",
