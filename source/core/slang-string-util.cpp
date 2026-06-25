@@ -2,6 +2,7 @@
 
 #include "slang-blob.h"
 #include "slang-char-util.h"
+#include "slang-math.h"
 #include "slang-text-io.h"
 
 #include <cmath>
@@ -1060,6 +1061,63 @@ String StringUtil::makeMinimalHexFloat(double value)
     SLANG_ASSERT(i < sizeof buf);
 
     return String(buf);
+}
+
+// Shared Levenshtein core. When `caseInsensitive` is set, characters are folded
+// with `CharUtil::toLower` during the comparison, avoiding the need to allocate
+// lowercased copies of the inputs.
+static Index _calcLevenshteinDistance(
+    const UnownedStringSlice& a,
+    const UnownedStringSlice& b,
+    bool caseInsensitive)
+{
+    const Index lenA = a.getLength();
+    const Index lenB = b.getLength();
+    if (lenA == 0)
+        return lenB;
+    if (lenB == 0)
+        return lenA;
+
+    auto fold = [&](char c) -> char { return caseInsensitive ? CharUtil::toLower(c) : c; };
+
+    // Classic dynamic-programming Levenshtein using two rolling rows so the
+    // working set is O(lenB) rather than O(lenA * lenB).
+    List<Index> prevRow;
+    List<Index> currRow;
+    prevRow.setCount(lenB + 1);
+    currRow.setCount(lenB + 1);
+
+    for (Index j = 0; j <= lenB; ++j)
+        prevRow[j] = j;
+
+    for (Index i = 1; i <= lenA; ++i)
+    {
+        currRow[0] = i;
+        const char ca = fold(a[i - 1]);
+        for (Index j = 1; j <= lenB; ++j)
+        {
+            const Index cost = (ca == fold(b[j - 1])) ? 0 : 1;
+            const Index deletion = prevRow[j] + 1;
+            const Index insertion = currRow[j - 1] + 1;
+            const Index substitution = prevRow[j - 1] + cost;
+            currRow[j] = Math::Min(deletion, insertion, substitution);
+        }
+        prevRow.swapWith(currRow);
+    }
+
+    return prevRow[lenB];
+}
+
+Index StringUtil::calcLevenshteinDistance(const UnownedStringSlice& a, const UnownedStringSlice& b)
+{
+    return _calcLevenshteinDistance(a, b, /*caseInsensitive:*/ false);
+}
+
+Index StringUtil::calcLevenshteinDistanceCaseInsensitive(
+    const UnownedStringSlice& a,
+    const UnownedStringSlice& b)
+{
+    return _calcLevenshteinDistance(a, b, /*caseInsensitive:*/ true);
 }
 
 } // namespace Slang
