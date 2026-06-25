@@ -1097,6 +1097,12 @@ inline bool isGenericParam(DeclRef<T> declRef)
     return isGenericParam(declRef.getDecl());
 }
 
+// Returns true for declarations that encode generic `where`-clause constraints.
+//
+// This is the broad syntactic set of constraint declarations. Use
+// `isGenericConstraintParameterDecl` instead when walking a generic's hidden substitution slots,
+// because a standalone generic interface requirement can have a constraint as its `GenericDecl`
+// inner decl without that constraint occupying an argument slot.
 inline bool isConstraintDecl(Decl* decl)
 {
     return as<GenericTypeConstraintDecl>(decl) || as<TypeCoercionConstraintDecl>(decl) ||
