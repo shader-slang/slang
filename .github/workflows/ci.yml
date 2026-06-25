@@ -45,23 +45,48 @@ jobs:
           fi
           echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
 
-  # Linux builds (containerized builds on GitHub-hosted runners)
+  # Linux x86_64 builds run in the CI container on the GCP self-hosted build
+  # pool. container-user is the GCP build runner image's UID:GID (1003), which
+  # owns _work; the reusable workflow defaults to 1001 for GitHub-hosted runners.
   build-linux-debug-gcc-x86_64:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build-container.yml
+    # id-token is never part of the default GITHUB_TOKEN even when the repo
+    # default is "write"; it must be requested explicitly for the reusable
+    # workflow's GCP Workload Identity auth step. Set it on the caller so the
+    # token actually carries id-token:write rather than relying on the default.
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
     with:
       config: debug
-      runs-on: '["ubuntu-22.04"]'
+      runs-on: '["Linux", "self-hosted", "build", "GCP"]'
+      container-user: "1003:1003"
 
   build-linux-release-gcc-x86_64:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build-container.yml
+    # id-token is never part of the default GITHUB_TOKEN even when the repo
+    # default is "write"; it must be requested explicitly for the reusable
+    # workflow's GCP Workload Identity auth step. Set it on the caller so the
+    # token actually carries id-token:write rather than relying on the default.
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
     with:
       config: release
-      runs-on: '["ubuntu-22.04"]'
+      runs-on: '["Linux", "self-hosted", "build", "GCP"]'
+      container-user: "1003:1003"
 
+  # NOTE: wasm stays on GitHub-hosted for now. It builds directly on the host
+  # (no container) via ci-slang-build.yml, and the GCP build runner image lacks
+  # the host build toolchain (cmake), so it fails there with "cmake: command not
+  # found". Moving it onto the build pool requires running it in the CI
+  # container like the other Linux builds — tracked as a follow-up.
   build-linux-release-gcc-wasm:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
@@ -73,7 +98,9 @@ jobs:
       config: release
       runs-on: '["ubuntu-22.04"]'
 
-  # Sanitizer build+test (blocking via check-ci, runs on every PR)
+  # Sanitizer build+test (blocking via check-ci, runs on every PR). Runs in the
+  # clang CI container; kept on GitHub-hosted until validated on the GCP build
+  # pool (tracked with the wasm container follow-up).
   sanitizer-linux-clang-x86_64:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
