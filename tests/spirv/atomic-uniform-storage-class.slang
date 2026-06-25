@@ -1,6 +1,6 @@
 // Atomics on a legacy Uniform/BufferBlock SSBO (SPIR-V < 1.4); see issue #11731.
 //TEST:SIMPLE(filecheck=CHECK):-profile spirv_1_3 -target spirv
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -profile spirv_1_3 -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -profile spirv_1_3 -output-using-type -warnings-disable 41012
 //TEST_INPUT: set buf = out ubuffer(data=[0 0 0 0], stride=4);
 RWStructuredBuffer<Atomic<uint>> buf;
 
