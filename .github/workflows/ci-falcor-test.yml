@@ -3,9 +3,15 @@ name: CI Falcor Test Workflow
 on:
   workflow_call:
     secrets:
-      FALCOR_CI_REPOSITORY:
+      FALCOR_CI_API_BASE_URL:
+        required: true
+      FALCOR_CI_PROJECT:
         required: true
       FALCOR_CI_REF:
+        required: true
+      FALCOR_CI_TOKEN:
+        required: true
+      FALCOR_CI_VARIABLES_JSON:
         required: true
 
 permissions:
@@ -16,62 +22,28 @@ jobs:
   test-falcor:
     name: Test (Falcor)
     timeout-minutes: 100
-    runs-on: [Windows, self-hosted, X64, falcor-bridge]
+    runs-on: [Linux, self-hosted, X64, falcor-bridge]
     defaults:
       run:
         shell: bash
     steps:
-      - name: Add Git Bash to PATH
-        shell: pwsh
-        run: |
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
           submodules: "false"
           fetch-depth: "1"
-      - name: Download Slang build
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
-        with:
-          name: slang-tests-windows-x86_64-cl-release
-          path: slang-bin
-      - name: Checkout Falcor CI source
-        shell: pwsh
+      - name: Run external CI
         env:
-          FALCOR_CI_REPOSITORY: ${{ secrets.FALCOR_CI_REPOSITORY }}
-          FALCOR_CI_REF: ${{ secrets.FALCOR_CI_REF }}
+          GITHUB_TOKEN: ${{ github.token }}
+          EXTERNAL_CI_API_BASE_URL: ${{ secrets.FALCOR_CI_API_BASE_URL }}
+          EXTERNAL_CI_PROJECT: ${{ secrets.FALCOR_CI_PROJECT }}
+          EXTERNAL_CI_REF: ${{ secrets.FALCOR_CI_REF }}
+          EXTERNAL_CI_TOKEN: ${{ secrets.FALCOR_CI_TOKEN }}
+          EXTERNAL_CI_VARIABLES_JSON: ${{ secrets.FALCOR_CI_VARIABLES_JSON }}
+          EXTERNAL_CI_ARTIFACT_NAME: slang-tests-windows-x86_64-cl-release
         run: |
-          $ErrorActionPreference = "Stop"
-          if (-not $env:FALCOR_CI_REPOSITORY) {
-            throw "FALCOR_CI_REPOSITORY is required"
-          }
-          if (-not $env:FALCOR_CI_REF) {
-            throw "FALCOR_CI_REF is required"
-          }
-          git clone --depth 1 --branch "$env:FALCOR_CI_REF" "$env:FALCOR_CI_REPOSITORY" Falcor
-      - name: Run Falcor CI
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $env:BUILD_CONFIG = "Release"
-          $env:BUILD_PRESET = "windows-ninja-msvc-ci"
-          $env:CMAKE_ARGS = "-DFALCOR_USE_SYSTEM_PYTHON=1"
-          $env:RUN_UNIT_TESTS = "true"
-          $env:RUN_PYTHON_TESTS = "true"
-          $env:RUN_IMAGE_TESTS = "true"
-          $env:CI_USE_CUSTOM_SLANG = "true"
-          $env:CI_SLANG_ARTIFACT_DIR = (Resolve-Path "slang-bin").Path
-          $env:CI_SLANG_CONFIG = "Release"
-          Set-Location Falcor
-          if (Test-Path "C:\Anaconda3\shell\condabin\conda-hook.ps1") {
-            & "C:\Anaconda3\shell\condabin\conda-hook.ps1"
-            conda activate falcor
-          }
-          if (Test-Path "build_agent\install_image_test_viewer.bat") {
-            & "build_agent\install_image_test_viewer.bat"
-          }
-          python -u build_agent/ci.py
+          set -euo pipefail
+          python3 .github/scripts/relay-external-ci.py
 
   test-falcor-perf:
     name: Test (Falcor Perf)

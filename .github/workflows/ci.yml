@@ -24,14 +24,14 @@ jobs:
         run: |
           # This step prevents subsequent steps from running if only documentation was changed
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            git fetch origin ${{ github.base_ref }}
+            git fetch origin "${{ github.base_ref }}"
             BASE=origin/${{ github.base_ref }}
           else
             BASE=HEAD^1
           fi
 
           shouldRun=true
-          if files="$(git diff --name-only $BASE...HEAD)"; then
+          if files="$(git diff --name-only "${BASE}...HEAD")"; then
             # Git diff succeeded, check if non-documentation files were changed
             if echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|CONTRIBUTING\.md$|README\.md$)'; then
               shouldRun=true
@@ -43,7 +43,7 @@ jobs:
             echo "Git diff failed, conservatively running tests"
             shouldRun=true
           fi
-          echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
+          echo "should-run=$shouldRun" >> "$GITHUB_OUTPUT"
 
   # Linux x86_64 builds run in the CI container on the GCP self-hosted build
   # pool. container-user is the GCP build runner image's UID:GID (1003), which
@@ -430,8 +430,11 @@ jobs:
       contents: read
       actions: read
     secrets:
-      FALCOR_CI_REPOSITORY: ${{ secrets.FALCOR_CI_REPOSITORY }}
+      FALCOR_CI_API_BASE_URL: ${{ secrets.FALCOR_CI_API_BASE_URL }}
+      FALCOR_CI_PROJECT: ${{ secrets.FALCOR_CI_PROJECT }}
       FALCOR_CI_REF: ${{ secrets.FALCOR_CI_REF }}
+      FALCOR_CI_TOKEN: ${{ secrets.FALCOR_CI_TOKEN }}
+      FALCOR_CI_VARIABLES_JSON: ${{ secrets.FALCOR_CI_VARIABLES_JSON }}
     uses: ./.github/workflows/ci-falcor-test.yml
 
   test-compile-regression:
