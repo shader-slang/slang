@@ -23,6 +23,11 @@ static bool _typeIsOrContainsResource(IRType* type)
         return false;
     if (isResourceType(type))
         return true;
+    // Some hosts (e.g. SlangPy) specialize tensor/buffer storage to a raw pointer on CUDA rather
+    // than a structured-buffer resource; a fixed-size array of such pointer-backed elements packed
+    // into the `.param` bank exhibits the same dynamic-addressing slowdown as a resource array.
+    if (as<IRPtrTypeBase>(type))
+        return true;
     if (auto arrayType = as<IRArrayTypeBase>(type))
         return _typeIsOrContainsResource(arrayType->getElementType());
     if (auto structType = as<IRStructType>(type))
