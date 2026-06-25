@@ -168,10 +168,17 @@ target_include_directories(
 # fast_float headers (header-only). Mark as a system include so the
 # bundled headers don't trip Slang's extra warnings / -Werror.
 add_library(fast_float INTERFACE)
+if(NOT SLANG_OVERRIDE_FAST_FLOAT_PATH)
+    set(_fast_float_include "${CMAKE_CURRENT_LIST_DIR}/fast_float/include")
+else()
+    set(_fast_float_include
+        "${SLANG_OVERRIDE_FAST_FLOAT_PATH}/fast_float/include"
+    )
+endif()
 target_include_directories(
     fast_float
     ${system}
-    INTERFACE "${CMAKE_CURRENT_LIST_DIR}/fast_float/include"
+    INTERFACE "${_fast_float_include}"
 )
 
 # SPIRV-Headers
