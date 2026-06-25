@@ -656,6 +656,17 @@ struct IRGenContext
     // A chain of nested `catch` handlers for `try` and `throw.
     CatchHandler* catchHandler = nullptr;
 
+    // Non-owning cache used while lowering one witness table. The actual dictionary is owned by
+    // the lowering scope so `IRGenContext` stays lightweight while copied contexts can still point
+    // at the cache for their current insertion/generic environment.
+    //
+    // TODO: Make the frontend `WitnessTable` a `Val` so this can use the normal lowered-value
+    // dictionary in `SharedIRGenContext`. Until then, keep this cache scoped to the current
+    // lowering environment: an `IRWitnessTable` is inserted into a specific IR scope and can refer
+    // to that scope's generic parameters, so a single global cache keyed only by frontend
+    // `WitnessTable*` would be too coarse.
+    Dictionary<WitnessTable*, IRWitnessTable*>* mapASTWitnessTableToIRWitnessTable = nullptr;
+
     explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
         : astBuilder(inAstBuilder), shared(inShared), env(&inShared->globalEnv), irBuilder(nullptr)
     {
@@ -10698,11 +10709,168 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return nullptr;
     }
 
+    // Lower one AST witness-table entry value. A `RequirementWitness` is not always a `Val`:
+    // method requirements store decl-refs, constraint requirements store witness values, and
+    // associated interface bounds can store nested AST witness tables that must be materialized
+    // recursively.
+    IRInst* lowerWitnessEntryValue(
+        IRGenContext* witnessContext,
+        IRWitnessTable* irWitnessTable,
+        RequirementWitness witness)
+    {
+        auto witnessBuilder = witnessContext->irBuilder;
+        switch (witness.getFlavor())
+        {
+        case RequirementWitness::Flavor::declRef:
+            {
+                auto satisfyingDeclRef = witness.getDeclRef();
+                return getSimpleVal(
+                    witnessContext,
+                    emitDeclRef(
+                        witnessContext,
+                        satisfyingDeclRef,
+                        // TODO: we need to know what type to plug in here...
+                        nullptr));
+            }
+
+        case RequirementWitness::Flavor::val:
+            {
+                auto satisfyingVal = witness.getVal()->resolve();
+                return lowerSimpleVal(witnessContext, satisfyingVal);
+            }
+
+        case RequirementWitness::Flavor::witnessTable:
+            {
+                auto astReqWitnessTable = witness.getWitnessTable();
+                auto witnessTableMap = witnessContext->mapASTWitnessTableToIRWitnessTable;
+                SLANG_ASSERT(witnessTableMap);
+                IRWitnessTable* irSatisfyingWitnessTable = nullptr;
+                if (!witnessTableMap->tryGetValue(astReqWitnessTable, irSatisfyingWitnessTable))
+                {
+                    // Need to construct a sub-witness-table
+                    auto irWitnessTableBaseType =
+                        lowerType(witnessContext, astReqWitnessTable->baseType);
+
+                    auto concreteType = irWitnessTable->getConcreteType();
+
+                    irSatisfyingWitnessTable =
+                        witnessBuilder->createWitnessTable(irWitnessTableBaseType, concreteType);
+                    (*witnessTableMap)[astReqWitnessTable] = irSatisfyingWitnessTable;
+
+                    // Avoid adding same decorations and child more than once.
+                    if (!irSatisfyingWitnessTable->hasDecorationOrChild())
+                    {
+                        auto mangledName = getMangledNameForConformanceWitness(
+                            witnessContext->astBuilder,
+                            astReqWitnessTable->witnessedType,
+                            astReqWitnessTable->baseType,
+                            concreteType->getOp());
+
+                        witnessBuilder->addExportDecoration(
+                            irSatisfyingWitnessTable,
+                            mangledName.getUnownedSlice());
+
+                        if (isExportedType(astReqWitnessTable->witnessedType))
+                        {
+                            witnessBuilder->addHLSLExportDecoration(irSatisfyingWitnessTable);
+                            witnessBuilder->addKeepAliveDecoration(irSatisfyingWitnessTable);
+                        }
+
+                        // Recursively lower the sub-table.
+                        lowerWitnessTable(
+                            witnessContext,
+                            astReqWitnessTable,
+                            irSatisfyingWitnessTable,
+                            getWitnessTableBaseDeclRef(astReqWitnessTable));
+
+                        irSatisfyingWitnessTable->moveToEnd();
+                    }
+                }
+                return irSatisfyingWitnessTable;
+            }
+
+        default:
+            SLANG_UNEXPECTED("handled requirement witness case");
+            break;
+        }
+        return nullptr;
+    }
+
+    // Lower a generic interface requirement entry as a generic IR value whose body computes the
+    // satisfying witness for one requirement-local specialization.
+    IRInst* lowerWitnessEntryValueInGenericWitnessTable(
+        IRGenContext* subContext,
+        DeclRef<GenericDecl> genericRequirementDeclRef,
+        IRWitnessTable* irWitnessTable,
+        RequirementWitness satisfyingWitness)
+    {
+        auto subBuilder = subContext->irBuilder;
+
+        // A generic interface requirement entry is a generic value whose body computes the
+        // satisfying witness for one requirement-local specialization. Consider this example:
+        //
+        //     interface IVector<T1>
+        //     {
+        //         [Differentiable]
+        //         T1 f<U>(U value) where U : IThing<T1>;
+        //     }
+        //
+        //     struct InlineVector<T2> : IVector<T2>
+        //     {
+        //         [Differentiable]
+        //         T2 f<U>(U value) where U : IThing<T2> { ... }
+        //     }
+        //
+        // Header checking turns `[Differentiable]` into a sibling generic interface requirement:
+        // `This.f<U> : IForwardDifferentiable<This.f<U>>`. That requirement is a witness-table
+        // key, not standalone code to lower immediately. A concrete conformance must provide the
+        // witness-table entry for that key, just as it provides entries for ordinary methods and
+        // associated-type bounds.
+        //
+        // That is why this helper is used while lowering the `InlineVector<T2> : IVector<T2>`
+        // witness table. For this conformance, the caller forms the requirement decl-ref as
+        // `MemberDeclRef(IVector<InlineVector<T2>.T2>, generic f-diff requirement)`. In that
+        // decl-ref, the interface parameter `T1` is already represented by the conforming type's
+        // projected parameter `InlineVector<T2>.T2`.
+        //
+        // This function emits the witness-table entry value for that generic requirement as a
+        // requirement-local `IRGeneric`:
+        //
+        //     witness_entry_value =
+        //         generic<U, U : IThing<InlineVector<T2>.T2>>
+        //         {
+        //             lowered_witness = lowerWitnessEntryValue(satisfyingWitness)
+        //             return lowered_witness
+        //         }
+        //
+        // The outer witness table still supplies the `InlineVector<T2> : IVector<T2>`
+        // substitution, while this `IRGeneric` supplies the method-local `U`. Later
+        // `lookupWitness(..., f-diff requirement)` produces this generic entry value, and
+        // `specialize(..., U, U:IThing<T2>)` applies the caller's method arguments.
+        IRGeneric* activeGeneric = nullptr;
+        if (auto activeBlock = as<IRBlock>(subBuilder->getInsertLoc().getParent()))
+            activeGeneric = as<IRGeneric>(activeBlock->getParent());
+
+        IRBuilderInsertLocScope insertScope(subBuilder);
+        IRGenEnv genericEnv;
+        genericEnv.outer = subContext->env;
+
+        IRGenContext genericContext = *subContext;
+        genericContext.env = &genericEnv;
+        Dictionary<WitnessTable*, IRWitnessTable*> genericWitnessTableMap;
+        genericContext.mapASTWitnessTableToIRWitnessTable = &genericWitnessTableMap;
+
+        auto outerGeneric = emitGenericDecl(&genericContext, genericRequirementDeclRef);
+
+        auto loweredWitness =
+            lowerWitnessEntryValue(&genericContext, irWitnessTable, satisfyingWitness);
+        return finishOuterGenerics(subBuilder, loweredWitness, outerGeneric, activeGeneric);
+    }
+
     void lowerWitnessTable(
         IRGenContext* subContext,
         WitnessTable* astWitnessTable,
         IRWitnessTable* irWitnessTable,
-        Dictionary<WitnessTable*, IRWitnessTable*>& mapASTToIRWitnessTable,
         DeclRefBase* witnessTableBaseDeclRef)
     {
         auto subBuilder = subContext->irBuilder;
@@ -10721,90 +10889,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (!irRequirementKey)
                 continue;
 
-            auto lowerSatisfyingWitness = [&](IRGenContext* witnessContext,
-                                              RequirementWitness witness) -> IRInst*
-            {
-                auto witnessBuilder = witnessContext->irBuilder;
-                switch (witness.getFlavor())
-                {
-                case RequirementWitness::Flavor::declRef:
-                    {
-                        auto satisfyingDeclRef = witness.getDeclRef();
-                        return getSimpleVal(
-                            witnessContext,
-                            emitDeclRef(
-                                witnessContext,
-                                satisfyingDeclRef,
-                                // TODO: we need to know what type to plug in here...
-                                nullptr));
-                    }
-
-                case RequirementWitness::Flavor::val:
-                    {
-                        auto satisfyingVal = witness.getVal()->resolve();
-                        return lowerSimpleVal(witnessContext, satisfyingVal);
-                    }
-
-                case RequirementWitness::Flavor::witnessTable:
-                    {
-                        auto astReqWitnessTable = witness.getWitnessTable();
-                        IRWitnessTable* irSatisfyingWitnessTable = nullptr;
-                        if (!mapASTToIRWitnessTable.tryGetValue(
-                                astReqWitnessTable,
-                                irSatisfyingWitnessTable))
-                        {
-                            // Need to construct a sub-witness-table
-                            auto irWitnessTableBaseType =
-                                lowerType(witnessContext, astReqWitnessTable->baseType);
-
-                            auto concreteType = irWitnessTable->getConcreteType();
-
-                            irSatisfyingWitnessTable = witnessBuilder->createWitnessTable(
-                                irWitnessTableBaseType,
-                                concreteType);
-
-                            // Avoid adding same decorations and child more than once.
-                            if (!irSatisfyingWitnessTable->hasDecorationOrChild())
-                            {
-                                auto mangledName = getMangledNameForConformanceWitness(
-                                    witnessContext->astBuilder,
-                                    astReqWitnessTable->witnessedType,
-                                    astReqWitnessTable->baseType,
-                                    concreteType->getOp());
-
-                                witnessBuilder->addExportDecoration(
-                                    irSatisfyingWitnessTable,
-                                    mangledName.getUnownedSlice());
-
-                                if (isExportedType(astReqWitnessTable->witnessedType))
-                                {
-                                    witnessBuilder->addHLSLExportDecoration(
-                                        irSatisfyingWitnessTable);
-                                    witnessBuilder->addKeepAliveDecoration(
-                                        irSatisfyingWitnessTable);
-                                }
-
-                                // Recursively lower the sub-table.
-                                lowerWitnessTable(
-                                    witnessContext,
-                                    astReqWitnessTable,
-                                    irSatisfyingWitnessTable,
-                                    mapASTToIRWitnessTable,
-                                    getWitnessTableBaseDeclRef(astReqWitnessTable));
-
-                                irSatisfyingWitnessTable->moveToEnd();
-                            }
-                        }
-                        return irSatisfyingWitnessTable;
-                    }
-
-                default:
-                    SLANG_UNEXPECTED("handled requirement witness case");
-                    break;
-                }
-                return nullptr;
-            };
-
             IRInst* irSatisfyingVal = nullptr;
             auto requiredConstraintDecl = as<GenericTypeConstraintDecl>(requiredMemberDecl);
             auto genericRequirementDecl = requiredConstraintDecl
@@ -10814,40 +10898,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 genericRequirementDecl = nullptr;
             if (genericRequirementDecl)
             {
-                // A generic interface requirement key lowers to an IR generic, so its satisfying
-                // witness has to be lowered under the requirement-local generic parameters.
-                // Consider this example:
-                //
-                //     interface IVector<T>
-                //     {
-                //         [Differentiable]
-                //         T f<U>(U value) where U : IThing<T>;
-                //     }
-                //
-                //     struct InlineVector<T> : IVector<T>
-                //     {
-                //         [Differentiable]
-                //         T f<U>(U value) where U : IThing<T> { ... }
-                //     }
-                //
-                // Header checking creates a sibling generic requirement for
-                // `This.f<U> : IForwardDifferentiable<This.f<U>>`. While lowering the witness table
-                // for `InlineVector<T> : IVector<T>`, `witnessTableBaseDeclRef` is
-                // `IVector<InlineVector<T>.T>`. Forming
-                // `MemberDeclRef(IVector<InlineVector<T>.T>, generic f-diff requirement)` lets
-                // `emitGenericDecl` substitute the interface `T` in the requirement signature
-                // while leaving the requirement-local `U` as the IR generic parameter.
-                IRGeneric* activeGeneric = nullptr;
-                if (auto activeBlock = as<IRBlock>(subBuilder->getInsertLoc().getParent()))
-                    activeGeneric = as<IRGeneric>(activeBlock->getParent());
-
-                IRBuilderInsertLocScope insertScope(subBuilder);
-                IRGenEnv genericEnv;
-                genericEnv.outer = subContext->env;
-
-                IRGenContext genericContext = *subContext;
-                genericContext.env = &genericEnv;
-
                 auto genericRequirementDeclRef =
                     witnessTableBaseDeclRef
                         ? subContext->astBuilder
@@ -10856,14 +10906,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                                   genericRequirementDecl)
                               .as<GenericDecl>()
                         : subContext->astBuilder->getDirectDeclRef(genericRequirementDecl);
-                auto outerGeneric = emitGenericDecl(&genericContext, genericRequirementDeclRef);
-                auto loweredWitness = lowerSatisfyingWitness(&genericContext, satisfyingWitness);
-                irSatisfyingVal =
-                    finishOuterGenerics(subBuilder, loweredWitness, outerGeneric, activeGeneric);
+                irSatisfyingVal = lowerWitnessEntryValueInGenericWitnessTable(
+                    subContext,
+                    genericRequirementDeclRef,
+                    irWitnessTable,
+                    satisfyingWitness);
             }
             else
             {
-                irSatisfyingVal = lowerSatisfyingWitness(subContext, satisfyingWitness);
+                irSatisfyingVal =
+                    lowerWitnessEntryValue(subContext, irWitnessTable, satisfyingWitness);
             }
 
             subBuilder->createWitnessTableEntry(irWitnessTable, irRequirementKey, irSatisfyingVal);
@@ -11060,16 +11112,25 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         auto irWitnessTableBaseType = lowerType(subContext, superType);
 
+        auto recursionPlaceholder =
+            LoweredValInfo::simple(findOuterMostGeneric(subBuilder->getInsertLoc().getParent()));
+        auto subTypeIsCallable = isDeclRefTypeOf<CallableDecl>(subType);
+
+        // Ordinary type and extension conformances need the temporary value before lowering the
+        // subtype: `lowerType(subType)` can ask for this same inheritance declaration while
+        // discovering associated conformances, and the placeholder breaks that recursion until the
+        // real witness table is installed below. Synthesized callable differentiability
+        // conformances are the narrow exception. Their subtype is the callable decl-ref itself;
+        // lowering that decl-ref can attach autodiff-associated values to the callable, so it must
+        // see the real callable lowering rather than recording this temporary placeholder as the
+        // callable's differentiability witness.
+        if (!subTypeIsCallable)
+            context->setGlobalValue(inheritanceDecl, recursionPlaceholder);
+
         auto irSubType = lowerType(subContext, subType);
 
-        // Register a dummy value to avoid infinite recursions while lowering the witness-table
-        // body. The subtype has already been lowered by this point; for callable-type extensions
-        // that matters because lowering the callable decl-ref can attach autodiff-associated
-        // values, and those values must not capture the recursion placeholder as the actual
-        // differentiability witness for the callable.
-        context->setGlobalValue(
-            inheritanceDecl,
-            LoweredValInfo::simple(findOuterMostGeneric(subBuilder->getInsertLoc().getParent())));
+        if (subTypeIsCallable)
+            context->setGlobalValue(inheritanceDecl, recursionPlaceholder);
 
         // Create the IR-level witness table
         IRInst* irWitnessTable;
@@ -11161,15 +11222,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             bool isSynthesized = inheritanceDecl->findModifier<SynthesizedModifier>();
             if ((!isImported || isExplicitExtern) && !isSynthesized)
             {
-                Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
                 auto inheritanceDeclRef =
                     createDefaultSpecializedDeclRef(subContext, nullptr, inheritanceDecl);
+                Dictionary<WitnessTable*, IRWitnessTable*> witnessTableMap;
+                auto oldWitnessTableMap = subContext->mapASTWitnessTableToIRWitnessTable;
+                subContext->mapASTWitnessTableToIRWitnessTable = &witnessTableMap;
                 lowerWitnessTable(
                     subContext,
                     inheritanceDecl->witnessTable,
                     cast<IRWitnessTable>(irWitnessTable),
-                    mapASTToIRWitnessTable,
                     getWitnessTableBaseDeclRef(subContext, inheritanceDeclRef));
+                subContext->mapASTWitnessTableToIRWitnessTable = oldWitnessTableMap;
             }
 
             irWitnessTable->moveToEnd();

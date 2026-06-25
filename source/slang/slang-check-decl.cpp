@@ -7154,20 +7154,18 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             {
                 synConstraintDecl->expectedCountExpr = packCountConstraintDecl->expectedCountExpr;
             }
-            // Header checking owns the diagnostic for a non-foldable count
-            // expression. Requirement-witness synthesis runs during recovery
-            // too, so skip cloning this proof if that earlier invariant failed.
-            SLANG_ASSERT(packCountConstraintDecl->actualCountVal);
-            if (!packCountConstraintDecl->actualCountVal)
-                continue;
+            // Header checking must populate the checked values before we clone the generic
+            // signature. The cloned signature's constraints are later consumed positionally by
+            // `getDefaultSubstitutionArgs` and `DeclaredVariadicPackCountWitness`; dropping this
+            // proof during recovery would shift every following witness argument into the wrong
+            // slot instead of producing a diagnosable failure.
+            SLANG_RELEASE_ASSERT(packCountConstraintDecl->actualCountVal);
             synConstraintDecl->actualCountVal =
                 as<IntVal>(packCountConstraintDecl->actualCountVal->substitute(
                     m_astBuilder,
                     SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
 
-            SLANG_ASSERT(packCountConstraintDecl->expectedCountVal);
-            if (!packCountConstraintDecl->expectedCountVal)
-                continue;
+            SLANG_RELEASE_ASSERT(packCountConstraintDecl->expectedCountVal);
             synConstraintDecl->expectedCountVal =
                 as<IntVal>(packCountConstraintDecl->expectedCountVal->substitute(
                     m_astBuilder,
@@ -7993,8 +7991,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                                     WitnessSynthesisFailureReason::DifferentiabilityMismatch;
                                 outFailureDetails->candidateMethod = declRefExpr->declRef;
                             }
-                            // Keep the synthesized wrapper and let derivative checking validate
-                            // its body.
+                            return false;
                         }
                         removeModifier(synFuncDecl, bwdDiffModifier);
                     }
@@ -10267,7 +10264,10 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                 // function. If we eagerly chase that optional constraint while building the first
                 // `IForwardDifferentiable` witness table, lookup can recurse through the same
                 // synthesized `fwd_diff` conformance. Record absence here; explicit higher-order
-                // differentiation still goes through the hard conformance paths.
+                // differentiation still goes through the hard conformance paths. This uses the
+                // same `NoneWitness` representation as the ordinary optional-constraint fallback
+                // below and the generic solver's optional witness arguments; `visitNoneWitness`
+                // lowers it to the sentinel witness table consumed by optional constraint checks.
                 if (isOptionalConstraint &&
                     as<FuncConstraintDecl>(requiredConstraintDeclRef.getDecl()))
                 {
@@ -14944,9 +14944,8 @@ static bool trySynthesizeExactDifferentiabilityConformanceForRequirement(
                   funcAsTypeFromExtension,
                   typeInfoWitnessFromExtension);
     auto inheritanceDecl = diffExtension.getDecl()->getMembersOfType<InheritanceDecl>().getFirst();
-    SLANG_ASSERT(inheritanceDecl);
-    if (inheritanceDecl)
-        inheritanceDecl->base.type = differentiabilityInterfaceTypeFromExtension;
+    SLANG_RELEASE_ASSERT(inheritanceDecl);
+    inheritanceDecl->base.type = differentiabilityInterfaceTypeFromExtension;
 
     if (kind == DifferentiabilityConformanceKind::Forward)
     {
