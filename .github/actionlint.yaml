@@ -1,8 +1,10 @@
 self-hosted-runner:
   labels:
+    - analytics
     - benchmark
     - build
     - falcor
+    - GCP
     - GCP-T4
     - GPU
     - nvrgfx-perf
