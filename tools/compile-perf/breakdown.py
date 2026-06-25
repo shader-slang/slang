@@ -282,7 +282,7 @@ def write_html(results_dir, label, metric):
     svg = render_stacked_svg(runs, label, metric)
     outdir = os.path.join(analyze.results_dir_for(results_dir, label), "breakdown")
     os.makedirs(outdir, exist_ok=True)
-    with open(os.path.join(outdir, "breakdown.svg"), "w") as fh:
+    with open(os.path.join(outdir, "breakdown.svg"), "w", encoding="utf-8") as fh:
         fh.write(svg)
     html = (f"<!doctype html><meta charset=utf-8>"
             f"<title>Phase breakdown — {esc(label)}</title>"
@@ -292,7 +292,7 @@ def write_html(results_dir, label, metric):
             f"time not covered by a named child (e.g. the autodiff transform sits "
             f"in <code>linkAndOptimizeIR (self)</code>).</p>{svg}</body>")
     out = os.path.join(outdir, "breakdown.html")
-    with open(out, "w") as fh:
+    with open(out, "w", encoding="utf-8") as fh:
         fh.write(html)
     print(f"wrote {out}  ({len(runs)} workloads)")
     return out
@@ -464,7 +464,7 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
         s.append(f'<rect x="{lx}" y="{yy}" width="12" height="12" fill="{color}"/>')
         s.append(f'<text x="{lx+16}" y="{yy+10}" fill="#222">{esc(name)}</text>')
     s.append("</svg>")
-    with open(out, "w") as fh:
+    with open(out, "w", encoding="utf-8") as fh:
         fh.write("\n".join(s))
     return out
 
@@ -528,7 +528,7 @@ def write_workload_pages(results_dir, index_path, metric, outdir):
             results_dir, index_path, metric, svgp, BUCKET_ORDER, buckets,
             cols=1, names=[wl], panel=(1040, 440),
             title=f"{esc(wl)} — full phase breakdown across releases ({esc(metric)} ms)")
-        svg = open(svgp).read()
+        svg = open(svgp, encoding="utf-8").read()
 
         desc = (inspect.getdoc(spec.gen) if spec and spec.gen else "") or "(no description)"
         flags = " ".join(spec.extra_flags) if spec and spec.extra_flags else "(none)"
@@ -551,7 +551,7 @@ def write_workload_pages(results_dir, index_path, metric, outdir):
         html = (f"<!doctype html><meta charset=utf-8><title>{esc(wl)} — phase breakdown</title>"
                 f"<body style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;"
                 f"margin:24px;color:#1a1a1a;max-width:1180px'>"
-                f"<p><a href='../report_per_workload.html'>&larr; all workloads</a></p>"
+                f"<p><a href='../index.html'>&larr; all workloads</a></p>"
                 f"<h1 style='font-size:21px;margin:0 0 6px'>{esc(wl)}</h1>"
                 f"<p style='color:#444;max-width:900px;white-space:pre-wrap'>{esc(desc)}</p>"
                 f"<p style='color:#666;font-size:13px'>{meta}</p>"
@@ -568,7 +568,7 @@ def write_workload_pages(results_dir, index_path, metric, outdir):
                 f"padding-bottom:4px'>Compiled Slang source</h2>"
                 f"<p style='color:#666;font-size:13px'>{esc(size_note)}</p>{code_html}"
                 f"</body>")
-        with open(os.path.join(wdir, f"{wl}.html"), "w") as fh:
+        with open(os.path.join(wdir, f"{wl}.html"), "w", encoding="utf-8") as fh:
             fh.write(html)
         links[wl] = f"workloads/{wl}.html"
     return links
