@@ -3395,6 +3395,21 @@ RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileReques
     return specializedProgram;
 }
 
+/// Diagnose an unspecialized generic entry point, reporting it against the
+/// entry-point function's source location.
+///
+/// A generic entry point is only legal if it is specialized with concrete
+/// generic arguments (via `-specialize` / `addEntryPointEx`). An
+/// *unspecialized* generic entry point cannot be lowered: it would produce an
+/// `IRGeneric` rather than an `IRFunc` and crash IR linking (issue #10209).
+static void diagnoseGenericEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
+{
+    auto funcDecl = entryPoint->getFuncDecl();
+    sink->diagnose(Diagnostics::EntryPointCannotBeGeneric{
+        .entryPoint = funcDecl->getName(),
+        .location = funcDecl->loc});
+}
+
 /// Create a specialized program based on the given compile request.
 ///
 /// The specialized program created here includes both the global
@@ -3470,6 +3485,25 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
         auto unspecializedEntryPoint =
             unspecializedGlobalAndEntryPointsComponentType->getEntryPoint(ii);
 
+        // A generic entry point must have concrete generic arguments. They can
+        // arrive either bound into the entry-point name (`-entry foo<int>`,
+        // reflected in the func declRef) or as separate specialization-arg
+        // strings (`-specialize`/`addEntryPointEx`, applied below by
+        // `createSpecializedEntryPoint`). If neither is present, the generic is
+        // unspecialized and would lower to an `IRGeneric` rather than an
+        // `IRFunc`, crashing IR linking (issue #10209); reject it here.
+        //
+        // `isSpecialized` walks the whole enclosing decl chain and compares the
+        // declRef's generic args against the defaults, so it correctly accepts
+        // name-bound args (and nested-generic entry points) while still flagging
+        // a genuinely unbound generic.
+        if (!endToEndReq->getLinkage()->isSpecialized(unspecializedEntryPoint->getFuncDeclRef()) &&
+            entryPointInfo.specializationArgStrings.getCount() == 0)
+        {
+            diagnoseGenericEntryPoint(unspecializedEntryPoint, endToEndReq->getSink());
+            continue;
+        }
+
         auto specializedEntryPoint =
             createSpecializedEntryPoint(endToEndReq, unspecializedEntryPoint, entryPointInfo);
         allComponentTypes.add(specializedEntryPoint);
@@ -3492,9 +3526,26 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
     {
         auto unspecializedEntryPoint =
             unspecializedGlobalAndEntryPointsComponentType->getEntryPoint(ii);
+
+        // These entry points (e.g. discovered via `[shader(...)]`) carry no
+        // specialization arguments, so an unspecialized generic one can never be
+        // specialized and must be rejected (#10209). `isSpecialized` is false
+        // only when the generic args are still the defaults (a discovered
+        // `[shader]` entry point can't bind args via its name either).
+        if (!endToEndReq->getLinkage()->isSpecialized(unspecializedEntryPoint->getFuncDeclRef()))
+        {
+            diagnoseGenericEntryPoint(unspecializedEntryPoint, endToEndReq->getSink());
+            continue;
+        }
+
         allComponentTypes.add(unspecializedEntryPoint);
         outSpecializedEntryPoints.add(unspecializedEntryPoint);
     }
+
+    // Bail out if rejecting a generic entry point above raised an error,
+    // rather than composing a program with a missing entry point.
+    if (endToEndReq->getSink()->getErrorCount() != 0)
+        return nullptr;
 
     RefPtr<ComponentType> composed =
         CompositeComponentType::create(endToEndReq->getLinkage(), allComponentTypes);

@@ -8,9 +8,16 @@
 #include "core/slang-char-encode.h"
 #include "core/slang-string-escape-util.h"
 #include "core/slang-string-util.h"
+#include "fast_float/fast_float.h"
 #include "slang-core-diagnostics.h"
 #include "slang-name.h"
 #include "slang-source-loc.h"
+
+#include <algorithm>
+#include <bit>
+#include <cmath>
+#include <cstdint>
+#include <limits>
 
 namespace Slang
 {
@@ -775,117 +782,268 @@ IntegerLiteralValue getIntegerLiteralValue(
     return value;
 }
 
+// Converts a literal in hexadecimal format to double. The return value is truncated
+// in case the significand in the literal cannot be fit.
+//
+// Params:
+//
+//   start            - literal (after 0x)
+//   end              - end of literal; start + strlen(literal)
+//   suffix           - pointer to receive the first unhandled character
+//   outIsOutOfRange  - Whether the value is out of range. Return value is
+//                      either 0 for subnormal underflow or INFINITY for overflow.
+//   outPrecisionLost - Significand was truncated. Only reported if the value was in range.
+//
+// Return:              Parsed value.
+//
+//
+static double _hexFloatLiteralToDouble(
+    const char* start,
+    const char* end,
+    const char*& suffix,
+    bool& outIsOutOfRange,
+    bool& outPrecisionLost)
+{
+    const char* cursor{start};
+    int64_t exponent{};
+    uint64_t significand{};
+    int64_t exponentBias{};
+    bool significandDotSeen{};
+    double ret{};
+    bool isOutOfRange{};
+    bool precisionLost{};
+
+    suffix = start;
+
+    while (cursor != end)
+    {
+        uint64_t digit{};
+        char c = *cursor;
+
+        if ((c >= '0') && (c <= '9'))
+            digit = static_cast<uint64_t>(c - '0');
+        else if ((c >= 'A') && (c <= 'F'))
+            digit = 10U + static_cast<uint64_t>(c - 'A');
+        else if ((c >= 'a') && (c <= 'f'))
+            digit = 10U + static_cast<uint64_t>(c - 'a');
+        else if (!significandDotSeen && (c == '.'))
+        {
+            significandDotSeen = true;
+            ++cursor;
+            continue;
+        }
+        else
+            break;
+
+        // check whether the significand has room for this digit
+        if ((significand & 0xF000000000000000U) == 0U)
+        {
+            significand <<= 4U;
+            significand |= digit;
+
+            if (significandDotSeen)
+                exponentBias -= 4;
+        }
+        else
+        {
+            // No more room, so just update the exponent if we're on the left
+            // side of the dot.
+            if (!significandDotSeen)
+                exponentBias += 4;
+
+            // significand is being truncated
+            if (digit != 0U)
+                precisionLost = true;
+        }
+
+        ++cursor;
+    }
+
+    if (cursor != start)
+        suffix = cursor;
+
+    // do/while for breakable exit
+    do
+    {
+        // significand parsed?
+        if (cursor == start)
+            break;
+
+        // read 'p'/'P'
+        if ((cursor == end) || ((*cursor != 'p') && (*cursor != 'P')))
+            break;
+        ++cursor;
+
+        bool sign{};
+
+        // read optional sign
+        if ((cursor != end) && ((*cursor == '+') || (*cursor == '-')))
+        {
+            sign = (*cursor == '-');
+            ++cursor;
+        }
+
+        while (cursor != end)
+        {
+            int64_t digit{};
+            char c = *cursor;
+            if ((c >= '0') && (c <= '9'))
+                digit = static_cast<int64_t>(c - '0');
+            else
+                break;
+
+            exponent *= 10;
+            exponent += digit;
+            exponent = std::min(exponent, std::numeric_limits<int64_t>::max() / 100);
+
+            ++cursor;
+            suffix = cursor;
+        }
+
+        if (sign)
+            exponent = -exponent;
+
+    } while (false);
+
+    // was something parsed?
+    if (suffix != start)
+    {
+        // start by applying exponent bias
+        exponent += exponentBias;
+
+        if (significand != 0U)
+        {
+            // normalize significand
+            int leadingZeroes = std::countl_zero(significand);
+            significand <<= leadingZeroes;
+            exponent -= leadingZeroes;
+
+            // truncate significand to 53 bits or less in case of subnormals
+            if (significand & 0x7FFU)
+                precisionLost = true;
+
+            significand >>= 11U;
+            exponent += 11;
+
+            // Note: normal exponent range is [-1022, 1023]. Numbers smaller
+            // than 2^-1022 are expressed as subnormals. In case of smaller
+            // exponents, we'll clamp the final exponent range to the normal
+            // range and shift the significand right. This prevents potential
+            // issues with rounding.
+            if (exponent < (-1022 - 52))
+            {
+                int64_t diff = (-1022 - 52) - exponent;
+                if (diff > 52)
+                {
+                    significand = 0;
+                    precisionLost = true;
+                }
+                else
+                {
+                    uint64_t lostBitsMask = (uint64_t{1U} << diff) - 1U;
+                    if (significand & lostBitsMask)
+                        precisionLost = true;
+                    significand >>= diff;
+                }
+
+                exponent = (-1022 - 52);
+            }
+
+            // now calculate the actual value
+            ret = static_cast<double>(significand);
+            ret *= std::exp2(-52);
+            exponent += 52;
+            ret *= std::exp2(exponent); // apply exponent
+
+            // detect underflow/overflow
+            isOutOfRange = (ret == 0.0 || (!std::isfinite(ret)));
+        }
+        else
+        {
+            // if significand is 0, then the value is 0 no matter the exponent
+            ret = 0.0;
+            isOutOfRange = false;
+        }
+    }
+
+    outIsOutOfRange = isOutOfRange;
+    outPrecisionLost = precisionLost && !isOutOfRange;
+    return ret;
+}
+
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
-    UnownedStringSlice* outSuffix)
+    UnownedStringSlice* outSuffix,
+    bool* outIsOutOfRange,
+    bool* outPrecisionLost)
 {
-    FloatingPointLiteralValue value = 0;
+    FloatingPointLiteralValue value{};
+    bool isOutOfRange{}; // underflow/overflow detection
+    bool precisionLost{};
 
     const UnownedStringSlice content = token.getContent();
 
     char const* cursor = content.begin();
     char const* end = content.end();
 
-    int radix = _readOptionalBase(&cursor);
-
-    bool seenDot = false;
-    FloatingPointLiteralValue divisor = 1;
-    for (;;)
+    if (UnownedStringSlice(cursor, end).startsWith("0x") ||
+        UnownedStringSlice(cursor, end).startsWith("0X"))
     {
-        if (*cursor == '.')
+        // Manual implementation for hex-to-double
+        // translation. std::from_chars() does not work reliably on Mac and
+        // fast_float only supports decimal floats. Fortunately, hex-to-double
+        // is reasonably straightforward.
+
+        cursor += 2U;
+        value = _hexFloatLiteralToDouble(cursor, end, cursor, isOutOfRange, precisionLost);
+    }
+    else
+    {
+        // We'll use fast_float to handle decimal float formats. This should
+        // give us bit-exact input regardless of the toolchain used to compile
+        // slang.
+
+        value = 0.0; // default in case of errors. fast_float sets the value
+                     // appropriately in case of result_out_of_range
+        auto result = fast_float::from_chars(cursor, end, value);
+        cursor = result.ptr;
+
+        if (result.ec == std::errc::result_out_of_range)
         {
-            cursor++;
-            seenDot = true;
-            continue;
+            // overflow-to-infinity or underflow-to-zero
+            isOutOfRange = true;
         }
-
-        int digit = _maybeReadDigit(&cursor, radix);
-        if (digit < 0)
-            break;
-
-        value = value * radix + digit;
-
-        if (seenDot)
+        else if (result.ec != std::errc{})
         {
-            divisor *= radix;
+            // We can still fail to parse literals here, since our accepted
+            // floating point format is narrower than the tokenizer general
+            // literal format. This should trigger an invalid suffix error later
+            // on.
+            value = 0.0;
         }
     }
 
-    if (*cursor == '#')
+    // check for special exponent for infinity
+    if ((cursor != end) && (*cursor == '#'))
     {
-        // It must be INF
         const auto inf = toSlice("#INF");
 
         if (UnownedStringSlice(cursor, end).startsWith(inf))
         {
-            if (outSuffix)
-            {
-                *outSuffix = UnownedStringSlice(cursor + inf.getLength(), end);
-            }
-
             value = INFINITY;
-
-            return value;
+            isOutOfRange = false;
+            cursor += inf.getLength();
         }
     }
-
-    // Now read optional exponent
-    if (_isNumberExponent(*cursor, radix))
-    {
-        cursor++;
-
-        bool exponentIsNegative = false;
-        switch (*cursor)
-        {
-        default:
-            break;
-
-        case '-':
-            exponentIsNegative = true;
-            cursor++;
-            break;
-
-        case '+':
-            cursor++;
-            break;
-        }
-
-        int exponentRadix = 10;
-        int exponent = 0;
-
-        for (;;)
-        {
-            int digit = _maybeReadDigit(&cursor, exponentRadix);
-            if (digit < 0)
-                break;
-
-            exponent = exponent * exponentRadix + digit;
-        }
-
-        FloatingPointLiteralValue exponentBase = 10;
-        if (radix == 16)
-        {
-            exponentBase = 2;
-        }
-
-        FloatingPointLiteralValue exponentValue = pow(exponentBase, exponent);
-
-        if (exponentIsNegative)
-        {
-            divisor *= exponentValue;
-        }
-        else
-        {
-            value *= exponentValue;
-        }
-    }
-
-    value /= divisor;
 
     if (outSuffix)
-    {
         *outSuffix = UnownedStringSlice(cursor, end);
-    }
+
+    if (outIsOutOfRange)
+        *outIsOutOfRange = isOutOfRange;
+
+    if (outPrecisionLost)
+        *outPrecisionLost = precisionLost;
 
     return value;
 }

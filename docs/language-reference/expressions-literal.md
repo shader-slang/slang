@@ -250,6 +250,14 @@ In either decimal or hexadecimal form, using `#INF` as the exponent signifies th
 positive infinity. The digits before the exponent are ignored. Negative infinity is expressed by preceding
 the literal with unary minus, e.g. `-1#INFf`.
 
+The literal evaluation rules are as follows:
+
+1. If the literal is too large for its type, its value is infinity and a warning is issued.
+2. If the literal is non-zero and too small for its type, its value is `0` and a warning is issued.
+3. Decimal literals are rounded to the nearest representable value (ties to even). No warning is
+   issued when rounding changes the value.
+4. Hexadecimal literals are truncated (rounded toward zero) to a representable value. A warning is
+   issued when truncation changes the value.
 
 **Examples:**
 
@@ -278,9 +286,6 @@ the literal with unary minus, e.g. `-1#INFf`.
 ```
 
 > 📝 **Remark 1:** A floating-point literal expression without a suffix has type `float`.
-
-> 📝 **Remark 2:** The current implementation does not fully conform to the language manual.
-> This is tracked by GitHub issue [#11276](https://github.com/shader-slang/slang/issues/11276).
 
 
 ## String Literal Expressions

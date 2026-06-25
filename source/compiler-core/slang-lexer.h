@@ -186,9 +186,18 @@ IntegerLiteralValue getIntegerLiteralValue(
     UnownedStringSlice* outSuffix = 0,
     bool* outIsDecimalBase = 0,
     bool* outHasOverflowed = 0);
+
+// When *outIsOutOfRange is true, the return value is either:
+// - 0        - underflow (between 0 and denormal min)
+// - INFINITY - overflow (above maximum double value)
+//
+// When *outPrecisionLost is true, the significand was truncated. Reported
+// only when *outIsOutOfRange is false.
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
-    UnownedStringSlice* outSuffix = 0);
+    UnownedStringSlice* outSuffix = 0,
+    bool* outIsOutOfRange = 0,
+    bool* outPrecisionLost = 0);
 
 // Returns a positive 32-bit code point in range [0, 0xffffffff] on success or
 // -1 on failure. A failure is also diagnosed.
