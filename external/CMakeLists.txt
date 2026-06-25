@@ -165,8 +165,8 @@ target_include_directories(
     INTERFACE "${CMAKE_CURRENT_LIST_DIR}/metal-cpp"
 )
 
-# fast_float headers (header-only). Mark as a system include so the
-# bundled headers don't trip Slang's extra warnings / -Werror.
+# fast_float headers (header-only). Mark as a system include so the bundled
+# (or override-supplied) headers don't trip Slang's extra warnings / -Werror.
 add_library(fast_float INTERFACE)
 if(NOT SLANG_OVERRIDE_FAST_FLOAT_PATH)
     set(_fast_float_include "${CMAKE_CURRENT_LIST_DIR}/fast_float/include")
@@ -174,6 +174,17 @@ else()
     set(_fast_float_include
         "${SLANG_OVERRIDE_FAST_FLOAT_PATH}/fast_float/include"
     )
+    # The add_subdirectory-based overrides fail at configure time on a bad path
+    # because CMake errors on a missing source directory. A header-only override
+    # is just an include-dir string, so validate the user-supplied path here to
+    # fail loudly at configure time rather than as an opaque "header not found"
+    # compile error later.
+    if(NOT EXISTS "${_fast_float_include}")
+        message(
+            FATAL_ERROR
+            "SLANG_OVERRIDE_FAST_FLOAT_PATH is set to '${SLANG_OVERRIDE_FAST_FLOAT_PATH}' but '${_fast_float_include}' does not exist"
+        )
+    endif()
 endif()
 target_include_directories(
     fast_float
