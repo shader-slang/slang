@@ -5638,9 +5638,14 @@ static SlangResult runUnitTestModule(
 
                 bool isFailed = (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail);
 
-                // If the rpc failed, output an error message
+                // If the rpc failed, the test-server never returned a result code, so
+                // exeRes.resultCode is still its init value (0 == Success). Mark the test
+                // as failed so the recorded result is honest; otherwise a crashed test-server
+                // is reported as a passing test (e.g. on the retry pass, which falls through
+                // to addResult(testResult) below).
                 if (SLANG_FAILED(rpcRes))
                 {
+                    testResult = TestResult::Fail;
                     reporter->message(TestMessageType::RunError, "rpc failed");
                 }
 
