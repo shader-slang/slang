@@ -516,24 +516,54 @@ func (m *Manager) reserveCreate(runnerName string, candidates []zoneCandidate) (
 		selected = candidates[m.nextNonGPUZone%len(candidates)]
 		m.nextNonGPUZone++
 	} else {
-		pendingByRegion := make(map[string]int)
-		for _, pending := range m.pendingCreates {
-			pendingByRegion[pending.region]++
-		}
-
-		for _, candidate := range candidates {
-			if candidate.available <= float64(pendingByRegion[candidate.region]) {
-				continue
-			}
-			selected = candidate
-			break
-		}
-		if selected.zone == "" {
-			return zoneCandidate{}, fmt.Errorf("no candidate zones have unreserved %s quota", m.config.GPUType)
+		var err error
+		selected, err = m.selectGPUZone(candidates)
+		if err != nil {
+			return zoneCandidate{}, err
 		}
 	}
 
 	m.pendingCreates[runnerName] = selected
+	return selected, nil
+}
+
+// selectGPUZone picks a GPU zone for a new reservation given the quota-ordered
+// candidates from selectZones and the creates already in flight. Quota is
+// enforced per region (GCP's GPU quota is regional), so a region is only
+// eligible while its reported availability exceeds the reservations already
+// pending against it. Among eligible candidates it keeps selectZones' region
+// ordering (most-available region first) but, within the chosen region,
+// spreads onto the zone with the fewest pending reservations — otherwise
+// concurrent creates would all herd onto the first zone in the region and
+// recreate the zonal stockouts this fan-out is meant to avoid. The caller must
+// hold m.mu.
+func (m *Manager) selectGPUZone(candidates []zoneCandidate) (zoneCandidate, error) {
+	pendingByRegion := make(map[string]int)
+	pendingByZone := make(map[string]int)
+	for _, pending := range m.pendingCreates {
+		pendingByRegion[pending.region]++
+		pendingByZone[pending.zone]++
+	}
+
+	var selected zoneCandidate
+	for _, candidate := range candidates {
+		if candidate.available <= float64(pendingByRegion[candidate.region]) {
+			continue
+		}
+		switch {
+		case selected.zone == "":
+			selected = candidate
+		case candidate.region != selected.region:
+			// candidates are region-ordered, so once we leave the
+			// already-selected region there is no better choice.
+			return selected, nil
+		case pendingByZone[candidate.zone] < pendingByZone[selected.zone]:
+			selected = candidate
+		}
+	}
+	if selected.zone == "" {
+		return zoneCandidate{}, fmt.Errorf("no candidate zones have unreserved %s quota", m.config.GPUType)
+	}
 	return selected, nil
 }
 
