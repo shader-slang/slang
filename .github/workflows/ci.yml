@@ -82,11 +82,11 @@ jobs:
       runs-on: '["Linux", "self-hosted", "build", "GCP"]'
       container-user: "1003:1003"
 
-  # NOTE: wasm stays on GitHub-hosted for now. It builds directly on the host
-  # (no container) via ci-slang-build.yml, and the GCP build runner image lacks
-  # the host build toolchain (cmake), so it fails there with "cmake: command not
-  # found". Moving it onto the build pool requires running it in the CI
-  # container like the other Linux builds — tracked as a follow-up.
+  # WASM build runs directly on the host (no container) via ci-slang-build.yml.
+  # Stays on GitHub-hosted ubuntu-22.04 for now: the GCP build image lacks the
+  # gcc host toolchain it needs (the native generators stage fails with
+  # CMAKE_CXX_COMPILER not set — no g++). Moving it requires either adding g++
+  # to the image or running the build in a container; tracked as a follow-up.
   build-linux-release-gcc-wasm:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
@@ -99,14 +99,18 @@ jobs:
       runs-on: '["ubuntu-22.04"]'
 
   # Sanitizer build+test (blocking via check-ci, runs on every PR). Runs in the
-  # clang CI container; kept on GitHub-hosted until validated on the GCP build
-  # pool (tracked with the wasm container follow-up).
+  # clang CI container (`--user root`, so no container-user concern) on the GCP
+  # build pool. id-token requested explicitly for GCP Workload Identity auth.
   sanitizer-linux-clang-x86_64:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-sanitizer.yml
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
     with:
-      runs-on: '["ubuntu-22.04"]'
+      runs-on: '["Linux", "self-hosted", "build", "GCP"]'
 
   # macOS builds
   build-macos-debug-clang-aarch64:
