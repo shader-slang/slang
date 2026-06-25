@@ -1,12 +1,16 @@
 // Companion regression for https://github.com/shader-slang/slang/issues/11731.
 //
 // gh-11731.slang covers `__atomic_add` (the `OpAtomicIAdd` path through
-// `emitMemorySemanticMask`). This file covers `Atomic<T>` load/store/exchange/
-// compareExchange, which additionally route through `isAtomicableAddressSpace`:
-// when targeting SPIR-V < 1.4 an SSBO pointer is in the legacy `Uniform` storage
-// class (BufferBlock model), and if that gate does not recognize the `Uniform`
-// spelling load/store degrade to non-atomic `OpLoad`/`OpStore` while exchange
-// aborts the compiler.
+// `emitMemorySemanticMask` -- gate-1, the Memory Semantics storage-class mask).
+// This file covers `Atomic<T>` load/store/exchange/compareExchange. Of those,
+// load/store/exchange additionally route through `isAtomicableAddressSpace`
+// (gate-2): when targeting SPIR-V < 1.4 an SSBO pointer is in the legacy
+// `Uniform` storage class (BufferBlock model), and if that gate does not
+// recognize the `Uniform` spelling load/store degrade to non-atomic
+// `OpLoad`/`OpStore` while exchange aborts the compiler. compareExchange does
+// NOT gate on atomicability -- it emits its atomic opcode unconditionally -- so
+// it exercises only gate-1; it is included here for the dual-mask coverage
+// described at its CHECK below.
 //
 // The `-profile spirv_1_3` target forces the pre-1.4 `Uniform`/`BufferBlock`
 // SSBO model, and every op must still emit its atomic opcode with the
