@@ -160,7 +160,7 @@ def main():
         "--repo", default=os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPO)
     )
     parser.add_argument("--workflow", default=DEFAULT_WORKFLOW)
-    parser.add_argument("--lookback-hours", type=int, default=12)
+    parser.add_argument("--lookback-hours", type=int, default=16)
     parser.add_argument(
         "--max-attempts",
         type=int,

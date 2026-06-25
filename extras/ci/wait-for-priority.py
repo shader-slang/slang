@@ -126,12 +126,12 @@ def main():
     parser.add_argument(
         "--max-yield-hours",
         type=float,
-        default=8.0,
+        default=12.0,
         help=(
             "Anti-starvation ceiling: once this run has been waiting longer "
             "than this many hours (measured from its original creation, across "
             "reruns), stop yielding and proceed regardless of higher-priority "
-            "CI. Default: 8."
+            "CI. Default: 12."
         ),
     )
     parser.add_argument(
