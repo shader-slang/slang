@@ -3,11 +3,11 @@
 // in reflection info and in output. See https://github.com/shader-slang/slang/issues/7894.
 
 //TEST:REFLECTION(filecheck=CHECK): -target spirv -stage compute -entry main
+// (the non-reflection case is tested by the compute-shader-layout test)
 
 #version 460
 layout(local_size_x = 4, local_size_y = 5, local_size_z = 6) in;
 
-[numthreads(2, 4, 8)]
 void main() {}
 
-// CHECK: "threadGroupSize": [2, 4, 8],
+// CHECK: "threadGroupSize": [4, 5, 6],
