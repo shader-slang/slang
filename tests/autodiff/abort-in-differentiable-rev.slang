@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -capability abort -skip-spirv-validation
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -capability abort
 
 // Document the current reverse-mode autodiff behavior for abort() in a
 // differentiable function.
