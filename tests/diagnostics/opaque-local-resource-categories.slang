@@ -8,6 +8,7 @@
 
 Texture2D<float> t0, t1;
 SamplerState s0, s1;
+SubpassInput<float4> sp0, sp1;
 
 // SamplerState selected via `?:`.
 [noinline]
@@ -31,10 +32,19 @@ Texture2D<float> selIfElse(bool b)
 }
 //CHECK-DAG: opaque-typed value ('Texture2D') cannot be placed in a function-local variable
 
+// SubpassInput selected via `?:` (Vulkan-only, fragment-stage opaque handle).
+[noinline]
+SubpassInput<float4> selSubpass(bool b)
+{
+    return b ? sp1 : sp0;
+}
+//CHECK-DAG: opaque-typed value ('SubpassInput') cannot be placed in a function-local variable
+
 [shader("fragment")]
 float main(bool b) : SV_Target
 {
     float v = t0.Sample(selSampler(b), float2(0, 0));
     v += selIfElse(b).Sample(s0, float2(0, 0));
+    v += selSubpass(b).SubpassLoad().x;
     return v;
 }

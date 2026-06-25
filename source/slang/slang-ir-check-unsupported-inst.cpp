@@ -83,14 +83,15 @@ static IRType* findUnstorableOpaqueHandleType(IRType* type)
 
 void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
 {
-    // Khronos targets (SPIR-V and GLSL) cannot place an
+    // Khronos targets (SPIR-V and GLSL) and WGSL cannot place an
     // image/sampler/subpass/acceleration-structure handle in a function-local
-    // variable: SPIR-V forbids OpStore/OpLoad (and OpPhi) of such a handle, and
-    // GLSL likewise forbids opaque-typed locals. A local variable of one of those
-    // types reaching here is invalid output we cannot legalize yet (issue #10526,
-    // typically from selecting or returning a resource through control flow);
-    // reject it with a diagnostic rather than emitting invalid code.
-    const bool rejectOpaqueLocals = isKhronosTarget(target);
+    // variable: SPIR-V forbids OpStore/OpLoad (and OpPhi) of such a handle, GLSL
+    // likewise forbids opaque-typed locals, and WGSL requires handle-address-space
+    // variables (textures/samplers) to be module-scope. A local variable of one
+    // of those types reaching here is invalid output we cannot legalize yet
+    // (issue #10526, typically from selecting or returning a resource through
+    // control flow); reject it with a diagnostic rather than emitting invalid code.
+    const bool rejectOpaqueLocals = isKhronosTarget(target) || isWGPUTarget(target);
 
     for (auto block : func->getBlocks())
     {

@@ -14,7 +14,7 @@ Texture1D<float> returnHelper(Texture1D<float> a, Texture1D<float> b, bool useSe
 {
     return useSecond ? b : a;
 //CHECK:             ^ opaque type in local variable is not supported for Khronos targets
-//CHECK:             ^ a resource or other opaque-typed value ('Texture1D') cannot be placed in a function-local variable for Khronos targets (SPIR-V/GLSL); this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function
+//CHECK:             ^ a resource or other opaque-typed value ('Texture1D') cannot be placed in a function-local variable for Khronos targets (SPIR-V/GLSL) or WGSL; this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function
 }
 
 [shader("fragment")]
