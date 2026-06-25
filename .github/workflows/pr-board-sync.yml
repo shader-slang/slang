@@ -4,9 +4,28 @@ name: PR Board Sync (reusable)
 # state on the shared "Slang PR Tracking" ProjectsV2 board:
 #   - adds the PR to the board (idempotent),
 #   - classifies + sets its Source (Internal / Community / Bot),
-#   - advances its Status (Revising / Todo / In Progress / Done) on the
-#     event-driven happy path, and
+#   - advances its Status (In Review / Revising / Snagged / Approved / Done)
+#     on the event-driven happy path, and
 #   - unrequests auto-assigned reviewers that cannot approve (e.g. bmillsNV).
+#
+# Status state machine (two variants that differ ONLY on a CI failure):
+#   - In Review  - default for an open PR; also re-set whenever a new commit
+#                  arrives (the commit has no review feedback yet). A Bot PR's
+#                  draft lands here too, so a human owner can see/shepherd it
+#                  (unless a reviewer requested changes, which wins -> Revising).
+#   - Revising   - the author is still working: a human draft, or a reviewer
+#                  requested changes (not yet superseded by a newer commit). A Bot
+#                  PR's CI failure also lands here.
+#   - Snagged    - needs a human's attention: a human PR's CI failed, or an
+#                  approved PR has green CI but is not in the merge queue (it fell
+#                  out, or needs a human to enqueue/merge it).
+#   - Approved   - not a draft, already has an approving review, and is still
+#                  waiting on something automated: CI is pending, or it is sitting
+#                  in the merge queue.
+#   - Done       - the PR is closed (merged or otherwise); terminal.
+# Bot vs. human: on a CI failure a Bot PR goes to Revising (the bot fixes it
+# itself); a human PR (Internal/Community) goes to Snagged. The merge-queue drop
+# is Snagged for both, since a human assignee always resolves that.
 #
 # This is the event-driven half of the slang-pr-maintenance state machine. The
 # committer-signal owner/reviewer *assignment* and full drift reconciliation
@@ -30,8 +49,12 @@ name: PR Board Sync (reusable)
 # org-wide, so `secrets: inherit` from any org repo supplies them — no per-repo
 # setup):
 #   ADD_TO_PROJECT_PAT        - PAT with ProjectV2 read+write on the board.
-#   SLANGBOT_MEMBERS_READONLY - PAT/token that can read org membership (used to
-#                               classify Internal vs Community on opened PRs).
+#   SLANGBOT_MEMBERS_READONLY - PAT/token that can read a repo collaborator's
+#                               permission level (used to classify Internal vs
+#                               Community by repo write access on opened PRs).
+#                               Reading collaborator permission needs push access
+#                               on the repo; on any read error classification
+#                               fails safe to Community.
 #
 # Safety: every job runs only on PR metadata / API calls and never checks out or
 # executes PR code, so `pull_request_target` (secrets available for fork PRs) is
@@ -40,10 +63,6 @@ name: PR Board Sync (reusable)
 on:
   workflow_call:
     inputs:
-      org:
-        description: "GitHub org that owns the board and team membership."
-        type: string
-        default: "shader-slang"
       project_id:
         description: "ProjectsV2 board node id (the 'Slang PR Tracking' board)."
         type: string
@@ -52,15 +71,18 @@ on:
         description: "Single-select field name for the board Status."
         type: string
         default: "Status"
+      status_inreview:
+        type: string
+        default: "In Review"
       status_revising:
         type: string
         default: "Revising"
-      status_todo:
+      status_snagged:
         type: string
-        default: "Todo"
-      status_inprogress:
+        default: "Snagged"
+      status_approved:
         type: string
-        default: "In Progress"
+        default: "Approved"
       status_done:
         type: string
         default: "Done"
@@ -93,7 +115,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      # --- Classify Source (org-membership read; opened/reopened only) --------
+      # --- Classify Source (repo write-access read; opened/reopened only) ------
       - name: Classify PR Source
         id: classify
         if: >-
@@ -101,7 +123,6 @@ jobs:
           (github.event.action == 'opened' || github.event.action == 'reopened')
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
-          ORG: ${{ inputs.org }}
           BOT_AUTHORS: ${{ inputs.bot_authors }}
           SOURCE_INTERNAL: ${{ inputs.source_internal }}
           SOURCE_COMMUNITY: ${{ inputs.source_community }}
@@ -120,22 +141,27 @@ jobs:
             if (isBot) {
               source = process.env.SOURCE_BOT;
             } else {
-              let isOrgMember = false;
+              // Internal iff the author has write (push) access to this repo, i.e.
+              // they can approve workflow runs and approve/merge PRs. Everyone else
+              // -- org members without write here, and fork contributors -- is
+              // Community. Mirrors pr_sweep.py classify_source (collaborators with
+              // permissions.push == true). On any read error, fail safe to Community.
+              let canWrite = false;
               try {
-                await github.rest.orgs.checkMembershipForUser({
-                  org: process.env.ORG,
+                const resp = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
                   username: login,
                 });
-                isOrgMember = true;
+                canWrite = resp.data?.user?.permissions?.push === true;
               } catch (error) {
-                if (error.status !== 404) {
-                  throw error;
-                }
+                core.warning(
+                  `could not read ${login} permission (${error.status}); treating as Community`);
               }
-              source = isOrgMember
+              source = canWrite
                 ? process.env.SOURCE_INTERNAL
                 : process.env.SOURCE_COMMUNITY;
-              console.log(`PR author ${login}; org member: ${isOrgMember}`);
+              console.log(`PR author ${login}; write access: ${canWrite}`);
             }
             core.setOutput("source", source);
 
@@ -148,12 +174,14 @@ jobs:
         env:
           PROJECT_ID: ${{ inputs.project_id }}
           STATUS_FIELD: ${{ inputs.status_field }}
+          STATUS_INREVIEW: ${{ inputs.status_inreview }}
           STATUS_REVISING: ${{ inputs.status_revising }}
-          STATUS_TODO: ${{ inputs.status_todo }}
-          STATUS_INPROGRESS: ${{ inputs.status_inprogress }}
+          STATUS_SNAGGED: ${{ inputs.status_snagged }}
+          STATUS_APPROVED: ${{ inputs.status_approved }}
           STATUS_DONE: ${{ inputs.status_done }}
           SOURCE_FIELD: ${{ inputs.source_field }}
           SOURCE_VALUE: ${{ steps.classify.outputs.source }}
+          SOURCE_BOT: ${{ inputs.source_bot }}
           BOT_AUTHORS: ${{ inputs.bot_authors }}
         with:
           github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
@@ -161,9 +189,10 @@ jobs:
             const PROJECT_ID = process.env.PROJECT_ID;
             const STATUS = {
               field: process.env.STATUS_FIELD,
+              inreview: process.env.STATUS_INREVIEW,
               revising: process.env.STATUS_REVISING,
-              todo: process.env.STATUS_TODO,
-              inprogress: process.env.STATUS_INPROGRESS,
+              snagged: process.env.STATUS_SNAGGED,
+              approved: process.env.STATUS_APPROVED,
               done: process.env.STATUS_DONE,
             };
             const SOURCE_FIELD = process.env.SOURCE_FIELD;
@@ -222,7 +251,9 @@ jobs:
               console.log(`set ${fieldName} = ${optionName}`);
             }
 
-            async function currentStatus(itemId) {
+            // Read a single-select field's current value name on a board item
+            // (e.g. the PR's Source), or null when unset.
+            async function itemSingleSelect(itemId, fieldName) {
               const data = await github.graphql(`
                 query($item: ID!, $name: String!) {
                   node(id: $item) {
@@ -232,7 +263,7 @@ jobs:
                       }
                     }
                   }
-                }`, { item: itemId, name: STATUS.field });
+                }`, { item: itemId, name: fieldName });
               return data?.node?.fieldValueByName?.name || null;
             }
 
@@ -250,7 +281,10 @@ jobs:
               return "passed";
             }
 
-            // One query per PR: node id, draft + author (bot) + CI rollup.
+            // One query per PR: everything computeTarget needs - draft, author
+            // (bot), merge-queue membership, CI rollup, the latest opinionated
+            // reviews (approve / changes-request), the head commit date and the
+            // last review time (to tell whether a commit landed after the review).
             async function prInfo(number) {
               const data = await github.graphql(`
                 query($owner: String!, $name: String!, $n: Int!) {
@@ -258,7 +292,10 @@ jobs:
                     pullRequest(number: $n) {
                       id isDraft state
                       author { login __typename }
-                      commits(last: 1) { nodes { commit { statusCheckRollup {
+                      mergeQueueEntry { id }
+                      latestOpinionatedReviews(first: 100) { nodes { state } }
+                      reviews(last: 1) { nodes { submittedAt } }
+                      commits(last: 1) { nodes { commit { committedDate statusCheckRollup {
                         contexts(first: 100) { nodes {
                           __typename
                           ... on CheckRun { status conclusion }
@@ -270,8 +307,8 @@ jobs:
                 }`, { owner: context.repo.owner, name: context.repo.repo, n: number });
               const pr = data?.repository?.pullRequest;
               if (!pr) return null;
-              const contexts =
-                pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes || [];
+              const headCommit = pr.commits?.nodes?.[0]?.commit || {};
+              const contexts = headCommit.statusCheckRollup?.contexts?.nodes || [];
               const runs = [];
               for (const c of contexts) {
                 if (c.__typename === "CheckRun") {
@@ -288,33 +325,68 @@ jobs:
               }
               const login = (pr.author?.login || "").toLowerCase();
               const isBot = pr.author?.__typename === "Bot" || BOT_AUTHORS.includes(login);
-              return { nodeId: pr.id, isDraft: pr.isDraft, isBot, ci: summarizeCi(runs) };
+              // Per-reviewer latest opinions: a current changes-request, or an
+              // approval with no outstanding changes-request.
+              const opinions = (pr.latestOpinionatedReviews?.nodes || []).map(r => r.state);
+              const changeRequested = opinions.includes("CHANGES_REQUESTED");
+              const approved = opinions.includes("APPROVED") && !changeRequested;
+              // A review counts only if no commit landed after it (a newer commit
+              // makes the feedback stale -> the PR is back to In Review).
+              const headAt = headCommit.committedDate;
+              const lastReviewAt = pr.reviews?.nodes?.[0]?.submittedAt || null;
+              const reviewed = !(headAt && lastReviewAt && new Date(headAt) > new Date(lastReviewAt));
+              return {
+                nodeId: pr.id, isDraft: pr.isDraft, isBot,
+                ci: summarizeCi(runs), approved, changeRequested, reviewed,
+                inMergeQueue: pr.mergeQueueEntry != null,
+              };
             }
 
-            // CI-driven transition (mirror _correct_failing_ci + promotion):
-            //   non-bot failing CI in Todo/In Progress  -> Revising (demote)
-            //   gate passed + not draft, in Revising/none -> Todo (promote)
-            async function evaluateCi(number, nodeId) {
+            // The Status an OPEN PR should currently carry, from observed state.
+            // This is the single source of truth for the event machine and MUST
+            // stay identical to target_status() in scripts/pr_sweep.py so the
+            // cadence sweep never fights this workflow. Priority (first match wins):
+            //   1. A current changes-request -> Revising (must revise; ranked above
+            //      the draft rule so even a Bot draft with a changes-request is
+            //      Revising). "Current" means no commit landed after the review.
+            //   2. Draft -> a human draft is Revising (author still working); a Bot
+            //      draft is In Review, since bot PRs arrive as drafts and a human
+            //      owner must see/shepherd them. (Ranked above CI, so a Bot draft
+            //      with merely failing CI still shows In Review.)
+            //   3. CI failed -> Revising (Bot, fixes itself) / Snagged (human).
+            //   4. Approved + not stale: Approved while still waiting on something
+            //      automated (CI pending, or in the merge queue); Snagged once CI
+            //      is green and it is NOT queued (nothing automated left - a human
+            //      must enqueue/merge it; also how a merge-queue drop reads).
+            //   5. Otherwise -> In Review (awaiting review, CI pending, or a fresh
+            //      commit with no feedback yet).
+            function computeTarget(info) {
+              if (info.reviewed && info.changeRequested) return STATUS.revising;
+              if (info.isDraft) return info.isBot ? STATUS.inreview : STATUS.revising;
+              if (info.ci === "failed") return info.isBot ? STATUS.revising : STATUS.snagged;
+              if (info.reviewed && info.approved) {
+                return (info.ci === "passed" && !info.inMergeQueue)
+                  ? STATUS.snagged : STATUS.approved;
+              }
+              return STATUS.inreview;
+            }
+
+            // Reconcile a PR's board Status to computeTarget(observed state). Used
+            // by every event that can change the lattice state, so each event just
+            // recomputes the whole target rather than hard-coding a transition.
+            async function reconcileStatus(number, nodeId, itemId) {
               const info = await prInfo(number);
               if (!info) return;
-              const itemId = await ensureItem(nodeId || info.nodeId);
+              itemId = itemId || await ensureItem(nodeId || info.nodeId);
               if (!itemId) return;
-              const status = await currentStatus(itemId);
-              if (info.ci === "failed" && !info.isBot &&
-                  (status === STATUS.todo || status === STATUS.inprogress)) {
-                await setSingleSelect(itemId, STATUS.field, STATUS.revising);
-                return;
-              }
-              const gatePassed = info.isBot ? true : info.ci === "passed";
-              if (gatePassed && !info.isDraft &&
-                  (status === null || status === STATUS.revising)) {
-                await setSingleSelect(itemId, STATUS.field, STATUS.todo);
-              }
-            }
-
-            function isBotUser(user) {
-              return user?.type === "Bot" ||
-                BOT_AUTHORS.includes((user?.login || "").toLowerCase());
+              // Resolve is_bot exactly like pr_sweep.py: trust the board Source
+              // when set (authoritative; honors a manual override), else the
+              // freshly-classified value (opened/reopened), else the author-derived
+              // value from prInfo. is_bot is then "Source == Bot".
+              const resolvedSource =
+                (await itemSingleSelect(itemId, SOURCE_FIELD)) || process.env.SOURCE_VALUE || "";
+              if (resolvedSource) info.isBot = (resolvedSource === process.env.SOURCE_BOT);
+              await setSingleSelect(itemId, STATUS.field, computeTarget(info));
             }
 
             // --- Dispatch on the triggering event ----------------------------
@@ -327,43 +399,77 @@ jobs:
               if (!itemId) { core.warning("could not add PR to board"); return; }
 
               if (action === "opened" || action === "reopened") {
+                // Set the classified Source only when the board has none yet, so
+                // an existing value (incl. a manual override, e.g. on reopen) is
+                // authoritative - matching pr_sweep.py, which only backfills Source.
                 const source = process.env.SOURCE_VALUE;
-                if (source) await setSingleSelect(itemId, SOURCE_FIELD, source);
+                if (source && !(await itemSingleSelect(itemId, SOURCE_FIELD))) {
+                  await setSingleSelect(itemId, SOURCE_FIELD, source);
+                }
               }
 
               if (action === "closed") {
+                // Closed (merged or otherwise) -> Done; terminal, and the only
+                // state not derived from computeTarget (a closed PR is not open).
                 await setSingleSelect(itemId, STATUS.field, STATUS.done);
-              } else if (action === "converted_to_draft") {
-                // Human drafts belong in Revising; bot drafts are not exempt.
-                if (!isBotUser(pr.user)) {
-                  await setSingleSelect(itemId, STATUS.field, STATUS.revising);
-                }
-              } else if (action === "opened") {
-                // Entry state; CI / ready_for_review events promote later.
-                const status = await currentStatus(itemId);
-                if (status === null) {
-                  await setSingleSelect(itemId, STATUS.field, STATUS.revising);
-                }
-              } else if (action === "ready_for_review" || action === "reopened") {
-                await evaluateCi(pr.number, pr.node_id);
+              } else if (action === "dequeued") {
+                // Fell out of the merge queue -> Snagged (a human re-queues/merges).
+                // The cadence sweep agrees: a dequeue does not change the head
+                // commit, and a PR needs green CI to have been enqueued, so the
+                // dropped PR reads approved + green + un-queued, which computeTarget
+                // also maps to Snagged. (A new commit is the one thing that makes
+                // head CI pending, but that dequeues via `synchronize` -> In Review.)
+                await setSingleSelect(itemId, STATUS.field, STATUS.snagged);
+              } else {
+                // opened / reopened / synchronize / enqueued / ready_for_review /
+                // converted_to_draft: recompute the whole target from current state.
+                await reconcileStatus(pr.number, pr.node_id, itemId);
               }
             } else if (ev === "pull_request_review") {
-              if ((context.payload.review?.state || "").toLowerCase() === "changes_requested") {
-                const pr = context.payload.pull_request;
-                const itemId = await ensureItem(pr.node_id);
-                if (itemId) await setSingleSelect(itemId, STATUS.field, STATUS.revising);
-              }
+              // Any review (approve / changes-request / dismiss) -> recompute.
+              const pr = context.payload.pull_request;
+              const itemId = await ensureItem(pr.node_id);
+              if (itemId) await reconcileStatus(pr.number, pr.node_id, itemId);
             } else if (ev === "check_suite") {
-              // Only same-repo PRs are linked here (fork PRs are covered by the
-              // periodic pr_sweep.py reconcile).
-              const prs = context.payload.check_suite?.pull_requests || [];
-              for (const p of prs) {
-                if (p.state && p.state !== "open") continue;
-                await evaluateCi(p.number, null);
+              // check_suite is commit-scoped, not PR-scoped. GitHub only lists
+              // *same-repo* PRs in check_suite.pull_requests (it is empty for fork
+              // PRs), so also resolve the suite's head SHA to its open PR(s) via
+              // the API - that covers fork PRs - and union the two. A CI
+              // completion recomputes the target, so a green run also recovers a
+              // Snagged/Revising PR. (One commit can head several PRs, hence a set.)
+              const suite = context.payload.check_suite || {};
+              const numbers = new Set();
+              for (const p of (suite.pull_requests || [])) {
+                if (!p.state || p.state === "open") numbers.add(p.number);
+              }
+              if (suite.head_sha) {
+                try {
+                  const assoc = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    commit_sha: suite.head_sha,
+                  });
+                  for (const p of (assoc.data || [])) {
+                    if (p.state === "open") numbers.add(p.number);
+                  }
+                } catch (error) {
+                  core.warning(
+                    `could not resolve PRs for ${suite.head_sha} (${error.status})`);
+                }
+              }
+              for (const number of numbers) {
+                await reconcileStatus(number, null);
               }
             }
 
       # --- Unrequest auto-assigned non-approver reviewers --------------------
+      # TODO(maintainer): reconcile this with scripts/pr_sweep.py, which unrequests
+      # the ignored reviewers (e.g. bmillsNV) only when it *assigns* a PR (a
+      # deliberate action), not on every event. That sweep behavior is preferred;
+      # this step instead fires broadly on opened/reopened/ready_for_review/
+      # review_requested. Figure out the right workflow equivalent (the workflow
+      # never assigns, so options include narrowing the triggers or moving the
+      # unrequest entirely to the cadence sweep).
       - name: Unrequest ignored reviewers
         if: >-
           github.event_name == 'pull_request_target' &&
