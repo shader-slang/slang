@@ -22316,6 +22316,328 @@ $}
             };
         }
     };
+
+    // --------------------------------------------------------------------
+    // Line-swept-spheres (LSS) and sphere geometry ray-query accessors.
+    //
+    // These expose the inline-ray-query side of the LSS feature added with
+    // the SPV_NV_linear_swept_spheres SPIR-V extension and the NVAPI NvRt*
+    // ray-query calls. Each accessor has a "candidate" form (the primitive
+    // currently being considered during traversal) and a "committed" form
+    // (the closest accepted hit). The IsNonOpaque* candidate checks report
+    // whether a candidate sphere/LSS is non-opaque so the shader can decide
+    // whether to commit it; their committed counterparts report the hit type.
+    //
+    // Targets: HLSL (via NVAPI), GLSL, and SPIR-V (SPV_NV_linear_swept_spheres).
+    // SPIR-V encodes candidate vs committed via the Intersection operand
+    // (candidate == 0, committed == 1); GLSL via the boolean second argument
+    // (false == candidate, true == committed).
+    // --------------------------------------------------------------------
+
+    /// Gets the object-space center position (xyz) and radius (w) of the
+    /// candidate sphere primitive.
+    /// @return float4 where xyz is the sphere center and w is the radius
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    float4 CandidateSphereObjectPositionAndRadiusNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateSphereObjectPositionAndRadius";
+        case glsl: __intrinsic_asm "vec4(rayQueryGetIntersectionSpherePositionNV($0, false), rayQueryGetIntersectionSphereRadiusNV($0, false))";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingSpheresGeometryNV;
+                %pos:$$float3 = OpRayQueryGetIntersectionSpherePositionNV &this $iCandidate;
+                %rad:$$float = OpRayQueryGetIntersectionSphereRadiusNV &this $iCandidate;
+                result:$$float4 = OpCompositeConstruct %pos %rad;
+            };
+        }
+    }
+
+    /// Gets the object-space center position (xyz) and radius (w) of the
+    /// committed sphere primitive.
+    /// @return float4 where xyz is the sphere center and w is the radius
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    float4 CommittedSphereObjectPositionAndRadiusNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedSphereObjectPositionAndRadius";
+        case glsl: __intrinsic_asm "vec4(rayQueryGetIntersectionSpherePositionNV($0, true), rayQueryGetIntersectionSphereRadiusNV($0, true))";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingSpheresGeometryNV;
+                %pos:$$float3 = OpRayQueryGetIntersectionSpherePositionNV &this $iCommitted;
+                %rad:$$float = OpRayQueryGetIntersectionSphereRadiusNV &this $iCommitted;
+                result:$$float4 = OpCompositeConstruct %pos %rad;
+            };
+        }
+    }
+
+    /// Gets the object-space endpoint positions and radii of the candidate
+    /// line-swept-sphere (LSS) primitive.
+    /// @return float2x4 whose rows are (endpoint.xyz, radius) for the two LSS endpoints
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float2x4 CandidateLssObjectPositionsAndRadiiNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateLssObjectPositionsAndRadii";
+        case glsl:
+            // glslang requires the candidate/committed selector to be a
+            // compile-time constant, so the literal is baked into a dedicated
+            // helper rather than passed as a runtime argument.
+            __requirePrelude(R"(
+                mat2x4 _slang_rayQueryGetCandidateLssPositionsAndRadii(rayQueryEXT rq) {
+                    vec3 _slang_lss_p[2];
+                    float _slang_lss_r[2];
+                    rayQueryGetIntersectionLSSPositionsNV(rq, false, _slang_lss_p);
+                    rayQueryGetIntersectionLSSRadiiNV(rq, false, _slang_lss_r);
+                    return mat2x4(vec4(_slang_lss_p[0], _slang_lss_r[0]), vec4(_slang_lss_p[1], _slang_lss_r[1]));
+                }
+            )");
+            __intrinsic_asm "_slang_rayQueryGetCandidateLssPositionsAndRadii($0)";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                %positions:$$float3[2] = OpRayQueryGetIntersectionLSSPositionsNV &this $iCandidate;
+                %radii:$$float[2] = OpRayQueryGetIntersectionLSSRadiiNV &this $iCandidate;
+                %p0:$$float3 = OpCompositeExtract %positions 0;
+                %p1:$$float3 = OpCompositeExtract %positions 1;
+                %r0:$$float = OpCompositeExtract %radii 0;
+                %r1:$$float = OpCompositeExtract %radii 1;
+                %a:$$float4 = OpCompositeConstruct %p0 %r0;
+                %b:$$float4 = OpCompositeConstruct %p1 %r1;
+                result:$$float2x4 = OpCompositeConstruct %a %b;
+            };
+        }
+    }
+
+    /// Gets the object-space endpoint positions and radii of the committed
+    /// line-swept-sphere (LSS) primitive.
+    /// @return float2x4 whose rows are (endpoint.xyz, radius) for the two LSS endpoints
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float2x4 CommittedLssObjectPositionsAndRadiiNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedLssObjectPositionsAndRadii";
+        case glsl:
+            // glslang requires the candidate/committed selector to be a
+            // compile-time constant, so the literal is baked into a dedicated
+            // helper rather than passed as a runtime argument.
+            __requirePrelude(R"(
+                mat2x4 _slang_rayQueryGetCommittedLssPositionsAndRadii(rayQueryEXT rq) {
+                    vec3 _slang_lss_p[2];
+                    float _slang_lss_r[2];
+                    rayQueryGetIntersectionLSSPositionsNV(rq, true, _slang_lss_p);
+                    rayQueryGetIntersectionLSSRadiiNV(rq, true, _slang_lss_r);
+                    return mat2x4(vec4(_slang_lss_p[0], _slang_lss_r[0]), vec4(_slang_lss_p[1], _slang_lss_r[1]));
+                }
+            )");
+            __intrinsic_asm "_slang_rayQueryGetCommittedLssPositionsAndRadii($0)";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                %positions:$$float3[2] = OpRayQueryGetIntersectionLSSPositionsNV &this $iCommitted;
+                %radii:$$float[2] = OpRayQueryGetIntersectionLSSRadiiNV &this $iCommitted;
+                %p0:$$float3 = OpCompositeExtract %positions 0;
+                %p1:$$float3 = OpCompositeExtract %positions 1;
+                %r0:$$float = OpCompositeExtract %radii 0;
+                %r1:$$float = OpCompositeExtract %radii 1;
+                %a:$$float4 = OpCompositeConstruct %p0 %r0;
+                %b:$$float4 = OpCompositeConstruct %p1 %r1;
+                result:$$float2x4 = OpCompositeConstruct %a %b;
+            };
+        }
+    }
+
+    /// Gets the hit parameter (position along the LSS axis, in [0,1]) for the
+    /// candidate line-swept-sphere intersection.
+    /// @return Scalar hit parameter along the candidate LSS primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float CandidateLssHitParameterNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateLssHitParameter";
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionLSSHitValueNV($0, false)";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$float = OpRayQueryGetIntersectionLSSHitValueNV &this $iCandidate;
+            };
+        }
+    }
+
+    /// Gets the hit parameter (position along the LSS axis, in [0,1]) for the
+    /// committed line-swept-sphere intersection.
+    /// @return Scalar hit parameter along the committed LSS primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float CommittedLssHitParameterNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedLssHitParameter";
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionLSSHitValueNV($0, true)";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$float = OpRayQueryGetIntersectionLSSHitValueNV &this $iCommitted;
+            };
+        }
+    }
+
+    /// Checks whether the candidate intersection is a non-opaque line-swept
+    /// sphere (LSS) primitive.
+    /// @return true if the candidate is a non-opaque LSS primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    bool CandidateIsNonOpaqueLssNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateIsNonOpaqueLss";
+        case glsl: __intrinsic_asm "rayQueryIsLSSHitNV($0, false)";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$bool = OpRayQueryIsLSSHitNV &this $iCandidate;
+            };
+        }
+    }
+
+    /// Checks whether the committed intersection is a line-swept-sphere (LSS)
+    /// primitive.
+    /// @return true if the committed hit is an LSS primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    bool CommittedIsLssNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedIsLss";
+        case glsl: __intrinsic_asm "rayQueryIsLSSHitNV($0, true)";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$bool = OpRayQueryIsLSSHitNV &this $iCommitted;
+            };
+        }
+    }
+
+    /// Checks whether the candidate intersection is a non-opaque sphere
+    /// primitive.
+    /// @return true if the candidate is a non-opaque sphere primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    bool CandidateIsNonOpaqueSphereNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateIsNonOpaqueSphere";
+        case glsl: __intrinsic_asm "rayQueryIsSphereHitNV($0, false)";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingSpheresGeometryNV;
+                result:$$bool = OpRayQueryIsSphereHitNV &this $iCandidate;
+            };
+        }
+    }
+
+    /// Checks whether the committed intersection is a sphere primitive.
+    /// @return true if the committed hit is a sphere primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    bool CommittedIsSphereNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedIsSphere";
+        case glsl: __intrinsic_asm "rayQueryIsSphereHitNV($0, true)";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingSpheresGeometryNV;
+                result:$$bool = OpRayQueryIsSphereHitNV &this $iCommitted;
+            };
+        }
+    }
 }
 
 //
