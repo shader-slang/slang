@@ -11,6 +11,9 @@
 //TEST:SIMPLE(filecheck=MIXED): -target cuda -line-directive-mode none -stage compute -entry mixedOrderMain
 //TEST:SIMPLE(filecheck=NEGNOARR): -target cuda -line-directive-mode none -stage compute -entry noResourceArrayMain
 //TEST:SIMPLE(filecheck=NEGNONRES): -target cuda -line-directive-mode none -stage compute -entry nonResourceArrayMain
+// Compiling every entry point together makes more than one compute kernel qualify, so the driver
+// must bail and hoist nothing (a single module cannot hold two `SLANG_globalParams` symbols).
+//TEST:SIMPLE(filecheck=MULTI): -target cuda -line-directive-mode none
 
 // Positive: a runtime-indexed fixed-size resource array uniform must be hoisted into __constant__.
 [shader("compute")]
@@ -103,3 +106,7 @@ void nonResourceArrayMain(
     output[tid] = scales[tid % 8];
 }
 // NEGNONRES-NOT: SLANG_globalParams
+
+// Multi-kernel module (all entry points compiled together): more than one compute kernel qualifies,
+// so the driver bails and nothing is hoisted.
+// MULTI-NOT: SLANG_globalParams
