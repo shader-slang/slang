@@ -3824,6 +3824,11 @@ T operator |(T v0, T v1);
 
 __generic<T : __EnumType>
 [__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitXor))
+T operator ^(T v0, T v1);
+
+__generic<T : __EnumType>
+[__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitNot))
 __prefix T operator ~(T v0);
 
