@@ -511,18 +511,42 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
             specializeWitnessLookup(cast<IRLookupWitnessMethod>(instWithCanonicalOperands)));
     }
 
+    // Reaching here means no specialization, translation, constant-fold, or witness
+    // lookup applied: this inst's resolution is purely "resolve operands, return self".
+    // It is therefore a structural fixed point — it can never resolve to anything other
+    // than itself — so record it (it is module-scope, guaranteed by the check above) to
+    // skip its O(operandCount) operand re-walk on the next `resolveInst` call. This is the
+    // O(N)-operand hot path: a witness-table / type `set` or `TaggedUnion` type referenced
+    // from many instructions.
+    //
+    // A `LookupWitnessMethod` returned earlier through its own branch and never reaches
+    // here. A set-specialized `Specialize` does fall through (it is left as-is for the
+    // dynamic-dispatch lowering), but unlike the structural set/union *types* it is a
+    // deferred generic application that Phase 2 rewrites and deallocates, so it is not a
+    // permanent fixed point — exclude it. (It is also not the O(N) cost; the cost is the
+    // set type's N members.)
+    if (instWithCanonicalOperands->getOp() != kIROp_Specialize)
+        ctx->recordStructuralFixedPoint(instWithCanonicalOperands);
     return instWithCanonicalOperands;
 }
 
 IRInst* TranslationContext::resolveInst(IRInst* inst)
 {
+    // Fast path: a recorded structural fixed point resolves to itself with no side
+    // effects, so skip the (potentially O(operandCount)) operand re-walk. The entry is
+    // only valid while the inst remains attached to the module; assert that to catch any
+    // future caller that passes an inst removed/deallocated since it was recorded.
+    if (inst && resolvedStructuralFixedPoints.contains(inst))
+    {
+        SLANG_ASSERT(inst->getParent() && as<IRModuleInst>(inst->getParent()));
+        return inst;
+    }
+
     IRBuilder builder(irModule);
     while (auto resolvedInst = _resolveInstRec(this, inst))
     {
         if (resolvedInst == inst)
-        {
             return resolvedInst;
-        }
 
         inst = resolvedInst;
     }
