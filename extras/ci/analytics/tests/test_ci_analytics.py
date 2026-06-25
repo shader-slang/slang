@@ -107,6 +107,34 @@ class TestRunnerTypeCoverage(unittest.TestCase):
             )
             self.assertTrue(self_hosted)
 
+    def test_classify_group_handles_gcp_build_and_analytics_pools(self):
+        """The CPU-only Linux build and analytics scaler pools carry the labels
+        ["Linux","self-hosted","build","GCP"] and
+        ["Linux","self-hosted","analytics","GCP"], and their VMs are named
+        linux-build-* / linux-analytics-*. Both the job-label path and the
+        scale-set runner-name-prefix path (empty labels) must classify into
+        their own GCP groups rather than falling through to "Other". Locks in
+        the shipped config so these pools stay visible in CI analytics.
+        """
+        config = ci_visualization.load_config()
+
+        cases = [
+            (["Linux", "self-hosted", "build", "GCP"], "linux-build-abc123", "Linux Build (GCP)"),
+            (["Linux", "self-hosted", "analytics", "GCP"], "linux-analytics-abc123", "Linux Analytics (GCP)"),
+        ]
+        for labels, runner_name, expected in cases:
+            # Job-label path (no runner name) and the scale-set name-prefix path
+            # (empty labels) must both resolve to the expected GCP group.
+            for name in ("", runner_name):
+                lbls = labels if name == "" else []
+                group, self_hosted = ci_visualization.classify_group(lbls, config, name)
+                self.assertEqual(
+                    group,
+                    expected,
+                    msg=f"misclassified for labels={lbls} runner_name={name!r}",
+                )
+                self.assertTrue(self_hosted)
+
     def test_record_snapshot_counts_all_gcp_runner_types(self):
         queue_data = {
             "summary": {
