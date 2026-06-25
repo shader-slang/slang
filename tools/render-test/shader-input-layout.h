@@ -187,6 +187,12 @@ public:
         InputTextureDesc textureDesc;
     };
 
+    struct BufferAddressRef
+    {
+        Slang::Index dataOffset; // offset in bufferData (in uint32 units)
+        Slang::String bufferName;
+    };
+
     class DataValBase : public Val
     {
     public:
@@ -196,6 +202,7 @@ public:
         }
 
         Slang::List<unsigned int> bufferData;
+        Slang::List<BufferAddressRef> addressRefs;
     };
 
     class BufferVal : public DataValBase

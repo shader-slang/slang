@@ -11,14 +11,11 @@ jobs:
     uses: ./.github/workflows/ci-slang-sanitizer.yml
     with:
       runs-on: '["ubuntu-22.04"]'
-      # Nightly uses the same smoke scope as PR runs: this runs on a
-      # GitHub-hosted CPU runner with the sanitizer workflow's 120-minute
-      # budget. Broader full coverage already exists in the regular
-      # GPU/container CI jobs.
-      # TODO: Expand to test-category: full once we have a dedicated runner
-      # with enough time budget, or after smoke stabilizes with zero findings.
-      test-category: smoke
-      server-count: 2
+      # GitHub-hosted CPU runner. GPU-requiring tests are skipped (no GPU
+      # available); this maximizes coverage of CPU, SPIRV-emit, and
+      # diagnostic tests under sanitizer.
+      server-count: 1
+      timeout-minutes: 90
     secrets: inherit
 
   notify:
@@ -28,7 +25,7 @@ jobs:
     steps:
       - name: Success notification
         if: needs.sanitizer-nightly.result == 'success'
-        uses: slackapi/slack-github-action@v1.26.0
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
         with:
           payload: |
             {
@@ -39,7 +36,7 @@ jobs:
 
       - name: Failure notification
         if: needs.sanitizer-nightly.result != 'success'
-        uses: slackapi/slack-github-action@v1.26.0
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
         with:
           payload: |
             {

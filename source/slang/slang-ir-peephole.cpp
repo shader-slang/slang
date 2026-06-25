@@ -834,9 +834,7 @@ struct PeepholeContext : InstPassBase
                             j);
                         args.add(e);
                     }
-                    const auto cvt = builder.getCoopVectorType(
-                        args[0]->getDataType(),
-                        builder.getIntValue(builder.getIntType(), args.getCount()));
+                    const auto cvt = inst->getFullType();
                     const auto v = builder.emitMakeCoopVector(cvt, args.getCount(), args.begin());
                     inst->replaceUsesWith(v);
                     inst->removeAndDeallocate();
@@ -1061,7 +1059,7 @@ struct PeepholeContext : InstPassBase
                         }
                     }
                 }
-                else if (const auto structKey = as<IRStructKey>(key))
+                else if (const auto structKey = as<IRStructKey>(key); structKey)
                 {
                     auto oldVal = inst->getOperand(0);
                     if (oldVal->getOp() == kIROp_MakeStruct)
@@ -1258,6 +1256,18 @@ struct PeepholeContext : InstPassBase
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }
+                else if (!as<IRConditionalType>(inst->getOperand(0)->getDataType()))
+                {
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+
+                    if (inst->getOperand(0)->getDataType() == inst->getDataType())
+                        inst->replaceUsesWith(inst->getOperand(0));
+                    else
+                        inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
             }
             break;
         case kIROp_OptionalHasValue:
@@ -1319,9 +1329,30 @@ struct PeepholeContext : InstPassBase
             {
                 if (inst->getOperand(0)->getOp() == kIROp_ExtractExistentialValue)
                 {
-                    inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
-                    maybeRemoveOldInst(inst);
-                    changed = true;
+                    auto sourceExistential = inst->getOperand(0)->getOperand(0);
+                    auto resultType = inst->getDataType();
+                    auto sourceType = sourceExistential->getDataType();
+                    // Detect interface-to-interface upcast, including when the
+                    // interface types are generic specializations whose IR form
+                    // is `Specialize(Generic(IInterface), ...)` rather than a
+                    // plain `IRInterfaceType`.
+                    auto rootInterface = [](IRType* t) -> IRInterfaceType*
+                    {
+                        while (auto spec = as<IRSpecialize>(t))
+                            t = (IRType*)spec->getBase();
+                        if (auto generic = as<IRGeneric>(t))
+                            t = (IRType*)findGenericReturnVal(generic);
+                        return as<IRInterfaceType>(t);
+                    };
+                    bool isInterfaceUpcast = rootInterface(resultType) &&
+                                             rootInterface(sourceType) &&
+                                             !isTypeEqual(resultType, sourceType);
+                    if (!isInterfaceUpcast)
+                    {
+                        inst->replaceUsesWith(sourceExistential);
+                        maybeRemoveOldInst(inst);
+                        changed = true;
+                    }
                 }
             }
             break;
@@ -1849,7 +1880,7 @@ struct PeepholeContext : InstPassBase
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
 
                     builder.setInsertBefore(inst);
-                    auto undef = builder.emitPoison(inst->getDataType());
+                    auto undef = builder.getPoison(inst->getDataType());
                     inst->replaceUsesWith(undef);
                     maybeRemoveOldInst(inst);
                     changed = true;

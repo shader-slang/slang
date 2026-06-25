@@ -83,27 +83,110 @@ struct ReinterpretLoweringContext
         processModuleForOp(kIROp_Reinterpret);
     }
 
+    bool isUnresolvedGenericValue(IRInst* inst)
+    {
+        if (!inst)
+            return false;
+
+        switch (inst->getOp())
+        {
+        case kIROp_GlobalGenericParam:
+        case kIROp_LookupWitnessMethod:
+        case kIROp_AssociatedType:
+            return true;
+        default:
+            break;
+        }
+
+        return isGenericParameter(inst);
+    }
+
+    bool containsUnresolvedGenericValue(IRInst* inst)
+    {
+        if (!inst)
+            return false;
+
+        HashSet<IRInst*> seen;
+        List<IRInst*> genericWorkList;
+        genericWorkList.add(inst);
+
+        while (genericWorkList.getCount() != 0)
+        {
+            auto current = genericWorkList.getLast();
+            genericWorkList.removeLast();
+
+            if (!current || seen.contains(current))
+                continue;
+            seen.add(current);
+
+            if (isUnresolvedGenericValue(current))
+                return true;
+
+            if (auto specialize = as<IRSpecialize>(current))
+            {
+                // A concrete specialization still references the generic
+                // declaration as its base. Only the specialization arguments
+                // describe whether this use site is still unresolved.
+                for (UInt i = 0; i < specialize->getArgCount(); ++i)
+                    genericWorkList.add(specialize->getArg(i));
+                continue;
+            }
+
+            switch (current->getOp())
+            {
+            case kIROp_WitnessTable:
+            case kIROp_WitnessTableEntry:
+                // Concrete witness tables can contain the generic parameters
+                // of the declarations they implement. Reaching those would
+                // make concrete specialized resource types look unresolved.
+                continue;
+            default:
+                break;
+            }
+
+            for (UInt i = 0; i < current->getOperandCount(); ++i)
+                genericWorkList.add(current->getOperand(i));
+        }
+
+        return false;
+    }
+
     void processReinterpret(IRInst* inst)
     {
         auto operand = inst->getOperand(0);
         auto fromType = operand->getDataType();
         auto toType = inst->getDataType();
         SlangInt fromTypeSize = getAnyValueSize(fromType, targetProgram->getTargetReq());
-        if (fromTypeSize < 0)
-        {
-            sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
-                .type = fromType,
-                .location = inst->sourceLoc,
-            });
-        }
         SlangInt toTypeSize = getAnyValueSize(toType, targetProgram->getTargetReq());
-        if (toTypeSize < 0)
+
+        // Unused witness-table code that survives linking can still contain
+        // unresolved generic types such as `vector<double, N>`, where `N` is a
+        // generic value parameter. Those reinterprets should be left for DCE
+        // instead of producing a user-facing diagnostic. Concrete unsizable
+        // types are different: this is the only pass that lowers Reinterpret,
+        // so keep reporting them instead of leaving live invalid IR behind.
+        if (fromTypeSize < 0 || toTypeSize < 0)
         {
-            sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
-                .type = toType,
-                .location = inst->sourceLoc,
-            });
+            if (containsUnresolvedGenericValue(fromType) || containsUnresolvedGenericValue(toType))
+                return;
+
+            if (fromTypeSize < 0)
+            {
+                sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
+                    .type = fromType,
+                    .location = inst->sourceLoc,
+                });
+            }
+            if (toTypeSize < 0)
+            {
+                sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
+                    .type = toType,
+                    .location = inst->sourceLoc,
+                });
+            }
+            return;
         }
+
         SlangInt anyValueSize = Math::Max(fromTypeSize, toTypeSize);
 
         IRBuilder builder(module);

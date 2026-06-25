@@ -55,20 +55,8 @@ static const int SubgroupSize = 32;
 public struct TestShMemSize : ISharedMemorySize {
     public static const uint Bytes = (OutputSize * 2 + SubgroupSize * 2) * sizeof(uint4);
 }
-typealias TestPool = SharedMemoryPool<TestShMemSize>;
 static const uint OffsetA = 0;
 static const uint OffsetB = OutputSize * 2;
-
-void testLoadShA<TargetEnum Target>(uint tid, uint tileIndex)
-{
-    typealias Address = BindlessAddress<half>;
-
-    Address address = Address(inputBuffer);
-
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, true>.loadShA<half, Address>(OffsetA, tileIndex, address);
-    GroupMemoryBarrierWithWaveSync();
-}
-
 
 bool verifiedOutput(uint tid, uint size, uint sharedMemOffset, uint tileIndex)
 {
@@ -90,7 +78,7 @@ bool verifiedOutput(uint tid, uint size, uint sharedMemOffset, uint tileIndex)
 
     for (int i = 0; i < NumVectorsPerColumn; i++)
     {
-        uint4 values = TestPool.data[sharedMemOffset + indexInTile + i];
+        uint4 values = neural_unittest.readSharedMemory<TestShMemSize>(sharedMemOffset + indexInTile + i);
         uint4 element = values;
         for (int j = 0; j < 4; j++)
         {
@@ -125,52 +113,12 @@ void test(uint tid, uint tileIndex, uint resIndex)
     if (tid >= SubgroupSize)
         return;
 
-    __target_switch
-    {
-    case cuda:
-        testLoadShA<TargetEnum.CUDA>(tid, tileIndex);
-        break;
-    case spirv:
-        testLoadShA<TargetEnum.SPIR_V>(tid, tileIndex);
-        break;
-    }
-    // serialRead(tid, OffsetA);
+    neural_unittest.testLoadShA<InputSize, OutputSize, SubgroupSize, TestShMemSize, true, 1>(OffsetA, tileIndex, inputBuffer);
 
     bool res = verifiedOutput(tid, OutputSize, OffsetA, tileIndex);
     res = WaveActiveAllTrue(res);
     if (tid == 0)
         outputBuffer[resIndex] = res ? 1 : 0;
-}
-
-// This function is just used for debugging, not for verification. So keep it here.
-void serialRead(uint tid, uint sharedMemOffset)
-{
-    GroupMemoryBarrierWithWaveSync();
-
-    if (tid > 0)
-        return;
-
-    // In transpose mode, tile is in column major, and each length is AlignedK length
-    for (int id = 0; id < 16; id++)
-    {
-        printf("col: %d\n", id);
-        for (int i = 0; i < 4; i++)
-        {
-            uint4 values = TestPool.data[sharedMemOffset + id * 4 + i];
-            uint4 element = values;
-            for (int j = 0; j < 4; j++)
-            {
-                uint value = element[j];
-                uint16_t a = (uint16_t)(value & 0xFFFF);
-                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
-
-                half aa = bit_cast<half>(a);
-                half bb = bit_cast<half>(b);
-                printf("%.1f %.1f ", float(aa), float(bb));
-            }
-        }
-        printf("\n");
-    }
 }
 
 [numthreads(1024, 1, 1)]

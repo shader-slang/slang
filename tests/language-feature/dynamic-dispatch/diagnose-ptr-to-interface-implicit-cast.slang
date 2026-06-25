@@ -1,19 +1,32 @@
-// Implicit conversion from a concrete pointer (Foo*) to an interface pointer
-// (IFoo*) is not allowed. The type checker requires an explicit cast because
-// the memory layouts differ: Foo contains only its fields, while IFoo contains
-// a tag, witness table, and AnyValue payload.
+// Implicit pointer conversions between incompatible types are rejected.
+// All four directions are tested per reviewer feedback:
+// 1. Ptr<struct> -> Ptr<interface>  (memory layout mismatch)
+// 2. Ptr<interface> -> Ptr<struct>  (memory layout mismatch)
+// 3. Ptr<struct> -> Ptr<struct>    (no struct inheritance in Slang)
+// 4. Ptr<interface supertype> -> Ptr<interface subtype> (narrowing)
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv
 
-interface IFoo
+interface IBase
 {
     int getVal();
 }
 
-struct Foo : IFoo
+interface IDerived : IBase
+{
+    int getExtra();
+}
+
+struct Foo : IDerived
 {
     int val;
     int getVal() { return val; }
+    int getExtra() { return val + 1; }
+}
+
+struct Bar
+{
+    int val;
 }
 
 RWStructuredBuffer<int> outputBuffer;
@@ -25,9 +38,28 @@ void computeMain()
     f.val = 5;
     Foo* pf = &f;
 
-    // Implicit conversion: error
+    // 1. Ptr<struct> -> Ptr<interface>: rejected (layout mismatch)
     // CHECK: error[E30019]
-    IFoo* ip = pf;
+    // CHECK: not bit equivalent
+    IBase* ip = pf;
+
+    // 2. Ptr<interface> -> Ptr<struct>: rejected
+    // CHECK: error[E30019]
+    // CHECK-NOT: not bit equivalent
+    Foo* pf2 = ip;
+
+    // 3. Ptr<struct> -> Ptr<another struct>: rejected (no struct inheritance)
+    Bar b;
+    // CHECK: error[E30019]
+    // CHECK-NOT: not bit equivalent
+    Foo* pf3 = &b;
+
+    // 4. Ptr<interface supertype> -> Ptr<interface subtype>: rejected (narrowing)
+    IBase ib;
+    IBase* ibp = &ib;
+    // CHECK: error[E30019]
+    // CHECK-NOT: not bit equivalent
+    IDerived* dp = ibp;
 
     outputBuffer[0] = 0;
 }

@@ -1,13 +1,21 @@
+//  TODO(#9675): Re-enable once the SPIRV-Tools ADCE pass is restored.
 //  DISABLED: SPIRV-Tools ADCE pass is temporarily disabled (see #9675).
 //  This test requires ADCE for SPIRV optimization to produce expected output.
 //DISABLE_TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -entry entry_mesh
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -entry entry_mesh
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -entry entry_mesh
 
-//CHECK_SPIRV: OpEntryPoint
-//CHECK_GLSL: void main()
-//CHECK_HLSL: void entry_mesh
+// BorrowInOut/E54005 coverage for write-only mesh output reads lives in
+// tests/diagnostics/mesh-shader-output-read.slang. This test covers mesh-output
+// parameter emission for GLSL/HLSL.
 
+//CHECK_SPIRV: OpEntryPoint
+//CHECK_GLSL: perprimitiveEXT
+//CHECK_GLSL: void main()
+//CHECK_HLSL: void entry_mesh(
+//CHECK_HLSL: out indices uint3
+//CHECK_HLSL: out vertices
+//CHECK_HLSL: out primitives
 
 const static float2 positions[3] = {
     float2(0.0, -0.5),
@@ -67,7 +75,9 @@ void mesh_fn<V : VertexI, P : PrimitiveI>(
 
     if (tig < numPrimitives) {
         triangles[tig] = uint3(0, 1, 2);
-        primitives[tig].set_tint(float3(1, 0, 0));
+        P p;
+        p.set_tint(float3(1, 0, 0));
+        primitives[tig] = p;
     }
 }
 

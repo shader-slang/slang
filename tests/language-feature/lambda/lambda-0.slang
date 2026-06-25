@@ -1,3 +1,4 @@
+// Used as example in docs/user-guide/03-convenience-features.md ("Lambda Expressions - Basic usage")
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type

@@ -3,7 +3,6 @@
 
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
-#include "slang-mangled-lexer.h"
 
 #include <assert.h>
 
@@ -30,6 +29,9 @@ void emitTorchScalarTypeName(SourceWriter* m_writer, IRInst* type)
         break;
     case kIROp_HalfType:
         m_writer->emit("kFloat16");
+        break;
+    case kIROp_BFloat16Type:
+        m_writer->emit("kBFloat16");
         break;
     case kIROp_DoubleType:
         m_writer->emit("kFloat64");

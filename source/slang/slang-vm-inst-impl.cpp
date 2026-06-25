@@ -496,6 +496,7 @@ void callHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
     }
     ctx->m_currentWorkingSet = newWorkingSetPtr;
     ctx->m_currentFuncCode = func.m_codeBuffer.getBuffer();
+    ctx->m_currentFunction = &func;
     ctx->m_currentInst = (VMExecInstHeader*)func.m_codeBuffer.getBuffer();
 }
 
@@ -507,9 +508,21 @@ static void retHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
         void* resultPtr = nullptr;
         if (ctx->m_stack.getCount())
         {
-            auto callInst = ctx->m_stack.getLast().m_currentInst;
-            auto callerWorkingSetPtr = (uint8_t*)(ctx->m_workingSetBuffer.getBuffer() +
-                                                  ctx->m_stack.getLast().m_workingSetOffset);
+            auto& stackFrame = ctx->m_stack.getLast();
+            auto callInst = stackFrame.m_currentInst;
+            if (inst->opcodeExtension > callInst->opcodeExtension)
+            {
+                ctx->failExecution("VM return size exceeds the caller result size.");
+                return;
+            }
+            if (uint64_t(callInst->getOperand(0).offset) + inst->opcodeExtension >
+                stackFrame.m_currentWorkingSetSizeInBytes)
+            {
+                ctx->failExecution("VM return result points outside the caller working set.");
+                return;
+            }
+            auto callerWorkingSetPtr =
+                (uint8_t*)(ctx->m_workingSetBuffer.getBuffer() + stackFrame.m_workingSetOffset);
             resultPtr = callerWorkingSetPtr + callInst->getOperand(0).offset;
         }
         else
@@ -558,73 +571,119 @@ static void jumpIfHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
 static void getWorkingSetPtrHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
 {
     auto ctx = convert(inCtx);
-    auto dst = (void**)inst->getOperand(0).getPtr();
-    auto ptr = (uint8_t*)ctx->m_currentWorkingSet + inst->opcodeExtension;
-    *dst = ptr;
+    if (inst->opcodeExtension >= ctx->m_currentWorkingSetSizeInBytes)
+    {
+        ctx->failExecution("VM working-set pointer offset is out of bounds.");
+        return;
+    }
+    void* ptr = (uint8_t*)ctx->m_currentWorkingSet + inst->opcodeExtension;
+    memcpy(inst->getOperand(0).getPtr(), &ptr, sizeof(void*));
 }
 
-static void getElementPtrHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
+static void getElementPtrHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
 {
-    SLANG_UNUSED(ctx);
-    auto dst = (void**)inst->getOperand(0).getPtr();
-    auto basePtr = *(uint8_t**)inst->getOperand(1).getPtr();
-    auto elementIndex = *(uint32_t*)inst->getOperand(2).getPtr();
-    *dst = (uint8_t*)basePtr + elementIndex * inst->opcodeExtension;
+    auto ctx = convert(inCtx);
+    uint8_t* basePtr;
+    memcpy(&basePtr, inst->getOperand(1).getPtr(), sizeof(void*));
+    uint32_t elementIndex;
+    memcpy(&elementIndex, inst->getOperand(2).getPtr(), sizeof(elementIndex));
+    void* result = nullptr;
+    if (!ctx->validatePointerOffset(basePtr, elementIndex, inst->opcodeExtension, 0, &result))
+    {
+        return;
+    }
+    memcpy(inst->getOperand(0).getPtr(), &result, sizeof(void*));
 }
 
-static void getElementHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
+static void getElementHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
 {
-    SLANG_UNUSED(ctx);
-    auto dst = (void*)inst->getOperand(0).getPtr();
+    auto ctx = convert(inCtx);
     auto basePtr = (uint8_t*)inst->getOperand(1).getPtr();
-    auto elementIndex = *(uint32_t*)inst->getOperand(2).getPtr();
-    memcpy(dst, basePtr + elementIndex * inst->opcodeExtension, inst->opcodeExtension);
+    uint32_t elementIndex;
+    memcpy(&elementIndex, inst->getOperand(2).getPtr(), sizeof(elementIndex));
+    auto elementIndex64 = static_cast<uint64_t>(elementIndex);
+    auto stride = static_cast<uint64_t>(inst->opcodeExtension);
+    if (stride != 0 && elementIndex64 > UINT64_MAX / stride)
+    {
+        ctx->failExecution("VM GetElement index overflow.");
+        return;
+    }
+    auto byteOffset = elementIndex64 * stride;
+    if (!ctx->validateOperandAccess(inst->getOperand(1), inst->opcodeExtension, false, byteOffset))
+    {
+        return;
+    }
+    memmove(inst->getOperand(0).getPtr(), basePtr + byteOffset, inst->opcodeExtension);
 }
 
-static void offsetPtrHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
+static void offsetPtrHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void*)
 {
-    SLANG_UNUSED(ctx);
-    auto dst = (void**)inst->getOperand(0).getPtr();
-    auto basePtr = *(uint8_t**)inst->getOperand(1).getPtr();
-    auto offset = *(int32_t*)inst->getOperand(2).getPtr();
-    *dst = basePtr + offset * inst->opcodeExtension;
+    auto ctx = convert(inCtx);
+    uint8_t* basePtr;
+    memcpy(&basePtr, inst->getOperand(1).getPtr(), sizeof(void*));
+    int32_t offset;
+    memcpy(&offset, inst->getOperand(2).getPtr(), sizeof(offset));
+    void* result = nullptr;
+    if (!ctx->validatePointerOffset(basePtr, offset, inst->opcodeExtension, 0, &result))
+    {
+        return;
+    }
+    memcpy(inst->getOperand(0).getPtr(), &result, sizeof(void*));
 }
 
 void loadHandler8(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 {
-    SLANG_UNUSED(ctx);
-    auto dst = (uint8_t*)inst->getOperand(0).getPtr();
-    auto src = *(uint8_t**)inst->getOperand(1).getPtr();
-    *dst = *src;
+    auto vm = convert(ctx);
+    void* src;
+    memcpy(&src, inst->getOperand(1).getPtr(), sizeof(void*));
+    if (!vm->validatePointerAccess(src, sizeof(uint8_t), false))
+        return;
+    uint8_t value;
+    memcpy(&value, src, sizeof(value));
+    memcpy(inst->getOperand(0).getPtr(), &value, sizeof(value));
 }
 void loadHandler16(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 {
-    SLANG_UNUSED(ctx);
-    auto dst = (uint16_t*)inst->getOperand(0).getPtr();
-    auto src = *(uint16_t**)inst->getOperand(1).getPtr();
-    *dst = *src;
+    auto vm = convert(ctx);
+    void* src;
+    memcpy(&src, inst->getOperand(1).getPtr(), sizeof(void*));
+    if (!vm->validatePointerAccess(src, sizeof(uint16_t), false))
+        return;
+    uint16_t value;
+    memcpy(&value, src, sizeof(value));
+    memcpy(inst->getOperand(0).getPtr(), &value, sizeof(value));
 }
 void loadHandler32(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 {
-    SLANG_UNUSED(ctx);
-    auto dst = (uint32_t*)inst->getOperand(0).getPtr();
-    auto src = *(uint32_t**)inst->getOperand(1).getPtr();
-    *dst = *src;
+    auto vm = convert(ctx);
+    void* src;
+    memcpy(&src, inst->getOperand(1).getPtr(), sizeof(void*));
+    if (!vm->validatePointerAccess(src, sizeof(uint32_t), false))
+        return;
+    uint32_t value;
+    memcpy(&value, src, sizeof(value));
+    memcpy(inst->getOperand(0).getPtr(), &value, sizeof(value));
 }
 void loadHandler64(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 {
-    SLANG_UNUSED(ctx);
-    auto dst = (uint64_t*)inst->getOperand(0).getPtr();
-    auto src = *(uint64_t**)inst->getOperand(1).getPtr();
-    *dst = *src;
+    auto vm = convert(ctx);
+    void* src;
+    memcpy(&src, inst->getOperand(1).getPtr(), sizeof(void*));
+    if (!vm->validatePointerAccess(src, sizeof(uint64_t), false))
+        return;
+    uint64_t value;
+    memcpy(&value, src, sizeof(value));
+    memcpy(inst->getOperand(0).getPtr(), &value, sizeof(value));
 }
 
 void generalLoadHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 {
-    SLANG_UNUSED(ctx);
-    auto dst = (uint8_t*)inst->getOperand(0).getPtr();
-    auto src = *(uint8_t**)inst->getOperand(1).getPtr();
-    memcpy(dst, src, inst->opcodeExtension);
+    auto vm = convert(ctx);
+    void* src;
+    memcpy(&src, inst->getOperand(1).getPtr(), sizeof(void*));
+    if (!vm->validatePointerAccess(src, inst->opcodeExtension, false))
+        return;
+    memmove(inst->getOperand(0).getPtr(), src, inst->opcodeExtension);
 }
 
 VMExtFunction getLoadHandler(uint32_t extCode)
@@ -646,42 +705,60 @@ VMExtFunction getLoadHandler(uint32_t extCode)
 
 void storeHandler8(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 {
-    SLANG_UNUSED(ctx);
-    auto dst = *(uint8_t**)inst->getOperand(0).getPtr();
-    auto src = (uint8_t*)inst->getOperand(1).getPtr();
-    *dst = *src;
+    auto vm = convert(ctx);
+    void* dst;
+    memcpy(&dst, inst->getOperand(0).getPtr(), sizeof(void*));
+    if (!vm->validatePointerAccess(dst, sizeof(uint8_t), true))
+        return;
+    uint8_t value;
+    memcpy(&value, inst->getOperand(1).getPtr(), sizeof(value));
+    memcpy(dst, &value, sizeof(value));
 }
 
 void storeHandler16(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 {
-    SLANG_UNUSED(ctx);
-    auto dst = *(uint16_t**)inst->getOperand(0).getPtr();
-    auto src = (uint16_t*)inst->getOperand(1).getPtr();
-    *dst = *src;
+    auto vm = convert(ctx);
+    void* dst;
+    memcpy(&dst, inst->getOperand(0).getPtr(), sizeof(void*));
+    if (!vm->validatePointerAccess(dst, sizeof(uint16_t), true))
+        return;
+    uint16_t value;
+    memcpy(&value, inst->getOperand(1).getPtr(), sizeof(value));
+    memcpy(dst, &value, sizeof(value));
 }
 
 void storeHandler32(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 {
-    SLANG_UNUSED(ctx);
-    auto dst = *(uint32_t**)inst->getOperand(0).getPtr();
-    auto src = (uint32_t*)inst->getOperand(1).getPtr();
-    *dst = *src;
+    auto vm = convert(ctx);
+    void* dst;
+    memcpy(&dst, inst->getOperand(0).getPtr(), sizeof(void*));
+    if (!vm->validatePointerAccess(dst, sizeof(uint32_t), true))
+        return;
+    uint32_t value;
+    memcpy(&value, inst->getOperand(1).getPtr(), sizeof(value));
+    memcpy(dst, &value, sizeof(value));
 }
 
 void storeHandler64(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 {
-    SLANG_UNUSED(ctx);
-    auto dst = *(uint64_t**)inst->getOperand(0).getPtr();
-    auto src = (uint64_t*)inst->getOperand(1).getPtr();
-    *dst = *src;
+    auto vm = convert(ctx);
+    void* dst;
+    memcpy(&dst, inst->getOperand(0).getPtr(), sizeof(void*));
+    if (!vm->validatePointerAccess(dst, sizeof(uint64_t), true))
+        return;
+    uint64_t value;
+    memcpy(&value, inst->getOperand(1).getPtr(), sizeof(value));
+    memcpy(dst, &value, sizeof(value));
 }
 
 void generalStoreHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 {
-    SLANG_UNUSED(ctx);
-    auto dst = *(uint8_t**)inst->getOperand(0).getPtr();
-    auto src = (uint8_t*)inst->getOperand(1).getPtr();
-    memcpy(dst, src, inst->opcodeExtension);
+    auto vm = convert(ctx);
+    void* dst;
+    memcpy(&dst, inst->getOperand(0).getPtr(), sizeof(void*));
+    if (!vm->validatePointerAccess(dst, inst->opcodeExtension, true))
+        return;
+    memmove(dst, inst->getOperand(1).getPtr(), inst->opcodeExtension);
 }
 
 VMExtFunction getStoreHandler(uint32_t extCode)
@@ -953,7 +1030,7 @@ void printHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void* userData
     auto ctx = convert(inCtx);
     SLANG_UNUSED(userData);
     const char* formatString = nullptr;
-    formatString = *(const char**)inst->getOperand(0).getPtr();
+    memcpy(&formatString, inst->getOperand(0).getPtr(), sizeof(const char*));
 
     List<List<uint8_t>> args;
     List<const void*> argPtrs;

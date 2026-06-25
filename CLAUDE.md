@@ -33,7 +33,11 @@ cmake --preset default
 # Configure with visual studio 2022 settings (Preferred on Windows)
 # On Windows, include -DSLANG_IGNORE_ABORT_MSG=ON to suppress
 # modal abort dialogs during unattended/LLM-driven builds.
-cmake.exe --preset vs2022 -DSLANG_IGNORE_ABORT_MSG=ON
+# Use -DSLANG_EMBED_CORE_MODULE=OFF to keep core module compilation separate
+# from C++ source compilation. This way errors in *.meta.slang files (e.g.
+# hlsl.meta.slang) do not break the C++ build — slangc and slang-test still
+# compile successfully and the module errors surface at runtime instead.
+cmake.exe --preset vs2022 -DSLANG_IGNORE_ABORT_MSG=ON -DSLANG_EMBED_CORE_MODULE=OFF
 
 # Build Release/Debug binaries.
 # It can take from 5 minutes to 20 minutes depending on the machine.
@@ -65,11 +69,125 @@ cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
 
 **Run `./extras/formatting.sh` before committing changes.** PRs must conform to the project's coding style. Use `./extras/formatting.sh --check-only` to verify without modifying files.
 
+### Suppressing Unused Variable Warnings
+
+When a variable declared in an `if` condition is unused inside the body (the condition exists only for its type-check side-effect), use the **C++17 if-init-statement** pattern instead of `SLANG_UNUSED`:
+
+```cpp
+// Preferred: C++17 if-init pattern
+if (auto foo = as<IRFoo>(inst); foo)
+{
+    // foo not needed in body — the type check is the point
+}
+
+// Avoid: SLANG_UNUSED inside the body
+if (auto foo = as<IRFoo>(inst))
+{
+    SLANG_UNUSED(foo);
+}
+```
+
+For variables that are set but never read outside an `if` (e.g., a plain local variable), use `SLANG_UNUSED(var)` with a comment explaining why.
+
+### Problem-Solving Methodology
+
+Follow the **principled path**, not the minimal-edit-distance path. The goal is a correct
+representation that is robust by construction, even when that means a larger rework.
+
+- **Fix root causes, not symptoms.** When a bug appears in emit/codegen, the cause is usually
+  upstream (an IR pass, type legalization, specialization, lowering, or the AST/IR representation
+  itself). Trace it there and fix it there.
+- **Question every change.** Before keeping a change, answer: _Why is this change necessary? What
+  test fails without it? Is this the right fix, or is the problem telling me the
+  direction/representation is flawed?_ If you cannot name a test that fails without a change, the
+  change probably should not exist.
+- **Do not mask.** A guard, null-check, or special case that papers over a malformed
+  AST/IR/witness-table is a band-aid that hides a representation bug. A guard that is never hit
+  under correct input is dead code. Prefer making the representation correct so consumers stay
+  simple.
+- **Interrogate the input shape.** Whenever you write or change code that handles a particular
+  shape of input — an AST node, IR inst, witness, type, etc. — always ask: _is that input shape
+  itself correct and principled, or should the upstream producer of it be fixed instead?_ If the
+  shape is wrong or accidental, fix the producer; handle it here only when the shape is genuinely
+  valid input. This is the routine double-check that root-causing was done at the right layer, and
+  its answer is required in the PR description (see the Process report below).
+- **Prefer correct representation over edit distance.** If two surface forms _should_ be
+  equivalent, model them identically. If a consumer reads data by position/index/identity when the
+  data is conceptually an unordered key→value set (e.g. witness-table / interface requirement
+  entries), make the access by role/key, not by position.
+- **Keep a working log/report.** Maintain a scratch markdown document throughout the task that
+  records: the problem and a motivating example, road-blockers encountered, how issues **cascade**
+  (one fix exposing the next), the fix chosen for each and _why it is principled_ (with a concrete
+  code trace), and alternatives that were rejected and why. This log is what you distill into the
+  PR description below. (Keep the log out of the commit — it feeds the PR body, it is not a repo
+  artifact.)
+
+### Code Style and Review Conventions
+
+Recurring review feedback distilled into rules — following them avoids review round-trips. (These
+govern how code reads and is structured; the Problem-Solving Methodology above governs _what_ to
+change.)
+
+- **Write function comments as complete sentences: what, then why.** State what the function does
+  first; then, if the reason it exists isn't obvious from that description, add a brief summary of
+  why. For non-trivial behavior, include a concrete example. Avoid terse fragment- or bullet-only
+  comments on a function. For instance, `substituteElementOfCompositeType` should read like _"Return
+  `target` with its element type replaced by `newElementType`, preserving shape: scalar →
+  newElementType, `vector<T,N>` → `vector<newElementType,N>`, `matrix<T,R,C>` → `matrix<newElementType,R,C>`."_
+  — not _"element coerce target"_.
+
+- **Reuse before you write; then extract non-trivial logic into a named, documented helper.** Before
+  writing a new helper, search for an existing one — what you need is often already provided by a
+  shared header (the AST/IR helpers in `slang-ast-type.h`, `slang-ir-util.h`, and the various
+  `*-util.h` files). For example, to test whether a type is a `DeclRefType` of a particular
+  declaration, use the existing `isDeclRefTypeOf<T>(type)` rather than re-deriving it. When the
+  logic genuinely is new, don't bury a multi-step computation in an inline lambda or a long inline
+  block: give it an intention-revealing name (`coerceOperandsOfBuiltinBinaryExpr`,
+  `substituteElementOfCompositeType`, `unifyBaseType`) and a doc comment, so the caller stays
+  readable and the helper is reusable.
+
+- **Keep one source of truth; delete dead code after a refactor.** Map or classify a given thing in
+  exactly one place — e.g. the operator-name → operation-kind mapping lives only in
+  `getBuiltinOperationKindFromString`, not re-implemented at call sites. When a change makes a
+  branch, fallback, or helper unreachable, remove it rather than leaving it as dead code.
+
+- **One canonical representation per value; assert the invariant.** Don't introduce a second
+  AST/IR/`Val` representation for something that already has one — multiple forms of the same logical
+  value break `equals`/identity checks and deduplication. When an invariant guarantees a
+  representation is never produced for certain inputs (e.g. `+`/`-`/`*` are always a
+  `PolynomialIntVal`, never a `BuiltinOperationIntVal`), `SLANG_ASSERT` it at the construction site
+  so a violation is caught rather than silently producing a divergent form.
+
+- **Fail loudly on out-of-contract input.** When a helper is only valid for a restricted set of
+  inputs, `SLANG_RELEASE_ASSERT` on anything outside that set instead of silently returning a default
+  — e.g. `substituteElementOfCompositeType` asserts its operand is a builtin scalar/vector/matrix.
+
 ### PR Workflow
 
 1. **Format your code**: Run `./extras/formatting.sh` before committing
-2. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking" (for ABI/language breaking changes)
+2. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking change" (for ABI/language breaking changes)
 3. **Include tests**: Add regression tests as `.slang` files under `tests/`
+4. **Write the PR description in this required five-part format:**
+   1. **Motivation** — the problem being solved, with a concrete example / motivating test case.
+   2. **Proposed solution** — the approach, and why it is the principled one.
+   3. **Change summary** — a table or list of the files/areas touched and what each does.
+   4. **Concepts and vocabulary** — a short glossary, placed between the change summary and the
+      process report. Restate only the _codebase-specific or subtle_ terms the report relies on, as
+      a reminder for the reviewer (e.g. witness / `getSub`, facet / `getInheritanceInfo`, the
+      fixpoint solver, or a non-obvious distinction the fix hinges on). Do **not** explain basic,
+      well-known concepts (e.g. interface, associated type) — assume them.
+   5. **Process report** — explain _every_ change with a logical reason. For a change that
+      addresses a **cascading** issue, describe the issue (with its motivating test case) and
+      justify why the fix is correct with a **code trace** (the exact functions/insts involved),
+      not just a description. State explicitly why each change is necessary and principled rather
+      than a workaround. For any change that handles, guards, or special-cases a particular input
+      shape, the report **must** answer the input-shape check from the methodology — _is that shape
+      correct and principled, or should its producer have been fixed instead?_ — so a reviewer can
+      confirm the fix sits at the right layer.
+
+   Write for a reviewer who does not have the full context in their head: ground each abstract claim
+   in a concrete example, and wire explanations to the source — name the function and file (or
+   `file.cpp:line`) — so the reader can navigate from prose to code without searching.
 
 ### Testing
 
@@ -122,8 +240,14 @@ int foo = undefined;
 
 **DO NOT USE** these options as they are unmaintained, unreliable or unnecessary:
 
-- slangc with `-dump-ast`, `-dump-intermediate-prefix`, `-dump-intermediates`, `-dump-ir-ids`, `-serial-ir`, `-dump-repro`, `-load-repro` and `-extract-repro`.
+- slangc with `-dump-ast`, `-dump-intermediate-prefix`, `-dump-intermediates`,
+  `-dump-ir-ids`, `-serial-ir`, and `-dump-repro`.
 - slang-test with `-category` and `-api`
+
+### Repro Tooling
+
+`-load-repro` and `-extract-repro` are specialized repro tools; use them when
+working on repro handling. Inputs are validated before use.
 
 ## Architecture Overview
 
@@ -191,6 +315,39 @@ int foo = undefined;
 - **Adding an IR instruction**: Update the Lua definition files in `source/slang/slang-ir-insts.lua`, then regenerate
 - **Adding a built-in function**: Add to appropriate module in `prelude/`
 - **Adding a new target**: Implement new emitter in `source/slang/slang-emit-*.cpp`
+
+### Modifying Public Headers (`include/`)
+
+All files under `include/` are public API. Changes must preserve binary (ABI) and source
+compatibility for callers compiled against older versions of the header.
+
+#### Enums
+
+- **Never insert a new enumerator in the middle of an existing enum.** Insertion shifts all
+  subsequent integer values, silently breaking any caller that stores or compares the value.
+- **Always append** new enumerators immediately before the terminal count/sentinel member
+  (e.g. `CountOf`, `Count`, `NUM_*`), assigning an explicit integer value (the next sequential
+  integer after the preceding enumerator).
+- **Removed enumerators**: rename to `REMOVED_<Name>` and keep the original integer value.
+  Never reuse or reclaim a retired integer.
+
+#### Virtual tables (COM interfaces)
+
+Slang's public interfaces (`ISession`, `IModule`, `IComponentType`, etc.) are COM-style
+vtables declared with `virtual` methods in `include/slang.h`. The vtable layout is fixed by
+declaration order. Violating these rules corrupts the vtable and causes silent crashes or
+wrong-method dispatch for any caller compiled against an older header.
+
+- **Never reorder virtual methods** within an interface.
+- **Never change a virtual method's signature** (return type, parameter types, calling
+  convention, or `SLANG_MCALL` decoration).
+- **Never insert a new virtual method** in the middle of an interface — append only, at the
+  end of the interface before the closing brace.
+- **Never remove a virtual method** — replace its body with a stub that returns
+  `SLANG_E_NOT_IMPLEMENTED` and keep the declaration in place.
+- Avoid extending an existing public COM interface in place when clients may implement or
+  query it by UUID. Prefer adding a new derived/versioned interface with its own UUID, while
+  keeping the original interface declaration and UUID supported for existing callers.
 
 ### Debugging tools
 
@@ -291,6 +448,10 @@ When running under WSL environment, try to append `.exe` to the executables to a
 - Use `cmake.exe` instead of `cmake`,
 - Use `python.exe` instead of `python`,
 - Use `gh.exe` instead of `gh` and so on.
+
+### Release Process
+
+Use the `/slang-release-process` skill to push a new release. See `.claude/skills/slang-release-process/SKILL.md` for the full workflow.
 
 ## Additional Documents
 

@@ -901,6 +901,51 @@ void fixUpFuncType(IRFunc* func)
     fixUpFuncType(func, func->getResultType());
 }
 
+IRFuncType* maybeExpandConcreteFuncTypePacks(IRBuilder* builder, IRFuncType* funcType)
+{
+    List<IRType*> paramTypes;
+    bool foundConcretePack = false;
+
+    for (auto paramType : funcType->getParamTypes())
+    {
+        if (auto typePack = as<IRTypePack>(paramType))
+        {
+            // Only flatten packs that specialization has already made concrete. Other pack-shaped
+            // IR must continue through the normal specialization/lowering path.
+            foundConcretePack = true;
+            for (UInt ii = 0; ii < typePack->getOperandCount(); ii++)
+                paramTypes.add((IRType*)typePack->getOperand(ii));
+        }
+        else
+        {
+            paramTypes.add(paramType);
+        }
+    }
+
+    if (!foundConcretePack)
+        return funcType;
+
+    if (auto attr = funcType->getAttr())
+        return builder->getFuncType(
+            paramTypes.getCount(),
+            paramTypes.getBuffer(),
+            funcType->getResultType(),
+            attr);
+
+    return builder->getFuncType(paramTypes, funcType->getResultType());
+}
+
+IRFuncType* maybeExpandConcreteFuncTypePacks(
+    IRBuilder* builder,
+    IRInst* funcValue,
+    IRFuncType* funcType)
+{
+    auto expandedFuncType = maybeExpandConcreteFuncTypePacks(builder, funcType);
+    if (expandedFuncType != funcType)
+        builder->replaceOperand(&funcValue->typeUse, expandedFuncType);
+    return expandedFuncType;
+}
+
 //
 
 bool isTerminatorInst(IROp op)
@@ -1312,7 +1357,7 @@ IRBlock* IRInsertLoc::getBlock() const
 IRInst* IRInsertLoc::getFunc() const
 {
     auto pp = getParent();
-    if (const auto block = as<IRBlock>(pp))
+    if (const auto block = as<IRBlock>(pp); block)
     {
         pp = pp->getParent();
     }
@@ -2725,10 +2770,16 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
             memoryArena.rewindToCursor(cursor);
 
             // If the found inst is defined in the same parent as current insert location but
-            // is located after the insert location, we need to move it to the insert location.
+            // is located after the insert location, we need to move it to the insert location,
+            // except for insts at the module level, where order does not matter.
+            //
+            // This last condition helps to accelerate the common case of emitting global hoistable
+            // insts (types, sets, etc.)
+            //
             auto foundInst = *found;
             if (foundInst->getParent() && foundInst->getParent() == getInsertLoc().getParent() &&
-                getInsertLoc().getMode() == IRInsertLoc::Mode::Before)
+                getInsertLoc().getMode() == IRInsertLoc::Mode::Before &&
+                foundInst->getParent() != getModule()->getModuleInst())
             {
                 auto insertLoc = getInsertLoc().getInst();
                 bool isAfter = false;
@@ -2882,7 +2933,7 @@ IRPtrTypeBase* IRBuilder::getPtrTypeWithAddressSpace(
     IRType* valueType,
     IRPtrTypeBase* ptrWithAddrSpace)
 {
-    if (ptrWithAddrSpace->hasAddressSpace())
+    if (ptrWithAddrSpace->hasAddressSpace() || ptrWithAddrSpace->getDataLayout())
         return (IRPtrTypeBase*)getPtrType(
             ptrWithAddrSpace->getOp(),
             valueType,
@@ -2978,6 +3029,44 @@ IRFuncType* IRBuilder::getFuncType(
     UInt counts[3] = {1, paramCount, 1};
     IRInst** lists[3] = {(IRInst**)&resultType, (IRInst**)paramTypes, (IRInst**)&attribute};
     return (IRFuncType*)createIntrinsicInst(nullptr, kIROp_FuncType, 3, counts, lists);
+}
+
+UInt IRFuncType::getParamCount()
+{
+    // A well-formed `IRFuncType` always has at least the result-type
+    // operand at index 0; the zero-operand check is purely defensive
+    // for malformed or partially-constructed IR.
+    auto count = getOperandCount();
+    if (count == 0)
+        return 0;
+    UInt n = count - 1;
+    if (n > 0 && as<IRAttr>(getOperand(count - 1)))
+        --n;
+    return n;
+}
+
+IRType* IRFuncType::getParamType(UInt index)
+{
+    // Bounds-checked against the (attribute-stripped) parameter count
+    // so attributed function types don't accidentally expose a trailing
+    // attribute as if it were a parameter.
+    SLANG_ASSERT(index < getParamCount());
+    return (IRType*)getOperand(1 + index);
+}
+
+IROperandList<IRType> IRFuncType::getParamTypes()
+{
+    IRUse* end = getOperands() + getOperandCount();
+    if (end != getOperands() + 1 && as<IRAttr>((end - 1)->get()))
+        --end;
+    return IROperandList<IRType>(getOperands() + 1, end);
+}
+
+IRAttr* IRFuncType::getAttr()
+{
+    if (getOperandCount() == 0)
+        return nullptr;
+    return as<IRAttr>(getOperand(getOperandCount() - 1));
 }
 
 IRType* IRBuilder::getBindExistentialsType(
@@ -3100,7 +3189,7 @@ IRLoadFromUninitializedMemory* IRBuilder::emitLoadFromUninitializedMemory(IRType
     return inst;
 }
 
-IRPoison* IRBuilder::emitPoison(IRType* type)
+IRPoison* IRBuilder::getPoison(IRType* type)
 {
     auto inst = createInst<IRPoison>(this, kIROp_Poison, type);
     addInst(inst);
@@ -3196,6 +3285,23 @@ static IRCompilerDictionaryScope* findScope(IRCompilerDictionary* dict)
     return nullptr;
 }
 
+static void addCompilerDictionaryEntryKeys(
+    IRBuilder* builder,
+    List<IRInst*>& keyVals,
+    IRCompilerDictionaryScope* scope,
+    IRInst* translationInst)
+{
+    keyVals.reserve(2 + translationInst->getOperandCount());
+    keyVals.add(scope);
+    // Operand 1 is the opcode discriminator and is kept as a strong dictionary-entry operand so
+    // DCE cannot collect and recreate it between cache insertions/lookups.
+    keyVals.add(builder->getIntValue(builder->getUIntType(), (UInt)translationInst->getOp()));
+    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
+    {
+        keyVals.add(translationInst->getOperand(ii));
+    }
+}
+
 IRCompilerDictionaryEntry* IRBuilder::fetchCompilerDictionaryEntry(
     IRCompilerDictionary* dict,
     IRInst* translationInst)
@@ -3205,13 +3311,7 @@ IRCompilerDictionaryEntry* IRBuilder::fetchCompilerDictionaryEntry(
 
     List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
 
-    keyVals.reserve(2 + translationInst->getOperandCount());
-    keyVals.add(scope);
-    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
-    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
-    {
-        keyVals.add(translationInst->getOperand(ii));
-    }
+    addCompilerDictionaryEntryKeys(this, keyVals, scope, translationInst);
 
     auto entry = _getCompilerDictionaryEntry(keyVals);
     getModule()->getContainerPool().free(&keyVals);
@@ -3221,7 +3321,7 @@ IRCompilerDictionaryEntry* IRBuilder::fetchCompilerDictionaryEntry(
 
 void IRBuilder::setCompilerDictionaryEntryValue(IRCompilerDictionaryEntry* entry, IRInst* valueInst)
 {
-    if (auto existingVal = entry->getValue())
+    if (auto existingVal = entry->getValue(); existingVal)
     {
         // Invalid.
         SLANG_UNEXPECTED("Translation entry already exists");
@@ -3243,16 +3343,10 @@ void IRBuilder::addCompilerDictionaryEntry(
 
     List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
 
-    keyVals.reserve(2 + translationInst->getOperandCount());
-    keyVals.add(scope);
-    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
-    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
-    {
-        keyVals.add(translationInst->getOperand(ii));
-    }
+    addCompilerDictionaryEntryKeys(this, keyVals, scope, translationInst);
 
     auto entry = _getCompilerDictionaryEntry(keyVals);
-    if (auto existingVal = entry->getValue())
+    if (auto existingVal = entry->getValue(); existingVal)
     {
         // Invalid.
         SLANG_UNEXPECTED("Translation entry already exists");
@@ -3275,13 +3369,7 @@ IRInst* IRBuilder::tryLookupCompilerDictionaryValue(
 
     List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
 
-    keyVals.reserve(2 + translationInst->getOperandCount());
-    keyVals.add(scope);
-    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
-    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
-    {
-        keyVals.add(translationInst->getOperand(ii));
-    }
+    addCompilerDictionaryEntryKeys(this, keyVals, scope, translationInst);
 
     auto entry = _getCompilerDictionaryEntry(keyVals);
     getModule()->getContainerPool().free(&keyVals);
@@ -3358,6 +3446,11 @@ IRInst* IRBuilder::emitDebugBuildIdentifier(
     IRInst* args[] = {getStringValue(buildIdentifier), getIntValue(getUIntType(), flags)};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugBuildIdentifier, 2, args);
 }
+IRInst* IRBuilder::emitDebugCompilationUnit(IRInst* source)
+{
+    IRInst* args[] = {source};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugCompilationUnit, 1, args);
+}
 IRInst* IRBuilder::emitDebugLine(
     IRInst* source,
     IRIntegerValue lineStart,
@@ -3373,6 +3466,36 @@ IRInst* IRBuilder::emitDebugLine(
         getIntValue(getUIntType(), colEnd)};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugLine, 5, args);
 }
+IRInst* IRBuilder::emitIncrementCoverageCounter()
+{
+    return emitIntrinsicInst(getVoidType(), kIROp_IncrementCoverageCounter, 0, nullptr);
+}
+
+IRInst* IRBuilder::emitIncrementFunctionCoverageCounter(
+    UnownedStringSlice functionName,
+    UnownedStringSlice functionMangledName)
+{
+    IRInst* args[] = {
+        getStringValue(functionName),
+        getStringValue(functionMangledName),
+    };
+    return emitIntrinsicInst(getVoidType(), kIROp_IncrementFunctionCoverageCounter, 2, args);
+}
+
+IRInst* IRBuilder::emitIncrementBranchCoverageCounter(
+    IRIntegerValue branchSiteID,
+    IRIntegerValue branchArmID,
+    IRIntegerValue branchArmKind)
+{
+    auto uintType = getUIntType();
+    IRInst* args[] = {
+        getIntValue(uintType, branchSiteID),
+        getIntValue(uintType, branchArmID),
+        getIntValue(uintType, branchArmKind),
+    };
+    return emitIntrinsicInst(getVoidType(), kIROp_IncrementBranchCoverageCounter, 3, args);
+}
+
 IRInst* IRBuilder::emitDebugVar(
     IRType* type,
     IRInst* source,
@@ -4824,6 +4947,104 @@ RefPtr<IRModule> IRModule::create(Session* session)
     return module;
 }
 
+ModuleLinkingInfo::ModuleLinkingInfo(IRModule* module)
+{
+    _build(module);
+}
+
+void ModuleLinkingInfo::_build(IRModule* module)
+{
+    auto moduleInst = module->getModuleInst();
+    if (!moduleInst)
+        return;
+
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto annotation = as<IRAnnotation>(inst);
+        if (annotation)
+        {
+            if (annotation->getParent() == moduleInst)
+                m_instAnnotationMap[annotation->getTarget()].add(annotation);
+            continue;
+        }
+
+        if (auto hashedStringLits = as<IRGlobalHashedStringLiterals>(inst))
+        {
+            SLANG_RELEASE_ASSERT(
+                !m_globalHashedStringLiterals || m_globalHashedStringLiterals == hashedStringLits);
+            m_globalHashedStringLiterals = hashedStringLits;
+        }
+
+        if (as<IRGlobalParam>(inst))
+            m_globalParams.add(inst);
+
+        bool isHLSLExported = false;
+        bool isKnownBuiltin = false;
+        for (auto decoration : inst->getDecorations())
+        {
+            switch (decoration->getOp())
+            {
+            case kIROp_HLSLExportDecoration:
+            case kIROp_DownstreamModuleExportDecoration:
+                isHLSLExported = true;
+                break;
+
+            case kIROp_KnownBuiltinDecoration:
+                isKnownBuiltin = true;
+                break;
+
+            default:
+                break;
+            }
+        }
+
+        if (isHLSLExported)
+            m_hlslExports.add(inst);
+        if (isKnownBuiltin)
+            m_knownBuiltins.add(inst);
+    }
+}
+
+ArrayView<IRAnnotation*> ModuleLinkingInfo::getAnnotationsForTarget(IRInst* target)
+{
+    if (!target)
+        return {};
+
+    auto annotations = m_instAnnotationMap.tryGetValue(target);
+    if (!annotations)
+        return {};
+
+    return annotations->getArrayView();
+}
+
+void IRModule::_ensureLinkingInfo()
+{
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    if (!m_linkingInfo)
+        m_linkingInfo = new ModuleLinkingInfo(this);
+}
+
+ModuleLinkingInfo* IRModule::_getOrCreateLinkingInfo()
+{
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    if (!m_linkingInfo)
+        m_linkingInfo = new ModuleLinkingInfo(this);
+    return m_linkingInfo;
+}
+
+ModuleLinkingInfo* IRModule::_getLinkingInfo()
+{
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    SLANG_RELEASE_ASSERT(m_linkingInfo);
+    return m_linkingInfo;
+}
+
+void IRModule::_invalidateLinkingInfo()
+{
+    std::lock_guard<std::mutex> lock(m_linkingInfoMutex);
+    m_linkingInfo = nullptr;
+}
+
 void IRModule::buildMangledNameToGlobalInstMap()
 {
     m_mapMangledNameToGlobalInst.clear();
@@ -5509,6 +5730,15 @@ IRInst* IRBuilder::emitElementExtract(IRInst* base, IRInst* index)
     else if (auto vectorType = as<IRVectorType>(base->getDataType()))
     {
         type = vectorType->getElementType();
+    }
+    // CoopVec element extraction produces the element type just like vector extraction.
+    else if (auto coopVectorType = as<IRCoopVectorType>(base->getDataType()))
+    {
+        type = coopVectorType->getElementType();
+    }
+    else if (auto packedVectorType = as<IRMetalPackedVectorType>(base->getDataType()))
+    {
+        type = packedVectorType->getElementType();
     }
     else if (auto matrixType = as<IRMatrixType>(base->getDataType()))
     {
@@ -9000,10 +9230,14 @@ void IRInst::removeAndDeallocate()
 
 void IRInst::removeAndDeallocateAllDecorationsAndChildren()
 {
-    IRInst* nextChild = nullptr;
-    for (IRInst* child = getFirstDecorationOrChild(); child; child = nextChild)
+    // We'll process the list of children and decorations in reverse order, since
+    // this way we deallocate fewer items that have uses (which hit slow
+    // corner-case logic when deallocating).
+    //
+    IRInst* prevChild = nullptr;
+    for (IRInst* child = getLastDecorationOrChild(); child; child = prevChild)
     {
-        nextChild = child->getNextInst();
+        prevChild = child->getPrevInst();
         child->removeAndDeallocate();
     }
 }

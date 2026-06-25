@@ -37,5 +37,5 @@ void computeMain()
 {
     IFoo* localPtr = p;
     // CHECK: 42
-    outputBuffer[0] = dispatchViaDoublePtr(&localPtr);
+    outputBuffer[0] = dispatchViaDoublePtr(__getAddress(localPtr));
 }

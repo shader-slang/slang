@@ -878,7 +878,8 @@ struct ModelViewer : WindowedAppBase
         view = glm::translate(view, -cameraPosition);
 
         glm::mat4x4 viewProjection = projection * view;
-        auto deviceInfo = gDevice->getInfo();
+        gDevice->getInfo();
+
         // Use identity matrix for correction
         static const float kIdentity[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
         glm::mat4x4 correctionMatrix;

@@ -168,27 +168,28 @@ bool isResourceType(IRType* type)
         type = arrayType->getElementType();
     }
 
-    if (const auto resourceTypeBase = as<IRResourceTypeBase>(type))
+    if (const auto resourceTypeBase = as<IRResourceTypeBase>(type); resourceTypeBase)
     {
         return true;
     }
-    else if (const auto builtinGenericType = as<IRBuiltinGenericType>(type))
+    else if (const auto builtinGenericType = as<IRBuiltinGenericType>(type); builtinGenericType)
     {
         return true;
     }
-    else if (const auto pointerLikeType = as<IRPointerLikeType>(type))
+    else if (const auto pointerLikeType = as<IRPointerLikeType>(type); pointerLikeType)
     {
         return true;
     }
-    else if (const auto samplerType = as<IRSamplerStateTypeBase>(type))
+    else if (const auto samplerType = as<IRSamplerStateTypeBase>(type); samplerType)
     {
         return true;
     }
-    else if (const auto subpassInputType = as<IRSubpassInputType>(type))
+    else if (const auto subpassInputType = as<IRSubpassInputType>(type); subpassInputType)
     {
         return true;
     }
-    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
+    else if (const auto untypedBufferType = as<IRUntypedBufferResourceType>(type);
+             untypedBufferType)
     {
         return true;
     }
@@ -1230,6 +1231,41 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
         else
         {
             legalElementType = legalizeType(context, originalElementType);
+
+            // When special types leak out of a parameter group, they need to
+            // be bound differently. Warn the user when this happens.
+            if (legalElementType.flavor == LegalType::Flavor::pair &&
+                as<IRConstantBufferType>(type))
+            {
+                // The parameter group type's source location can be empty
+                // (e.g. when it comes from a linked module). Fall back to the
+                // location of the first use so the warning always points
+                // somewhere meaningful.
+                SourceLoc groupLoc = findFirstUseLoc(type);
+
+                context->m_sink->diagnose(
+                    Diagnostics::SpecialTypeLeaksFromParameterGroup{.location = groupLoc});
+
+                // indicate which elements cannot be part of the parameter group
+                auto& specialType = legalElementType.getPair()->specialType;
+                if (specialType.flavor == LegalType::Flavor::tuple)
+                {
+                    auto specialTuple = specialType.getTuple();
+                    for (auto specialElement : specialTuple->elements)
+                    {
+                        // The member key's location may be empty; fall back to
+                        // the parameter group location computed above.
+                        SourceLoc memberLoc =
+                            specialElement.key ? specialElement.key->sourceLoc : SourceLoc();
+                        if (!memberLoc.isValid())
+                            memberLoc = groupLoc;
+                        context->m_sink->diagnose(
+                            Diagnostics::SpecialTypeMemberLeaksFromParameterGroup{
+                                .location = memberLoc});
+                    }
+                }
+            }
+
             // As a bit of a corner case, if the user requested something
             // like `ConstantBuffer<Texture2D>` the element type would
             // legalize to a "simple" type, and that would be interpreted

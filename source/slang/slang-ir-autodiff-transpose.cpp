@@ -529,7 +529,7 @@ struct DiffTransposePass
         {
             return RegionEntryPoint(revBlockMap[currentBlock], branchInst->getTargetBlock(), false);
         }
-        else if (const auto returnInst = as<IRReturn>(currentBlock->getTerminator()))
+        else if (const auto returnInst = as<IRReturn>(currentBlock->getTerminator()); returnInst)
         {
             return RegionEntryPoint(revBlockMap[currentBlock], nullptr, true);
         }
@@ -1520,6 +1520,12 @@ struct DiffTransposePass
 
         case kIROp_MakeVector:
             return transposeMakeVector(builder, fwdInst, revValue);
+        // CoopVec construction is element-wise, so reverse-mode gradients split back to
+        // the constructor operands the same way vector construction does.
+        case kIROp_MakeCoopVector:
+            return transposeMakeCoopVector(builder, fwdInst, revValue);
+        case kIROp_MakeCoopVectorFromValuePack:
+            return transposeMakeCoopVectorFromValuePack(builder, fwdInst, revValue);
         case kIROp_MakeVectorFromScalar:
             return transposeMakeVectorFromScalar(builder, fwdInst, revValue);
         case kIROp_MakeMatrixFromScalar:
@@ -1763,6 +1769,79 @@ struct DiffTransposePass
             fwdMakeVector)});
     }
 
+    // Split the CoopVec output gradient into one scalar gradient per constructor operand.
+    TranspositionResult transposeMakeCoopVector(
+        IRBuilder* builder,
+        IRInst* fwdMakeCoopVector,
+        IRInst* revValue)
+    {
+        List<RevGradient> gradients;
+        auto coopVectorType = cast<IRCoopVectorType>(fwdMakeCoopVector->getFullType());
+        auto elementType = coopVectorType->getElementType();
+
+        for (UInt ii = 0; ii < fwdMakeCoopVector->getOperandCount(); ii++)
+        {
+            auto gradAtIndex = builder->emitElementExtract(
+                elementType,
+                revValue,
+                builder->getIntValue(builder->getIntType(), ii));
+            gradients.add(RevGradient(
+                RevGradient::Flavor::Simple,
+                fwdMakeCoopVector->getOperand(ii),
+                gradAtIndex,
+                fwdMakeCoopVector));
+        }
+        return TranspositionResult(gradients);
+    }
+
+    // Variadic CoopVec construction may be represented through a value pack; transpose the
+    // gradient either directly to pack elements or back to the pack value when needed.
+    TranspositionResult transposeMakeCoopVectorFromValuePack(
+        IRBuilder* builder,
+        IRInst* fwdMakeCoopVector,
+        IRInst* revValue)
+    {
+        auto pack = fwdMakeCoopVector->getOperand(0);
+        auto packType = cast<IRTypePack>(pack->getDataType());
+
+        if (auto makePack = as<IRMakeValuePack>(pack))
+        {
+            List<RevGradient> gradients;
+            for (UInt ii = 0; ii < makePack->getOperandCount(); ii++)
+            {
+                auto elementType = cast<IRType>(packType->getOperand(ii));
+                auto gradAtIndex = builder->emitElementExtract(
+                    elementType,
+                    revValue,
+                    builder->getIntValue(builder->getIntType(), ii));
+                gradients.add(RevGradient(
+                    RevGradient::Flavor::Simple,
+                    makePack->getOperand(ii),
+                    gradAtIndex,
+                    fwdMakeCoopVector));
+            }
+            return TranspositionResult(gradients);
+        }
+
+        List<IRInst*> gradElements;
+        for (UInt ii = 0; ii < packType->getOperandCount(); ii++)
+        {
+            auto elementType = cast<IRType>(packType->getOperand(ii));
+            auto gradAtIndex = builder->emitElementExtract(
+                elementType,
+                revValue,
+                builder->getIntValue(builder->getIntType(), ii));
+            gradElements.add(gradAtIndex);
+        }
+
+        auto gradPack = builder->emitMakeValuePack(
+            (IRType*)packType,
+            (UInt)gradElements.getCount(),
+            gradElements.getBuffer());
+        return TranspositionResult(List<RevGradient>(
+            RevGradient(RevGradient::Flavor::Simple, pack, gradPack, fwdMakeCoopVector)));
+    }
+
     TranspositionResult transposeMakeMatrixFromScalar(
         IRBuilder* builder,
         IRInst* fwdMakeMatrix,
@@ -1793,7 +1872,7 @@ struct DiffTransposePass
         {
             auto argOperand = fwdMakeMatrix->getOperand(ii);
             IRInst* gradAtIndex = nullptr;
-            if (const auto vecType = as<IRVectorType>(argOperand->getDataType()))
+            if (const auto vecType = as<IRVectorType>(argOperand->getDataType()); vecType)
             {
                 gradAtIndex = builder->emitElementExtract(
                     argOperand->getDataType(),
@@ -2464,11 +2543,8 @@ struct DiffTransposePass
                         builder->emitMul(operandType, fwdInst->getOperand(0), revValue),
                         fwdInst)));
                 }
-                else
-                {
-                    SLANG_ASSERT_FAILURE(
-                        "Neither operand of a mul instruction is a differential inst");
-                }
+                SLANG_ASSERT_FAILURE("Neither operand of a mul instruction is a differential inst");
+                break;
             }
         case kIROp_Div:
             {
@@ -2482,10 +2558,8 @@ struct DiffTransposePass
                         builder->emitDiv(operandType, revValue, fwdInst->getOperand(1)),
                         fwdInst)));
                 }
-                {
-                    SLANG_ASSERT_FAILURE(
-                        "The first operand of a div inst must be a differential inst");
-                }
+                SLANG_ASSERT_FAILURE("The first operand of a div inst must be a differential inst");
+                break;
             }
         case kIROp_Neg:
             {
@@ -2497,15 +2571,13 @@ struct DiffTransposePass
                         builder->emitNeg(operandType, revValue),
                         fwdInst)));
                 }
-                else
-                {
-                    SLANG_UNEXPECTED("Cannot transpose neg of a non-differentiable inst");
-                }
+                SLANG_UNEXPECTED("Cannot transpose neg of a non-differentiable inst");
             }
 
         default:
             SLANG_UNEXPECTED("Unhandled arithmetic");
         }
+        SLANG_UNREACHABLE("Unhandled arithmetic");
     }
 
     RevGradient materializeSwizzleGradients(

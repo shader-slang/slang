@@ -1,15 +1,21 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target cpp -entry computeMain -stage compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+
+//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<float> outputBuffer;
 
 //
-// Limitation: Mutating Methods
+// Test: Mutating Methods with Associated Type Parameters
 //
-// Using [mutating] methods with associated type parameters fails.
-// Reading with obj.get() and writing with obj.set(x) on the same object should work.
-// The value x has type obj.Element, and set expects obj.Element — they're the same type
-// from the same object. The [mutating] attribute shouldn't break associated type tracking.
+// Reading with obj.get() and writing with obj.set(x) on the same object should
+// work. The value x has type obj.Element, and set expects obj.Element — they're
+// the same type from the same object.
+//
+// This was broken prior to #10004: the compiler created separate temporary
+// variables for each access to a mutable existential, causing the associated
+// type scope to differ between get() and set() calls.
 //
 
 interface IContainer
@@ -52,18 +58,23 @@ IContainer makeContainer(int id)
         return FloatContainer(3.5);
 }
 
-RWStructuredBuffer<float> outputBuffer;
-
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 threadId: SV_DispatchThreadID)
 {
-    var obj = makeContainer(0);
-    obj.Element x = obj.get();
+    // Test 1: get + set on the same object — fixed in #10004
+    {
+        var obj = makeContainer(0);
+        obj.Element x = obj.get();
+        obj.set(x);
+        outputBuffer[0] = obj.toFloat();  // CHECK: 42.0
+    }
 
-    // Cannot pass associated type value to [mutating] method on the same object
-    // CHECK: error[E30019]
-    obj.set(x);
-
-    outputBuffer[0] = obj.toFloat();
+    // Test 2: set with a different value — fixed in #10004
+    {
+        var obj = makeContainer(1);
+        obj.Element x = obj.get();
+        obj.set(x);
+        outputBuffer[1] = obj.toFloat();  // CHECK: 3.5
+    }
 }

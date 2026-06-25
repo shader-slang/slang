@@ -65,10 +65,6 @@ innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argc, const 
         spSetWriter(request, channel, stdWriters->getWriter(channel));
     }
 
-    char const* appName = "slang-reflection-test";
-    if (argc > 0)
-        appName = argv[0];
-
     SlangResult res = performCompilationAndReflection(request, argc, argv);
 
     spDestroyCompileRequest(request);

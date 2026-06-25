@@ -659,6 +659,8 @@ SlangResult Parser::_maybeParseNode(Node::Kind kind)
     }
 
     const Token braceToken = m_reader.advanceToken();
+    // TODO: PR #2159 (jsmall-nvidia) - braceToken is set but never used.
+    SLANG_UNUSED(braceToken);
 
     // Push the class scope
     return pushScope(node);

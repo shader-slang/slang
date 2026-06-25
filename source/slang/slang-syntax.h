@@ -35,6 +35,27 @@ inline Type* getBaseType(
     return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
 }
 
+inline SubstExpr<Expr> getPackCountConstraintPackExpr(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    if (!declRef)
+        return SubstExpr<Expr>();
+    return declRef.substitute(astBuilder, declRef.getDecl()->packExpr);
+}
+
+inline IntVal* getPackCountConstraintExpectedCount(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    if (!declRef)
+        return nullptr;
+    auto val = declRef.getDecl()->expectedCountVal;
+    if (!val)
+        return nullptr;
+    return as<IntVal>(val->substitute(astBuilder, SubstitutionSet(declRef)));
+}
+
 // `Val`
 
 inline bool areValsEqual(Val* left, Val* right)
@@ -396,9 +417,9 @@ inline Type* getResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef
 {
     if (hasDirectFuncType(declRef))
     {
-        return as<FuncType>(
-                   declRef.substitute(astBuilder, declRef.getDecl()->funcType.type)->resolve())
-            ->getResultType();
+        auto substituted = declRef.substitute(astBuilder, declRef.getDecl()->funcType.type);
+        if (auto funcType = as<FuncType>(substituted->resolve()))
+            return funcType->getResultType();
     }
 
     return declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);

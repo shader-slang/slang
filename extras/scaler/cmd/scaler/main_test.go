@@ -17,3 +17,57 @@ func TestParseCleanupIntervalInvalid(t *testing.T) {
 		t.Fatal("parseCleanupInterval should fail for invalid duration")
 	}
 }
+
+func TestParseSessionMaxAgeValid(t *testing.T) {
+	got, err := parseSessionMaxAge("2h")
+	if err != nil {
+		t.Fatalf("parseSessionMaxAge returned error: %v", err)
+	}
+	if got.String() != "2h0m0s" {
+		t.Fatalf("parseSessionMaxAge = %v, want 2h0m0s", got)
+	}
+}
+
+func TestParseSessionMaxAgeZero(t *testing.T) {
+	got, err := parseSessionMaxAge("0")
+	if err != nil {
+		t.Fatalf("parseSessionMaxAge returned error: %v", err)
+	}
+	if got != 0 {
+		t.Fatalf("parseSessionMaxAge = %v, want 0", got)
+	}
+}
+
+func TestParseSessionMaxAgeNegative(t *testing.T) {
+	if _, err := parseSessionMaxAge("-1s"); err == nil {
+		t.Fatal("parseSessionMaxAge should fail for negative durations")
+	}
+}
+
+func TestValidateSessionMaxAgeNegative(t *testing.T) {
+	if err := validateSessionMaxAge(-1); err == nil {
+		t.Fatal("validateSessionMaxAge should fail for negative durations")
+	}
+}
+
+// TestDrainStateTransitions verifies the scaler's drain flag is initially
+// false and toggles via setDraining. The scale-set-preservation defer in
+// run() keys off this state to decide whether to delete the scale set on
+// exit (#11067): preserve when draining, delete otherwise.
+func TestDrainStateTransitions(t *testing.T) {
+	s := &gcpRunnerScaler{}
+
+	if s.isDraining() {
+		t.Fatal("new scaler should not be draining")
+	}
+
+	s.setDraining(true)
+	if !s.isDraining() {
+		t.Fatal("setDraining(true) should make isDraining() true")
+	}
+
+	s.setDraining(false)
+	if s.isDraining() {
+		t.Fatal("setDraining(false) should make isDraining() false")
+	}
+}

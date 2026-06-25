@@ -491,7 +491,10 @@ struct TagOpsLoweringContext : public InstPassBase
         auto srcSet = cast<IRWitnessTableSet>(
             cast<IRSetTagType>(inst->getOperand(0)->getDataType())->getOperand(0));
         auto destSet = cast<IRSetBase>(cast<IRSetTagType>(inst->getDataType())->getOperand(0));
-        auto key = cast<IRStructKey>(inst->getOperand(1));
+        // The requirement key; `IRInst*` rather than `IRStructKey*` because a
+        // built-in interface requirement uses the hoistable `IRBuiltinRequirementKey`.
+        // Used only as a witness-table lookup key below.
+        IRInst* key = inst->getOperand(1);
 
         IRBuilder builder(inst->getModule());
         builder.setInsertAfter(inst);
@@ -638,21 +641,6 @@ struct UntaggedUnionLoweringContext : public InstPassBase
         case kIROp_AtomicType:
         case kIROp_UnsizedArrayType:
             return true;
-
-        case kIROp_PtrType:
-            {
-                // SPIRV generates incompatible struct types for Function vs
-                // PhysicalStorageBuffer storage classes. Pointers to concrete
-                // structs packed into AnyValue produce type mismatches in the
-                // generated SPIRV. CPU and CUDA handle this correctly.
-                // Interface pointers are allowed: they point to existential
-                // tuples that are already handled by dynamic dispatch lowering.
-                if (!isSPIRV(targetProgram->getTargetReq()->getTarget()))
-                    return false;
-                auto ptrType = cast<IRPtrTypeBase>(type);
-                auto valueType = ptrType->getValueType();
-                return valueType->getOp() != kIROp_InterfaceType;
-            }
 
         case kIROp_StructType:
             {
@@ -1069,6 +1057,18 @@ void lowerTagTypes(IRModule* module)
     context.processModule();
 }
 
+// Extract the element type from a pointer-like data type.
+// Handles both IRPtrTypeBase (regular pointers like Ptr<T>) and
+// IRPointerLikeType (ConstantBuffer<T>, ParameterBlock<T>).
+static IRType* getPointerElementType(IRType* ptrDataType)
+{
+    if (auto ptrType = as<IRPtrTypeBase>(ptrDataType))
+        return ptrType->getValueType();
+    if (auto pointerLikeType = as<IRPointerLikeType>(ptrDataType))
+        return pointerLikeType->getElementType();
+    return nullptr;
+}
+
 bool isEffectivelyComPtrType(IRType* type)
 {
     if (!type)
@@ -1238,7 +1238,13 @@ struct TaggedUnionLoweringContext : public InstPassBase
                     {
                         auto baseInterfacePtr = inst->getPtr();
                         auto baseInterfaceType = as<IRInterfaceType>(
-                            as<IRPtrTypeBase>(baseInterfacePtr->getDataType())->getValueType());
+                            getPointerElementType(baseInterfacePtr->getDataType()));
+                        if (!baseInterfaceType)
+                        {
+                            SLANG_UNEXPECTED(
+                                "CastInterfaceToTaggedUnionPtr load: pointer element is not an "
+                                "interface type");
+                        }
 
                         // Rewrite the load to use the original ptr and load
                         // an interface-typed object.
@@ -1269,7 +1275,13 @@ struct TaggedUnionLoweringContext : public InstPassBase
 
                         auto baseInterfacePtr = inst->getPtr();
                         auto baseInterfaceType = as<IRInterfaceType>(
-                            as<IRPtrTypeBase>(baseInterfacePtr->getDataType())->getValueType());
+                            getPointerElementType(baseInterfacePtr->getDataType()));
+                        if (!baseInterfaceType)
+                        {
+                            SLANG_UNEXPECTED(
+                                "CastInterfaceToTaggedUnionPtr store: pointer element is not an "
+                                "interface type");
+                        }
 
                         // Rewrite the store to use the original ptr and store
                         // an interface type'd object.
@@ -1432,7 +1444,7 @@ struct TaggedUnionLoweringContext : public InstPassBase
         // We'll replace it with a poison value so that any accidental uses will result in
         // an error later on.
         //
-        inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+        inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
         return true;
     }
 

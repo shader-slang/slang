@@ -1,0 +1,4 @@
+TN:corrupt
+SF:foo.c
+DA:not-a-number,5
+end_of_record

@@ -570,6 +570,13 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     const auto numInsts = flat.instAllocInfo.getCount();
 #endif
 
+    const auto operandIndicesCount = flat.operandIndices.getCount();
+
+    // These relationships are serialized IR invariants; stop before rebuilding pointers from
+    // inconsistent flat tables.
+    SLANG_RELEASE_ASSERT(flat.childCounts.getCount() == numInsts);
+    SLANG_RELEASE_ASSERT(sourceLocs.getCount() == numInsts);
+
     instsList.setCount(numInsts + 1);
     // nullptr instructions are represented as `-1`. We can save ourselves a
     // branch by just making that index valid.
@@ -608,10 +615,19 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         // About 5% of instructions in the core module are strings!
         case kIROp_StringLit:
         case kIROp_BlobLit:
-            minSizeInBytes = offsetof(IRConstant, value) +
-                             offsetof(IRConstant::StringValue, chars) +
-                             flat.stringLengths[stringLengthIndex++];
-            break;
+            {
+                SLANG_RELEASE_ASSERT(stringLengthIndex < flat.stringLengths.getCount());
+                const auto len = flat.stringLengths[stringLengthIndex++];
+                SLANG_RELEASE_ASSERT(len >= 0);
+                SLANG_RELEASE_ASSERT(uint64_t(len) <= uint64_t(UINT32_MAX));
+
+                const size_t headerSize =
+                    offsetof(IRConstant, value) + offsetof(IRConstant::StringValue, chars);
+                SLANG_RELEASE_ASSERT(size_t(len) <= size_t(-1) - headerSize);
+
+                minSizeInBytes = headerSize + size_t(len);
+                break;
+            }
         }
         insts[instIndex] = module->_allocateInst(op, a.operandCount, minSizeInBytes);
     }
@@ -621,16 +637,26 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     Int64 instIndex = 0;
     stringLengthIndex = 0;
     Int64 stringDataIndex = 0;
-    const auto go = [&](auto& go, IRInst* parent) -> IRInst*
+    auto readInstRef = [&]() -> IRInst*
     {
+        SLANG_RELEASE_ASSERT(operandIndex < operandIndicesCount);
+        const auto index = flat.operandIndices[operandIndex++];
+        SLANG_RELEASE_ASSERT(index >= -1 && index < numInsts);
+        return insts[index];
+    };
+    const auto go = [&](auto& go, IRInst* parent, Int64 depth) -> IRInst*
+    {
+        SLANG_RELEASE_ASSERT(depth < kMaxIRSerializationDepth);
+        SLANG_RELEASE_ASSERT(instIndex < numInsts);
+
         const auto thisInstIndex = instIndex++;
         IRInst* inst = insts[thisInstIndex];
 
         // operands and sourcelocs
         inst->sourceLoc = sourceLocs[thisInstIndex];
-        inst->typeUse.init(inst, insts[flat.operandIndices[operandIndex++]]);
+        inst->typeUse.init(inst, readInstRef());
         for (Int64 o = 0; o < inst->operandCount; ++o)
-            inst->getOperands()[o].init(inst, insts[flat.operandIndices[operandIndex++]]);
+            inst->getOperands()[o].init(inst, readInstRef());
 
         // Handle special instructions
         switch (inst->m_op)
@@ -640,25 +666,47 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             break;
         case kIROp_BoolLit:
         case kIROp_IntLit:
-            cast<IRConstant>(inst)->value.intVal =
-                bitCast<IRIntegerValue>(flat.literals[litIndex++]);
-            break;
+            {
+                SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
+                const auto bits = flat.literals[litIndex++];
+                cast<IRConstant>(inst)->value.intVal = bitCast<IRIntegerValue>(bits);
+                break;
+            }
         case kIROp_FloatLit:
-            cast<IRConstant>(inst)->value.floatVal = bitCast<double>(flat.literals[litIndex++]);
-            break;
+            {
+                SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
+                const auto bits = flat.literals[litIndex++];
+                cast<IRConstant>(inst)->value.floatVal = bitCast<double>(bits);
+                break;
+            }
         case kIROp_PtrLit:
-            // Keep the compiler happy on 32 bit builds
-            cast<IRConstant>(inst)->value.ptrVal = (void*)(uintptr_t(flat.literals[litIndex++]));
-            break;
+            {
+                SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
+                const auto bits = flat.literals[litIndex++];
+                // Keep the compiler happy on 32 bit builds
+                cast<IRConstant>(inst)->value.ptrVal = (void*)(uintptr_t(bits));
+                break;
+            }
         case kIROp_StringLit:
         case kIROp_BlobLit:
-            const auto c = cast<IRConstant>(inst);
-            const auto len = flat.stringLengths[stringLengthIndex++];
-            char* const dstChars = c->value.stringVal.chars;
-            c->value.stringVal.numChars = uint32_t(len);
-            memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, len);
-            stringDataIndex += len;
-            break;
+            {
+                const auto c = cast<IRConstant>(inst);
+                SLANG_RELEASE_ASSERT(stringLengthIndex < flat.stringLengths.getCount());
+                const auto len = flat.stringLengths[stringLengthIndex++];
+                SLANG_RELEASE_ASSERT(len >= 0);
+                SLANG_RELEASE_ASSERT(uint64_t(len) <= uint64_t(UINT32_MAX));
+
+                const auto stringCharsCount = flat.stringChars.getCount();
+                SLANG_RELEASE_ASSERT(stringDataIndex <= stringCharsCount);
+                SLANG_RELEASE_ASSERT(len <= stringCharsCount - stringDataIndex);
+
+                char* const dstChars = c->value.stringVal.chars;
+                c->value.stringVal.numChars = uint32_t(len);
+                if (len != 0)
+                    memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, size_t(len));
+                stringDataIndex += len;
+                break;
+            }
         }
 
         // Read in children, and fix up pointers
@@ -666,9 +714,11 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         IRInst* prev = nullptr;
         IRInst* first = nullptr;
         IRInst* last = nullptr;
-        for (Int64 i = 0; i < flat.childCounts[thisInstIndex]; ++i)
+        const auto childCount = flat.childCounts[thisInstIndex];
+        SLANG_RELEASE_ASSERT(childCount >= 0);
+        for (Int64 i = 0; i < childCount; ++i)
         {
-            auto c = go(go, inst);
+            auto c = go(go, inst, depth + 1);
             if (i == 0)
                 first = c;
             last = c;
@@ -684,7 +734,18 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
 
         return inst;
     };
-    const auto moduleInst = go(go, nullptr);
+    const auto moduleInst = go(go, nullptr, 0);
+    SLANG_RELEASE_ASSERT(instIndex == numInsts);
+    SLANG_RELEASE_ASSERT(operandIndex == operandIndicesCount);
+    // Unknown future opcodes intentionally become a recoverable read failure later.
+    // This reader cannot know whether those opcodes consume literal or string payloads.
+    if (!readContext._foundUnrecognizedInstructions)
+    {
+        SLANG_RELEASE_ASSERT(litIndex == flat.literals.getCount());
+        SLANG_RELEASE_ASSERT(stringLengthIndex == flat.stringLengths.getCount());
+        SLANG_RELEASE_ASSERT(stringDataIndex == flat.stringChars.getCount());
+    }
+    SLANG_RELEASE_ASSERT(as<IRModuleInst>(moduleInst));
     return cast<IRModuleInst>(moduleInst);
 }
 

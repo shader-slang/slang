@@ -2,6 +2,7 @@
 #include "slang-emit-c-like.h"
 
 #include "../compiler-core/slang-name.h"
+#include "../core/slang-char-util.h"
 #include "../core/slang-stable-hash.h"
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
@@ -20,7 +21,6 @@
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
-#include "slang-mangled-lexer.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
@@ -1554,7 +1554,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     }
 
     // Don't allow temporaries of pointer types to be created,
-    // if target langauge doesn't support pointers.
+    // if target language doesn't support pointers.
     if (as<IRPtrTypeBase>(type))
     {
         if (!doesTargetSupportPtrTypes())
@@ -3221,6 +3221,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugFunction:
     case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugCompilationUnit:
         break;
 
     case kIROp_Unmodified:
@@ -3813,9 +3814,12 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
         {
             emitInterpolationModifiers(param, paramType, layout);
-            emitMeshShaderModifiers(param);
         }
     }
+
+    // Emit mesh-output qualifiers unconditionally: they key off the parameter's
+    // decoration, not its varying-IO layout (which an SV-only output never registers).
+    emitMeshShaderModifiers(param);
 
     emitParamType(paramType, paramName);
     emitSemantics(param);
@@ -4651,8 +4655,12 @@ void CLikeSourceEmitter::emitVarModifiers(IRVarLayout* layout, IRInst* varDecl, 
         layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
     {
         emitInterpolationModifiers(varDecl, varType, layout);
-        emitMeshShaderModifiers(varDecl);
     }
+
+    // Mesh output decorations do not always come with a varying-output layout kind
+    // (for example, OutputVertices can lower to a plain array layout), so gate on the
+    // decoration itself instead of the layout classification.
+    emitMeshShaderModifiers(varDecl);
 
     // Output target specific qualifiers
     emitLayoutQualifiersImpl(layout);
@@ -5224,6 +5232,12 @@ void CLikeSourceEmitter::ensureGlobalInst(
         return;
     case kIROp_ThisType:
         return;
+    case kIROp_BuiltinRequirementKey:
+        // A built-in interface requirement key is metadata (like an interface
+        // requirement entry); it never corresponds to emitted code. Unlike an
+        // ordinary `StructKey`, this key is hoistable and so may survive as an
+        // (unreferenced) global inst after specialization, so skip it explicitly.
+        return;
     case kIROp_DebugInlinedAt:
     case kIROp_DebugScope:
     case kIROp_DebugNoScope:
@@ -5234,6 +5248,7 @@ void CLikeSourceEmitter::ensureGlobalInst(
     case kIROp_DebugValue:
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugCompilationUnit:
         return;
     default:
         break;

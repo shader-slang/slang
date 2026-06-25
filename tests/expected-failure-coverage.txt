@@ -1,6 +1,36 @@
-# macOS only: tests that throw and catch C++ exceptions across shared library
-# boundaries fail when running in-process (server-count=1) due to cross-dylib
-# exception RTTI mismatch. Coverage CI uses server-count=1 for profiling.
-slang-unit-test-tool/replayContextSyncModeMismatch.internal
-slang-unit-test-tool/replayContextPlaybackOutputMismatch.internal
-slang-unit-test-tool/replayContextTypeMismatch.internal
+# Coverage-CI test skiplist
+# =========================
+# This file uses slang-test's `-expected-failure-list` semantics: tests
+# listed here are expected to FAIL (not skipped). slang-test still runs
+# them and just reclassifies a failing exit as expected. That only helps
+# when a test returns a clean failing exit code; it does NOT help when a
+# test crashes the slang-test process itself -- the runner dies before
+# any classification step.
+#
+# Crash-mode skips therefore live elsewhere: as workflow-level filters in
+# `.github/workflows/ci-slang-coverage.yml`. As of writing:
+#   - slang-unit-test-tool/RecordReplayApiTypeOperations  (Windows / OCC)
+#   - tests/autodiff/global-param-hoisting                (Windows / OCC,
+#                                                          intermittent crash)
+#   - generated synthetic LLVM runtime variants           (macOS / LLVM
+#                                                          coverage crash)
+# Update both this file and the workflow when adding a new coverage-only
+# skip.
+
+# Run 26813684019 (sequential reproducer with -server-count 1):
+# SIGSEGV in slang-test immediately after
+# design/ir-reference/metadata/type-layout-base.slang passes. The same
+# test is already listed in expected-failures.txt (it fails on the
+# uninstrumented Linux nightly); coverage instrumentation
+# escalates that failure into a SIGSEGV inside the slang-test
+# orchestrator, which kills the rest of the suite.
+docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-buffer-element.slang
+
+# Coverage metadata is not propagated from the upstream Slang IR artifact
+# through the Metal downstream compilation chain (xcrun metallib-asm path),
+# so _maybeWriteCoverageManifest finds no ICoverageTracingMetadata on the
+# final artifact and writes no manifest file. The two MetalLib sub-checks
+# inside this unit test therefore always fail on macOS coverage CI where the
+# Metal toolchain is present. Tracked in: https://github.com/shader-slang/slang/issues/11629
+# On non-Apple CI the sub-checks are skipped via _isMetalLibDownstreamUnavailable.
+slang-unit-test-tool/SlangcCoverageManifestOutput.internal

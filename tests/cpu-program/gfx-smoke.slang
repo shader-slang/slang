@@ -7,7 +7,7 @@ export __extern_cpp int main()
     gfx.DeviceDesc deviceDesc = {};
     deviceDesc.deviceType = gfx.DeviceType.CPU;
     Optional<gfx.IDevice> device;
-    gfx.gfxCreateDevice(&deviceDesc, device);
+    gfx.gfxCreateDevice(__getAddress(deviceDesc), device);
     if (device == none)
     {
         printf("fail\n");
@@ -17,7 +17,7 @@ export __extern_cpp int main()
     gfx.CommandQueueDesc queueDesc = {gfx::QueueType::Graphics};
     queueDesc.type = gfx.QueueType.Graphics;
     Optional<gfx.ICommandQueue> queue;
-    device.value.createCommandQueue(&queueDesc, queue);
+    device.value.createCommandQueue(__getAddress(queueDesc), queue);
 
     gfx.ShaderProgramDesc2 programDesc = {};
     NativeString s = R"(
@@ -36,15 +36,15 @@ export __extern_cpp int main()
     programDesc.sourceDataSize = s.length;
     programDesc.entryPointCount = 1;
     NativeString entryPointName = "computeMain";
-    programDesc.entryPointNames = &entryPointName;
+    programDesc.entryPointNames = __getAddress(entryPointName);
     Optional<gfx.IShaderProgram> program;
     Optional<slang.ISlangBlob> diagBlob;
-    device.value.createProgram2(&programDesc, program, diagBlob);
+    device.value.createProgram2(__getAddress(programDesc), program, diagBlob);
 
     Optional<gfx.IPipelineState> pipeline;
     gfx.ComputePipelineStateDesc pipelineDesc;
     pipelineDesc.program = NativeRef<gfx.IShaderProgram>(program.value);
-    device.value.createComputePipelineState(&pipelineDesc, pipeline);
+    device.value.createComputePipelineState(__getAddress(pipelineDesc), pipeline);
 
     Optional<gfx.ITransientResourceHeap> transientHeap;
     gfx.TransientResourceHeapDesc transientHeapDesc;
@@ -54,7 +54,7 @@ export __extern_cpp int main()
     transientHeapDesc.uavDescriptorCount = 1024;
     transientHeapDesc.samplerDescriptorCount = 256;
     transientHeapDesc.accelerationStructureDescriptorCount = 32;
-    device.value.createTransientResourceHeap(&transientHeapDesc, transientHeap);
+    device.value.createTransientResourceHeap(__getAddress(transientHeapDesc), transientHeap);
 
     Optional<gfx.IBufferResource> buffer;
     gfx.BufferResourceDesc bufferDesc = {};
@@ -64,12 +64,12 @@ export __extern_cpp int main()
     bufferDesc.elementSize = 4;
     bufferDesc.sizeInBytes = 256;
     bufferDesc.type = gfx.ResourceType.Buffer;
-    device.value.createBufferResource(&bufferDesc, nullptr, buffer);
+    device.value.createBufferResource(__getAddress(bufferDesc), nullptr, buffer);
 
     Optional<gfx.IResourceView> bufferView;
     gfx.ResourceViewDesc viewDesc;
     viewDesc.type = gfx.ResourceViewType.UnorderedAccess;
-    device.value.createBufferView(buffer.value, none, &viewDesc, bufferView);
+    device.value.createBufferView(buffer.value, none, __getAddress(viewDesc), bufferView);
 
     Optional<gfx.ICommandBuffer> commandBuffer;
     transientHeap.value.createCommandBuffer(commandBuffer);
@@ -80,13 +80,13 @@ export __extern_cpp int main()
     Optional<gfx.IShaderObject> entryPointObject;
     rootObject.value.getEntryPoint(0, entryPointObject);
     gfx.ShaderOffset offset = {};
-    entryPointObject.value.setResource(&offset, bufferView.value);
+    entryPointObject.value.setResource(__getAddress(offset), bufferView.value);
     encoder.value.dispatchCompute(1, 1, 1);
     encoder.value.endEncoding();
     commandBuffer.value.close();
     
     NativeRef<gfx.ICommandBuffer> commandBufferRef = NativeRef<gfx.ICommandBuffer>(commandBuffer.value);
-    queue.value.executeCommandBuffers(1, &commandBufferRef, none, 0);
+    queue.value.executeCommandBuffers(1, __getAddress(commandBufferRef), none, 0);
     queue.value.waitOnHost();
 
     Optional<slang.ISlangBlob> blob;

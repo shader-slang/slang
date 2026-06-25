@@ -4,6 +4,7 @@
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-specialize.h"
 #include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -284,11 +285,46 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
             }
         }
         break;
+    case kIROp_IdentityRemat:
+        return memoize(maybeTranslateIdentityRemat(inst));
     default:
         break;
     }
 
     return translationResult;
+}
+
+IRInst* TranslationContext::maybeTranslateIdentityRemat(IRInst* inst)
+{
+    // Identity remat: MinimalContext == BwdCallable, so remat is the identity.
+    // Build a function that takes (MinCtx, <original params>) and returns MinCtx.
+    IRBuilder subBuilder(inst->getModule());
+    subBuilder.setInsertBefore(inst);
+
+    DifferentiableTypeConformanceContext ctx(&autodiffContext);
+    auto funcType = cast<IRFuncType>(ctx.resolveType(&subBuilder, inst->getFullType()));
+    SLANG_ASSERT(funcType->getParamCount() > 0);
+    if (funcType->getParamCount() == 0)
+        return inst;
+
+    IRBuilder funcBuilder(subBuilder);
+    auto func = funcBuilder.createFunc();
+    func->setFullType(funcType);
+
+    funcBuilder.setInsertInto(func);
+    auto block = funcBuilder.emitBlock();
+    funcBuilder.setInsertInto(block);
+
+    // Emit parameters.
+    List<IRParam*> params;
+    for (UIndex i = 0; i < funcType->getParamCount(); ++i)
+        params.add(funcBuilder.emitParam(funcType->getParamType(i)));
+
+    // Return the first parameter (the MinimalContext).
+    SLANG_ASSERT(params[0]->getDataType() == funcType->getResultType());
+    funcBuilder.emitReturn(params[0]);
+
+    return func;
 }
 
 static IRInst* specializeWitnessLookup(IRLookupWitnessMethod* lookupInst)
@@ -333,9 +369,6 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
     if (as<IRParam>(inst))
         return inst;
 
-    List<IRInst*> operands;
-    bool changed = false;
-
     IRBuilder builder(ctx->getModule());
     IRWeakUse* instRef = builder.getWeakUse(inst);
 
@@ -343,9 +376,7 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
     for (UInt i = 0; i < inst->getOperandCount(); ++i)
     {
         auto operand = inst->getOperand(i);
-        auto resolvedOperand = ctx->resolveInst(operand);
-        if (resolvedOperand != operand)
-            changed = true;
+        ctx->resolveInst(operand);
     }
 
     // Extract effective inst post-resolution. (the inst may have changed).
@@ -436,14 +467,22 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
             if (!isSetSpecializedGeneric(instWithCanonicalOperands))
             {
                 auto specInst = cast<IRSpecialize>(instWithCanonicalOperands);
-                auto specResult = specializeGeneric(ctx->getSpecializationContext(), specInst);
+                auto specResult =
+                    specializeGeneric(ctx->getSpecializationContext(), specInst, false);
 
                 if (specResult && as<IRGlobalValueWithCode>(specResult))
                 {
                     // If we ended up with something that has code,
-                    // specialization may have opened up some simplification opportunities.
+                    // specialization may have opened up simplification opportunities.
                     //
 
+                    // Specialize any child instructions. This handles any non-hoistable
+                    // instructions and peephole-style opportunities.
+                    // TODO: Should this just run both specialization and peephole in a loop until
+                    // we reach a fixed point?
+                    specializeChildInsts(ctx->getSpecializationContext(), specResult);
+
+                    // Fold any constants within the specialized code.
                     applySparseConditionalConstantPropagation(
                         specResult,
                         ctx->getTargetProgram(),
@@ -458,8 +497,9 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
                         return nullptr;
                 }
 
-                if (specResult && specResult != specInst)
-                    specInst->replaceUsesWith(specResult);
+                auto currentSpecInst = as<IRSpecialize>(instRef->getOperand(0));
+                if (specResult && currentSpecInst && specResult != currentSpecInst)
+                    currentSpecInst->replaceUsesWith(specResult);
 
                 // No need to memoize since specializeGeneric will already have memoized this.
                 return specResult;

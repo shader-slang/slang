@@ -90,6 +90,7 @@ struct IRSpecContextBase
     List<IRModule*> irModules;
 
     HashSet<UnownedStringSlice> deferredWitnessTableEntryKeys;
+    HashSet<IRInst*> globalsWithClonedAnnotations;
     List<RefPtr<WitnessTableCloneInfo>> witnessTables;
 
     IRSpecSymbol* findSymbols(UnownedStringSlice mangledName)
@@ -147,11 +148,19 @@ void registerClonedValue(IRSpecContextBase* context, IRInst* clonedValue, IRInst
     switch (clonedValue->getOp())
     {
     case kIROp_LookupWitnessMethod:
-
-        // If `originalVal` represents a witness table entry key, add the key
-        // to witnessTableEntryWorkList.
-        context->deferredWitnessTableEntryKeys.add(
-            getMangledName(as<IRLookupWitnessMethod>(clonedValue)->getRequirementKey()));
+        {
+            // If `originalVal` represents a witness table entry key, add the key
+            // to witnessTableEntryWorkList.
+            //
+            // Built-in requirement keys (`IRBuiltinRequirementKey`) are hoistable
+            // and carry no linkage/mangled name; their witness-table entries are
+            // cloned eagerly (see `cloneWitnessTableImpl`), so they must not enter
+            // the mangled-name-keyed deferred bookkeeping (every such key would
+            // otherwise collide on the empty mangled name).
+            auto reqKey = as<IRLookupWitnessMethod>(clonedValue)->getRequirementKey();
+            if (!as<IRBuiltinRequirementKey>(reqKey))
+                context->deferredWitnessTableEntryKeys.add(getMangledName(reqKey));
+        }
         break;
     }
 }
@@ -196,13 +205,21 @@ IRInst* cloneInst(
 static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRInst* originalInst)
 {
     SLANG_UNUSED(clonedInst);
-    traverseUsers<IRAnnotation>(
-        originalInst,
-        [&](IRAnnotation* annotation)
-        {
-            if (annotation->getTarget() == originalInst)
-                cloneInst(context, context->builder, annotation, annotation);
-        });
+
+    // Local annotations will be cloned normally as part of cloning their parent function/generic
+    // body. For module-scope annotations, we need to look them up since they won't get
+    // automatically pulled in.
+
+    if (!originalInst->getParent() || originalInst->getParent()->getOp() != kIROp_ModuleInst)
+        return;
+
+    if (!context->globalsWithClonedAnnotations.add(originalInst))
+        return;
+
+    auto annotations =
+        originalInst->getModule()->_getLinkingInfo()->getAnnotationsForTarget(originalInst);
+    for (auto annotation : annotations)
+        cloneInst(context, context->builder, annotation, annotation);
 }
 
 IRInst* cloneInst(IRSpecContextBase* context, IRBuilder* builder, IRInst* originalInst)
@@ -757,7 +774,14 @@ IRWitnessTable* cloneWitnessTableImpl(
     {
         if (auto entry = as<IRWitnessTableEntry>(child))
         {
-            if (!shouldDeepClone)
+            // Built-in requirement keys are hoistable and have no mangled name,
+            // so they cannot key the deferred-entry dictionary below (they would
+            // all collide on the empty name). Such entries are few (the
+            // `IDifferentiable` requirements), so clone them eagerly instead of
+            // deferring.
+            bool isBuiltinReqEntry =
+                as<IRBuiltinRequirementKey>(entry->getRequirementKey()) != nullptr;
+            if (!shouldDeepClone && !isBuiltinReqEntry)
             {
                 // Skip witness table entries during the first pass,
                 // and just add them to the deferred work list.
@@ -1676,19 +1700,6 @@ struct IRSpecializationState
     }
 };
 
-static bool _isHLSLExported(IRInst* inst)
-{
-    for (auto decoration : inst->getDecorations())
-    {
-        const auto op = decoration->getOp();
-        if (op == kIROp_HLSLExportDecoration || op == kIROp_DownstreamModuleExportDecoration)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
 static bool doesFuncHaveDefinition(IRFunc* func)
 {
     if (func->getFirstBlock() != nullptr)
@@ -2123,6 +2134,12 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     irModules.addRange(builtinModules);
     ArrayView<IRModule*> userModules = irModules.getArrayView(0, userModuleCount);
 
+    // Source/layout/builtin modules are fully built by this point. Build the module-owned linker
+    // global acceleration cache once here so the linker can avoid repeated global scans and
+    // high-fanout use-list walks.
+    for (auto irModule : irModules)
+        irModule->_ensureLinkingInfo();
+
     // Check if any user module uses auto-diff, if so we will need to link
     // additional witnesses and decorations.
     for (IRModule* irModule : userModules)
@@ -2228,6 +2245,10 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
                 // but we still need to keep it around if it is in the IR.
                 cloneValue(context, inst);
                 break;
+            case kIROp_DebugCompilationUnit:
+                // DebugCompilationUnit references a DebugSource; clone it along with source.
+                cloneValue(context, inst);
+                break;
             }
         }
     }
@@ -2235,49 +2256,40 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     bool shouldCopyGlobalParams =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::PreserveParameters);
 
-    auto shouldCopy = [&](IRInst* inst) -> bool
+    HashSet<IRInst*> extraInstsToClone;
+    auto cloneAndKeepAlive = [&](IRInst* inst)
     {
-        // We need to copy over exported symbols,
-        // and any global parameters if preserve-params option is set.
-        //
-        if (_isHLSLExported(inst))
-        {
-            return true;
-        }
+        if (!inst || !extraInstsToClone.add(inst))
+            return;
 
-        if (shouldCopyGlobalParams && as<IRGlobalParam>(inst))
+        auto cloned = cloneValue(context, inst);
+        if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
         {
-            return true;
+            context->builder->addKeepAliveDecoration(cloned);
         }
-
-        if (auto knownBuiltin = inst->findDecoration<IRKnownBuiltinDecoration>())
-        {
-            switch (knownBuiltin->getName())
-            {
-            case KnownBuiltinDeclName::NullDifferential:
-                return true;
-            default:
-                break;
-            }
-        }
-
-        return false;
     };
 
     for (IRModule* irModule : irModules)
     {
-        for (auto inst : irModule->getGlobalInsts())
+        auto linkingInfo = irModule->_getOrCreateLinkingInfo();
+
+        // We need to copy over exported symbols, any global parameters if preserve-params option
+        // is set, and specific known builtins that must be present even when not referenced from
+        // the entry-point clone graph.
+        for (auto inst : linkingInfo->getHLSLExports())
+            cloneAndKeepAlive(inst);
+
+        if (shouldCopyGlobalParams)
         {
-            // We need to copy over exported symbols,
-            // and any global parameters if preserve-params option is set.
-            if (shouldCopy(inst))
-            {
-                auto cloned = cloneValue(context, inst);
-                if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
-                {
-                    context->builder->addKeepAliveDecoration(cloned);
-                }
-            }
+            for (auto inst : linkingInfo->getGlobalParams())
+                cloneAndKeepAlive(inst);
+        }
+
+        for (auto inst : linkingInfo->getKnownBuiltins())
+        {
+            auto knownBuiltin = inst->findDecoration<IRKnownBuiltinDecoration>();
+            if (knownBuiltin && knownBuiltin->getName() == KnownBuiltinDeclName::NullDifferential)
+                cloneAndKeepAlive(inst);
         }
     }
 
@@ -2448,7 +2460,7 @@ struct IRPrelinkContext : IRSpecContext
         case kIROp_WitnessTable:
             {
                 auto witnessTable = as<IRWitnessTable>(originalVal);
-                clonedInst = builder->createWitnessTable(
+                clonedInst = builderForClone->createWitnessTable(
                     cloneType(this, (IRType*)witnessTable->getConformanceType()),
                     cloneType(this, witnessTable->getConcreteType()));
                 break;
@@ -2514,6 +2526,28 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
     for (auto& m : globalSession->coreModules)
         builtinModules.add(m->getIRModule());
 
+    // Prelink can pull in dependencies from any available input module, not only the modules
+    // that directly own `externalSymbolsToLink`. Build linking info for all stable input modules
+    // before cloning. Do not build it for `irModule` itself here: prelink will mutate it by
+    // replacing declarations with cloned definitions, and linking info assumes the module does
+    // not change after it is built.
+    HashSet<IRModule*> inputModules;
+    for (auto inputModule : specContext.irModules)
+    {
+        if (inputModule)
+            inputModules.add(inputModule);
+    }
+    for (auto inputModule : builtinModules)
+    {
+        if (inputModule)
+            inputModules.add(inputModule);
+    }
+    for (auto inputModule : inputModules)
+    {
+        if (inputModule != irModule)
+            inputModule->_ensureLinkingInfo();
+    }
+
     // First, register all external symbols in the current module.
     insertGlobalValueSymbols(&sharedContext, irModule);
 
@@ -2527,16 +2561,17 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
         specContext.shared->symbols.remove(mangledName);
         specContext.builder->setInsertBefore(existingInst);
 
-        // Remove existing inst from the module before cloning so our duplication-check
-        // (`checkIRDuplicate`) doesn't complain.
-        existingInst->removeFromParent();
+        // Strip the linkage decoration from existingInst so that checkIRDuplicate
+        // won't find a name conflict when the clone is created.
+        // We intentionally keep existingInst in the module tree so that its children
+        // (e.g. Specialize insts inside a Generic's body that reference the Generic
+        // itself) remain connected to the module during replaceUsesWith. Removing it
+        // from parent would orphan the entire subtree and crash the dedup/hoisting
+        // logic when it encounters those children as users with no module.
+        if (auto linkageDecor = existingInst->findDecoration<IRLinkageDecoration>())
+            linkageDecor->removeAndDeallocate();
 
         auto cloned = cloneValue(&specContext, originalInst);
-
-        // Replace uses and deallocate immediately rather than deferring to a second pass.
-        // Deferring causes crashes when existingInst A is a user of existingInst B: both
-        // get removed from parent in the first pass, then B's replaceUsesWith encounters
-        // orphaned A (no module) and crashes in the dedup/hoisting logic.
         existingInst->replaceUsesWith(cloned);
         existingInst->removeAndDeallocate();
     }

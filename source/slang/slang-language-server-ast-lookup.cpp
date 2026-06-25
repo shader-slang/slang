@@ -237,6 +237,17 @@ public:
         return false;
     }
 
+    bool visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
+    {
+        // A fast-path builtin operator has no callee decl to look up, but its operands may
+        // contain identifiers the user can hover / go-to.
+        PushNode pushNodeRAII(context, expr);
+        for (auto arg : expr->arguments)
+            if (dispatchIfNotNull(arg))
+                return true;
+        return false;
+    }
+
     bool visitVarExpr(VarExpr* expr)
     {
         if (expr->name && expr->declRef.getDecl())
@@ -244,7 +255,7 @@ public:
             if (expr->declRef.getDecl()->hasModifier<ImplicitConversionModifier>())
                 return false;
             Int declLength = 0;
-            if (const auto ctorDecl = as<ConstructorDecl>(expr->declRef.getDecl()))
+            if (const auto ctorDecl = as<ConstructorDecl>(expr->declRef.getDecl()); ctorDecl)
             {
                 auto humaneLoc =
                     context->sourceManager->getHumaneLoc(expr->loc, SourceLocType::Actual);
@@ -881,7 +892,7 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
         if (auto container = as<ContainerDecl>(node))
         {
             bool shouldInspectChildren = true;
-            if (const auto genericDecl = as<GenericDecl>(node))
+            if (const auto genericDecl = as<GenericDecl>(node); genericDecl)
             {
             }
             else if (container->closingSourceLoc.getRaw() >= container->loc.getRaw())

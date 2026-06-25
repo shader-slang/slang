@@ -78,7 +78,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     vec.y = 7;
 
     // MultiPtrImpl: 10 + 5 + 20 + 7 = 42
-    var comp = makeCompute(typeSelector[0], &ival, &fval, &vec);
+    var comp = makeCompute(typeSelector[0], __getAddress(ival), __getAddress(fval), __getAddress(vec));
     // CHECK: 42
     outputBuffer[0] = comp.compute();
 
@@ -92,7 +92,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     fval = 50.0;
     vec.x = 0;
     vec.y = 0;
-    var comp3 = makeCompute(typeSelector[2], &ival, &fval, &vec);
+    var comp3 = makeCompute(typeSelector[2], __getAddress(ival), __getAddress(fval), __getAddress(vec));
     // CHECK: 150
     outputBuffer[2] = comp3.compute();
 }

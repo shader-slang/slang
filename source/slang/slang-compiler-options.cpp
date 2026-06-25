@@ -126,6 +126,18 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                 sb << " " << name << v.intValue << " " << v.intValue2;
             }
             break;
+        case CompilerOptionName::TraceCoverageBinding: // intValue0: index; intValue1: space
+            for (auto v : option.value)
+            {
+                sb << " " << name << " " << v.intValue << " " << v.intValue2;
+            }
+            break;
+        case CompilerOptionName::TraceCoverageReservedSpace: // intValue0: space
+            for (auto v : option.value)
+            {
+                sb << " " << name << " " << v.intValue;
+            }
+            break;
         case CompilerOptionName::Optimization:
             for (auto v : option.value)
             {
@@ -171,6 +183,12 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
 {
     for (auto& kv : options)
     {
+        // This is an output-policy knob (manifest sidecar path), not generated shader code.
+        // Locked by _testCoverageManifestOutputDoesNotAffectCompilerOptionHash; re-including it
+        // would invalidate persistent module caches on every sidecar-path change.
+        if (kv.key == CompilerOptionName::CoverageManifestOutput)
+            continue;
+
         builder.append(kv.key);
         builder.append(kv.value.getCount());
         for (auto& v : kv.value)
@@ -205,6 +223,7 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::TypeConformance:
     case CompilerOptionName::DumpIRBefore:
     case CompilerOptionName::DumpIRAfter:
+    case CompilerOptionName::TraceCoverageReservedSpace:
         return true;
     }
     return false;
@@ -216,7 +235,7 @@ CompilerOptionValue Slang::CompilerOptionSet::getDefault(CompilerOptionName name
     case CompilerOptionName::Optimization:
         return CompilerOptionValue::fromEnum(OptimizationLevel::Default);
     case CompilerOptionName::LanguageVersion:
-        return CompilerOptionValue::fromEnum(SLANG_LANGAUGE_VERSION_DEFAULT);
+        return CompilerOptionValue::fromEnum(SLANG_LANGUAGE_VERSION_DEFAULT);
     default:
         return CompilerOptionValue();
     }

@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           submodules: "recursive"
           fetch-depth: "0"
@@ -37,7 +37,8 @@ jobs:
             bash -euo pipefail -c '
               yum install -y gcc-toolset-11-gcc gcc-toolset-11-gcc-c++
               source /opt/rh/gcc-toolset-11/enable
-              pip3 install cmake==3.25.0 ninja==1.11.1.4
+              /opt/python/cp310-cp310/bin/pip install cmake==3.25.0 ninja==1.11.1.4
+              export PATH=/opt/python/cp310-cp310/bin:$PATH
               cd /home/app
               git config --global --add safe.directory /home/app
               cmake --preset default --fresh -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
@@ -67,7 +68,7 @@ jobs:
         run: |
           find "build/dist-release" -type f ! -iname '*.md' ! -iname '*.h' -print0 | xargs -0 file
       - name: UploadBinary
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           draft: ${{contains(github.ref, 'draft')}}

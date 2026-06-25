@@ -73,7 +73,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     int storage = 0;
 
     // PtrAccumulator: mutations go through the pointer to `storage`
-    var acc = makeAccumulator(typeSelector[0], &storage, 0);
+    var acc = makeAccumulator(typeSelector[0], __getAddress(storage), 0);
     acc.accumulate(10);
     acc.accumulate(20);
     // CHECK: 30
