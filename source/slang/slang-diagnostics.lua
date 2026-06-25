@@ -936,6 +936,13 @@ warning(
 )
 
 err(
+    "default-value-on-extension-generic-param",
+    20104,
+    "default value on extension generic parameter",
+    span { loc = "location", message = "an extension's generic parameter '~name:Name' is inferred from its target, so it cannot have a default value" }
+)
+
+err(
     "decl-not-allowed",
     30102,
     "declaration not allowed here",
