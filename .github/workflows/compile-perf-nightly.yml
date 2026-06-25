@@ -229,8 +229,51 @@ jobs:
       # job. trend.py exits non-zero (job red + ::error:: annotations) when a
       # primary timer drifts past threshold vs the trailing median.
       - name: Check trend (fail on regression)
+        id: trend
         shell: bash
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE/tools/compile-perf"
           python trend.py --results "$GITHUB_WORKSPACE/perf-results"
+
+      - name: Notify Slack
+        if: github.event_name == 'schedule' && always()
+        shell: bash
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLANG_PERF_SLACK_WEBHOOK }}
+          TREND_OUTCOME: ${{ steps.trend.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK" ]; then
+            echo "SLANG_PERF_SLACK_WEBHOOK not set; skipping Slack notification"
+            exit 0
+          fi
+          DATE=$(date -u +%Y-%m-%d)
+          if [ "$TREND_OUTCOME" = "success" ]; then
+            ICON=":white_check_mark:"
+            STATUS="No regressions detected"
+          elif [ "$TREND_OUTCOME" = "failure" ]; then
+            ICON=":warning:"
+            STATUS="Regression detected — see CI run for details"
+          else
+            ICON=":x:"
+            STATUS="Nightly job failed — see CI run for details"
+          fi
+          python -c "
+          import json, os, urllib.request
+          payload = {
+              'text': (
+                  f'{os.environ[\"ICON\"]} *Compile-perf nightly — {os.environ[\"DATE\"]}*\n'
+                  f'{os.environ[\"STATUS\"]}\n'
+                  f'• Run: {os.environ[\"RUN_URL\"]}\n'
+                  f'• Report: https://shader-slang.org/slang-compile-perf/ '
+                  f'(may take a few minutes to update after the run)'
+              )
+          }
+          req = urllib.request.Request(
+              os.environ['SLACK_WEBHOOK'],
+              data=json.dumps(payload).encode(),
+              headers={'Content-Type': 'application/json'})
+          urllib.request.urlopen(req, timeout=10)
+          print('Slack notification sent')
+          "
