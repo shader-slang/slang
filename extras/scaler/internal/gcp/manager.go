@@ -486,7 +486,7 @@ func (m *Manager) CreateVM(ctx context.Context, runnerName, jitConfig string) (s
 }
 
 func removeZoneCandidate(candidates []zoneCandidate, zone string) []zoneCandidate {
-	filtered := candidates[:0]
+	filtered := make([]zoneCandidate, 0, len(candidates))
 	for _, candidate := range candidates {
 		if candidate.zone != zone {
 			filtered = append(filtered, candidate)
@@ -498,13 +498,6 @@ func removeZoneCandidate(candidates []zoneCandidate, zone string) []zoneCandidat
 func (m *Manager) reserveCreate(runnerName string, candidates []zoneCandidate) (zoneCandidate, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
-	if m.vms == nil {
-		m.vms = make(map[string]*vmInfo)
-	}
-	if m.pendingCreates == nil {
-		m.pendingCreates = make(map[string]zoneCandidate)
-	}
 
 	if _, ok := m.vms[runnerName]; ok {
 		return zoneCandidate{}, fmt.Errorf("runner %q is already tracked", runnerName)
@@ -518,6 +511,8 @@ func (m *Manager) reserveCreate(runnerName string, candidates []zoneCandidate) (
 
 	var selected zoneCandidate
 	if m.config.GPUType == "none" {
+		// selectZones returns the full configured zone set for non-GPU
+		// pools, so this counter rotates through a stable ring.
 		selected = candidates[m.nextNonGPUZone%len(candidates)]
 		m.nextNonGPUZone++
 	} else {
@@ -551,9 +546,6 @@ func (m *Manager) releaseCreate(runnerName string) {
 func (m *Manager) completeCreate(runnerName, vmName string, candidate zoneCandidate) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.vms == nil {
-		m.vms = make(map[string]*vmInfo)
-	}
 	delete(m.pendingCreates, runnerName)
 	m.vms[runnerName] = &vmInfo{vmName: vmName, zone: candidate.zone, createdAt: m.now()}
 }

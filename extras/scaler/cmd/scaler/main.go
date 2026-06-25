@@ -496,15 +496,15 @@ func (s *gcpRunnerScaler) HandleDesiredRunnerCount(ctx context.Context, count in
 		// CreateVM already guards its shared state (the VM tracker and zone
 		// selection are mutex-locked), so it is safe to call in parallel.
 		// Bound the fan-out so we don't issue an unbounded burst of GCP API
-		// inserts at once (rate-limit safety).
+		// inserts at once or launch a goroutine per queued job.
 		const maxConcurrentCreates = 8
 		sem := make(chan struct{}, maxConcurrentCreates)
 		var wg sync.WaitGroup
 		for range scaleUp {
+			sem <- struct{}{}
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				sem <- struct{}{}
 				defer func() { <-sem }()
 
 				name := fmt.Sprintf("%s-%s", s.vmPrefix, uuid.NewString()[:8])

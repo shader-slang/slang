@@ -360,7 +360,8 @@ func TestCreateVMTryNextZoneAfterStockout(t *testing.T) {
 			GPUType:          "nvidia-l4",
 			Platform:         "linux",
 		},
-		vms: map[string]*vmInfo{},
+		vms:            map[string]*vmInfo{},
+		pendingCreates: map[string]zoneCandidate{},
 	}
 	m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
 		return []zoneCandidate{
@@ -409,7 +410,8 @@ func TestCreateVMAllCandidateZonesStockout(t *testing.T) {
 			GPUType:          "nvidia-l4",
 			Platform:         "linux",
 		},
-		vms: map[string]*vmInfo{},
+		vms:            map[string]*vmInfo{},
+		pendingCreates: map[string]zoneCandidate{},
 	}
 	m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
 		return []zoneCandidate{
@@ -454,7 +456,8 @@ func TestCreateVMStopsOnNonStockoutError(t *testing.T) {
 			GPUType:          "nvidia-l4",
 			Platform:         "linux",
 		},
-		vms: map[string]*vmInfo{},
+		vms:            map[string]*vmInfo{},
+		pendingCreates: map[string]zoneCandidate{},
 	}
 	m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
 		return []zoneCandidate{
@@ -659,7 +662,8 @@ func TestCreateVMStampsExpectGPUMetadata(t *testing.T) {
 					GPUType:          tc.gpuType,
 					Platform:         "linux",
 				},
-				vms: map[string]*vmInfo{},
+				vms:            map[string]*vmInfo{},
+				pendingCreates: map[string]zoneCandidate{},
 			}
 			m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
 				return []zoneCandidate{{zone: "us-east1-d", region: "us-east1", available: 16}}, nil
