@@ -90,6 +90,20 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
         // route their uniforms through the SBT and are handled elsewhere.
         if (entryPointDecoration->getProfile().getStage() != Stage::Compute)
             return false;
+        // We synthesize a `ConstantBuffer<GlobalParams>` global, so the entry point's params layout
+        // must itself be a parameter group for us to build a matching parameter-group layout. The
+        // layout pipeline may instead produce a bare `IRStructTypeLayout` (no constant-buffer
+        // wrapper) — see the `needConstantBuffer` discrimination in
+        // slang-ir-entry-point-uniforms.cpp — and such an entry point is left on the default path
+        // rather than hoisted.
+        auto funcLayoutDecoration = func->findDecoration<IRLayoutDecoration>();
+        if (!funcLayoutDecoration)
+            return false;
+        auto entryPointLayout = as<IREntryPointLayout>(funcLayoutDecoration->getLayout());
+        if (!entryPointLayout)
+            return false;
+        if (!as<IRParameterGroupTypeLayout>(entryPointLayout->getParamsLayout()->getTypeLayout()))
+            return false;
         for (IRParam* param = func->getFirstParam(); param; param = param->getNextParam())
         {
             auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
@@ -221,10 +235,10 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
         }
 
         // Construct and attach the global parameter's layout. The synthesized global is always a
-        // `ConstantBuffer<GlobalParams>`, so its layout must be a parameter-group layout. On CUDA
-        // the entry point's params layout is a parameter group at this point; fail loudly if that
-        // invariant is ever violated rather than attach a mismatched bare struct layout to a
-        // parameter-group-typed global. We mirror the original group's container/element split with
+        // `ConstantBuffer<GlobalParams>`, so its layout must be a parameter-group layout. This is
+        // guaranteed for any entry point reaching here: `_funcQualifiesForHoist` requires the
+        // params layout to be an `IRParameterGroupTypeLayout` (entry points with a bare struct
+        // layout are not hoisted). We mirror the original group's container/element split with
         // unrelated (e.g. varying) offsets filtered out, modeled on
         // `moveEntryPointUniformParamsToGlobalScope`.
         auto originalParamGroupLayout =
@@ -302,8 +316,13 @@ void hoistCUDAResourceArrayParamsToParameterGroup(IRModule* module)
         return;
 
     // Never hoist when a module-scope uniform parameter group global already exists (e.g. one
-    // `collectGlobalUniformParameters` created): every such global emits as the same hardcoded
-    // `__constant__ SLANG_globalParams`, so a second one would collide in NVRTC.
+    // `collectGlobalUniformParameters` synthesizes for any global-scope uniform or user `cbuffer`):
+    // every such global emits as the same hardcoded `__constant__ SLANG_globalParams`, so adding a
+    // second would collide in NVRTC. A consequence is that the optimization does not fire for a
+    // kernel that also has global-scope uniforms; the runtime-indexed resource array stays on the
+    // `.param` path in that case.
+    // TODO: merge the hoisted fields into the existing GlobalParams instead of bailing, so the
+    // optimization also applies when a global parameter group is already present.
     if (HoistCUDAResourceArrayParams::_moduleHasUniformParameterGroupGlobal(module))
         return;
 
