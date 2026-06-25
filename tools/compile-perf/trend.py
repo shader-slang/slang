@@ -16,7 +16,7 @@ this machine — re-run compile-perf-release-sweep (force=true); trend.py warns 
 compares only against same-runner points.
 
     python3 trend.py --results <perf-results>        # after track.py rebuild
-    python3 trend.py --results <dir> --window 7 --rel 1.25 --abs 2.0
+    python3 trend.py --results <dir> --window 7 --rel 1.10 --abs 2.0
 """
 import argparse
 import json
@@ -58,9 +58,11 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
     # Threshold rationale:
-    # --rel 1.25: flag a 25% rise vs trailing median. The per-PR gate uses 15%;
-    #   25% here catches gradual drift that accumulates across many PRs without
-    #   any single one tripping the per-PR gate.
+    # --rel 1.10: flag a 10% rise vs trailing median. The runner is a dedicated
+    #   quiesced machine with 5-sample medians, giving a noise floor of ~1-3%,
+    #   so 10% catches real medium regressions while avoiding noise false positives.
+    #   The --abs guard (2 ms) prevents alerting on tiny absolute deltas even when
+    #   the relative ratio exceeds 10%.
     # --abs 2.0: ignore sub-2 ms absolute deltas regardless of ratio — a 50%
     #   rise in a 3 ms timer is within measurement noise, not a real regression.
     # --window 7: trailing-7-point median spans ~one week of nightly runs,
@@ -69,7 +71,7 @@ def main():
     # --min-baseline 3: require at least 3 prior same-runner points before judging,
     #   so the first few nights after a new runner don't produce false positives.
     ap.add_argument("--window", type=int, default=7, help="trailing points for the median")
-    ap.add_argument("--rel", type=float, default=1.25, help="relative regression threshold")
+    ap.add_argument("--rel", type=float, default=1.10, help="relative regression threshold")
     ap.add_argument("--abs", type=float, default=2.0, help="min absolute ms delta to flag")
     ap.add_argument("--min-baseline", type=int, default=3,
                     help="min trailing points required to judge a metric")
