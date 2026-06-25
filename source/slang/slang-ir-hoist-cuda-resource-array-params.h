@@ -18,7 +18,10 @@ struct IRModule;
 /// chain.
 ///
 /// This pass only fires for compute entry points that actually contain such a fixed-size
-/// resource array; other entry points are left untouched.
+/// resource array; other entry points are left untouched. Because CUDA emits a single hardcoded
+/// `SLANG_globalParams` symbol per module, it also hoists nothing unless *exactly one* entry point
+/// qualifies and no module-scope uniform parameter group global already exists — so a host should
+/// only expect `SLANG_globalParams` from this transform under those conditions.
 ///
 /// @note This transformation runs after `ProgramLayout` is finalized, so reflection continues to
 /// report the original per-parameter entry-point layout, not the synthesized

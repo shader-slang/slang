@@ -106,22 +106,20 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
         return false;
     }
 
-    // Returns true if the module already contains a module-scope uniform parameter group global
-    // named "globalParams" (the one `collectGlobalUniformParameters` creates). That global emits as
-    // the hardcoded `SLANG_globalParams` symbol, so hoisting another would collide in NVRTC. We key
-    // on the name rather than the type so unrelated user `ConstantBuffer<T>` globals don't suppress
-    // the optimization.
-    static bool _moduleHasGlobalParamsGlobal(IRModule* module)
+    // Returns true if the module already contains any module-scope uniform parameter group global.
+    // `CUDASourceEmitter::emitParameterGroupImpl` emits *every* such global as the hardcoded
+    // `extern "C" __constant__ ... SLANG_globalParams` symbol (the variable's name only drives a
+    // `#define` alias), so a second one — whatever its name — would be a duplicate-symbol error in
+    // NVRTC. We therefore refuse to hoist when any parameter group global already exists (e.g. one
+    // `collectGlobalUniformParameters` created); merging into it is future work.
+    static bool _moduleHasUniformParameterGroupGlobal(IRModule* module)
     {
         for (auto inst : module->getGlobalInsts())
         {
             auto globalParam = as<IRGlobalParam>(inst);
             if (!globalParam)
                 continue;
-            if (!as<IRUniformParameterGroupType>(globalParam->getDataType()))
-                continue;
-            auto nameHint = globalParam->findDecoration<IRNameHintDecoration>();
-            if (nameHint && nameHint->getName() == UnownedTerminatedStringSlice("globalParams"))
+            if (as<IRUniformParameterGroupType>(globalParam->getDataType()))
                 return true;
         }
         return false;
@@ -303,10 +301,10 @@ void hoistCUDAResourceArrayParamsToParameterGroup(IRModule* module)
     if (qualifyingCount != 1)
         return;
 
-    // Never hoist when a module-scope `globalParams` already exists (e.g. one
-    // `collectGlobalUniformParameters` created): a second `__constant__ SLANG_globalParams` would
-    // collide in NVRTC.
-    if (HoistCUDAResourceArrayParams::_moduleHasGlobalParamsGlobal(module))
+    // Never hoist when a module-scope uniform parameter group global already exists (e.g. one
+    // `collectGlobalUniformParameters` created): every such global emits as the same hardcoded
+    // `__constant__ SLANG_globalParams`, so a second one would collide in NVRTC.
+    if (HoistCUDAResourceArrayParams::_moduleHasUniformParameterGroupGlobal(module))
         return;
 
     HoistCUDAResourceArrayParams context;
