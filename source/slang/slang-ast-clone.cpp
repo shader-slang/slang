@@ -92,9 +92,9 @@ NodeBase* ASTCloner::cloneSyntaxNode(NodeBase* node)
     {
         cloneNonReflectedDeclFields(clonedDecl, decl);
 
-        // Container membership is re-established by callers such as GenericSignatureCloner through
-        // addDirectMemberDecl. Drop the cloned lookup-accelerator chain so it cannot temporarily
-        // point back into the source container.
+        // Container membership is re-established by callers that invoke addDirectMemberDecl after
+        // cloning. Drop the cloned lookup-accelerator chain so it cannot temporarily point back
+        // into the source container.
         clonedDecl->_prevInContainerWithSameName = nullptr;
     }
     return clonedNode;
@@ -339,6 +339,15 @@ void GenericSignatureCloner::cloneParameterMembers()
             continue;
 
         auto clonedParam = m_astCloner.cloneDecl(member);
+        // GenericSignatureCloner creates synthetic wrappers that preserve binder identity and
+        // checked constraints, not user-facing default arguments. Keeping defaults here can make a
+        // synthesized extension wrapper cloned from a defaulted generic type look user-written to
+        // the extension-default diagnostic, but that diagnostic is only meant for source
+        // declarations.
+        if (auto typeParam = as<GenericTypeParamDecl>(clonedParam))
+            typeParam->initType = TypeExp();
+        else if (auto valueParam = as<GenericValueParamDecl>(clonedParam))
+            valueParam->initExpr = nullptr;
         m_destGenericDecl->addDirectMemberDecl(clonedParam);
 
         if (m_outGenericArgs)

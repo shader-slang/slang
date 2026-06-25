@@ -4840,12 +4840,10 @@ void lowerAssociatedVals(IRGenContext* context, Val* val, IRInst* irVal)
                 {
                     // Associated vals are recorded against the checked AST decl-ref that produced
                     // a callee. Interface default implementations can later lower that same
-                    // decl-ref through a concrete conformance, e.g.
-                    // `ITensor<T,D>.load<TIndex>` becomes `Tensor<float,2>.load<int,int>`.
-                    // Substitute the stored associated value through the actual key before
-                    // lowering it so witnesses such as
-                    // `load<TIndex>.fwd_diff : IBackwardDifferentiable<...>` carry the same
-                    // generic/interface substitutions as the callee they annotate.
+                    // decl-ref through a concrete conformance. Substitute the stored associated
+                    // value through the actual key before lowering it so differentiability witness
+                    // entries carry the same generic/interface substitutions as the callee they
+                    // annotate.
                     associatedVal =
                         associatedVal->substitute(context->astBuilder, SubstitutionSet(declRef));
                 }
@@ -10817,21 +10815,28 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (genericRequirementDecl)
             {
                 // A generic interface requirement key lowers to an IR generic, so its satisfying
-                // witness has to be lowered under the requirement-local generic parameters. For
-                // example `[Differentiable] f<T>()` contributes the sibling requirement
-                // `generic<T> This.f<T> : IForwardDifferentiable<This.f<T>>`.
+                // witness has to be lowered under the requirement-local generic parameters. Full
+                // source shape:
                 //
-                // The requirement can itself be nested under a generic interface, so emit the
-                // requirement generic through a decl-ref rooted at the table's specialized base
-                // interface:
+                //     interface IVector<T>
+                //     {
+                //         [Differentiable]
+                //         T f<U>(U value) where U : IThing<T>;
+                //     }
                 //
-                //     interface IVector<T> { [Differentiable] f<U>() where U : IThing<T>; }
+                //     struct InlineVector<T> : IVector<T>
+                //     {
+                //         [Differentiable]
+                //         T f<U>(U value) where U : IThing<T> { ... }
+                //     }
                 //
-                // For `InlineVector<T> : IVector<T>`, the table base decl-ref is
-                // `IVector<InlineVector.T>`. Forming
-                // `MemberDeclRef(IVector<InlineVector.T>, generic f-diff requirement)` lets
-                // `emitGenericDecl` substitute `T` in the requirement signature while leaving the
-                // requirement-local `U` as an IR generic parameter.
+                // AST-to-IR trace: header checking creates a sibling generic requirement for
+                // `This.f<U> : IForwardDifferentiable<This.f<U>>`. While lowering the witness table
+                // for `InlineVector<T> : IVector<T>`, `witnessTableBaseDeclRef` is
+                // `IVector<InlineVector<T>.T>`. Forming
+                // `MemberDeclRef(IVector<InlineVector<T>.T>, generic f-diff requirement)` lets
+                // `emitGenericDecl` substitute the interface `T` in the requirement signature
+                // while leaving the requirement-local `U` as the IR generic parameter.
                 IRGeneric* activeGeneric = nullptr;
                 if (auto activeBlock = as<IRBlock>(subBuilder->getInsertLoc().getParent()))
                     activeGeneric = as<IRGeneric>(activeBlock->getParent());
@@ -11868,20 +11873,27 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // representation as an interface-level requirement (a sibling of `A`). It is
                 // a *conformance* requirement: its witness is a witness table for the bound.
                 // We must lower it with a `WitnessTableType` requirement value, because
-                // consumers (e.g. autodiff) that read the requirement expect the witness-table
-                // entry for the associated type's bound.
-                // (Equality constraints, e.g. `__constraint A == B`, are handled by the
-                // generic path below.)
+                // consumers of associated-type bounds read the witness-table entry for the bound.
+                // Equality constraints are handled by the generic path below.
                 auto genericParent =
                     as<GenericDecl>(relocatedSubtypeConstraint.getDecl()->parentDecl);
                 if (genericParent && genericParent->inner != relocatedSubtypeConstraint.getDecl())
                     genericParent = nullptr;
                 if (genericParent)
                 {
-                    // `[Differentiable]` on a generic interface requirement is represented as a
-                    // sibling `generic { constraint }` requirement. Its `sup` type mentions the
-                    // cloned generic parameters, so lower the witness-table type inside the same
-                    // IR generic environment instead of flattening it to a non-generic entry.
+                    // Full source shape:
+                    //
+                    //     interface IFoo
+                    //     {
+                    //         [Differentiable]
+                    //         void f<T>(T value);
+                    //     }
+                    //
+                    // Header checking represents the differentiability annotation as a sibling
+                    // `GenericDecl { inner = FuncConstraintDecl }`. The constraint's `sup` type
+                    // mentions the cloned method parameter `T`, so the requirement value for the
+                    // witness-table entry must be lowered inside that same IR generic environment
+                    // instead of flattening to a non-generic entry.
                     IRGenEnv constraintEnv;
                     constraintEnv.outer = subContext->env;
                     IRBuilder constraintBuilder(subContext->irBuilder->getModule());
@@ -14485,13 +14497,17 @@ bool canDeclLowerToAGeneric(Decl* decl)
         {
             if (parentGenericDecl->inner == genericTypeConstraintDecl)
             {
-                // A `[Differentiable]` generic interface requirement is represented as a sibling
-                // generic constraint:
+                // Full source-to-AST shape:
                 //
-                //     interface IFoo { __generic<T> f(); }
-                //     interface IFoo { __generic<T> __constraint This.f<T> : IDiff<This.f<T>>; }
+                //     interface IFoo
+                //     {
+                //         [Differentiable]
+                //         void f<T>(T value);
+                //     }
                 //
-                // The constraint is an interface requirement key, but the satisfying witness is a
+                // Header checking keeps `f<T>` as one generic requirement and creates a sibling
+                // `GenericDecl { inner = FuncConstraintDecl(This.f<T> : IDiff<This.f<T>>) }`.
+                // That constraint is an interface requirement key, but the satisfying witness is a
                 // generic value with the same signature as `f`. Keep its `GenericAppDeclRef`
                 // substitutions so lowering produces `specialize(lookupWitness(...), args...)`
                 // instead of dropping the method generic arguments and doing a flat witness lookup.

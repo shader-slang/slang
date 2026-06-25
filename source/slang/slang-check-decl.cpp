@@ -4264,8 +4264,7 @@ void SemanticsDeclHeaderVisitor::visitGenericVariadicPackCountConstraintDecl(
     // established here is stricter: `Pack` must be a direct type/value pack
     // parameter of this generic and is stored in `packDeclRef`, `countof(Pack)`
     // is stored in `actualCountVal`, and `CountExpr` must fold to an `IntVal`
-    // that can be canonicalized to `int`, such as `3`, `N`, or
-    // `countof(OuterPack)`.
+    // that can be canonicalized to `int` before witness matching.
     // Witness matching and default substitution rely on those checked fields
     // instead of reinterpreting arbitrary syntax or proving algebraically
     // equivalent forms.
@@ -5447,11 +5446,35 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
 
         // The signature requirement and its sibling `FuncConstraintDecl` are both about the
         // requirement-side callable contract, not necessarily the satisfying method's ambient
-        // differentiability proof. `MyLinearArithmeticType.ldot` is the motivating shape: the
-        // interface is not itself differentiable, so `This` parameters are treated as `no_diff`
-        // in the requirement proof even though the concrete method may later be seen through an
-        // `IDifferentiable` subtype. Filter overload candidates against that requirement proof so
-        // signature matching agrees with the later sibling constraint check.
+        // differentiability proof. Motivating source shape from
+        // tests/autodiff/generic-jvp-trivial.slang:
+        //
+        //     interface MyLinearArithmeticType
+        //     {
+        //         [Differentiable]
+        //         static Real ldot(This a, This b);
+        //     }
+        //
+        //     extension myvector<3> : MyLinearArithmeticType
+        //     {
+        //         [Differentiable]
+        //         static float ldot(myvector<3> a, myvector<3> b) { ... }
+        //     }
+        //
+        //     extension myfloat3 : IDifferentiable { ... }
+        //
+        //     [Differentiable]
+        //     T f<T>(T x) where T : MyLinearArithmeticType, IDifferentiable { ... }
+        //
+        // Type-check trace: checking `myvector<3> : MyLinearArithmeticType` compares the
+        // concrete `myvector<3>.ldot` against the requirement `This.ldot`. At the interface
+        // declaration, `This` is not constrained to `IDifferentiable`, so the hidden
+        // `DiffTypeInfoWitness` for `This.ldot(This, This)` marks both `This` parameters
+        // `no_diff`. In the later generic function `f<T>`, the same concrete type is also visible
+        // through `T : IDifferentiable`, so the concrete callable's ambient diff proof may include
+        // differentiable parameters. Filter overload candidates against the requirement-side proof
+        // here so signature matching agrees with the sibling `FuncConstraintDecl` witness that the
+        // conformance loop checks next.
         auto requiredDifferentiabilityInterfaceType =
             isBackward ? m_astBuilder->getBackwardDiffFuncInterfaceType(
                              satisfyingFuncAsType,
@@ -6688,9 +6711,8 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
     //
     // The cloned generic parameters and constraints form the standalone generic environment for
     // `Syn`, and references inside `Syn` are rewritten from the original generic binders/proofs to
-    // the cloned ones. Constraints are cloned as part of that environment, including proof-bearing
-    // constraints such as `where countof(T) == N`, so default substitution arguments and witness
-    // references keep the same logical shape.
+    // the cloned ones. Proof-bearing constraints are cloned as part of that environment, so default
+    // substitution arguments and witness references keep the same logical shape.
     sourceGenericDecls.reverse();
     ASTCloneContext outerCloneContext;
     outerCloneContext.astBuilder = m_astBuilder;
@@ -7097,12 +7119,20 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             // `GenericVariadicPackCountConstraintDecl` stores the checked
             // `countof(pack)` value in `actualCountVal`, keeps `packExpr` for
             // diagnostics/printing, and uses `expectedCountVal` for witness
-            // matching. When `synthesizeGenericSignatureForRequirementWitness`
-            // clones a requirement such as `where countof(I) == N`, rebuild
-            // the direct `N` expression to reference the synthesized value
-            // parameter; `getDefaultSubstitutionArgs` then creates a declared
-            // witness for the synthesized proof, not for the original
-            // requirement.
+            // matching. Full source shape:
+            //
+            //     interface ITensor<T, int D>
+            //     {
+            //         T load<each I>(I indices)
+            //             where I == int
+            //             where countof(I) == D;
+            //     }
+            //
+            // Clone trace: `synthesizeGenericSignatureForRequirementWitness` creates a fresh
+            // generic signature for a satisfying `load<each I2>` requirement. Rebuild the direct
+            // expected-count expression `D` to reference the synthesized value parameter in that
+            // cloned signature; `getDefaultSubstitutionArgs` then creates a declared witness for
+            // the synthesized `countof(I2) == D2` proof, not for the original requirement proof.
             if (auto declRefExpr = as<DeclRefExpr>(packCountConstraintDecl->expectedCountExpr))
             {
                 auto origExpectedCountDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
@@ -10156,11 +10186,21 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // The exception to that is when the requiredMemberDeclRef is already
     // resolved to the actual satisfying decl, in which case we simply return
     // true without any further lookup.
-    // A generic-wrapped interface requirement has its `GenericDecl` as the immediate
-    // parent in the decl-ref chain, even though the wrapped declaration is still an
-    // interface requirement. For example `[Differentiable] f<T>()` contributes the
-    // sibling requirement `__generic<T> This.f<T> : IBackwardDifferentiable<This.f<T>>`.
-    // Do not treat that shape as already resolved; it still needs a witness-table entry.
+    // A generic-wrapped interface requirement has its `GenericDecl` as the immediate parent in the
+    // decl-ref chain, even though the wrapped declaration is still an interface requirement. Full
+    // source shape:
+    //
+    //     interface IFoo
+    //     {
+    //         [Differentiable]
+    //         void f<T>(T value);
+    //     }
+    //
+    // Header checking keeps `f<T>` as the callable requirement and creates a sibling
+    // `GenericDecl { inner = FuncConstraintDecl(This.f<T> :
+    // IBackwardDifferentiable<This.f<T>>) }`. Do not treat that wrapped constraint shape as
+    // already resolved just because the decl-ref parent is the generic wrapper; it still needs its
+    // own witness-table entry.
     auto requiredDecl = requiredMemberDeclRef.getDecl();
     auto isGenericWrappedConstraintRequirement =
         as<GenericTypeConstraintDecl>(requiredDecl) && isInterfaceRequirement(requiredDecl);
@@ -10779,9 +10819,20 @@ bool SemanticsVisitor::checkInterfaceConformance(
         result = result && requirementSatisfied;
     }
     // Inherited-interface entries are witness-table entries too, and constraints can refer to
-    // requirements inherited through those entries. For example, `interface IDerived : IBase {
-    // __constraint DataType == This; }` needs the nested `IBase` witness table populated before
-    // `getSub`/`getSup` can resolve `DataType` for a concrete `IDerived` conformance.
+    // requirements inherited through those entries. Full source shape:
+    //
+    //     interface IBase
+    //     {
+    //         associatedtype DataType;
+    //     }
+    //
+    //     interface IDerived : IBase
+    //     {
+    //         __constraint DataType == This;
+    //     }
+    //
+    // Conformance trace: a concrete `S : IDerived` table needs a nested `S : IBase` witness-table
+    // entry before `getSub`/`getSup` can resolve `DataType` in the `IDerived` equality constraint.
     for (auto requiredMemberDecl : getMembers(m_astBuilder, superInterfaceDeclRef))
     {
         auto requiredInheritanceDecl = as<InheritanceDecl>(requiredMemberDecl.getDecl());
@@ -10805,9 +10856,22 @@ bool SemanticsVisitor::checkInterfaceConformance(
         result = result && requirementSatisfied;
     }
     // Constraints that refine associated-type requirements must be checked before ordinary member
-    // signatures. For example, `interface ISimple { associatedtype U : IBase; U.V add(...); }`
-    // first records `ISimple.U -> Val`, then must check `Val : IBase` so resolving the substituted
-    // method result `Val.V` can look up `IBase.V` in the completed `Val : IBase` witness table.
+    // signatures. Full source shape:
+    //
+    //     interface IBase
+    //     {
+    //         associatedtype V;
+    //     }
+    //
+    //     interface ISimple
+    //     {
+    //         associatedtype U : IBase;
+    //         U.V add(U left, U right);
+    //     }
+    //
+    // Conformance trace: if a concrete type maps `ISimple.U -> Val`, this loop checks `Val : IBase`
+    // before the ordinary method loop compares `add`. Resolving the substituted method result
+    // `Val.V` then has a completed `Val : IBase` witness table to query.
     for (auto requiredMemberDecl : getMembers(m_astBuilder, superInterfaceDeclRef))
     {
         auto constraintDecl = asGenericTypeConstraintRequirement(requiredMemberDecl.getDecl());
@@ -14367,8 +14431,20 @@ DeclRef<Decl> SemanticsVisitor::getRequirementAsLookedUpDecl(ASTBuilder* astBuil
             if (i == 0 && decl->isChildOf(genericParentDecls[i]))
             {
                 // Accessors belong to their storage declaration, not directly to the generic
-                // environment. A generic subscript requirement such as
-                // `This.operator[]<T>.get` is therefore represented as a member lookup on the
+                // environment. Full source shape:
+                //
+                //     interface ITensor<T, int D>
+                //     {
+                //         __subscript<each TIndex>(TIndex indices)
+                //             where TIndex == int
+                //             where countof(TIndex) == D
+                //         {
+                //             [Differentiable]
+                //             get { return load(indices); }
+                //         }
+                //     }
+                //
+                // The getter requirement is therefore represented as a member lookup on the
                 // specialized subscript:
                 // `MemberDeclRef(GenericAppDeclRef(Lookup(This, operator[]), T), get)`.
                 // `MemberDeclRef::resolve` can then remap the accessor after the subscript
@@ -14675,8 +14751,8 @@ static DeclRef<ExtensionDecl> extendCallableDeclRefForDifferentiabilityRequireme
     // The requirement key already contains the callable decl-ref with the substitutions chosen by
     // interface conformance (`This.f<T>` -> `Concrete.f<T>`). Preserve that shape when creating the
     // extension target. Using the callable's default decl-ref here would recreate the ambient
-    // callable proof and miss interface-context differentiability requirements such as
-    // `This.ldot : IForwardDifferentiable<This.ldot>` where `This` is intentionally `no_diff`.
+    // callable proof and miss the interface-context differentiability proof selected by
+    // `doesSignatureMatchRequirement`.
     SubstitutionSet substSet;
     auto extDeclRef = visitor->liftDeclFromGenericContainers(extensionDecl, substSet);
 
@@ -14802,10 +14878,10 @@ static bool trySynthesizeExactDifferentiabilityConformanceForRequirement(
     case DifferentiabilityConformanceKind::Forward:
         // This helper materializes a conformance for the exact diff-type proof requested by an
         // interface requirement. The callable may not already conform under its ambient concrete
-        // proof: `MyLinearArithmeticType.ldot(This, This)` intentionally treats `This` as
-        // `no_diff` in the requirement, while the concrete `myvector` method may later be visible
-        // through an `IDifferentiable` constraint. In that case the source differentiability
-        // modifier is the authority that lets us synthesize the proof-specific conformance below.
+        // proof: requirement-side diff info can mark an interface `This` parameter as `no_diff`
+        // while the same concrete callable is visible through an `IDifferentiable` constraint in a
+        // later generic context. In that case the source differentiability modifier is the
+        // authority that lets us synthesize the proof-specific conformance below.
         if (!callableDeclRef.getDecl()->findModifier<ForwardDifferentiableAttribute>() &&
             !visitor->isFuncForwardDifferentiable(callableDeclRef))
             return false;
@@ -14837,10 +14913,10 @@ static bool trySynthesizeExactDifferentiabilityConformanceForRequirement(
     // Compute the proof from the concrete callable decl-ref that the synthesized member will
     // actually target, matching the ordinary `[Differentiable]` extension path. The one exception
     // is when the requirement-side proof explicitly suppresses a derivative witness that the
-    // concrete callable proof would add, such as the `no_diff This` parameters in
-    // `MyLinearArithmeticType.ldot`; in that case the requirement proof is the coherent source of
-    // the differentiability contract. Do not otherwise import requirement-side positive witnesses:
-    // their generic substitutions can be recursive or stale compared to the synthesized extension.
+    // concrete callable proof would add. In that case the requirement proof is the coherent source
+    // of the differentiability contract. Do not otherwise import requirement-side positive
+    // witnesses: their generic substitutions can be recursive or stale compared to the synthesized
+    // extension.
     auto typeInfoWitnessFromExtension = visitor->getDiffTypeInfoWitness(funcAsTypeFromExtension);
     auto requirementTypeInfoWitnessFromExtension =
         requirementTypeInfoWitness
@@ -15003,14 +15079,22 @@ static Decl* _moveInterfaceDifferentiabilityRequirementToInterface(
     GenericTypeConstraintDecl* constraintDecl,
     DeclRef<Decl>& ioCallableRequirementDeclRef)
 {
-    // A differentiability annotation on `interface IFoo { f<T>() }` is a separate interface
-    // requirement about `This.f<T>`, but the requirement type initially mentions `f`'s generic
-    // environment. Start the synthesized constraint under the callable/accessor that owns that
-    // environment and let `liftDeclFromGenericContainers` hoist it into a standalone generic
-    // requirement under the interface when needed. Non-generic callables take the same path, but no
-    // generic wrappers are cloned. We only set `parentDecl` here instead of appending to the
-    // callable's direct member list because the declaration is immediately moved; leaving it in the
-    // callable member list would give the AST two owners for the same requirement.
+    // Full source shape:
+    //
+    //     interface IFoo
+    //     {
+    //         [Differentiable]
+    //         void f<T>(T value);
+    //     }
+    //
+    // The annotation is a separate interface requirement about `This.f<T>`, but the synthesized
+    // requirement type initially mentions `f`'s generic environment. Start the constraint under the
+    // callable/accessor that owns that environment and let `liftDeclFromGenericContainers` hoist it
+    // into a standalone generic requirement under the interface when needed. Non-generic callables
+    // take the same path, but no generic wrappers are cloned. We only set `parentDecl` here instead
+    // of appending to the callable's direct member list because the declaration is immediately
+    // moved; leaving it in the callable member list would give the AST two owners for the same
+    // requirement.
     constraintDecl->parentDecl = requirementDecl;
     SubstitutionSet declSubst;
     visitor->liftDeclFromGenericContainers(constraintDecl, declSubst, interfaceDecl);

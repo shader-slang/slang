@@ -32,9 +32,19 @@ struct ASTCloneContext
 // Returns `genericDeclToSpecialize` applied to the default arguments from
 // `genericDeclProvidingSpecializationArgs`.
 //
-// For example, after cloning `generic<T>` to `generic<T2>`, this returns a decl-ref for the
-// source generic specialized as `generic<T2>`. Callers use that substitution to rewrite references
-// from the original generic environment into the standalone cloned environment.
+// Full source shape:
+//
+//     interface IFoo
+//     {
+//         [Differentiable]
+//         void f<T>(T value) where T : IBar;
+//     }
+//
+// Header checking first builds the method generic `f<T>` and then clones that signature for the
+// sibling `FuncConstraintDecl`. If the clone is `f_diff<T2>`, this helper returns a decl-ref for
+// the source generic specialized as `f<T2>`. `GenericSignatureCloner` uses that substitution to
+// rewrite checked references from the original method environment into the standalone constraint
+// environment.
 DeclRef<Decl> getSpecializedDeclRefWithParamsFromGeneric(
     ASTBuilder* astBuilder,
     SemanticsVisitor* semantics,
@@ -144,9 +154,9 @@ public:
             else
             {
                 // Fiddle-reflected raw Decl* fields include external semantic references and lookup
-                // accelerator links such as `_prevInContainerWithSameName`. Only declarations
-                // present in `oldToNewDecls` are part of the cloned generic environment; all other
-                // raw declaration pointers remain external references.
+                // accelerator links. Only declarations present in `oldToNewDecls` are part of the
+                // cloned generic environment; all other raw declaration pointers remain external
+                // references.
                 dst = src;
             }
         }

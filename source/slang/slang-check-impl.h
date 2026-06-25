@@ -3107,11 +3107,19 @@ public:
         ShortList<SolverConstraint, 8> discoveredConstraints;
 
         // Hidden witness arguments discovered while unifying full generic-app
-        // decl-refs. A use site such as `This.load<TIndex>` already carries
-        // proof arguments for `load`'s source generic constraints; when that
-        // lookup resolves to a satisfying method, the solver should preserve
-        // those proof arguments instead of recomputing them from default
-        // declaration context.
+        // decl-refs. Full source shape:
+        //
+        //     interface ITensor<T, int D>
+        //     {
+        //         T load<each TIndex>(TIndex indices)
+        //             where TIndex == int
+        //             where countof(TIndex) == D;
+        //     }
+        //
+        // A use site for this requirement already carries proof arguments for `load`'s source
+        // generic constraints. When that lookup resolves to a satisfying method, the solver should
+        // preserve those proof arguments instead of recomputing them from default declaration
+        // context.
         Dictionary<Decl*, Val*> discoveredWitnessArgs;
 
         // Additional subtype witnesses available to the current constraint solving context.

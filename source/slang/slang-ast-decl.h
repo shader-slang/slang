@@ -1005,11 +1005,28 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
 
 // A synthesized interface requirement that constrains a callable requirement as a type.
 //
-// For `interface IFoo { [Differentiable] void f<T>(); }`, this decl represents the sibling
-// requirement `f<T> : IForward/BackwardDifferentiableFunc<f<T>>`. If `f` is generic, the decl is
-// wrapped in a cloned standalone generic signature, and `callableRequirementDeclRef` stores the
-// `This.f<T>` decl-ref after substituting the callable's generic parameters/proofs with that cloned
-// signature.
+// Full source-to-AST shape:
+//
+//     interface IFoo
+//     {
+//         [Differentiable]
+//         void f<T>(T value);
+//     }
+//
+// Header checking keeps the callable requirement as
+// `GenericDecl { inner = CallableDecl f }` and synthesizes a sibling requirement:
+//
+//     GenericDecl
+//     {
+//         inner = FuncConstraintDecl(
+//             callableRequirementDeclRef = This.f<T>,
+//             sub = This.f<T>,
+//             sup = IForward/BackwardDifferentiableFunc<This.f<T>>)
+//     }
+//
+// If `f` is generic, this decl is wrapped in a cloned standalone generic signature, and
+// `callableRequirementDeclRef` stores the `This.f<T>` decl-ref after substituting the callable's
+// generic parameters/proofs with that cloned signature.
 //
 // This intentionally remains a subtype of `GenericTypeConstraintDecl`: conformance checking and
 // witness-table lowering consume it through the same sibling subtype-constraint path used by

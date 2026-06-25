@@ -642,12 +642,17 @@ Witness* findNonEmptyPackWitnessForConstraint(
 
 static DeclRef<Decl> getDirectGenericPackParamDeclRefFromArg(Val* val)
 {
-    // Pack-count witnesses need declaration identity only while checking an
-    // abstract generic body such as `foo<each I>() where countof(I) == N`.
-    // In that path the pack argument for `I` is represented as either a
-    // `DeclRefType` or a `DeclRefIntVal`. Concrete pack values intentionally
-    // return an empty decl-ref because equality for those values is handled by
-    // comparing the pack value itself.
+    // Pack-count witnesses need declaration identity only while checking an abstract generic body:
+    //
+    //     void foo<let N, each I>(I values)
+    //         where countof(I) == N
+    //     {
+    //         bar<N, I>(values);
+    //     }
+    //
+    // In that path the pack argument for `I` is represented as either a `DeclRefType` or a
+    // `DeclRefIntVal`. Concrete pack values intentionally return an empty decl-ref because
+    // equality for those values is handled by comparing the pack value itself.
     auto tryGetPackParamDeclRef = [](DeclRef<Decl> const& declRef) -> DeclRef<Decl>
     {
         if (as<GenericTypePackParamDecl>(declRef.getDecl()) ||
@@ -670,10 +675,10 @@ static DeclRef<Decl> getDirectGenericPackParamDeclRefFromArg(Val* val)
 
 static Val* getCountOfArgIgnoringCasts(IntVal* countVal)
 {
-    // Declared pack-count proofs are source constraints of the form
-    // `countof(I) == N`. Most proof checks can compare substituted `IntVal`s
-    // directly; this helper only peels the actual-count side when an abstract
-    // generic body still needs to find the declared source proof for `I`.
+    // Declared pack-count proofs are source constraints from generic bodies described above. Most
+    // proof checks can compare substituted `IntVal`s directly; this helper only peels the
+    // actual-count side when an abstract generic body still needs to find the declared source proof
+    // for `I`.
     Val* val = countVal;
     while (auto typeCastIntVal = as<TypeCastIntVal>(val))
         val = typeCastIntVal->getBase();
@@ -688,12 +693,21 @@ static DeclRef<GenericVariadicPackCountConstraintDecl> _findDeclaredPackCountCon
     IntVal* actualCount,
     IntVal* expectedCount)
 {
-    // A nested call such as `foo<let N, each I>() where countof(I) == N`
-    // calling `bar<N, I>() where countof(I) == N` has no concrete pack count
-    // during body checking. The proof is the source constraint declared on the
-    // generic that owns `I`; accept it only when both the pack declaration and
-    // substituted count `IntVal` match the callee's requirement exactly, aside
-    // from integer casts that semantic normalization may add around `N`.
+    // Full nested-call source shape:
+    //
+    //     void bar<let M, each J>(J values)
+    //         where countof(J) == M;
+    //
+    //     void foo<let N, each I>(I values)
+    //         where countof(I) == N
+    //     {
+    //         bar<N, I>(values);
+    //     }
+    //
+    // During `foo` body checking there is no concrete pack count for `I`. The proof is the source
+    // constraint declared on the generic that owns `I`; accept it only when both the pack
+    // declaration and substituted count `IntVal` match the callee's requirement exactly, aside from
+    // integer casts that semantic normalization may add around `N`.
     auto constrainedArg = getCountOfArgIgnoringCasts(actualCount);
     auto constrainedPackDeclRef = getDirectGenericPackParamDeclRefFromArg(constrainedArg);
     auto constrainedPackDecl = constrainedPackDeclRef.getDecl();
@@ -2160,11 +2174,11 @@ private:
             return true;
         }
 
-        // `where countof(I) == N` can only be validated after both checked
-        // count operands have been solved by other inputs. This is
-        // intentionally a dependency check, not an inference path;
-        // `trySolveVariadicPackCountWitnessForConstraint` will reject the
-        // constraint if those solved values do not prove equality.
+        // In a source shape like `bar<let M, each J>(J values) where countof(J) == M`, the
+        // pack-count proof can only be validated after both checked count operands have been
+        // solved by other inputs. This is intentionally a dependency check, not an inference path;
+        // `trySolveVariadicPackCountWitnessForConstraint` will reject the constraint if those
+        // solved values do not prove equality.
         if (auto packCountConstraintDecl =
                 as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
         {

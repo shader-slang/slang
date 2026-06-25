@@ -66,11 +66,27 @@ static AccessorDecl* _tryGetCorrespondingAccessorDecl(Decl* memberDecl, Decl* su
     // generic substitutions.
     //
     // Conceptually this is not quite an ordinary static `MemberDeclRef`; it is projecting an
-    // accessor role from the resolved storage declaration:
+    // accessor role from the resolved storage declaration. Full source shape:
+    //
+    //     interface ITensor<T, int D>
+    //     {
+    //         __subscript<each TIndex>(TIndex indices)
+    //             where TIndex == int
+    //             where countof(TIndex) == D
+    //         {
+    //             [Differentiable]
+    //             get { return load(indices); }
+    //         }
+    //     }
+    //
+    // During conformance checking, the requirement getter is represented as:
     //
     //     MemberDeclRef(GenericAppDeclRef(Lookup(This, operator[]), TIndex), get)
     //
-    // behaves more like a possible future
+    // After `Lookup(This, operator[])` resolves through the witness table to the selected concrete
+    // or default subscript, the `get` accessor must be re-selected under that same resolved
+    // storage declaration while preserving the subscript's generic arguments. That behavior is
+    // closer to a possible future
     // `AccessorProjectionDeclRef(parentStorageDeclRef, AccessorKind::Get)`. We encode that
     // projection here to avoid adding a new decl-ref kind and the corresponding lookup/cache
     // machinery on storage declarations. If this pattern grows beyond accessors, consider making

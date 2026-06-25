@@ -389,9 +389,9 @@ void SharedSemanticsContext::getDependentGenericParentImpl(
         if (as<Witness>(val) || as<DeclRefBase>(val))
             return;
 
-        // Generic value arguments can be expressions such as `N + 1` or `countof(T)`.
-        // Walk their operands so a generic application is still recognized as dependent
-        // on the generic parameters referenced inside those expressions.
+        // Generic value arguments can be compound expressions. Walk their operands so a generic
+        // application is still recognized as dependent on the generic parameters referenced inside
+        // those expressions.
         for (auto operand : val->m_operands)
         {
             if (operand.kind == ValNodeOperandKind::ValNode)
@@ -411,10 +411,9 @@ void SharedSemanticsContext::getDependentGenericParentImpl(
     }
     else if (auto memberDeclRef = as<MemberDeclRef>(declRef.declRefBase))
     {
-        // A member/accessor can be the endpoint of a generic lookup path, e.g.
-        // `MemberDeclRef(GenericAppDeclRef(Lookup(This, operator[]), TIndex), get)`.
-        // The leaf accessor is not owned by the generic, but the parent path still carries
-        // `TIndex`, so dependency queries must continue through the parent decl-ref.
+        // A member/accessor can be the endpoint of a generic lookup path. The leaf accessor is not
+        // owned by the generic, but the parent path still carries the generic arguments, so
+        // dependency queries must continue through the parent decl-ref.
         getDependentGenericParentImpl(genericParent, DeclRef<Decl>(memberDeclRef->getParent()));
     }
     else if (auto genericAppDeclRef = as<GenericAppDeclRef>(declRef.declRefBase))
@@ -518,18 +517,23 @@ static DeclRef<GenericTypeConstraintDecl> _tryGetDefaultDifferentiabilityConstra
     SubtypeWitness* conformingWitness,
     DeclRef<GenericDecl>& outLookedUpGenericRequirementDeclRef)
 {
-    // `[Differentiable]` on a generic interface requirement is encoded as a sibling
-    // generic requirement:
+    // Full source-to-AST shape:
     //
-    //     interface IFoo { __generic<T> f(); }
-    //     interface IFoo { __generic<T> __constraint This.f<T> : IDiff<This.f<T>>; }
+    //     interface IFoo
+    //     {
+    //         [Differentiable]
+    //         void f<T>(T value);
+    //     }
     //
-    // When computing inheritance for a requirement type such as `SomeThis.f<int>`, the direct
-    // constraint scan cannot see the inner
-    // `GenericTypeConstraintDecl`. This helper re-expresses that generic requirement through the
-    // conformance witness of the source type whose interface facets are being scanned, then
-    // applies default substitutions so the caller can specialize the copied generic requirement
-    // from the satisfying method type.
+    // The callable requirement remains `GenericDecl { inner = CallableDecl f }`, and the
+    // differentiability annotation contributes a sibling
+    // `GenericDecl { inner = FuncConstraintDecl(This.f<T> : IDiff<This.f<T>>) }`.
+    //
+    // Inheritance trace: when computing inheritance for a looked-up method type, the direct
+    // constraint scan sees the outer generic requirement but cannot use the inner
+    // `FuncConstraintDecl` until it is expressed through the source type's conformance witness.
+    // This helper forms that looked-up generic requirement and applies default
+    // substitutions so the caller can copy the satisfying method's generic arguments onto it.
     auto constraintDecl = as<FuncConstraintDecl>(genericDifferentiabilityRequirementDecl->inner);
     if (!constraintDecl || constraintDecl->checkState.isBeingChecked())
         return DeclRef<GenericTypeConstraintDecl>();
@@ -994,7 +998,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     //
     // A `[Differentiable]` interface method uses the same mechanism:
     //
-    //     interface IDiff { [Differentiable] static T dadd(T, T); }
+    //     interface IDiff
+    //     {
+    //         [Differentiable]
+    //         static T dadd(T left, T right);
+    //     }
     //
     // Header checking creates the sibling constraint
     // `__constraint This.dadd : IForwardDifferentiable<This.dadd>`. When a
@@ -1031,9 +1039,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             }
         };
 
-        // The depth of a lookup access is the number of lookup substitutions applied to
-        // its root type (e.g. `T.A.B` has depth 2, `T.dadd` has depth 1, and `T`
-        // has depth 0).
+        // The depth of a lookup access is the number of lookup substitutions applied to its root
+        // type.
         auto lookupChainDepth = [&](Type* type) -> Index
         {
             Index depth = 0;
@@ -1041,12 +1048,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             return depth;
         };
 
-        // The depth of the access we are computing inheritance for. We never add a
-        // base that is a *deeper* lookup access than `selfType`: an equality constraint
-        // such as `Differential.Differential == Differential` would otherwise make
-        // `T.Differential` claim `T.Differential.Differential` as a base, which
-        // re-expands without bound. Only the reduce-to-shallower direction of an
-        // equality is useful for member lookup, and it terminates.
+        // The depth of the access we are computing inheritance for. We never add a base that is a
+        // *deeper* lookup access than `selfType`: a recursive associated-type equality would
+        // otherwise make an access claim a deeper access as a base, which re-expands without bound.
+        // Only the reduce-to-shallower direction of an equality is useful for member lookup, and it
+        // terminates.
         Index selfChainDepth = lookupChainDepth(selfType);
 
         // Collect the conforming types along `selfType`'s lookup chain. For
@@ -1106,9 +1112,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     {
                         // Re-express the constraint as a lookup through the witness
                         // that the conforming type conforms to this interface; this
-                        // substitutes the interface's `This` with the conforming type, so
-                        // both endpoints are expressed as concrete accesses rooted at
-                        // that type (e.g. `This.D == This` becomes `T.D == T`).
+                        // substitutes the interface's `This` with the conforming type, so both
+                        // endpoints are expressed as concrete accesses rooted at that type.
                         lookedUpConstraint =
                             astBuilder->getLookupDeclRef(conformingWitness, constraintDecl)
                                 .as<GenericTypeConstraintDecl>();
@@ -1785,7 +1790,7 @@ void SharedSemanticsContext::_mergeFacetLists(
                     // Enum tag types use inheritance syntax to name the underlying integer type,
                     // but they should not inherit all structural facets of that integer type. Keep
                     // enum-to-tag conversion on the explicit conversion path instead of adding
-                    // indirect inheritance facets such as `Enum -> __BuiltinInt32Type`.
+                    // indirect inheritance facets introduced by enum backing types.
                 }
             }
         }
