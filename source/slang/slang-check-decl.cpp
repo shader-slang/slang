@@ -5307,6 +5307,11 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     // declarations they contain should be fully checked.
 }
 
+static bool trySynthesizeExactDifferentiabilityConformanceForRequirement(
+    SemanticsVisitor* visitor,
+    Type* constraintSub,
+    Type* constraintSup);
+
 bool SemanticsVisitor::doesSignatureMatchRequirement(
     DeclRef<CallableDecl> satisfyingMemberDeclRef,
     DeclRef<CallableDecl> requiredMemberDeclRef,
@@ -5424,23 +5429,62 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
     if (!satisfyingCalleeForDiffLookup)
         satisfyingCalleeForDiffLookup = satisfyingMemberDeclRef;
 
-    // A hard differentiability requirement is part of the callable's semantic contract, not
-    // just a follow-up witness-table entry. Reject a signature-only match that has no matching
-    // derivative conformance so overload search can continue to another candidate with the same
-    // source signature. This is what lets `IFloat.__init(float)` choose the differentiable
-    // vector/matrix constructor instead of an earlier non-differentiable conversion overload; the
-    // subsequent interface-level constraint then records the actual derivative witness.
-    //
+    auto requiredCalleeForDiffLookup =
+        createDefaultSubstitutionsIfNeeded(m_astBuilder, this, requiredMemberDeclRef)
+            .as<CallableDecl>();
+    if (!requiredCalleeForDiffLookup)
+        requiredCalleeForDiffLookup = requiredMemberDeclRef.as<CallableDecl>();
+
+    auto satisfiesDifferentiabilityRequirement = [&](bool isBackward) -> bool
+    {
+        if (!requiredCalleeForDiffLookup)
+            return false;
+
+        auto satisfyingFuncAsType =
+            DeclRefType::create(m_astBuilder, satisfyingCalleeForDiffLookup);
+        auto requiredFuncAsType = DeclRefType::create(m_astBuilder, requiredCalleeForDiffLookup);
+        auto requirementTypeInfoWitness = getDiffTypeInfoWitness(requiredFuncAsType);
+
+        // The signature requirement and its sibling `FuncConstraintDecl` are both about the
+        // requirement-side callable contract, not necessarily the satisfying method's ambient
+        // differentiability proof. `MyLinearArithmeticType.ldot` is the motivating shape: the
+        // interface is not itself differentiable, so `This` parameters are treated as `no_diff`
+        // in the requirement proof even though the concrete method may later be seen through an
+        // `IDifferentiable` subtype. Filter overload candidates against that requirement proof so
+        // signature matching agrees with the later sibling constraint check.
+        auto requiredDifferentiabilityInterfaceType =
+            isBackward ? m_astBuilder->getBackwardDiffFuncInterfaceType(
+                             satisfyingFuncAsType,
+                             requirementTypeInfoWitness)
+                       : m_astBuilder->getForwardDiffFuncInterfaceType(
+                             satisfyingFuncAsType,
+                             requirementTypeInfoWitness);
+
+        if (tryGetSubtypeWitness(satisfyingFuncAsType, requiredDifferentiabilityInterfaceType))
+            return true;
+
+        return trySynthesizeExactDifferentiabilityConformanceForRequirement(
+            this,
+            satisfyingFuncAsType,
+            requiredDifferentiabilityInterfaceType);
+    };
+
+    // A hard differentiability requirement is part of the callable's semantic contract, not just a
+    // follow-up witness-table entry. Reject a signature-only match that has no matching derivative
+    // conformance so overload search can continue to another candidate with the same source
+    // signature. The conformance check above uses the requirement's diff-info proof rather than the
+    // satisfying method's ambient proof because interface requirements can intentionally suppress
+    // derivatives with `NoDiffThis`.
     if (requiredMemberDeclRef.getDecl()->hasModifier<ForwardDifferentiableAttribute>() ||
         requiredMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>())
     {
-        if (!isFuncForwardDifferentiable(satisfyingCalleeForDiffLookup))
+        if (!satisfiesDifferentiabilityRequirement(false))
             return false;
     }
 
     if (requiredMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>())
     {
-        if (!isFuncBackwardDifferentiable(satisfyingCalleeForDiffLookup))
+        if (!satisfiesDifferentiabilityRequirement(true))
             return false;
     }
 
@@ -8757,7 +8801,6 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
             case BuiltinRequirementKind::BwdApplyFunc:
             case BuiltinRequirementKind::BwdCallablePropFunc:
             case BuiltinRequirementKind::BwdCallableRematFunc:
-            case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
                 if (!lookupResult.isValid())
                     return trySynthesizeDiffFuncRequirementWitness(
                         context,
@@ -8765,6 +8808,21 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
                         witnessTable,
                         builtinAttr->kind);
                 break;
+            case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
+                // `bwd_diff` is the compatibility associated function synthesized from the
+                // selected `apply_bwd`, `remat`, and `BwdCallable.operator()` entries. A callable
+                // can have more than one differentiability conformance when interface
+                // requirements ask for a different `DiffTypeInfoWitness` than the callable's
+                // ambient `[Differentiable]` conformance. In that case lookup may find another
+                // proof's synthesized `bwd_diff`; direct matching above rejects it by signature,
+                // and this step synthesizes the `bwd_diff` for the current conformance from the
+                // already-selected proof-specific entries. User-provided legacy `bwd_diff`
+                // functions are still handled in `trySynthesizeDiffFuncRequirementWitness`.
+                return trySynthesizeDiffFuncRequirementWitness(
+                    context,
+                    requiredFuncDeclRef,
+                    witnessTable,
+                    builtinAttr->kind);
             }
         }
         return false;
@@ -14742,11 +14800,19 @@ static bool trySynthesizeExactDifferentiabilityConformanceForRequirement(
     switch (kind)
     {
     case DifferentiabilityConformanceKind::Forward:
-        if (!visitor->isFuncForwardDifferentiable(callableDeclRef))
+        // This helper materializes a conformance for the exact diff-type proof requested by an
+        // interface requirement. The callable may not already conform under its ambient concrete
+        // proof: `MyLinearArithmeticType.ldot(This, This)` intentionally treats `This` as
+        // `no_diff` in the requirement, while the concrete `myvector` method may later be visible
+        // through an `IDifferentiable` constraint. In that case the source differentiability
+        // modifier is the authority that lets us synthesize the proof-specific conformance below.
+        if (!callableDeclRef.getDecl()->findModifier<ForwardDifferentiableAttribute>() &&
+            !visitor->isFuncForwardDifferentiable(callableDeclRef))
             return false;
         break;
     case DifferentiabilityConformanceKind::Backward:
-        if (!visitor->isFuncBackwardDifferentiable(callableDeclRef))
+        if (!callableDeclRef.getDecl()->findModifier<BackwardDifferentiableAttribute>() &&
+            !visitor->isFuncBackwardDifferentiable(callableDeclRef))
             return false;
         break;
     default:
@@ -14895,35 +14961,6 @@ static bool trySynthesizeExactDifferentiabilityConformanceForRequirement(
                            .as<SynthesizedFuncDecl>();
 
         visitor->ensureDecl(synContextStruct, DeclCheckState::ReadyForConformances);
-        auto bwdPropFnLookupResult = lookUpMember(
-            astBuilder,
-            visitor,
-            visitor->getName("()"),
-            fullCtxType,
-            visitor->getScope(diffExtension.getDecl()));
-        bwdPropFnLookupResult = visitor->resolveOverloadedLookup(bwdPropFnLookupResult);
-        if (!bwdPropFnLookupResult.item.declRef)
-            return false;
-        auto bwdPropFnDeclRef = bwdPropFnLookupResult.item.declRef.as<FunctionDeclBase>();
-        if (!bwdPropFnDeclRef)
-            return false;
-
-        auto bwdDiffFuncType = visitor->getCalculatedDiffFuncTypeWithWitness(
-            "BwdDiffFuncType",
-            funcAsTypeFromExtension,
-            typeInfoWitnessFromExtension);
-        if (!bwdDiffFuncType)
-            return false;
-
-        addSynthesizedFunc(
-            visitor,
-            diffExtension.getDecl(),
-            visitor->getName("bwd_diff"),
-            kIROp_LegacyBackwardDifferentiate,
-            {applyBwdDeclRef, rematDeclRef, bwdPropFnDeclRef},
-            bwdDiffFuncType,
-            true,
-            synthesizedVisibility.memberVisibility);
     }
 
     visitor->ensureDecl(diffExtension, DeclCheckState::ReadyForLookup);
