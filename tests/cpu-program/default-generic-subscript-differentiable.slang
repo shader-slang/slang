@@ -1,4 +1,5 @@
 //TEST:INTERPRET(filecheck=CHECK):
+//TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain -stage compute
 
 interface IGenericDifferentiableMethod
 {
@@ -74,6 +75,8 @@ float readThroughDefaultSubscript(Tensor<float, 2> tensor)
     return tensor[0, 1] * tensor[1, 0];
 }
 
+RWStructuredBuffer<float> outputBuffer;
+
 void main()
 {
     let methodValue = readThroughGenericInterfaceMethod<GenericDifferentiableMethodImpl>(4.0f);
@@ -81,12 +84,40 @@ void main()
     Tensor<float, 2> tensor;
     tensor.value = 3.0f;
 
+    var tangent = Tensor<float, 2>.dzero();
+    tangent.value = 1.0f;
+    let fwdPair = fwd_diff(readThroughDefaultSubscript)(diffPair(tensor, tangent));
+
     var pair = diffPair(tensor, Tensor<float, 2>.dzero());
     bwd_diff(readThroughDefaultSubscript)(pair, 1.0f);
 
     printf("%f\n", methodValue);
+    printf("%f\n", fwdPair.p);
+    printf("%f\n", fwdPair.d);
     printf("%f\n", pair.d.value);
 }
 
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    Tensor<float, 2> tensor;
+    tensor.value = 3.0f;
+
+    var tangent = Tensor<float, 2>.dzero();
+    tangent.value = 1.0f;
+    let fwdPair = fwd_diff(readThroughDefaultSubscript)(diffPair(tensor, tangent));
+
+    var pair = diffPair(tensor, Tensor<float, 2>.dzero());
+    bwd_diff(readThroughDefaultSubscript)(pair, 1.0f);
+
+    outputBuffer[0] = fwdPair.d + pair.d.value;
+}
+
 // CHECK: 8.000000
+// CHECK: 9.000000
 // CHECK: 6.000000
+// CHECK: 6.000000
+
+// CPP: s_bwdProp_readThroughDefaultSubscript
+// CPP: s_fwd_readThroughDefaultSubscript

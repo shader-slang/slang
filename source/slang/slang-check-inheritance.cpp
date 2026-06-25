@@ -840,8 +840,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     auto currentDeclRef = declRef;
     for (; currentDeclRef;)
     {
-        if (currentDeclRef.as<AggTypeDeclBase>() || currentDeclRef.as<CallableDecl>() ||
-            currentDeclRef.as<ExtensionDecl>())
+        if (currentDeclRef.as<AggTypeDeclBase>() || currentDeclRef.as<CallableDecl>())
         {
             auto containerDeclRef = currentDeclRef.as<ContainerDecl>();
 

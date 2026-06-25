@@ -138,6 +138,15 @@ SLANG_UNIT_TEST(findTypeByNameExtensionTypeAlias)
     SLANG_CHECK_ABORT(layout != nullptr);
     auto scalarAliasType = layout->findTypeByName("VectorizeGridArgTo<uint, 1>.VectorType");
     SLANG_CHECK_ABORT(scalarAliasType != nullptr);
+    SLANG_CHECK_ABORT(scalarAliasType->getKind() == slang::TypeReflection::Kind::Scalar);
     SLANG_CHECK_ABORT(
         scalarAliasType->getScalarType() == slang::TypeReflection::ScalarType::UInt32);
+
+    auto vectorAliasType =
+        layout->findTypeByName("VectorizeGridArgTo<vector<uint, 4>, 4>.VectorType");
+    SLANG_CHECK_ABORT(vectorAliasType != nullptr);
+    SLANG_CHECK_ABORT(vectorAliasType->getKind() == slang::TypeReflection::Kind::Vector);
+    SLANG_CHECK_ABORT(vectorAliasType->getElementCount() == 4);
+    SLANG_CHECK_ABORT(
+        vectorAliasType->getScalarType() == slang::TypeReflection::ScalarType::UInt32);
 }

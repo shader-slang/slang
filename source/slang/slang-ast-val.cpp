@@ -1388,7 +1388,7 @@ Val* HasDiffTypeInfoWitness::_substituteImplOverride(
             Index index = 0;
             for (auto member : genericDecl->getDirectMemberDecls())
             {
-                if (isConstraintDecl(member))
+                if (isGenericConstraintParameterDecl(member))
                 {
                     if (member == constraintDeclRef.getDecl())
                     {
@@ -1474,7 +1474,7 @@ Val* DeclaredVariadicPackCountWitness::_substituteImplOverride(
             Index index = 0;
             for (auto member : genericDecl->getDirectMemberDecls())
             {
-                if (isConstraintDecl(member))
+                if (isGenericConstraintParameterDecl(member))
                 {
                     if (member == constraintDeclRef.getDecl())
                     {

@@ -298,7 +298,8 @@ struct DifferentialPairTypeBuilder
                     auto witness = witnessPack->getOperand(i);
                     auto witnessType = as<IRWitnessTableTypeBase>(witness->getDataType());
                     if (!witnessType)
-                        return result;
+                        SLANG_UNEXPECTED(
+                            "unexpected non-witness element in differential pair witness pack");
 
                     IRType* elemPairType = nullptr;
                     auto conformanceType = witnessType->getConformanceType();
