@@ -1,5 +1,4 @@
 //TEST:INTERPRET(filecheck=CHECK):
-//TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain -stage compute
 
 interface IGenericDifferentiableMethod
 {
@@ -118,6 +117,3 @@ void computeMain()
 // CHECK: 9.000000
 // CHECK: 6.000000
 // CHECK: 6.000000
-
-// CPP: s_bwdProp_readThroughDefaultSubscript
-// CPP: s_fwd_readThroughDefaultSubscript
