@@ -1003,15 +1003,21 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
     const TypeExp& _getSupOverride() const { return sup; }
 };
 
-// A synthesized interface requirement for `[Differentiable]` on a callable requirement.
+// A synthesized interface requirement that constrains a callable requirement as a type.
 //
 // For `interface IFoo { [Differentiable] void f<T>(); }`, this decl represents the sibling
 // requirement `f<T> : IForward/BackwardDifferentiableFunc<f<T>>`. If `f` is generic, the decl is
-// wrapped in a copied standalone generic signature, and `callableRequirementDeclRef` stores the
-// `This.f<T>` decl-ref after substituting the callable's generic parameters/proofs with that copied
+// wrapped in a cloned standalone generic signature, and `callableRequirementDeclRef` stores the
+// `This.f<T>` decl-ref after substituting the callable's generic parameters/proofs with that cloned
 // signature.
+//
+// This intentionally remains a subtype of `GenericTypeConstraintDecl`: conformance checking and
+// witness-table lowering consume it through the same sibling subtype-constraint path used by
+// associated-type constraints. The extra checked decl-ref records the callable-as-type endpoint
+// being constrained, so later consumers can target that callable without structural rediscovery
+// through overloaded members.
 FIDDLE()
-class DifferentiableRequirementConstraintDecl : public GenericTypeConstraintDecl
+class FuncConstraintDecl : public GenericTypeConstraintDecl
 {
     FIDDLE(...)
     FIDDLE() DeclRef<CallableDecl> callableRequirementDeclRef;

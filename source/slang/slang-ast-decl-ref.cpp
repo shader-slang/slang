@@ -740,10 +740,17 @@ DeclRefBase* DeclRefBase::getParent()
 
         if (parentDecl != genericDecl && parentDecl->isChildOf(genericDecl))
         {
-            // A generic application can name a nested declaration under the generic's inner
-            // declaration, not only the inner declaration itself. Preserve the same specialization
-            // when asking for such a decl-ref's parent so parameter collection and substitution
-            // keep the generic arguments from the original decl-ref chain.
+            // A generic application can name a declaration nested under the generic's inner
+            // declaration, not only the inner declaration itself:
+            //
+            //     GenericAppDeclRef(Generic<T>, ..., inner = InnerNestedDecl)
+            //
+            // In that case, `getParent()` should preserve the same generic arguments while moving
+            // to the lexical parent of `InnerNestedDecl`. This is not a replacement for the normal
+            // `MemberDeclRef(GenericAppDeclRef(...), member)` projection form; that form is still
+            // what represents an ordinary member selected from a specialized parent. This branch
+            // only handles a decl-ref that is already a generic application to a nested `inner`
+            // decl, so parent traversal remains consistent with the decl-ref's existing shape.
             return astBuilder->getGenericAppDeclRef(
                 genericDeclRef,
                 genericAppDeclRef->getArgs(),

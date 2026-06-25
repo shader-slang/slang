@@ -1,4 +1,4 @@
-//TEST:EXECUTABLE:
+//TEST:INTERPRET(filecheck=CHECK):
 
 interface IGenericDifferentiableMethod
 {
@@ -74,7 +74,7 @@ float readThroughDefaultSubscript(Tensor<float, 2> tensor)
     return tensor[0, 1] * tensor[1, 0];
 }
 
-export __extern_cpp int main()
+void main()
 {
     let methodValue = readThroughGenericInterfaceMethod<GenericDifferentiableMethodImpl>(4.0f);
 
@@ -84,8 +84,9 @@ export __extern_cpp int main()
     var pair = diffPair(tensor, Tensor<float, 2>.dzero());
     bwd_diff(readThroughDefaultSubscript)(pair, 1.0f);
 
-    return methodValue > 7.9f && methodValue < 8.1f && pair.d.value > 5.9f &&
-                   pair.d.value < 6.1f
-               ? 0
-               : 1;
+    printf("%f\n", methodValue);
+    printf("%f\n", pair.d.value);
 }
+
+// CHECK: 8.000000
+// CHECK: 6.000000

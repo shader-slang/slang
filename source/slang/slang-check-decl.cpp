@@ -1,5 +1,5 @@
 // slang-check-decl.cpp
-#include "slang-ast-copy.h"
+#include "slang-ast-clone.h"
 #include "slang-ast-modifier.h"
 #include "slang-ast-support-types.h"
 #include "slang-check-impl.h"
@@ -5363,16 +5363,16 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         // If the requirement is defined using a funcType, we'll check the effective
         // func-types
         //
-        auto substitutedFuncType =
-            as<Type>(funcType->substitute(m_astBuilder, SubstitutionSet(requiredMemberDeclRef)));
-        auto resolvedFuncType = as<Type>(substitutedFuncType->resolve());
+        auto resolvedFuncType =
+            as<Type>(funcType->substitute(m_astBuilder, SubstitutionSet(requiredMemberDeclRef)))
+                ->resolve();
 
         auto targetFuncType = getTypeForDeclRef(
             m_astBuilder,
             satisfyingMemberDeclRef,
             satisfyingMemberDeclRef.getLoc());
 
-        if (!resolvedFuncType->equals(targetFuncType.type))
+        if (!targetFuncType.type->equals(resolvedFuncType))
             return false;
     }
     else
@@ -6590,8 +6590,8 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
 
 // Invalidates cached default-substitution arguments for `genericDecl`.
 //
-// Call this after adding copied constraints because later default arguments may include newly
-// copied proof-bearing constraint members.
+// Call this after adding cloned constraints because later default arguments may include newly
+// cloned proof-bearing constraint members.
 static void invalidateDefaultSubstitutionArgs(ASTBuilder* astBuilder, GenericDecl* genericDecl)
 {
     astBuilder->m_cachedGenericDefaultArgs.remove(genericDecl);
@@ -6604,7 +6604,7 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
     ContainerDecl* destinationParentDecl)
 {
     List<GenericDecl*> sourceGenericDecls;
-    List<GenericDecl*> copiedGenericDecls;
+    List<GenericDecl*> clonedGenericDecls;
 
     auto destinationParent = destinationParentDecl ? destinationParentDecl : getModuleDecl(decl);
     for (auto cur = decl->parentDecl; cur && cur != destinationParent; cur = cur->parentDecl)
@@ -6622,7 +6622,7 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
     currentDeclRef =
         createDefaultSubstitutionsIfNeeded(getCurrentASTBuilder(), this, currentDeclRef);
 
-    // Move a synthesized declaration out of a nested generic context by giving it its own copied
+    // Move a synthesized declaration out of a nested generic context by giving it its own cloned
     // generic context.
     //
     // For example, given:
@@ -6642,15 +6642,15 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
     //     generic<T2>
     //     struct Syn { T2 value; }
     //
-    // The copied generic parameters and constraints form the standalone generic environment for
+    // The cloned generic parameters and constraints form the standalone generic environment for
     // `Syn`, and references inside `Syn` are rewritten from the original generic binders/proofs to
-    // the copied ones. Constraints are copied as part of that environment, including proof-bearing
+    // the cloned ones. Constraints are cloned as part of that environment, including proof-bearing
     // constraints such as `where countof(T) == N`, so default substitution arguments and witness
     // references keep the same logical shape.
     sourceGenericDecls.reverse();
-    ASTCopyContext outerCopyContext;
-    outerCopyContext.astBuilder = m_astBuilder;
-    outerCopyContext.semantics = this;
+    ASTCloneContext outerCloneContext;
+    outerCloneContext.astBuilder = m_astBuilder;
+    outerCloneContext.semantics = this;
 
     for (auto sourceGenericDecl : sourceGenericDecls)
     {
@@ -6660,15 +6660,15 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
         synGenericDecl->ownedScope = m_astBuilder->create<Scope>();
         synGenericDecl->ownedScope->containerDecl = synGenericDecl;
         synGenericDecl->ownedScope->parent = parentScope;
-        copiedGenericDecls.add(synGenericDecl);
+        clonedGenericDecls.add(synGenericDecl);
 
         if (auto genericParentDecl = as<GenericDecl>(parentDecl))
             genericParentDecl->inner = synGenericDecl;
 
-        GenericSignatureCopier copier(m_astBuilder, this, sourceGenericDecl, synGenericDecl);
-        for (auto const& kv : outerCopyContext.oldToNewDecls)
-            copier.getASTCopier().mapDecl(kv.first, kv.second);
-        copier.copyParameterMembers();
+        GenericSignatureCloner cloner(m_astBuilder, this, sourceGenericDecl, synGenericDecl);
+        for (auto const& kv : outerCloneContext.oldToNewDecls)
+            cloner.getASTCloner().mapDecl(kv.first, kv.second);
+        cloner.cloneParameterMembers();
 
         auto partiallySpecializedSourceDeclRef = getSpecializedDeclRefWithParamsFromGeneric(
             m_astBuilder,
@@ -6685,11 +6685,11 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
 
         for (auto member : sourceGenericDecl->getDirectMemberDecls())
         {
-            if (!copier.copyConstraintMember(member, SubstitutionSet(currentDeclRef)))
+            if (!cloner.cloneConstraintMember(member, SubstitutionSet(currentDeclRef)))
                 continue;
 
             // Future constraints in the same generic can depend on proof-bearing members that were
-            // just copied, so refresh default substitution arguments after each copied constraint.
+            // just cloned, so refresh default substitution arguments after each cloned constraint.
             invalidateDefaultSubstitutionArgs(m_astBuilder, synGenericDecl);
             auto partiallySpecializedSourceDeclRefAfterConstraint =
                 getSpecializedDeclRefWithParamsFromGeneric(
@@ -6702,8 +6702,8 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
                 SubstitutionSet(partiallySpecializedSourceDeclRefAfterConstraint)));
         }
 
-        // The copier drops witness/path-resolution tables because they are tied to the original
-        // declaration graph. Rebuild the derived tables after all copied constraints are present.
+        // The cloner drops witness/path-resolution tables because they are tied to the original
+        // declaration graph. Rebuild the derived tables after all cloned constraints are present.
         checkGenericConstraintConformances(synGenericDecl);
 
         // Override generic pointer to point to the original generic container.
@@ -6725,7 +6725,7 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
             SubstitutionSet(fullySpecializedDeclRef)));
 
         // Update parent pointers.
-        outerCopyContext = copier.getASTCopier().getContext();
+        outerCloneContext = cloner.getASTCloner().getContext();
         parentDecl = synGenericDecl;
         parentScope = synGenericDecl->ownedScope;
     }
@@ -6740,9 +6740,9 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
     outSubstitutions = SubstitutionSet(currentDeclRef);
 
     DeclRefBase* newDeclRef = nullptr;
-    for (Index i = 0; i < (Index)copiedGenericDecls.getCount(); i++)
+    for (Index i = 0; i < (Index)clonedGenericDecls.getCount(); i++)
     {
-        auto genericDecl = copiedGenericDecls[i];
+        auto genericDecl = clonedGenericDecls[i];
         auto origGenericDecl = sourceGenericDecls[i];
 
         auto substArgs = getDefaultSubstitutionArgs(m_astBuilder, this, origGenericDecl);
@@ -8758,15 +8758,12 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
             case BuiltinRequirementKind::BwdCallablePropFunc:
             case BuiltinRequirementKind::BwdCallableRematFunc:
             case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
-                // Differentiability associated functions are proof-sensitive: two conformances for
-                // the same callable can need same-named members with different signatures. We only
-                // get here after every lookup result failed signature matching, so synthesize the
-                // exact builtin requirement even when lookup found another proof variant.
-                return trySynthesizeDiffFuncRequirementWitness(
-                    context,
-                    requiredFuncDeclRef,
-                    witnessTable,
-                    builtinAttr->kind);
+                if (!lookupResult.isValid())
+                    return trySynthesizeDiffFuncRequirementWitness(
+                        context,
+                        requiredFuncDeclRef,
+                        witnessTable,
+                        builtinAttr->kind);
                 break;
             }
         }
@@ -10174,8 +10171,8 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                 // `IForwardDifferentiable` witness table, lookup can recurse through the same
                 // synthesized `fwd_diff` conformance. Record absence here; explicit higher-order
                 // differentiation still goes through the hard conformance paths.
-                if (isOptionalConstraint && as<DifferentiableRequirementConstraintDecl>(
-                                                requiredConstraintDeclRef.getDecl()))
+                if (isOptionalConstraint &&
+                    as<FuncConstraintDecl>(requiredConstraintDeclRef.getDecl()))
                 {
                     if (auto synFuncDecl =
                             as<SynthesizedFuncDecl>(constraintSubCallableDeclRef.getDecl()))
@@ -10202,8 +10199,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
             constraintWitness = nullptr;
         }
 
-        if (!constraintWitness &&
-            as<DifferentiableRequirementConstraintDecl>(requiredConstraintDeclRef.getDecl()) &&
+        if (!constraintWitness && as<FuncConstraintDecl>(requiredConstraintDeclRef.getDecl()) &&
             trySynthesizeExactDifferentiabilityConformanceForRequirement(
                 this,
                 constraintSub,
@@ -11461,8 +11457,8 @@ void SemanticsVisitor::checkGenericConstraintConformances(GenericDecl* genericDe
             continue;
 
         // The path-resolution table is derived from the constraint's current sub/super types.
-        // `GenericSignatureCopier` drops the source table when copying a generic signature, so the
-        // first check of the copied constraint rebuilds it here. Later visits through the normal
+        // `GenericSignatureCloner` drops the source table when cloning a generic signature, so the
+        // first check of the cloned constraint rebuilds it here. Later visits through the normal
         // declaration-checking pipeline reuse that table instead of appending duplicate inherited
         // interface entries.
         RefPtr<WitnessTable> pathResolutionTable = constraintDecl->pathResolutionTable;
@@ -14975,7 +14971,7 @@ static Decl* _moveInterfaceDifferentiabilityRequirementToInterface(
     // environment. Start the synthesized constraint under the callable/accessor that owns that
     // environment and let `liftDeclFromGenericContainers` hoist it into a standalone generic
     // requirement under the interface when needed. Non-generic callables take the same path, but no
-    // generic wrappers are copied. We only set `parentDecl` here instead of appending to the
+    // generic wrappers are cloned. We only set `parentDecl` here instead of appending to the
     // callable's direct member list because the declaration is immediately moved; leaving it in the
     // callable member list would give the AST two owners for the same requirement.
     constraintDecl->parentDecl = requirementDecl;
@@ -15412,8 +15408,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                 [&](bool isBackwardDifferentiabilityRequirement, bool isOptional)
             {
                 auto requirementDeclRef = funcAsLookupDeclRef;
-                auto constraintDecl =
-                    getCurrentASTBuilder()->create<DifferentiableRequirementConstraintDecl>();
+                auto constraintDecl = getCurrentASTBuilder()->create<FuncConstraintDecl>();
                 constraintDecl->loc = decl->loc;
 
                 auto interfaceMemberDecl = _moveInterfaceDifferentiabilityRequirementToInterface(
@@ -15427,7 +15422,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                 // interface requirement: `This.f : IForward/BackwardDifferentiable<This.f>`.
                 // Keep that fact as a sibling requirement, the same way constraints on
                 // associated types are sibling requirements about `This.A`. For generic
-                // callables, the hoist helper above moved the constraint under a standalone copy
+                // callables, the hoist helper above moved the constraint under a standalone clone
                 // of the callable's generic signature, so `This.f<T>` references parameters owned
                 // by this requirement rather than by the callable declaration.
                 auto funcAsLookupType =

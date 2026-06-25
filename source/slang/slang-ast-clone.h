@@ -1,4 +1,4 @@
-// slang-ast-copy.h
+// slang-ast-clone.h
 #pragma once
 
 #include "slang-ast-all.h"
@@ -10,58 +10,58 @@ namespace Slang
 
 struct SemanticsVisitor;
 
-struct ASTCopyContext
+struct ASTCloneContext
 {
     ASTBuilder* astBuilder = nullptr;
     SemanticsVisitor* semantics = nullptr;
 
-    // Source of truth for hygienic copying: references to these declarations are rewritten to the
-    // copied declarations.
+    // Source of truth for hygienic cloning: references to these declarations are rewritten to the
+    // cloned declarations.
     Dictionary<Decl*, Decl*> oldToNewDecls;
 
     // Performance cache for semantic values rebuilt after applying `oldToNewDecls`.
     Dictionary<Val*, Val*> oldToNewVals;
 
     // Witness tables are derived semantic data tied to the original declaration graph. Raw
-    // ASTCopier users fail loudly if they encounter populated witness tables;
-    // GenericSignatureCopier opts in because its callers rebuild generic constraint path tables
-    // after copying.
+    // ASTCloner users fail loudly if they encounter populated witness tables;
+    // GenericSignatureCloner opts in because its callers rebuild generic constraint path tables
+    // after cloning.
     bool allowDroppingWitnessTables = false;
 };
 
 // Returns `genericDeclToSpecialize` applied to the default arguments from
 // `genericDeclProvidingSpecializationArgs`.
 //
-// For example, after copying `generic<T>` to `generic<T2>`, this returns a decl-ref for the
+// For example, after cloning `generic<T>` to `generic<T2>`, this returns a decl-ref for the
 // source generic specialized as `generic<T2>`. Callers use that substitution to rewrite references
-// from the original generic environment into the standalone copied environment.
+// from the original generic environment into the standalone cloned environment.
 DeclRef<Decl> getSpecializedDeclRefWithParamsFromGeneric(
     ASTBuilder* astBuilder,
     SemanticsVisitor* semantics,
     GenericDecl* genericDeclToSpecialize,
     GenericDecl* genericDeclProvidingSpecializationArgs);
 
-// Copies AST syntax nodes while rewriting semantic references through `oldToNewDecls`.
+// Clones AST syntax nodes while rewriting semantic references through `oldToNewDecls`.
 //
-// Callers pre-map declaration binders that are being copied into a new scope. The copier then
+// Callers pre-map declaration binders that are being cloned into a new scope. The cloner then
 // rewrites DeclRef/Val/Type fields that mention those binders, preserves unmapped raw Decl*
 // references as external references, and leaves container membership to the caller. Derived witness
-// tables are out of contract for ordinary ASTCopier use because they are tied to the checked source
+// tables are out of contract for ordinary ASTCloner use because they are tied to the checked source
 // declaration graph.
-class ASTCopier
+class ASTCloner
 {
 public:
-    ASTCopier(ASTBuilder* astBuilder, SemanticsVisitor* semantics = nullptr);
+    ASTCloner(ASTBuilder* astBuilder, SemanticsVisitor* semantics = nullptr);
 
-    ASTCopyContext& getContext() { return m_context; }
-    ASTCopyContext const& getContext() const { return m_context; }
+    ASTCloneContext& getContext() { return m_context; }
+    ASTCloneContext const& getContext() const { return m_context; }
 
     void mapDecl(Decl* oldDecl, Decl* newDecl);
 
-    Decl* copyDecl(Decl* decl);
-    Expr* copyExpr(Expr* expr);
-    Stmt* copyStmt(Stmt* stmt);
-    Modifier* copyModifier(Modifier* modifier);
+    Decl* cloneDecl(Decl* decl);
+    Expr* cloneExpr(Expr* expr);
+    Stmt* cloneStmt(Stmt* stmt);
+    Modifier* cloneModifier(Modifier* modifier);
 
     Val* rewriteVal(Val* val);
     Type* rewriteType(Type* type) { return as<Type>(rewriteVal(type)); }
@@ -78,54 +78,54 @@ public:
     }
 
     QualType rewriteQualType(QualType const& type);
-    TypeExp copyTypeExp(TypeExp const& typeExp);
+    TypeExp cloneTypeExp(TypeExp const& typeExp);
 
-    void copyField(QualType& dst, QualType const& src);
-    void copyField(TypeExp& dst, TypeExp const& src);
-    void copyField(Modifiers& dst, Modifiers const& src);
-    void copyField(ValNodeOperand& dst, ValNodeOperand const& src);
-    void copyField(RefPtr<WitnessTable>& dst, RefPtr<WitnessTable> const& src);
-    void copyField(ContainerDeclDirectMemberDecls& dst, ContainerDeclDirectMemberDecls const& src);
+    void cloneField(QualType& dst, QualType const& src);
+    void cloneField(TypeExp& dst, TypeExp const& src);
+    void cloneField(Modifiers& dst, Modifiers const& src);
+    void cloneField(ValNodeOperand& dst, ValNodeOperand const& src);
+    void cloneField(RefPtr<WitnessTable>& dst, RefPtr<WitnessTable> const& src);
+    void cloneField(ContainerDeclDirectMemberDecls& dst, ContainerDeclDirectMemberDecls const& src);
 
     template<typename T>
-    void copyField(DeclRef<T>& dst, DeclRef<T> const& src)
+    void cloneField(DeclRef<T>& dst, DeclRef<T> const& src)
     {
         dst = rewriteDeclRef(src);
     }
 
     template<typename T>
-    void copyField(List<T>& dst, List<T> const& src)
+    void cloneField(List<T>& dst, List<T> const& src)
     {
         dst.clear();
         for (auto const& item : src)
         {
-            T copiedItem{};
-            copyField(copiedItem, item);
-            dst.add(copiedItem);
+            T clonedItem{};
+            cloneField(clonedItem, item);
+            dst.add(clonedItem);
         }
     }
 
     template<typename T, int N>
-    void copyField(T (&dst)[N], T const (&src)[N])
+    void cloneField(T (&dst)[N], T const (&src)[N])
     {
         for (int i = 0; i < N; ++i)
-            copyField(dst[i], src[i]);
+            cloneField(dst[i], src[i]);
     }
 
     template<typename T>
-    void copyField(T*& dst, T* src)
+    void cloneField(T*& dst, T* src)
     {
         if constexpr (std::is_base_of_v<Expr, T>)
         {
-            dst = as<T>(copyExpr(src));
+            dst = as<T>(cloneExpr(src));
         }
         else if constexpr (std::is_base_of_v<Stmt, T>)
         {
-            dst = as<T>(copyStmt(src));
+            dst = as<T>(cloneStmt(src));
         }
         else if constexpr (std::is_base_of_v<Modifier, T>)
         {
-            dst = as<T>(copyModifier(src));
+            dst = as<T>(cloneModifier(src));
         }
         else if constexpr (std::is_base_of_v<Val, T>)
         {
@@ -145,7 +145,7 @@ public:
             {
                 // Fiddle-reflected raw Decl* fields include external semantic references and lookup
                 // accelerator links such as `_prevInContainerWithSameName`. Only declarations
-                // present in `oldToNewDecls` are part of the copied generic environment; all other
+                // present in `oldToNewDecls` are part of the cloned generic environment; all other
                 // raw declaration pointers remain external references.
                 dst = src;
             }
@@ -157,46 +157,46 @@ public:
     }
 
     template<typename T>
-    std::enable_if_t<!std::is_array_v<T>, void> copyField(T& dst, T const& src)
+    std::enable_if_t<!std::is_array_v<T>, void> cloneField(T& dst, T const& src)
     {
         dst = src;
     }
 
 private:
-    NodeBase* copySyntaxNode(NodeBase* node);
-    void copyNodeFields(NodeBase* dst, NodeBase* src);
+    NodeBase* cloneSyntaxNode(NodeBase* node);
+    void cloneNodeFields(NodeBase* dst, NodeBase* src);
     Decl* rewriteDecl(Decl* decl);
     Val* rewriteValImpl(Val* val);
 
-    ASTCopyContext m_context;
+    ASTCloneContext m_context;
 };
 
-// Copies the parameter and constraint members that define a generic declaration's signature.
+// Clones the parameter and constraint members that define a generic declaration's signature.
 //
-// The destination generic owns the copied members. `oldToNewDecls` maps source binders and
-// proof-bearing constraint declarations to those copies so later constraints and default
-// substitution arguments can reference the copied environment. Witness/path-resolution tables are
-// dropped during the field copy; callers rebuild generic constraint path tables after all copied
+// The destination generic owns the cloned members. `oldToNewDecls` maps source binders and
+// proof-bearing constraint declarations to those clones so later constraints and default
+// substitution arguments can reference the cloned environment. Witness/path-resolution tables are
+// dropped during field cloning; callers rebuild generic constraint path tables after all cloned
 // constraints are present.
-class GenericSignatureCopier
+class GenericSignatureCloner
 {
 public:
-    GenericSignatureCopier(
+    GenericSignatureCloner(
         ASTBuilder* astBuilder,
         SemanticsVisitor* semantics,
         GenericDecl* sourceGenericDecl,
         GenericDecl* destGenericDecl,
         List<Expr*>* outGenericArgs = nullptr);
 
-    ASTCopier& getASTCopier() { return m_astCopier; }
+    ASTCloner& getASTCloner() { return m_astCloner; }
 
-    void copyParameterMembers();
-    Decl* copyConstraintMember(Decl* member, SubstitutionSet const& sourceToDestSubstitution);
+    void cloneParameterMembers();
+    Decl* cloneConstraintMember(Decl* member, SubstitutionSet const& sourceToDestSubstitution);
 
 private:
     Expr* createGenericArgExpr(Decl* decl);
 
-    ASTCopier m_astCopier;
+    ASTCloner m_astCloner;
     GenericDecl* m_sourceGenericDecl = nullptr;
     GenericDecl* m_destGenericDecl = nullptr;
     List<Expr*>* m_outGenericArgs = nullptr;

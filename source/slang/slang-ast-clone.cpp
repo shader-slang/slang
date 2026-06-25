@@ -1,6 +1,6 @@
-// slang-ast-copy.cpp
+// slang-ast-clone.cpp
 
-#include "slang-ast-copy.h"
+#include "slang-ast-clone.h"
 
 #include "slang-ast-builder.h"
 #include "slang-ast-dispatch.h"
@@ -10,36 +10,36 @@
 namespace Slang
 {
 
-struct ASTCopyFieldAccess
+struct ASTCloneFieldAccess
 {
 #if 0 // FIDDLE TEMPLATE:
 %for _,T in ipairs(Slang.NodeBase.subclasses) do
-    static void copyFields(ASTCopier& copier, $T* dst, $T* src)
+    static void cloneFields(ASTCloner& cloner, $T* dst, $T* src)
     {
-        SLANG_UNUSED(copier);
+        SLANG_UNUSED(cloner);
         SLANG_UNUSED(dst);
         SLANG_UNUSED(src);
 %   if T.directSuperClass then
-        copyFields(copier, static_cast<$(T.directSuperClass)*>(dst), src);
+        cloneFields(cloner, static_cast<$(T.directSuperClass)*>(dst), src);
 %   end
 %   for _,f in ipairs(T.directFields) do
-        copier.copyField(dst->$f, src->$f);
+        cloner.cloneField(dst->$f, src->$f);
 %   end
     }
 %end
 #else // FIDDLE OUTPUT:
 #define FIDDLE_GENERATED_OUTPUT_ID 0
-#include "slang-ast-copy.cpp.fiddle"
+#include "slang-ast-clone.cpp.fiddle"
 #endif // FIDDLE END
 };
 
-ASTCopier::ASTCopier(ASTBuilder* astBuilder, SemanticsVisitor* semantics)
+ASTCloner::ASTCloner(ASTBuilder* astBuilder, SemanticsVisitor* semantics)
 {
     m_context.astBuilder = astBuilder;
     m_context.semantics = semantics;
 }
 
-void ASTCopier::mapDecl(Decl* oldDecl, Decl* newDecl)
+void ASTCloner::mapDecl(Decl* oldDecl, Decl* newDecl)
 {
     if (!oldDecl || !newDecl || oldDecl == newDecl)
         return;
@@ -64,10 +64,10 @@ DeclRef<Decl> getSpecializedDeclRefWithParamsFromGeneric(
     return astBuilder->getGenericAppDeclRef(genericDeclToSpecialize, defaultArgs.getArrayView());
 }
 
-static void copyNonReflectedDeclFields(Decl* dst, Decl* src)
+static void cloneNonReflectedDeclFields(Decl* dst, Decl* src)
 {
-    // `parameterIndex` is checked metadata rather than syntax, so FIDDLE does not copy it.
-    // GenericSignatureCopier copies already-checked generic signatures, and later substitution
+    // `parameterIndex` is checked metadata rather than syntax, so FIDDLE does not clone it.
+    // GenericSignatureCloner clones already-checked generic signatures, and later substitution
     // and generic argument solving index ordinary parameters by this field.
     if (auto srcTypeParam = as<GenericTypeParamDeclBase>(src))
         as<GenericTypeParamDeclBase>(dst)->parameterIndex = srcTypeParam->parameterIndex;
@@ -77,51 +77,51 @@ static void copyNonReflectedDeclFields(Decl* dst, Decl* src)
         as<GenericValueParamDecl>(dst)->parameterIndex = srcValParam->parameterIndex;
 }
 
-NodeBase* ASTCopier::copySyntaxNode(NodeBase* node)
+NodeBase* ASTCloner::cloneSyntaxNode(NodeBase* node)
 {
     if (!node)
         return nullptr;
 
-    auto copiedNode = m_context.astBuilder->createByNodeType(node->astNodeType);
+    auto clonedNode = m_context.astBuilder->createByNodeType(node->astNodeType);
     auto decl = as<Decl>(node);
     if (decl)
-        mapDecl(decl, as<Decl>(copiedNode));
+        mapDecl(decl, as<Decl>(clonedNode));
 
-    copyNodeFields(copiedNode, node);
-    if (auto copiedDecl = as<Decl>(copiedNode))
+    cloneNodeFields(clonedNode, node);
+    if (auto clonedDecl = as<Decl>(clonedNode))
     {
-        copyNonReflectedDeclFields(copiedDecl, decl);
+        cloneNonReflectedDeclFields(clonedDecl, decl);
 
-        // Container membership is re-established by callers such as GenericSignatureCopier through
-        // addDirectMemberDecl. Drop the copied lookup-accelerator chain so it cannot temporarily
+        // Container membership is re-established by callers such as GenericSignatureCloner through
+        // addDirectMemberDecl. Drop the cloned lookup-accelerator chain so it cannot temporarily
         // point back into the source container.
-        copiedDecl->_prevInContainerWithSameName = nullptr;
+        clonedDecl->_prevInContainerWithSameName = nullptr;
     }
-    return copiedNode;
+    return clonedNode;
 }
 
-void ASTCopier::copyNodeFields(NodeBase* dst, NodeBase* src)
+void ASTCloner::cloneNodeFields(NodeBase* dst, NodeBase* src)
 {
     ASTNodeDispatcher<NodeBase, void>::dispatch(
         src,
         [&](auto typedSrc)
         {
             using T = std::remove_pointer_t<decltype(typedSrc)>;
-            ASTCopyFieldAccess::copyFields(*this, static_cast<T*>(dst), typedSrc);
+            ASTCloneFieldAccess::cloneFields(*this, static_cast<T*>(dst), typedSrc);
         });
 
     if (auto srcStaticMemberExpr = as<StaticMemberExpr>(src))
     {
-        // These fields are not reflected through FIDDLE, so the generated copy above cannot see
-        // them. Preserve the lookup base because copied generic-constraint type syntax may need it
+        // These fields are not reflected through FIDDLE, so the generated clone above cannot see
+        // them. Preserve the lookup base because cloned generic-constraint type syntax may need it
         // if the type expression is checked again.
         auto dstStaticMemberExpr = as<StaticMemberExpr>(dst);
-        dstStaticMemberExpr->baseExpression = copyExpr(srcStaticMemberExpr->baseExpression);
+        dstStaticMemberExpr->baseExpression = cloneExpr(srcStaticMemberExpr->baseExpression);
         dstStaticMemberExpr->memberOperatorLoc = srcStaticMemberExpr->memberOperatorLoc;
     }
 }
 
-Decl* ASTCopier::copyDecl(Decl* decl)
+Decl* ASTCloner::cloneDecl(Decl* decl)
 {
     if (!decl)
         return nullptr;
@@ -129,25 +129,25 @@ Decl* ASTCopier::copyDecl(Decl* decl)
     if (auto existing = m_context.oldToNewDecls.tryGetValue(decl))
         return *existing;
 
-    return as<Decl>(copySyntaxNode(decl));
+    return as<Decl>(cloneSyntaxNode(decl));
 }
 
-Expr* ASTCopier::copyExpr(Expr* expr)
+Expr* ASTCloner::cloneExpr(Expr* expr)
 {
-    return as<Expr>(copySyntaxNode(expr));
+    return as<Expr>(cloneSyntaxNode(expr));
 }
 
-Stmt* ASTCopier::copyStmt(Stmt* stmt)
+Stmt* ASTCloner::cloneStmt(Stmt* stmt)
 {
-    return as<Stmt>(copySyntaxNode(stmt));
+    return as<Stmt>(cloneSyntaxNode(stmt));
 }
 
-Modifier* ASTCopier::copyModifier(Modifier* modifier)
+Modifier* ASTCloner::cloneModifier(Modifier* modifier)
 {
-    return as<Modifier>(copySyntaxNode(modifier));
+    return as<Modifier>(cloneSyntaxNode(modifier));
 }
 
-Val* ASTCopier::rewriteVal(Val* val)
+Val* ASTCloner::rewriteVal(Val* val)
 {
     if (!val)
         return nullptr;
@@ -164,14 +164,14 @@ Val* ASTCopier::rewriteVal(Val* val)
     return rewritten;
 }
 
-Decl* ASTCopier::rewriteDecl(Decl* decl)
+Decl* ASTCloner::rewriteDecl(Decl* decl)
 {
     if (auto newDecl = m_context.oldToNewDecls.tryGetValue(decl))
         return *newDecl;
     return decl;
 }
 
-Val* ASTCopier::rewriteValImpl(Val* val)
+Val* ASTCloner::rewriteValImpl(Val* val)
 {
     ValNodeDesc desc;
     desc.type = val->getClass();
@@ -217,46 +217,46 @@ Val* ASTCopier::rewriteValImpl(Val* val)
     return m_context.astBuilder->_getOrCreateImpl(_Move(desc));
 }
 
-QualType ASTCopier::rewriteQualType(QualType const& type)
+QualType ASTCloner::rewriteQualType(QualType const& type)
 {
     QualType result = type;
     result.type = rewriteType(type.type);
     return result;
 }
 
-TypeExp ASTCopier::copyTypeExp(TypeExp const& typeExp)
+TypeExp ASTCloner::cloneTypeExp(TypeExp const& typeExp)
 {
     TypeExp result;
-    result.exp = copyExpr(typeExp.exp);
+    result.exp = cloneExpr(typeExp.exp);
     result.type = rewriteType(typeExp.type);
     return result;
 }
 
-void ASTCopier::copyField(QualType& dst, QualType const& src)
+void ASTCloner::cloneField(QualType& dst, QualType const& src)
 {
     dst = rewriteQualType(src);
 }
 
-void ASTCopier::copyField(TypeExp& dst, TypeExp const& src)
+void ASTCloner::cloneField(TypeExp& dst, TypeExp const& src)
 {
-    dst = copyTypeExp(src);
+    dst = cloneTypeExp(src);
 }
 
-void ASTCopier::copyField(Modifiers& dst, Modifiers const& src)
+void ASTCloner::cloneField(Modifiers& dst, Modifiers const& src)
 {
     dst.first = nullptr;
     Modifier** link = &dst.first;
     auto modifier = src.first;
     while (modifier)
     {
-        auto copiedModifier = copyModifier(modifier);
-        *link = copiedModifier;
-        link = &copiedModifier->next;
+        auto clonedModifier = cloneModifier(modifier);
+        *link = clonedModifier;
+        link = &clonedModifier->next;
         modifier = modifier->next;
     }
 }
 
-void ASTCopier::copyField(ValNodeOperand& dst, ValNodeOperand const& src)
+void ASTCloner::cloneField(ValNodeOperand& dst, ValNodeOperand const& src)
 {
     switch (src.kind)
     {
@@ -285,18 +285,18 @@ void ASTCopier::copyField(ValNodeOperand& dst, ValNodeOperand const& src)
     }
 }
 
-void ASTCopier::copyField(RefPtr<WitnessTable>& dst, RefPtr<WitnessTable> const& src)
+void ASTCloner::cloneField(RefPtr<WitnessTable>& dst, RefPtr<WitnessTable> const& src)
 {
     // Witness tables and generic-constraint path-resolution tables are derived from the checked
-    // declaration graph. GenericSignatureCopier deliberately drops them and then asks
-    // checkGenericConstraintConformances to rebuild path-resolution data for copied constraints.
-    // Other ASTCopier callers fail here so they do not produce checked declarations whose derived
+    // declaration graph. GenericSignatureCloner deliberately drops them and then asks
+    // checkGenericConstraintConformances to rebuild path-resolution data for cloned constraints.
+    // Other ASTCloner callers fail here so they do not produce checked declarations whose derived
     // witness data silently points at the original graph or disappears.
     SLANG_RELEASE_ASSERT(!src || m_context.allowDroppingWitnessTables);
     dst = nullptr;
 }
 
-void ASTCopier::copyField(
+void ASTCloner::cloneField(
     ContainerDeclDirectMemberDecls& dst,
     ContainerDeclDirectMemberDecls const& src)
 {
@@ -305,54 +305,54 @@ void ASTCopier::copyField(
     dst = ContainerDeclDirectMemberDecls();
 }
 
-GenericSignatureCopier::GenericSignatureCopier(
+GenericSignatureCloner::GenericSignatureCloner(
     ASTBuilder* astBuilder,
     SemanticsVisitor* semantics,
     GenericDecl* sourceGenericDecl,
     GenericDecl* destGenericDecl,
     List<Expr*>* outGenericArgs)
-    : m_astCopier(astBuilder, semantics)
+    : m_astCloner(astBuilder, semantics)
     , m_sourceGenericDecl(sourceGenericDecl)
     , m_destGenericDecl(destGenericDecl)
     , m_outGenericArgs(outGenericArgs)
 {
-    m_astCopier.getContext().allowDroppingWitnessTables = true;
+    m_astCloner.getContext().allowDroppingWitnessTables = true;
 }
 
-Expr* GenericSignatureCopier::createGenericArgExpr(Decl* decl)
+Expr* GenericSignatureCloner::createGenericArgExpr(Decl* decl)
 {
     auto declRef = makeDeclRef(decl);
-    auto expr = m_astCopier.getContext().astBuilder->create<VarExpr>();
+    auto expr = m_astCloner.getContext().astBuilder->create<VarExpr>();
     expr->declRef = declRef;
     if (auto varDecl = as<VarDeclBase>(decl))
         expr->type = QualType(varDecl->type.type);
     else
-        expr->type = getTypeForDeclRef(m_astCopier.getContext().astBuilder, declRef, SourceLoc());
+        expr->type = getTypeForDeclRef(m_astCloner.getContext().astBuilder, declRef, SourceLoc());
     return expr;
 }
 
-void GenericSignatureCopier::copyParameterMembers()
+void GenericSignatureCloner::cloneParameterMembers()
 {
     for (auto member : m_sourceGenericDecl->getDirectMemberDecls())
     {
         if (!isGenericParam(member))
             continue;
 
-        auto copiedParam = m_astCopier.copyDecl(member);
-        m_destGenericDecl->addDirectMemberDecl(copiedParam);
+        auto clonedParam = m_astCloner.cloneDecl(member);
+        m_destGenericDecl->addDirectMemberDecl(clonedParam);
 
         if (m_outGenericArgs)
-            m_outGenericArgs->add(createGenericArgExpr(copiedParam));
+            m_outGenericArgs->add(createGenericArgExpr(clonedParam));
     }
 }
 
 static TypeExp substituteConstraintTypeExp(
     ASTBuilder* astBuilder,
     TypeExp const& sourceTypeExp,
-    TypeExp const& copiedTypeExp,
+    TypeExp const& clonedTypeExp,
     SubstitutionSet const& sourceToDestSubstitution)
 {
-    TypeExp result = copiedTypeExp;
+    TypeExp result = clonedTypeExp;
     if (sourceTypeExp.type)
     {
         result.type =
@@ -361,7 +361,7 @@ static TypeExp substituteConstraintTypeExp(
     return result;
 }
 
-Decl* GenericSignatureCopier::copyConstraintMember(
+Decl* GenericSignatureCloner::cloneConstraintMember(
     Decl* member,
     SubstitutionSet const& sourceToDestSubstitution)
 {
@@ -377,18 +377,19 @@ Decl* GenericSignatureCopier::copyConstraintMember(
     if (!isGenericConstraintParameterDecl(member))
         return nullptr;
 
-    auto copiedConstraint = m_astCopier.copyDecl(member);
-    m_destGenericDecl->addDirectMemberDecl(copiedConstraint);
+    auto clonedConstraint = m_astCloner.cloneDecl(member);
+    m_destGenericDecl->addDirectMemberDecl(clonedConstraint);
 
     // The source constraint's checked `TypeExp::type` can contain declared witnesses and
-    // associated-type lookup paths that are tied to the source generic environment. The syntax copy
-    // above preserves the written expressions, but the checked types must be rebuilt through the
-    // source-to-destination generic decl-ref that `liftDeclFromGenericContainers` is constructing;
-    // otherwise a copied proof can keep the old parent path while naming the new constraint decl.
-    auto astBuilder = m_astCopier.getContext().astBuilder;
+    // associated-type lookup paths that are tied to the source generic environment. The syntax
+    // clone above preserves the written expressions, but the checked types must be rebuilt through
+    // the source-to-destination generic decl-ref that `liftDeclFromGenericContainers` is
+    // constructing; otherwise a cloned proof can keep the old parent path while naming the new
+    // constraint decl.
+    auto astBuilder = m_astCloner.getContext().astBuilder;
     if (auto sourceTypeConstraint = as<GenericTypeConstraintDecl>(member))
     {
-        auto destTypeConstraint = as<GenericTypeConstraintDecl>(copiedConstraint);
+        auto destTypeConstraint = as<GenericTypeConstraintDecl>(clonedConstraint);
         destTypeConstraint->sub = substituteConstraintTypeExp(
             astBuilder,
             sourceTypeConstraint->sub,
@@ -402,7 +403,7 @@ Decl* GenericSignatureCopier::copyConstraintMember(
     }
     else if (auto sourceCoercionConstraint = as<TypeCoercionConstraintDecl>(member))
     {
-        auto destCoercionConstraint = as<TypeCoercionConstraintDecl>(copiedConstraint);
+        auto destCoercionConstraint = as<TypeCoercionConstraintDecl>(clonedConstraint);
         destCoercionConstraint->fromType = substituteConstraintTypeExp(
             astBuilder,
             sourceCoercionConstraint->fromType,
@@ -416,7 +417,7 @@ Decl* GenericSignatureCopier::copyConstraintMember(
     }
     else if (auto sourceHasDiffTypeInfoConstraint = as<HasDiffTypeInfoConstraintDecl>(member))
     {
-        auto destHasDiffTypeInfoConstraint = as<HasDiffTypeInfoConstraintDecl>(copiedConstraint);
+        auto destHasDiffTypeInfoConstraint = as<HasDiffTypeInfoConstraintDecl>(clonedConstraint);
         destHasDiffTypeInfoConstraint->type = substituteConstraintTypeExp(
             astBuilder,
             sourceHasDiffTypeInfoConstraint->type,
@@ -424,7 +425,7 @@ Decl* GenericSignatureCopier::copyConstraintMember(
             sourceToDestSubstitution);
     }
 
-    return copiedConstraint;
+    return clonedConstraint;
 }
 
 } // namespace Slang

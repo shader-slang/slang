@@ -530,8 +530,7 @@ static DeclRef<GenericTypeConstraintDecl> _tryGetDefaultDifferentiabilityConstra
     // conformance witness of the source type whose interface facets are being scanned, then
     // applies default substitutions so the caller can specialize the copied generic requirement
     // from the satisfying method type.
-    auto constraintDecl =
-        as<DifferentiableRequirementConstraintDecl>(genericDifferentiabilityRequirementDecl->inner);
+    auto constraintDecl = as<FuncConstraintDecl>(genericDifferentiabilityRequirementDecl->inner);
     if (!constraintDecl || constraintDecl->checkState.isBeingChecked())
         return DeclRef<GenericTypeConstraintDecl>();
 
@@ -560,8 +559,7 @@ _getSpecializedDifferentiabilityConstraintDeclRefFromSatisfyingMethod(
     if (!defaultConstraintDeclRef)
         return DeclRef<GenericTypeConstraintDecl>();
 
-    auto constraintDecl =
-        as<DifferentiableRequirementConstraintDecl>(defaultConstraintDeclRef.getDecl());
+    auto constraintDecl = as<FuncConstraintDecl>(defaultConstraintDeclRef.getDecl());
     if (!constraintDecl)
         return DeclRef<GenericTypeConstraintDecl>();
 
