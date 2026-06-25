@@ -1332,11 +1332,11 @@ Result linkAndOptimizeIR(
     SLANG_PASS(finalizeSpecialization);
 
     // On CUDA, hoist compute entry-point uniform params that contain a fixed-size resource array
-    // into a `ConstantBuffer<GlobalParams>` so they emit as `__constant__` (pointer + global
-    // backing) instead of a serial dynamic-address `ld.param` chain. Must run after generic
-    // specialization (so the param types are concrete structs) and before resource-type
-    // legalization. Gate on the whole CUDA family (CUDASource/CUDAHeader/PTX) since all three
-    // share the CUDA source emitter where the `.param` slowdown manifests.
+    // into a `ConstantBuffer<GlobalParams>` so they emit as the `__constant__` descriptor object
+    // instead of a serial dynamic-address `ld.param` chain. Must run after generic specialization
+    // so the param types are concrete structs. Gate on the whole CUDA family
+    // (CUDASource/CUDAHeader/PTX) since all three share the CUDA source emitter where the `.param`
+    // slowdown manifests.
     if (isCUDATarget(targetRequest))
     {
         SLANG_PASS(hoistCUDAResourceArrayParamsToParameterGroup);
