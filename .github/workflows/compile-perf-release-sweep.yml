@@ -200,6 +200,7 @@ jobs:
 
           cp -r "$ANALYSIS/." .
           mv report_per_workload.html index.html
+          touch .nojekyll  # skip Jekyll so Pages serves files directly
           # _combined_index.json is a derived intermediate — no need to serve it
           rm -f _combined_index.json
 
