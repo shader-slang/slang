@@ -53,6 +53,33 @@ jobs:
         with:
           python-version: "3.x"
 
+      - name: Diagnose MSVC version (before update)
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswhere) {
+            & $vswhere -latest -format json | ConvertFrom-Json | ForEach-Object {
+              Write-Host "VS install:   $($_.displayName)"
+              Write-Host "VS version:   $($_.catalog.productDisplayVersion)"
+              Write-Host "MSVC version: $($_.catalog.productLineVersion)"
+              Write-Host "Install path: $($_.installationPath)"
+            }
+          } else {
+            Write-Host "vswhere not found"
+          }
+
+      - name: Update Visual Studio Build Tools
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installPath = (& $vswhere -latest -format json | ConvertFrom-Json).installationPath
+          $installer   = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+          Write-Host "Updating Visual Studio at: $installPath"
+          $proc = Start-Process -FilePath $installer `
+            -ArgumentList "update", "--passive", "--norestart", "--installPath", $installPath `
+            -Wait -PassThru
+          Write-Host "VS installer exit code: $($proc.ExitCode)"
+
       - name: Common setup
         uses: ./.github/actions/common-setup
         with:
@@ -60,7 +87,7 @@ jobs:
           compiler: cl
           platform: x86_64
           config: release
-          build-llvm: false
+          build-llvm: true
 
       - name: Build Slang (tip of tree)
         run: |
@@ -74,7 +101,7 @@ jobs:
           # linker errors. The perf suite only uses SPIRV/Metal/WGSL targets which
           # do not need the LLVM backend.
           cmake --preset default --fresh `
-            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE `
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM `
             -DCMAKE_COMPILE_WARNING_AS_ERROR=false `
             -DSLANG_ENABLE_RELEASE_LTO=ON `
             -DSLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF
