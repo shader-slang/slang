@@ -344,8 +344,10 @@ SlangResult GlslangDownstreamCompiler::disassembleWithResult(
             outString = String(resultString);
             // String copied the contents; release the shim-owned buffer through the shim's
             // matching free export so the new[]/delete[] pair stays in one module (freeing it
-            // here would be a cross-module allocator mismatch). An older shim may lack the
-            // export; leak rather than free across the module boundary.
+            // here would be a cross-module allocator mismatch). The export is missing only under
+            // shim/compiler-core version skew; on that path leak rather than free across the
+            // module boundary — strictly no worse than the prior always-leak, and only on the
+            // low-frequency -dump-ir-over-SPIR-V disassembly path.
             if (m_freeDisassembly)
             {
                 m_freeDisassembly(resultString);
