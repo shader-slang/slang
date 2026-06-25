@@ -53,11 +53,11 @@ static bool _typeContainsFixedSizeResourceArray(IRType* type)
     if (!type)
         return false;
 
-    // `IRArrayType` is the fixed-size array (as opposed to `IRUnsizedArrayType`).
+    // `IRArrayType` is the fixed-size array (as opposed to `IRUnsizedArrayType`); its extent need
+    // not be a literal `IRIntLit` after specialization, so detect on the array node itself.
     if (auto arrayType = as<IRArrayType>(type))
     {
-        if (as<IRIntLit>(arrayType->getElementCount()) &&
-            _typeIsOrContainsResource(arrayType->getElementType()))
+        if (_typeIsOrContainsResource(arrayType->getElementType()))
             return true;
         // An array of structs/arrays may itself hold a qualifying fixed-size resource array.
         return _typeContainsFixedSizeResourceArray(arrayType->getElementType());
@@ -78,54 +78,19 @@ static bool _typeContainsFixedSizeResourceArray(IRType* type)
 
 struct HoistCUDAResourceArrayParams : PerEntryPointPass
 {
-    // CUDA emits a single hardcoded `SLANG_globalParams` symbol, so a module can hold only one
-    // hoisted global parameter group; this tracks whether we have already created it.
-    bool m_moduleAlreadyHoisted = false;
-
-    // Returns true if the module already contains a module-scope uniform parameter group global
-    // (e.g. one created by `collectGlobalUniformParameters`, or our own from a prior entry point).
-    // Emitting a second would collide on the hardcoded `SLANG_globalParams` symbol in NVRTC.
-    static bool _moduleHasUniformParameterGroupGlobal(IRModule* module)
+    // Returns true if `func` is a compute entry point whose uniform parameters transitively contain
+    // a fixed-size resource array — i.e. one this pass would hoist. Used both to gate the per-entry
+    // point transform and to count qualifying entry points up front.
+    static bool _funcQualifiesForHoist(IRFunc* func)
     {
-        for (auto inst : module->getGlobalInsts())
-        {
-            if (auto globalParam = as<IRGlobalParam>(inst))
-            {
-                if (as<IRUniformParameterGroupType>(globalParam->getDataType()))
-                    return true;
-            }
-        }
-        return false;
-    }
-
-    void processEntryPointImpl(EntryPointInfo const& info) SLANG_OVERRIDE
-    {
-        auto entryPointFunc = info.func;
-        auto entryPointDecoration = info.decoration;
-
-        // CUDA launch parameters only matter for ordinary compute kernels; ray-tracing entry
-        // points route their uniforms through the SBT and are handled elsewhere.
+        auto entryPointDecoration = func->findDecoration<IREntryPointDecoration>();
+        if (!entryPointDecoration)
+            return false;
+        // CUDA launch parameters only matter for ordinary compute kernels; ray-tracing entry points
+        // route their uniforms through the SBT and are handled elsewhere.
         if (entryPointDecoration->getProfile().getStage() != Stage::Compute)
-            return;
-
-        // We need explicit layout to know the field keys and to attach a matching layout to the
-        // synthesized global parameter. Be defensive in release builds.
-        auto funcLayoutDecoration = entryPointFunc->findDecoration<IRLayoutDecoration>();
-        SLANG_ASSERT(funcLayoutDecoration);
-        if (!funcLayoutDecoration)
-            return;
-        auto entryPointLayout = as<IREntryPointLayout>(funcLayoutDecoration->getLayout());
-        SLANG_ASSERT(entryPointLayout);
-        if (!entryPointLayout)
-            return;
-        auto entryPointParamsLayout = entryPointLayout->getParamsLayout();
-        auto entryPointParamsStructLayout = getScopeStructLayout(entryPointLayout);
-
-        // Decide whether this entry point is one we care about: it must have at least one uniform
-        // parameter that transitively contains a fixed-size resource array. If not, leave it
-        // completely untouched so we never perturb the common fast path.
-        bool shouldHoist = false;
-        for (IRParam* param = entryPointFunc->getFirstParam(); param; param = param->getNextParam())
+            return false;
+        for (IRParam* param = func->getFirstParam(); param; param = param->getNextParam())
         {
             auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
             if (!layoutDecoration)
@@ -136,23 +101,50 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
             if (isVaryingParameter(paramLayout))
                 continue;
             if (_typeContainsFixedSizeResourceArray(param->getFullType()))
-            {
-                shouldHoist = true;
-                break;
-            }
+                return true;
         }
-        if (!shouldHoist)
+        return false;
+    }
+
+    // Returns true if the module already contains a module-scope uniform parameter group global
+    // named "globalParams" (the one `collectGlobalUniformParameters` creates). That global emits as
+    // the hardcoded `SLANG_globalParams` symbol, so hoisting another would collide in NVRTC. We key
+    // on the name rather than the type so unrelated user `ConstantBuffer<T>` globals don't suppress
+    // the optimization.
+    static bool _moduleHasGlobalParamsGlobal(IRModule* module)
+    {
+        for (auto inst : module->getGlobalInsts())
+        {
+            auto globalParam = as<IRGlobalParam>(inst);
+            if (!globalParam)
+                continue;
+            if (!as<IRUniformParameterGroupType>(globalParam->getDataType()))
+                continue;
+            auto nameHint = globalParam->findDecoration<IRNameHintDecoration>();
+            if (nameHint && nameHint->getName() == UnownedTerminatedStringSlice("globalParams"))
+                return true;
+        }
+        return false;
+    }
+
+    void processEntryPointImpl(EntryPointInfo const& info) SLANG_OVERRIDE
+    {
+        auto entryPointFunc = info.func;
+
+        // The module-level driver guarantees exactly one entry point qualifies and that hoisting
+        // will not collide with an existing `globalParams`, so any qualifying entry point we see
+        // here is the one to hoist.
+        if (!_funcQualifiesForHoist(entryPointFunc))
             return;
 
-        // CUDA emits a single hardcoded `SLANG_globalParams` symbol per module
-        // (`CUDASourceEmitter::emitParameterGroupImpl`), so a module can have only one global
-        // parameter group. Hoist at most one qualifying compute entry point per module, and never
-        // when a module-scope uniform parameter group already exists (e.g. one that
-        // `collectGlobalUniformParameters` created): a second `__constant__ SLANG_globalParams`
-        // would be a duplicate-symbol error in NVRTC. Any other qualifying kernels keep the default
-        // (correct, if slower) entry-point `.param` path. A full multi-kernel merge is future work.
-        if (m_moduleAlreadyHoisted || _moduleHasUniformParameterGroupGlobal(m_module))
-            return;
+        // We need explicit layout to know the field keys and to attach a matching layout to the
+        // synthesized global parameter; these hold for a qualifying compute entry point.
+        auto funcLayoutDecoration = entryPointFunc->findDecoration<IRLayoutDecoration>();
+        SLANG_RELEASE_ASSERT(funcLayoutDecoration);
+        auto entryPointLayout = as<IREntryPointLayout>(funcLayoutDecoration->getLayout());
+        SLANG_RELEASE_ASSERT(entryPointLayout);
+        auto entryPointParamsLayout = entryPointLayout->getParamsLayout();
+        auto entryPointParamsStructLayout = getScopeStructLayout(entryPointLayout);
 
         IRBuilder builderStorage(m_module);
         auto builder = &builderStorage;
@@ -204,8 +196,10 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
             auto paramType = param->getFullType();
 
             builder->setInsertBefore(paramStructType);
-            auto paramFieldKey = cast<IRStructKey>(
-                entryPointParamsStructLayout->getFieldLayoutAttrs()[paramIndex]->getFieldKey());
+            SLANG_RELEASE_ASSERT(entryPointParamsStructLayout);
+            auto fieldLayoutAttrs = entryPointParamsStructLayout->getFieldLayoutAttrs();
+            SLANG_RELEASE_ASSERT(paramIndex < (UInt)fieldLayoutAttrs.getCount());
+            auto paramFieldKey = cast<IRStructKey>(fieldLayoutAttrs[paramIndex]->getFieldKey());
             structLayoutBuilder.addField(
                 paramFieldKey,
                 entryPointParamsStructLayout->getFieldLayout(paramIndex));
@@ -228,51 +222,47 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
             param->removeAndDeallocate();
         }
 
-        // Construct and attach the global parameter's layout. When the entry point's params layout
-        // is itself a parameter group (the common case), mirror its container/element split with
-        // unrelated (e.g. varying) offsets filtered out so the result is a parameter-group layout
-        // whose type matches the `ConstantBuffer`-typed global; otherwise fall back to the bare
-        // struct layout. Modeled on `moveEntryPointUniformParamsToGlobalScope`.
-        IRTypeLayout* collectedTypeLayout = nullptr;
-        if (auto originalParamGroupLayout =
-                as<IRParameterGroupTypeLayout>(entryPointParamsLayout->getTypeLayout()))
-        {
-            for (auto offsetAttr :
-                 originalParamGroupLayout->getContainerVarLayout()->getOffsetAttrs())
-                resourceKinds.add(offsetAttr->getResourceKind());
+        // Construct and attach the global parameter's layout. The synthesized global is always a
+        // `ConstantBuffer<GlobalParams>`, so its layout must be a parameter-group layout. On CUDA
+        // the entry point's params layout is a parameter group at this point; fail loudly if that
+        // invariant is ever violated rather than attach a mismatched bare struct layout to a
+        // parameter-group-typed global. We mirror the original group's container/element split with
+        // unrelated (e.g. varying) offsets filtered out, modeled on
+        // `moveEntryPointUniformParamsToGlobalScope`.
+        auto originalParamGroupLayout =
+            as<IRParameterGroupTypeLayout>(entryPointParamsLayout->getTypeLayout());
+        SLANG_RELEASE_ASSERT(originalParamGroupLayout);
 
-            auto structTypeLayout = structLayoutBuilder.build();
-            auto originalElementVarLayout = originalParamGroupLayout->getElementVarLayout();
-            IRVarLayout::Builder elementVarLayoutBuilder(builder, structTypeLayout);
-            elementVarLayoutBuilder.cloneEverythingButOffsetsFrom(originalElementVarLayout);
-            for (auto resKind : resourceKinds)
-            {
-                auto originalOffset = originalElementVarLayout->findOffsetAttr(resKind);
-                if (!originalOffset)
-                    continue;
-                auto resInfo = elementVarLayoutBuilder.findOrAddResourceInfo(resKind);
-                resInfo->offset = originalOffset->getOffset();
-                resInfo->space = originalOffset->getSpace();
-            }
-            auto newElementVarLayout = elementVarLayoutBuilder.build();
+        for (auto offsetAttr : originalParamGroupLayout->getContainerVarLayout()->getOffsetAttrs())
+            resourceKinds.add(offsetAttr->getResourceKind());
 
-            IRParameterGroupTypeLayout::Builder paramGroupTypeLayoutBuilder(builder);
-            for (auto resKind : resourceKinds)
-            {
-                if (auto sizeAttr = originalParamGroupLayout->findSizeAttr(resKind))
-                    paramGroupTypeLayoutBuilder.addResourceUsage(sizeAttr);
-            }
-            paramGroupTypeLayoutBuilder.setContainerVarLayout(
-                originalParamGroupLayout->getContainerVarLayout());
-            paramGroupTypeLayoutBuilder.setElementVarLayout(newElementVarLayout);
-            paramGroupTypeLayoutBuilder.setOffsetElementTypeLayout(
-                applyOffsetToTypeLayout(builder, structTypeLayout, newElementVarLayout));
-            collectedTypeLayout = paramGroupTypeLayoutBuilder.build();
-        }
-        else
+        auto structTypeLayout = structLayoutBuilder.build();
+        auto originalElementVarLayout = originalParamGroupLayout->getElementVarLayout();
+        IRVarLayout::Builder elementVarLayoutBuilder(builder, structTypeLayout);
+        elementVarLayoutBuilder.cloneEverythingButOffsetsFrom(originalElementVarLayout);
+        for (auto resKind : resourceKinds)
         {
-            collectedTypeLayout = structLayoutBuilder.build();
+            auto originalOffset = originalElementVarLayout->findOffsetAttr(resKind);
+            if (!originalOffset)
+                continue;
+            auto resInfo = elementVarLayoutBuilder.findOrAddResourceInfo(resKind);
+            resInfo->offset = originalOffset->getOffset();
+            resInfo->space = originalOffset->getSpace();
         }
+        auto newElementVarLayout = elementVarLayoutBuilder.build();
+
+        IRParameterGroupTypeLayout::Builder paramGroupTypeLayoutBuilder(builder);
+        for (auto resKind : resourceKinds)
+        {
+            if (auto sizeAttr = originalParamGroupLayout->findSizeAttr(resKind))
+                paramGroupTypeLayoutBuilder.addResourceUsage(sizeAttr);
+        }
+        paramGroupTypeLayoutBuilder.setContainerVarLayout(
+            originalParamGroupLayout->getContainerVarLayout());
+        paramGroupTypeLayoutBuilder.setElementVarLayout(newElementVarLayout);
+        paramGroupTypeLayoutBuilder.setOffsetElementTypeLayout(
+            applyOffsetToTypeLayout(builder, structTypeLayout, newElementVarLayout));
+        IRTypeLayout* collectedTypeLayout = paramGroupTypeLayoutBuilder.build();
 
         IRVarLayout::Builder varLayoutBuilder(builder, collectedTypeLayout);
         varLayoutBuilder.cloneEverythingButOffsetsFrom(entryPointParamsLayout);
@@ -287,12 +277,38 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
         builder->addLayoutDecoration(collectedParam, varLayoutBuilder.build());
 
         fixUpFuncType(entryPointFunc);
-        m_moduleAlreadyHoisted = true;
     }
 };
 
 void hoistCUDAResourceArrayParamsToParameterGroup(IRModule* module)
 {
+    // CUDA emits a single hardcoded `SLANG_globalParams` symbol per module
+    // (`CUDASourceEmitter::emitParameterGroupImpl`), so at most one parameter-group global can
+    // exist. If more than one compute entry point would qualify, hoisting just one and leaving the
+    // rest on the `.param` path would be non-uniform and risks mutating layout/field-key state
+    // shared with the un-hoisted kernels, so we hoist none and leave every kernel on the default
+    // path. Merging multiple kernels into one shared `GlobalParams` is future work.
+    int qualifyingCount = 0;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(inst))
+        {
+            if (HoistCUDAResourceArrayParams::_funcQualifiesForHoist(func))
+            {
+                if (++qualifyingCount > 1)
+                    return;
+            }
+        }
+    }
+    if (qualifyingCount != 1)
+        return;
+
+    // Never hoist when a module-scope `globalParams` already exists (e.g. one
+    // `collectGlobalUniformParameters` created): a second `__constant__ SLANG_globalParams` would
+    // collide in NVRTC.
+    if (HoistCUDAResourceArrayParams::_moduleHasGlobalParamsGlobal(module))
+        return;
+
     HoistCUDAResourceArrayParams context;
     context.processModule(module);
 }

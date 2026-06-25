@@ -11,9 +11,11 @@ struct IRModule;
 /// resources (e.g. `RWStructuredBuffer<T> t[N]`) indexed by a runtime value lowers, by default,
 /// to a serial dynamic-address `ld.param` chain in the kernel `.param` bank. Hoisting those
 /// uniform parameters into a module-scope `ConstantBuffer<GlobalParams>` instead routes them
-/// through `CUDASourceEmitter::emitParameterGroupImpl`, which emits a pointer in `__constant__`
-/// memory (`SLANG_globalParams`) to a `.global` backing buffer; the backing data is then read via
-/// the read-only data cache (`ld.global.nc`), avoiding the dynamic-address `.param` chain.
+/// through `CUDASourceEmitter::emitParameterGroupImpl`, which emits the `GlobalParams` object
+/// itself in CUDA `__constant__` memory (`extern "C" __constant__ ... SLANG_globalParams`). The
+/// hoisted uniforms — including the resource-array descriptors — are then read from constant
+/// memory rather than the per-thread `.param` bank, avoiding the serial dynamic-address `ld.param`
+/// chain.
 ///
 /// This pass only fires for compute entry points that actually contain such a fixed-size
 /// resource array; other entry points are left untouched.

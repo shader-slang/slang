@@ -6,6 +6,8 @@
 // here only when the hoist fires.
 
 //TEST:SIMPLE(filecheck=POS): -target cuda -line-directive-mode none -stage compute -entry positiveMain
+//TEST:SIMPLE(filecheck=TRANS): -target cuda -line-directive-mode none -stage compute -entry transitiveMain
+//TEST:SIMPLE(filecheck=TENSOR): -target cuda -line-directive-mode none -stage compute -entry tensorWrapperMain
 //TEST:SIMPLE(filecheck=NEGNOARR): -target cuda -line-directive-mode none -stage compute -entry noResourceArrayMain
 //TEST:SIMPLE(filecheck=NEGNONRES): -target cuda -line-directive-mode none -stage compute -entry nonResourceArrayMain
 
@@ -20,6 +22,42 @@ void positiveMain(
     tensors[indices[tid]][tid] = 1.0f;
 }
 // POS: __constant__{{.*}}SLANG_globalParams
+// The hoisted uniforms are removed from the kernel signature (it then takes no parameters).
+// POS-NOT: positiveMain({{.+}})
+
+// Positive (transitive): a fixed-size resource array nested inside a struct uniform must also be
+// hoisted, exercising the recursive walk through struct fields.
+struct Tensors
+{
+    RWStructuredBuffer<float> bufs[8];
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void transitiveMain(uint tid: SV_DispatchThreadID, Tensors t, StructuredBuffer<uint> indices)
+{
+    t.bufs[indices[tid]][tid] = 1.0f;
+}
+// TRANS: __constant__{{.*}}SLANG_globalParams
+
+// Positive (struct-wrapped element): a fixed-size array whose element is a struct wrapping a
+// resource (the SlangPy tensor shape) must be hoisted, exercising the recursive walk into the
+// array element type.
+struct Tensor
+{
+    RWStructuredBuffer<float> data;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void tensorWrapperMain(
+    uint tid: SV_DispatchThreadID,
+    Tensor tensors[8],
+    StructuredBuffer<uint> indices)
+{
+    tensors[indices[tid]].data[tid] = 1.0f;
+}
+// TENSOR: __constant__{{.*}}SLANG_globalParams
 
 // Negative: a single resource (not a fixed-size array) must not trigger the hoist.
 [shader("compute")]
