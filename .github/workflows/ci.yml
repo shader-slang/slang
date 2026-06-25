@@ -429,6 +429,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+    secrets: inherit
     uses: ./.github/workflows/ci-falcor-test.yml
 
   test-compile-regression:

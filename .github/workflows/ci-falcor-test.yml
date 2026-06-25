@@ -2,6 +2,11 @@ name: CI Falcor Test Workflow
 
 on:
   workflow_call:
+    secrets:
+      FALCOR_CI_REPOSITORY:
+        required: false
+      FALCOR_CI_REF:
+        required: false
 
 permissions:
   contents: read
@@ -11,7 +16,7 @@ jobs:
   test-falcor:
     name: Test (Falcor)
     timeout-minutes: 100
-    runs-on: [Windows, self-hosted, falcor]
+    runs-on: [Windows, self-hosted, X64, falcor-bridge]
     defaults:
       run:
         shell: bash
@@ -31,53 +36,42 @@ jobs:
         with:
           name: slang-tests-windows-x86_64-cl-release
           path: slang-bin
-      - name: setup-falcor
+      - name: Checkout Falcor CI source
+        shell: pwsh
+        env:
+          FALCOR_CI_REPOSITORY: ${{ secrets.FALCOR_CI_REPOSITORY }}
+          FALCOR_CI_REF: ${{ secrets.FALCOR_CI_REF }}
         run: |
-          set -euo pipefail
-          mkdir -p FalcorBin/build/windows-vs2022
-          cp -r 'C:/Falcor/build/windows-vs2022/bin' 'FalcorBin/build/windows-vs2022/bin'
-          find 'FalcorBin/build/windows-vs2022/bin' -name '*.pdb' -delete
-          cp -r 'C:/Falcor/tests' 'FalcorBin/tests'
-          cp -r 'C:/Falcor/tools' 'FalcorBin/tools'
-          cp -r 'C:/Falcor/media' 'FalcorBin/media'
-          cp -r 'C:/Falcor/media_internal' 'FalcorBin/media_internal'
-          cp -r 'C:/Falcor/scripts' 'FalcorBin/scripts'
-      - name: Copy Slang to Falcor
+          $ErrorActionPreference = "Stop"
+          if (-not $env:FALCOR_CI_REPOSITORY) {
+            throw "FALCOR_CI_REPOSITORY is required"
+          }
+          if (-not $env:FALCOR_CI_REF) {
+            throw "FALCOR_CI_REF is required"
+          }
+          git clone --depth 1 --branch "$env:FALCOR_CI_REF" "$env:FALCOR_CI_REPOSITORY" Falcor
+      - name: Run Falcor CI
+        shell: pwsh
         run: |
-          set -euo pipefail
-          TARGET="./FalcorBin/build/windows-vs2022/bin/Release"
-          SRC="slang-bin/Release/bin"
-          # Copy only Slang core DLLs and executables — the full CI artifact also
-          # contains gfx.dll, platform.dll, dawn.dll, and test-tool DLLs that
-          # Falcor provides its own versions of; overwriting those breaks FalcorTest.
-          # slang-rt.dll must be copied alongside slang.dll: it is a version-matched
-          # runtime peer, and leaving C:\Falcor's older copy in place while replacing
-          # slang.dll causes FalcorTest.exe to crash during DLL initialization.
-          # D3D12/ (D3D12 Agility SDK DLLs) and optix/ are intentionally NOT copied
-          # from the CI artifact: the old Falcor-specific build did not produce these
-          # directories, so the versions already present from C:\Falcor (copied during
-          # setup-falcor) are correct for FalcorTest.exe. Overwriting them with the CI
-          # artifact's versions would break FalcorTest.exe at startup.
-          for name in slang.dll slang-rt.dll slang-compiler.dll slang-llvm.dll slang-glslang.dll slang-glsl-module.dll dxcompiler.dll dxil.dll slangc.exe; do
-            [[ -f "$SRC/$name" ]] || { echo "Missing required file: $SRC/$name" >&2; exit 1; }
-            cp --verbose "$SRC/$name" "$TARGET/"
-          done
-          shopt -s nullglob
-          modules=( "$SRC"/slang-standard-module-*/ )
-          (( ${#modules[@]} > 0 )) || { echo "Missing slang-standard-module-* in $SRC" >&2; exit 1; }
-          for d in "${modules[@]}"; do
-            cp --verbose -r "$d" "$TARGET/"
-          done
-      - name: falcor-unit-test
-        run: |
-          set -euo pipefail
-          cd FalcorBin/tests
-          python ./testing/run_unit_tests.py --config windows-vs2022-Release -t "-slow"
-      - name: falcor-image-test
-        run: |
-          set -euo pipefail
-          cd FalcorBin/tests
-          python ./testing/run_image_tests.py --config windows-vs2022-Release --run-only
+          $ErrorActionPreference = "Stop"
+          $env:BUILD_CONFIG = "Release"
+          $env:BUILD_PRESET = "windows-ninja-msvc-ci"
+          $env:CMAKE_ARGS = "-DFALCOR_USE_SYSTEM_PYTHON=1"
+          $env:RUN_UNIT_TESTS = "true"
+          $env:RUN_PYTHON_TESTS = "true"
+          $env:RUN_IMAGE_TESTS = "true"
+          $env:CI_USE_CUSTOM_SLANG = "true"
+          $env:CI_SLANG_ARTIFACT_DIR = (Resolve-Path "slang-bin").Path
+          $env:CI_SLANG_CONFIG = "Release"
+          Set-Location Falcor
+          if (Test-Path "C:\Anaconda3\shell\condabin\conda-hook.ps1") {
+            & "C:\Anaconda3\shell\condabin\conda-hook.ps1"
+            conda activate falcor
+          }
+          if (Test-Path "build_agent\install_image_test_viewer.bat") {
+            & "build_agent\install_image_test_viewer.bat"
+          }
+          python -u build_agent/ci.py
 
   test-falcor-perf:
     name: Test (Falcor Perf)
