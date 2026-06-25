@@ -9,6 +9,15 @@ on:
       runs-on:
         required: true
         type: string
+      container-user:
+        # UID:GID the build container runs as. The container must run as the
+        # user that owns the runner's _work directory, or actions/checkout
+        # cannot write the workspace. GitHub-hosted ubuntu runners own _work as
+        # UID 1001, but self-hosted runner images differ (the GCP build pool's
+        # runner is UID 1003), so this is overridable per runner pool.
+        required: false
+        type: string
+        default: "1001:1001"
 
 jobs:
   # Uses nvidia/cuda container for CUDA support.
@@ -21,10 +30,12 @@ jobs:
       packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
-      # EXPERIMENT: drop --user root and -v /:/host_root mount; host cleanup
-      # step removed below. If disk pressure resurfaces, slim the container
-      # image (issue #11339) rather than bringing host-root access back.
-      options: --user 1001:1001
+      # Drop --user root and -v /:/host_root mount; host cleanup step removed
+      # below. If disk pressure resurfaces, slim the container image (issue
+      # #11339) rather than bringing host-root access back. The UID:GID is an
+      # input because it must match the runner's _work owner, which differs
+      # between GitHub-hosted (1001) and self-hosted runner images.
+      options: --user ${{ inputs.container-user }}
 
     env:
       IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}

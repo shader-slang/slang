@@ -48,3 +48,7 @@
 	path = external/cmark
 	url = https://github.com/swiftlang/swift-cmark.git
 	branch = gfm
+[submodule "external/fast_float"]
+	path = external/fast_float
+	url = https://github.com/fastfloat/fast_float
+	branch = v8.2.7
