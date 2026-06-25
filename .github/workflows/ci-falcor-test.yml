@@ -4,9 +4,9 @@ on:
   workflow_call:
     secrets:
       FALCOR_CI_REPOSITORY:
-        required: false
+        required: true
       FALCOR_CI_REF:
-        required: false
+        required: true
 
 permissions:
   contents: read

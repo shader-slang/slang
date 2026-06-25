@@ -429,7 +429,9 @@ jobs:
     permissions:
       contents: read
       actions: read
-    secrets: inherit
+    secrets:
+      FALCOR_CI_REPOSITORY: ${{ secrets.FALCOR_CI_REPOSITORY }}
+      FALCOR_CI_REF: ${{ secrets.FALCOR_CI_REF }}
     uses: ./.github/workflows/ci-falcor-test.yml
 
   test-compile-regression:
