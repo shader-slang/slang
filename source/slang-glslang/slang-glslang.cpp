@@ -236,6 +236,21 @@ extern "C"
     }
 }
 
+// Release a disassembly buffer produced by glslang_disassembleSPIRVWithResult.
+// Freeing here keeps the new[]/delete[] pair inside this module, so callers in other
+// modules release the buffer through this export rather than calling delete[] across the
+// module boundary (a cross-module allocator mismatch is undefined behavior).
+extern "C"
+#ifdef _MSC_VER
+    _declspec(dllexport)
+#else
+    __attribute__((__visibility__("default")))
+#endif
+        void glslang_freeDisassembly(char* disassembly)
+{
+    delete[] disassembly;
+}
+
 
 // Disassemble the given SPIRV-ASM instructions.
 extern "C"
