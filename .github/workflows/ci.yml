@@ -106,6 +106,8 @@ jobs:
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-sanitizer.yml
     permissions:
+      # Required by ci-slang-sanitizer.yml's GCP Workload Identity auth step;
+      # id-token is never part of the default GITHUB_TOKEN.
       id-token: write
       contents: read
       packages: read
