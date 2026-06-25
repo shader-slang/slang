@@ -489,30 +489,49 @@ func (s *gcpRunnerScaler) HandleDesiredRunnerCount(ctx context.Context, count in
 		scaleUp := targetCount - currentCount
 		s.logger.Info("scaling up", "current", currentCount, "target", targetCount, "creating", scaleUp)
 
+		// Create the VMs concurrently. Each CreateVM blocks on the GCP insert
+		// operation (op.Wait), so doing them serially made a burst of N jobs
+		// wait up to N × ~2-3 min for the last VM — the build pool routinely
+		// gets several jobs at once, so the last build sat queued for ~10 min.
+		// CreateVM already guards its shared state (the VM tracker and zone
+		// selection are mutex-locked), so it is safe to call in parallel.
+		// Bound the fan-out so we don't issue an unbounded burst of GCP API
+		// inserts at once (rate-limit safety).
+		const maxConcurrentCreates = 8
+		sem := make(chan struct{}, maxConcurrentCreates)
+		var wg sync.WaitGroup
 		for range scaleUp {
-			name := fmt.Sprintf("%s-%s", s.vmPrefix, uuid.NewString()[:8])
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
 
-			jit, err := s.scalesetClient.GenerateJitRunnerConfig(
-				ctx,
-				&scaleset.RunnerScaleSetJitRunnerSetting{Name: name},
-				s.scaleSetID,
-			)
-			if err != nil {
-				s.logger.Error("failed to generate JIT config", "error", err)
-				continue
-			}
+				name := fmt.Sprintf("%s-%s", s.vmPrefix, uuid.NewString()[:8])
 
-			vmName, err := s.vmManager.CreateVM(ctx, name, jit.EncodedJITConfig)
-			if err != nil {
-				s.logger.Error("failed to create VM", "error", err)
-				// JIT config was generated (runner registered) but VM
-				// creation failed. Clean up the stale runner entry.
-				s.removeRunnerFromGitHub(ctx, name)
-				continue
-			}
+				jit, err := s.scalesetClient.GenerateJitRunnerConfig(
+					ctx,
+					&scaleset.RunnerScaleSetJitRunnerSetting{Name: name},
+					s.scaleSetID,
+				)
+				if err != nil {
+					s.logger.Error("failed to generate JIT config", "error", err)
+					return
+				}
 
-			s.logger.Info("created runner VM", "vm", vmName, "runner", name)
+				vmName, err := s.vmManager.CreateVM(ctx, name, jit.EncodedJITConfig)
+				if err != nil {
+					s.logger.Error("failed to create VM", "error", err)
+					// JIT config was generated (runner registered) but VM
+					// creation failed. Clean up the stale runner entry.
+					s.removeRunnerFromGitHub(ctx, name)
+					return
+				}
+
+				s.logger.Info("created runner VM", "vm", vmName, "runner", name)
+			}()
 		}
+		wg.Wait()
 	case targetCount == currentCount:
 		// No scaling needed
 	default:
