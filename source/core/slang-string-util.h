@@ -199,6 +199,18 @@ struct StringUtil
     /// Returns parsed integer.
     static int parseIntAndAdvancePos(UnownedStringSlice text, Index& pos);
 
+    /// Format `value` as a C99 hexadecimal floating-point literal. The output
+    /// is a minimal string, with the following format:
+    ///
+    /// - value  0.0:  0x0p+0
+    /// - value -0.0: -0x0p+0
+    /// - non-zero finite value: (-)?0x1p[+-]N or (-)?0x1.xxxxxp[+-]N where the last 'x'
+    ///   is non-zero. Examples: 0x1p-100, 0x1.fedcba9876p+54
+    /// - infinite value: (-)?inf
+    /// - not-a-number: nan
+    ///
+    static String makeMinimalHexFloat(double value);
+
     /// Compute the Levenshtein edit distance between `a` and `b`: the minimum number of
     /// single-character insertions, deletions, or substitutions needed to turn one string
     /// into the other. Used, for example, to suggest the closest known identifier for a

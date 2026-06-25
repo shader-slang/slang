@@ -1,6 +1,7 @@
 #include "slang-parser.h"
 
 #include "../core/slang-semantic-version.h"
+#include "../core/slang-string-util.h"
 #include "slang-ast-decl.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
@@ -11,8 +12,11 @@
 
 #include <assert.h>
 #include <climits>
+#include <cmath>
 #include <float.h>
+#include <limits>
 #include <optional>
+#include <type_traits>
 
 namespace Slang
 {
@@ -8132,20 +8136,6 @@ static NodeBase* parseTreatAsDifferentiableExpr(Parser* parser, void* /*userData
     return noDiffExpr;
 }
 
-static bool _isFinite(double value)
-{
-    // Lets type pun double to uint64_t, so we can detect special double values
-    union
-    {
-        double d;
-        uint64_t i;
-    } u = {value};
-    // Detects nan and +-inf
-    const uint64_t i = u.i;
-    int e = int(i >> 52) & 0x7ff;
-    return (e != 0x7ff);
-}
-
 enum class FloatFixKind
 {
     None,            ///< No modification was made
@@ -8154,97 +8144,198 @@ enum class FloatFixKind
     Truncated,       ///< Truncated to a non zero value
 };
 
+// Truncates double to a narrower float type
+//
+// Parameters:
+//
+//   value           - Value to truncate. May be 0, infinity, NaN
+//   minNormalExp    - Minimum normal exponent before subnormal
+//   maxExp          - Maximum exponent. Anything above that is INFINITY or -INFINITY
+//   precisionBits   - Precision in number of bits
+//
+// Note:
+// - float:  -126, +127, 24
+// - half:   -14,  +15,  11
+static double _truncateDouble(double value, int minNormalExp, int maxExp, unsigned precisionBits)
+{
+    // NaNs and INFs are passed as is
+    if (!std::isfinite(value))
+        return value;
+
+    int exp{};
+    double fraction = std::frexp(value, &exp);
+
+    // Note: there is a seeming off-by-one with exponents. This is because frexp() returns
+    // fraction between [0.5, 1). That is, the 1.0 is decomposed as as 0.5 * 2^1.
+    if (exp > (maxExp + 1))
+    {
+        // overflow
+        if (value >= 0.0)
+            return INFINITY;
+        else
+            return -INFINITY;
+    }
+
+    // for subnormals - note the exponent off-by-one comment above.
+    int precisionLoss = std::max(minNormalExp - (exp - 1), 0);
+
+    int exponentShift = static_cast<int>(precisionBits) - precisionLoss;
+
+    // truncate fraction
+    fraction = ldexp(fraction, exponentShift);
+    fraction = trunc(fraction);
+    fraction = ldexp(fraction, -exponentShift);
+
+    // return truncated double
+    return ldexp(fraction, exp);
+}
+
+
 static FloatFixKind _fixFloatLiteralValue(
     BaseType type,
+    bool truncateToFit, // hex literals are truncated if necessary
     IRFloatingPointValue value,
     IRFloatingPointValue& outValue)
 {
-    IRFloatingPointValue epsilon = 1e-10f;
-
-    // Check the value is finite for checking narrowing to literal type losing information
-    if (_isFinite(value))
+    // Notes:
+    // - Infinite and NaN values don't need fixing. They're infinites and NaNs
+    //   regardless of the precision.
+    // - Double-to-double conversion never loses precision
+    if ((type != BaseType::Double) && std::isfinite(value))
     {
+        // our logic depends on that IRFloatingPointValue is double
+        static_assert(
+            std::is_same_v<IRFloatingPointValue, double>,
+            "_fixFloatLiteralValue() logic assumption");
+
+        // representable range
+        double positiveMin; // minimum value
+        double nonzeroMin;  // minimum value that we'll still consider rounded to non-zero
+        double positiveMax; // maximum value
+        double finiteMax;   // maximum value that we'll still consider finite
+
+        // truncation control
+        int minNormalExp;
+        int maxExp;
+        unsigned precisionBits;
+
         switch (type)
         {
         case BaseType::Float:
-            {
-                // Fix out of range
-                if (value > FLT_MAX)
-                {
-                    if (Math::AreNearlyEqual(value, FLT_MAX, epsilon))
-                    {
-                        outValue = FLT_MAX;
-                        return FloatFixKind::Truncated;
-                    }
-                    else
-                    {
-                        outValue = float(INFINITY);
-                        return FloatFixKind::Unrepresentable;
-                    }
-                }
-                else if (value < -FLT_MAX)
-                {
-                    if (Math::AreNearlyEqual(-value, FLT_MAX, epsilon))
-                    {
-                        outValue = -FLT_MAX;
-                        return FloatFixKind::Truncated;
-                    }
-                    else
-                    {
-                        outValue = -float(INFINITY);
-                        return FloatFixKind::Unrepresentable;
-                    }
-                }
-                else if (value && float(value) == 0.0f)
-                {
-                    outValue = 0.0f;
-                    return FloatFixKind::Zeroed;
-                }
-                break;
-            }
-        case BaseType::Double:
-            {
-                // All representable
-                break;
-            }
-        case BaseType::Half:
-            {
-                // Fix out of range
-                if (value > SLANG_HALF_MAX)
-                {
-                    if (Math::AreNearlyEqual(value, FLT_MAX, epsilon))
-                    {
-                        outValue = SLANG_HALF_MAX;
-                        return FloatFixKind::Truncated;
-                    }
-                    else
-                    {
-                        outValue = float(INFINITY);
-                        return FloatFixKind::Unrepresentable;
-                    }
-                }
-                else if (value < -SLANG_HALF_MAX)
-                {
-                    if (Math::AreNearlyEqual(-value, FLT_MAX, epsilon))
-                    {
-                        outValue = -SLANG_HALF_MAX;
-                        return FloatFixKind::Truncated;
-                    }
-                    else
-                    {
-                        outValue = -float(INFINITY);
-                        return FloatFixKind::Unrepresentable;
-                    }
-                }
-                else if (value && Math::Abs(value) < SLANG_HALF_SUB_NORMAL_MIN)
-                {
-                    outValue = 0.0f;
-                    return FloatFixKind::Zeroed;
-                }
-                break;
-            }
-        default:
+            positiveMin = std::numeric_limits<float>::denorm_min();
+            nonzeroMin = double{std::numeric_limits<float>::denorm_min()} / 2.0;
+            static_assert(0x1.FFFFFE0p127 == double{std::numeric_limits<float>::max()});
+            positiveMax = 0x1.FFFFFE0p127;
+            finiteMax = 0x1.FFFFFFp127; // this still rounds down to positiveMax
+            minNormalExp = -126;
+            maxExp = 127;
+            precisionBits = 24;
             break;
+
+        case BaseType::Half:
+            static_assert(0x0.004p-14 == SLANG_HALF_SUB_NORMAL_MIN);
+            positiveMin = 0x0.004p-14;
+            nonzeroMin = 0x0.002p-14;
+            static_assert(0x1.FFC0p15 == SLANG_HALF_MAX);
+            positiveMax = 0x1.FFC0p15;
+            finiteMax = 0x1.FFE0p15; // this still rounds up to positiveMax
+            minNormalExp = -14;
+            maxExp = 15;
+            precisionBits = 11;
+            break;
+
+        default:
+            outValue = value;
+            return FloatFixKind::None;
+        }
+
+        if (!std::signbit(value))
+        {
+            // positive number
+            if (value > finiteMax)
+            {
+                outValue = INFINITY;
+                return FloatFixKind::Unrepresentable;
+            }
+
+            if (value > positiveMax)
+            {
+                outValue = positiveMax;
+                return FloatFixKind::Truncated;
+            }
+
+            if (value >= positiveMin)
+            {
+                if (truncateToFit)
+                {
+                    outValue = _truncateDouble(value, minNormalExp, maxExp, precisionBits);
+                    return value == outValue ? FloatFixKind::None : FloatFixKind::Truncated;
+                }
+                else
+                {
+                    outValue = value;
+                    return FloatFixKind::None;
+                }
+            }
+
+            if (value >= nonzeroMin)
+            {
+                outValue = positiveMin;
+                return FloatFixKind::Truncated;
+            }
+
+            if (value > 0.0)
+            {
+                outValue = 0.0;
+                return FloatFixKind::Zeroed;
+            }
+
+            outValue = value;
+            return FloatFixKind::None;
+        }
+        else
+        {
+            // negative number
+            if (value < -finiteMax)
+            {
+                outValue = -INFINITY;
+                return FloatFixKind::Unrepresentable;
+            }
+
+            if (value < -positiveMax)
+            {
+                outValue = -positiveMax;
+                return FloatFixKind::Truncated;
+            }
+
+            if (value <= -positiveMin)
+            {
+                if (truncateToFit)
+                {
+                    outValue = _truncateDouble(value, minNormalExp, maxExp, precisionBits);
+                    return value == outValue ? FloatFixKind::None : FloatFixKind::Truncated;
+                }
+                else
+                {
+                    outValue = value;
+                    return FloatFixKind::None;
+                }
+            }
+
+            if (value <= -nonzeroMin)
+            {
+                outValue = -positiveMin;
+                return FloatFixKind::Truncated;
+            }
+
+            if (value < 0.0)
+            {
+                outValue = -0.0;
+                return FloatFixKind::Zeroed;
+            }
+
+            outValue = value;
+            return FloatFixKind::None;
         }
     }
 
@@ -8753,6 +8844,108 @@ static Expr* parseIntegerLiteralExpr(Parser* parser)
     return constExpr;
 }
 
+static Expr* parseFloatingPointLiteralExpr(Parser* parser)
+{
+    FloatingPointLiteralExpr* constExpr = parser->astBuilder->create<FloatingPointLiteralExpr>();
+    parser->FillPosition(constExpr);
+
+    auto token = parser->tokenReader.advanceToken();
+    constExpr->token = token;
+
+    UnownedStringSlice suffix{};
+    bool isOutOfRange{};
+    bool precisionLost{};
+    bool isHexFloat = token.getContent().startsWith("0x") || token.getContent().startsWith("0X");
+    FloatingPointLiteralValue value =
+        getFloatingPointLiteralValue(token, &suffix, &isOutOfRange, &precisionLost);
+
+    // Look at any suffix on the value, default is Float
+    BaseType suffixBaseType = BaseType::Float;
+    if ((suffix == "") || (suffix == "f") || (suffix == "F"))
+        suffixBaseType = BaseType::Float;
+    else if (
+        (suffix == "h") || (suffix == "H") || (suffix == "hf") || (suffix == "HF") ||
+        (suffix == "fh") || (suffix == "FH"))
+        suffixBaseType = BaseType::Half;
+    else if (
+        (suffix == "l") || (suffix == "L") || (suffix == "lf") || (suffix == "LF") ||
+        (suffix == "fl") || (suffix == "FL"))
+        suffixBaseType = BaseType::Double;
+    else
+        parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
+            .suffix = String(suffix),
+            .location = token.loc});
+
+    if (isOutOfRange)
+    {
+        if (std::isfinite(value))
+        {
+            parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
+                .literal = String(token.getContent()),
+                .type = String(BaseTypeInfo::asText(suffixBaseType)),
+                .convertedValue = String(value),
+                .location = token.loc});
+        }
+        else
+        {
+            parser->sink->diagnose(Diagnostics::FloatLiteralUnrepresentable{
+                .type = String(BaseTypeInfo::asText(suffixBaseType)),
+                .literal = String(token.getContent()),
+                .convertedValue = String(value),
+                .location = token.loc});
+        }
+    }
+
+    // TODO(JS):
+    // It is worth noting here that because of the way that the lexer works, that
+    // literals are always handled as if they are positive (a preceding - is taken as a
+    // negate on a positive value). The code in _fixFloatLiteralValue() is designed to
+    // work with positive and negative values, as this behavior might change in the
+    // future, and is arguably more 'correct'.
+
+    FloatingPointLiteralValue fixedValue = value;
+    auto fixType = _fixFloatLiteralValue(suffixBaseType, isHexFloat, value, fixedValue);
+
+    switch (fixType)
+    {
+    case FloatFixKind::Truncated:
+        precisionLost = true;
+        break;
+
+    case FloatFixKind::None:
+        break;
+
+    case FloatFixKind::Zeroed:
+        parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
+            .literal = String(token.getContent()),
+            .type = String(BaseTypeInfo::asText(suffixBaseType)),
+            .convertedValue = String(fixedValue),
+            .location = token.loc});
+        break;
+
+    case FloatFixKind::Unrepresentable:
+        parser->sink->diagnose(Diagnostics::FloatLiteralUnrepresentable{
+            .type = String(BaseTypeInfo::asText(suffixBaseType)),
+            .literal = String(token.getContent()),
+            .convertedValue = String(fixedValue),
+            .location = token.loc});
+        break;
+    }
+
+    if (precisionLost && isHexFloat)
+    {
+        parser->sink->diagnose(Diagnostics::FloatHexLiteralPrecisionLost{
+            .literal = String(token.getContent()),
+            .truncatedValue = StringUtil::makeMinimalHexFloat(fixedValue),
+            .location = token.loc});
+    }
+
+    constExpr->value = fixedValue;
+    constExpr->suffixType = suffixBaseType;
+
+    return constExpr;
+}
+
 static Expr* parseAtomicExpr(Parser* parser)
 {
     switch (peekTokenType(parser))
@@ -8948,132 +9141,7 @@ static Expr* parseAtomicExpr(Parser* parser)
         return parseIntegerLiteralExpr(parser);
 
     case TokenType::FloatingPointLiteral:
-        {
-            FloatingPointLiteralExpr* constExpr =
-                parser->astBuilder->create<FloatingPointLiteralExpr>();
-            parser->FillPosition(constExpr);
-
-            auto token = parser->tokenReader.advanceToken();
-            constExpr->token = token;
-
-            UnownedStringSlice suffix;
-            FloatingPointLiteralValue value = getFloatingPointLiteralValue(token, &suffix);
-
-            // Look at any suffix on the value
-            char const* suffixCursor = suffix.begin();
-            const char* const suffixEnd = suffix.end();
-
-            // Default is Float
-            BaseType suffixBaseType = BaseType::Float;
-            if (suffixCursor < suffixEnd)
-            {
-                int fCount = 0;
-                int lCount = 0;
-                int hCount = 0;
-                int unknownCount = 0;
-                while (suffixCursor < suffixEnd)
-                {
-                    switch (*suffixCursor++)
-                    {
-                    case 'f':
-                    case 'F':
-                        fCount++;
-                        break;
-
-                    case 'l':
-                    case 'L':
-                        lCount++;
-                        break;
-
-                    case 'h':
-                    case 'H':
-                        hCount++;
-                        break;
-
-                    default:
-                        unknownCount++;
-                        break;
-                    }
-                }
-
-                if (unknownCount)
-                {
-                    parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
-                        .suffix = String(suffix),
-                        .location = token.loc});
-                    suffixBaseType = BaseType::Float;
-                }
-                // `f` suffix -> `float`
-                if (fCount == 1 && !lCount && !hCount)
-                {
-                    suffixBaseType = BaseType::Float;
-                }
-                // `l` or `lf` suffix on floating-point literal -> `double`
-                else if (lCount == 1 && (fCount <= 1))
-                {
-                    suffixBaseType = BaseType::Double;
-                }
-                // `h` or `hf` suffix on floating-point literal -> `half`
-                else if (hCount == 1 && (fCount <= 1))
-                {
-                    suffixBaseType = BaseType::Half;
-                }
-                // TODO: are there other suffixes we need to handle?
-                else
-                {
-                    parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
-                        .suffix = String(suffix),
-                        .location = token.loc});
-                    suffixBaseType = BaseType::Float;
-                }
-            }
-
-            // TODO(JS):
-            // It is worth noting here that because of the way that the lexer works, that
-            // literals are always handled as if they are positive (a preceding - is taken as a
-            // negate on a positive value). The code here is designed to work with positive and
-            // negative values, as this behavior might change in the future, and is arguably
-            // more 'correct'.
-
-            FloatingPointLiteralValue fixedValue = value;
-            auto fixType = _fixFloatLiteralValue(suffixBaseType, value, fixedValue);
-
-            switch (fixType)
-            {
-            case FloatFixKind::Truncated:
-            case FloatFixKind::None:
-                {
-                    // No warning.
-                    // The truncation allowed must be very small. When Truncated the value *is*
-                    // changed though.
-                    break;
-                }
-            case FloatFixKind::Zeroed:
-                {
-                    parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
-                        .literal = String(token.getContent()),
-                        .type = String(BaseTypeInfo::asText(suffixBaseType)),
-                        .convertedValue = String(fixedValue),
-                        .location = token.loc});
-                    break;
-                }
-            case FloatFixKind::Unrepresentable:
-                {
-                    parser->sink->diagnose(Diagnostics::FloatLiteralUnrepresentable{
-                        .type = String(BaseTypeInfo::asText(suffixBaseType)),
-                        .literal = String(token.getContent()),
-                        .convertedValue = String(fixedValue),
-                        .location = token.loc});
-                    break;
-                }
-            }
-
-
-            constExpr->value = fixedValue;
-            constExpr->suffixType = suffixBaseType;
-
-            return constExpr;
-        }
+        return parseFloatingPointLiteralExpr(parser);
 
     case TokenType::StringLiteral:
         {

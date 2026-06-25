@@ -4008,6 +4008,13 @@ warning(
     span { loc = "location", message = "'~literal' is smaller than the smallest representable value for type ~type, converted to '~convertedValue'" }
 )
 
+warning(
+    "float-hex-literal-precision-lost",
+    40019,
+    "floating-point precision lost",
+    span { loc = "location", message = "significand of '~literal' was truncated, value is now '~truncatedValue'" }
+)
+
 err(
     "matrix-column-or-row-count-is-one",
     39999,
