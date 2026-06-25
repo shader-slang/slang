@@ -57,15 +57,16 @@ jobs:
         shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          if (Test-Path $vswhere) {
-            & $vswhere -latest -format json | ConvertFrom-Json | ForEach-Object {
-              Write-Host "VS install:   $($_.displayName)"
-              Write-Host "VS version:   $($_.catalog.productDisplayVersion)"
-              Write-Host "MSVC version: $($_.catalog.productLineVersion)"
-              Write-Host "Install path: $($_.installationPath)"
-            }
-          } else {
-            Write-Host "vswhere not found"
+          if (-not (Test-Path $vswhere)) { Write-Host "vswhere not found"; exit 0 }
+          # -products * includes BuildTools (not just IDE installs)
+          $installs = & $vswhere -all -products * -format json | ConvertFrom-Json
+          if (-not $installs) { Write-Host "No VS installations found by vswhere"; exit 0 }
+          foreach ($vs in $installs) {
+            Write-Host "VS install:   $($vs.displayName)"
+            Write-Host "VS version:   $($vs.catalog.productDisplayVersion)"
+            Write-Host "MSVC version: $($vs.catalog.productLineVersion)"
+            Write-Host "Install path: $($vs.installationPath)"
+            Write-Host "---"
           }
 
       - name: Common setup
