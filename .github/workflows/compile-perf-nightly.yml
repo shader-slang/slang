@@ -60,7 +60,7 @@ jobs:
           compiler: cl
           platform: x86_64
           config: release
-          build-llvm: true
+          build-llvm: false
 
       - name: Build Slang (tip of tree)
         run: |
@@ -69,8 +69,12 @@ jobs:
           # ~1.5x slower than the official LTO binaries, producing a build-method step
           # at the release->daily boundary rather than a real regression.
           # SLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF also matches release.yml.
+          # LLVM is disabled: the prebuilt slang-llvm artifact links against a newer
+          # MSVC CRT than is available on the nvrgfx-perf runner, causing LNK2001
+          # linker errors. The perf suite only uses SPIRV/Metal/WGSL targets which
+          # do not need the LLVM backend.
           cmake --preset default --fresh `
-            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM `
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE `
             -DCMAKE_COMPILE_WARNING_AS_ERROR=false `
             -DSLANG_ENABLE_RELEASE_LTO=ON `
             -DSLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF
