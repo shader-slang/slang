@@ -240,12 +240,12 @@ jobs:
         if: github.event_name == 'schedule' && always()
         shell: bash
         env:
-          SLACK_WEBHOOK: ${{ secrets.SLANG_PERF_SLACK_WEBHOOK }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_COMPILE_PERF }}
           TREND_OUTCOME: ${{ steps.trend.outcome }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -z "$SLACK_WEBHOOK" ]; then
-            echo "SLANG_PERF_SLACK_WEBHOOK not set; skipping Slack notification"
+            echo "SLACK_WEBHOOK_COMPILE_PERF not set; skipping Slack notification"
             exit 0
           fi
           DATE=$(date -u +%Y-%m-%d)
