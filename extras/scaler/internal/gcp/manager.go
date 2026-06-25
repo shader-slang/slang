@@ -90,7 +90,9 @@ type Manager struct {
 
 	mu sync.Mutex
 	// runnerName -> vmInfo
-	vms map[string]*vmInfo
+	vms            map[string]*vmInfo
+	pendingCreates map[string]zoneCandidate
+	nextNonGPUZone int
 }
 
 // NewManager creates a new GCP VM manager.
@@ -126,6 +128,7 @@ func NewManager(ctx context.Context, cfg ManagerConfig) (*Manager, error) {
 		cancelCleanup:   cancelCleanup,
 		nowFunc:         time.Now,
 		vms:             make(map[string]*vmInfo),
+		pendingCreates:  make(map[string]zoneCandidate),
 	}
 
 	// Start background loop to clean up TERMINATED VMs.
@@ -163,20 +166,25 @@ func (m *Manager) Close() {
 	m.regionsClient.Close()
 }
 
-// ActiveCount returns the number of VMs currently tracked.
+// ActiveCount returns the number of VMs currently tracked or being created.
 func (m *Manager) ActiveCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return len(m.vms)
+	return len(m.vms) + len(m.pendingCreates)
 }
 
 // ActiveRunnerNames returns the names of all tracked runners.
 func (m *Manager) ActiveRunnerNames() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	names := make([]string, 0, len(m.vms))
+	names := make([]string, 0, len(m.vms)+len(m.pendingCreates))
 	for name := range m.vms {
 		names = append(names, name)
+	}
+	for name := range m.pendingCreates {
+		if _, ok := m.vms[name]; !ok {
+			names = append(names, name)
+		}
 	}
 	return names
 }
@@ -245,13 +253,15 @@ func (m *Manager) selectZones(ctx context.Context) ([]zoneCandidate, error) {
 		return nil, err
 	}
 
-	// Non-GPU VMs: simple round-robin, no quota check needed
+	// Non-GPU VMs: all configured zones are candidates. CreateVM reserves
+	// one under the manager lock, so concurrent creates still round-robin
+	// instead of all observing the same active VM count.
 	if m.config.GPUType == "none" {
-		m.mu.Lock()
-		count := len(m.vms)
-		m.mu.Unlock()
-		zone := zones[count%len(zones)]
-		return []zoneCandidate{{zone: zone, region: zoneRegion(zone)}}, nil
+		candidates := make([]zoneCandidate, 0, len(zones))
+		for _, zone := range zones {
+			candidates = append(candidates, zoneCandidate{zone: zone, region: zoneRegion(zone)})
+		}
+		return candidates, nil
 	}
 
 	// GPU VMs: select zone by quota availability
@@ -419,7 +429,11 @@ func (m *Manager) CreateVM(ctx context.Context, runnerName, jitConfig string) (s
 	}
 
 	var stockoutErrors []string
-	for _, candidate := range candidates {
+	for len(candidates) > 0 {
+		candidate, err := m.reserveCreate(runnerName, candidates)
+		if err != nil {
+			return "", err
+		}
 		zone := candidate.zone
 		slog.Info("selected zone", "zone", zone, "region", candidate.region, "available_gpus", candidate.available)
 
@@ -449,17 +463,17 @@ func (m *Manager) CreateVM(ctx context.Context, runnerName, jitConfig string) (s
 		}
 
 		if err := m.insertVM(ctx, req); err != nil {
+			m.releaseCreate(runnerName)
 			if isZoneResourceExhausted(err) {
 				slog.Warn("zone resource exhausted, trying next candidate zone", "zone", zone, "error", err)
 				stockoutErrors = append(stockoutErrors, fmt.Sprintf("%s: %v", zone, err))
+				candidates = removeZoneCandidate(candidates, zone)
 				continue
 			}
 			return "", err
 		}
 
-		m.mu.Lock()
-		m.vms[runnerName] = &vmInfo{vmName: vmName, zone: zone, createdAt: m.now()}
-		m.mu.Unlock()
+		m.completeCreate(runnerName, vmName, candidate)
 
 		slog.Info("VM created", "vm", vmName, "zone", zone)
 		return vmName, nil
@@ -469,6 +483,79 @@ func (m *Manager) CreateVM(ctx context.Context, runnerName, jitConfig string) (s
 		return "", fmt.Errorf("all candidate zones are out of stock for %s: %s", m.config.GPUType, strings.Join(stockoutErrors, "; "))
 	}
 	return "", fmt.Errorf("no candidate zones available for %s", m.config.GPUType)
+}
+
+func removeZoneCandidate(candidates []zoneCandidate, zone string) []zoneCandidate {
+	filtered := candidates[:0]
+	for _, candidate := range candidates {
+		if candidate.zone != zone {
+			filtered = append(filtered, candidate)
+		}
+	}
+	return filtered
+}
+
+func (m *Manager) reserveCreate(runnerName string, candidates []zoneCandidate) (zoneCandidate, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.vms == nil {
+		m.vms = make(map[string]*vmInfo)
+	}
+	if m.pendingCreates == nil {
+		m.pendingCreates = make(map[string]zoneCandidate)
+	}
+
+	if _, ok := m.vms[runnerName]; ok {
+		return zoneCandidate{}, fmt.Errorf("runner %q is already tracked", runnerName)
+	}
+	if _, ok := m.pendingCreates[runnerName]; ok {
+		return zoneCandidate{}, fmt.Errorf("runner %q already has a pending create", runnerName)
+	}
+	if len(candidates) == 0 {
+		return zoneCandidate{}, fmt.Errorf("no candidate zones available for %s", m.config.GPUType)
+	}
+
+	var selected zoneCandidate
+	if m.config.GPUType == "none" {
+		selected = candidates[m.nextNonGPUZone%len(candidates)]
+		m.nextNonGPUZone++
+	} else {
+		pendingByRegion := make(map[string]int)
+		for _, pending := range m.pendingCreates {
+			pendingByRegion[pending.region]++
+		}
+
+		for _, candidate := range candidates {
+			if candidate.available <= float64(pendingByRegion[candidate.region]) {
+				continue
+			}
+			selected = candidate
+			break
+		}
+		if selected.zone == "" {
+			return zoneCandidate{}, fmt.Errorf("no candidate zones have unreserved %s quota", m.config.GPUType)
+		}
+	}
+
+	m.pendingCreates[runnerName] = selected
+	return selected, nil
+}
+
+func (m *Manager) releaseCreate(runnerName string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.pendingCreates, runnerName)
+}
+
+func (m *Manager) completeCreate(runnerName, vmName string, candidate zoneCandidate) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.vms == nil {
+		m.vms = make(map[string]*vmInfo)
+	}
+	delete(m.pendingCreates, runnerName)
+	m.vms[runnerName] = &vmInfo{vmName: vmName, zone: candidate.zone, createdAt: m.now()}
 }
 
 func (m *Manager) insertVM(ctx context.Context, req *computepb.InsertInstanceRequest) error {
