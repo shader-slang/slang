@@ -2,20 +2,8 @@ name: CI Falcor Test Workflow
 
 on:
   workflow_call:
-    secrets:
-      FALCOR_CI_API_BASE_URL:
-        required: true
-      FALCOR_CI_PROJECT:
-        required: true
-      FALCOR_CI_REF:
-        required: true
-      FALCOR_CI_TOKEN:
-        required: true
-      FALCOR_CI_VARIABLES_JSON:
-        required: true
 
 permissions:
-  contents: read
   actions: read
 
 jobs:
@@ -27,23 +15,13 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-        with:
-          persist-credentials: false
-          submodules: "false"
-          fetch-depth: "1"
       - name: Run external CI
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          EXTERNAL_CI_API_BASE_URL: ${{ secrets.FALCOR_CI_API_BASE_URL }}
-          EXTERNAL_CI_PROJECT: ${{ secrets.FALCOR_CI_PROJECT }}
-          EXTERNAL_CI_REF: ${{ secrets.FALCOR_CI_REF }}
-          EXTERNAL_CI_TOKEN: ${{ secrets.FALCOR_CI_TOKEN }}
-          EXTERNAL_CI_VARIABLES_JSON: ${{ secrets.FALCOR_CI_VARIABLES_JSON }}
-          EXTERNAL_CI_ARTIFACT_NAME: slang-tests-windows-x86_64-cl-release
+          SLANG_CI_ARTIFACT_NAME: slang-tests-windows-x86_64-cl-release
         run: |
           set -euo pipefail
-          python3 .github/scripts/relay-external-ci.py
+          /opt/slang-ci/run-external-ci
 
   test-falcor-perf:
     name: Test (Falcor Perf)

@@ -429,12 +429,6 @@ jobs:
     permissions:
       contents: read
       actions: read
-    secrets:
-      FALCOR_CI_API_BASE_URL: ${{ secrets.FALCOR_CI_API_BASE_URL }}
-      FALCOR_CI_PROJECT: ${{ secrets.FALCOR_CI_PROJECT }}
-      FALCOR_CI_REF: ${{ secrets.FALCOR_CI_REF }}
-      FALCOR_CI_TOKEN: ${{ secrets.FALCOR_CI_TOKEN }}
-      FALCOR_CI_VARIABLES_JSON: ${{ secrets.FALCOR_CI_VARIABLES_JSON }}
     uses: ./.github/workflows/ci-falcor-test.yml
 
   test-compile-regression:
