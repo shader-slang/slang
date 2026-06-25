@@ -1,10 +1,10 @@
-name: RTX Remix Shaders (Nightly)
+name: RTX Remix Shaders (PR)
 
 on:
   workflow_dispatch:
-  schedule:
-    # Run daily at 3 AM UTC (after coverage runs)
-    - cron: "0 3 * * *"
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -12,10 +12,10 @@ concurrency:
 
 permissions:
   contents: read # Read slang repo
-  issues: write # To create issues on failure (optional)
 
 jobs:
   rtx-remix-shader-test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     runs-on: windows-2022
     timeout-minutes: 45 # Slang build ~10-15 min + RTX Remix shaders ~10-15 min + buffer
 
@@ -101,6 +101,7 @@ jobs:
           slangcPath="build/Release/bin/slangc.exe"
           if [ -f "$slangcPath" ]; then
             echo "slangc built successfully at: $slangcPath"
+            echo "Built slangc version:"
             "$slangcPath" -version
           else
             echo "Failed to build slangc"
@@ -208,8 +209,28 @@ jobs:
 
           # Copy our built Slang binaries, overwriting packman's files
           # This preserves the directory structure (including junctions)
-          $builtSlangBin = Resolve-Path "build\Release\bin"
+          $builtSlangBin = (Resolve-Path "build\Release\bin").Path
           Write-Host "`nOverwriting Slang binaries from: $builtSlangBin"
+          $copiedFiles = @(Get-ChildItem -Path $builtSlangBin -File -Recurse)
+          if ($copiedFiles.Count -eq 0) {
+            Write-Error "ERROR: No built Slang files found to copy from: $builtSlangBin"
+            exit 1
+          }
+
+          $hashManifest = "built-slang-file-hashes.tsv"
+          $hashRecords = @()
+          foreach ($src in $copiedFiles) {
+            $relativePath = [System.IO.Path]::GetRelativePath($builtSlangBin, $src.FullName)
+            $hash = (Get-FileHash -Algorithm SHA256 -Path $src.FullName).Hash
+            $hashRecords += [PSCustomObject]@{
+              RelativePath = $relativePath
+              Hash = $hash
+            }
+          }
+          $hashRecords |
+            ForEach-Object { "$($_.Hash)`t$($_.RelativePath)" } |
+            Set-Content -Path $hashManifest -Encoding utf8NoBOM
+
           Copy-Item -Path "$builtSlangBin\*" -Destination $remixSlangDir -Recurse -Force
 
           # Verify replacement succeeded
@@ -226,6 +247,23 @@ jobs:
             }
           }
 
+          # Verify every copied file is byte-identical to the locally built source file.
+          foreach ($record in $hashRecords) {
+            $targetPath = Join-Path $remixSlangDir $record.RelativePath
+            if (-not (Test-Path $targetPath)) {
+              Write-Error "ERROR: Copied file missing from packman Slang directory: $($record.RelativePath)"
+              exit 1
+            }
+            $targetHash = (Get-FileHash -Algorithm SHA256 -Path $targetPath).Hash
+            if ($targetHash -ne $record.Hash) {
+              Write-Error "ERROR: Copied file hash mismatch: $($record.RelativePath)"
+              Write-Error "  Source hash: $($record.Hash)"
+              Write-Error "  Target hash: $targetHash"
+              exit 1
+            }
+          }
+          Write-Host "`nVerified $($hashRecords.Count) copied Slang files match the locally built files byte-for-byte"
+
           # List all copied Slang DLLs for verification
           Write-Host "`nCopied Slang files:"
           Get-ChildItem -Path $remixSlangDir -Filter "slang*" | ForEach-Object { Write-Host "  $($_.Name)" }
@@ -235,11 +273,6 @@ jobs:
           $newVersion = (& $newSlangc -version 2>&1 | Out-String).Trim()
           Write-Host "New slangc version:"
           Write-Host $newVersion
-
-          if ($originalVersion -and ($newVersion -eq $originalVersion)) {
-            Write-Error "ERROR: Slangc version unchanged after replacement!"
-            exit 1
-          }
 
           # Check that version looks valid (not just a timestamp)
           if ($newVersion -match '^\d{10,}$') {
@@ -275,6 +308,54 @@ jobs:
           $duration = (Get-Date) - $startTime
           Write-Host "End time: $(Get-Date -Format 'HH:mm:ss')"
           Write-Host "Build duration: $($duration.TotalMinutes.ToString('0.00')) minutes"
+
+      # Confirm the copied Slang binaries were not modified by the shader build.
+      - name: Verify copied Slang binaries remained unchanged
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $remixSlangDir = "dxvk-remix\external\slang"
+          $hashManifest = "built-slang-file-hashes.tsv"
+
+          if (-not (Test-Path $hashManifest)) {
+            Write-Error "Hash manifest not found: $hashManifest"
+            exit 1
+          }
+
+          $verifiedCount = 0
+          foreach ($line in Get-Content $hashManifest) {
+            if ([string]::IsNullOrWhiteSpace($line)) {
+              continue
+            }
+
+            $parts = $line -split "`t", 2
+            if ($parts.Count -ne 2) {
+              Write-Error "Invalid hash manifest line: $line"
+              exit 1
+            }
+
+            $expectedHash = $parts[0]
+            $relativePath = $parts[1]
+            $targetPath = Join-Path $remixSlangDir $relativePath
+
+            if (-not (Test-Path $targetPath)) {
+              Write-Error "Copied Slang file no longer exists: $relativePath"
+              exit 1
+            }
+
+            $actualHash = (Get-FileHash -Algorithm SHA256 -Path $targetPath).Hash
+            if ($actualHash -ne $expectedHash) {
+              Write-Error "Copied Slang file was modified: $relativePath"
+              Write-Error "  Expected hash: $expectedHash"
+              Write-Error "  Actual hash:   $actualHash"
+              exit 1
+            }
+
+            $verifiedCount++
+          }
+
+          Write-Host "Verified $verifiedCount copied Slang files remained byte-identical to the built files"
 
       # Verify build output
       - name: Verify shader compilation
@@ -338,28 +419,3 @@ jobs:
           echo "================================================"
         env:
           BUILD_RESULT: ${{ job.status }}
-
-      # Slack notifications (for scheduled runs only)
-      - name: Success notification
-        id: slack-notify-success
-        if: ${{ github.event_name == 'schedule' && success() }}
-        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
-        with:
-          payload: |
-            {
-              "RTX-Remix-Nightly": ":green-check-mark: RTX Remix nightly status: ${{ job.status }}"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_RTX_REMIX }}
-
-      - name: Failure notification
-        id: slack-notify-failure
-        if: ${{ github.event_name == 'schedule' && !success() }}
-        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
-        with:
-          payload: |
-            {
-              "RTX-Remix-Nightly": ":alert: :alert: :alert: :alert: :alert: :alert:\nRTX Remix nightly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_RTX_REMIX }}
