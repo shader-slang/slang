@@ -33,7 +33,10 @@ jobs:
           shouldRun=true
           if files="$(git diff --name-only $BASE...HEAD)"; then
             # Git diff succeeded, check if non-documentation files were changed
-            if echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|\.claude/|[^/]+\.md$|\.coderabbit\.yaml$)'; then
+            if echo "$files" | grep -qx 'docs/user-guide/a3-02-reference-capability-atoms.md'; then
+              echo "Generated capability atoms reference changed, running checks"
+              shouldRun=true
+            elif echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|\.claude/|[^/]+\.md$|\.coderabbit\.yaml$)'; then
               shouldRun=true
             else
               echo "Only documentation files changed, skipping remaining steps"
@@ -457,8 +460,9 @@ jobs:
           fi
           mkdir -p temp/capability temp/docs/user-guide
           cp docs/user-guide/a3-02-reference-capability-atoms.md temp/docs/user-guide/a3-02-reference-capability-atoms.md
+          capdefs=(source/slang/*.capdef)
           artifacts/Release/bin/slang-capability-generator \
-            source/slang/slang-capabilities.capdef \
+            "${capdefs[@]}" \
             --target-directory temp/capability \
             --doc temp/docs/user-guide/a3-02-reference-capability-atoms.md
 
