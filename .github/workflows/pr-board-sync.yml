@@ -34,29 +34,27 @@ name: PR Board Sync (reusable)
 # missed webhooks, repos not yet onboarded).
 #
 # Cross-repo reuse: any shader-slang repo adds a thin caller workflow that
-# declares the PR event triggers and calls this one, mapping the two required
-# secrets explicitly (least privilege — do NOT use `secrets: inherit`):
+# declares the PR event triggers and calls this one, mapping the single required
+# secret explicitly (no `secrets: inherit`, and no `permissions:` block needed —
+# this workflow uses the PAT for everything, not the GITHUB_TOKEN):
 #
 #   jobs:
 #     board-sync:
 #       uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
 #       secrets:
-#         ADD_TO_PROJECT_PAT: ${{ secrets.ADD_TO_PROJECT_PAT }}
-#         SLANGBOT_MEMBERS_READONLY: ${{ secrets.SLANGBOT_MEMBERS_READONLY }}
+#         SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}
 #
 # All shader-slang repos feed the SAME board, so every input below already
-# defaults to the shared board's values; callers normally pass only the two
-# secrets above.
+# defaults to the shared board's values; callers pass only the one secret.
 #
-# Required secrets (both are shader-slang **org-level** secrets, shared org-wide,
-# so any org repo can map them — no per-repo setup beyond the mapping):
-#   ADD_TO_PROJECT_PAT        - PAT with ProjectV2 read+write on the board.
-#   SLANGBOT_MEMBERS_READONLY - PAT/token that can read a repo collaborator's
-#                               permission level (used to classify Internal vs
-#                               Community by repo write access on opened PRs).
-#                               Reading collaborator permission needs push access
-#                               on the repo; on any read error classification
-#                               fails safe to Community.
+# Required secret (a shader-slang **org-level** secret, shared org-wide):
+#   SLANG_PR_BOT_TOKEN - a dedicated bot PAT used for EVERY GitHub call this
+#     workflow makes (so growing its capabilities never changes the caller
+#     contract — you widen this PAT's scopes centrally, callers are untouched).
+#     Scopes needed: org Projects read+write (board) and Members read; repo
+#     Contents read, Pull requests write, Issues write, Metadata read. Reading a
+#     collaborator's permission needs repo read; on any read error the Source
+#     classification fails safe to Community.
 #
 # Safety: every job runs only on PR metadata / API calls and never checks out or
 # executes PR code, so `pull_request_target` (secrets available for fork PRs) is
@@ -110,23 +108,17 @@ on:
         type: string
         default: "bmillsNV"
     secrets:
-      ADD_TO_PROJECT_PAT:
-        description: "PAT with ProjectsV2 read+write on the board."
-        required: true
-      SLANGBOT_MEMBERS_READONLY:
-        description: "Token that can read a repo collaborator's permission level (Internal vs Community classification)."
+      SLANG_PR_BOT_TOKEN:
+        description: "Dedicated bot PAT used for every GitHub call this workflow makes (org Projects RW + Members read; repo Contents read, Pull requests write, Issues write, Metadata read)."
         required: true
 
-# Deny-by-default for the workflow's GITHUB_TOKEN; the job grants only what it needs.
+# Every step authenticates with SLANG_PR_BOT_TOKEN, so the GITHUB_TOKEN is unused;
+# deny it entirely. (Callers therefore need no permissions block.)
 permissions: {}
 
 jobs:
   board-sync:
     runs-on: ubuntu-latest
-    permissions:
-      # Only the "Unrequest ignored reviewers" step uses GITHUB_TOKEN; the board
-      # writes and Source classification use dedicated PATs (see secrets above).
-      pull-requests: write
     steps:
       # --- Classify Source (repo write-access read; opened/reopened only) ------
       - name: Classify PR Source
@@ -141,7 +133,7 @@ jobs:
           SOURCE_COMMUNITY: ${{ inputs.source_community }}
           SOURCE_BOT: ${{ inputs.source_bot }}
         with:
-          github-token: ${{ secrets.SLANGBOT_MEMBERS_READONLY }}
+          github-token: ${{ secrets.SLANG_PR_BOT_TOKEN }}
           script: |
             const user = context.payload.pull_request.user;
             const login = user.login;
@@ -194,7 +186,7 @@ jobs:
           SOURCE_BOT: ${{ inputs.source_bot }}
           BOT_AUTHORS: ${{ inputs.bot_authors }}
         with:
-          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          github-token: ${{ secrets.SLANG_PR_BOT_TOKEN }}
           script: |
             const PROJECT_ID = process.env.PROJECT_ID;
             const STATUS = {
@@ -491,6 +483,7 @@ jobs:
         env:
           IGNORED_REVIEWERS: ${{ inputs.ignored_reviewers }}
         with:
+          github-token: ${{ secrets.SLANG_PR_BOT_TOKEN }}
           script: |
             const ignored = (process.env.IGNORED_REVIEWERS || "")
               .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);

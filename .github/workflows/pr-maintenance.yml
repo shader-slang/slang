@@ -29,11 +29,6 @@ on:
 
 jobs:
   board-sync:
-    permissions:
-      # Caps the GITHUB_TOKEN handed to the reusable workflow; its only
-      # GITHUB_TOKEN use is unrequesting reviewers (pull-requests: write).
-      pull-requests: write
     uses: ./.github/workflows/pr-board-sync.yml
     secrets:
-      ADD_TO_PROJECT_PAT: ${{ secrets.ADD_TO_PROJECT_PAT }}
-      SLANGBOT_MEMBERS_READONLY: ${{ secrets.SLANGBOT_MEMBERS_READONLY }}
+      SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}
