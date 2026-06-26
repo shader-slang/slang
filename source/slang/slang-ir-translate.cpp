@@ -536,7 +536,9 @@ IRInst* TranslationContext::resolveInst(IRInst* inst)
     while (auto resolvedInst = _resolveInstRec(this, inst))
     {
         if (resolvedInst == inst)
+        {
             return resolvedInst;
+        }
 
         inst = resolvedInst;
     }
