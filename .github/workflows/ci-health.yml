@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   update-health:
-    runs-on: ubuntu-latest
+    runs-on: ["Linux", "self-hosted", "analytics", "GCP"]
     permissions:
       contents: read
       actions: read

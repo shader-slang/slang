@@ -198,6 +198,32 @@ struct StringUtil
     /// Modifies pos to the position where parsing ends.
     /// Returns parsed integer.
     static int parseIntAndAdvancePos(UnownedStringSlice text, Index& pos);
+
+    /// Format `value` as a C99 hexadecimal floating-point literal. The output
+    /// is a minimal string, with the following format:
+    ///
+    /// - value  0.0:  0x0p+0
+    /// - value -0.0: -0x0p+0
+    /// - non-zero finite value: (-)?0x1p[+-]N or (-)?0x1.xxxxxp[+-]N where the last 'x'
+    ///   is non-zero. Examples: 0x1p-100, 0x1.fedcba9876p+54
+    /// - infinite value: (-)?inf
+    /// - not-a-number: nan
+    ///
+    static String makeMinimalHexFloat(double value);
+
+    /// Compute the Levenshtein edit distance between `a` and `b`: the minimum number of
+    /// single-character insertions, deletions, or substitutions needed to turn one string
+    /// into the other. Used, for example, to suggest the closest known identifier for a
+    /// misspelled name ("did you mean ...?"). The comparison is case-sensitive; use
+    /// `calcLevenshteinDistanceCaseInsensitive` (or lower-case the inputs beforehand) for a
+    /// case-insensitive distance.
+    static Index calcLevenshteinDistance(const UnownedStringSlice& a, const UnownedStringSlice& b);
+
+    /// Like `calcLevenshteinDistance`, but folds characters with `CharUtil::toLower` during
+    /// the comparison, so it does not allocate lower-cased copies of the inputs.
+    static Index calcLevenshteinDistanceCaseInsensitive(
+        const UnownedStringSlice& a,
+        const UnownedStringSlice& b);
 };
 
 /* A helper class that allows parsing of lines from text with iteration. Uses
