@@ -478,6 +478,62 @@ func TestCreateVMStopsOnNonStockoutError(t *testing.T) {
 	}
 }
 
+// TestCreateVMStampsExpectGPUMetadata verifies that CreateVM stamps the
+// "expect-gpu" instance-metadata key from the pool's GPUType: "true" for GPU
+// pools and "false" for CPU-only pools (GPUType == "none"). The Linux startup
+// script reads this to decide whether a missing accelerator is fatal (GPU pool)
+// or expected (CPU-only build/analytics pool), so the contract must be explicit
+// rather than inferred from the VM's PCI state.
+func TestCreateVMStampsExpectGPUMetadata(t *testing.T) {
+	cases := []struct {
+		name    string
+		gpuType string
+		want    string
+	}{
+		{"gpu pool", "nvidia-l4", "true"},
+		{"cpu-only pool", "none", "false"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := &Manager{
+				config: ManagerConfig{
+					Project:          "test-project",
+					Zones:            "us-east1-d",
+					InstanceTemplate: "linux-build-runner",
+					GPUType:          tc.gpuType,
+					Platform:         "linux",
+				},
+				vms: map[string]*vmInfo{},
+			}
+			m.selectZonesFunc = func(context.Context) ([]zoneCandidate, error) {
+				return []zoneCandidate{{zone: "us-east1-d", region: "us-east1", available: 16}}, nil
+			}
+
+			var got string
+			var found bool
+			m.insertVMFunc = func(_ context.Context, req *computepb.InsertInstanceRequest) error {
+				for _, item := range req.GetInstanceResource().GetMetadata().GetItems() {
+					if item.GetKey() == "expect-gpu" {
+						got = item.GetValue()
+						found = true
+					}
+				}
+				return nil
+			}
+
+			if _, err := m.CreateVM(context.Background(), "build-test", "jit-config"); err != nil {
+				t.Fatalf("CreateVM returned error: %v", err)
+			}
+			if !found {
+				t.Fatal("expect-gpu metadata key was not set")
+			}
+			if got != tc.want {
+				t.Fatalf("expect-gpu = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestIsZoneResourceExhausted(t *testing.T) {
 	if !isZoneResourceExhausted(errors.New("ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS")) {
 		t.Fatal("expected ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS to be treated as stockout")

@@ -407,6 +407,17 @@ func (m *Manager) CreateVM(ctx context.Context, runnerName, jitConfig string) (s
 		scriptContent = windowsStartupScript
 	}
 
+	// Tell the VM whether this pool expects a GPU, so the startup script can
+	// treat a missing accelerator as a fatal misconfiguration on GPU pools
+	// (where a runner with no device would silently accept GPU-labeled jobs)
+	// while skipping GPU init on the CPU-only build/analytics pools. Derived
+	// from the pool's own --gcp-gpu-type config rather than guessed from the
+	// VM's PCI state, so the expectation is authoritative per pool.
+	expectGPU := "true"
+	if m.config.GPUType == "none" {
+		expectGPU = "false"
+	}
+
 	var stockoutErrors []string
 	for _, candidate := range candidates {
 		zone := candidate.zone
@@ -426,6 +437,10 @@ func (m *Manager) CreateVM(ctx context.Context, runnerName, jitConfig string) (s
 						{
 							Key:   proto.String(scriptKey),
 							Value: proto.String(scriptContent),
+						},
+						{
+							Key:   proto.String("expect-gpu"),
+							Value: proto.String(expectGPU),
 						},
 					},
 				},
