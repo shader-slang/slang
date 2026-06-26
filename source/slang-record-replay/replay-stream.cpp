@@ -30,6 +30,11 @@ ReplayStream ReplayStream::loadFromFile(const char* path)
     return stream;
 }
 
+ReplayStream::ReplayStream(ReplayStream&& other)
+{
+    *this = Slang::_Move(other);
+}
+
 ReplayStream& ReplayStream::operator=(ReplayStream&& other)
 {
     if (this == &other)

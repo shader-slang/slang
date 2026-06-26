@@ -116,11 +116,14 @@ SLANG_UNIT_TEST(replayStreamRejectsNullDataWithNonzeroSize)
         caughtException = containsString(e.Message, "data || size == 0");
     }
     SLANG_CHECK(caughtException);
+#else
+    SLANG_IGNORE_TEST;
 #endif
 }
 
 SLANG_UNIT_TEST(replayStreamRejectsWritePositionOverflow)
 {
+#if SLANG_HAS_EXCEPTIONS
     ReplayStream stream;
     stream.seek((std::numeric_limits<size_t>::max)());
 
@@ -135,10 +138,14 @@ SLANG_UNIT_TEST(replayStreamRejectsWritePositionOverflow)
         caughtException = containsString(e.Message, "Write past maximum stream size");
     }
     SLANG_CHECK(caughtException);
+#else
+    SLANG_IGNORE_TEST;
+#endif
 }
 
 SLANG_UNIT_TEST(replayStreamRejectsReadSizeOverflow)
 {
+#if SLANG_HAS_EXCEPTIONS
     uint8_t value = 0;
     ReplayStream stream(&value, sizeof(value));
 
@@ -153,6 +160,9 @@ SLANG_UNIT_TEST(replayStreamRejectsReadSizeOverflow)
         caughtException = containsString(e.Message, "Read past end of stream");
     }
     SLANG_CHECK(caughtException);
+#else
+    SLANG_IGNORE_TEST;
+#endif
 }
 
 SLANG_UNIT_TEST(replayStreamMoveAssignmentReplacesExistingBuffer)

@@ -56,7 +56,7 @@ public:
     SLANG_API static ReplayStream loadFromFile(const char* path);
 
     // Move-only (no copying)
-    ReplayStream(ReplayStream&&) = default;
+    SLANG_API ReplayStream(ReplayStream&& other);
     SLANG_API ReplayStream& operator=(ReplayStream&& other);
     ReplayStream(const ReplayStream&) = delete;
     ReplayStream& operator=(const ReplayStream&) = delete;
