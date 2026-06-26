@@ -131,6 +131,7 @@ static void buildStateRiff(const List<uint8_t>& payload, List<uint8_t>& outRiff)
 
 static ComPtr<ISlangBlob> createSentinelBlob()
 {
+    // Negative loadState tests use this to prove failure clears an existing out value.
     static const uint8_t kSentinel = 0xff;
     return RawBlob::create(&kSentinel, sizeof(kSentinel));
 }
