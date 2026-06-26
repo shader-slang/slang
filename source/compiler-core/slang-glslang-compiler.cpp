@@ -549,7 +549,45 @@ SlangResult SpirvLinkDownstreamCompilerUtil::locateCompilers(
 
 #else // SLANG_ENABLE_GLSLANG_SUPPORT
 
+// With glslang support disabled, none of the slang-glslang-backed downstream compilers can be
+// located. Every locator below reports SLANG_E_NOT_AVAILABLE so the downstream-compiler registry
+// (slang-downstream-compiler-util.cpp), which takes the address of each of these functions,
+// still links without pulling in any reference to the slang-glslang module.
+
 /* static */ SlangResult GlslangDownstreamCompilerUtil::locateCompilers(
+    const String& path,
+    ISlangSharedLibraryLoader* loader,
+    DownstreamCompilerSet* set)
+{
+    SLANG_UNUSED(path);
+    SLANG_UNUSED(loader);
+    SLANG_UNUSED(set);
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+/* static */ SlangResult SpirvOptDownstreamCompilerUtil::locateCompilers(
+    const String& path,
+    ISlangSharedLibraryLoader* loader,
+    DownstreamCompilerSet* set)
+{
+    SLANG_UNUSED(path);
+    SLANG_UNUSED(loader);
+    SLANG_UNUSED(set);
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+/* static */ SlangResult SpirvDisDownstreamCompilerUtil::locateCompilers(
+    const String& path,
+    ISlangSharedLibraryLoader* loader,
+    DownstreamCompilerSet* set)
+{
+    SLANG_UNUSED(path);
+    SLANG_UNUSED(loader);
+    SLANG_UNUSED(set);
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+/* static */ SlangResult SpirvLinkDownstreamCompilerUtil::locateCompilers(
     const String& path,
     ISlangSharedLibraryLoader* loader,
     DownstreamCompilerSet* set)

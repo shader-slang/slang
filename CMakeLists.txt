@@ -165,6 +165,11 @@ option(
     ON
 )
 option(
+    SLANG_ENABLE_GLSLANG_SUPPORT
+    "Register the slang-glslang downstream SPIR-V compiler (optimize/validate/disassemble/link) in compiler-core. Disable for a standalone/static build that must not reference or load the slang-glslang module. Registration is also compiled out automatically when SLANG_ENABLE_SLANG_GLSLANG is OFF (no module to load)."
+    ON
+)
+option(
     SLANG_ENABLE_SLANG_PROXY
     "Build the legacy slang.dll proxy and libslang symlink backward-compatibility outputs for slang-compiler"
     ON

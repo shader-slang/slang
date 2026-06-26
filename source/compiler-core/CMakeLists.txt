@@ -22,3 +22,14 @@ if(NOT MSVC)
         DIRECTORY ${slang_SOURCE_DIR}
     )
 endif()
+
+# slang-glslang-compiler.cpp defaults SLANG_ENABLE_GLSLANG_SUPPORT to 1 when the build does not
+# define it. Define it to 0 (compiling out the in-process registration of the slang-glslang
+# downstream compiler and the include of its header) when registration is explicitly disabled,
+# or when the slang-glslang module itself is not being built -- registering a compiler that
+# dlopen()s a module that was never produced is exactly the missing-module failure (#11662) we
+# want to avoid. So a `-DSLANG_ENABLE_SLANG_GLSLANG=OFF` build drops both the module and its
+# registration, leaving compiler-core with no reference to or dependency on slang-glslang.
+if(NOT SLANG_ENABLE_GLSLANG_SUPPORT OR NOT SLANG_ENABLE_SLANG_GLSLANG)
+    target_compile_definitions(compiler-core PRIVATE SLANG_ENABLE_GLSLANG_SUPPORT=0)
+endif()
