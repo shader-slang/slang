@@ -76,7 +76,7 @@ jobs:
           compiler: cl
           platform: x86_64
           config: release
-          build-llvm: true
+          build-llvm: false
 
       - name: Build Slang (tip of tree)
         run: |
@@ -90,7 +90,7 @@ jobs:
           # linker errors. The perf suite only uses SPIRV/Metal/WGSL targets which
           # do not need the LLVM backend.
           cmake --preset default --fresh `
-            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM `
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE `
             -DCMAKE_COMPILE_WARNING_AS_ERROR=false `
             -DSLANG_ENABLE_RELEASE_LTO=ON `
             -DSLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF
