@@ -19,6 +19,7 @@
 #include "../core/slang-hex-dump-util.h"
 #include "../core/slang-name-value.h"
 #include "../core/slang-platform.h"
+#include "../core/slang-stream.h"
 #include "../core/slang-string-slice-pool.h"
 #include "../core/slang-string-util.h"
 #include "../core/slang-type-text-util.h"
@@ -1911,13 +1912,37 @@ void OptionsParser::setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode
     }
 }
 
+static SlangResult _loadReproBlobFromFile(
+    const String& path,
+    DiagnosticSink* sink,
+    ISlangBlob** outBlob)
+{
+    RefPtr<FileStream> stream = new FileStream;
+    SLANG_RETURN_ON_FAIL(
+        stream->init(path, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
+
+    List<Byte> streamData;
+    auto readResult = StreamUtil::readAll(stream, streamData);
+    if (SLANG_FAILED(readResult))
+    {
+        sink->diagnose(Diagnostics::UnableToReadRiff{});
+        return readResult;
+    }
+
+    return ReproUtil::loadState(
+        reinterpret_cast<const uint8_t*>(streamData.getBuffer()),
+        streamData.getCount(),
+        sink,
+        outBlob);
+}
+
 static SlangResult _loadRepro(
     const String& path,
     DiagnosticSink* sink,
     EndToEndCompileRequest* request)
 {
     ComPtr<ISlangBlob> reproBlob;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(path, sink, reproBlob.writeRef()));
+    SLANG_RETURN_ON_FAIL(_loadReproBlobFromFile(path, sink, reproBlob.writeRef()));
 
     auto requestState = const_cast<ReproUtil::RequestState*>(
         ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
@@ -2316,7 +2341,7 @@ SlangResult OptionsParser::_parseReproFileSystem(const CommandLineArg& arg)
 
     ComPtr<ISlangBlob> reproBlob;
     {
-        const Result res = ReproUtil::loadState(reproName.value, m_sink, reproBlob.writeRef());
+        const Result res = _loadReproBlobFromFile(reproName.value, m_sink, reproBlob.writeRef());
         if (SLANG_FAILED(res))
         {
             m_sink->diagnose(

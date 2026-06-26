@@ -1336,35 +1336,6 @@ static SlangResult _loadStateToBlob(
 }
 
 /* static */ SlangResult ReproUtil::loadState(
-    const String& filename,
-    DiagnosticSink* sink,
-    ISlangBlob** outBlob)
-{
-    RefPtr<FileStream> stream = new FileStream;
-    SLANG_RETURN_ON_FAIL(
-        stream->init(filename, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
-    return loadState(stream, sink, outBlob);
-}
-
-/* static */ SlangResult ReproUtil::loadState(
-    Stream* stream,
-    DiagnosticSink* sink,
-    ISlangBlob** outBlob)
-{
-    List<Byte> streamData;
-    {
-        auto result = StreamUtil::readAll(stream, streamData);
-        if (SLANG_FAILED(result))
-        {
-            sink->diagnose(Diagnostics::UnableToReadRiff{});
-            return result;
-        }
-    }
-
-    return _loadStateToBlob(streamData.getBuffer(), streamData.getCount(), sink, outBlob);
-}
-
-/* static */ SlangResult ReproUtil::loadState(
     const uint8_t* data,
     size_t dataSize,
     DiagnosticSink* sink,
