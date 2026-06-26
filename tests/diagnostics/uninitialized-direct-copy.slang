@@ -8,10 +8,13 @@ struct SelfRef
     SelfRef* next;
 }
 
-// Case 1 (the core bug): a direct copy of an uninitialized scalar local that
-// is then written to an output buffer element. Previously the copy was
-// silently elided so no warning was produced; now the uninitialized read is
-// diagnosed at the point it is stored.
+// Case 1 (the core bug): an uninitialized scalar is copied into a local and the
+// local is then read. The checker reports at the *surviving use* of the
+// propagated value -- the `output[0] = copy;` store below -- not at the
+// `float copy = uninit;` initializer (a copy into a local that is never read is
+// a dead store and is correctly not diagnosed). Before the fix the surviving
+// store was elided so no warning was produced; now the uninitialized read is
+// diagnosed at that store.
 void direct_copy_to_local()
 {
     float uninit;
@@ -109,8 +112,49 @@ void store_address_not_a_read()
     output[4] = 0.0;
 }
 
+// Case 8: a direct copy of an uninitialized aggregate (struct) value into an
+// `out` parameter. The stored value is a non-pointer `IRUndefined` aggregate in
+// operand 1, so the value-operand reclassification applies to aggregates too,
+// not just scalars/vectors/swizzles -- the uninitialized copy is diagnosed.
+struct Agg
+{
+    float a;
+    float b;
+}
+
+void copy_aggregate_to_out_param(out Agg o)
+{
+    Agg uninit;
+    o = uninit;
+//CHK:^ use of uninitialized variable
+//CHK:^ use of uninitialized variable 'uninit'
+}
+
+// Case 9 (second classifier consumer): a constructor that copies an
+// uninitialized aggregate into a field exercises the constructor field-init
+// analysis (`checkConstructor` -> `checkFieldsFromExit` -> `isDirectlyWrittenTo`),
+// which shares `getInstructionUsageType` with the direct-copy checker above. The
+// uninitialized source `u` is diagnosed; the field `inner` is written (with the
+// undefined value) so it is *not* reported as an uninitialized field. This pins
+// the non-pointer undef-aggregate-as-store-value path in the second consumer,
+// which the realistic IRVar-origin path (covered by tests/bugs/gh-6331.slang)
+// does not directly exercise.
+struct Outer
+{
+    Agg inner;
+    __init()
+    {
+        Agg u;
+        inner = u;
+//CHK:        ^ use of uninitialized variable
+//CHK:        ^ use of uninitialized variable 'u'
+    }
+}
+
 [Shader("compute")]
 [NumThreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
+    Outer outer;
+    output[5] = outer.inner.a;
 }

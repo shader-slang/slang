@@ -295,8 +295,11 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
         // address (e.g. a variable's own address in `self.self = &self;`, which
         // lowers to `store(getFieldAddr(self), self)` with the `self` pointer as
         // the value) stores that address without reading the pointed-to memory,
-        // so it is not a use of the location. This mirrors the pointer-vs-value
-        // rule used by the `default` case below.
+        // so it is not a use of the location. This applies the same
+        // pointer-vs-value rule as the `default` case below, but on a different
+        // subject: here it tests the stored value's type
+        // (`inst->getDataType()`), whereas the `default` case tests the using
+        // instruction's type (`user->getDataType()`).
         if (inst == user->getOperand(1) && !as<IRPtrTypeBase>(inst->getDataType()))
             return Load;
         return Store;

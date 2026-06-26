@@ -1899,15 +1899,15 @@ struct PeepholeContext : InstPassBase
                 // synthesized `Undefined` values carry no such evidence, so
                 // those stores are still elided.
                 //
-                // A preserved store does reach codegen (e.g. an `OpUndef`
-                // feeding an `OpStore` on SPIR-V), but that is intentional and
-                // benign: the program genuinely copied an undefined value, so
-                // emitting an undefined store faithfully preserves that meaning
-                // -- it is the same value any later load of the destination
-                // would already observe.
+                // A preserved store can survive to codegen on textual targets
+                // (HLSL/GLSL/CPU emit a store of the undefined value); on
+                // SPIR-V the backend re-elides it. Either way it is benign: the
+                // program genuinely copied an undefined value, so emitting an
+                // undefined store faithfully preserves that meaning -- it is the
+                // same value any later load of the destination would observe.
                 auto storedVal = as<IRStore>(inst)->getVal();
                 if (as<IRUndefined>(storedVal) &&
-                    storedVal->getOp() != kIROp_LoadFromUninitializedMemory)
+                    !as<IRLoadFromUninitializedMemory>(storedVal))
                 {
                     maybeRemoveOldInst(inst);
                     changed = true;
