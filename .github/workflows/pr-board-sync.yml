@@ -34,20 +34,22 @@ name: PR Board Sync (reusable)
 # missed webhooks, repos not yet onboarded).
 #
 # Cross-repo reuse: any shader-slang repo adds a thin caller workflow that
-# declares the PR event triggers and calls this one with `secrets: inherit`:
+# declares the PR event triggers and calls this one, mapping the two required
+# secrets explicitly (least privilege — do NOT use `secrets: inherit`):
 #
 #   jobs:
 #     board-sync:
 #       uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
-#       secrets: inherit
+#       secrets:
+#         ADD_TO_PROJECT_PAT: ${{ secrets.ADD_TO_PROJECT_PAT }}
+#         SLANGBOT_MEMBERS_READONLY: ${{ secrets.SLANGBOT_MEMBERS_READONLY }}
 #
 # All shader-slang repos feed the SAME board, so every input below already
-# defaults to the shared board's values; callers normally pass nothing but
-# `secrets: inherit`.
+# defaults to the shared board's values; callers normally pass only the two
+# secrets above.
 #
-# Required secrets (both are shader-slang **org-level** secrets, already shared
-# org-wide, so `secrets: inherit` from any org repo supplies them — no per-repo
-# setup):
+# Required secrets (both are shader-slang **org-level** secrets, shared org-wide,
+# so any org repo can map them — no per-repo setup beyond the mapping):
 #   ADD_TO_PROJECT_PAT        - PAT with ProjectV2 read+write on the board.
 #   SLANGBOT_MEMBERS_READONLY - PAT/token that can read a repo collaborator's
 #                               permission level (used to classify Internal vs
@@ -107,12 +109,23 @@ on:
         description: "Comma-separated auto-assigned reviewers that cannot approve; unrequested on the PR."
         type: string
         default: "bmillsNV"
+    secrets:
+      ADD_TO_PROJECT_PAT:
+        description: "PAT with ProjectsV2 read+write on the board."
+        required: true
+      SLANGBOT_MEMBERS_READONLY:
+        description: "Token that can read a repo collaborator's permission level (Internal vs Community classification)."
+        required: true
+
+# Deny-by-default for the workflow's GITHUB_TOKEN; the job grants only what it needs.
+permissions: {}
 
 jobs:
   board-sync:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # Only the "Unrequest ignored reviewers" step uses GITHUB_TOKEN; the board
+      # writes and Source classification use dedicated PATs (see secrets above).
       pull-requests: write
     steps:
       # --- Classify Source (repo write-access read; opened/reopened only) ------
@@ -353,7 +366,9 @@ jobs:
             //      draft is In Review, since bot PRs arrive as drafts and a human
             //      owner must see/shepherd them. (Ranked above CI, so a Bot draft
             //      with merely failing CI still shows In Review.)
-            //   3. CI failed -> Revising (Bot, fixes itself) / Snagged (human).
+            //   3. CI needs approval (action_required, e.g. a fork PR awaiting a
+            //      maintainer to approve the run) -> Snagged (always; a human gates
+            //      it). CI failed -> Revising (Bot, fixes itself) / Snagged (human).
             //   4. Approved + not stale: Approved while still waiting on something
             //      automated (CI pending, or in the merge queue); Snagged once CI
             //      is green and it is NOT queued (nothing automated left - a human
@@ -363,6 +378,7 @@ jobs:
             function computeTarget(info) {
               if (info.reviewed && info.changeRequested) return STATUS.revising;
               if (info.isDraft) return info.isBot ? STATUS.inreview : STATUS.revising;
+              if (info.ci === "action_required") return STATUS.snagged;
               if (info.ci === "failed") return info.isBot ? STATUS.revising : STATUS.snagged;
               if (info.reviewed && info.approved) {
                 return (info.ci === "passed" && !info.inMergeQueue)
