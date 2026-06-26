@@ -3,6 +3,11 @@
 RWStructuredBuffer<float> output;
 RWStructuredBuffer<Atomic<uint> > atomicOut;
 
+struct SelfRef
+{
+    SelfRef* next;
+}
+
 // Case 1 (the core bug): a direct copy of an uninitialized scalar local that
 // is then written to an output buffer element. Previously the copy was
 // silently elided so no warning was produced; now the uninitialized read is
@@ -89,6 +94,19 @@ void matrix_swizzle_copy()
 //CHK:           ^^^^^^ use of uninitialized variable
 //CHK:           ^^^^^^ use of uninitialized variable 'uninit'
     output[3] = m[0][0] + m[1][1];
+}
+
+// Case 7 (negative control): storing the *address* of a variable is not a read
+// of its contents. `s.next = &s;` lowers to `store(getFieldAddr(s), s)`, where
+// the value operand is the `s` pointer itself; taking an address does not read
+// the (still-uninitialized) memory, so no warning must be produced here. This
+// guards against over-broadening the store-family value-operand reclassification
+// (the exhaustive `diag=CHK` matching fails if any unannotated warning appears).
+void store_address_not_a_read()
+{
+    SelfRef s;
+    s.next = &s;
+    output[4] = 0.0;
 }
 
 [Shader("compute")]

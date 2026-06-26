@@ -287,11 +287,17 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
         // Each of these writes to its destination pointer (operand 0) but
         // *reads* the value/source being stored (operand 1). When the tracked
         // instruction is that value -- rather than the destination -- the store
-        // is a use (a read) of the value, not a write to it, so classify it as
-        // a `Load`. This lets a direct copy of an uninitialized value (e.g.
-        // `x = uninit;` or `v.x = uninit;`) be detected just like feeding it to
-        // an expression (`x = uninit + 1.0;`).
-        if (inst == user->getOperand(1))
+        // reads it, so classify it as a `Load`. This lets a direct copy of an
+        // uninitialized value (e.g. `x = uninit;` or `v.x = uninit;`) be
+        // detected just like feeding it to an expression (`x = uninit + 1.0;`).
+        //
+        // A pointer-typed operand is excluded: a store whose value is an
+        // address (e.g. a variable's own address in `self.self = &self;`, which
+        // lowers to `store(getFieldAddr(self), self)` with the `self` pointer as
+        // the value) stores that address without reading the pointed-to memory,
+        // so it is not a use of the location. This mirrors the pointer-vs-value
+        // rule used by the `default` case below.
+        if (inst == user->getOperand(1) && !as<IRPtrTypeBase>(inst->getDataType()))
             return Load;
         return Store;
 
