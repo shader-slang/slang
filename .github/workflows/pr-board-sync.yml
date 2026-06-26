@@ -127,6 +127,10 @@ on:
         description: "org/team-slug tracking the current maintainer(s); the fallback assignee when a non-Internal PR has no linked-issue or committer-signal owner."
         type: string
         default: "shader-slang/slang-maintainer"
+      fallback_assignee:
+        description: "Last-resort assignee for a non-Internal PR when maintainer_team is empty/unset/unreadable and no linked-issue or committer-signal owner is found, so PRs are never left unassigned. Never requested as a reviewer (it is typically an ignored non-approver). Empty disables this fallback (the PR is left to the sweep)."
+        type: string
+        default: "bmillsNV"
     secrets:
       SLANG_PR_BOT_TOKEN:
         description: "Dedicated bot PAT used for every GitHub call this workflow makes (org Projects RW + Members read; repo Contents read, Pull requests write, Issues write, Metadata read)."
@@ -210,6 +214,7 @@ jobs:
           OWNERS_TEAM: ${{ inputs.owners_team }}
           BOT_OWNERS_TEAM: ${{ inputs.bot_owners_team }}
           MAINTAINER_TEAM: ${{ inputs.maintainer_team }}
+          FALLBACK_ASSIGNEE: ${{ inputs.fallback_assignee }}
         with:
           github-token: ${{ secrets.SLANG_PR_BOT_TOKEN }}
           script: |
@@ -231,6 +236,7 @@ jobs:
             const OWNERS_TEAM = process.env.OWNERS_TEAM || "";
             const BOT_OWNERS_TEAM = process.env.BOT_OWNERS_TEAM || "";
             const MAINTAINER_TEAM = process.env.MAINTAINER_TEAM || "";
+            const FALLBACK_ASSIGNEE = process.env.FALLBACK_ASSIGNEE || "";
 
             // Committer-signal ranking + assignee/reviewer selection, inlined so
             // this reusable workflow needs NO checkout when called cross-repo
@@ -917,10 +923,12 @@ jobs:
               return _collabCache;
             }
 
-            // The fallback assignee: the (sorted-first) member of the maintainer
-            // team. Empty when the team is unset/empty -> no maintainer fallback
-            // (selectAssigneeAndReviewers then yields no pick and we leave it to
-            // the sweep). Cached per run.
+            // The fallback assignee for a non-Internal PR that has no linked-issue
+            // or committer-signal owner: the (sorted-first) member of the
+            // maintainer team, else FALLBACK_ASSIGNEE (e.g. bmillsNV) when that
+            // team is unset/empty/unreadable, so a PR is never left unassigned.
+            // Only "" if both are unset, in which case selectAssigneeAndReviewers
+            // yields no pick and we leave it to the sweep. Cached per run.
             let _maintainer;
             async function resolveMaintainer() {
               if (_maintainer !== undefined) return _maintainer;
@@ -928,7 +936,7 @@ jobs:
               if (members.length > 1)
                 core.warning(
                   `maintainer team ${MAINTAINER_TEAM} has ${members.length} members; using ${members[0]}`);
-              _maintainer = members[0] || "";
+              _maintainer = members[0] || FALLBACK_ASSIGNEE;
               return _maintainer;
             }
 
@@ -1004,16 +1012,19 @@ jobs:
 
               // Request the selected reviewers (assignee + top dev-not-owner). The
               // selection already drops the author and the case where a real
-              // reviewer is present, so an empty list means "request nobody".
-              if (reviewers.length) {
+              // reviewer is present. Also never request an ignored non-approver
+              // (e.g. the bmillsNV fallback assignee), which can legitimately leave
+              // the reviewer set empty -- that is fine.
+              const toRequest = reviewers.filter(r => !IGNORED.has(r.toLowerCase()));
+              if (toRequest.length) {
                 try {
                   await github.rest.pulls.requestReviewers({
                     owner: context.repo.owner, repo: context.repo.repo,
-                    pull_number: number, reviewers,
+                    pull_number: number, reviewers: toRequest,
                   });
                 } catch (error) {
                   core.warning(
-                    `could not request reviewers ${reviewers.join(", ")} (${error.status})`);
+                    `could not request reviewers ${toRequest.join(", ")} (${error.status})`);
                 }
               }
             }
