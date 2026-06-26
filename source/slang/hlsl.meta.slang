@@ -17237,10 +17237,14 @@ uint WaveGetLaneIndex()
 
 /// Returns the number of waves (subgroups) in the current workgroup.
 /// Equivalent to GLSL gl_NumSubgroups.
+///
+/// On GLSL and SPIR-V this lowers to gl_NumSubgroups / BuiltIn NumSubgroups,
+/// which are restricted to compute-class execution models (compute, mesh,
+/// amplification); using it from any other stage is a capability error.
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_workgroup_index)]
 uint WaveGetNumWaves()
 {
     __target_switch
@@ -17273,12 +17277,16 @@ uint WaveGetNumWaves()
 
 /// Returns the index of the current wave (subgroup) within the workgroup.
 /// Equivalent to GLSL gl_SubgroupID / Metal simdgroup_index_in_threadgroup.
+///
+/// On GLSL and SPIR-V this lowers to gl_SubgroupID / BuiltIn SubgroupId,
+/// which are restricted to compute-class execution models (compute, mesh,
+/// amplification); using it from any other stage is a capability error.
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
 [ForceInline]
-[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_workgroup_index)]
 uint WaveGetWaveIndex()
 {
     __target_switch

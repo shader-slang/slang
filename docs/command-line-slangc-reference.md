@@ -1774,6 +1774,7 @@ A capability describes an optional feature that a target may or may not support.
 * `shader5_sm_5_0` 
 * `pack_vector` 
 * `subgroup_basic` 
+* `subgroup_workgroup_index` 
 * `subgroup_ballot` 
 * `subgroup_ballot_activemask` 
 * `subgroup_basic_ballot` 
