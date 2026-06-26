@@ -14,8 +14,12 @@
 //TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
 
 // Before the fix the lowered handle fields were `uint2`; on Metal they must be
-// scalar `ulong`. (This shader has only scalar `int` payloads, so no unrelated
-// `uint2` is expected in the Metal output.)
+// scalar `ulong`. This shader has only scalar `int` payloads and no vectors, so
+// the only `uint2`/`ulong`-relevant values in the Metal output are the lowered
+// handle fields: the output must contain `ulong` and must contain no `uint2`
+// anywhere. The two `MTL-NOT: uint2` directives bracket the positive `ulong`
+// match so the absence of `uint2` is asserted across the whole emitted source.
+// MTL-NOT: uint2
 // MTL: ulong
 // MTL-NOT: uint2
 

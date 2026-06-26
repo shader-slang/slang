@@ -1949,9 +1949,10 @@ struct ExistentialLoweringContext : public InstPassBase
 
     bool processGetSequentialIDInst(IRGetSequentialID* inst)
     {
-        // If the operand is a witness table, it is already replaced with a uint2
-        // at this point, where the first element in the uint2 is the id of the
-        // witness table.
+        // If the operand is a witness table, it has already been replaced with the
+        // lowered handle representation chosen by lowerHandleTypes() — a `uint2`
+        // (id in element 0) on most targets, or a scalar `ulong` (id in the low 32
+        // bits) on Metal. The id is read back accordingly below.
         //
 
         IRBuilder builder(module);
