@@ -95,16 +95,22 @@ private:
     //    `GetArrayLength` (simplify once the type concretizes) and a set-specialized
     //    `Specialize` (lowered/deallocated by Phase 2) — are deliberately not cached, and any
     //    future op kind defaults to not cached, which is safe by construction.
-    //  - Sets are module-scope and are not freed while the cache is live, so the pointer key
-    //    cannot be invalidated by an inst being deallocated and its address reused.
-    //    `resolveInst` additionally `SLANG_RELEASE_ASSERT`s the cached inst is still
-    //    module-attached on every hit, so any future caller that violates this fails loudly
-    //    in every build instead of reading a stale pointer.
+    //  - The pointer key stays valid for as long as the cache could return it. A recorded set
+    //    *can* be freed mid-run: `_replaceInstUsesWith` (slang-ir.cpp) rebuilds a hoistable set
+    //    when one of its elements is RAUW'd, and frees the old set if the rebuild deduplicates to
+    //    a different one. But that path calls `replaceUsesWith(newSet)` on the old set *before*
+    //    freeing it, redirecting every reference — operands, data-types, and the weak use that
+    //    `_resolveInstRec` re-reads via `instRef` — to the live target. So once a set is freed no
+    //    live inst references it, it is off the module's inst list, and `resolveInst` is never
+    //    called on it again; the cache never returns a freed pointer. (Address reuse is also
+    //    impossible: the IR arena does not free individual allocations.) The fast path
+    //    `SLANG_RELEASE_ASSERT`s the cached inst is still module-attached, so if a future change
+    //    ever did re-query a freed set it fails loudly rather than returning a stale pointer.
     //
-    // Lifetime: the cache lives for one `TranslationContext` (a single specialization run)
-    // and is never cleared. Its growth is bounded by the number of set insts in the module
-    // (at most one entry per set), and those sets outlive the cache — which is what keeps
-    // their addresses, and therefore the pointer keys, stable.
+    // Lifetime: the cache lives for one `TranslationContext` (a single specialization run) and is
+    // never cleared; growth is bounded by the number of set insts in the module (at most one entry
+    // per set). An entry for a set that was later deduplicated away is dead (never re-queried, per
+    // the previous point) but harmless.
     HashSet<IRInst*> resolvedStructuralFixedPoints;
 };
 
