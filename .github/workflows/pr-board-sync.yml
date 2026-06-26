@@ -5,7 +5,10 @@ name: PR Board Sync (reusable)
 #   - adds the PR to the board (idempotent),
 #   - classifies + sets its Source (Internal / Community / Bot),
 #   - advances its Status (In Review / Revising / Snagged / Approved / Done)
-#     on the event-driven happy path, and
+#     on the event-driven happy path,
+#   - backfills the assignee from a high-confidence pick (an Internal PR's
+#     author, or a linked issue's owner-team assignee) and requests that owner
+#     as reviewer, and
 #   - unrequests auto-assigned reviewers that cannot approve (e.g. bmillsNV).
 #
 # Status state machine (two variants that differ ONLY on a CI failure):
@@ -28,10 +31,12 @@ name: PR Board Sync (reusable)
 # is Snagged for both, since a human assignee always resolves that.
 #
 # This is the event-driven half of the slang-pr-maintenance state machine. The
-# committer-signal owner/reviewer *assignment* and full drift reconciliation
-# still live in scripts/pr_sweep.py (run on a cadence), which is idempotent and
-# acts as the safety net for events this workflow cannot see (e.g. fork-PR CI,
-# missed webhooks, repos not yet onboarded).
+# lower-confidence half of *assignment* -- the committer-signal owner/reviewer
+# ranking and the maintainer fallback -- plus full drift reconciliation still
+# live in scripts/pr_sweep.py (run on a cadence), which is idempotent and acts
+# as the safety net for events this workflow cannot see (e.g. fork-PR CI, missed
+# webhooks, a linked issue assigned/linked after the PR opened, repos not yet
+# onboarded).
 #
 # Cross-repo reuse: any shader-slang repo adds a thin caller workflow that
 # declares the PR event triggers and calls this one, mapping the single required
@@ -107,6 +112,14 @@ on:
         description: "Comma-separated auto-assigned reviewers that cannot approve; unrequested on the PR."
         type: string
         default: "bmillsNV"
+      owners_team:
+        description: "org/team-slug whose members may be inherited as a Community PR's assignee from a linked issue."
+        type: string
+        default: "shader-slang/pr-owners"
+      bot_owners_team:
+        description: "org/team-slug whose members may be inherited as a Bot PR's assignee from a linked issue."
+        type: string
+        default: "shader-slang/bot-pr-owners"
     secrets:
       SLANG_PR_BOT_TOKEN:
         description: "Dedicated bot PAT used for every GitHub call this workflow makes (org Projects RW + Members read; repo Contents read, Pull requests write, Issues write, Metadata read)."
@@ -183,8 +196,12 @@ jobs:
           STATUS_DONE: ${{ inputs.status_done }}
           SOURCE_FIELD: ${{ inputs.source_field }}
           SOURCE_VALUE: ${{ steps.classify.outputs.source }}
+          SOURCE_INTERNAL: ${{ inputs.source_internal }}
           SOURCE_BOT: ${{ inputs.source_bot }}
           BOT_AUTHORS: ${{ inputs.bot_authors }}
+          IGNORED_REVIEWERS: ${{ inputs.ignored_reviewers }}
+          OWNERS_TEAM: ${{ inputs.owners_team }}
+          BOT_OWNERS_TEAM: ${{ inputs.bot_owners_team }}
         with:
           github-token: ${{ secrets.SLANG_PR_BOT_TOKEN }}
           script: |
@@ -198,8 +215,13 @@ jobs:
               done: process.env.STATUS_DONE,
             };
             const SOURCE_FIELD = process.env.SOURCE_FIELD;
+            const SOURCE_INTERNAL = process.env.SOURCE_INTERNAL;
             const BOT_AUTHORS = (process.env.BOT_AUTHORS || "")
               .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+            const IGNORED = new Set((process.env.IGNORED_REVIEWERS || "")
+              .split(",").map(s => s.trim().toLowerCase()).filter(Boolean));
+            const OWNERS_TEAM = process.env.OWNERS_TEAM || "";
+            const BOT_OWNERS_TEAM = process.env.BOT_OWNERS_TEAM || "";
 
             // --- ProjectsV2 helpers (mirror Applier in pr_sweep.py) ----------
             const fieldCache = {};
@@ -294,6 +316,9 @@ jobs:
                     pullRequest(number: $n) {
                       id isDraft state
                       author { login __typename }
+                      assignees(first: 10) { nodes { login } }
+                      reviewRequests(first: 20) { nodes { requestedReviewer { __typename ... on User { login } } } }
+                      closingIssuesReferences(first: 10) { nodes { assignees(first: 20) { nodes { login } } } }
                       mergeQueueEntry { id }
                       latestOpinionatedReviews(first: 100) { nodes { state commit { oid } } }
                       commits(last: 1) { nodes { commit { oid statusCheckRollup {
@@ -337,10 +362,27 @@ jobs:
                 .map(r => r.state);
               const changeRequested = states.includes("CHANGES_REQUESTED");
               const approved = states.includes("APPROVED") && !changeRequested;
+              // Assignment inputs: who is assigned, which real reviewers are
+              // requested, and the assignees of the PR's linked (closing) issues.
+              const authorLogin = pr.author?.login || "";
+              const assignees = (pr.assignees?.nodes || [])
+                .map(n => n.login).filter(Boolean);
+              const requestedReviewers = (pr.reviewRequests?.nodes || [])
+                .map(n => n.requestedReviewer)
+                .filter(r => r && r.__typename === "User" && r.login)
+                .map(r => r.login);
+              const issueAssignees = [];
+              for (const iss of (pr.closingIssuesReferences?.nodes || [])) {
+                for (const a of (iss.assignees?.nodes || [])) {
+                  if (a.login && !issueAssignees.includes(a.login))
+                    issueAssignees.push(a.login);
+                }
+              }
               return {
                 nodeId: pr.id, isDraft: pr.isDraft, isBot,
                 ci: summarizeCi(runs), approved, changeRequested,
                 inMergeQueue: pr.mergeQueueEntry != null,
+                authorLogin, assignees, requestedReviewers, issueAssignees,
               };
             }
 
@@ -377,9 +419,108 @@ jobs:
               return STATUS.inreview;
             }
 
-            // Reconcile a PR's board Status to computeTarget(observed state). Used
-            // by every event that can change the lattice state, so each event just
-            // recomputes the whole target rather than hard-coding a transition.
+            function isBotLogin(login) {
+              const l = (login || "").toLowerCase();
+              return BOT_AUTHORS.includes(l) || l.endsWith("[bot]");
+            }
+
+            // Is `login` a member of `teamSpec` ("org/slug", or a bare slug under
+            // this repo's org)? Cached per run. A 404 means "not a member"; any
+            // other read error is treated as "not a member" (fail safe: we simply
+            // skip the inherited assignment and let the sweep decide).
+            const teamMemberCache = {};
+            async function isTeamMember(teamSpec, login) {
+              if (!teamSpec || !login) return false;
+              const key = `${teamSpec}:${login.toLowerCase()}`;
+              if (key in teamMemberCache) return teamMemberCache[key];
+              const slash = teamSpec.indexOf("/");
+              const org = slash >= 0 ? teamSpec.slice(0, slash) : context.repo.owner;
+              const slug = slash >= 0 ? teamSpec.slice(slash + 1) : teamSpec;
+              let member = false;
+              try {
+                await github.rest.teams.getMembershipForUserInOrg(
+                  { org, team_slug: slug, username: login });
+                member = true;
+              } catch (error) {
+                if (error.status !== 404)
+                  core.warning(
+                    `could not read ${login} membership in ${teamSpec} (${error.status})`);
+              }
+              teamMemberCache[key] = member;
+              return member;
+            }
+
+            // Backfill a PR's assignee (and request them as reviewer), mirroring the
+            // signal-free half of pr_sweep.py's select_assignee_and_reviewers. This
+            // real-time path acts ONLY on a high-confidence pick: an Internal PR's
+            // author, or the first linked-issue assignee who is a member of the
+            // relevant owners team. The committer-signal fallback, the maintainer
+            // fallback, and the extra dev-reviewer remain the cadence sweep's job.
+            // Idempotent: it only ever assigns an UNASSIGNED PR, so re-running on any
+            // event is a no-op once an owner is set, and the pick is a pure function
+            // of observed state (so concurrent event runs converge on the same
+            // login; addAssignees is a set union).
+            async function reconcileAssignment(info, source, number) {
+              if (!source) return;                     // Source unknown -> leave to sweep
+              if (info.assignees.length) return;        // already assigned
+              if (info.inMergeQueue) return;            // far enough along
+              if (info.isDraft && !info.isBot) return;  // human draft: author's "not ready"
+
+              let assignee = null;
+              if (source === SOURCE_INTERNAL) {
+                // Internal: the author drives; assign them, request no reviewers.
+                assignee = info.authorLogin;
+              } else {
+                // Community/Bot: inherit the first linked-issue assignee who is a
+                // member of the relevant owners team (excluding the author/bots).
+                // No maintainer/signal fallback here -- that is the sweep's job.
+                const pool =
+                  (source === process.env.SOURCE_BOT) ? BOT_OWNERS_TEAM : OWNERS_TEAM;
+                for (const cand of info.issueAssignees) {
+                  if (cand.toLowerCase() === info.authorLogin.toLowerCase()) continue;
+                  if (cand.toLowerCase().endsWith("[bot]")) continue;
+                  if (await isTeamMember(pool, cand)) { assignee = cand; break; }
+                }
+              }
+              if (!assignee) return;                    // nothing high-confidence to do
+
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: number, assignees: [assignee],
+              });
+              console.log(`assigned ${assignee} (source ${source})`);
+
+              // Unrequest auto-assigned non-approvers (e.g. bmillsNV), coupled to
+              // assignment exactly as the sweep does.
+              const toRemove =
+                info.requestedReviewers.filter(r => IGNORED.has(r.toLowerCase()));
+              if (toRemove.length) {
+                await github.rest.pulls.removeRequestedReviewers({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  pull_number: number, reviewers: toRemove,
+                });
+              }
+
+              // Request the assignee as reviewer for Community/Bot, unless a real
+              // (non-bot, non-ignored) reviewer is already requested. Internal PRs
+              // get no auto-requested reviewer. GitHub rejects requesting the author.
+              if (source !== SOURCE_INTERNAL) {
+                const realExisting = info.requestedReviewers.some(
+                  r => !IGNORED.has(r.toLowerCase()) && !isBotLogin(r));
+                if (!realExisting &&
+                    assignee.toLowerCase() !== info.authorLogin.toLowerCase()) {
+                  await github.rest.pulls.requestReviewers({
+                    owner: context.repo.owner, repo: context.repo.repo,
+                    pull_number: number, reviewers: [assignee],
+                  });
+                }
+              }
+            }
+
+            // Reconcile a PR's board Status to computeTarget(observed state), then
+            // backfill its assignee. Used by every event that can change the lattice
+            // state, so each event just recomputes the whole target rather than
+            // hard-coding a transition.
             async function reconcileStatus(number, nodeId, itemId) {
               const info = await prInfo(number);
               if (!info) return;
@@ -393,6 +534,7 @@ jobs:
                 (await itemSingleSelect(itemId, SOURCE_FIELD)) || process.env.SOURCE_VALUE || "";
               if (resolvedSource) info.isBot = (resolvedSource === process.env.SOURCE_BOT);
               await setSingleSelect(itemId, STATUS.field, computeTarget(info));
+              await reconcileAssignment(info, resolvedSource, number);
             }
 
             // --- Dispatch on the triggering event ----------------------------
@@ -472,9 +614,11 @@ jobs:
       # Runs only at onboarding (opened/reopened) to strip an auto-assigned
       # non-approver (e.g. bmillsNV) that repo automation requests on a new PR. It
       # deliberately does NOT run on review_requested, so a maintainer manually
-      # requesting that reviewer is never undone. The cadence sweep
-      # (scripts/pr_sweep.py) is the backstop, removing it when it assigns an owner;
-      # once this workflow does its own assignment, fold the unrequest into that.
+      # requesting that reviewer is never undone. reconcileAssignment also unrequests
+      # these (coupled to assignment, like the sweep), but only when it assigns an
+      # owner; this onboarding step still covers PRs that get no high-confidence
+      # assignment (e.g. a Community PR with no linked-issue owner). The cadence
+      # sweep (scripts/pr_sweep.py) remains the backstop for both.
       - name: Unrequest ignored reviewers
         if: >-
           github.event_name == 'pull_request_target' &&
