@@ -8658,34 +8658,34 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
 
     switch (literalType)
     {
-        case FloatingPointLiteralType::Half:
-            suffixBaseType = BaseType::Half;
-            break;
+    case FloatingPointLiteralType::Half:
+        suffixBaseType = BaseType::Half;
+        break;
 
-        case FloatingPointLiteralType::Float:
-            suffixBaseType = BaseType::Float;
-            break;
+    case FloatingPointLiteralType::Float:
+        suffixBaseType = BaseType::Float;
+        break;
 
-        case FloatingPointLiteralType::Double:
-            suffixBaseType = BaseType::Double;
-            break;
+    case FloatingPointLiteralType::Double:
+        suffixBaseType = BaseType::Double;
+        break;
 
-        default:
-            SLANG_ASSERT(!"Unhandled floating point literal type");
-            // fall-through
-        case FloatingPointLiteralType::BadSignificand:
-            parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralNumber{
-                .number = String(errorContent),
-                .location = token.loc});
-            diagnosed = true;
-            break;
+    default:
+        SLANG_ASSERT(!"Unhandled floating point literal type");
+        // fall-through
+    case FloatingPointLiteralType::BadSignificand:
+        parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralNumber{
+            .number = String(errorContent),
+            .location = token.loc});
+        diagnosed = true;
+        break;
 
-        case FloatingPointLiteralType::BadSuffix:
-            parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
-                .suffix = String(errorContent),
-                .location = token.loc});
-            diagnosed = true;
-            break;
+    case FloatingPointLiteralType::BadSuffix:
+        parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
+            .suffix = String(errorContent),
+            .location = token.loc});
+        diagnosed = true;
+        break;
     }
 
     if (isOutOfRange && !diagnosed)

@@ -788,11 +788,13 @@ IntegerLiteralValue getIntegerLiteralValue(
 //
 // Parameters:
 //
-//   value           - Value to round. When a regular number, must be >= 0. May also be 0, +infinity, NaN.
+//   value           - Value to round. When a regular number, must be >= 0. May also be 0,
+//                     +infinity, NaN.
 //   minNormalExp    - Minimum normal exponent before subnormal
 //   maxExp          - Maximum exponent. Anything above that is +INFINITY
 //   precisionBits   - Precision in number of bits
-//   roundToNearest  - Rounding mode: true = round to nearest, ties to even. False = truncate (round towards zero)
+//   roundToNearest  - Rounding mode: true = round to nearest, ties to even. False = truncate
+//                     (round towards zero)
 //
 // Note:
 // - float:  -126, +127, 24
@@ -1232,7 +1234,12 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     }
     else if (hexFloat)
     {
-        value = _hexFloatLiteralToDouble(number.begin(), number.end(), cursor, isOutOfRange, precisionLost);
+        value = _hexFloatLiteralToDouble(
+            number.begin(),
+            number.end(),
+            cursor,
+            isOutOfRange,
+            precisionLost);
 
         double oldValue = value;
 
