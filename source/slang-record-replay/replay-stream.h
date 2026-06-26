@@ -40,7 +40,7 @@ public:
     // =========================================================================
 
     /// Create an empty stream for writing (capture mode).
-    SLANG_API ReplayStream();
+    ReplayStream() = default;
 
     /// Create a reading stream from existing data.
     /// Makes a copy of the data.
@@ -55,8 +55,8 @@ public:
     SLANG_API static ReplayStream loadFromFile(const char* path);
 
     // Move-only (no copying)
-    SLANG_API ReplayStream(ReplayStream&&);
-    SLANG_API ReplayStream& operator=(ReplayStream&&);
+    ReplayStream(ReplayStream&&) = default;
+    ReplayStream& operator=(ReplayStream&&) = default;
     ReplayStream(const ReplayStream&) = delete;
     ReplayStream& operator=(const ReplayStream&) = delete;
 

@@ -1338,7 +1338,7 @@ struct LoadContext
 
 /* static */ ReproUtil::RequestState* ReproUtil::getRequest(const void* data, size_t size)
 {
-    if (size < kStartOffset + sizeof(ReproUtil::RequestState))
+    if (!data || size < kStartOffset || size - kStartOffset < sizeof(ReproUtil::RequestState))
     {
         return nullptr;
     }

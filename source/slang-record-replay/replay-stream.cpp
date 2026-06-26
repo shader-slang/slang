@@ -1,14 +1,15 @@
 #include "slang-record-replay/replay-stream.h"
 
+#include <limits>
+
 namespace SlangRecord
 {
-
-ReplayStream::ReplayStream() = default;
 
 ReplayStream::ReplayStream(const void* data, size_t size)
     : m_isReading(true)
 {
-    if (data && size > 0)
+    SLANG_RELEASE_ASSERT(data || size == 0);
+    if (size > 0)
     {
         m_buffer.setCount(size);
         std::memcpy(m_buffer.getBuffer(), data, size);
@@ -29,10 +30,6 @@ ReplayStream ReplayStream::loadFromFile(const char* path)
     return stream;
 }
 
-ReplayStream::ReplayStream(ReplayStream&&) = default;
-
-ReplayStream& ReplayStream::operator=(ReplayStream&&) = default;
-
 ReplayStream::~ReplayStream()
 {
     closeMirrorFile();
@@ -42,6 +39,12 @@ void ReplayStream::write(const void* data, size_t size)
 {
     if (m_isReading)
         throw Slang::Exception("Cannot write to a reading stream");
+
+    if (size == 0)
+        return;
+
+    if (size > (std::numeric_limits<size_t>::max)() - m_position)
+        throw Slang::Exception("Write past maximum stream size");
 
     size_t newSize = m_position + size;
     if (newSize > size_t(m_buffer.getCapacity()))
@@ -68,7 +71,8 @@ void ReplayStream::read(void* data, size_t size)
     if (!m_isReading)
         throw Slang::Exception("Cannot read from a writing stream");
 
-    if (m_position + size > size_t(m_buffer.getCount()))
+    const size_t bufferSize = size_t(m_buffer.getCount());
+    if (m_position > bufferSize || size > bufferSize - m_position)
         throw Slang::Exception("Read past end of stream");
 
     std::memcpy(data, m_buffer.getBuffer() + m_position, size);
@@ -87,11 +91,8 @@ void ReplayStream::setMirrorFile(const char* path)
     closeMirrorFile();
 
     m_mirrorFile = new FileStream();
-    SlangResult result = m_mirrorFile->init(
-        String(path),
-        FileMode::Create,
-        FileAccess::Write,
-        FileShare::ReadWrite);
+    SlangResult result =
+        m_mirrorFile->init(String(path), FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
     if (SLANG_FAILED(result))
     {
         m_mirrorFile = nullptr;

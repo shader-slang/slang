@@ -1267,9 +1267,7 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
     loadReproBlobState(savedReproBlob, loadedBlob);
 
     MemoryOffsetBase loadedBase;
-    loadedBase.set(
-        const_cast<void*>(loadedBlob->getBufferPointer()),
-        loadedBlob->getBufferSize());
+    loadedBase.set(const_cast<void*>(loadedBlob->getBufferPointer()), loadedBlob->getBufferSize());
     auto loadedRequestState =
         ReproUtil::getRequest(loadedBlob->getBufferPointer(), loadedBlob->getBufferSize());
     SLANG_CHECK_ABORT(loadedRequestState->translationUnits.getCount() == 2);
