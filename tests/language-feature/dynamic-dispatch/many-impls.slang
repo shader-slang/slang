@@ -13,12 +13,16 @@
 // lives in the compile-perf suite; this test verifies the dispatch still produces
 // correct results after the resolution cache.
 
+// anyValueSize(16) is a safe upper bound for the boxed payload: S0..S7 are stateless, so
+// the any-value just needs room for the type tag.
 [anyValueSize(16)]
 interface IShape
 {
     int eval(int x);
 }
 
+// Each Si evaluates to Si::eval(x) = x*(i+1) + i, so at x = 10 the outputs are
+// 10, 21, 32, 43, 54, 65, 76, 87 — i.e. CHECK line i corresponds to shapes[i].
 struct S0 : IShape { int eval(int x) { return x * 1 + 0; } }
 struct S1 : IShape { int eval(int x) { return x * 2 + 1; } }
 struct S2 : IShape { int eval(int x) { return x * 3 + 2; } }

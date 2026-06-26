@@ -42,11 +42,17 @@ public:
 
     IRInst* resolveInst(IRInst* inst);
 
-    // Record `inst` as a structural fixed point of `resolveInst` so subsequent calls
-    // can return it in O(1). Called by `_resolveInstRec` only for witness-table / type
-    // `set` insts — see `resolvedStructuralFixedPoints` for why those are the only insts
-    // it is sound to record.
-    void recordStructuralFixedPoint(IRInst* inst) { resolvedStructuralFixedPoints.add(inst); }
+    // Record `inst` as a structural fixed point of `resolveInst`, so subsequent calls can
+    // return it in O(1). Precondition: `inst` is an `IRSetBase` (a witness-table / type
+    // `set`) that has resolved to itself — see `resolvedStructuralFixedPoints` for why a set
+    // is the only kind sound to record. The precondition is release-asserted because the
+    // cache's soundness depends on it: a non-set recorded here would later be returned
+    // unchanged, masking a resolution the set-only invariant rules out.
+    void recordStructuralFixedPoint(IRInst* inst)
+    {
+        SLANG_RELEASE_ASSERT(as<IRSetBase>(inst));
+        resolvedStructuralFixedPoints.add(inst);
+    }
 
     IRModule* getModule() const { return irModule; }
 
@@ -94,6 +100,11 @@ private:
     //    `resolveInst` additionally `SLANG_RELEASE_ASSERT`s the cached inst is still
     //    module-attached on every hit, so any future caller that violates this fails loudly
     //    in every build instead of reading a stale pointer.
+    //
+    // Lifetime: the cache lives for one `TranslationContext` (a single specialization run)
+    // and is never cleared. Its growth is bounded by the number of set insts in the module
+    // (at most one entry per set), and those sets outlive the cache — which is what keeps
+    // their addresses, and therefore the pointer keys, stable.
     HashSet<IRInst*> resolvedStructuralFixedPoints;
 };
 

@@ -511,23 +511,10 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
             specializeWitnessLookup(cast<IRLookupWitnessMethod>(instWithCanonicalOperands)));
     }
 
-    // Record a witness-table / type `set` as a structural fixed point so the next
-    // `resolveInst` call returns it in O(1) instead of re-walking its operands. A set is
-    // the O(N)-operand inst at the root of the quadratic (see the commit message): its
-    // members are concrete witness tables / types that are themselves permanent fixed
-    // points, it has no specialization / translation / fold / witness-lookup form, and
-    // `_resolveInstRec` never transforms it — so it is monotonic and can never resolve to
-    // anything other than itself. Caching only the sets is also sufficient for the perf
-    // win: anything that references a set (e.g. a `TaggedUnion` type) recurses into the
-    // cached set and so becomes O(1) too.
-    //
-    // This is a whitelist on purpose. Other op kinds also reach this fall-through but are
-    // *not* monotonic — they are left as-is here only because their conditional transform
-    // has not fired yet, and a later call can resolve them once their operands concretize:
-    // `SizeOf` / `AlignOf` / `GetArrayLength` (simplify once the type is concrete, lines
-    // ~406-416) and a set-specialized `Specialize` (lowered and deallocated by Phase 2).
-    // Caching any of those would mask the later resolution, so only `IRSetBase` is cached;
-    // every other kind defaults to not cached, which is safe by construction.
+    // Only witness-table / type `set` insts are cached: a set is the O(N)-operand inst at
+    // the root of the quadratic, and the only kind sound to record here (other op kinds also
+    // reach this fall-through but are non-monotonic). See `resolvedStructuralFixedPoints` for
+    // the full whitelist rationale.
     if (as<IRSetBase>(instWithCanonicalOperands))
         ctx->recordStructuralFixedPoint(instWithCanonicalOperands);
     return instWithCanonicalOperands;
