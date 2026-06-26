@@ -46,6 +46,7 @@ public:
     /// Makes a copy of the data.
     /// @param data Pointer to the data.
     /// @param size Size of the data in bytes.
+    /// data must be non-null when size is nonzero.
     SLANG_API ReplayStream(const void* data, size_t size);
 
     /// Create a reading stream by loading entire file into memory.
@@ -56,7 +57,7 @@ public:
 
     // Move-only (no copying)
     ReplayStream(ReplayStream&&) = default;
-    ReplayStream& operator=(ReplayStream&&) = default;
+    SLANG_API ReplayStream& operator=(ReplayStream&& other);
     ReplayStream(const ReplayStream&) = delete;
     ReplayStream& operator=(const ReplayStream&) = delete;
 

@@ -30,6 +30,25 @@ ReplayStream ReplayStream::loadFromFile(const char* path)
     return stream;
 }
 
+ReplayStream& ReplayStream::operator=(ReplayStream&& other)
+{
+    if (this == &other)
+    {
+        return *this;
+    }
+
+    closeMirrorFile();
+    m_buffer = Slang::_Move(other.m_buffer);
+    m_position = other.m_position;
+    m_isReading = other.m_isReading;
+    m_mirrorFile = Slang::_Move(other.m_mirrorFile);
+
+    other.m_position = 0;
+    other.m_isReading = false;
+
+    return *this;
+}
+
 ReplayStream::~ReplayStream()
 {
     closeMirrorFile();

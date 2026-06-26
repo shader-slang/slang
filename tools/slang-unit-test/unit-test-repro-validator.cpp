@@ -1117,6 +1117,21 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsEmptyPayload)
     SLANG_CHECK(outputContainsDiagnosticId(sink, Severity::Error, kInvalidReproStateDiagnosticId));
 }
 
+SLANG_UNIT_TEST(reproStateLoadStateRejectsNullBlobOutParam)
+{
+    List<uint8_t> payload;
+    buildMinimalValid(payload);
+    List<uint8_t> riffData;
+    buildStateRiff(payload, riffData);
+
+    DiagnosticSink sink;
+    SlangResult result =
+        ReproUtil::loadState(riffData.getBuffer(), riffData.getCount(), &sink, nullptr);
+
+    SLANG_CHECK(SLANG_FAILED(result));
+    SLANG_CHECK(sink.getErrorCount() == 0);
+}
+
 SLANG_UNIT_TEST(reproStateValidatorAcceptsSavedState)
 {
     auto session = spCreateSession();

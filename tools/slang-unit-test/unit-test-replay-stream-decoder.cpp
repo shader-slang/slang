@@ -2,6 +2,8 @@
 #include "unit-test/slang-unit-test.h"
 
 #include <cstdint>
+#include <limits>
+#include <stdlib.h>
 
 using namespace Slang;
 using namespace SlangRecord;
@@ -10,6 +12,70 @@ static bool containsString(const String& text, const char* value)
 {
     return text.indexOf(UnownedStringSlice(value)) != -1;
 }
+
+static int _writeEnvironmentVariable(const char* key, const char* val)
+{
+#ifdef _WIN32
+    String var = String(key) + "=" + val;
+    return _putenv(var.getBuffer());
+#else
+    return setenv(key, val, 1);
+#endif
+}
+
+static int _unsetEnvironmentVariable(const char* key)
+{
+#ifdef _WIN32
+    String var = String(key) + "=";
+    return _putenv(var.getBuffer());
+#else
+    return unsetenv(key);
+#endif
+}
+
+struct ScopedEnvVar
+{
+    const char* key;
+    bool hadOldValue = false;
+    String oldValue;
+
+    ScopedEnvVar(const char* inKey, const char* inVal)
+        : key(inKey)
+    {
+#ifdef _WIN32
+        char* value = nullptr;
+        size_t valueLength = 0;
+        if (_dupenv_s(&value, &valueLength, key) == 0 && value)
+        {
+            hadOldValue = true;
+            oldValue = value;
+            free(value);
+        }
+#else
+        if (const char* value = getenv(key))
+        {
+            hadOldValue = true;
+            oldValue = value;
+        }
+#endif
+        _writeEnvironmentVariable(key, inVal);
+    }
+
+    ScopedEnvVar(const ScopedEnvVar&) = delete;
+    ScopedEnvVar& operator=(const ScopedEnvVar&) = delete;
+
+    ~ScopedEnvVar()
+    {
+        if (hadOldValue)
+        {
+            _writeEnvironmentVariable(key, oldValue.getBuffer());
+        }
+        else
+        {
+            _unsetEnvironmentVariable(key);
+        }
+    }
+};
 
 static void writeReplayTypeId(ReplayStream& stream, TypeId type)
 {
@@ -33,6 +99,80 @@ static void writeArrayHeader(ReplayStream& stream, uint64_t count)
     writeReplayTypeId(stream, TypeId::Array);
     writeReplayTypeId(stream, TypeId::UInt64);
     writeUInt64Payload(stream, count);
+}
+
+SLANG_UNIT_TEST(replayStreamRejectsNullDataWithNonzeroSize)
+{
+#if SLANG_HAS_EXCEPTIONS
+    ScopedEnvVar assertMode("SLANG_ASSERT", "release-assert-only");
+
+    bool caughtException = false;
+    try
+    {
+        ReplayStream stream(nullptr, 1);
+    }
+    catch (const InternalError& e)
+    {
+        caughtException = containsString(e.Message, "data || size == 0");
+    }
+    SLANG_CHECK(caughtException);
+#endif
+}
+
+SLANG_UNIT_TEST(replayStreamRejectsWritePositionOverflow)
+{
+    ReplayStream stream;
+    stream.seek((std::numeric_limits<size_t>::max)());
+
+    uint8_t value = 0;
+    bool caughtException = false;
+    try
+    {
+        stream.write(&value, sizeof(value));
+    }
+    catch (const Exception& e)
+    {
+        caughtException = containsString(e.Message, "Write past maximum stream size");
+    }
+    SLANG_CHECK(caughtException);
+}
+
+SLANG_UNIT_TEST(replayStreamRejectsReadSizeOverflow)
+{
+    uint8_t value = 0;
+    ReplayStream stream(&value, sizeof(value));
+
+    uint8_t out = 0;
+    bool caughtException = false;
+    try
+    {
+        stream.read(&out, (std::numeric_limits<size_t>::max)());
+    }
+    catch (const Exception& e)
+    {
+        caughtException = containsString(e.Message, "Read past end of stream");
+    }
+    SLANG_CHECK(caughtException);
+}
+
+SLANG_UNIT_TEST(replayStreamMoveAssignmentReplacesExistingBuffer)
+{
+    uint32_t oldValue = 1;
+    ReplayStream target;
+    target.write(&oldValue, sizeof(oldValue));
+
+    uint32_t newValue = 42;
+    ReplayStream source(&newValue, sizeof(newValue));
+
+    target = Slang::_Move(source);
+
+    SLANG_CHECK(target.isReading());
+    SLANG_CHECK(target.getSize() == sizeof(newValue));
+
+    uint32_t readValue = 0;
+    target.read(&readValue, sizeof(readValue));
+    SLANG_CHECK(readValue == newValue);
+    SLANG_CHECK(target.atEnd());
 }
 
 SLANG_UNIT_TEST(replayStreamDecoderRejectsHugeArrayCount)
