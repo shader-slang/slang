@@ -89,7 +89,7 @@ log() {
   echo "$msg" >>"$LOG_FILE"
 }
 
-log "=== Linux GPU Runner Startup ==="
+log "=== Linux Runner Startup ==="
 log "Runner directory: $RUNNER_DIR"
 log "Runner user: $RUNNER_USER"
 
@@ -166,59 +166,98 @@ if [ "$current_runner_version" != "$RUNNER_VERSION" ]; then
 fi
 
 # Step 0.5: Ensure NVIDIA GPU devices are initialized.
-# On fresh boot, the kernel module may not be loaded yet. Running nvidia-smi
-# loads the module and creates /dev/nvidia* device files that the CI workflow
-# mounts into Docker containers (--device /dev/nvidia-modeset, /dev/dri, etc.)
-log "Initializing NVIDIA GPU..."
-gpu_ready=false
-for attempt in $(seq 1 10); do
-  if nvidia-smi >/dev/null 2>&1; then
-    log "  GPU initialized successfully."
-    gpu_ready=true
-    break
-  fi
-  log "  Attempt ${attempt}/10: nvidia-smi not ready, waiting..."
-  sleep 5
-done
+#
+# This block only applies to GPU pools (the Linux test runners). CPU-only pools
+# (the build and analytics runners) share both this startup script *and* the
+# same base image, so the nvidia-smi tool and driver libraries are present even
+# when no GPU is attached — tool presence is therefore NOT a reliable signal.
+#
+# Whether this pool is *supposed* to have a GPU is authoritative, not inferred:
+# the scaler stamps an "expect-gpu" metadata key from the pool's --gcp-gpu-type
+# config (true for GPU pools, false for CPU-only build/analytics pools). We then
+# combine that contract with the actual hardware, detected by a physically-
+# attached NVIDIA device on the PCI bus (vendor ID 10de — prefer lspci, fall
+# back to the sysfs PCI vendor list if pciutils is absent):
+#   - GPU pool + GPU present     -> initialize the GPU (fatal if init fails).
+#   - GPU pool + GPU MISSING     -> fatal: the accelerator attach failed; a
+#                                   runner here would silently accept GPU jobs.
+#   - CPU-only pool              -> skip GPU init and register as a CPU runner.
+# Defaulting expect-gpu to "true" keeps existing GPU pools fail-safe even if the
+# metadata is somehow absent.
+EXPECT_GPU="$(curl -sf --max-time 10 --connect-timeout 5 \
+  -H "Metadata-Flavor: Google" \
+  "http://metadata.google.internal/computeMetadata/v1/instance/attributes/expect-gpu" 2>/dev/null || echo "true")"
+log "GPU expectation for this pool: expect-gpu=${EXPECT_GPU}"
 
-if [ "$gpu_ready" != "true" ]; then
-  log "ERROR: GPU initialization failed after 10 attempts"
+gpu_present=false
+if command -v lspci >/dev/null 2>&1; then
+  if lspci -d 10de: 2>/dev/null | grep -q .; then
+    gpu_present=true
+  fi
+elif grep -qi '0x10de' /sys/bus/pci/devices/*/vendor 2>/dev/null; then
+  gpu_present=true
+fi
+
+if [ "$EXPECT_GPU" != "false" ] && [ "$gpu_present" != "true" ]; then
+  log "ERROR: This pool expects an NVIDIA GPU but none is attached (accelerator attach failed?). Refusing to register a GPU runner with no device."
   shutdown -h now
   exit 1
 fi
 
-# Create nvidia-modeset device if it doesn't exist (needed for Vulkan)
-if [ ! -e /dev/nvidia-modeset ]; then
-  log "  Creating /dev/nvidia-modeset..."
-  nvidia-modprobe -m 2>/dev/null || modprobe nvidia-modeset 2>/dev/null || true
-fi
+if [ "$gpu_present" = "true" ]; then
+  log "Initializing NVIDIA GPU..."
+  gpu_ready=false
+  for attempt in $(seq 1 10); do
+    if nvidia-smi >/dev/null 2>&1; then
+      log "  GPU initialized successfully."
+      gpu_ready=true
+      break
+    fi
+    log "  Attempt ${attempt}/10: nvidia-smi not ready, waiting..."
+    sleep 5
+  done
 
-# Enable GPU persistence mode to prevent NVML state corruption in containers.
-# Without this, NVML can lose track of GPU processes when they exit inside Docker,
-# causing "Failed to initialize NVML: Unknown Error".
-log "  Enabling GPU persistence mode..."
-if pm_out="$(nvidia-smi -pm 1 2>&1)"; then
-  log "  GPU persistence mode enabled."
+  if [ "$gpu_ready" != "true" ]; then
+    log "ERROR: GPU initialization failed after 10 attempts"
+    shutdown -h now
+    exit 1
+  fi
+
+  # Create nvidia-modeset device if it doesn't exist (needed for Vulkan)
+  if [ ! -e /dev/nvidia-modeset ]; then
+    log "  Creating /dev/nvidia-modeset..."
+    nvidia-modprobe -m 2>/dev/null || modprobe nvidia-modeset 2>/dev/null || true
+  fi
+
+  # Enable GPU persistence mode to prevent NVML state corruption in containers.
+  # Without this, NVML can lose track of GPU processes when they exit inside Docker,
+  # causing "Failed to initialize NVML: Unknown Error".
+  log "  Enabling GPU persistence mode..."
+  if pm_out="$(nvidia-smi -pm 1 2>&1)"; then
+    log "  GPU persistence mode enabled."
+  else
+    log "WARNING: Failed to enable GPU persistence mode: ${pm_out}"
+  fi
+
+  # Create /dev/char symlinks for all NVIDIA device nodes. Recent runc versions
+  # with cgroup v2 require these symlinks to properly inject devices into
+  # containers. Without them, containers can intermittently lose GPU access
+  # with "Failed to initialize NVML: Unknown Error".
+  # See: https://github.com/NVIDIA/nvidia-docker/issues/1730
+  log "  Creating /dev/char symlinks..."
+  if ctk_out="$(nvidia-ctk system create-dev-char-symlinks --create-all 2>&1)"; then
+    log "  /dev/char symlinks created."
+  else
+    log "WARNING: Failed to create /dev/char symlinks: ${ctk_out}"
+  fi
+
+  # Verify GPU devices
+  log "  GPU devices:"
+  ls -la /dev/nvidia* 2>&1 | while read -r line; do log "    $line"; done || true
+  ls -la /dev/dri/* 2>&1 | while read -r line; do log "    $line"; done || true
 else
-  log "WARNING: Failed to enable GPU persistence mode: ${pm_out}"
+  log "No NVIDIA GPU on the PCI bus and none expected; skipping GPU initialization (CPU-only runner)."
 fi
-
-# Create /dev/char symlinks for all NVIDIA device nodes. Recent runc versions
-# with cgroup v2 require these symlinks to properly inject devices into
-# containers. Without them, containers can intermittently lose GPU access
-# with "Failed to initialize NVML: Unknown Error".
-# See: https://github.com/NVIDIA/nvidia-docker/issues/1730
-log "  Creating /dev/char symlinks..."
-if ctk_out="$(nvidia-ctk system create-dev-char-symlinks --create-all 2>&1)"; then
-  log "  /dev/char symlinks created."
-else
-  log "WARNING: Failed to create /dev/char symlinks: ${ctk_out}"
-fi
-
-# Verify GPU devices
-log "  GPU devices:"
-ls -la /dev/nvidia* 2>&1 | while read -r line; do log "    $line"; done || true
-ls -la /dev/dri/* 2>&1 | while read -r line; do log "    $line"; done || true
 
 # Step 1: Read JIT config from GCP instance metadata
 log "Reading JIT config from instance metadata..."
