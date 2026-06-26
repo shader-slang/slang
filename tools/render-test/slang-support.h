@@ -42,24 +42,18 @@ class ScopedCoreDebugCallback
 {
 public:
     ScopedCoreDebugCallback(CoreToRHIDebugBridge& bridge, Slang::IDebugCallback* coreCallback)
-        : m_bridge(&bridge)
+        : m_bridge(bridge)
     {
-        m_bridge->setCoreCallback(coreCallback);
+        m_bridge.setCoreCallback(coreCallback);
     }
 
-    ~ScopedCoreDebugCallback()
-    {
-        if (m_bridge)
-        {
-            m_bridge->setCoreCallback(nullptr);
-        }
-    }
+    ~ScopedCoreDebugCallback() { m_bridge.setCoreCallback(nullptr); }
 
     ScopedCoreDebugCallback(const ScopedCoreDebugCallback&) = delete;
     ScopedCoreDebugCallback& operator=(const ScopedCoreDebugCallback&) = delete;
 
 private:
-    CoreToRHIDebugBridge* m_bridge;
+    CoreToRHIDebugBridge& m_bridge;
 };
 
 /// Core debug callback that captures debug messages in a string buffer

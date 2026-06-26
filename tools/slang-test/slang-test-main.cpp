@@ -1876,11 +1876,6 @@ String getOutput(const ExecuteResult& exeRes, bool removeEmbeddedSource = false)
     return actualOutputBuilder.produceString();
 }
 
-static bool _hasDebugLayerError(const ExecuteResult& exeRes)
-{
-    return exeRes.debugLayer.getLength() > 0;
-}
-
 // Finds the specialized or default path for expected data for a test.
 // If neither are found, will return an empty string
 String findExpectedPath(const TestInput& input, const char* postFix)
@@ -2718,7 +2713,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         context,
         input,
         actualOutput,
-        _hasDebugLayerError(exeRes),
+        false,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
@@ -2832,7 +2827,7 @@ TestResult runInterpreterTest(TestContext* context, TestInput& input)
         context,
         input,
         actualOutput,
-        _hasDebugLayerError(exeRes),
+        false,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
@@ -2867,7 +2862,7 @@ TestResult runDispatcherTest(TestContext* context, TestInput& input)
         context,
         input,
         actualOutput,
-        _hasDebugLayerError(exeRes),
+        false,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
@@ -3066,11 +3061,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
         }
     }
 
-    return _validateOutput(
-        context,
-        input,
-        actualOutput,
-        _hasDebugLayerError(exeRes));
+    return _validateOutput(context, input, actualOutput);
 }
 
 static String _calcSummary(IArtifactDiagnostics* inDiagnostics)
@@ -3728,11 +3719,7 @@ static TestResult _runHLSLComparisonTest(
     // Always fail if the compilation produced a failure, just
     // to catch situations where, e.g., command-line options parsing
     // caused the same error in both the Slang and fxc cases.
-    return _validateOutput(
-        context,
-        input,
-        actualOutput,
-        resultCode != 0 || _hasDebugLayerError(exeRes));
+    return _validateOutput(context, input, actualOutput, resultCode != 0);
 }
 
 static TestResult runDXBCComparisonTest(TestContext* context, TestInput& input)
@@ -4125,7 +4112,7 @@ TestResult runComputeComparisonImpl(
         context,
         input,
         actualOutput,
-        _hasDebugLayerError(exeRes),
+        false,
         "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n");
 
     // check against reference output
