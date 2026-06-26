@@ -1607,9 +1607,21 @@ struct ExistentialLoweringContext : public InstPassBase
         return true;
     }
 
-    // Replace all WitnessTableID type or RTTIHandleType with `uint2`.
+    // Replace all WitnessTableID type or RTTIHandleType with a fixed-layout
+    // 64-bit integer representation: `uint2` on most targets, but `ulong`
+    // (UInt64) on Metal.
+    //
+    // `uint2` was chosen originally (PR #9386) so that SPIR-V output would not
+    // require the Int64 capability. Metal, however, disallows casting a vector
+    // to a pointer: a handle that is later bit-cast to a `device T*` (e.g. a
+    // serialized existential's RTTI/witness slot reconstructed as a pointer)
+    // emits `(device T*)(uint2)`, which MSL rejects. Metal fully supports
+    // `ulong`, and a scalar `ulong`->pointer cast is legal, so on Metal we lower
+    // these handles to `ulong` instead. The byte size (8) is unchanged, so the
+    // memory layout of serialized existentials is preserved. See issue #11313.
     void lowerHandleTypes()
     {
+        const bool useUInt64 = isMetalTarget(targetProgram->getTargetReq());
         List<IRInst*> instsToRemove;
         for (auto inst : module->getGlobalInsts())
         {
@@ -1623,10 +1635,12 @@ struct ExistentialLoweringContext : public InstPassBase
                 {
                     IRBuilder builder(module);
                     builder.setInsertBefore(inst);
-                    auto uint2Type = builder.getVectorType(
-                        builder.getUIntType(),
-                        builder.getIntValue(builder.getIntType(), 2));
-                    inst->replaceUsesWith(uint2Type);
+                    IRType* loweredType =
+                        useUInt64 ? builder.getUInt64Type()
+                                  : builder.getVectorType(
+                                        builder.getUIntType(),
+                                        builder.getIntValue(builder.getIntType(), 2));
+                    inst->replaceUsesWith(loweredType);
                     instsToRemove.add(inst);
                 }
                 break;
