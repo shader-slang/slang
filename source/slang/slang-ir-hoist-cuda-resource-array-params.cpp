@@ -18,6 +18,12 @@ namespace Slang
 // Returns true if `type` is a resource, or transitively contains one through struct fields or
 // array elements. Used to decide whether a fixed-size array's element carries a resource (the
 // element may be a struct wrapping a resource, e.g. a tensor type, not a bare resource).
+//
+// `isResourceType` (slang-legalize-types.cpp) is the single source of truth for the resource-leaf
+// test: it already unwraps `IRArrayTypeBase` and recognizes the whole resource family (textures,
+// samplers, structured/byte-address buffers, pointer-like types). The extra array/struct recursion
+// below exists only to thread the `IRPtrType` carve-out and the struct-wrapping case through
+// nesting that `isResourceType`'s leaf check does not itself reach (e.g. a `Ptr<float>[N]` field).
 static bool _typeIsOrContainsResource(IRType* type)
 {
     if (!type)
@@ -83,6 +89,21 @@ static bool _typeContainsFixedSizeResourceArray(IRType* type)
     return false;
 }
 
+// Returns `param`'s variable layout if it carries an `IRLayoutDecoration` whose payload is an
+// `IRVarLayout`, or null otherwise. A parameter can legitimately lack such a layout (e.g. one
+// synthesized by an earlier pass), so the qualifier and the rewrite both consult this single
+// predicate and skip a null result identically — without it the two loops diverged on which
+// parameters they considered hoistable (the qualifier `continue`d, the rewrite release-asserted),
+// which could abort the compiler on a qualifying kernel that happened to carry a layout-less
+// sibling parameter.
+static IRVarLayout* _getParamVarLayout(IRParam* param)
+{
+    auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecoration)
+        return nullptr;
+    return as<IRVarLayout>(layoutDecoration->getLayout());
+}
+
 struct HoistCUDAResourceArrayParams : PerEntryPointPass
 {
     // Returns true if `func` is a compute entry point whose uniform parameters transitively contain
@@ -113,10 +134,7 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
             return false;
         for (IRParam* param = func->getFirstParam(); param; param = param->getNextParam())
         {
-            auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
-            if (!layoutDecoration)
-                continue;
-            auto paramLayout = as<IRVarLayout>(layoutDecoration->getLayout());
+            auto paramLayout = _getParamVarLayout(param);
             if (!paramLayout)
                 continue;
             if (isVaryingParameter(paramLayout))
@@ -208,12 +226,15 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
             nextParam = param->getNextParam();
             UInt paramIndex = paramCounter++;
 
-            // Once hoisting, every uniform parameter must carry layout information; a missing
-            // layout would leave a half-hoisted ABI, so fail loudly rather than silently continue.
-            auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
-            SLANG_RELEASE_ASSERT(layoutDecoration);
-            auto paramLayout = as<IRVarLayout>(layoutDecoration->getLayout());
-            SLANG_RELEASE_ASSERT(paramLayout);
+            // Skip exactly the parameters the qualifier skips. A parameter without an `IRVarLayout`
+            // is not a uniform we can place into the layout-bearing `GlobalParams` struct, so leave
+            // it on the entry point (matching the reference pass
+            // `moveEntryPointUniformParamsToGlobalScope`, which also `continue`s) rather than
+            // aborting. `paramCounter` is incremented above for every parameter, so skipping here
+            // does not disturb the positional field-key indexing used below.
+            auto paramLayout = _getParamVarLayout(param);
+            if (!paramLayout)
+                continue;
 
             // Leave varying parameters (system values, stage I/O) on the entry point.
             if (isVaryingParameter(paramLayout))

@@ -9,6 +9,7 @@
 //TEST:SIMPLE(filecheck=TRANS): -target cuda -line-directive-mode none -stage compute -entry transitiveMain
 //TEST:SIMPLE(filecheck=TENSOR): -target cuda -line-directive-mode none -stage compute -entry tensorWrapperMain
 //TEST:SIMPLE(filecheck=MIXED): -target cuda -line-directive-mode none -stage compute -entry mixedOrderMain
+//TEST:SIMPLE(filecheck=KINDS): -target cuda -line-directive-mode none -stage compute -entry textureSamplerMain
 //TEST:SIMPLE(filecheck=NEGNOARR): -target cuda -line-directive-mode none -stage compute -entry noResourceArrayMain
 //TEST:SIMPLE(filecheck=NEGNONRES): -target cuda -line-directive-mode none -stage compute -entry nonResourceArrayMain
 // Compiling every entry point together makes more than one compute kernel qualify, so the driver
@@ -91,6 +92,24 @@ void mixedOrderMain(
 // MIXED: __constant__{{.*}}SLANG_globalParams
 // MIXED: mixedOrderMain()
 // MIXED: blockIdx
+
+// Positive (resource-kind matrix): the classifier admits the whole CUDA resource family via
+// `isResourceType`, not just structured buffers — fixed-size arrays of textures and of samplers must
+// hoist too. This guards against an `isResourceType` change that silently drops a resource kind and
+// lets the affected kernel fall back to the `.param` slowdown.
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void textureSamplerMain(
+    uint tid: SV_DispatchThreadID,
+    Texture2D<float4> textures[4],
+    SamplerState samplers[4],
+    RWStructuredBuffer<float4> output,
+    StructuredBuffer<uint> indices)
+{
+    uint i = indices[tid];
+    output[tid] = textures[i].SampleLevel(samplers[i], float2(0.5f, 0.5f), 0.0f);
+}
+// KINDS: __constant__{{.*}}SLANG_globalParams
 
 // Negative: a single resource (not a fixed-size array) must not trigger the hoist.
 [shader("compute")]

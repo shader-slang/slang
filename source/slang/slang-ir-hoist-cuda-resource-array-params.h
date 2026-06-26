@@ -30,6 +30,19 @@ struct IRModule;
 /// `ConstantBuffer<GlobalParams>` wrapper. A host driving CUDA binding from reflection must route
 /// the entry-point uniform data to the `SLANG_globalParams` symbol when this pass fires (this is
 /// why the paired slang-rhi dispatch change exists).
+///
+/// @note The pass empties the entry point's uniform parameter list but deliberately leaves the
+/// function's own `IREntryPointLayout` decoration in place (the stale layout is what preserves the
+/// reflection behavior described above). The one place in the compiler that positionally zips an
+/// entry point's `IRParam`s against `getScopeStructLayout(entryPointLayout)` is
+/// `maybeCopyLayoutInformationToParameters` (slang-ir-link.cpp), which runs during linking — i.e.
+/// before `finalizeSpecialization`, and therefore before this pass — so the zip is already complete
+/// when the parameters are removed and cannot be re-tripped by the now-shorter list. (That zipper's
+/// only hard failure, `SLANG_UNEXPECTED("too many parameters")`, fires when parameters *outnumber*
+/// layout fields, the opposite of what removing parameters can produce.) Unlike the reference pass
+/// `moveEntryPointUniformParamsToGlobalScope`, this one does not rebuild the entry-point layout:
+/// its hoist target is reflection-visible and so must stay consistent, whereas here the original
+/// layout is intentionally retained for CUDA reflection.
 void hoistCUDAResourceArrayParamsToParameterGroup(IRModule* module);
 
 } // namespace Slang
