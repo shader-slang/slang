@@ -42,6 +42,18 @@ public:
     /// Create an empty stream for writing (capture mode).
     ReplayStream() = default;
 
+    ReplayStream(const ReplayStream&) = delete;
+    ReplayStream& operator=(const ReplayStream&) = delete;
+
+    // =========================================================================
+    // Module-Boundary Operations
+    // =========================================================================
+    //
+    // These methods are intentionally SLANG_API and defined out of line in
+    // replay-stream.cpp. They copy, move, grow, clear, close, or release
+    // heap-backed state in m_buffer or m_mirrorFile, so calls from another DLL
+    // execute in the compiler module that owns the replay stream state.
+
     /// Create a reading stream from existing data.
     /// Makes a copy of the data.
     /// @param data Pointer to the data.
@@ -55,17 +67,13 @@ public:
     /// @throws Slang::Exception if file cannot be opened or read.
     SLANG_API static ReplayStream loadFromFile(const char* path);
 
-    // Move-only (no copying)
+    /// Move-construct from another stream.
     SLANG_API ReplayStream(ReplayStream&& other);
+
+    /// Move-assign from another stream.
     SLANG_API ReplayStream& operator=(ReplayStream&& other);
-    ReplayStream(const ReplayStream&) = delete;
-    ReplayStream& operator=(const ReplayStream&) = delete;
 
     SLANG_API ~ReplayStream();
-
-    // =========================================================================
-    // Reading/Writing
-    // =========================================================================
 
     /// Write data to the stream.
     /// @param data Pointer to the data to write.
@@ -79,8 +87,32 @@ public:
     /// @throws Slang::Exception if this is a writing stream or read past end.
     SLANG_API void read(void* data, size_t size);
 
+    /// Reset the stream to initial empty writing state.
+    SLANG_API void reset();
+
+    /// Set a mirror file for crash-safe capture.
+    /// All subsequent writes will be immediately written to this file as well.
+    /// @param path Path to the mirror file.
+    /// @throws Slang::Exception if file cannot be opened.
+    SLANG_API void setMirrorFile(const char* path);
+
+    /// Save all data to a file.
+    /// @param path Path to the file to write.
+    /// @throws Slang::Exception if file cannot be opened or written.
+    SLANG_API void saveToFile(const char* path) const;
+
+    /// Close the mirror file (data remains in memory).
+    SLANG_API void closeMirrorFile();
+
+    /// Create a reading stream from this stream's data.
+    /// Makes a copy of the current data.
+    SLANG_API ReplayStream createReader() const;
+
+    /// Clear the stream and reset to writing mode.
+    SLANG_API void clear();
+
     // =========================================================================
-    // Position/Size
+    // Inline State Accessors
     // =========================================================================
 
     /// Get the current position in the stream.
@@ -105,8 +137,8 @@ public:
     /// Returns true if the stream has reached the end.
     bool atEnd() const { return m_position >= size_t(m_buffer.getCount()); }
 
-    /// Reset the stream to initial empty writing state.
-    SLANG_API void reset();
+    /// Check if a mirror file is currently active.
+    bool hasMirrorFile() const { return m_mirrorFile != nullptr; }
 
     // =========================================================================
     // Direct Memory Access
@@ -158,38 +190,6 @@ public:
             throw Slang::Exception("Offset past end of stream");
         return m_buffer[Slang::Index(offset)];
     }
-
-    // =========================================================================
-    // File Operations
-    // =========================================================================
-
-    /// Set a mirror file for crash-safe capture.
-    /// All subsequent writes will be immediately written to this file as well.
-    /// @param path Path to the mirror file.
-    /// @throws Slang::Exception if file cannot be opened.
-    SLANG_API void setMirrorFile(const char* path);
-
-    /// Save all data to a file.
-    /// @param path Path to the file to write.
-    /// @throws Slang::Exception if file cannot be opened or written.
-    SLANG_API void saveToFile(const char* path) const;
-
-    /// Check if a mirror file is currently active.
-    bool hasMirrorFile() const { return m_mirrorFile != nullptr; }
-
-    /// Close the mirror file (data remains in memory).
-    SLANG_API void closeMirrorFile();
-
-    // =========================================================================
-    // Utility
-    // =========================================================================
-
-    /// Create a reading stream from this stream's data.
-    /// Makes a copy of the current data.
-    SLANG_API ReplayStream createReader() const;
-
-    /// Clear the stream and reset to writing mode.
-    SLANG_API void clear();
 
 private:
     List<uint8_t> m_buffer;
