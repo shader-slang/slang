@@ -448,6 +448,14 @@ void ReplayContext::requireReplayArenaAllocation(size_t offset, size_t size)
     m_replayArenaAllocationSize += size;
 }
 
+void* ReplayContext::allocateReplayArena(size_t sizeInBytes, size_t alignment)
+{
+    if (sizeInBytes == 0)
+        return nullptr;
+
+    return m_arena.allocateAligned(sizeInBytes, alignment);
+}
+
 // =============================================================================
 // Call Index Access
 // =============================================================================
