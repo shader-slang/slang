@@ -292,9 +292,9 @@ jobs:
             }
 
             // One query per PR: everything computeTarget needs - draft, author
-            // (bot), merge-queue membership, CI rollup, the latest opinionated
-            // reviews (approve / changes-request), the head commit date and the
-            // last review time (to tell whether a commit landed after the review).
+            // (bot), merge-queue membership, CI rollup, and each reviewer's latest
+            // opinionated review with the commit it was made on (so we can tell
+            // whether the feedback is on the *current* head commit).
             async function prInfo(number) {
               const data = await github.graphql(`
                 query($owner: String!, $name: String!, $n: Int!) {
@@ -303,9 +303,8 @@ jobs:
                       id isDraft state
                       author { login __typename }
                       mergeQueueEntry { id }
-                      latestOpinionatedReviews(first: 100) { nodes { state } }
-                      reviews(last: 1) { nodes { submittedAt } }
-                      commits(last: 1) { nodes { commit { committedDate statusCheckRollup {
+                      latestOpinionatedReviews(first: 100) { nodes { state commit { oid } } }
+                      commits(last: 1) { nodes { commit { oid statusCheckRollup {
                         contexts(first: 100) { nodes {
                           __typename
                           ... on CheckRun { status conclusion }
@@ -335,19 +334,20 @@ jobs:
               }
               const login = (pr.author?.login || "").toLowerCase();
               const isBot = pr.author?.__typename === "Bot" || BOT_AUTHORS.includes(login);
-              // Per-reviewer latest opinions: a current changes-request, or an
-              // approval with no outstanding changes-request.
-              const opinions = (pr.latestOpinionatedReviews?.nodes || []).map(r => r.state);
-              const changeRequested = opinions.includes("CHANGES_REQUESTED");
-              const approved = opinions.includes("APPROVED") && !changeRequested;
-              // A review counts only if no commit landed after it (a newer commit
-              // makes the feedback stale -> the PR is back to In Review).
-              const headAt = headCommit.committedDate;
-              const lastReviewAt = pr.reviews?.nodes?.[0]?.submittedAt || null;
-              const reviewed = !(headAt && lastReviewAt && new Date(headAt) > new Date(lastReviewAt));
+              // A reviewer's opinion counts only if it was made on the CURRENT head
+              // commit; an opinion on an earlier commit was superseded by a newer
+              // push (so the PR is back to In Review until re-reviewed). This is
+              // commit-identity, not timestamps - a later comment-only review or a
+              // late-pushed older commit can't revive stale feedback.
+              const headOid = headCommit.oid;
+              const states = (pr.latestOpinionatedReviews?.nodes || [])
+                .filter(r => r.commit && r.commit.oid === headOid)
+                .map(r => r.state);
+              const changeRequested = states.includes("CHANGES_REQUESTED");
+              const approved = states.includes("APPROVED") && !changeRequested;
               return {
                 nodeId: pr.id, isDraft: pr.isDraft, isBot,
-                ci: summarizeCi(runs), approved, changeRequested, reviewed,
+                ci: summarizeCi(runs), approved, changeRequested,
                 inMergeQueue: pr.mergeQueueEntry != null,
               };
             }
@@ -358,7 +358,8 @@ jobs:
             // cadence sweep never fights this workflow. Priority (first match wins):
             //   1. A current changes-request -> Revising (must revise; ranked above
             //      the draft rule so even a Bot draft with a changes-request is
-            //      Revising). "Current" means no commit landed after the review.
+            //      Revising). "Current" = the review was made on the head commit;
+            //      an opinion on an earlier commit is superseded by a newer push.
             //   2. Draft -> a human draft is Revising (author still working); a Bot
             //      draft is In Review, since bot PRs arrive as drafts and a human
             //      owner must see/shepherd them. (Ranked above CI, so a Bot draft
@@ -373,11 +374,11 @@ jobs:
             //   5. Otherwise -> In Review (awaiting review, CI pending, or a fresh
             //      commit with no feedback yet).
             function computeTarget(info) {
-              if (info.reviewed && info.changeRequested) return STATUS.revising;
+              if (info.changeRequested) return STATUS.revising;
               if (info.isDraft) return info.isBot ? STATUS.inreview : STATUS.revising;
               if (info.ci === "action_required") return STATUS.snagged;
               if (info.ci === "failed") return info.isBot ? STATUS.revising : STATUS.snagged;
-              if (info.reviewed && info.approved) {
+              if (info.approved) {
                 return (info.ci === "passed" && !info.inMergeQueue)
                   ? STATUS.snagged : STATUS.approved;
               }
