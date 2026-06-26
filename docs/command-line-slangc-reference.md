@@ -699,6 +699,16 @@ Specify path to a downstream [&lt;compiler&gt;](#compiler) executable or library
 
 
 
+<a id="none-version"></a>
+### -&lt;compiler&gt;-version
+
+**-&lt;[compiler](#compiler)&gt;-version**
+
+Print the version of the downstream [&lt;compiler&gt;](#compiler) that Slang would load for that pass-through, then continue. Reports "not found" if the compiler cannot be located. Takes no value. 
+
+
+
+
 <a id="default-downstream-compiler"></a>
 ### -default-downstream-compiler
 

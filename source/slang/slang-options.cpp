@@ -981,6 +981,28 @@ void initCommandOptions(CommandOptions& options)
             "-<compiler>-path");
     }
 
+    {
+        auto namesList = NameValueUtil::getNames(
+            NameValueUtil::NameKind::First,
+            TypeTextUtil::getCompilerInfos());
+        StringBuilder names;
+        for (auto name : namesList)
+        {
+            names << "-" << name << "-version,";
+        }
+        // remove last ,
+        names.reduceLength(names.getLength() - 1);
+
+        options.add(
+            names.getBuffer(),
+            "-<compiler>-version",
+            "Print the version of the downstream <compiler> that Slang would load for that "
+            "pass-through, then continue. Reports \"not found\" if the compiler cannot be "
+            "located. Takes no value.\n",
+            UserValue(OptionKind::CompilerVersion),
+            "-<compiler>-version");
+    }
+
     const Option downstreamOpts[] = {
         {OptionKind::DefaultDownstreamCompiler,
          "-default-downstream-compiler",
@@ -3636,6 +3658,54 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                             .location = arg.loc});
                         return SLANG_FAIL;
                     }
+                }
+                break;
+            }
+        case OptionKind::CompilerVersion:
+            {
+                // `-<compiler>-version` is a print-and-continue query option. It has the same
+                // "-<compiler>-..." shape as -<compiler>-path, but instead of consuming a value it
+                // prints the version of the downstream compiler Slang would actually load for that
+                // pass-through, then lets parsing continue (like -version). Recover <compiler> as
+                // the text between the leading '-' and the trailing "-version", exactly as the
+                // CompilerPath case recovers the name before "-path".
+                const Index index = argValue.lastIndexOf('-');
+                if (index >= 0)
+                {
+                    UnownedStringSlice passThroughSlice =
+                        argValue.getUnownedSlice().head(index).tail(1);
+
+                    SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
+                    if (SLANG_FAILED(TypeTextUtil::findPassThrough(passThroughSlice, passThrough)))
+                    {
+                        m_sink->diagnose(Diagnostics::UnknownDownstreamCompiler{
+                            .compiler = passThroughSlice,
+                            .location = arg.loc});
+                        return SLANG_FAIL;
+                    }
+
+                    // getDownstreamCompilerVersion shares the same lazy-discovery funnel used
+                    // during compilation, so the reported version is the library that would
+                    // actually be used for this pass-through (it honors -<compiler>-path and the
+                    // standard search order). It returns SLANG_OK once the compiler is located and
+                    // loaded -- major/minor are then valid, and a loaded-but-versionless compiler
+                    // such as glslang reports 0.0 -- and SLANG_E_NOT_FOUND when it cannot be
+                    // loaded (e.g. the toolchain is not installed).
+                    int major = 0;
+                    int minor = 0;
+                    StringBuilder versionStr;
+                    versionStr << passThroughSlice << " version: ";
+                    if (SLANG_SUCCEEDED(
+                            m_session->getDownstreamCompilerVersion(passThrough, &major, &minor)))
+                    {
+                        versionStr << major << "." << minor;
+                    }
+                    else
+                    {
+                        versionStr << "not found";
+                    }
+                    versionStr << "\n";
+                    m_sink->diagnoseRaw(Severity::Note, versionStr.getUnownedSlice());
                 }
                 break;
             }
