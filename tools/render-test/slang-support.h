@@ -38,6 +38,11 @@ private:
 };
 
 /// Binds an RHI debug bridge to a core callback for one active test invocation.
+///
+/// The bridge may be retained by RHI device state after this scope exits, but the
+/// per-test core callback must not be retained. Messages that arrive after the
+/// scope exits are intentionally dropped by the bridge instead of being written
+/// to a dead callback or the next test's callback.
 class ScopedCoreDebugCallback
 {
 public:
