@@ -543,6 +543,8 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 
     TestReporter testReporter;
     renderer_test::CoreDebugCallback coreDebugCallback;
+    // RHI state can outlive an RPC invocation, so the bridge must outlive the
+    // stack callback whose binding is controlled by the scoped helper.
     static renderer_test::CoreToRHIDebugBridge rhiDebugCallback;
     renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
         rhiDebugCallback,

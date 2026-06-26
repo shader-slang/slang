@@ -12,8 +12,10 @@
 namespace renderer_test
 {
 
-/// Bridge from core debug callback to RHI debug callback
-/// This allows core callbacks to receive messages from RHI systems
+/// Bridge from core debug callback to RHI debug callback.
+///
+/// RHI backends may invoke debug callbacks from backend or driver threads, so
+/// binding changes and forwarded messages are serialized.
 /// TODO: We should replace rhi::IDebugCallback with Slang::IDebugCallback.
 class CoreToRHIDebugBridge : public rhi::IDebugCallback
 {
@@ -70,7 +72,10 @@ private:
     CoreToRHIDebugBridge& m_bridge;
 };
 
-/// Core debug callback that captures debug messages in a string buffer
+/// Core debug callback that captures debug messages in a string buffer.
+///
+/// Message capture is thread-safe so backend debug callbacks can report while
+/// the test harness reads the collected messages.
 class CoreDebugCallback : public Slang::IDebugCallback
 {
 public:

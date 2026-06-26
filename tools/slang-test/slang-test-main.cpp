@@ -5556,6 +5556,8 @@ static SlangResult runUnitTestModule(
         return SLANG_FAIL;
 
     renderer_test::CoreDebugCallback coreDebugCallback;
+    // RHI state can outlive a unit-test invocation, so the bridge must outlive
+    // the stack callback whose binding is controlled below.
     static renderer_test::CoreToRHIDebugBridge rhiDebugBridge;
 
     UnitTestContext unitTestContext;
