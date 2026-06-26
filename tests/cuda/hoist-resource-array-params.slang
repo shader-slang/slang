@@ -14,6 +14,10 @@
 // Compiling every entry point together makes more than one compute kernel qualify, so the driver
 // must bail and hoist nothing (a single module cannot hold two `SLANG_globalParams` symbols).
 //TEST:SIMPLE(filecheck=MULTI): -target cuda -line-directive-mode none
+// The pass is CUDA-only (gated on isCUDATarget). The same kernel on a non-CUDA target must not be
+// hoisted — no `SLANG_globalParams` — guarding against a regression that drops/broadens the gate.
+//TEST:SIMPLE(filecheck=NEGHLSL): -target hlsl -line-directive-mode none -stage compute -entry positiveMain
+//TEST:SIMPLE(filecheck=NEGSPIRV): -target spirv -line-directive-mode none -stage compute -entry positiveMain
 
 // Positive: a runtime-indexed fixed-size resource array uniform must be hoisted into __constant__.
 [shader("compute")]
@@ -31,7 +35,8 @@ void positiveMain(
 // POS: tensors
 // POS: indices
 // POS: __constant__{{.*}}SLANG_globalParams
-// POS-NOT: positiveMain({{.+}})
+// The kernel signature is emptied — all uniform params were hoisted (literal `()`, no parameters).
+// POS: positiveMain()
 // POS: blockIdx
 
 // Positive (transitive): a fixed-size resource array nested inside a struct uniform must also be
@@ -84,6 +89,7 @@ void mixedOrderMain(
 // MIXED: tensors
 // MIXED: indices
 // MIXED: __constant__{{.*}}SLANG_globalParams
+// MIXED: mixedOrderMain()
 // MIXED: blockIdx
 
 // Negative: a single resource (not a fixed-size array) must not trigger the hoist.
@@ -110,3 +116,7 @@ void nonResourceArrayMain(
 // Multi-kernel module (all entry points compiled together): more than one compute kernel qualifies,
 // so the driver bails and nothing is hoisted.
 // MULTI-NOT: SLANG_globalParams
+
+// Non-CUDA targets never run the pass, so the hoisted global must not appear.
+// NEGHLSL-NOT: SLANG_globalParams
+// NEGSPIRV-NOT: SLANG_globalParams

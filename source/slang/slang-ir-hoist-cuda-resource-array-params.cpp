@@ -48,6 +48,13 @@ static bool _typeIsOrContainsResource(IRType* type)
 // Returns true if `type` is, or transitively contains, a fixed-size (constant-length) array whose
 // element type is or contains a resource. Unsized arrays (`IRUnsizedArrayType`) are intentionally
 // ignored: they are not packed into the `.param` bank and are out of scope here.
+//
+// This is purely a type check and does not inspect access patterns. A uniform whose resource array
+// is only statically indexed (e.g. `tensors[0][tid]`) therefore also qualifies — the hoist is still
+// correct in that case, just not a perf win (the `.param` slowdown the pass targets only arises
+// with a runtime index). Narrowing to genuinely-runtime-indexed accesses would require walking the
+// parameter's uses for a non-literal `IRGetElement`; the conservative type-based proxy is used for
+// now.
 static bool _typeContainsFixedSizeResourceArray(IRType* type)
 {
     if (!type)
