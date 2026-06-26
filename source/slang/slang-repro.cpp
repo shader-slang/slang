@@ -1331,19 +1331,30 @@ struct LoadContext
     return SLANG_OK;
 }
 
-/* static */ ReproUtil::RequestState* ReproUtil::getRequest(const List<uint8_t>& buffer)
+static bool _hasRequestStateRoot(const void* data, size_t size)
 {
-    return getRequest(buffer.getBuffer(), buffer.getCount());
+    return data && size >= kStartOffset && size - kStartOffset >= sizeof(ReproUtil::RequestState);
 }
 
-/* static */ ReproUtil::RequestState* ReproUtil::getRequest(const void* data, size_t size)
+/* static */ ReproUtil::RequestState* ReproUtil::getRequest(List<uint8_t>& buffer)
 {
-    if (!data || size < kStartOffset || size - kStartOffset < sizeof(ReproUtil::RequestState))
+    if (!_hasRequestStateRoot(buffer.getBuffer(), buffer.getCount()))
     {
         return nullptr;
     }
 
-    return (ReproUtil::RequestState*)((uint8_t*)data + kStartOffset);
+    return reinterpret_cast<ReproUtil::RequestState*>(buffer.getBuffer() + kStartOffset);
+}
+
+/* static */ const ReproUtil::RequestState* ReproUtil::getRequest(const void* data, size_t size)
+{
+    if (!_hasRequestStateRoot(data, size))
+    {
+        return nullptr;
+    }
+
+    return reinterpret_cast<const ReproUtil::RequestState*>(
+        static_cast<const uint8_t*>(data) + kStartOffset);
 }
 
 /* static */ SlangResult ReproUtil::calcDirectoryPathFromFilename(

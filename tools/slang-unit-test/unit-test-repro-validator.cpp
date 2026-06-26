@@ -2,6 +2,7 @@
 // Tests for isReproStateValid and the ReproStateValidator graph traversal.
 
 #include "compiler-core/slang-diagnostic-sink.h"
+#include "core/slang-blob.h"
 #include "core/slang-io.h"
 #include "core/slang-memory-file-system.h"
 #include "core/slang-offset-container.h"
@@ -126,6 +127,12 @@ static void buildStateRiff(const List<uint8_t>& payload, List<uint8_t>& outRiff)
     OwnedMemoryStream stream(FileAccess::Write);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(riff.writeTo(&stream)));
     stream.swapContents(outRiff);
+}
+
+static ComPtr<ISlangBlob> createSentinelBlob()
+{
+    static const uint8_t kSentinel = 0xff;
+    return RawBlob::create(&kSentinel, sizeof(kSentinel));
 }
 
 static void loadReproBlobState(ISlangBlob* reproBlob, ComPtr<ISlangBlob>& outBlob)
@@ -1079,10 +1086,12 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsInvalidPayload)
     buildStateRiff(invalidPayload, riffData);
 
     DiagnosticSink sink;
-    ComPtr<ISlangBlob> outBlob;
+    ComPtr<ISlangBlob> sentinelBlob = createSentinelBlob();
+    SLANG_CHECK_ABORT(sentinelBlob != nullptr);
+    ISlangBlob* outBlob = sentinelBlob.get();
 
     SlangResult result =
-        ReproUtil::loadState(riffData.getBuffer(), riffData.getCount(), &sink, outBlob.writeRef());
+        ReproUtil::loadState(riffData.getBuffer(), riffData.getCount(), &sink, &outBlob);
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(outBlob == nullptr);
     SLANG_CHECK(sink.getErrorCount() == 1);
@@ -1096,10 +1105,12 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsEmptyPayload)
     buildStateRiff(emptyPayload, riffData);
 
     DiagnosticSink sink;
-    ComPtr<ISlangBlob> outBlob;
+    ComPtr<ISlangBlob> sentinelBlob = createSentinelBlob();
+    SLANG_CHECK_ABORT(sentinelBlob != nullptr);
+    ISlangBlob* outBlob = sentinelBlob.get();
 
     SlangResult result =
-        ReproUtil::loadState(riffData.getBuffer(), riffData.getCount(), &sink, outBlob.writeRef());
+        ReproUtil::loadState(riffData.getBuffer(), riffData.getCount(), &sink, &outBlob);
     SLANG_CHECK(SLANG_FAILED(result));
     SLANG_CHECK(outBlob == nullptr);
     SLANG_CHECK(sink.getErrorCount() == 1);
@@ -1266,10 +1277,13 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
     ComPtr<ISlangBlob> loadedBlob;
     loadReproBlobState(savedReproBlob, loadedBlob);
 
+    List<uint8_t> loadedBuffer;
+    loadedBuffer.setCount(loadedBlob->getBufferSize());
+    memcpy(loadedBuffer.getBuffer(), loadedBlob->getBufferPointer(), loadedBuffer.getCount());
+
     MemoryOffsetBase loadedBase;
-    loadedBase.set(const_cast<void*>(loadedBlob->getBufferPointer()), loadedBlob->getBufferSize());
-    auto loadedRequestState =
-        ReproUtil::getRequest(loadedBlob->getBufferPointer(), loadedBlob->getBufferSize());
+    loadedBase.set(loadedBuffer.getBuffer(), loadedBuffer.getCount());
+    auto loadedRequestState = ReproUtil::getRequest(loadedBuffer);
     SLANG_CHECK_ABORT(loadedRequestState->translationUnits.getCount() == 2);
     const auto& loadedTu0 = loadedBase.asRaw(loadedRequestState->translationUnits[0]);
     const auto& loadedTu1 = loadedBase.asRaw(loadedRequestState->translationUnits[1]);

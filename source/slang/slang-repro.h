@@ -228,17 +228,22 @@ struct ReproUtil
         size_t size,
         DiagnosticSink* sink,
         List<uint8_t>& outBuffer);
-    /// Load repro state into a COM blob so ownership can cross binary module boundaries.
+    /// Load, unwrap, version-check, and validate a serialized repro state payload into a COM blob.
+    /// On invalid repro-state payloads, clears *outBlob, emits Diagnostics::InvalidReproState
+    /// through sink, and returns SLANG_FAIL.
     SLANG_API static SlangResult loadState(
         const uint8_t* data,
         size_t size,
         DiagnosticSink* sink,
         ISlangBlob** outBlob);
 
-    /// Return the RequestState root for a validated repro state payload.
+    /// Return the RequestState root for a validated repro state payload in a mutable buffer.
     /// Returns nullptr when inBuffer is too small to contain the root object.
-    SLANG_API static RequestState* getRequest(const List<uint8_t>& inBuffer);
-    SLANG_API static RequestState* getRequest(const void* data, size_t size);
+    SLANG_API static RequestState* getRequest(List<uint8_t>& inBuffer);
+    /// Return the RequestState root for a validated repro state payload stored in raw bytes.
+    /// data must point to bytes accepted by loadState() or isReproStateValid().
+    /// Returns nullptr when data is null or size is too small to contain the root object.
+    SLANG_API static const RequestState* getRequest(const void* data, size_t size);
 
     SLANG_API static SlangResult extractFilesToDirectory(const String& file, DiagnosticSink* sink);
 
