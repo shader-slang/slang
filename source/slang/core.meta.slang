@@ -1516,10 +1516,15 @@ __intrinsic_op($(kIROp_AlignedAttr))
 internal int __align_attr(int alignment);
 
 __intrinsic_op($(kIROp_Load))
-internal T __load_aligned<T, Access access>(Ptr<T, access, AddressSpace.Device> ptr, int alignmentAttr);
+internal T __load_aligned<T, Access access, AddressSpace addrSpace, L:IBufferDataLayout>(
+    Ptr<T, access, addrSpace, L> ptr,
+    int alignmentAttr);
 
 __intrinsic_op($(kIROp_Store))
-internal void __store_aligned<T>(T* ptr, T value, int alignmentAttr);
+internal void __store_aligned<T, AddressSpace addrSpace, L:IBufferDataLayout>(
+    Ptr<T, Access::ReadWrite, addrSpace, L> ptr,
+    T value,
+    int alignmentAttr);
 
 //@public:
 
@@ -1529,13 +1534,16 @@ internal void __store_aligned<T>(T* ptr, T value, int alignmentAttr);
 /// @param ptr The pointer to load from.
 /// @return The value loaded from the pointer.
 /// @remarks When targeting SPIRV, this function maps to an `OpLoad` instruction with the `Aligned` memory operand.
-/// The functions maps to normal load operation on other targets.
+/// When targeting CUDA, device-pointer loads use aligned wrapper types and immutable
+/// device-pointer loads may use `__ldg`.
+/// The function maps to normal load operation on other targets.
 ///
 [__NoSideEffect]
 [ForceInline]
-T loadAligned<int alignment, T, Access access>(Ptr<T, access, AddressSpace.Device> ptr)
+__generic<int alignment, T, Access access, AddressSpace addrSpace, L:IBufferDataLayout>
+T loadAligned(Ptr<T, access, addrSpace, L> ptr)
 {
-    return __load_aligned(ptr, __align_attr(alignment));
+    return __load_aligned<T, access, addrSpace, L>(ptr, __align_attr(alignment));
 }
 
 /// Store a value to a pointer with a known alignment.
@@ -1544,12 +1552,14 @@ T loadAligned<int alignment, T, Access access>(Ptr<T, access, AddressSpace.Devic
 /// @param ptr The pointer to store value to.
 /// @param value The value to store.
 /// @remarks When targeting SPIRV, this function maps to an `OpStore` instruction with the `Aligned` memory operand.
-/// The functions maps to normal store operation on other targets.
+/// When targeting CUDA, device-pointer stores use aligned wrapper types.
+/// The function maps to normal store operation on other targets.
 ///
 [ForceInline]
-void storeAligned<int alignment, T>(T* ptr, T value)
+__generic<int alignment, T, AddressSpace addrSpace, L:IBufferDataLayout>
+void storeAligned(Ptr<T, Access::ReadWrite, addrSpace, L> ptr, T value)
 {
-    __store_aligned(ptr, value, __align_attr(alignment));
+    __store_aligned<T, addrSpace, L>(ptr, value, __align_attr(alignment));
 }
 
 //@hidden:

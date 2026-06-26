@@ -77,6 +77,22 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
 
     Dictionary<AlignedTypeWrapperKey, IRType*> alignedWrapperTypes;
 
+    bool shouldUseDevicePointerAlignmentWrapper(IRInst* ptr)
+    {
+        auto ptrType = as<IRPtrTypeBase>(ptr->getDataType());
+        return ptrType && ptrType->getAddressSpace() == AddressSpace::UserPointer;
+    }
+
+    bool shouldLowerImmutableLoad(IRInst* rootAddr)
+    {
+        if (auto ptrType = as<IRPtrTypeBase>(rootAddr->getDataType()))
+        {
+            if (ptrType->getAddressSpace() != AddressSpace::UserPointer)
+                return false;
+        }
+        return isPointerToImmutableLocation(rootAddr);
+    }
+
     IRType* getOrCreateAlignedWrapper(IRType* innerType, IRIntegerValue alignment)
     {
         IRSizeAndAlignment naturalSizeAlignment;
@@ -356,7 +372,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
                 auto rootAddr = getRootAddr(load->getPtr());
                 auto alignmentAttr = load->findAttr<IRAlignedAttr>();
                 bool needUnwrap = false;
-                if (alignmentAttr)
+                if (alignmentAttr && shouldUseDevicePointerAlignmentWrapper(load->getPtr()))
                 {
                     auto wrappedType = getOrCreateAlignedWrapper(
                         load->getDataType(),
@@ -374,7 +390,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
                         needUnwrap = true;
                     }
                 }
-                if (isPointerToImmutableLocation(rootAddr))
+                if (shouldLowerImmutableLoad(rootAddr))
                 {
                     if (auto immutableLoad = emitImmutableLoad(builder, load->getPtr()))
                     {
@@ -394,11 +410,16 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
                     auto firstField = wrappedStruct->getFields().getFirst();
                     SLANG_ASSERT(firstField);
                     auto fieldKey = firstField->getKey();
-                    builder.setInsertAfter(loadedValue);
-                    loadedValue = builder.emitFieldExtract(loadedValue, fieldKey);
+                    auto wrappedLoadedValue = loadedValue;
+                    builder.setInsertAfter(wrappedLoadedValue);
+                    auto unwrappedValue = builder.emitFieldExtract(wrappedLoadedValue, fieldKey);
                     for (auto use : uses)
                     {
-                        builder.replaceOperand(use, loadedValue);
+                        builder.replaceOperand(use, unwrappedValue);
+                    }
+                    if (wrappedLoadedValue != inst)
+                    {
+                        inst->removeAndDeallocate();
                     }
                 }
                 else if (loadedValue != inst)
@@ -406,6 +427,36 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
                     inst->replaceUsesWith(loadedValue);
                     inst->removeAndDeallocate();
                 }
+            }
+            break;
+        case kIROp_Store:
+            {
+                auto store = as<IRStore>(inst);
+                auto alignmentAttr = store->findAttr<IRAlignedAttr>();
+                if (!alignmentAttr || store->findAttr<IRMemoryScopeAttr>() ||
+                    !shouldUseDevicePointerAlignmentWrapper(store->getPtr()))
+                    break;
+
+                auto val = store->getVal();
+                auto wrappedType = getOrCreateAlignedWrapper(
+                    val->getDataType(),
+                    getIntVal(alignmentAttr->getAlignment()));
+                if (wrappedType == val->getDataType())
+                    break;
+
+                IRBuilder builder(store);
+                builder.setInsertBefore(store);
+
+                auto newPtr = builder.emitBitCast(
+                    builder.getPtrType(
+                        kIROp_PtrType,
+                        wrappedType,
+                        as<IRPtrTypeBase>(store->getPtr()->getDataType())),
+                    store->getPtr());
+                IRInst* args[] = {val};
+                auto wrappedVal = builder.emitMakeStruct(wrappedType, SLANG_COUNT_OF(args), args);
+                builder.emitStore(newPtr, wrappedVal);
+                store->removeAndDeallocate();
             }
             break;
         case kIROp_StructuredBufferLoad:
