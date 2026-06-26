@@ -33,8 +33,8 @@ jobs:
           shouldRun=true
           if files="$(git diff --name-only $BASE...HEAD)"; then
             # Git diff succeeded, check if non-documentation files were changed
-            if echo "$files" | grep -qx 'docs/user-guide/a3-02-reference-capability-atoms.md'; then
-              echo "Generated capability atoms reference changed, running checks"
+            if echo "$files" | grep -Eqx 'docs/(command-line-slangc-reference.md|user-guide/a3-02-reference-capability-atoms.md)'; then
+              echo "Generated reference document changed, running checks"
               shouldRun=true
             elif echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|\.claude/|[^/]+\.md$|\.coderabbit\.yaml$)'; then
               shouldRun=true
