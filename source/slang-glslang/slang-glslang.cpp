@@ -190,6 +190,7 @@ extern "C"
 }
 
 // Disassemble the given SPIRV-ASM instructions and return the result as a string.
+// The caller owns *outString and must release it with glslang_freeDisassembly().
 extern "C"
 #ifdef _MSC_VER
     _declspec(dllexport)
