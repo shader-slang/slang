@@ -2252,6 +2252,27 @@ Result linkAndOptimizeIR(
             SLANG_PASS(invertYOfPositionOutput);
         if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::VulkanUseDxPositionW))
             SLANG_PASS(rcpWOfPositionInput);
+
+        // `-fgl-remap-z` is scoped to the textual GLSL target and the vertex stage only:
+        // the OpenGL [-1, 1] NDC depth convention only differs from the standard [0, 1] used
+        // by Vulkan/SPIR-V/D3D/Metal, so the remap must NOT run for SPIR-V (which also passes
+        // isKhronosTarget). Code generation runs on a single entry point at a time (see
+        // slang-code-gen.cpp), so the stage is checked here, keeping the IR pass stage-agnostic.
+        if (target == CodeGenTarget::GLSL &&
+            targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GLSLRemapZ))
+        {
+            bool isVertexStage = false;
+            for (Index ee = 0; ee < codeGenContext->getEntryPointCount(); ++ee)
+            {
+                if (codeGenContext->getEntryPoint(ee)->getStage() == Stage::Vertex)
+                {
+                    isVertexStage = true;
+                    break;
+                }
+            }
+            if (isVertexStage)
+                SLANG_PASS(remapZOfPositionOutput);
+        }
     }
 
     BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};

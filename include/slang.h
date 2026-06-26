@@ -1204,6 +1204,9 @@ typedef uint32_t SlangSizeT;
                  //   watchdog timeouts heavy coverage can trigger) at the cost of exact
                  //   counts. Off by default.
 
+        GLSLRemapZ = 153, // bool: GLSL vertex output only. Remap SV_Position.z from OpenGL
+                          //   clip space [-w, w] to standard [0, w] via z' = (z + w) / 2.
+
         CountOf,
     };
 
