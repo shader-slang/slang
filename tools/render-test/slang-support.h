@@ -6,6 +6,7 @@
 #include "shader-input-layout.h"
 #include "slang.h"
 
+#include <mutex>
 #include <slang-rhi.h>
 
 namespace renderer_test
@@ -17,32 +18,40 @@ namespace renderer_test
 class CoreToRHIDebugBridge : public rhi::IDebugCallback
 {
 public:
-    void setCoreCallback(Slang::IDebugCallback* coreCallback) { m_coreCallback = coreCallback; }
+    void setCoreCallback(Slang::IDebugCallback* coreCallback)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_coreCallback = coreCallback;
+    }
 
     virtual SLANG_NO_THROW void SLANG_MCALL handleMessage(
         rhi::DebugMessageType type,
         rhi::DebugMessageSource source,
         const char* message) override
     {
-        if (m_coreCallback)
+        std::lock_guard<std::mutex> lock(m_mutex);
+
+        auto coreCallback = m_coreCallback;
+        if (coreCallback)
         {
             // Convert RHI types to core types
             Slang::DebugMessageType coreType = static_cast<Slang::DebugMessageType>(type);
             Slang::DebugMessageSource coreSource = static_cast<Slang::DebugMessageSource>(source);
-            m_coreCallback->handleMessage(coreType, coreSource, message);
+            coreCallback->handleMessage(coreType, coreSource, message);
         }
     }
 
 private:
+    std::mutex m_mutex;
     Slang::IDebugCallback* m_coreCallback = nullptr;
 };
 
 /// Binds an RHI debug bridge to a core callback for one active test invocation.
 ///
 /// The bridge may be retained by RHI device state after this scope exits, but the
-/// per-test core callback must not be retained. Messages that arrive after the
-/// scope exits are intentionally dropped by the bridge instead of being written
-/// to a dead callback or the next test's callback.
+/// per-test core callback must not be retained. Messages that arrive while no
+/// scoped callback is active are intentionally dropped by the bridge instead of
+/// being written to dead callback storage.
 class ScopedCoreDebugCallback
 {
 public:
@@ -75,6 +84,7 @@ public:
         // Only capture error messages
         if (type == Slang::DebugMessageType::Error)
         {
+            std::lock_guard<std::mutex> lock(m_mutex);
             m_buf << message;
             if (message[strlen(message) - 1] != '\n')
             {
@@ -83,10 +93,20 @@ public:
         }
     }
 
-    void clear() { m_buf.clear(); }
-    Slang::String getString() { return m_buf.toString(); }
+    void clear()
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_buf.clear();
+    }
+
+    Slang::String getString()
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return m_buf.toString();
+    }
 
 private:
+    std::mutex m_mutex;
     Slang::StringBuilder m_buf;
 };
 
