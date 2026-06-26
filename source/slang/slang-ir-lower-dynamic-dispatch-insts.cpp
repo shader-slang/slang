@@ -1612,10 +1612,7 @@ struct ExistentialLoweringContext : public InstPassBase
     // of truth for the handle representation; the type lowering
     // (lowerHandleTypes) and every site that constructs or decomposes a handle
     // value must agree on it. See lowerHandleTypes() for why Metal differs.
-    bool useUInt64HandleRepresentation()
-    {
-        return isMetalTarget(targetProgram->getTargetReq());
-    }
+    bool useUInt64HandleRepresentation() { return isMetalTarget(targetProgram->getTargetReq()); }
 
     // Replace all WitnessTableID type or RTTIHandleType with a fixed-layout
     // 64-bit integer representation: `uint2` on most targets, but `ulong`
