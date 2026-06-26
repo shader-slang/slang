@@ -187,17 +187,46 @@ IntegerLiteralValue getIntegerLiteralValue(
     bool* outIsDecimalBase = 0,
     bool* outHasOverflowed = 0);
 
-// When *outIsOutOfRange is true, the return value is either:
+
+// The suffix type of the literal
+enum class FloatingPointLiteralType
+{
+    // Error: bad mantissa
+    BadSignificand,
+
+    // Error: bad suffix
+    BadSuffix,
+
+    // 16-bit half-float
+    Half,
+
+    // 32-bit float
+    Float,
+
+    // 64-bit double
+    Double,
+};
+
+// Reads a floating point value from a literal token.
+//
+// outLiteralType signals the literal type, including parsing errors. In case of
+// a parsing error, outErrorContent contains the bad part (significand or suffix).
+//
+// When outIsOutOfRange is true, the return value is either:
 // - 0        - underflow (between 0 and denormal min)
 // - INFINITY - overflow (above maximum double value)
 //
-// When *outPrecisionLost is true, the significand was truncated. Reported
-// only when *outIsOutOfRange is false.
+// When outPrecisionLost is true, the significand was truncated. Reported only
+// for hex floats and when outIsOutOfRange is false.
+//
+// The returned value is rounded according to the suffix as reported by
+// outLiteralType.
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
-    UnownedStringSlice* outSuffix = 0,
-    bool* outIsOutOfRange = 0,
-    bool* outPrecisionLost = 0);
+    FloatingPointLiteralType& outLiteralType,
+    bool& outIsOutOfRange,
+    bool& outPrecisionLost,
+    UnownedStringSlice& outErrorContent);
 
 IntegerLiteralValue getCharLiteralValue(Token const& token);
 } // namespace Slang
