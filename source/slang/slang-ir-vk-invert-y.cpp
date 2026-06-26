@@ -98,13 +98,20 @@ static IRInst* _remapZOfVector(IRBuilder& builder, IRInst* originalVector)
 
 // Find outputs to SV_Position and remap their clip-space z right before the write, so a shader
 // authored against the OpenGL [-1, 1] NDC depth convention emits the standard [0, 1] depth. This
-// reuses `invertYOfPositionOutput`'s store/getElementPtr traversal but transforms the output side
-// only: unlike y-negation (involutive, so invert-y also fixes up read-backs), z' = (z + w) / 2 is
-// not its own inverse, and the scope here is the written stage output, so there is no read-back
-// branch. The position output is lowered as a single full-`float4` store, so the store value is
-// always a vector and `_remapZOfVector` asserts that invariant rather than this pass guarding
-// against it. The pass is scheduled exclusively for the GLSL target on vertex entry points (see
-// linkAndOptimizeIR in slang-emit.cpp), so it performs no target/stage checks of its own.
+// reuses `invertYOfPositionOutput`'s store/getElementPtr traversal but transforms only the value
+// written to the position output; unlike `invertYOfPositionOutput` it intentionally does NOT fix
+// up `IRLoad` uses of the global. invert-y handles loads so that a shader which reads its negated
+// `y` back observes the value it wrote; the analogous concern here is that a read-back would
+// observe the remapped `z`. Omitting the load branch is therefore correct only under the invariant
+// that a gated GLSL vertex `gl_Position` is not read back within the shader after the output write
+// (the ordinary case: the position is computed, written, and not re-read). If a future IR shape
+// routed a post-write `gl_Position` load through this pass, a load fix-up mirroring invert-y would
+// be required -- and note `_remapZOfVector` could not simply be reused for it, since z' = (z + w) /
+// 2 is not its own inverse (that non-involutivity explains the helper-reuse limit, not the
+// omission's correctness). The position output is lowered as a single full-`float4` store, so the
+// store value is always a vector and `_remapZOfVector` asserts that invariant rather than this pass
+// guarding against it. The pass is scheduled exclusively for the GLSL target on vertex entry points
+// (see linkAndOptimizeIR in slang-emit.cpp), so it performs no target/stage checks of its own.
 void remapZOfPositionOutput(IRModule* module)
 {
     for (auto globalInst : module->getGlobalInsts())
