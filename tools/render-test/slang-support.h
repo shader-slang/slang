@@ -1,6 +1,7 @@
 // slang-support.h
 #pragma once
 
+#include "core/slang-basic.h"
 #include "core/slang-std-writers.h"
 #include "options.h"
 #include "shader-input-layout.h"
@@ -17,7 +18,7 @@ namespace renderer_test
 /// RHI backends may invoke debug callbacks from backend or driver threads, so
 /// binding changes and forwarded messages are serialized.
 /// TODO: We should replace rhi::IDebugCallback with Slang::IDebugCallback.
-class CoreToRHIDebugBridge : public rhi::IDebugCallback
+class CoreToRHIDebugBridge : public Slang::RefObject, public rhi::IDebugCallback
 {
 public:
     void setCoreCallback(Slang::IDebugCallback* coreCallback)
@@ -47,6 +48,24 @@ private:
     std::mutex m_mutex;
     Slang::IDebugCallback* m_coreCallback = nullptr;
 };
+
+/// Creates an RHI debug bridge that remains alive for process teardown.
+///
+/// Device descriptors store debug callbacks as raw pointers, and retained RHI
+/// state may emit messages after the harness invocation that created a device.
+/// Each invocation gets a distinct bridge so old emitters can only reach their
+/// own cleared bridge, not the next invocation's callback.
+inline Slang::RefPtr<CoreToRHIDebugBridge> createRetainedCoreToRHIDebugBridge()
+{
+    static std::mutex* mutex = new std::mutex;
+    static Slang::List<Slang::RefPtr<CoreToRHIDebugBridge>>* bridges =
+        new Slang::List<Slang::RefPtr<CoreToRHIDebugBridge>>();
+
+    Slang::RefPtr<CoreToRHIDebugBridge> bridge = new CoreToRHIDebugBridge();
+    std::lock_guard<std::mutex> lock(*mutex);
+    bridges->add(bridge);
+    return bridge;
+}
 
 /// Binds an RHI debug bridge to a core callback for one active test invocation.
 ///

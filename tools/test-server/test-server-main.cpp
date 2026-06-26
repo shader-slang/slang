@@ -543,11 +543,9 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 
     TestReporter testReporter;
     renderer_test::CoreDebugCallback coreDebugCallback;
-    // RHI state can outlive an RPC invocation, so the bridge must outlive the
-    // stack callback whose binding is controlled by the scoped helper.
-    static renderer_test::CoreToRHIDebugBridge rhiDebugCallback;
+    auto rhiDebugCallback = renderer_test::createRetainedCoreToRHIDebugBridge();
     renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
-        rhiDebugCallback,
+        *rhiDebugCallback,
         &coreDebugCallback);
 
     testModule->setTestReporter(&testReporter);
@@ -565,7 +563,7 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     unitTestContext.enabledApis = RenderApiFlags(args.enabledApis);
     unitTestContext.executableDirectory = m_exeDirectory.getBuffer();
     unitTestContext.enableDebugLayers = args.enableDebugLayers;
-    unitTestContext.debugCallback = &rhiDebugCallback;
+    unitTestContext.debugCallback = rhiDebugCallback.Ptr();
 
     auto testCount = testModule->getTestCount();
     SLANG_ASSERT(testIndex >= 0 && testIndex < testCount);

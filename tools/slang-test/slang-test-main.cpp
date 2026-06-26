@@ -5556,9 +5556,6 @@ static SlangResult runUnitTestModule(
         return SLANG_FAIL;
 
     renderer_test::CoreDebugCallback coreDebugCallback;
-    // RHI state can outlive a unit-test invocation, so the bridge must outlive
-    // the stack callback whose binding is controlled below.
-    static renderer_test::CoreToRHIDebugBridge rhiDebugBridge;
 
     UnitTestContext unitTestContext;
     unitTestContext.slangGlobalSession = context->getSession();
@@ -5569,7 +5566,7 @@ static SlangResult runUnitTestModule(
         context->options.enabledApis & _getAvailableRenderApiFlags(context);
     unitTestContext.enableDebugLayers = context->options.enableDebugLayers;
     unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
-    unitTestContext.debugCallback = &rhiDebugBridge;
+    unitTestContext.debugCallback = nullptr;
 
     auto testCount = testModule->getTestCount();
 
@@ -5688,8 +5685,10 @@ static SlangResult runUnitTestModule(
 
             // Clear any previous debug messages
             coreDebugCallback.clear();
+            auto rhiDebugBridge = renderer_test::createRetainedCoreToRHIDebugBridge();
+            unitTestContext.debugCallback = rhiDebugBridge.Ptr();
             renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
-                rhiDebugBridge,
+                *rhiDebugBridge,
                 &coreDebugCallback);
 
             try

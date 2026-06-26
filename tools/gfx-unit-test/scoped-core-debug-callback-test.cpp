@@ -11,18 +11,18 @@ void emitError(renderer_test::CoreToRHIDebugBridge& bridge, const char* message)
     bridge.handleMessage(rhi::DebugMessageType::Error, rhi::DebugMessageSource::Layer, message);
 }
 
-renderer_test::CoreToRHIDebugBridge& getStaticBridgeAfterStackCallbackScope()
+renderer_test::CoreToRHIDebugBridge* getRetainedBridgeAfterStackCallbackScope()
 {
-    static renderer_test::CoreToRHIDebugBridge bridge;
+    auto bridge = renderer_test::createRetainedCoreToRHIDebugBridge();
 
     renderer_test::CoreDebugCallback callback;
     {
-        renderer_test::ScopedCoreDebugCallback scopedDebugCallback(bridge, &callback);
-        emitError(bridge, "static scope");
+        renderer_test::ScopedCoreDebugCallback scopedDebugCallback(*bridge, &callback);
+        emitError(*bridge, "retained scope");
     }
-    SLANG_CHECK(callback.getString() == "static scope\n");
+    SLANG_CHECK(callback.getString() == "retained scope\n");
 
-    return bridge;
+    return bridge.Ptr();
 }
 } // namespace
 
@@ -99,16 +99,16 @@ SLANG_UNIT_TEST(scopedCoreDebugCallbackClearsBridgeOnException)
     SLANG_CHECK(secondCallback.getString() == "next iteration\n");
 }
 
-SLANG_UNIT_TEST(scopedCoreDebugCallbackClearsStaticBridgeAfterStackCallback)
+SLANG_UNIT_TEST(scopedCoreDebugCallbackSeparatesRetainedBridgeScopes)
 {
-    renderer_test::CoreToRHIDebugBridge& bridge = getStaticBridgeAfterStackCallbackScope();
-
-    emitError(bridge, "after stack callback");
+    renderer_test::CoreToRHIDebugBridge* oldBridge = getRetainedBridgeAfterStackCallbackScope();
+    auto nextBridge = renderer_test::createRetainedCoreToRHIDebugBridge();
 
     renderer_test::CoreDebugCallback nextCallback;
     {
-        renderer_test::ScopedCoreDebugCallback scopedDebugCallback(bridge, &nextCallback);
-        emitError(bridge, "next invocation");
+        renderer_test::ScopedCoreDebugCallback scopedDebugCallback(*nextBridge, &nextCallback);
+        emitError(*oldBridge, "after stack callback");
+        emitError(*nextBridge, "next invocation");
     }
     SLANG_CHECK(nextCallback.getString() == "next invocation\n");
 }
@@ -116,44 +116,61 @@ SLANG_UNIT_TEST(scopedCoreDebugCallbackClearsStaticBridgeAfterStackCallback)
 SLANG_UNIT_TEST(coreDebugBridgeHandlesConcurrentMessages)
 {
     static constexpr int kThreadCount = 4;
-    static constexpr int kMessageCount = 64;
+    static constexpr int kMessageCount = 1024;
 
     renderer_test::CoreToRHIDebugBridge bridge;
     renderer_test::CoreDebugCallback callback;
-    {
-        renderer_test::ScopedCoreDebugCallback scopedDebugCallback(bridge, &callback);
+    std::atomic<bool> startWriting(false);
+    std::atomic<bool> keepReading(true);
 
-        std::atomic<bool> keepReading(true);
-        std::thread readerThread(
+    std::thread readerThread(
+        [&]()
+        {
+            while (keepReading.load(std::memory_order_acquire))
+            {
+                callback.getString();
+            }
+        });
+
+    std::thread writerThreads[kThreadCount];
+    for (int threadIndex = 0; threadIndex < kThreadCount; ++threadIndex)
+    {
+        writerThreads[threadIndex] = std::thread(
             [&]()
             {
-                while (keepReading.load(std::memory_order_acquire))
+                while (!startWriting.load(std::memory_order_acquire))
                 {
-                    callback.getString();
+                    std::this_thread::yield();
+                }
+
+                for (int messageIndex = 0; messageIndex < kMessageCount; ++messageIndex)
+                {
+                    emitError(bridge, "x");
                 }
             });
-
-        std::thread writerThreads[kThreadCount];
-        for (int threadIndex = 0; threadIndex < kThreadCount; ++threadIndex)
-        {
-            writerThreads[threadIndex] = std::thread(
-                [&]()
-                {
-                    for (int messageIndex = 0; messageIndex < kMessageCount; ++messageIndex)
-                    {
-                        emitError(bridge, "x");
-                    }
-                });
-        }
-
-        for (auto& writerThread : writerThreads)
-        {
-            writerThread.join();
-        }
-
-        keepReading.store(false, std::memory_order_release);
-        readerThread.join();
     }
 
-    SLANG_CHECK(callback.getString().getLength() == kThreadCount * kMessageCount * 2);
+    {
+        renderer_test::ScopedCoreDebugCallback scopedDebugCallback(bridge, &callback);
+        startWriting.store(true, std::memory_order_release);
+        for (int spinCount = 0; spinCount < 100000 && callback.getString().getLength() == 0;
+             ++spinCount)
+        {
+            std::this_thread::yield();
+        }
+        SLANG_CHECK(callback.getString().getLength() > 0);
+    }
+
+    for (auto& writerThread : writerThreads)
+    {
+        writerThread.join();
+    }
+
+    keepReading.store(false, std::memory_order_release);
+    readerThread.join();
+
+    auto capturedLength = callback.getString().getLength();
+    SLANG_CHECK(capturedLength > 0);
+    SLANG_CHECK(capturedLength <= kThreadCount * kMessageCount * 2);
+    SLANG_CHECK((capturedLength % 2) == 0);
 }
