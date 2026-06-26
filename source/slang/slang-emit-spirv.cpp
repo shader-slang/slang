@@ -4353,6 +4353,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                 case AddressSpace::StorageBuffer:
                 case AddressSpace::UserPointer:
+                case AddressSpace::Uniform:
                     memoryClass = SpvMemorySemanticsUniformMemoryMask;
                     break;
                 case AddressSpace::Image:
@@ -4679,6 +4680,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
         case AddressSpace::Global:
         case AddressSpace::StorageBuffer:
+        case AddressSpace::Uniform:
         case AddressSpace::UserPointer:
         case AddressSpace::GroupShared:
         case AddressSpace::Image:

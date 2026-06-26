@@ -88,6 +88,8 @@ bool isSimpleDecoration(IROp op)
     switch (op)
     {
     case kIROp_EarlyDepthStencilDecoration:
+    case kIROp_GLSLFragDepthGreaterDecoration:
+    case kIROp_GLSLFragDepthLessDecoration:
     case kIROp_Shader64BitIndexingDecoration:
     case kIROp_KeepAliveDecoration:
     case kIROp_LineAdjInputPrimitiveTypeDecoration:
