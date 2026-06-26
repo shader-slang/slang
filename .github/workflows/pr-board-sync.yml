@@ -143,6 +143,15 @@ permissions: {}
 jobs:
   board-sync:
     runs-on: ubuntu-latest
+    # Serialize events for the same PR so two near-simultaneous events (e.g.
+    # opened + a fast synchronize) cannot double-write; cancel-in-progress: false
+    # lets the in-flight run finish and queues the next. A check_suite keys on its
+    # head SHA rather than a PR number, so it can still overlap a PR-keyed event --
+    # benign, since the assignment pick is deterministic and the Status writes are
+    # idempotent recomputes.
+    concurrency:
+      group: pr-board-sync-${{ github.event.pull_request.number || github.event.check_suite.head_sha || github.run_id }}
+      cancel-in-progress: false
     steps:
       # --- Classify Source (repo write-access read; opened/reopened only) ------
       - name: Classify PR Source
@@ -1088,8 +1097,9 @@ jobs:
                 // head CI pending, but that dequeues via `synchronize` -> In Review.)
                 await setSingleSelect(itemId, STATUS.field, STATUS.snagged);
               } else {
-                // opened / reopened / synchronize / enqueued / ready_for_review /
-                // converted_to_draft: recompute the whole target from current state.
+                // opened / reopened / edited / synchronize / enqueued /
+                // ready_for_review / converted_to_draft: recompute the whole target
+                // from current state.
                 await reconcileStatus(pr.number, pr.node_id, itemId);
               }
             } else if (ev === "pull_request_review") {
