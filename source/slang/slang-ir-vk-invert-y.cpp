@@ -97,11 +97,14 @@ static IRInst* _remapZOfVector(IRBuilder& builder, IRInst* originalVector)
 }
 
 // Find outputs to SV_Position and remap their clip-space z right before the write, so a shader
-// authored against the OpenGL [-1, 1] NDC depth convention emits the standard [0, 1] depth.
-// This is the output/store path only; the affine remap needs the full float4 to read w, so
-// partial single-component writes to the position are intentionally left untouched. The pass is
-// scheduled exclusively for the GLSL target on vertex entry points (see linkAndOptimizeIR in
-// slang-emit.cpp), so it performs no target/stage checks of its own.
+// authored against the OpenGL [-1, 1] NDC depth convention emits the standard [0, 1] depth. This
+// reuses `invertYOfPositionOutput`'s store/getElementPtr traversal but transforms the output side
+// only: unlike y-negation (involutive, so invert-y also fixes up read-backs), z' = (z + w) / 2 is
+// not its own inverse, and the scope here is the written stage output, so there is no read-back
+// branch. The position output is lowered as a single full-`float4` store, so the store value is
+// always a vector and `_remapZOfVector` asserts that invariant rather than this pass guarding
+// against it. The pass is scheduled exclusively for the GLSL target on vertex entry points (see
+// linkAndOptimizeIR in slang-emit.cpp), so it performs no target/stage checks of its own.
 void remapZOfPositionOutput(IRModule* module)
 {
     for (auto globalInst : module->getGlobalInsts())
@@ -118,13 +121,8 @@ void remapZOfPositionOutput(IRModule* module)
                     if (getRootAddr(store->getPtr()) != globalInst)
                         return;
 
-                    // Only a full-vector write can be remapped, since z' depends on w; skip
-                    // partial single-component stores (e.g. a write to just `.z`).
-                    auto originalVal = store->getVal();
-                    if (!as<IRVectorType>(originalVal->getDataType()))
-                        return;
-
                     builder.setInsertBefore(store);
+                    auto originalVal = store->getVal();
                     auto remappedVal = _remapZOfVector(builder, originalVal);
                     builder.replaceOperand(&store->val, remappedVal);
                 }

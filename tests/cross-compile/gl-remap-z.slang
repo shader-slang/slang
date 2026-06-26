@@ -6,6 +6,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -entry main -stage vertex -profile vs_5_1 -fgl-remap-z
 //TEST:SIMPLE(filecheck=COMPOSE):-target glsl -entry main -stage vertex -profile vs_5_1 -fvk-invert-y -fgl-remap-z
+//TEST:SIMPLE(filecheck=NOREMAP):-target glsl -entry main -stage vertex -profile vs_5_1
 
 struct VOutput
 {
@@ -28,5 +29,11 @@ VOutput main()
     // COMPOSE-DAG: {{[_A-Za-z0-9]+}}.y = - output_0.v_0.y;
     // COMPOSE-DAG: {{[_A-Za-z0-9]+}}.z = {{.*}}.z{{.*}}.w{{.*}};
     // COMPOSE: gl_Position =
+
+    // Off by default: without '-fgl-remap-z' the position is written unmodified, with no
+    // (z + w) / 2 temp, confirming the remap is a pure opt-in (and that the gate, not the
+    // shader, controls it).
+    // NOREMAP-NOT: / 2.0
+    // NOREMAP: gl_Position = output_0.v_0;
     return output;
 }

@@ -2262,9 +2262,9 @@ Result linkAndOptimizeIR(
             targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GLSLRemapZ))
         {
             bool isVertexStage = false;
-            for (Index ee = 0; ee < codeGenContext->getEntryPointCount(); ++ee)
+            for (auto entryPointIndex : codeGenContext->getEntryPointIndices())
             {
-                if (codeGenContext->getEntryPoint(ee)->getStage() == Stage::Vertex)
+                if (codeGenContext->getEntryPoint(entryPointIndex)->getStage() == Stage::Vertex)
                 {
                     isVertexStage = true;
                     break;
