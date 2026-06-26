@@ -3,13 +3,15 @@
 // Regression test for the O(N^2) compile-time blowup in dynamic-dispatch
 // specialization (`specializeModule` / `TranslationContext::resolveInst`).
 //
-// An interface with many implementations dispatched through a runtime-typed
-// existential forces real witness-table dynamic dispatch. Before the fix,
-// resolving the N-element witness-table / type set was re-done O(N) times per
-// referencing instruction, making compilation quadratic in the number of
-// implementations. This test exercises that path (and verifies the dispatch
-// still produces correct results); the compile-time guard lives in the
-// compile-perf suite.
+// An *array of existentials* (interface-typed elements) holding many distinct
+// implementations and dispatched in a loop forces construction of the N-member
+// witness-table / type `set` (and the `TaggedUnion` type built over it) whose
+// repeated resolution was quadratic before the fix. This deliberately differs from
+// the switch-factory coverage in `dispatch-many-conformances.slang`: it exercises
+// the existential-aggregate lowering path, mirroring the `existential_aggregate`
+// compile-perf workload that the fix also speeds up. The compile-time guard itself
+// lives in the compile-perf suite; this test verifies the dispatch still produces
+// correct results after the resolution cache.
 
 [anyValueSize(16)]
 interface IShape
@@ -26,39 +28,33 @@ struct S5 : IShape { int eval(int x) { return x * 6 + 5; } }
 struct S6 : IShape { int eval(int x) { return x * 7 + 6; } }
 struct S7 : IShape { int eval(int x) { return x * 8 + 7; } }
 
-int dispatch(int id, int x)
-{
-    IShape s;
-    switch (id)
-    {
-    case 0:  s = S0(); break;
-    case 1:  s = S1(); break;
-    case 2:  s = S2(); break;
-    case 3:  s = S3(); break;
-    case 4:  s = S4(); break;
-    case 5:  s = S5(); break;
-    case 6:  s = S6(); break;
-    case 7:  s = S7(); break;
-    default: s = S0(); break;
-    }
-    return s.eval(x);
-}
-
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    outputBuffer[0] = dispatch(0, 10);
+    // An array of existentials populated with N distinct concrete implementations:
+    // this is what builds the N-member set / tagged-union types.
+    IShape shapes[8];
+    shapes[0] = S0();
+    shapes[1] = S1();
+    shapes[2] = S2();
+    shapes[3] = S3();
+    shapes[4] = S4();
+    shapes[5] = S5();
+    shapes[6] = S6();
+    shapes[7] = S7();
+
+    for (int i = 0; i < 8; i++)
+        outputBuffer[i] = shapes[i].eval(10);
+
     // CHECK: 10
-
-    outputBuffer[1] = dispatch(1, 10);
     // CHECK: 21
-
-    outputBuffer[2] = dispatch(2, 10);
     // CHECK: 32
-
-    outputBuffer[3] = dispatch(7, 10);
+    // CHECK: 43
+    // CHECK: 54
+    // CHECK: 65
+    // CHECK: 76
     // CHECK: 87
 }

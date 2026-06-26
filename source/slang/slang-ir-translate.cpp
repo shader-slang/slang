@@ -511,21 +511,24 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
             specializeWitnessLookup(cast<IRLookupWitnessMethod>(instWithCanonicalOperands)));
     }
 
-    // Reaching here means no specialization, translation, constant-fold, or witness
-    // lookup applied: this inst's resolution is purely "resolve operands, return self".
-    // It is therefore a structural fixed point — it can never resolve to anything other
-    // than itself — so record it (it is module-scope, guaranteed by the check above) to
-    // skip its O(operandCount) operand re-walk on the next `resolveInst` call. This is the
-    // O(N)-operand hot path: a witness-table / type `set` or `TaggedUnion` type referenced
-    // from many instructions.
+    // Record a witness-table / type `set` as a structural fixed point so the next
+    // `resolveInst` call returns it in O(1) instead of re-walking its operands. A set is
+    // the O(N)-operand inst at the root of the quadratic (see the commit message): its
+    // members are concrete witness tables / types that are themselves permanent fixed
+    // points, it has no specialization / translation / fold / witness-lookup form, and
+    // `_resolveInstRec` never transforms it — so it is monotonic and can never resolve to
+    // anything other than itself. Caching only the sets is also sufficient for the perf
+    // win: anything that references a set (e.g. a `TaggedUnion` type) recurses into the
+    // cached set and so becomes O(1) too.
     //
-    // A `LookupWitnessMethod` returned earlier through its own branch and never reaches
-    // here. A set-specialized `Specialize` does fall through (it is left as-is for the
-    // dynamic-dispatch lowering), but unlike the structural set/union *types* it is a
-    // deferred generic application that Phase 2 rewrites and deallocates, so it is not a
-    // permanent fixed point — exclude it. (It is also not the O(N) cost; the cost is the
-    // set type's N members.)
-    if (instWithCanonicalOperands->getOp() != kIROp_Specialize)
+    // This is a whitelist on purpose. Other op kinds also reach this fall-through but are
+    // *not* monotonic — they are left as-is here only because their conditional transform
+    // has not fired yet, and a later call can resolve them once their operands concretize:
+    // `SizeOf` / `AlignOf` / `GetArrayLength` (simplify once the type is concrete, lines
+    // ~406-416) and a set-specialized `Specialize` (lowered and deallocated by Phase 2).
+    // Caching any of those would mask the later resolution, so only `IRSetBase` is cached;
+    // every other kind defaults to not cached, which is safe by construction.
+    if (as<IRSetBase>(instWithCanonicalOperands))
         ctx->recordStructuralFixedPoint(instWithCanonicalOperands);
     return instWithCanonicalOperands;
 }
@@ -534,11 +537,13 @@ IRInst* TranslationContext::resolveInst(IRInst* inst)
 {
     // Fast path: a recorded structural fixed point resolves to itself with no side
     // effects, so skip the (potentially O(operandCount)) operand re-walk. The entry is
-    // only valid while the inst remains attached to the module; assert that to catch any
-    // future caller that passes an inst removed/deallocated since it was recorded.
+    // only valid while the inst remains attached to the module; use SLANG_RELEASE_ASSERT
+    // (not SLANG_ASSERT, which compiles to an assume in release) so a future caller that
+    // passes an inst removed/deallocated since it was recorded fails loudly in every
+    // build rather than reading a stale pointer.
     if (inst && resolvedStructuralFixedPoints.contains(inst))
     {
-        SLANG_ASSERT(inst->getParent() && as<IRModuleInst>(inst->getParent()));
+        SLANG_RELEASE_ASSERT(inst->getParent() && as<IRModuleInst>(inst->getParent()));
         return inst;
     }
 
