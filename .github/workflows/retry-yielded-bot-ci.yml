@@ -23,7 +23,11 @@ permissions:
 
 jobs:
   retry:
-    runs-on: ubuntu-latest
+    # Lightweight CPU-only GCP analytics pool (checkout + Python + `gh api`),
+    # the same pool ci-health/ci-analytics use — keeps this off the ~20-runner
+    # GitHub-hosted pool. Not latency-sensitive, so a scale-from-zero cold start
+    # here is fine.
+    runs-on: ["Linux", "self-hosted", "analytics", "GCP"]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5

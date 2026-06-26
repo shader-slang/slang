@@ -62,7 +62,11 @@ jobs:
   wait-for-human-priority:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
-    runs-on: ubuntu-latest
+    # Run on the lightweight CPU-only GCP analytics pool, not a GitHub-hosted
+    # runner: this gate fires for every PR revision, and the GitHub-hosted pool
+    # is only ~20 runners. That pool image already serves the same shape of work
+    # (checkout + Python + `gh api`, no GPU) for ci-health/ci-analytics.
+    runs-on: ["Linux", "self-hosted", "analytics", "GCP"]
     timeout-minutes: 10
     # Only reads Actions API state and runs a script; no write access needed.
     permissions:
