@@ -1906,8 +1906,7 @@ struct PeepholeContext : InstPassBase
                 // undefined store faithfully preserves that meaning -- it is the
                 // same value any later load of the destination would observe.
                 auto storedVal = as<IRStore>(inst)->getVal();
-                if (as<IRUndefined>(storedVal) &&
-                    !as<IRLoadFromUninitializedMemory>(storedVal))
+                if (as<IRUndefined>(storedVal) && !as<IRLoadFromUninitializedMemory>(storedVal))
                 {
                     maybeRemoveOldInst(inst);
                     changed = true;
