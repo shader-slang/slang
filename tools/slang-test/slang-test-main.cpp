@@ -5641,6 +5641,7 @@ static SlangResult runUnitTestModule(
                 // If the rpc failed, output an error message
                 if (SLANG_FAILED(rpcRes))
                 {
+                    testResult = TestResult::Fail;
                     reporter->message(TestMessageType::RunError, "rpc failed");
                 }
 

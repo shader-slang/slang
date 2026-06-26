@@ -22,6 +22,7 @@ namespace ns
         f_a(); // Error.
 //CHECK:^^^ undefined identifier
 //CHECK:^^^ undefined identifier 'f_a'.
+//CHECK:^^^ did you mean 'f_b'?
     }
 }
 
@@ -35,5 +36,22 @@ namespace ns2
         f_a(); // Error.
 //CHECK:^^^ undefined identifier
 //CHECK:^^^ undefined identifier 'f_a'.
+//CHECK:^^^ did you mean 'f_b'?
+    }
+}
+
+namespace ns3
+{
+    using namespace ns;
+
+    void testFunc4()
+    {
+        // A typo of the *non-public* `ns::f_private` from module b. Because
+        // lookup would never resolve an inaccessible decl, it must not be
+        // offered as a suggestion (exhaustive mode: a spurious "did you mean"
+        // would be an unannotated diagnostic and fail the test).
+        f_privat(); // Error, no suggestion.
+//CHECK:^^^^^^^^ undefined identifier
+//CHECK:^^^^^^^^ undefined identifier 'f_privat'.
     }
 }
