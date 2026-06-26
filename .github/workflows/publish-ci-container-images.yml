@@ -32,7 +32,7 @@ jobs:
   validate:
     if: github.repository == 'shader-slang/slang' && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
     name: Validate ${{ matrix.name }}
-    runs-on: ubuntu-22.04
+    runs-on: ["Linux", "self-hosted", "build", "GCP"]
     timeout-minutes: 120
     permissions:
       contents: read # Required for actions/checkout.
@@ -189,7 +189,7 @@ jobs:
     needs: validate
     if: github.repository == 'shader-slang/slang' && github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     name: Publish ${{ matrix.name }}
-    runs-on: ubuntu-22.04
+    runs-on: ["Linux", "self-hosted", "build", "GCP"]
     timeout-minutes: 120
     permissions:
       contents: read # Required for actions/checkout.
