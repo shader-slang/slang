@@ -14,6 +14,7 @@
 
 namespace Slang
 {
+
 namespace
 {
 
@@ -2381,6 +2382,28 @@ bool SemanticsVisitor::_coerce(
     // This is treated as a form of overload resolution,
     // since we are effectively forming an overloaded
     // call to one of the initializers in the target type.
+
+    // Fast rejection: an opaque generic type parameter cannot be converted to a
+    // concrete *scalar* builtin type through an initializer. A generic parameter's
+    // only valid coercions are to its declared constraint supertypes (handled by the
+    // subtype-witness path above) and to itself (exact-match path above); there is no
+    // initializer on a scalar builtin that accepts an opaque parameter, so the
+    // initializer-based conversion search below would do a full (recursive) overload
+    // resolution only to fail. This is the dominant `_coerce` cost when ranking an
+    // operator on a constrained generic `T` against the many concrete builtin scalar
+    // operator overloads (each rejected `operator OP(float,float)`-style candidate
+    // drives one such doomed search).
+    //
+    // The check is intentionally narrow: only a *scalar* `toType` is rejected.
+    // `vector<T,N>` / `matrix<T,N,M>` are excluded because a scalar generic `T`
+    // legitimately broadcasts into them via their element constructor, and any
+    // aggregate/struct `toType` is excluded because it may expose a generic
+    // initializer that accepts `T`. Both of those must still take the search below.
+    if (as<BasicExpressionType>(toType) &&
+        isDeclRefTypeOf<GenericTypeParamDeclBase>(fromType.type))
+    {
+        return _failedCoercion(toType, outToExpr, fromExpr, sink);
+    }
 
     OverloadResolveContext overloadContext;
     overloadContext.disallowNestedConversions = (site != CoercionSite::ExplicitCoercion);
