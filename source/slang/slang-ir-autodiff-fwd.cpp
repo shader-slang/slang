@@ -2622,6 +2622,11 @@ struct ForwardDiffTranslationContext
         case kIROp_MakeCoopVectorFromValuePack:
         case kIROp_MakeTuple:
         case kIROp_MakeOptionalValue:
+        // `Conditional<T, hasValue>` is the structural sibling of `Optional<T>`; its
+        // `__init(T)` lowers to `MakeConditionalValue`. Forward-mode AD constructs it the
+        // same way as `MakeOptionalValue`: translateConstruct re-emits the primal value and
+        // differentiates the operand when the result type is differentiable.
+        case kIROp_MakeConditionalValue:
         case kIROp_MakeResultValue:
         case kIROp_MakeValuePack:
         case kIROp_BuiltinCast:
@@ -2661,6 +2666,14 @@ struct ForwardDiffTranslationContext
         case kIROp_GetTupleElement:
             return translateGetTupleElement(builder, origInst);
         case kIROp_GetOptionalValue:
+        // `Conditional<T, hasValue>.value` lowers to `GetConditionalValue`, the structural
+        // sibling of `GetOptionalValue`. translateGetOptionalValue emits using
+        // `originalInst->getOp()`, so it differentiates the conditional getter identically:
+        // it re-emits the primal getter and, when the base carries a differential, the diff
+        // getter. Without this case the forward transcriber falls through to the
+        // InternalCompilerError default (E99999) for any differentiation through
+        // `Conditional.get()` (see issue #11784).
+        case kIROp_GetConditionalValue:
             return translateGetOptionalValue(builder, origInst);
 
         case kIROp_IfElse:
