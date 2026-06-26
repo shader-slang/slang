@@ -1,81 +1,19 @@
+#include "core/slang-io.h"
+#include "scoped-env-var.h"
 #include "slang-record-replay/replay-stream-decoder.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <cstdint>
 #include <limits>
-#include <stdlib.h>
 
 using namespace Slang;
 using namespace SlangRecord;
+using SlangUnitTest::ScopedEnvVar;
 
 static bool containsString(const String& text, const char* value)
 {
     return text.indexOf(UnownedStringSlice(value)) != -1;
 }
-
-static int _writeEnvironmentVariable(const char* key, const char* val)
-{
-#ifdef _WIN32
-    String var = String(key) + "=" + val;
-    return _putenv(var.getBuffer());
-#else
-    return setenv(key, val, 1);
-#endif
-}
-
-static int _unsetEnvironmentVariable(const char* key)
-{
-#ifdef _WIN32
-    String var = String(key) + "=";
-    return _putenv(var.getBuffer());
-#else
-    return unsetenv(key);
-#endif
-}
-
-struct ScopedEnvVar
-{
-    const char* key;
-    bool hadOldValue = false;
-    String oldValue;
-
-    ScopedEnvVar(const char* inKey, const char* inVal)
-        : key(inKey)
-    {
-#ifdef _WIN32
-        char* value = nullptr;
-        size_t valueLength = 0;
-        if (_dupenv_s(&value, &valueLength, key) == 0 && value)
-        {
-            hadOldValue = true;
-            oldValue = value;
-            free(value);
-        }
-#else
-        if (const char* value = getenv(key))
-        {
-            hadOldValue = true;
-            oldValue = value;
-        }
-#endif
-        _writeEnvironmentVariable(key, inVal);
-    }
-
-    ScopedEnvVar(const ScopedEnvVar&) = delete;
-    ScopedEnvVar& operator=(const ScopedEnvVar&) = delete;
-
-    ~ScopedEnvVar()
-    {
-        if (hadOldValue)
-        {
-            _writeEnvironmentVariable(key, oldValue.getBuffer());
-        }
-        else
-        {
-            _unsetEnvironmentVariable(key);
-        }
-    }
-};
 
 static void writeReplayTypeId(ReplayStream& stream, TypeId type)
 {
@@ -143,6 +81,49 @@ SLANG_UNIT_TEST(replayStreamRejectsWritePositionOverflow)
 #endif
 }
 
+SLANG_UNIT_TEST(replayStreamRejectsWritePastListIndexLimit)
+{
+#if SLANG_HAS_EXCEPTIONS
+    ReplayStream stream;
+    stream.seek(size_t((std::numeric_limits<Slang::Index>::max)()));
+
+    uint8_t value = 0;
+    bool caughtException = false;
+    try
+    {
+        stream.write(&value, sizeof(value));
+    }
+    catch (const Exception& e)
+    {
+        caughtException = containsString(e.Message, "Write past maximum stream size");
+    }
+    SLANG_CHECK(caughtException);
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
+SLANG_UNIT_TEST(replayStreamRejectsNullWriteWithNonzeroSize)
+{
+#if SLANG_HAS_EXCEPTIONS
+    ScopedEnvVar assertMode("SLANG_ASSERT", "release-assert-only");
+
+    ReplayStream stream;
+    bool caughtException = false;
+    try
+    {
+        stream.write(nullptr, 1);
+    }
+    catch (const InternalError& e)
+    {
+        caughtException = containsString(e.Message, "data");
+    }
+    SLANG_CHECK(caughtException);
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
 SLANG_UNIT_TEST(replayStreamRejectsReadSizeOverflow)
 {
 #if SLANG_HAS_EXCEPTIONS
@@ -158,6 +139,29 @@ SLANG_UNIT_TEST(replayStreamRejectsReadSizeOverflow)
     catch (const Exception& e)
     {
         caughtException = containsString(e.Message, "Read past end of stream");
+    }
+    SLANG_CHECK(caughtException);
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
+SLANG_UNIT_TEST(replayStreamRejectsNullReadWithNonzeroSize)
+{
+#if SLANG_HAS_EXCEPTIONS
+    ScopedEnvVar assertMode("SLANG_ASSERT", "release-assert-only");
+
+    uint8_t value = 0;
+    ReplayStream stream(&value, sizeof(value));
+
+    bool caughtException = false;
+    try
+    {
+        stream.read(nullptr, 1);
+    }
+    catch (const InternalError& e)
+    {
+        caughtException = containsString(e.Message, "data");
     }
     SLANG_CHECK(caughtException);
 #else
@@ -183,6 +187,39 @@ SLANG_UNIT_TEST(replayStreamMoveAssignmentReplacesExistingBuffer)
     target.read(&readValue, sizeof(readValue));
     SLANG_CHECK(readValue == newValue);
     SLANG_CHECK(target.atEnd());
+}
+
+SLANG_UNIT_TEST(replayStreamMirrorWriteUsesStreamOffset)
+{
+    String mirrorPath;
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        File::generateTemporary(UnownedStringSlice("slang-replay-stream"), mirrorPath)));
+
+    {
+        ReplayStream stream;
+        stream.setMirrorFile(mirrorPath.getBuffer());
+
+        const uint8_t initial[] = {1, 2, 3, 4};
+        stream.write(initial, sizeof(initial));
+
+        const uint8_t replacement[] = {9, 8};
+        stream.seek(1);
+        stream.write(replacement, sizeof(replacement));
+        stream.closeMirrorFile();
+    }
+
+    List<unsigned char> mirrorBytes;
+    SLANG_CHECK(SLANG_SUCCEEDED(File::readAllBytes(mirrorPath, mirrorBytes)));
+    SLANG_CHECK(mirrorBytes.getCount() == 4);
+    if (mirrorBytes.getCount() == 4)
+    {
+        SLANG_CHECK(mirrorBytes[0] == 1);
+        SLANG_CHECK(mirrorBytes[1] == 9);
+        SLANG_CHECK(mirrorBytes[2] == 8);
+        SLANG_CHECK(mirrorBytes[3] == 4);
+    }
+
+    File::remove(mirrorPath);
 }
 
 SLANG_UNIT_TEST(replayStreamDecoderRejectsHugeArrayCount)

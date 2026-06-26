@@ -67,24 +67,37 @@ void ReplayStream::write(const void* data, size_t size)
     if (size == 0)
         return;
 
+    SLANG_RELEASE_ASSERT(data);
+
     if (size > (std::numeric_limits<size_t>::max)() - m_position)
         throw Slang::Exception("Write past maximum stream size");
 
     size_t newSize = m_position + size;
+    const size_t maxListCount = size_t((std::numeric_limits<Slang::Index>::max)());
+    if (newSize > maxListCount)
+        throw Slang::Exception("Write past maximum stream size");
+
     if (newSize > size_t(m_buffer.getCapacity()))
     {
-        m_buffer.reserve(Slang::Index(newSize) * 2);
+        size_t reserveSize = newSize;
+        if (reserveSize <= maxListCount / 2)
+            reserveSize *= 2;
+        else
+            reserveSize = maxListCount;
+        m_buffer.reserve(Slang::Index(reserveSize));
     }
     if (newSize > size_t(m_buffer.getCount()))
     {
         m_buffer.setCount(Slang::Index(newSize));
     }
 
-    std::memcpy(m_buffer.getBuffer() + m_position, data, size);
+    const size_t writeOffset = m_position;
+    std::memcpy(m_buffer.getBuffer() + writeOffset, data, size);
     m_position += size;
 
     if (m_mirrorFile)
     {
+        m_mirrorFile->seek(SeekOrigin::Start, Slang::Int64(writeOffset));
         m_mirrorFile->write(data, size);
         m_mirrorFile->flush();
     }
@@ -94,6 +107,11 @@ void ReplayStream::read(void* data, size_t size)
 {
     if (!m_isReading)
         throw Slang::Exception("Cannot read from a writing stream");
+
+    if (size == 0)
+        return;
+
+    SLANG_RELEASE_ASSERT(data);
 
     const size_t bufferSize = size_t(m_buffer.getCount());
     if (m_position > bufferSize || size > bufferSize - m_position)
