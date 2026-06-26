@@ -22,6 +22,7 @@
 #include "../core/slang-string-slice-pool.h"
 #include "../core/slang-string-util.h"
 #include "../core/slang-type-text-util.h"
+#include "core/slang-stream.h"
 #include "slang-compiler-options.h"
 #include "slang-compiler.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
@@ -1911,17 +1912,42 @@ void OptionsParser::setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode
     }
 }
 
+static SlangResult _loadReproBlobFromFile(
+    const String& path,
+    DiagnosticSink* sink,
+    ISlangBlob** outBlob)
+{
+    RefPtr<FileStream> stream = new FileStream;
+    SLANG_RETURN_ON_FAIL(
+        stream->init(path, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
+
+    List<Byte> streamData;
+    auto readResult = StreamUtil::readAll(stream, streamData);
+    if (SLANG_FAILED(readResult))
+    {
+        sink->diagnose(Diagnostics::UnableToReadRiff{});
+        return readResult;
+    }
+
+    return ReproUtil::loadState(
+        reinterpret_cast<const uint8_t*>(streamData.getBuffer()),
+        streamData.getCount(),
+        sink,
+        outBlob);
+}
+
 static SlangResult _loadRepro(
     const String& path,
     DiagnosticSink* sink,
     EndToEndCompileRequest* request)
 {
-    List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(path, sink, buffer));
+    ComPtr<ISlangBlob> reproBlob;
+    SLANG_RETURN_ON_FAIL(_loadReproBlobFromFile(path, sink, reproBlob.writeRef()));
 
-    auto requestState = ReproUtil::getRequest(buffer);
+    auto requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
     // If we can find a directory, that exists, we will set up a file system to load from that
     // directory
@@ -2313,9 +2339,9 @@ SlangResult OptionsParser::_parseReproFileSystem(const CommandLineArg& arg)
     CommandLineArg reproName;
     SLANG_RETURN_ON_FAIL(m_reader.expectArg(reproName));
 
-    List<uint8_t> buffer;
+    ComPtr<ISlangBlob> reproBlob;
     {
-        const Result res = ReproUtil::loadState(reproName.value, m_sink, buffer);
+        const Result res = _loadReproBlobFromFile(reproName.value, m_sink, reproBlob.writeRef());
         if (SLANG_FAILED(res))
         {
             m_sink->diagnose(
@@ -2324,9 +2350,10 @@ SlangResult OptionsParser::_parseReproFileSystem(const CommandLineArg& arg)
         }
     }
 
-    auto requestState = ReproUtil::getRequest(buffer);
+    auto requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
     // If we can find a directory, that exists, we will set up a file system to load from that
     // directory
