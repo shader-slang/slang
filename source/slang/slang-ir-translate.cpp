@@ -511,10 +511,11 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
             specializeWitnessLookup(cast<IRLookupWitnessMethod>(instWithCanonicalOperands)));
     }
 
-    // Only witness-table / type `set` insts are cached: a set is the O(N)-operand inst at
-    // the root of the quadratic, and the only kind sound to record here (other op kinds also
-    // reach this fall-through but are non-monotonic). See `resolvedStructuralFixedPoints` for
-    // the full whitelist rationale.
+    // Only `set` insts are cached: a set is the O(N)-operand inst at the root of the
+    // quadratic, and the only kind sound to record here (other op kinds also reach this
+    // fall-through but are non-monotonic). `IRSetBase` covers all four set kinds
+    // (`IRTypeSet` / `IRFuncSet` / `IRWitnessTableSet` / `IRGenericSet`); the rationale
+    // applies uniformly. See `resolvedStructuralFixedPoints` for the full whitelist rationale.
     if (as<IRSetBase>(instWithCanonicalOperands))
         ctx->recordStructuralFixedPoint(instWithCanonicalOperands);
     return instWithCanonicalOperands;

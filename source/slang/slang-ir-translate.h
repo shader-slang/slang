@@ -43,9 +43,9 @@ public:
     IRInst* resolveInst(IRInst* inst);
 
     // Record `inst` as a structural fixed point of `resolveInst`, so subsequent calls can
-    // return it in O(1). Precondition: `inst` is an `IRSetBase` (a witness-table / type
-    // `set`) that has resolved to itself — see `resolvedStructuralFixedPoints` for why a set
-    // is the only kind sound to record. The precondition is release-asserted because the
+    // return it in O(1). Precondition: `inst` is an `IRSetBase` (a `set`) that has resolved to
+    // itself — see `resolvedStructuralFixedPoints` for why a set is the only kind sound to
+    // record. The precondition is release-asserted because the
     // cache's soundness depends on it: a non-set recorded here would later be returned
     // unchanged, masking a resolution the set-only invariant rules out.
     void recordStructuralFixedPoint(IRInst* inst)
@@ -75,13 +75,16 @@ private:
     AutoDiffSharedContext autodiffContext;
     SpecializationContext* specContext;
 
-    // Memo of witness-table / type `set` insts (`IRSetBase`) that are structural fixed
-    // points of `resolveInst`. A set is the O(N)-operand inst at the root of the quadratic:
-    // re-resolving it re-walks all N of its members for no net effect, so for a set
-    // referenced from many instructions the redundant re-resolution is O(N) per call and
-    // O(N^2) over a function. Caching makes subsequent calls O(1) — and caching only the
-    // sets suffices, because anything that references a set (e.g. a `TaggedUnion` type)
-    // recurses into the cached set and so becomes O(1) too.
+    // Memo of `set` insts (`IRSetBase`) that are structural fixed points of `resolveInst`.
+    // `IRSetBase` is the base of all four set kinds — `IRTypeSet`, `IRFuncSet`,
+    // `IRWitnessTableSet`, `IRGenericSet` — which share the same operand invariants (concrete,
+    // de-duplicated, consistently-sorted leaf members; see the `SetBase` spec in
+    // slang-ir-insts.lua), so the argument below holds uniformly for each. A set is the
+    // O(N)-operand inst at the root of the quadratic: re-resolving it re-walks all N of its
+    // members for no net effect, so for a set referenced from many instructions the redundant
+    // re-resolution is O(N) per call and O(N^2) over a function. Caching makes subsequent calls
+    // O(1) — and caching only the sets suffices, because anything that references a set (e.g. a
+    // `TaggedUnion` type) recurses into the cached set and so becomes O(1) too.
     //
     // Why a `set` is sound to cache by pointer (and why nothing else is cached):
     //  - A set's resolution is the identity modulo operand resolution: its members are

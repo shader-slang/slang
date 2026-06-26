@@ -1,17 +1,18 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type -cpu
 
-// Regression test for the O(N^2) compile-time blowup in dynamic-dispatch
-// specialization (`specializeModule` / `TranslationContext::resolveInst`).
+// Coverage test for the existential-aggregate dynamic-dispatch lowering path that the
+// O(N^2) `specializeModule` / `TranslationContext::resolveInst` fix touches.
 //
-// An *array of existentials* (interface-typed elements) holding many distinct
-// implementations and dispatched in a loop forces construction of the N-member
-// witness-table / type `set` (and the `TaggedUnion` type built over it) whose
-// repeated resolution was quadratic before the fix. This deliberately differs from
-// the switch-factory coverage in `dispatch-many-conformances.slang`: it exercises
-// the existential-aggregate lowering path, mirroring the `existential_aggregate`
-// compile-perf workload that the fix also speeds up. The compile-time guard itself
-// lives in the compile-perf suite; this test verifies the dispatch still produces
-// correct results after the resolution cache.
+// This is a *correctness* test, not a perf guard: it verifies that dispatch still produces
+// the right results through that path. The compile-time blowup is wall-clock only —
+// reverting the cache leaves these outputs (and the emitted IR) unchanged — so the perf
+// regression is guarded by the compile-perf suite (`tools/compile-perf`, `dynamic_dispatch`
+// and `existential_aggregate` workloads), not here.
+//
+// An *array of existentials* (interface-typed elements) holding many distinct implementations
+// dispatched in a loop forces construction of the N-member `set` / `TaggedUnion` types whose
+// repeated resolution was quadratic. This deliberately differs from the switch-factory
+// coverage in `dispatch-many-conformances.slang`.
 
 // anyValueSize(16) is a safe upper bound for the boxed payload: S0..S7 are stateless, so
 // the any-value just needs room for the type tag.
