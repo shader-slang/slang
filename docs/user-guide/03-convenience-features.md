@@ -329,7 +329,7 @@ int test()
     return rs.val; // returns 3.
 }
 ```
-Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators is not supported.
+Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `+`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators is not supported.
 
 In addition, you can overload operator `()` as a member method:
 ```csharp

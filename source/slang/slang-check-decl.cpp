@@ -720,6 +720,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkInterfaceRequirement(Decl* decl);
 
     void checkCallableDeclCommon(CallableDecl* decl);
+    void maybeInferPrefixModifierForOperator(CallableDecl* decl);
     void checkPublicCallableOperandVisibility(CallableDecl* decl);
 
     void checkCallableConstraints(CallableDecl* decl);
@@ -15140,12 +15141,78 @@ bool doesTypeHaveNoDiffModifier(Type* type)
     return false;
 }
 
+// True if `name` is an operator that can appear in prefix (unary) position:
+// `-`, `+`, `~`, or `!`. These are the unary operators the core module declares
+// with `__prefix` and that a user may overload. `~`/`!` are unary-only, while
+// `+`/`-` are also binary and so are only treated as prefix when the
+// declaration's arity matches a unary operator (see
+// `maybeInferPrefixModifierForOperator`).
+static bool isPrefixOperatorName(Name* name)
+{
+    if (!name)
+        return false;
+    auto text = name->text.getUnownedSlice();
+    return text == "-" || text == "+" || text == "~" || text == "!";
+}
+
+// Attaches a `PrefixModifier` to a user-defined unary operator declaration
+// (e.g. `A operator-(A a)`) so it can be used in prefix position.
+//
+// Why this is needed: prefix-expression overload resolution only considers
+// candidates carrying a `PrefixModifier` (see `TryCheckOverloadCandidateFixity`).
+// The `__prefix` keyword that sets this modifier is an internal builtin used by
+// the core module, not part of the documented surface language, yet the user
+// guide documents `operator-`/`operator~`/`operator!` as overloadable unary
+// operators; without this inference such a user operator would never be eligible
+// in prefix position.
+//
+// Consider:
+//
+//     struct A { int x; }
+//     A operator-(A a) { A na = { -a.x }; return na; }
+//     A foo(A a) { return -a; }   // prefix `-a` must find `operator-(A)`
+//
+// A unary operator consumes exactly one operand. The operand is the single
+// explicit parameter for a free-function operator, but for an instance-method
+// operator (a member of an aggregate or an `extension`) the operand is the
+// implicit `this`, so the explicit parameter list is empty. We must account for
+// `this`: otherwise a binary instance-method operator such as
+// `extension T { T operator-(T rhs) }` (one explicit parameter plus `this`)
+// would be wrongly tagged prefix, and binary `a - b` would stop resolving to it.
+// Inference also respects an explicit `__prefix`/`__postfix` if the user wrote
+// one.
+void SemanticsDeclHeaderVisitor::maybeInferPrefixModifierForOperator(CallableDecl* decl)
+{
+    if (!isPrefixOperatorName(decl->getName()))
+        return;
+
+    // Respect an explicit fixity modifier if the user wrote one.
+    if (decl->findModifier<PrefixModifier>() || decl->findModifier<PostfixModifier>())
+        return;
+
+    // Use `getParentAggTypeDeclBase` (which walks past any enclosing
+    // `GenericDecl`) rather than inspecting `decl->parentDecl` directly, so a
+    // generic member/extension operator is still recognized as an instance
+    // method; `isEffectivelyStatic` performs the same generic unwrapping.
+    const bool isInstanceMethod =
+        getParentAggTypeDeclBase(decl) != nullptr && !isEffectivelyStatic(decl);
+    const Count unaryParamCount = isInstanceMethod ? 0 : 1;
+    if (decl->getParameters().getCount() != unaryParamCount)
+        return;
+
+    auto prefixModifier = m_astBuilder->create<PrefixModifier>();
+    prefixModifier->loc = decl->loc;
+    addModifier(decl, prefixModifier);
+}
+
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 {
     for (auto paramDecl : decl->getParameters())
     {
         ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
     }
+
+    maybeInferPrefixModifierForOperator(decl);
 
     // Check that no parameter without a default value follows a parameter with one.
     bool seenDefaultParam = false;
