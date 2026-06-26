@@ -9,6 +9,9 @@ on:
         type: boolean
         default: false
   pull_request:
+    # PRs validate the tag/version contract only. They intentionally do not
+    # build Dockerfiles, because Dockerfile RUN commands would execute PR code
+    # on self-hosted runners.
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "docker/linux-clang-ci.Dockerfile"
@@ -31,7 +34,7 @@ concurrency:
 jobs:
   validate:
     if: github.repository == 'shader-slang/slang' && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
-    name: Validate ${{ matrix.name }}
+    name: Validate tag policy ${{ matrix.name }}
     runs-on: ["Linux", "self-hosted", "build", "GCP"]
     timeout-minutes: 120
     permissions:
@@ -187,6 +190,8 @@ jobs:
 
   publish:
     needs: validate
+    # Publishing is restricted to master. PRs never build or push container
+    # images, and manual dispatches from non-master refs only run validation.
     if: github.repository == 'shader-slang/slang' && github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     name: Publish ${{ matrix.name }}
     runs-on: ["Linux", "self-hosted", "build", "GCP"]
