@@ -1889,23 +1889,22 @@ struct PeepholeContext : InstPassBase
             }
         case kIROp_Store:
             {
-                // An attempt to store to an undefined pointer value is
-                // undefined behavior (just like a load), so we can conveniently
-                // decide to implement that behavior as a no-op.
+                // Storing an undefined value writes nothing meaningful, so the
+                // store can normally be dropped as a no-op -- with one
+                // exception. A `LoadFromUninitializedMemory` value is the
+                // compiler's record that the program read an uninitialized
+                // location; the uninitialized-use checker (a later,
+                // validation-only pass) needs this store to survive so it can
+                // diagnose the read (e.g. `x = uninit;`). Plain poison /
+                // synthesized `Undefined` values carry no such evidence, so
+                // those stores are still elided.
                 //
-                // TODO: While it is not the responsibility of a pass like this
-                // to diagnose errors (that is the front-end's job), it might
-                // be best to replace an invalid `store` like this with an
-                // instruction that represents a "panic" or similar exceptional
-                // situation.
-                //
-                // Storing an undefined value is a no-op and can be removed --
-                // with one exception. A `LoadFromUninitializedMemory` value is
-                // the compiler's record that the program read an uninitialized
-                // location; the uninitialized-use checker runs later and needs
-                // this store to survive so it can diagnose the read (e.g.
-                // `x = uninit;`). Plain poison / synthesized `Undefined` values
-                // carry no such evidence, so those stores are still elided.
+                // A preserved store does reach codegen (e.g. an `OpUndef`
+                // feeding an `OpStore` on SPIR-V), but that is intentional and
+                // benign: the program genuinely copied an undefined value, so
+                // emitting an undefined store faithfully preserves that meaning
+                // -- it is the same value any later load of the destination
+                // would already observe.
                 auto storedVal = as<IRStore>(inst)->getVal();
                 if (as<IRUndefined>(storedVal) &&
                     storedVal->getOp() != kIROp_LoadFromUninitializedMemory)

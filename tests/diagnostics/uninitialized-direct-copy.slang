@@ -1,6 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHK): -target spirv -entry computeMain
 
 RWStructuredBuffer<float> output;
+RWStructuredBuffer<Atomic<uint> > atomicOut;
 
 // Case 1 (the core bug): a direct copy of an uninitialized scalar local that
 // is then written to an output buffer element. Previously the copy was
@@ -62,6 +63,32 @@ void swizzle_copy()
 //CHK:   ^ use of uninitialized variable
 //CHK:   ^ use of uninitialized variable 'uninit'
     output[2] = v.x + v.y;
+}
+
+// Case 5: a direct copy of an uninitialized value into an atomic location.
+// A direct assignment to an `Atomic<T>` lvalue lowers to `atomicStore`, whose
+// value operand is likewise read; this exercises the `AtomicStore` arm of the
+// store-family classification.
+void copy_to_atomic()
+{
+    uint uninit;
+    atomicOut[0] = uninit;
+//CHK:           ^ use of uninitialized variable
+//CHK:           ^ use of uninitialized variable 'uninit'
+}
+
+// Case 6: a copy of an uninitialized value into multiple matrix components via
+// a matrix swizzle lowers to `matrixSwizzleStore`, whose source operand is read
+// too; this exercises the `MatrixSwizzleStore` arm of the store-family
+// classification (the final one not covered above).
+void matrix_swizzle_copy()
+{
+    float uninit;
+    float2x2 m = float2x2(0.0, 0.0, 0.0, 0.0);
+    m._m00_m11 = uninit;
+//CHK:           ^^^^^^ use of uninitialized variable
+//CHK:           ^^^^^^ use of uninitialized variable 'uninit'
+    output[3] = m[0][0] + m[1][1];
 }
 
 [Shader("compute")]
