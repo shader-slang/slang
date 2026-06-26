@@ -71,6 +71,10 @@ name: PR Board Sync (reusable)
 on:
   workflow_call:
     inputs:
+      mode:
+        description: "event (default): reconcile the single PR from the triggering event. sweep: reconcile every open PR in this repo (for a scheduled cadence run), the periodic backstop for events the per-event path cannot see."
+        type: string
+        default: "event"
       project_id:
         description: "ProjectsV2 board node id (the 'Slang PR Tracking' board)."
         type: string
@@ -207,6 +211,7 @@ jobs:
       - name: Reconcile board (add, Source, Status)
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
+          MODE: ${{ inputs.mode }}
           PROJECT_ID: ${{ inputs.project_id }}
           STATUS_FIELD: ${{ inputs.status_field }}
           STATUS_INREVIEW: ${{ inputs.status_inreview }}
@@ -217,6 +222,7 @@ jobs:
           SOURCE_FIELD: ${{ inputs.source_field }}
           SOURCE_VALUE: ${{ steps.classify.outputs.source }}
           SOURCE_INTERNAL: ${{ inputs.source_internal }}
+          SOURCE_COMMUNITY: ${{ inputs.source_community }}
           SOURCE_BOT: ${{ inputs.source_bot }}
           BOT_AUTHORS: ${{ inputs.bot_authors }}
           IGNORED_REVIEWERS: ${{ inputs.ignored_reviewers }}
@@ -238,6 +244,8 @@ jobs:
             };
             const SOURCE_FIELD = process.env.SOURCE_FIELD;
             const SOURCE_INTERNAL = process.env.SOURCE_INTERNAL;
+            const SOURCE_COMMUNITY = process.env.SOURCE_COMMUNITY;
+            const SWEEP = process.env.MODE === "sweep";
             const BOT_AUTHORS = (process.env.BOT_AUTHORS || "")
               .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
             const IGNORED = new Set((process.env.IGNORED_REVIEWERS || "")
@@ -671,6 +679,12 @@ jobs:
             const SIGNAL_HORIZON_DAYS = 180;
             const SIGNAL_FINALISTS = 6;
             const SIGNAL_CLEAR_MARGIN = 1.5;
+            // Run-scoped signal caches (raw, PR-independent source data) so a sweep
+            // fetches each file's history / commit stats once across all PRs, not
+            // once per PR. `since` is computed once for stable cache keys. Mirrors
+            // pr_sweep.py's SignalCache + signal_since.
+            const SIGNAL_CACHE = makeCache();
+            const SIGNAL_SINCE = horizonSince(SIGNAL_HORIZON_DAYS);
 
             // `gh` client the signal modules expect: octokit-shaped graphql plus a
             // commitFiles(repo, sha) -> [{filename, additions, deletions}] helper.
@@ -987,6 +1001,8 @@ jobs:
                     botAuthors: BOT_AUTHORS,
                     finalists: SIGNAL_FINALISTS,
                     clearMargin: SIGNAL_CLEAR_MARGIN,
+                    cache: SIGNAL_CACHE,
+                    since: SIGNAL_SINCE,
                   });
                 ({ assignee, reviewers } = selectAssigneeAndReviewers({
                   issueAssignees: info.issueAssignees,
@@ -1038,23 +1054,79 @@ jobs:
               }
             }
 
-            // Reconcile a PR's board Status to computeTarget(observed state), then
+            // Classify a PR's Source from observed state, mirroring the
+            // "Classify PR Source" step and pr_common.classify_source: Bot for a
+            // bot author, else Internal iff the author has repo write access, else
+            // Community. Used when the board has no Source yet and no freshly-
+            // classified value is available (i.e. the sweep, or a non-onboarding
+            // event). Fails safe to Community on a read error.
+            async function classifySource(info) {
+              if (info.isBot) return process.env.SOURCE_BOT;
+              let canWrite = false;
+              try {
+                const resp = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  username: info.authorLogin,
+                });
+                canWrite = resp.data?.user?.permissions?.push === true;
+              } catch (error) {
+                core.warning(
+                  `could not read ${info.authorLogin} permission (${error.status}); treating as Community`);
+              }
+              return canWrite ? SOURCE_INTERNAL : SOURCE_COMMUNITY;
+            }
+
+            // Numbers of every open PR in this repo (paginated). The sweep's outer
+            // enumeration; the per-PR engine below is shared with the event path.
+            async function listOpenPullRequests() {
+              const numbers = [];
+              let cursor = null;
+              for (;;) {
+                const data = await github.graphql(`
+                  query($owner: String!, $name: String!, $cursor: String) {
+                    repository(owner: $owner, name: $name) {
+                      pullRequests(states: OPEN, first: 100, after: $cursor,
+                                   orderBy: {field: UPDATED_AT, direction: DESC}) {
+                        pageInfo { hasNextPage endCursor }
+                        nodes { number }
+                      }
+                    }
+                  }`, { owner: context.repo.owner, name: context.repo.repo, cursor });
+                const conn = data?.repository?.pullRequests;
+                for (const n of (conn?.nodes || [])) numbers.push(n.number);
+                if (!conn?.pageInfo?.hasNextPage) break;
+                cursor = conn.pageInfo.endCursor;
+              }
+              return numbers;
+            }
+
+            // Reconcile a PR's board Source + Status to its observed state, then
             // backfill its assignee. Used by every event that can change the lattice
-            // state, so each event just recomputes the whole target rather than
-            // hard-coding a transition.
+            // state AND by the sweep, so each just recomputes the whole target rather
+            // than hard-coding a transition.
             async function reconcileStatus(number, nodeId, itemId) {
               const info = await prInfo(number);
               if (!info) return;
               itemId = itemId || await ensureItem(nodeId || info.nodeId);
               if (!itemId) return;
-              // Resolve is_bot exactly like pr_sweep.py: trust the board Source
-              // when set (authoritative; honors a manual override), else the
-              // freshly-classified value (opened/reopened), else the author-derived
-              // value from prInfo. is_bot is then "Source == Bot".
-              const resolvedSource =
-                (await itemSingleSelect(itemId, SOURCE_FIELD)) || process.env.SOURCE_VALUE || "";
+              // Resolve Source like pr_sweep.py: the board value when set
+              // (authoritative; honors a manual override), else the freshly-
+              // classified value (opened/reopened), else classify now (the sweep, or
+              // an event without the classify step). Backfill the board when it had
+              // none, so a PR first seen by the sweep gets its Source. is_bot is then
+              // "Source == Bot".
+              let resolvedSource = await itemSingleSelect(itemId, SOURCE_FIELD);
+              if (!resolvedSource) {
+                resolvedSource = process.env.SOURCE_VALUE || await classifySource(info);
+                if (resolvedSource) await setSingleSelect(itemId, SOURCE_FIELD, resolvedSource);
+              }
               if (resolvedSource) info.isBot = (resolvedSource === process.env.SOURCE_BOT);
-              await setSingleSelect(itemId, STATUS.field, computeTarget(info));
+              // Only write Status when it actually changes, so a sweep over every PR
+              // does not rewrite (and re-timeline) unchanged cards every night.
+              const target = computeTarget(info);
+              if ((await itemSingleSelect(itemId, STATUS.field)) !== target) {
+                await setSingleSelect(itemId, STATUS.field, target);
+              }
               // Assignment is best-effort: a failure here (e.g. an unrequestable
               // reviewer, or a transient API error in the signal ranking) must not
               // undo the Status write or fail the run -- the sweep will reconcile.
@@ -1069,7 +1141,17 @@ jobs:
             const ev = context.eventName;
             const action = context.payload.action;
 
-            if (ev === "pull_request_target") {
+            if (SWEEP) {
+              // Cadence sweep: reconcile every open PR in this repo. The per-PR
+              // engine (Source/Status/assignment) is shared with the event path;
+              // only this enumeration differs. The idempotency guards in
+              // reconcileStatus / reconcileAssignment keep an unchanged PR a no-op.
+              const numbers = await listOpenPullRequests();
+              console.log(`sweep: reconciling ${numbers.length} open PR(s)`);
+              for (const number of numbers) {
+                await reconcileStatus(number, null);
+              }
+            } else if (ev === "pull_request_target") {
               const pr = context.payload.pull_request;
               const itemId = await ensureItem(pr.node_id);
               if (!itemId) { core.warning("could not add PR to board"); return; }
