@@ -37,6 +37,31 @@ private:
     Slang::IDebugCallback* m_coreCallback = nullptr;
 };
 
+/// Binds an RHI debug bridge to a core callback for one active test invocation.
+class ScopedCoreDebugCallback
+{
+public:
+    ScopedCoreDebugCallback(CoreToRHIDebugBridge& bridge, Slang::IDebugCallback* coreCallback)
+        : m_bridge(&bridge)
+    {
+        m_bridge->setCoreCallback(coreCallback);
+    }
+
+    ~ScopedCoreDebugCallback()
+    {
+        if (m_bridge)
+        {
+            m_bridge->setCoreCallback(nullptr);
+        }
+    }
+
+    ScopedCoreDebugCallback(const ScopedCoreDebugCallback&) = delete;
+    ScopedCoreDebugCallback& operator=(const ScopedCoreDebugCallback&) = delete;
+
+private:
+    CoreToRHIDebugBridge* m_bridge;
+};
+
 /// Core debug callback that captures debug messages in a string buffer
 class CoreDebugCallback : public Slang::IDebugCallback
 {

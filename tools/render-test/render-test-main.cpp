@@ -1770,7 +1770,9 @@ static SlangResult _innerMain(
     }
 
     static renderer_test::CoreToRHIDebugBridge debugCallback;
-    debugCallback.setCoreCallback(stdWriters->getDebugCallback());
+    renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
+        debugCallback,
+        stdWriters->getDebugCallback());
 
     // Use the profile name set on options if set
     input.profile = options.profileName.getLength() ? options.profileName : input.profile;

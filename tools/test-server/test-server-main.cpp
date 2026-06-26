@@ -543,8 +543,10 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 
     TestReporter testReporter;
     renderer_test::CoreDebugCallback coreDebugCallback;
-    renderer_test::CoreToRHIDebugBridge rhiDebugCallback;
-    rhiDebugCallback.setCoreCallback(&coreDebugCallback);
+    static renderer_test::CoreToRHIDebugBridge rhiDebugCallback;
+    renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
+        rhiDebugCallback,
+        &coreDebugCallback);
 
     testModule->setTestReporter(&testReporter);
 
