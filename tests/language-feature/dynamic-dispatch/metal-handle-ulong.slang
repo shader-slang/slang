@@ -14,8 +14,10 @@
 //TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1"
 
 // Before the fix the lowered handle fields were `uint2`; on Metal they must be
-// scalar `ulong`. (No other 64-bit scalar appears in this shader.)
+// scalar `ulong`. (This shader has only scalar `int` payloads, so no unrelated
+// `uint2` is expected in the Metal output.)
 // MTL: ulong
+// MTL-NOT: uint2
 
 [anyValueSize(8)]
 interface IFoo
