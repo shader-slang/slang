@@ -1899,7 +1899,16 @@ struct PeepholeContext : InstPassBase
                 // instruction that represents a "panic" or similar exceptional
                 // situation.
                 //
-                if (as<IRUndefined>(as<IRStore>(inst)->getVal()))
+                // Storing an undefined value is a no-op and can be removed --
+                // with one exception. A `LoadFromUninitializedMemory` value is
+                // the compiler's record that the program read an uninitialized
+                // location; the uninitialized-use checker runs later and needs
+                // this store to survive so it can diagnose the read (e.g.
+                // `x = uninit;`). Plain poison / synthesized `Undefined` values
+                // carry no such evidence, so those stores are still elided.
+                auto storedVal = as<IRStore>(inst)->getVal();
+                if (as<IRUndefined>(storedVal) &&
+                    storedVal->getOp() != kIROp_LoadFromUninitializedMemory)
                 {
                     maybeRemoveOldInst(inst);
                     changed = true;

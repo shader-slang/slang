@@ -19,8 +19,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     for (int i = 0; i < 3; ++i)
     {
-        // This should be fine
+        // The index is in bounds, but `a` is never initialized, so reading it
+        // is a use of an uninitialized variable.
         outputBuffer[i] = a[i].coeffs[0];
+//CHECK:                ^ use of uninitialized variable
+//CHECK:                ^ use of uninitialized variable 'a'
     }
 
     // This reproduces the issue - accessing index 3 in array of size 3
@@ -28,4 +31,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 //CHECK: array index out of bounds
 //CHECK: array index '3' is out of bounds for array of size '3'.
     outputBuffer[3] = a[3].coeffs[0];
+//CHECK:            ^ use of uninitialized variable
+//CHECK:            ^ use of uninitialized variable 'a'
 }
