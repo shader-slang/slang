@@ -161,6 +161,11 @@ jobs:
               mkdir -p "artifacts-staging/${cmake_config}/bin"
               find "build/${cmake_config}/bin" -maxdepth 1 -type f ! -name "*.pdb" ! -name "*.ilk" ! -name "*.dwarf" ! -name "*.debug" ! -name "*.dSYM" -exec cp {} "artifacts-staging/${cmake_config}/bin/" \; || echo "Failed to copy bin directory"
 
+              # The capability atoms reference check reuses this artifact and
+              # needs the generator binary, which CMake places under the
+              # generator output directory instead of build/${cmake_config}/bin.
+              cp "build/generators/${cmake_config}/bin/slang-capability-generator" "artifacts-staging/${cmake_config}/bin/" || echo "Failed to copy slang-capability-generator"
+
               cp -r "build/${cmake_config}/bin/D3D12" "artifacts-staging/${cmake_config}/bin/" 2>/dev/null || echo "No D3D12 directory (expected on Linux)"
               cp -r "build/${cmake_config}/bin/optix" "artifacts-staging/${cmake_config}/bin/" || echo "Failed to copy bin/optix directory"
             fi
