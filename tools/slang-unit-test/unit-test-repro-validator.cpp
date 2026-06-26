@@ -1046,16 +1046,21 @@ SLANG_UNIT_TEST(reproStateValidator)
         List<uint8_t> tooSmall;
         tooSmall.setCount(N - 1);
         memset(tooSmall.getBuffer(), 0, tooSmall.getCount());
+        SLANG_CHECK(ReproUtil::getRequest(nullptr, 0) == nullptr);
+        SLANG_CHECK(ReproUtil::getRequest(nullptr, N) == nullptr);
+        SLANG_CHECK(ReproUtil::getRequest(tooSmall.getBuffer(), tooSmall.getCount()) == nullptr);
         SLANG_CHECK(ReproUtil::getRequest(tooSmall) == nullptr);
 
         List<uint8_t> exact;
         exact.setCount(N);
         memset(exact.getBuffer(), 0, exact.getCount());
+        SLANG_CHECK(ReproUtil::getRequest(exact.getBuffer(), exact.getCount()) != nullptr);
         SLANG_CHECK(ReproUtil::getRequest(exact) != nullptr);
 
         List<uint8_t> oversize;
         oversize.setCount(N + 1);
         memset(oversize.getBuffer(), 0, oversize.getCount());
+        SLANG_CHECK(ReproUtil::getRequest(oversize.getBuffer(), oversize.getCount()) != nullptr);
         SLANG_CHECK(ReproUtil::getRequest(oversize) != nullptr);
     }
 
