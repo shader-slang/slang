@@ -180,9 +180,6 @@ jobs:
 
       # --- Board writes: add + Source + Status (ProjectsV2 PAT) ---------------
       - name: Reconcile board (add, Source, Status)
-        if: >-
-          github.event_name != 'pull_request_target' ||
-          github.event.action != 'review_requested'
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           PROJECT_ID: ${{ inputs.project_id }}
@@ -479,20 +476,16 @@ jobs:
             }
 
       # --- Unrequest auto-assigned non-approver reviewers --------------------
-      # TODO(maintainer): reconcile this with scripts/pr_sweep.py, which unrequests
-      # the ignored reviewers (e.g. bmillsNV) only when it *assigns* a PR (a
-      # deliberate action), not on every event. That sweep behavior is preferred;
-      # this step instead fires broadly on opened/reopened/ready_for_review/
-      # review_requested. Figure out the right workflow equivalent (the workflow
-      # never assigns, so options include narrowing the triggers or moving the
-      # unrequest entirely to the cadence sweep).
+      # Runs only at onboarding (opened/reopened) to strip an auto-assigned
+      # non-approver (e.g. bmillsNV) that repo automation requests on a new PR. It
+      # deliberately does NOT run on review_requested, so a maintainer manually
+      # requesting that reviewer is never undone. The cadence sweep
+      # (scripts/pr_sweep.py) is the backstop, removing it when it assigns an owner;
+      # once this workflow does its own assignment, fold the unrequest into that.
       - name: Unrequest ignored reviewers
         if: >-
           github.event_name == 'pull_request_target' &&
-          (github.event.action == 'opened' ||
-           github.event.action == 'reopened' ||
-           github.event.action == 'ready_for_review' ||
-           github.event.action == 'review_requested')
+          (github.event.action == 'opened' || github.event.action == 'reopened')
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           IGNORED_REVIEWERS: ${{ inputs.ignored_reviewers }}

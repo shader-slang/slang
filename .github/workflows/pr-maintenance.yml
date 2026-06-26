@@ -21,7 +21,6 @@ on:
         converted_to_draft,
         enqueued,
         dequeued,
-        review_requested,
       ]
   pull_request_review:
     types: [submitted]
