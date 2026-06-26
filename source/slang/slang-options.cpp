@@ -1916,12 +1916,13 @@ static SlangResult _loadRepro(
     DiagnosticSink* sink,
     EndToEndCompileRequest* request)
 {
-    List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(path, sink, buffer));
+    ComPtr<ISlangBlob> reproBlob;
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(path, sink, reproBlob.writeRef()));
 
-    auto requestState = ReproUtil::getRequest(buffer);
+    auto requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
     // If we can find a directory, that exists, we will set up a file system to load from that
     // directory
@@ -2313,9 +2314,9 @@ SlangResult OptionsParser::_parseReproFileSystem(const CommandLineArg& arg)
     CommandLineArg reproName;
     SLANG_RETURN_ON_FAIL(m_reader.expectArg(reproName));
 
-    List<uint8_t> buffer;
+    ComPtr<ISlangBlob> reproBlob;
     {
-        const Result res = ReproUtil::loadState(reproName.value, m_sink, buffer);
+        const Result res = ReproUtil::loadState(reproName.value, m_sink, reproBlob.writeRef());
         if (SLANG_FAILED(res))
         {
             m_sink->diagnose(
@@ -2324,9 +2325,10 @@ SlangResult OptionsParser::_parseReproFileSystem(const CommandLineArg& arg)
         }
     }
 
-    auto requestState = ReproUtil::getRequest(buffer);
+    auto requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
     // If we can find a directory, that exists, we will set up a file system to load from that
     // directory

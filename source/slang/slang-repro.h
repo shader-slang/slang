@@ -206,31 +206,17 @@ struct ReproUtil
         ISlangFileSystem* overrideFileSystem,
         EndToEndCompileRequest* request);
 
-    /// Load, unwrap, version-check, and validate a serialized repro state payload into a List.
-    /// This overload is for same-module mutable buffers. Use the ISlangBlob overload when the
-    /// loaded bytes need to cross a DLL boundary.
-    /// On invalid repro-state payloads, clears outBuffer, emits Diagnostics::InvalidReproState
+    /// Load, unwrap, version-check, and validate a serialized repro state file into a COM blob.
+    /// On invalid repro-state payloads, clears *outBlob, emits Diagnostics::InvalidReproState
     /// through sink, and returns SLANG_FAIL.
     static SlangResult loadState(
         const String& filename,
         DiagnosticSink* sink,
-        List<uint8_t>& outBuffer);
-    /// Load, unwrap, version-check, and validate a serialized repro state payload into a List.
-    /// This overload is for same-module mutable buffers. Use the ISlangBlob overload when the
-    /// loaded bytes need to cross a DLL boundary.
-    /// On invalid repro-state payloads, clears outBuffer, emits Diagnostics::InvalidReproState
+        ISlangBlob** outBlob);
+    /// Load, unwrap, version-check, and validate a serialized repro state stream into a COM blob.
+    /// On invalid repro-state payloads, clears *outBlob, emits Diagnostics::InvalidReproState
     /// through sink, and returns SLANG_FAIL.
-    static SlangResult loadState(Stream* stream, DiagnosticSink* sink, List<uint8_t>& outBuffer);
-    /// Load, unwrap, version-check, and validate a serialized repro state payload into a List.
-    /// This overload is for same-module mutable buffers. Use the ISlangBlob overload when the
-    /// loaded bytes need to cross a DLL boundary.
-    /// On invalid repro-state payloads, clears outBuffer, emits Diagnostics::InvalidReproState
-    /// through sink, and returns SLANG_FAIL.
-    static SlangResult loadState(
-        const uint8_t* data,
-        size_t size,
-        DiagnosticSink* sink,
-        List<uint8_t>& outBuffer);
+    static SlangResult loadState(Stream* stream, DiagnosticSink* sink, ISlangBlob** outBlob);
     /// Load, unwrap, version-check, and validate a serialized repro state payload into a COM blob.
     /// On invalid repro-state payloads, clears *outBlob, emits Diagnostics::InvalidReproState
     /// through sink, and returns SLANG_FAIL.
@@ -244,12 +230,6 @@ struct ReproUtil
     /// data must point to bytes accepted by loadState() or isReproStateValid().
     /// Returns nullptr when data is null or size is too small to contain the root object.
     SLANG_API static const RequestState* getRequest(const void* data, size_t size);
-    /// Return the RequestState root for a validated repro state payload in a mutable List.
-    /// This inline wrapper does not allocate, free, or retain List storage.
-    static RequestState* getRequest(List<uint8_t>& inBuffer)
-    {
-        return const_cast<RequestState*>(getRequest(inBuffer.getBuffer(), inBuffer.getCount()));
-    }
 
     SLANG_API static SlangResult extractFilesToDirectory(const String& file, DiagnosticSink* sink);
 

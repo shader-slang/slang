@@ -1049,19 +1049,16 @@ SLANG_UNIT_TEST(reproStateValidator)
         SLANG_CHECK(ReproUtil::getRequest(nullptr, 0) == nullptr);
         SLANG_CHECK(ReproUtil::getRequest(nullptr, N) == nullptr);
         SLANG_CHECK(ReproUtil::getRequest(tooSmall.getBuffer(), tooSmall.getCount()) == nullptr);
-        SLANG_CHECK(ReproUtil::getRequest(tooSmall) == nullptr);
 
         List<uint8_t> exact;
         exact.setCount(N);
         memset(exact.getBuffer(), 0, exact.getCount());
         SLANG_CHECK(ReproUtil::getRequest(exact.getBuffer(), exact.getCount()) != nullptr);
-        SLANG_CHECK(ReproUtil::getRequest(exact) != nullptr);
 
         List<uint8_t> oversize;
         oversize.setCount(N + 1);
         memset(oversize.getBuffer(), 0, oversize.getCount());
         SLANG_CHECK(ReproUtil::getRequest(oversize.getBuffer(), oversize.getCount()) != nullptr);
-        SLANG_CHECK(ReproUtil::getRequest(oversize) != nullptr);
     }
 
     // 21. Exported loader helpers fail cleanly on null request pointers.
@@ -1076,8 +1073,9 @@ SLANG_UNIT_TEST(reproStateValidator)
 
         ComPtr<ISlangMutableFileSystem> mutableFileSystem(new MemoryFileSystem);
         SLANG_CHECK(SLANG_FAILED(ReproUtil::extractFiles(base, nullptr, mutableFileSystem)));
-        SLANG_CHECK(
-            SLANG_FAILED(ReproUtil::extractFiles(base, ReproUtil::getRequest(buf), nullptr)));
+        auto requestState = const_cast<ReproUtil::RequestState*>(
+            ReproUtil::getRequest(buf.getBuffer(), buf.getCount()));
+        SLANG_CHECK(SLANG_FAILED(ReproUtil::extractFiles(base, requestState, nullptr)));
     }
 }
 
@@ -1304,7 +1302,8 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
 
     MemoryOffsetBase loadedBase;
     loadedBase.set(loadedBuffer.getBuffer(), loadedBuffer.getCount());
-    auto loadedRequestState = ReproUtil::getRequest(loadedBuffer);
+    auto loadedRequestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(loadedBuffer.getBuffer(), loadedBuffer.getCount()));
     SLANG_CHECK_ABORT(loadedRequestState->translationUnits.getCount() == 2);
     const auto& loadedTu0 = loadedBase.asRaw(loadedRequestState->translationUnits[0]);
     const auto& loadedTu1 = loadedBase.asRaw(loadedRequestState->translationUnits[1]);
