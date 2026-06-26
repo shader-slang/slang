@@ -6,7 +6,10 @@
 "use strict";
 
 const assert = require("node:assert");
-const { selectAssigneeAndReviewers } = require("./extract-workflow-js.js").load();
+const { selectAssigneeAndReviewers } = require("./extract-workflow-js.js").load({
+  workflow: ".github/workflows/pr-board-sync.yml",
+  block: "assignment",
+});
 
 const OWNERS = new Set(["owner1", "owner2"]);
 const COLLAB = new Set(["owner1", "owner2", "dev1", "dev2"]); // owners are also collaborators

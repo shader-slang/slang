@@ -1,36 +1,41 @@
-// Extract the inlined committer-signal / assignment JavaScript from the
-// pr-board-sync.yml workflow and load it as a module.
+// Extract a named, inlined JavaScript block from a GitHub workflow YAML and
+// load it as a module.
 //
-// The workflow is the single source of truth for that logic (it is inlined so
-// the reusable workflow needs no checkout when called cross-repo). To keep the
-// logic unit-testable, the same block is delimited by sentinel comments:
+// Workflows sometimes inline JS into a `script:` literal (e.g. so a reusable
+// workflow needs no checkout when called cross-repo). To keep that JS unit-
+// testable, wrap the block in sentinel comments that NAME it:
 //
-//     // ----- extracted-assignment-js:begin -----
-//     ...the ported functions...
-//     // ----- extracted-assignment-js:end -----
+//     // ----- extract-js:<block>:begin -----
+//     ...the functions...
+//     // ----- extract-js:<block>:end -----
 //
-// `load()` reads that block, dedents it (the exact inverse of the 12-space
-// indent it carries inside the YAML `script:` literal, so the result is byte-
-// identical to the original modules), appends `module.exports` for every
-// top-level declaration, writes a temp file, and requires it. The test files
-// (pr-signal.test.js, pr-assign.test.js) consume this instead of standalone
-// source modules, so they test exactly what the workflow runs.
+// `load({workflow, block})` reads that block, dedents it (the inverse of the
+// indent it carries inside the `script:` literal, so the result is byte-
+// identical to standalone source), appends `module.exports` for every top-level
+// declaration, writes a temp file, and requires it. Tests then exercise exactly
+// what the workflow runs. Nothing here is specific to any one workflow or block.
 "use strict";
 
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const BEGIN = "// ----- extracted-assignment-js:begin -----";
-const END = "// ----- extracted-assignment-js:end -----";
-const DEFAULT_WORKFLOW = path.join(__dirname, "..", "workflows", "pr-board-sync.yml");
+// Repo root, so callers can pass a repo-relative workflow path.
+const REPO_ROOT = path.join(__dirname, "..", "..");
 
-// The dedented JavaScript source between the sentinel markers.
-function extractSource(yamlText) {
-  const bi = yamlText.indexOf(BEGIN);
-  const ei = yamlText.indexOf(END);
+function markerPair(block) {
+  if (!block || !/^[\w.-]+$/.test(block))
+    throw new Error(`invalid block name: ${JSON.stringify(block)}`);
+  return { begin: `extract-js:${block}:begin`, end: `extract-js:${block}:end` };
+}
+
+// The dedented JavaScript source of the named block within `yamlText`.
+function extractSource(yamlText, block) {
+  const { begin, end } = markerPair(block);
+  const bi = yamlText.indexOf(begin);
+  const ei = yamlText.indexOf(end);
   if (bi < 0 || ei < 0 || ei < bi)
-    throw new Error("extracted-assignment-js markers not found in workflow");
+    throw new Error(`extract-js markers for block "${block}" not found`);
   const between = yamlText.slice(yamlText.indexOf("\n", bi) + 1, yamlText.lastIndexOf("\n", ei) + 1);
   const lines = between.split("\n");
   let min = Infinity;
@@ -43,10 +48,15 @@ function extractSource(yamlText) {
   return lines.map((l) => l.slice(min)).join("\n").replace(/\s+$/, "") + "\n";
 }
 
-// `extractSource` + a `module.exports` of every top-level function/const, ready
-// to write to a .js file.
-function buildModule(yamlPath) {
-  const src = extractSource(fs.readFileSync(yamlPath || DEFAULT_WORKFLOW, "utf8"));
+function resolveWorkflow(workflow) {
+  if (!workflow) throw new Error("workflow path is required");
+  return path.isAbsolute(workflow) ? workflow : path.join(REPO_ROOT, workflow);
+}
+
+// `extractSource` + a `module.exports` of every top-level function/const,
+// ready to write to a .js file.
+function buildModule({ workflow, block }) {
+  const src = extractSource(fs.readFileSync(resolveWorkflow(workflow), "utf8"), block);
   const names = new Set();
   const re = /^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)|^const\s+([A-Za-z_$][\w$]*)\s*=/gm;
   let m;
@@ -55,9 +65,9 @@ function buildModule(yamlPath) {
 }
 
 // Build, write to a unique temp file, and require it.
-function load(yamlPath) {
-  const code = buildModule(yamlPath);
-  const tmp = path.join(os.tmpdir(), `pr-board-assignment-${process.pid}-${Date.now()}.js`);
+function load({ workflow, block }) {
+  const code = buildModule({ workflow, block });
+  const tmp = path.join(os.tmpdir(), `wf-extract-${block}-${process.pid}-${Date.now()}.js`);
   fs.writeFileSync(tmp, code);
   try {
     return require(tmp);
@@ -68,10 +78,14 @@ function load(yamlPath) {
 
 module.exports = { extractSource, buildModule, load };
 
-// CLI: `node extract-workflow-js.js [out.js]` writes (or prints) the module.
+// CLI: `node extract-workflow-js.js <workflow-yaml> <block> [out.js]`
 if (require.main === module) {
-  const out = process.argv[2];
-  const code = buildModule();
+  const [workflow, block, out] = process.argv.slice(2);
+  if (!workflow || !block) {
+    console.error("usage: extract-workflow-js.js <workflow-yaml> <block> [out.js]");
+    process.exit(2);
+  }
+  const code = buildModule({ workflow, block });
   if (out) {
     fs.writeFileSync(out, code);
     console.log(`wrote ${out}`);

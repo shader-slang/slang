@@ -6,7 +6,10 @@
 "use strict";
 
 const assert = require("node:assert");
-const s = require("./extract-workflow-js.js").load();
+const s = require("./extract-workflow-js.js").load({
+  workflow: ".github/workflows/pr-board-sync.yml",
+  block: "assignment",
+});
 
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);

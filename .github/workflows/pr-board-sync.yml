@@ -241,7 +241,7 @@ jobs:
             // pr-assign.test.js) extract THIS block from the YAML at run time via
             // extract-workflow-js.js, so a change here is what gets tested. Keep
             // it behaviorally identical to the cadence sweep's Python.
-            // ----- extracted-assignment-js:begin -----
+            // ----- extract-js:assignment:begin -----
             const DEFAULT_SIGNAL_FINALISTS = 6; // top candidates re-scored by true per-file LOC
             const DEFAULT_SIGNAL_CLEAR_MARGIN = 1.5; // skip the tiebreak when #1 leads #2 by this factor
 
@@ -638,7 +638,7 @@ jobs:
               }
               return { assignee, reviewers: deduped };
             }
-            // ----- extracted-assignment-js:end -----
+            // ----- extract-js:assignment:end -----
 
             // Committer-signal weighting. MUST match pr_common.py's DEFAULT_*
             // (file multipliers, top-files, commit sample, horizon) so the sweep
