@@ -1356,7 +1356,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_quad_control` : enables the SPV_KHR_quad_control extension 
 * `SPV_KHR_fragment_shader_barycentric` : enables the SPV_KHR_fragment_shader_barycentric extension 
 * `SPV_KHR_non_semantic_info` : enables the SPV_KHR_non_semantic_info extension 
-* `SPV_KHR_shader_abort` : enables the SPV_KHR_shader_abort extension 
+* `SPV_KHR_abort` : enables the SPV_KHR_abort extension 
 * `SPV_KHR_device_group` : enables the SPV_KHR_device_group extension 
 * `SPV_KHR_variable_pointers` : enables the SPV_KHR_variable_pointers extension 
 * `SPV_KHR_ray_tracing` : enables the SPV_KHR_ray_tracing extension 
@@ -1384,6 +1384,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_EXT_descriptor_heap` : enables the SPV_EXT_descriptor_heap extension 
 * `SPV_KHR_untyped_pointers` : enables the SPV_KHR_untyped_pointers extension 
 * `SPV_KHR_bfloat16` : enables the SPV_KHR_bfloat16 extension 
+* `spvAbort` 
 * `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
 * `spvAtomicFloat16AddEXT` 
@@ -1423,6 +1424,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvShaderInvocationReorderNV` 
 * `spvRayTracingClusterAccelerationStructureNV` 
 * `spvRayTracingLinearSweptSpheresGeometryNV` 
+* `spvRayTracingSpheresGeometryNV` 
 * `spvShaderClockKHR` 
 * `spvShaderNonUniformEXT` 
 * `spvShaderNonUniform` 
@@ -1561,6 +1563,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_NV_compute_shader_derivatives` : enables the GL_NV_compute_shader_derivatives extension 
 * `GL_NV_fragment_shader_barycentric` : enables the GL_NV_fragment_shader_barycentric extension 
 * `GL_NV_gpu_shader5` : enables the GL_NV_gpu_shader5 extension 
+* `GL_NV_linear_swept_spheres` : enables the GL_NV_linear_swept_spheres extension 
 * `GL_NV_ray_tracing` : enables the GL_NV_ray_tracing extension 
 * `GL_NV_ray_tracing_motion_blur` : enables the GL_NV_ray_tracing_motion_blur extension 
 * `GL_NV_shader_atomic_fp16_vector` : enables the GL_NV_shader_atomic_fp16_vector extension 
@@ -1797,6 +1800,8 @@ A capability describes an optional feature that a target may or may not support.
 * `raytracing_intersection` 
 * `raytracing_anyhit_closesthit` 
 * `raytracing_lss` 
+* `rayquery_sphere_nv` 
+* `rayquery_lss_nv` 
 * `raytracing_lss_ho` 
 * `raytracing_anyhit_closesthit_intersection` 
 * `raytracing_object_space_ray` 

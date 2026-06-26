@@ -11,6 +11,16 @@
       "self_hosted": true
     },
     {
+      "labels": ["Linux", "self-hosted", "build"],
+      "name": "Linux Build (GCP)",
+      "self_hosted": true
+    },
+    {
+      "labels": ["Linux", "self-hosted", "analytics"],
+      "name": "Linux Analytics (GCP)",
+      "self_hosted": true
+    },
+    {
       "labels": ["Windows", "self-hosted", "GCP-T4"],
       "name": "Windows GPU (GCP)",
       "self_hosted": true
@@ -130,6 +140,16 @@
     {
       "prefix": "linux-test-",
       "name": "Linux GPU (GCP)",
+      "self_hosted": true
+    },
+    {
+      "prefix": "linux-build-",
+      "name": "Linux Build (GCP)",
+      "self_hosted": true
+    },
+    {
+      "prefix": "linux-analytics-",
+      "name": "Linux Analytics (GCP)",
       "self_hosted": true
     },
     {

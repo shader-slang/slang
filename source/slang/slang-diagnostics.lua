@@ -928,6 +928,20 @@ err(
     span { loc = "location", message = "unexpected function body after signature declaration, is this ';' a typo?" }
 )
 
+warning(
+    "keyword-used-as-name",
+    20103,
+    "keyword used as a name",
+    span { loc = "location", message = "'~name:Name' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts" }
+)
+
+err(
+    "default-value-on-extension-generic-param",
+    20104,
+    "default value on extension generic parameter",
+    span { loc = "location", message = "an extension's generic parameter '~name:Name' is inferred from its target, so it cannot have a default value" }
+)
+
 err(
     "decl-not-allowed",
     30102,
@@ -971,9 +985,15 @@ standalone_note(
     span { loc = "location" }
 )
 
+-- Renumbered from E29104 (#11318) to resolve an integer-code collision
+-- with `MiscDiagnostics::spirvCoreGrammarJSONParseFailure` defined in
+-- `source/compiler-core/slang-misc-diagnostic-defs.h`. Both diagnostics
+-- are alive (~8 emit sites in spirv-core-grammar.cpp for the misc one,
+-- and slang-parser.cpp emits this one), so renumbering is the right
+-- fix; renaming either would break callers.
 err(
     "spirv-instruction-without-result-id",
-    29104,
+    29117,
     "instruction has no result-id operand",
     span { loc = "location", message = "cannot use this 'x = ~opcode ...' syntax because ~opcode does not have a <result-id> operand" }
 )
@@ -1130,7 +1150,10 @@ err(
     "undefined-identifier",
     30015,
     "undefined identifier",
-    span { loc = "location", message = "undefined identifier '~name:Name'." }
+    span { loc = "location", message = "undefined identifier '~name:Name'." },
+    -- Optional "did you mean ...?" note, rendered only when `suggestionLocation`
+    -- is set to a valid location by the caller (i.e. a close in-scope name exists).
+    note { message = "did you mean '~suggestion:Name'?", span { loc = "suggestionLocation" } }
 )
 
 err(
@@ -3807,6 +3830,13 @@ err(
     span { loc = "expr:Expr", message = "ambiguous call to overloaded operation with arguments of type ~args" }
 )
 
+err(
+    "bitwise-operator-requires-integer-operands",
+    39999,
+    "bitwise/shift operator '~name:Name' requires integer operands, but the operand type is ~type:Type",
+    span { loc = "expr:Expr", message = "bitwise/shift operator '~name' requires integer operands" }
+)
+
 standalone_note(
     "overload-candidate",
     40011,
@@ -3978,6 +4008,13 @@ warning(
     span { loc = "location", message = "'~literal' is smaller than the smallest representable value for type ~type, converted to '~convertedValue'" }
 )
 
+warning(
+    "float-hex-literal-precision-lost",
+    40019,
+    "floating-point precision lost",
+    span { loc = "location", message = "significand of '~literal' was truncated, value is now '~truncatedValue'" }
+)
+
 err(
     "matrix-column-or-row-count-is-one",
     39999,
@@ -4057,6 +4094,13 @@ err(
     38012,
     "entry point cannot return array type",
     span { loc = "location", message = "entry point '~entryPoint:Name' cannot return array type '~returnType:Type'" }
+)
+
+err(
+    "entry-point-cannot-be-generic",
+    38014,
+    "generic entry point used without specialization arguments",
+    span { loc = "location", message = "generic entry point '~entryPoint:Name' must be specialized with concrete generic arguments (e.g. via '-specialize' or 'addEntryPointEx'); an unspecialized generic entry point cannot be compiled" }
 )
 
 
@@ -4370,6 +4414,13 @@ err(
     38206,
     "invalid vector element count",
     span { loc = "location", message = "vector has invalid element count '~count', valid values are between '~min' and '~max' inclusive" }
+)
+
+err(
+    "unspecialized-global-generic-param-with-uses",
+    38207,
+    "global generic parameter used in code without a concrete binding",
+    span { loc = "location", message = "a global generic parameter ('type_param' / '__generic_value_param') cannot be used in shader code without a concrete binding; such global-scope declarations are intended for reflection and external specialization, not direct use in shader bodies" }
 )
 
 err(
@@ -5382,6 +5433,13 @@ fatal(
     56003,
     "use of uninitialized opaque handle",
     span { loc = "location", message = "use of uninitialized opaque handle '~handleType:IRInst'." }
+)
+
+err(
+    "opaque-type-in-local-variable-not-allowed-on-khronos",
+    56004,
+    "opaque type in local variable is not supported for Khronos targets",
+    span { loc = "location", message = "a resource or other opaque-typed value ('~type:IRInst') cannot be placed in a function-local variable for Khronos targets (SPIR-V/GLSL) or WGSL; this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function" }
 )
 
 

@@ -22,13 +22,10 @@ jobs:
     permissions:
       id-token: write
       contents: read
-      packages: read
+      packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
 
     container:
       image: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
       options: --user root
 
     env:

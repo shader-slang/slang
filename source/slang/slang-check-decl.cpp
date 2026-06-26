@@ -687,6 +687,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void visitGenericValuePackParamDecl(GenericValuePackParamDecl* decl);
 
+    bool diagnoseDefaultOnExtensionGenericParam(Decl* paramDecl, Expr* defaultValue);
+
     void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl);
 
     void checkGenericTypeEqualityConstraintSubType(GenericTypeConstraintDecl* decl);
@@ -1422,7 +1424,19 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
 
     void visitFunctionDeclBase(FunctionDeclBase* funcDecl);
 
+    void visitExtensionDecl(ExtensionDecl* extensionDecl);
+
+    void visitSubscriptDecl(SubscriptDecl* subscriptDecl);
+
+    void visitPropertyDecl(PropertyDecl* propertyDecl);
+
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
+
+    // Check that a callable or property extension member's own [require(...)] attributes are
+    // compatible with the extension's target type capabilities. Shared by
+    // visitFunctionDeclBase (functions and constructors), visitSubscriptDecl, and
+    // visitPropertyDecl.
+    void _checkExtensionMemberCapConflict(Decl* memberDecl);
 
     enum class UndeclaredCapabilityDiagnosticKind
     {
@@ -1775,6 +1789,11 @@ QualType getTypeForDeclRef(
         // TODO: This code could break if we ever go down this path with
         // an identifier that doesn't have a name.
         //
+        // Note: unlike the `VarExpr` lookup path, we do not attach a "did you
+        // mean ...?" suggestion here. This site is reached for a name that
+        // already resolved to a contextual keyword (not an ordinary in-scope
+        // lookup), so a Levenshtein match against the lexical scope would be
+        // misleading.
         sink->diagnose(
             Diagnostics::UndefinedIdentifier{.name = declRef.getName(), .location = loc});
     }
@@ -4620,8 +4639,45 @@ void SemanticsDeclHeaderVisitor::checkGenericTypeEqualityConstraintSubType(
     }
 }
 
+// Returns true if `paramDecl` is a generic parameter of an `extension` or a
+// `__func_extension`. In both cases the generic parameters are always inferred
+// from the target (the target type, or the target function expression), so a
+// default value on one of them can never be selected and is meaningless.
+static bool isExtensionGenericParam(Decl* paramDecl)
+{
+    auto genericDecl = as<GenericDecl>(paramDecl->parentDecl);
+    if (!genericDecl)
+        return false;
+    return as<ExtensionDecl>(genericDecl->inner) || as<FuncExtensionDecl>(genericDecl->inner);
+}
+
+// If `paramDecl` is a generic parameter of an extension and `defaultValue` is a
+// (non-null) default for it, diagnose the meaningless default. Returns true if a
+// diagnostic was emitted, signalling that the caller should drop the default
+// instead of type-checking it (which would otherwise cascade unrelated errors
+// for an ill-formed default the compiler has just declared unused).
+bool SemanticsDeclHeaderVisitor::diagnoseDefaultOnExtensionGenericParam(
+    Decl* paramDecl,
+    Expr* defaultValue)
+{
+    if (!defaultValue || !isExtensionGenericParam(paramDecl))
+        return false;
+    getSink()->diagnose(Diagnostics::DefaultValueOnExtensionGenericParam{
+        .name = paramDecl->getName(),
+        .location = defaultValue->loc});
+    return true;
+}
+
 void SemanticsDeclHeaderVisitor::visitGenericTypeParamDecl(GenericTypeParamDecl* decl)
 {
+    // A default value on an extension's generic parameter is never used; reject it
+    // and drop the default so it is not type-checked below.
+    if (diagnoseDefaultOnExtensionGenericParam(decl, decl->initType.exp))
+    {
+        decl->initType = TypeExp();
+        return;
+    }
+
     // TODO: could probably push checking the default value
     // for a generic type parameter later.
     //
@@ -4644,6 +4700,14 @@ void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDec
                 .type = decl->type.type,
                 .decl = decl});
         }
+    }
+
+    // A default value on an extension's generic parameter is never used; reject it
+    // and drop the default so it is not type-checked below.
+    if (diagnoseDefaultOnExtensionGenericParam(decl, decl->initExpr))
+    {
+        decl->initExpr = nullptr;
+        return;
     }
 
     if (decl->initExpr)
@@ -20110,6 +20174,66 @@ void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl).freeze(getASTBuilder());
 }
 
+void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extensionDecl)
+{
+    // Set up the extension's own inferred capabilities from its [require(...)] attributes,
+    // the same as any other container decl.
+    visitContainerDecl(extensionDecl);
+
+    // If the extension has no explicit capability requirements, there is nothing to validate
+    // at the extension level. Member functions and constructors with their own [require(...)]
+    // attributes are validated individually in visitFunctionDeclBase; subscripts and properties
+    // are validated in visitSubscriptDecl and visitPropertyDecl via
+    // _checkExtensionMemberCapConflict.
+    if (!extensionDecl->inferredCapabilityRequirements ||
+        extensionDecl->inferredCapabilityRequirements->isEmpty())
+        return;
+
+    // An extension can only be used where its target type is available. Therefore the
+    // capabilities declared on the extension must be compatible with (i.e. have a non-empty
+    // intersection with) the target type's capabilities. We use _propagateRequirement to
+    // detect conflicts: it emits a diagnostic when the intersection of the extension's caps
+    // and the target's caps is empty (i.e. no shared target/stage survives the join).
+    //
+    // Note: this is a non-empty-intersection check, not a strict subset check. An extension
+    // may declare caps that are a superset of or overlap with the target's caps — the check
+    // only fires when the two are disjoint. For example, [require(hlsl)][require(glsl)]
+    // extension on a [require(hlsl)] type passes silently because the intersection {hlsl}
+    // is non-empty. If strict subset semantics are ever desired, the check here and in
+    // _checkExtensionMemberCapConflict would need to be replaced with an explicit subset test.
+    //
+    // We deliberately do NOT write back to extensionDecl->inferredCapabilityRequirements
+    // here: doing so would alter how getDeclaredCapabilitySet walks the parent chain for
+    // child declarations and would produce false positives in code where extension members
+    // legitimately target a narrower subset of the target type's platforms (e.g. a member
+    // [require(hlsl)] on a [require(glsl)][require(hlsl)] extension is valid).
+    auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType.type);
+    if (!targetDeclRefType)
+        return;
+
+    auto targetTypeDecl = targetDeclRefType->getDeclRef().getDecl();
+    if (!targetTypeDecl)
+        return;
+
+    // We must call ensureDecl before the _propagateRequirement call below because
+    // targetTypeDecl->inferredCapabilityRequirements is evaluated as a C++ argument
+    // expression at the call site, before _propagateRequirement runs its own ensureDecl.
+    // Without this pre-call the field can still be null/stale, and _propagateRequirement
+    // tolerates null nodeCaps by no-opping — the conflict check would silently be skipped.
+    // Genuine cycles are diagnosed inside ensureDecl itself (Diagnostics::CyclicReference),
+    // so we do not need a separate guard here.
+    ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
+
+    CapabilitySet checkCapSet{extensionDecl->inferredCapabilityRequirements};
+    _propagateRequirement(
+        this,
+        checkCapSet,
+        extensionDecl,
+        targetTypeDecl,
+        targetTypeDecl->inferredCapabilityRequirements,
+        extensionDecl->loc);
+}
+
 // A `[ForwardDerivative(fn)]` / `[BackwardDerivative(fn)]` attribute references a
 // user-defined derivative function `fn` that is not part of the decorated function's
 // body, so its capability requirements would otherwise be ignored. Resolve the
@@ -20269,6 +20393,94 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
                     .freeze(getASTBuilder());
         }
     }
+
+    // See _checkExtensionMemberCapConflict for the rationale behind checking
+    // only own [require(...)] attributes here.
+    //
+    // Constructors are also checked despite isEffectivelyStatic returning true for
+    // them: a [require(hlsl)] __init inside a [require(glsl)] extension target is
+    // a genuine conflict even though there is no implicit `this` pointer.
+    if (!isEffectivelyStatic(funcDecl) || as<ConstructorDecl>(funcDecl))
+        _checkExtensionMemberCapConflict(funcDecl);
+}
+
+// Verify that a callable extension member's own [require(...)] attributes are
+// compatible with the extension's target type capabilities.
+//
+// We check only the member's own [require(...)] attributes rather than the
+// full declaredCaps (which includes caps inherited from the parent extension)
+// for two reasons:
+//  1. Avoids cascading errors: when the extension itself has an incompatible
+//     [require(X)] (already caught by visitExtensionDecl), members that inherit
+//     X should not also generate errors — fixing the extension fixes them too.
+//  2. Catches a case that full declaredCaps misses: if an extension has a
+//     compatible [require(glsl)] and a member adds its own [require(hlsl)],
+//     declaredCaps would be {hlsl|glsl} and joining that with {glsl} gives the
+//     valid {glsl}, hiding the conflict. Using just {hlsl} detects it.
+void SemanticsDeclCapabilityVisitor::_checkExtensionMemberCapConflict(Decl* memberDecl)
+{
+    CapabilitySet ownDeclaredCaps;
+    for (auto mod : memberDecl->modifiers)
+    {
+        if (auto req = as<RequireCapabilityAttribute>(mod))
+            ownDeclaredCaps.unionWith(req->capabilitySet);
+    }
+    if (ownDeclaredCaps.isEmpty())
+        return;
+
+    // Walk up to find an enclosing ExtensionDecl, but stop at any AggTypeDeclBase:
+    // a member that lives inside a nested struct/class inside the extension belongs to
+    // that nested type, not to the extension target, and must not be checked here.
+    // SubscriptDecl, PropertyDecl, and GenericDecl are transparent wrappers that we
+    // skip past (e.g. an accessor's parent is the subscript, which lives in the extension).
+    auto parentDecl = memberDecl->parentDecl;
+    while (parentDecl && !as<ExtensionDecl>(parentDecl))
+    {
+        if (as<AggTypeDeclBase>(parentDecl))
+            return;
+        parentDecl = parentDecl->parentDecl;
+    }
+    auto extensionDecl = as<ExtensionDecl>(parentDecl);
+    if (!extensionDecl)
+        return;
+
+    auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType.type);
+    if (!targetDeclRefType)
+        return;
+
+    auto targetTypeDecl = targetDeclRefType->getDeclRef().getDecl();
+    if (!targetTypeDecl)
+        return;
+
+    // We must call ensureDecl before the _propagateRequirement call below because
+    // targetTypeDecl->inferredCapabilityRequirements is evaluated as a C++ argument
+    // expression at the call site, before _propagateRequirement runs its own ensureDecl.
+    // Without this pre-call the field can still be null/stale, and _propagateRequirement
+    // tolerates null nodeCaps by no-opping — the conflict check would silently be skipped.
+    // Genuine cycles are diagnosed inside ensureDecl itself (Diagnostics::CyclicReference),
+    // so we do not need a separate guard here.
+    ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
+    _propagateRequirement(
+        this,
+        ownDeclaredCaps,
+        memberDecl,
+        targetTypeDecl,
+        targetTypeDecl->inferredCapabilityRequirements,
+        memberDecl->loc);
+    // Intentionally do not use ownDeclaredCaps after this: we only
+    // called _propagateRequirement for its conflict-detection side-effect.
+}
+
+void SemanticsDeclCapabilityVisitor::visitSubscriptDecl(SubscriptDecl* subscriptDecl)
+{
+    visitContainerDecl(subscriptDecl);
+    _checkExtensionMemberCapConflict(subscriptDecl);
+}
+
+void SemanticsDeclCapabilityVisitor::visitPropertyDecl(PropertyDecl* propertyDecl)
+{
+    visitContainerDecl(propertyDecl);
+    _checkExtensionMemberCapConflict(propertyDecl);
 }
 
 void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inheritanceDecl)

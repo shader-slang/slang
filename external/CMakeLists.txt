@@ -165,6 +165,15 @@ target_include_directories(
     INTERFACE "${CMAKE_CURRENT_LIST_DIR}/metal-cpp"
 )
 
+# fast_float headers (header-only). Mark as a system include so the
+# bundled headers don't trip Slang's extra warnings / -Werror.
+add_library(fast_float INTERFACE)
+target_include_directories(
+    fast_float
+    ${system}
+    INTERFACE "${CMAKE_CURRENT_LIST_DIR}/fast_float/include"
+)
+
 # SPIRV-Headers
 # Avoid using ${system} intentionally in `add_subdirectory`, because if we do, it will end up using
 # spirv.h installed in the system directory on MacOS.

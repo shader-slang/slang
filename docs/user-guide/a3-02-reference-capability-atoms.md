@@ -476,7 +476,7 @@ Extensions
 
 `GL_EXT_shader_abort`
 > Represents the GL_EXT_shader_abort extension for GLSL targets, or the
-> corresponding SPV_KHR_shader_abort extension for SPIR-V targets.
+> corresponding spvAbort capability for SPIR-V targets.
 
 `GL_EXT_shader_atomic_float`
 > Represents the GL_EXT_shader_atomic_float extension.
@@ -572,6 +572,9 @@ Extensions
 `GL_NV_gpu_shader5`
 > Represents the GL_NV_gpu_shader5 extension.
 
+`GL_NV_linear_swept_spheres`
+> Represents the GL_NV_linear_swept_spheres extension.
+
 `GL_NV_ray_tracing`
 > Represents the GL_NV_ray_tracing extension.
 
@@ -638,6 +641,9 @@ Extensions
 `SPV_GOOGLE_user_type`
 > Represents the SPIR-V extension for SPV_GOOGLE_user_type.
 
+`SPV_KHR_abort`
+> Represents the SPIR-V extension for shader abort (SPV_KHR_abort).
+
 `SPV_KHR_bfloat16`
 > Represents the SPIR-V extension for BFloat16 types.
 
@@ -671,9 +677,6 @@ Extensions
 `SPV_KHR_ray_tracing_position_fetch`
 > Represents the SPIR-V extension for ray tracing position fetch.
 > Should be used with either SPV_KHR_ray_query or SPV_KHR_ray_tracing.
-
-`SPV_KHR_shader_abort`
-> Represents the SPIR-V extension for shader abort (VK_KHR_shader_abort).
 
 `SPV_KHR_shader_clock`
 > Represents the SPIR-V extension for shader clock.
@@ -723,6 +726,9 @@ Extensions
 
 `ser_hlsl_native`
 > DXR 1.3 native SER support (SM 6.9, no NVAPI required)
+
+`spvAbort`
+> Represents the SPIR-V AbortKHR capability for OpAbortKHR.
 
 `spvAtomicFloat16AddEXT`
 > Represents the SPIR-V capability for atomic float 16 add operations.
@@ -873,6 +879,9 @@ Extensions
 
 `spvRayTracingPositionFetchKHR`
 > Represents the SPIR-V capability for ray tracing position fetch.
+
+`spvRayTracingSpheresGeometryNV`
+> Represents the SPIR-V capability for sphere geometry.
 
 `spvReplicatedCompositesEXT`
 > Represents the SPIR-V capability for replicated composites
@@ -1309,8 +1318,28 @@ Compound Capabilities
 `rayquery`
 > Capabilities needed for compute-shader rayquery
 
+`rayquery_lss_nv`
+> Collection of capabilities for the NV line-swept-spheres (LSS) accessors of
+> an inline ray query. These are vendor (NV) extensions on every target, so the
+> alias carries the `NV` suffix. Available on any RayQuery-capable stage, but
+> each target must carry its LSS geometry support: GLSL requires
+> `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR` together with
+> `spvRayTracingLinearSweptSpheresGeometryNV` (so a SPIR-V caller cannot satisfy
+> this with plain ray query alone, and a sphere-only caller cannot reach the
+> LSS accessors); HLSL/NVAPI carries the geometry support implicitly (`_sm_6_3`).
+
 `rayquery_position`
 > Collection of capabilities for rayquery + ray_tracing_position_fetch.
+
+`rayquery_sphere_nv`
+> Collection of capabilities for the NV sphere-geometry accessors of an inline
+> ray query. These are vendor (NV) extensions on every target, so the alias
+> carries the `NV` suffix. Available on any RayQuery-capable stage, but each
+> target must carry its sphere geometry support: GLSL requires
+> `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR` together with
+> `spvRayTracingSpheresGeometryNV` (so a SPIR-V caller cannot satisfy this with
+> plain ray query alone, and an LSS-only caller cannot reach the sphere
+> accessors); HLSL/NVAPI carries the geometry support implicitly (`_sm_6_3`).
 
 `raytracing`
 > Capabilities needed for minimal raytracing support
