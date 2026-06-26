@@ -128,7 +128,7 @@ static void buildStateRiff(const List<uint8_t>& payload, List<uint8_t>& outRiff)
     stream.swapContents(outRiff);
 }
 
-static void loadReproBlobState(ISlangBlob* reproBlob, List<uint8_t>& outBuffer)
+static void loadReproBlobState(ISlangBlob* reproBlob, ComPtr<ISlangBlob>& outBlob)
 {
     SLANG_CHECK_ABORT(reproBlob && reproBlob->getBufferSize() != 0);
 
@@ -137,12 +137,13 @@ static void loadReproBlobState(ISlangBlob* reproBlob, List<uint8_t>& outBuffer)
         static_cast<const uint8_t*>(reproBlob->getBufferPointer()),
         reproBlob->getBufferSize(),
         &sink,
-        outBuffer);
+        outBlob.writeRef());
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(loadResult));
     SLANG_CHECK_ABORT(sink.getErrorCount() == 0);
-    SLANG_CHECK_ABORT(isReproStateValid(outBuffer));
-    SLANG_CHECK_ABORT(ReproUtil::getRequest(outBuffer) != nullptr);
+    SLANG_CHECK_ABORT(outBlob && outBlob->getBufferSize() != 0);
+    SLANG_CHECK_ABORT(
+        ReproUtil::getRequest(outBlob->getBufferPointer(), outBlob->getBufferSize()) != nullptr);
 }
 
 static const char* getTranslationUnitSourceFilePath(
@@ -1077,16 +1078,13 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsInvalidPayload)
     List<uint8_t> riffData;
     buildStateRiff(invalidPayload, riffData);
 
-    OwnedMemoryStream stream(FileAccess::Read);
-    stream.setContent(riffData.getBuffer(), riffData.getCount());
-
     DiagnosticSink sink;
-    List<uint8_t> outBuffer;
-    outBuffer.add(0xff);
+    ComPtr<ISlangBlob> outBlob;
 
-    SlangResult result = ReproUtil::loadState(&stream, &sink, outBuffer);
+    SlangResult result =
+        ReproUtil::loadState(riffData.getBuffer(), riffData.getCount(), &sink, outBlob.writeRef());
     SLANG_CHECK(SLANG_FAILED(result));
-    SLANG_CHECK(outBuffer.getCount() == 0);
+    SLANG_CHECK(outBlob == nullptr);
     SLANG_CHECK(sink.getErrorCount() == 1);
     SLANG_CHECK(outputContainsDiagnosticId(sink, Severity::Error, kInvalidReproStateDiagnosticId));
 }
@@ -1097,16 +1095,13 @@ SLANG_UNIT_TEST(reproStateLoadStateRejectsEmptyPayload)
     List<uint8_t> riffData;
     buildStateRiff(emptyPayload, riffData);
 
-    OwnedMemoryStream stream(FileAccess::Read);
-    stream.setContent(riffData.getBuffer(), riffData.getCount());
-
     DiagnosticSink sink;
-    List<uint8_t> outBuffer;
-    outBuffer.add(0xff);
+    ComPtr<ISlangBlob> outBlob;
 
-    SlangResult result = ReproUtil::loadState(&stream, &sink, outBuffer);
+    SlangResult result =
+        ReproUtil::loadState(riffData.getBuffer(), riffData.getCount(), &sink, outBlob.writeRef());
     SLANG_CHECK(SLANG_FAILED(result));
-    SLANG_CHECK(outBuffer.getCount() == 0);
+    SLANG_CHECK(outBlob == nullptr);
     SLANG_CHECK(sink.getErrorCount() == 1);
     SLANG_CHECK(outputContainsDiagnosticId(sink, Severity::Error, kInvalidReproStateDiagnosticId));
 }
@@ -1136,8 +1131,8 @@ SLANG_UNIT_TEST(reproStateValidatorAcceptsSavedState)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(spSaveRepro(request, reproBlob.writeRef())));
     SLANG_CHECK_ABORT(reproBlob && reproBlob->getBufferSize() != 0);
 
-    List<uint8_t> outBuffer;
-    loadReproBlobState(reproBlob, outBuffer);
+    ComPtr<ISlangBlob> stateBlob;
+    loadReproBlobState(reproBlob, stateBlob);
 
     auto replayRequest = spCreateCompileRequest(session);
     SLANG_CHECK_ABORT(replayRequest != nullptr);
@@ -1268,12 +1263,15 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
     ComPtr<ISlangBlob> savedReproBlob;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(spSaveRepro(externalRequest, savedReproBlob.writeRef())));
 
-    List<uint8_t> loadedBuffer;
-    loadReproBlobState(savedReproBlob, loadedBuffer);
+    ComPtr<ISlangBlob> loadedBlob;
+    loadReproBlobState(savedReproBlob, loadedBlob);
 
     MemoryOffsetBase loadedBase;
-    loadedBase.set(loadedBuffer.getBuffer(), loadedBuffer.getCount());
-    auto loadedRequestState = ReproUtil::getRequest(loadedBuffer);
+    loadedBase.set(
+        const_cast<void*>(loadedBlob->getBufferPointer()),
+        loadedBlob->getBufferSize());
+    auto loadedRequestState =
+        ReproUtil::getRequest(loadedBlob->getBufferPointer(), loadedBlob->getBufferSize());
     SLANG_CHECK_ABORT(loadedRequestState->translationUnits.getCount() == 2);
     const auto& loadedTu0 = loadedBase.asRaw(loadedRequestState->translationUnits[0]);
     const auto& loadedTu1 = loadedBase.asRaw(loadedRequestState->translationUnits[1]);

@@ -4,6 +4,7 @@
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "compiler-core/slang-artifact-util.h"
 #include "compiler-core/slang-source-loc.h"
+#include "core/slang-blob.h"
 #include "core/slang-castable.h"
 #include "core/slang-math.h"
 #include "core/slang-stream.h"
@@ -1312,14 +1313,37 @@ struct LoadContext
     return SLANG_OK;
 }
 
+/* static */ SlangResult ReproUtil::loadState(
+    const uint8_t* data,
+    size_t dataSize,
+    DiagnosticSink* sink,
+    ISlangBlob** outBlob)
+{
+    if (!outBlob)
+        return SLANG_FAIL;
+
+    *outBlob = nullptr;
+
+    List<uint8_t> buffer;
+    SLANG_RETURN_ON_FAIL(loadState(data, dataSize, sink, buffer));
+
+    *outBlob = ListBlob::moveCreate(buffer).detach();
+    return SLANG_OK;
+}
+
 /* static */ ReproUtil::RequestState* ReproUtil::getRequest(const List<uint8_t>& buffer)
 {
-    if (size_t(buffer.getCount()) < kStartOffset + sizeof(ReproUtil::RequestState))
+    return getRequest(buffer.getBuffer(), buffer.getCount());
+}
+
+/* static */ ReproUtil::RequestState* ReproUtil::getRequest(const void* data, size_t size)
+{
+    if (size < kStartOffset + sizeof(ReproUtil::RequestState))
     {
         return nullptr;
     }
 
-    return (ReproUtil::RequestState*)(buffer.getBuffer() + kStartOffset);
+    return (ReproUtil::RequestState*)((uint8_t*)data + kStartOffset);
 }
 
 /* static */ SlangResult ReproUtil::calcDirectoryPathFromFilename(
