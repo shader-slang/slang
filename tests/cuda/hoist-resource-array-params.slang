@@ -10,6 +10,7 @@
 //TEST:SIMPLE(filecheck=TENSOR): -target cuda -line-directive-mode none -stage compute -entry tensorWrapperMain
 //TEST:SIMPLE(filecheck=MIXED): -target cuda -line-directive-mode none -stage compute -entry mixedOrderMain
 //TEST:SIMPLE(filecheck=KINDS): -target cuda -line-directive-mode none -stage compute -entry textureSamplerMain
+//TEST:SIMPLE(filecheck=PTR): -target cuda -line-directive-mode none -stage compute -entry ptrMain
 //TEST:SIMPLE(filecheck=NEGNOARR): -target cuda -line-directive-mode none -stage compute -entry noResourceArrayMain
 //TEST:SIMPLE(filecheck=NEGNONRES): -target cuda -line-directive-mode none -stage compute -entry nonResourceArrayMain
 // Compiling every entry point together makes more than one compute kernel qualify, so the driver
@@ -37,7 +38,10 @@ void positiveMain(
 // POS: indices
 // POS: __constant__{{.*}}SLANG_globalParams
 // The kernel signature is emptied — all uniform params were hoisted (literal `()`, no parameters).
-// POS: positiveMain()
+// POS: void positiveMain()
+// A partial regression that left a uniform on the signature would still match a bare
+// `positiveMain(` substring, so explicitly forbid a resource-typed kernel argument.
+// POS-NOT: positiveMain({{.*}}RWStructuredBuffer
 // POS: blockIdx
 
 // Positive (transitive): a fixed-size resource array nested inside a struct uniform must also be
@@ -53,6 +57,9 @@ void transitiveMain(uint tid: SV_DispatchThreadID, Tensors t, StructuredBuffer<u
 {
     t.bufs[indices[tid]][tid] = 1.0f;
 }
+// The struct is synthesized and the uniforms actually land in it (not just an empty GlobalParams).
+// TRANS: struct GlobalParams
+// TRANS: indices
 // TRANS: __constant__{{.*}}SLANG_globalParams
 
 // Positive (struct-wrapped element): a fixed-size array whose element is a struct wrapping a
@@ -72,6 +79,9 @@ void tensorWrapperMain(
 {
     tensors[indices[tid]].data[tid] = 1.0f;
 }
+// TENSOR: struct GlobalParams
+// TENSOR: tensors
+// TENSOR: indices
 // TENSOR: __constant__{{.*}}SLANG_globalParams
 
 // Positive (mixed ordering): a uniform resource array declared *before* the varying
@@ -109,7 +119,33 @@ void textureSamplerMain(
     uint i = indices[tid];
     output[tid] = textures[i].SampleLevel(samplers[i], float2(0.5f, 0.5f), 0.0f);
 }
+// KINDS: struct GlobalParams
+// KINDS: textures
+// KINDS: samplers
 // KINDS: __constant__{{.*}}SLANG_globalParams
+
+// Positive (pointer-backed element): the `_typeIsOrContainsResource` carve-out admits a first-class
+// data pointer (`IRPtrType`), not just the resource family `isResourceType` covers. This is the
+// SlangPy shape — tensor storage specialized to a plain `float*` on CUDA — and a fixed-size array of
+// such pointer-backed structs must hoist too. Pins the documented `IRPtrType` (not `IRPtrTypeBase`)
+// distinction so a regression that drops the carve-out (regressing SlangPy) fails here.
+struct PtrTensor
+{
+    float* data;
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void ptrMain(
+    uint tid: SV_DispatchThreadID,
+    PtrTensor tensors[8],
+    StructuredBuffer<uint> indices)
+{
+    tensors[indices[tid]].data[tid] = 1.0f;
+}
+// PTR: struct GlobalParams
+// PTR: tensors
+// PTR: __constant__{{.*}}SLANG_globalParams
 
 // Negative: a single resource (not a fixed-size array) must not trigger the hoist.
 [shader("compute")]

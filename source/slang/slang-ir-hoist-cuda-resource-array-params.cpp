@@ -258,6 +258,18 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
             // Move decorations (name hint, etc.) onto the field key for downstream emit.
             param->transferDecorationsTo(paramFieldKey);
 
+            // `paramFieldKey` is the *same* `IRStructKey` the original entry-point params struct
+            // layout keys on, and we deliberately retain that layout (it preserves CUDA reflection,
+            // see the header). `transferDecorationsTo` also moved the parameter's
+            // `IRLayoutDecoration` — whose offsets are relative to the *entry-point* layout — onto
+            // that shared key, so a consumer reading field-level layout off the key would see
+            // entry-point-relative offsets rather than the constant-buffer-relative ones the
+            // synthesized `structTypeLayout` represents. The `GlobalParams` field's layout already
+            // lives in `structLayoutBuilder`, so strip the stray decoration off the key to keep the
+            // two layout pictures from aliasing.
+            if (auto staleParamLayout = paramFieldKey->findDecoration<IRLayoutDecoration>())
+                staleParamLayout->removeAndDeallocate();
+
             while (auto use = param->firstUse)
             {
                 builder->setInsertBefore(use->getUser());
