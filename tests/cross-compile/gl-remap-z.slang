@@ -20,14 +20,16 @@ VOutput main()
     output.v = float4(1, 2, 3, 4);
 
     // The z component of the written position is set from an expression that reads both its
-    // z and its w (i.e. z' = (z + w) / 2), then the result is written to gl_Position.
-    // CHECK: [[TMP:[_A-Za-z0-9]+]].z = {{.*}}output_0.v_0.z{{.*}}output_0.v_0.w{{.*}};
+    // z and its w and halves the sum (i.e. z' = (z + w) / 2), then the result is written to
+    // gl_Position.
+    // CHECK: [[TMP:[_A-Za-z0-9]+]].z = {{.*}}output_0.v_0.z{{.*}}output_0.v_0.w{{.*}}/{{.*}}2.0{{.*}};
     // CHECK: gl_Position = [[TMP]];
 
     // Composed with -fvk-invert-y: y is additively inverted AND z is remapped reading both
-    // z and w. The two transforms are independent, so order does not matter (CHECK-DAG).
+    // z and w and halving. The two transforms are independent, so order does not matter
+    // (CHECK-DAG).
     // COMPOSE-DAG: {{[_A-Za-z0-9]+}}.y = - output_0.v_0.y;
-    // COMPOSE-DAG: {{[_A-Za-z0-9]+}}.z = {{.*}}.z{{.*}}.w{{.*}};
+    // COMPOSE-DAG: {{[_A-Za-z0-9]+}}.z = {{.*}}.z{{.*}}.w{{.*}}/{{.*}}2.0{{.*}};
     // COMPOSE: gl_Position =
 
     // Off by default: without '-fgl-remap-z' the position is written unmodified, with no

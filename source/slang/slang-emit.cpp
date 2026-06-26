@@ -2253,25 +2253,22 @@ Result linkAndOptimizeIR(
         if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::VulkanUseDxPositionW))
             SLANG_PASS(rcpWOfPositionInput);
 
-        // `-fgl-remap-z` is scoped to the textual GLSL target and the vertex stage only:
-        // the OpenGL [-1, 1] NDC depth convention only differs from the standard [0, 1] used
-        // by Vulkan/SPIR-V/D3D/Metal, so the remap must NOT run for SPIR-V (which also passes
-        // isKhronosTarget). Code generation runs on a single entry point at a time (see
-        // slang-code-gen.cpp), so the stage is checked here, keeping the IR pass stage-agnostic.
+        // `-fgl-remap-z` is scoped to the textual GLSL target and the vertex stage only.
+        // The OpenGL [-1, 1] NDC depth convention only differs from the standard [0, 1] used by
+        // Vulkan/SPIR-V/D3D/Metal, so the remap must NOT run for SPIR-V (which also passes
+        // isKhronosTarget) -- hence the inner CodeGenTarget::GLSL check. remapZOfPositionOutput
+        // rewrites every position output in the linked module, so to stay strictly vertex-only it
+        // runs only when exactly one entry point is being generated and that entry point is a
+        // vertex shader. A mixed-stage whole-program request (e.g. vertex + mesh, which reaches
+        // this path with getEntryPointCount() > 1) is left untouched rather than risk remapping a
+        // non-vertex stage's position output, keeping the IR pass itself target/stage-agnostic.
         if (target == CodeGenTarget::GLSL &&
-            targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GLSLRemapZ))
+            targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GLSLRemapZ) &&
+            codeGenContext->getEntryPointCount() == 1 &&
+            codeGenContext->getEntryPoint(codeGenContext->getSingleEntryPointIndex())->getStage() ==
+                Stage::Vertex)
         {
-            bool isVertexStage = false;
-            for (auto entryPointIndex : codeGenContext->getEntryPointIndices())
-            {
-                if (codeGenContext->getEntryPoint(entryPointIndex)->getStage() == Stage::Vertex)
-                {
-                    isVertexStage = true;
-                    break;
-                }
-            }
-            if (isVertexStage)
-                SLANG_PASS(remapZOfPositionOutput);
+            SLANG_PASS(remapZOfPositionOutput);
         }
     }
 
