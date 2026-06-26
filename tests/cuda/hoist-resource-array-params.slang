@@ -117,6 +117,9 @@ void nonResourceArrayMain(
 // so the driver bails and nothing is hoisted.
 // MULTI-NOT: SLANG_globalParams
 
-// Non-CUDA targets never run the pass, so the hoisted global must not appear.
-// NEGHLSL-NOT: SLANG_globalParams
-// NEGSPIRV-NOT: SLANG_globalParams
+// Non-CUDA targets never run the pass, so the synthesized `GlobalParams` struct must not appear.
+// (We check `GlobalParams`, not `SLANG_globalParams`: the latter is a CUDA-emit-only symbol that is
+// absent on these targets regardless of the gate, so it would be a vacuous check — but the
+// `GlobalParams` struct this pass synthesizes would show up on any target if the gate broke.)
+// NEGHLSL-NOT: GlobalParams
+// NEGSPIRV-NOT: GlobalParams

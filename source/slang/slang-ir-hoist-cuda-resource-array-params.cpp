@@ -189,9 +189,11 @@ struct HoistCUDAResourceArrayParams : PerEntryPointPass
         // (slang-ir-entry-point-uniforms.cpp:652), we intentionally do NOT add an
         // `IREntryPointParamDecoration` back-link to `entryPointFunc`. CUDA source emit consumes
         // this global directly via `CUDASourceEmitter::emitParameterGroupImpl` and never reads that
-        // decoration; its only consumers — `introduceExplicitGlobalContext` (which skips CUDA) and
-        // the Metal/CPU layout-legalization paths — do not run on the CUDA source path. Add it if
-        // this pass is ever reused for a target that re-associates globals with their entry point.
+        // decoration; its only consumers do not act on it for CUDA —
+        // `introduceExplicitGlobalContext` runs but skips over `IRGlobalParam`s on CUDA, leaving
+        // them as `__constant__` (slang-ir-explicit-global-context.cpp:245-247), and the Metal/CPU
+        // layout-legalization paths do not run on the CUDA source path. Add it if this pass is ever
+        // reused for a target that re-associates globals with their entry point.
 
         // Move every uniform parameter into the struct and rematerialize its value at each use site
         // as a load from the constant buffer. A fresh `IRStructTypeLayout` is built in lock-step
