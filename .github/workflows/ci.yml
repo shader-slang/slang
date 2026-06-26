@@ -33,7 +33,7 @@ jobs:
           shouldRun=true
           if files="$(git diff --name-only $BASE...HEAD)"; then
             # Git diff succeeded, check if non-documentation files were changed
-            if echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|CONTRIBUTING\.md$|README\.md$)'; then
+            if echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|\.claude/|[^/]+\.md$|\.coderabbit\.yaml$)'; then
               shouldRun=true
             else
               echo "Only documentation files changed, skipping remaining steps"
