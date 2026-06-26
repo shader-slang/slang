@@ -1645,11 +1645,17 @@ struct ExistentialLoweringContext : public InstPassBase
                 {
                     IRBuilder builder(module);
                     builder.setInsertBefore(inst);
-                    IRType* loweredType =
-                        useUInt64 ? builder.getUInt64Type()
-                                  : builder.getVectorType(
-                                        builder.getUIntType(),
-                                        builder.getIntValue(builder.getIntType(), 2));
+                    IRType* loweredType = nullptr;
+                    if (useUInt64)
+                    {
+                        loweredType = builder.getUInt64Type();
+                    }
+                    else
+                    {
+                        loweredType = builder.getVectorType(
+                            builder.getUIntType(),
+                            builder.getIntValue(builder.getIntType(), 2));
+                    }
                     inst->replaceUsesWith(loweredType);
                     instsToRemove.add(inst);
                 }
@@ -1906,8 +1912,8 @@ struct ExistentialLoweringContext : public InstPassBase
         // `ulong`, elsewhere a `uint2` (low element = id, high element = 0). The
         // RTTI handle is a zero placeholder. The witness table id occupies the
         // low 32 bits; on Metal it is zero-extended into the `ulong`.
-        IRInst* rttiHandle;
-        IRInst* witnessTableIDHandle;
+        IRInst* rttiHandle = nullptr;
+        IRInst* witnessTableIDHandle = nullptr;
         if (useUInt64HandleRepresentation())
         {
             rttiHandle = builder.getIntValue(builder.getUInt64Type(), 0);
@@ -1972,7 +1978,7 @@ struct ExistentialLoweringContext : public InstPassBase
         // For the `uint2` representation that is element 0; for the scalar
         // `ulong` representation (Metal) a swizzle is not valid, so truncate to
         // `uint` instead. See lowerHandleTypes() and useUInt64HandleRepresentation().
-        IRInst* id;
+        IRInst* id = nullptr;
         if (useUInt64HandleRepresentation())
         {
             id = builder.emitCast(builder.getUIntType(), inst->getRTTIOperand());
