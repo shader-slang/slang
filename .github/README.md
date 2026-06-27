@@ -55,42 +55,90 @@ block. Branch filters, path filters, activity `types`, schedules, and per-job
 
 ## Workflow-To-Workflow Dependencies
 
+Solid arrows are direct reusable-workflow calls through
+`uses: ./.github/workflows/<file>.yml`. Dotted arrows are event or artifact
+relationships.
+
+### CI Entry Point
+
 ```mermaid
-flowchart TD
-    ci["ci.yml"] --> ciBuildContainer["ci-slang-build-container.yml"]
-    ci --> ciBuild["ci-slang-build.yml"]
-    ci --> ciSanitizer["ci-slang-sanitizer.yml"]
-    ci --> ciTestContainer["ci-slang-test-container.yml"]
-    ci --> ciRhiContainer["ci-rhi-test-container.yml"]
-    ci --> ciTest["ci-slang-test.yml"]
-    ci --> ciRhi["ci-rhi-test.yml"]
-    ci --> materialx["materialx-test.yml"]
-    ci --> falcor["ci-falcor-test.yml"]
-    ci --> compileTest["ci-compile-test.yml"]
-    ci --> benchmarkTest["ci-benchmark-test.yml"]
+flowchart TB
+    ci["ci.yml"]
 
-    populate["populate-sccache.yml"] --> ciBuildContainer
-    populate --> ciBuild
+    subgraph build["Build and sanitizer reusable workflows"]
+        direction TB
+        ciBuildContainer["ci-slang-build-container.yml"]
+        ciBuild["ci-slang-build.yml"]
+        ciSanitizer["ci-slang-sanitizer.yml"]
+    end
 
-    nightlySanitizer["ci-nightly-sanitizer.yml"] --> ciSanitizer
+    subgraph test["Test reusable workflows"]
+        direction TB
+        ciTestContainer["ci-slang-test-container.yml"]
+        ciRhiContainer["ci-rhi-test-container.yml"]
+        ciTest["ci-slang-test.yml"]
+        ciRhi["ci-rhi-test.yml"]
+    end
 
-    coverageNightly["coverage-nightly.yml"] --> coverageReusable["ci-slang-coverage.yml"]
+    subgraph integration["Integration and regression reusable workflows"]
+        direction TB
+        materialx["materialx-test.yml"]
+        falcor["ci-falcor-test.yml"]
+        compileTest["ci-compile-test.yml"]
+        benchmarkTest["ci-benchmark-test.yml"]
+    end
 
-    cmakeOptions["cmake-options.yml"] --> cmakeContainer["cmake-options-build-container.yml"]
+    ci --> ciBuildContainer
+    ci --> ciBuild
+    ci --> ciSanitizer
+    ci --> ciTestContainer
+    ci --> ciRhiContainer
+    ci --> ciTest
+    ci --> ciRhi
+    ci --> materialx
+    ci --> falcor
+    ci --> compileTest
+    ci --> benchmarkTest
+```
+
+### Other Reusable Workflow Callers
+
+```mermaid
+flowchart TB
+    populate["populate-sccache.yml"]
+    populate --> ciBuildContainer["ci-slang-build-container.yml"]
+    populate --> ciBuild["ci-slang-build.yml"]
+
+    nightlySanitizer["ci-nightly-sanitizer.yml"]
+    nightlySanitizer --> ciSanitizer["ci-slang-sanitizer.yml"]
+
+    coverageNightly["coverage-nightly.yml"]
+    coverageNightly --> coverageReusable["ci-slang-coverage.yml"]
+
+    cmakeOptions["cmake-options.yml"]
+    cmakeOptions --> cmakeContainer["cmake-options-build-container.yml"]
     cmakeOptions --> cmakeBuild["cmake-options-build.yml"]
+```
 
+### Event And Container Image Relationships
+
+```mermaid
+flowchart TB
+    ci["ci.yml"]
     ci -. workflow_run .-> irComment["comment-ir-version-check.yml"]
     ci -. workflow_run .-> retryYielded["retry-yielded-bot-ci.yml"]
 
     publishImages["publish-ci-container-images.yml"] -. publishes .-> clangImage["slang-linux-clang-ci"]
     publishImages -. publishes .-> gpuImage["slang-linux-gpu-ci"]
+
     clangImage -. used by .-> agenticTests["ci-agentic-tests-nightly.yml"]
-    clangImage -. used by .-> coverageNightly
-    clangImage -. used by .-> ciSanitizer
-    gpuImage -. used by .-> ciBuildContainer
-    gpuImage -. used by .-> ciTestContainer
-    gpuImage -. used by .-> ciRhiContainer
-    gpuImage -. used by .-> cmakeContainer
+    clangImage -. used by .-> coverageNightly["coverage-nightly.yml"]
+    clangImage -. used by .-> ciSanitizer["ci-slang-sanitizer.yml"]
+
+    gpuImage -. used by .-> ciBuildContainer["ci-slang-build-container.yml"]
+    gpuImage -. used by .-> ciTestContainer["ci-slang-test-container.yml"]
+    gpuImage -. used by .-> ciRhiContainer["ci-rhi-test-container.yml"]
+    gpuImage -. used by .-> cmakeContainer["cmake-options-build-container.yml"]
 ```
 
 ## Reusable Workflows
