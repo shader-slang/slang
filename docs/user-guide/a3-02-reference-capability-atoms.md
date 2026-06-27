@@ -1527,6 +1527,16 @@ Compound Capabilities
 `subgroup_vote`
 > Capabilities required to use GLSL-style subgroup operations 'subgroup_vote'
 
+`subgroup_workgroup_index`
+> Capabilities required to use the subgroup-within-workgroup queries
+> 'WaveGetWaveIndex' / 'WaveGetNumWaves'. These lower to GLSL
+> gl_SubgroupID / gl_NumSubgroups and SPIR-V BuiltIn SubgroupId /
+> NumSubgroups, which the GLSL and Vulkan SPIR-V environment specs
+> restrict to compute-class execution models (compute, mesh,
+> amplification/task); the restriction is encoded here so misuse is
+> caught by the capability system rather than producing invalid
+> GLSL / SPIR-V.
+
 `subpass`
 > Capabilities required to use Subpass-Input's
 
