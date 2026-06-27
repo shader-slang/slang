@@ -372,7 +372,8 @@ local insts = {
 			{
 				UntypedResourceHandle = {
 					-- An opaque, untyped handle produced by `ResourceDescriptorHeap[i]`. It is nullary:
-					-- the heap index lives in the value, not the type. It lowers to `uint` before emit.
+					-- the heap index lives in the value, not the type. It is emitted directly as `uint`
+					-- (backends print the type as uint; there is no separate pre-emit lowering pass).
 					struct_name = "UntypedResourceHandleType",
 					hoistable = true,
 				},
@@ -380,7 +381,7 @@ local insts = {
 			{
 				UntypedSamplerHandle = {
 					-- An opaque, untyped handle produced by `SamplerDescriptorHeap[j]`. Nullary, like
-					-- `UntypedResourceHandle`; lowers to `uint` before emit.
+					-- `UntypedResourceHandle`; emitted directly as `uint` (no pre-emit lowering pass).
 					struct_name = "UntypedSamplerHandleType",
 					hoistable = true,
 				},

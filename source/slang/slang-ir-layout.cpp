@@ -437,6 +437,12 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_DefaultBufferLayoutType:
         *outSizeAndAlignment = IRSizeAndAlignment(0, 4);
         return SLANG_OK;
+    case kIROp_UntypedResourceHandleType:
+    case kIROp_UntypedSamplerHandleType:
+        // An untyped descriptor-heap handle is represented as its `uint` heap index, so a
+        // dangling handle held in a local `var` lays out as a 4-byte uint.
+        *outSizeAndAlignment = IRSizeAndAlignment(4, 4);
+        return SLANG_OK;
     case kIROp_DescriptorHandleType:
         {
             // Check for spvBindlessTextureNV capability
