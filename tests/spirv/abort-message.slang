@@ -1,39 +1,40 @@
-// Runtime message-round-trip coverage for the `abort()` intrinsic on Vulkan (VK_KHR_shader_abort),
-// complementing the emit + keep-alive coverage in tests/spirv/abort-runtime.slang. Each case here
-// fires abort() on a path the 1-thread dispatch always takes, which on capable hardware loses the
-// device; slang-rhi (shader-slang/slang-rhi#782) recovers the abort message via the device-fault
-// path and forwards it through the debug callback. render-test, when `-render-features shader-abort`
-// is requested, runs a device-loss-tolerant capture mode that prints any "Shader abort: ..." text it
-// receives to stdout, so the `filecheck=` lines below can assert the formatted message.
+// Runtime message coverage for the `abort()` intrinsic on Vulkan (VK_KHR_shader_abort),
+// complementing the emit + keep-alive coverage in tests/spirv/abort-runtime.slang.
 //
-// Each aborting case is its own render-test invocation (its own //TEST line + its own entry point),
-// because a fired abort loses the device and is terminal for that invocation. An unsupporting
-// device/driver -> SLANG_E_NOT_AVAILABLE -> the line is cleanly skipped (no GPU in CI).
+// Each case fires abort() on a path the 1-thread dispatch always takes. On capable hardware that
+// loses the device; slang-rhi (shader-slang/slang-rhi#782) recovers the abort message via the
+// device-fault path and forwards it through the debug callback, and render-test (in the
+// `-render-features shader-abort` capture mode) prints the "Shader abort: ..." text to stdout. The
+// `filecheck=` prefix asserts that captured message; the `filecheck-buffer=EMPTY` prefix asserts the
+// readback buffer is empty (the lost device never writes it), which is how COMPARE_COMPUTE's buffer
+// comparison is satisfied inline -- no separate .expected.txt file.
+//
+// Each aborting case is its own render-test invocation (own //TEST line + own entry point), since a
+// fired abort is terminal for that invocation. Where the feature is unavailable the line is cleanly
+// skipped (SLANG_E_NOT_AVAILABLE) -- e.g. a GPU-less CI runner.
 //
 // HONESTY: the abort-fires -> message-round-trip -> FileCheck-match end-to-end is only validated on
-// capable hardware (a maintainer run, see slang#11790 / slang-rhi#782). In a GPU-less environment
-// these `-vk` lines are skipped before any output is checked.
-//
-// On a successful capture, render-test prints lines of the form:
-//     Shader abort: <your formatted message>
-// The device-loss buffer never gets written, so each line's empty <stem>.N.expected.txt makes the
-// harness buffer-comparison pass against the empty (pre-cleared) actual buffer.
+// capable hardware (a maintainer run; see slang#11790 / slang-rhi#782).
 
 // Case 0: a plain string abort message (no format arguments).
-//TEST(compute):COMPARE_COMPUTE(filecheck=PLAIN): -vk -compute -emit-spirv-directly -capability abort -render-features shader-abort -entry abortPlain
+//TEST(compute):COMPARE_COMPUTE(filecheck=PLAIN,filecheck-buffer=EMPTY): -vk -compute -emit-spirv-directly -capability abort -render-features shader-abort -entry abortPlain
 // PLAIN: Shader abort: plain abort message
 
 // Case 1: %f float formatting.
-//TEST(compute):COMPARE_COMPUTE(filecheck=FLOAT): -vk -compute -emit-spirv-directly -capability abort -render-features shader-abort -entry abortFloat
+//TEST(compute):COMPARE_COMPUTE(filecheck=FLOAT,filecheck-buffer=EMPTY): -vk -compute -emit-spirv-directly -capability abort -render-features shader-abort -entry abortFloat
 // FLOAT: Shader abort: value={{.*}}1.5
 
 // Case 2: more than one argument.
-//TEST(compute):COMPARE_COMPUTE(filecheck=MULTI): -vk -compute -emit-spirv-directly -capability abort -render-features shader-abort -entry abortMulti
+//TEST(compute):COMPARE_COMPUTE(filecheck=MULTI,filecheck-buffer=EMPTY): -vk -compute -emit-spirv-directly -capability abort -render-features shader-abort -entry abortMulti
 // MULTI: Shader abort: multi 1 2 3
 
 // Case 3: mixed argument types (an int and a float).
-//TEST(compute):COMPARE_COMPUTE(filecheck=MIXED): -vk -compute -emit-spirv-directly -capability abort -render-features shader-abort -entry abortMixed
+//TEST(compute):COMPARE_COMPUTE(filecheck=MIXED,filecheck-buffer=EMPTY): -vk -compute -emit-spirv-directly -capability abort -render-features shader-abort -entry abortMixed
 // MIXED: Shader abort: mixed 7 2.5
+
+// Shared by every case above: the aborted dispatch loses the device, so the readback buffer is
+// never written -- assert it stays empty (no stray output) to satisfy the buffer comparison inline.
+// EMPTY-NOT: {{.}}
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
