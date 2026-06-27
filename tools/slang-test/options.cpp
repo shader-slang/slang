@@ -746,8 +746,7 @@ static bool _isSubCommand(const char* arg)
         }
     }
 
-    if (optionsOut->verbosity >= VerbosityLevel::Info &&
-        optionsOut->skipListFiles.getCount() > 0)
+    if (optionsOut->verbosity >= VerbosityLevel::Info && optionsOut->skipListFiles.getCount() > 0)
     {
         stdOut.print("Skip lists:\n");
         for (const auto& fileInfo : optionsOut->skipListFiles)
