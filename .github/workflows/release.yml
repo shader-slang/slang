@@ -11,7 +11,6 @@ jobs:
   release:
     strategy:
       matrix:
-        image: [""]
         os: [linux, macos, windows]
         config: [release]
         platform: [x86_64, aarch64, wasm]
@@ -84,7 +83,6 @@ jobs:
             }
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
-    container: ${{ matrix.image || '' }}
 
     defaults:
       run:
