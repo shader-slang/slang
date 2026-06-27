@@ -6,7 +6,7 @@
 //
 // Compilation-only regression test: should not crash during specialization.
 // Note: specify `-o` so slang-test doesn't treat SPIR-V text on stdout as a failure.
-//TEST:SIMPLE: -target spirv -o gh-9526.spv
+//TEST:SIMPLE: -target spirv -o tests/bugs/gh-9526.spv
 
 struct MyStruct : IDifferentiable
 {

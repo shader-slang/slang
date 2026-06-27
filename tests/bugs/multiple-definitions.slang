@@ -1,5 +1,5 @@
 // multiple-definitions.slang
-//TEST:SIMPLE:-entry main -o multiple-definitions.hlsl
+//TEST:SIMPLE:-entry main -o tests/bugs/multiple-definitions.hlsl
 
 __specialized_for_target(hlsl)
 int a(int x)

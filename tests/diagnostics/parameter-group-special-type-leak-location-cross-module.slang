@@ -11,7 +11,7 @@
 // Precompile the helper to a module, then compile this file referencing it.
 
 //TEST:COMPILE: tests/diagnostics/parameter-group-special-type-leak-location-helper.slang -o tests/diagnostics/parameter-group-special-type-leak-location-helper.slang-module
-//TEST:SIMPLE(filecheck=CHECK): -r tests/diagnostics/parameter-group-special-type-leak-location-helper.slang-module -target spirv -entry computeMain -stage compute -o out.spv
+//TEST:SIMPLE(filecheck=CHECK): -r tests/diagnostics/parameter-group-special-type-leak-location-helper.slang-module -target spirv -entry computeMain -stage compute -o tests/diagnostics/parameter-group-special-type-leak-location-cross-module.spv
 
 import "parameter-group-special-type-leak-location-helper";
 
