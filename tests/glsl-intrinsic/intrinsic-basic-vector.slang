@@ -56,8 +56,10 @@ bool Test_VectorType()
 
     bool voidResults = true;
 
-    // Note: "CHECK_SPIR-NOT:" testing is to detect cases where a scalar
-    // version of the function is called when it should use a vector version.
+    // The GLSL `-NOT`/`-COUNT` pairs detect cases where a scalar version of the
+    // function is called when it should use a vector version. The direct SPIR-V
+    // checks below are DAG presence checks because the helper output is not
+    // reliably clustered when merge-return optimization is disabled.
 
     // 8.8. Integer Functions
 
