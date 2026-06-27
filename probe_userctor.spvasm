@@ -1,0 +1,214 @@
+; SPIR-V
+; Version: 1.5
+; Generator: Khronos Slang Compiler; 0
+; Bound: 142
+; Schema: 0
+OpCapability Shader
+OpExtension "SPV_KHR_non_semantic_info"
+OpExtension "SPV_KHR_storage_buffer_storage_class"
+%2 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main" %outputBuffer %gl_GlobalInvocationID
+OpExecutionMode %main LocalSize 1 1 1
+
+; Debug Information
+%1 = OpString "// Probe: a USER-defined constructor must KEEP its source-level debug info.
+// (Regression guard for the #11550 fix, which suppresses debug info only for
+// SYNTHESIZED initializers.)
+struct Vec
+{
+    float x;
+    float y;
+    __init(float a, float b)
+    {
+        x = a;
+        y = b;
+    }
+};
+
+RWStructuredBuffer<float> outputBuffer;
+
+[shader(\"compute\")]
+[numthreads(1, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    Vec v = Vec(1.0, 2.0);
+    outputBuffer[tid.x] = v.x + v.y;
+}
+"
+%5 = OpString "/workspace/agent/wt-slang-11550/probe_userctor.slang"
+OpSource Slang 1
+%22 = OpString "uint"
+%31 = OpString "main"
+%37 = OpString "slangc"
+%38 = OpString "-target spirv  -I \"/workspace/agent/wt-slang-11550/build/Debug/bin\" -matrix-layout-column-major -O0 -stage compute -entry main -g2"
+%40 = OpString "tid"
+%54 = OpString "float"
+%56 = OpString "x"
+%58 = OpString "y"
+%61 = OpString "Vec"
+%66 = OpString "v"
+%81 = OpString "Vec.$init"
+%86 = OpString "b"
+%90 = OpString "a"
+%132 = OpString "__member0"
+%134 = OpString "RWStructuredBuffer"
+%136 = OpString "outputBuffer"
+OpName %_dbgvar_tid "_dbgvar_tid"                   ; id %16
+OpName %Vec "Vec"                                   ; id %17
+OpMemberName %Vec 0 "x"
+OpMemberName %Vec 1 "y"
+OpName %_dbgvar_v "_dbgvar_v"                       ; id %20
+OpName %tid "tid"                                   ; id %39
+OpName %v "v"                                       ; id %65
+OpName %a "a"                                       ; id %72
+OpName %b "b"                                       ; id %73
+OpName %_dbgvar_b "_dbgvar_b"                       ; id %76
+OpName %_dbgvar_a "_dbgvar_a"                       ; id %77
+OpName %b_0 "b"                                     ; id %85
+OpName %a_0 "a"                                     ; id %89
+OpName %Vec__init "Vec.$init"                       ; id %70
+OpName %v_0 "v"                                     ; id %69
+OpName %RWStructuredBuffer "RWStructuredBuffer"     ; id %126
+OpMemberName %RWStructuredBuffer 0 "__member0"
+OpName %outputBuffer "outputBuffer"                 ; id %129
+OpName %main "main"                                 ; id %11
+
+; Annotations
+OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+OpDecorate %_ptr_StorageBuffer_float ArrayStride 4
+OpDecorate %_runtimearr_float ArrayStride 4
+OpDecorate %RWStructuredBuffer Block
+OpMemberDecorate %RWStructuredBuffer 0 Offset 0
+OpDecorate %outputBuffer Binding 0
+OpDecorate %outputBuffer DescriptorSet 0
+
+; Types, variables and constants
+%void = OpTypeVoid
+%4 = OpExtInst %void %2 DebugSource %5 %1
+%uint = OpTypeInt 32 0
+%uint_11 = OpConstant %uint 11
+%uint_5 = OpConstant %uint 5
+%uint_100 = OpConstant %uint 100
+%10 = OpExtInst %void %2 DebugCompilationUnit %uint_100 %uint_5 %4 %uint_11
+%12 = OpTypeFunction %void
+%v3uint = OpTypeVector %uint 3
+%_ptr_Function_v3uint = OpTypePointer Function %v3uint
+%float = OpTypeFloat 32
+%Vec = OpTypeStruct %float %float
+%_ptr_Function_Vec = OpTypePointer Function %Vec
+%uint_32 = OpConstant %uint 32
+%uint_6 = OpConstant %uint 6
+%uint_131072 = OpConstant %uint 131072
+%21 = OpExtInst %void %2 DebugTypeBasic %22 %uint_32 %uint_6 %uint_131072
+%uint_3 = OpConstant %uint 3
+%26 = OpExtInst %void %2 DebugTypeVector %21 %uint_3
+%uint_0 = OpConstant %uint 0
+%28 = OpExtInst %void %2 DebugTypeFunction %uint_0 %void %26
+%uint_19 = OpConstant %uint 19
+%30 = OpExtInst %void %2 DebugFunction %31 %28 %4 %uint_19 %uint_6 %10 %31 %uint_0 %uint_19
+%36 = OpExtInst %void %2 DebugEntryPoint %30 %10 %37 %38
+%uint_1 = OpConstant %uint 1
+%tid = OpExtInst %void %2 DebugLocalVariable %40 %26 %4 %uint_19 %uint_6 %30 %uint_0 %uint_1
+%42 = OpExtInst %void %2 DebugExpression
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+%uint_21 = OpConstant %uint 21
+%53 = OpExtInst %void %2 DebugTypeBasic %54 %uint_32 %uint_3 %uint_131072
+%55 = OpExtInst %void %2 DebugTypeMember %56 %53 %4 %uint_6 %uint_11 %uint_0 %uint_32 %uint_0
+%uint_7 = OpConstant %uint 7
+%57 = OpExtInst %void %2 DebugTypeMember %58 %53 %4 %uint_7 %uint_11 %uint_32 %uint_32 %uint_0
+%uint_4 = OpConstant %uint 4
+%uint_8 = OpConstant %uint 8
+%uint_64 = OpConstant %uint 64
+%60 = OpExtInst %void %2 DebugTypeComposite %61 %uint_1 %4 %uint_4 %uint_8 %10 %61 %uint_64 %uint_131072 %55 %57
+%uint_9 = OpConstant %uint 9
+%v = OpExtInst %void %2 DebugLocalVariable %66 %60 %4 %uint_21 %uint_9 %30 %uint_0
+%71 = OpTypeFunction %Vec %float %float
+%_ptr_Function_float = OpTypePointer Function %float
+%79 = OpExtInst %void %2 DebugTypeFunction %uint_0 %60 %53 %53
+%80 = OpExtInst %void %2 DebugFunction %81 %79 %4 %uint_8 %uint_5 %10 %81 %uint_0 %uint_8
+%uint_2 = OpConstant %uint 2
+%b_0 = OpExtInst %void %2 DebugLocalVariable %86 %53 %4 %uint_8 %uint_5 %80 %uint_0 %uint_2
+%a_0 = OpExtInst %void %2 DebugLocalVariable %90 %53 %4 %uint_8 %uint_5 %80 %uint_0 %uint_1
+%uint_10 = OpConstant %uint 10
+%int = OpTypeInt 32 1
+%int_0 = OpConstant %int 0
+%int_1 = OpConstant %int 1
+%float_1 = OpConstant %float 1
+%float_2 = OpConstant %float 2
+%uint_22 = OpConstant %uint 22
+%_ptr_StorageBuffer_float = OpTypePointer StorageBuffer %float  ; ArrayStride 4
+%_runtimearr_float = OpTypeRuntimeArray %float                  ; ArrayStride 4
+%RWStructuredBuffer = OpTypeStruct %_runtimearr_float           ; Block
+%_ptr_StorageBuffer_RWStructuredBuffer = OpTypePointer StorageBuffer %RWStructuredBuffer
+%130 = OpExtInst %void %2 DebugTypeArray %53 %uint_0
+%131 = OpExtInst %void %2 DebugTypeMember %132 %130 %4 %uint_0 %uint_0 %uint_0 %uint_0 %uint_0
+%133 = OpExtInst %void %2 DebugTypeComposite %134 %uint_1 %4 %uint_0 %uint_0 %10 %134 %uint_0 %uint_131072 %131
+%uint_15 = OpConstant %uint 15
+%uint_27 = OpConstant %uint 27
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input    ; BuiltIn GlobalInvocationId
+%outputBuffer = OpVariable %_ptr_StorageBuffer_RWStructuredBuffer StorageBuffer     ; Binding 0, DescriptorSet 0
+%135 = OpExtInst %void %2 DebugGlobalVariable %136 %133 %4 %uint_15 %uint_27 %10 %136 %outputBuffer %uint_0
+
+; Function main
+%main = OpFunction %void None %12
+%13 = OpLabel
+%_dbgvar_tid = OpVariable %_ptr_Function_v3uint Function
+%_dbgvar_v = OpVariable %_ptr_Function_Vec Function
+%33 = OpExtInst %void %2 DebugFunctionDefinition %30 %main
+%34 = OpExtInst %void %2 DebugScope %30
+%35 = OpExtInst %void %2 DebugLine %4 %uint_19 %uint_19 %uint_6 %uint_6
+%43 = OpExtInst %void %2 DebugDeclare %tid %_dbgvar_tid %42
+%44 = OpLoad %v3uint %gl_GlobalInvocationID
+%47 = OpExtInst %void %2 DebugValue %tid %44 %42
+OpStore %_dbgvar_tid %44
+%49 = OpExtInst %void %2 DebugLine %4 %uint_21 %uint_21 %uint_5 %uint_6
+%51 = OpExtInst %void %2 DebugLine %4 %uint_21 %uint_21 %uint_5 %uint_6
+%52 = OpExtInst %void %2 DebugLine %4 %uint_21 %uint_21 %uint_5 %uint_6
+%68 = OpExtInst %void %2 DebugDeclare %v %_dbgvar_v %42
+%v_0 = OpFunctionCall %Vec %Vec__init %float_1 %float_2
+%112 = OpAccessChain %_ptr_Function_float %_dbgvar_v %int_0
+%113 = OpCompositeExtract %float %v_0 0
+%114 = OpExtInst %void %2 DebugValue %v %113 %42 %int_0
+OpStore %112 %113
+%116 = OpAccessChain %_ptr_Function_float %_dbgvar_v %int_1
+%117 = OpCompositeExtract %float %v_0 1
+%118 = OpExtInst %void %2 DebugValue %v %117 %42 %int_1
+OpStore %116 %117
+%120 = OpExtInst %void %2 DebugLine %4 %uint_22 %uint_22 %uint_5 %uint_6
+%122 = OpLoad %v3uint %gl_GlobalInvocationID
+%123 = OpCompositeExtract %uint %122 0
+%125 = OpAccessChain %_ptr_StorageBuffer_float %outputBuffer %int_0 %123
+%139 = OpFAdd %float %113 %117
+OpStore %125 %139
+OpReturn
+OpFunctionEnd
+
+; Function Vec__init
+%Vec__init = OpFunction %Vec None %71
+%a = OpFunctionParameter %float
+%b = OpFunctionParameter %float
+%74 = OpLabel
+%_dbgvar_b = OpVariable %_ptr_Function_float Function
+%_dbgvar_a = OpVariable %_ptr_Function_float Function
+%78 = OpVariable %_ptr_Function_Vec Function
+%82 = OpExtInst %void %2 DebugFunctionDefinition %80 %Vec__init
+%83 = OpExtInst %void %2 DebugScope %80
+%84 = OpExtInst %void %2 DebugLine %4 %uint_8 %uint_8 %uint_5 %uint_5
+%88 = OpExtInst %void %2 DebugDeclare %b_0 %_dbgvar_b %42
+%91 = OpExtInst %void %2 DebugDeclare %a_0 %_dbgvar_a %42
+%92 = OpExtInst %void %2 DebugValue %a_0 %a %42
+OpStore %_dbgvar_a %a
+%94 = OpExtInst %void %2 DebugValue %b_0 %b %42
+OpStore %_dbgvar_b %b
+%96 = OpExtInst %void %2 DebugLine %4 %uint_10 %uint_10 %uint_9 %uint_10
+%98 = OpExtInst %void %2 DebugLine %4 %uint_10 %uint_10 %uint_9 %uint_10
+%99 = OpExtInst %void %2 DebugLine %4 %uint_10 %uint_10 %uint_9 %uint_10
+%102 = OpAccessChain %_ptr_Function_float %78 %int_0
+OpStore %102 %a
+%104 = OpExtInst %void %2 DebugLine %4 %uint_11 %uint_11 %uint_9 %uint_10
+%106 = OpAccessChain %_ptr_Function_float %78 %int_1
+OpStore %106 %b
+%108 = OpLoad %Vec %78
+OpReturnValue %108
+OpFunctionEnd

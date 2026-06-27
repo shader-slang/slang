@@ -1,0 +1,176 @@
+; SPIR-V
+; Version: 1.5
+; Generator: Khronos Slang Compiler; 0
+; Bound: 116
+; Schema: 0
+OpCapability Shader
+OpExtension "SPV_KHR_non_semantic_info"
+OpExtension "SPV_KHR_storage_buffer_storage_class"
+%2 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main" %outputBuffer %gl_GlobalInvocationID
+OpExecutionMode %main LocalSize 1 1 1
+
+; Debug Information
+%1 = OpString "struct Pair
+{
+    float x;
+    float y;
+};
+
+RWStructuredBuffer<float> outputBuffer;
+
+[shader(\"compute\")]
+[numthreads(1, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    Pair p = {1.0, 2.0};
+    outputBuffer[tid.x] = p.x + p.y;
+}
+"
+%5 = OpString "/workspace/agent/wt-slang-11550/repro11550.slang"
+OpSource Slang 1
+%22 = OpString "uint"
+%31 = OpString "main"
+%36 = OpString "slangc"
+%37 = OpString "-target spirv  -I \"/workspace/agent/wt-slang-11550/build/Debug/bin\" -matrix-layout-column-major -O0 -stage compute -entry main -g2"
+%39 = OpString "tid"
+%53 = OpString "float"
+%55 = OpString "x"
+%57 = OpString "y"
+%60 = OpString "Pair"
+%64 = OpString "p"
+%106 = OpString "__member0"
+%108 = OpString "RWStructuredBuffer"
+%110 = OpString "outputBuffer"
+OpName %_dbgvar_tid "_dbgvar_tid"                   ; id %16
+OpName %Pair "Pair"                                 ; id %17
+OpMemberName %Pair 0 "x"
+OpMemberName %Pair 1 "y"
+OpName %_dbgvar_p "_dbgvar_p"                       ; id %20
+OpName %tid "tid"                                   ; id %38
+OpName %p "p"                                       ; id %63
+OpName %x "x"                                       ; id %70
+OpName %y "y"                                       ; id %71
+OpName %Pair__init "Pair.$init"                     ; id %68
+OpName %p_0 "p"                                     ; id %67
+OpName %RWStructuredBuffer "RWStructuredBuffer"     ; id %100
+OpMemberName %RWStructuredBuffer 0 "__member0"
+OpName %outputBuffer "outputBuffer"                 ; id %103
+OpName %main "main"                                 ; id %11
+
+; Annotations
+OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+OpDecorate %_ptr_StorageBuffer_float ArrayStride 4
+OpDecorate %_runtimearr_float ArrayStride 4
+OpDecorate %RWStructuredBuffer Block
+OpMemberDecorate %RWStructuredBuffer 0 Offset 0
+OpDecorate %outputBuffer Binding 0
+OpDecorate %outputBuffer DescriptorSet 0
+
+; Types, variables and constants
+%void = OpTypeVoid
+%4 = OpExtInst %void %2 DebugSource %5 %1
+%uint = OpTypeInt 32 0
+%uint_11 = OpConstant %uint 11
+%uint_5 = OpConstant %uint 5
+%uint_100 = OpConstant %uint 100
+%10 = OpExtInst %void %2 DebugCompilationUnit %uint_100 %uint_5 %4 %uint_11
+%12 = OpTypeFunction %void
+%v3uint = OpTypeVector %uint 3
+%_ptr_Function_v3uint = OpTypePointer Function %v3uint
+%float = OpTypeFloat 32
+%Pair = OpTypeStruct %float %float
+%_ptr_Function_Pair = OpTypePointer Function %Pair
+%uint_32 = OpConstant %uint 32
+%uint_6 = OpConstant %uint 6
+%uint_131072 = OpConstant %uint 131072
+%21 = OpExtInst %void %2 DebugTypeBasic %22 %uint_32 %uint_6 %uint_131072
+%uint_3 = OpConstant %uint 3
+%26 = OpExtInst %void %2 DebugTypeVector %21 %uint_3
+%uint_0 = OpConstant %uint 0
+%28 = OpExtInst %void %2 DebugTypeFunction %uint_0 %void %26
+%30 = OpExtInst %void %2 DebugFunction %31 %28 %4 %uint_11 %uint_6 %10 %31 %uint_0 %uint_11
+%35 = OpExtInst %void %2 DebugEntryPoint %30 %10 %36 %37
+%uint_1 = OpConstant %uint 1
+%tid = OpExtInst %void %2 DebugLocalVariable %39 %26 %4 %uint_11 %uint_6 %30 %uint_0 %uint_1
+%41 = OpExtInst %void %2 DebugExpression
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+%uint_13 = OpConstant %uint 13
+%52 = OpExtInst %void %2 DebugTypeBasic %53 %uint_32 %uint_3 %uint_131072
+%54 = OpExtInst %void %2 DebugTypeMember %55 %52 %4 %uint_3 %uint_11 %uint_0 %uint_32 %uint_0
+%uint_4 = OpConstant %uint 4
+%56 = OpExtInst %void %2 DebugTypeMember %57 %52 %4 %uint_4 %uint_11 %uint_32 %uint_32 %uint_0
+%uint_8 = OpConstant %uint 8
+%uint_64 = OpConstant %uint 64
+%59 = OpExtInst %void %2 DebugTypeComposite %60 %uint_1 %4 %uint_1 %uint_8 %10 %60 %uint_64 %uint_131072 %54 %56
+%uint_10 = OpConstant %uint 10
+%p = OpExtInst %void %2 DebugLocalVariable %64 %59 %4 %uint_13 %uint_10 %30 %uint_0
+%69 = OpTypeFunction %Pair %float %float
+%int = OpTypeInt 32 1
+%int_0 = OpConstant %int 0
+%_ptr_Function_float = OpTypePointer Function %float
+%int_1 = OpConstant %int 1
+%float_1 = OpConstant %float 1
+%float_2 = OpConstant %float 2
+%uint_14 = OpConstant %uint 14
+%_ptr_StorageBuffer_float = OpTypePointer StorageBuffer %float  ; ArrayStride 4
+%_runtimearr_float = OpTypeRuntimeArray %float                  ; ArrayStride 4
+%RWStructuredBuffer = OpTypeStruct %_runtimearr_float           ; Block
+%_ptr_StorageBuffer_RWStructuredBuffer = OpTypePointer StorageBuffer %RWStructuredBuffer
+%104 = OpExtInst %void %2 DebugTypeArray %52 %uint_0
+%105 = OpExtInst %void %2 DebugTypeMember %106 %104 %4 %uint_0 %uint_0 %uint_0 %uint_0 %uint_0
+%107 = OpExtInst %void %2 DebugTypeComposite %108 %uint_1 %4 %uint_0 %uint_0 %10 %108 %uint_0 %uint_131072 %105
+%uint_7 = OpConstant %uint 7
+%uint_27 = OpConstant %uint 27
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input    ; BuiltIn GlobalInvocationId
+%outputBuffer = OpVariable %_ptr_StorageBuffer_RWStructuredBuffer StorageBuffer     ; Binding 0, DescriptorSet 0
+%109 = OpExtInst %void %2 DebugGlobalVariable %110 %107 %4 %uint_7 %uint_27 %10 %110 %outputBuffer %uint_0
+
+; Function main
+%main = OpFunction %void None %12
+%13 = OpLabel
+%_dbgvar_tid = OpVariable %_ptr_Function_v3uint Function
+%_dbgvar_p = OpVariable %_ptr_Function_Pair Function
+%32 = OpExtInst %void %2 DebugFunctionDefinition %30 %main
+%33 = OpExtInst %void %2 DebugScope %30
+%34 = OpExtInst %void %2 DebugLine %4 %uint_11 %uint_11 %uint_6 %uint_6
+%42 = OpExtInst %void %2 DebugDeclare %tid %_dbgvar_tid %41
+%43 = OpLoad %v3uint %gl_GlobalInvocationID
+%46 = OpExtInst %void %2 DebugValue %tid %43 %41
+OpStore %_dbgvar_tid %43
+%48 = OpExtInst %void %2 DebugLine %4 %uint_13 %uint_13 %uint_5 %uint_6
+%50 = OpExtInst %void %2 DebugLine %4 %uint_13 %uint_13 %uint_5 %uint_6
+%51 = OpExtInst %void %2 DebugLine %4 %uint_13 %uint_13 %uint_5 %uint_6
+%66 = OpExtInst %void %2 DebugDeclare %p %_dbgvar_p %41
+%p_0 = OpFunctionCall %Pair %Pair__init %float_1 %float_2
+%86 = OpAccessChain %_ptr_Function_float %_dbgvar_p %int_0
+%87 = OpCompositeExtract %float %p_0 0
+%88 = OpExtInst %void %2 DebugValue %p %87 %41 %int_0
+OpStore %86 %87
+%90 = OpAccessChain %_ptr_Function_float %_dbgvar_p %int_1
+%91 = OpCompositeExtract %float %p_0 1
+%92 = OpExtInst %void %2 DebugValue %p %91 %41 %int_1
+OpStore %90 %91
+%94 = OpExtInst %void %2 DebugLine %4 %uint_14 %uint_14 %uint_5 %uint_6
+%96 = OpLoad %v3uint %gl_GlobalInvocationID
+%97 = OpCompositeExtract %uint %96 0
+%99 = OpAccessChain %_ptr_StorageBuffer_float %outputBuffer %int_0 %97
+%113 = OpFAdd %float %87 %91
+OpStore %99 %113
+OpReturn
+OpFunctionEnd
+
+; Function Pair__init
+%Pair__init = OpFunction %Pair None %69
+%x = OpFunctionParameter %float
+%y = OpFunctionParameter %float
+%72 = OpLabel
+%73 = OpVariable %_ptr_Function_Pair Function
+%77 = OpAccessChain %_ptr_Function_float %73 %int_0
+OpStore %77 %x
+%80 = OpAccessChain %_ptr_Function_float %73 %int_1
+OpStore %80 %y
+%82 = OpLoad %Pair %73
+OpReturnValue %82
+OpFunctionEnd
