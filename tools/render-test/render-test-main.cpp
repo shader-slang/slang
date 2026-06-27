@@ -212,6 +212,42 @@ static rhi::Feature _getFeatureFromName(const UnownedStringSlice& featureName)
     return rhi::Feature::_Count;
 }
 
+/// Returns whether the test requested the `shader-abort` render feature.
+///
+/// In shader-abort mode the dispatch is expected to fire an `abort()` (OpAbortKHR), which on
+/// Vulkan causes device loss; slang-rhi recovers the abort message via the device-fault path
+/// and forwards it through the debug callback. Render-test enters a device-loss-tolerant capture
+/// mode (see the dispatch site) only when this feature is requested, so that every other test
+/// keeps its existing behavior.
+static bool _isShaderAbortRequested(const Options& options)
+{
+    for (const auto& name : options.renderFeatures)
+    {
+        if (_getFeatureFromName(name.getUnownedSlice()) == rhi::Feature::ShaderAbort)
+            return true;
+    }
+    return false;
+}
+
+/// Prints any captured "Shader abort: ..." messages from `callback` to `out`, one per line.
+///
+/// slang-rhi prefixes a shader abort's host-delivered message with "Shader abort: "; the debug
+/// callback may also collect unrelated validation/driver errors during a device-loss, so this
+/// filters to just the abort lines. Emitting them on render-test's stdout lets a `filecheck=`
+/// line in the test assert the abort text (the harness FileCheck runs against captured stdout).
+static void _printCapturedShaderAbortMessages(CoreDebugCallback& callback, WriterHelper out)
+{
+    const String captured = callback.getString();
+    List<UnownedStringSlice> lines;
+    StringUtil::calcLines(captured.getUnownedSlice(), lines);
+    const UnownedStringSlice prefix = UnownedStringSlice::fromLiteral("Shader abort: ");
+    for (const auto& line : lines)
+    {
+        if (line.startsWith(prefix))
+            out.print("%.*s\n", (int)line.getLength(), line.begin());
+    }
+}
+
 class ProgramVars;
 
 struct ShaderOutputPlan
@@ -2036,11 +2072,39 @@ static SlangResult _innerMain(
         return SLANG_OK;
     }
 
+    // In shader-abort mode the dispatch is expected to fire an abort() that loses the device, so
+    // capture the abort message slang-rhi forwards through the debug callback and print it to
+    // stdout for a `filecheck=` assertion. This whole block is gated on the shader-abort feature
+    // being requested, so non-abort tests keep their existing behavior unchanged.
+    const bool shaderAbortMode = _isShaderAbortRequested(options);
+
     {
         RenderTestApp app;
         renderDocBeginFrame();
         SLANG_RETURN_ON_FAIL(app.initialize(session, deviceWrapper.get(), options, input));
-        app.update();
+
+        if (shaderAbortMode)
+        {
+            // Re-route the device's debug bridge to a local capture buffer for the dispatch, so
+            // render-test owns the abort text regardless of how the harness wired its callback.
+            renderer_test::CoreDebugCallback abortCapture;
+            {
+                renderer_test::ScopedCoreDebugCallback scopedAbortCapture(
+                    *debugCallback,
+                    &abortCapture);
+
+                // A shader abort loses the device, so update() is expected to fail here; that is
+                // not a render-test error in this mode. Swallow the result so we still reach the
+                // print below and the stdout FileCheck can run.
+                app.update();
+            }
+            _printCapturedShaderAbortMessages(abortCapture, stdWriters->getOut());
+        }
+        else
+        {
+            app.update();
+        }
+
         renderDocEndFrame();
         app.finalize();
     }
