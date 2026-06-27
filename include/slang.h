@@ -1204,7 +1204,7 @@ typedef uint32_t SlangSizeT;
                  //   watchdog timeouts heavy coverage can trigger) at the cost of exact
                  //   counts. Off by default.
         SPIRVUnifiedDescriptorHeapStride =
-            153, // bool: when set, emit each SPIRV resource descriptor-heap runtime array's
+            154, // bool: when set, emit each SPIRV resource descriptor-heap runtime array's
                  //   ArrayStride as the maximum of image and buffer descriptor sizes, so a
                  //   single heap shared by buffers and images is indexed at the device's unified
                  //   stride. Opt-in; mutually exclusive with a non-zero
