@@ -33,7 +33,10 @@ jobs:
           shouldRun=true
           if files="$(git diff --name-only $BASE...HEAD)"; then
             # Git diff succeeded, check if non-documentation files were changed
-            if echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|\.claude/|[^/]+\.md$|\.coderabbit\.yaml$)'; then
+            if echo "$files" | grep -Eqx 'docs/(command-line-slangc-reference.md|user-guide/a3-02-reference-capability-atoms.md)'; then
+              echo "Generated reference document changed, running checks"
+              shouldRun=true
+            elif echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|\.claude/|[^/]+\.md$|\.coderabbit\.yaml$)'; then
               shouldRun=true
             else
               echo "Only documentation files changed, skipping remaining steps"
@@ -514,6 +517,55 @@ jobs:
             exit 1
           fi
 
+  # Verify docs/user-guide/a3-02-reference-capability-atoms.md matches
+  # source/slang/slang-capabilities.capdef.
+  # Reuses the release artifact built by build-linux-release-gcc-x86_64 instead
+  # of building slang-capability-generator again from scratch.
+  check-capability-atoms-ref:
+    needs: [filter, build-linux-release-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Download Slang release artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: slang-tests-linux-x86_64-gcc-release
+          path: artifacts
+
+      - name: Generate capability atoms reference
+        run: |
+          # slang-capability-generator may depend on libraries under Release/lib,
+          # separate from the Release/bin binaries.
+          chmod +x artifacts/Release/bin/* 2>/dev/null || true
+          export LD_LIBRARY_PATH="$PWD/artifacts/Release/lib:$LD_LIBRARY_PATH"
+          if [[ ! -x artifacts/Release/bin/slang-capability-generator ]]; then
+            echo "slang-capability-generator is missing from the Slang release artifact."
+            exit 1
+          fi
+          mkdir -p temp/capability temp/docs/user-guide
+          cp docs/user-guide/a3-02-reference-capability-atoms.md temp/docs/user-guide/a3-02-reference-capability-atoms.md
+          capdefs=(source/slang/*.capdef)
+          artifacts/Release/bin/slang-capability-generator \
+            "${capdefs[@]}" \
+            --target-directory temp/capability \
+            --doc temp/docs/user-guide/a3-02-reference-capability-atoms.md
+
+      - name: Compare with existing reference
+        run: |
+          if ! diff -q temp/docs/user-guide/a3-02-reference-capability-atoms.md docs/user-guide/a3-02-reference-capability-atoms.md > /dev/null; then
+            echo "Capability atoms reference is out of date. Diff:"
+            diff -u docs/user-guide/a3-02-reference-capability-atoms.md temp/docs/user-guide/a3-02-reference-capability-atoms.md
+            echo "Please regenerate docs/user-guide/a3-02-reference-capability-atoms.md with slang-capability-generator."
+            exit 1
+          fi
+
   test-falcor:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
@@ -577,6 +629,7 @@ jobs:
         test-materialx-windows-release,
         sanitizer-linux-clang-x86_64,
         check-cmdline-ref,
+        check-capability-atoms-ref,
         test-falcor,
         test-compile-regression,
         test-benchmark,
