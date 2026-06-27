@@ -11,6 +11,7 @@ jobs:
   release:
     strategy:
       matrix:
+        image: [""]
         os: [linux, macos, windows]
         config: [release]
         platform: [x86_64, aarch64, wasm]
