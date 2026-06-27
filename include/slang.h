@@ -1203,6 +1203,12 @@ typedef uint32_t SlangSizeT;
                  //   of `1`, eliminating atomic contention (much faster, and avoids the GPU
                  //   watchdog timeouts heavy coverage can trigger) at the cost of exact
                  //   counts. Off by default.
+        SPIRVUnifiedDescriptorHeapStride =
+            154, // bool: when set, emit each SPIRV resource descriptor-heap runtime array's
+                 //   ArrayStride as the maximum of image and buffer descriptor sizes, so a
+                 //   single heap shared by buffers and images is indexed at the device's unified
+                 //   stride. Opt-in; mutually exclusive with a non-zero
+                 //   `-spirv-resource-heap-stride` (combining the two is an error).
 
         // CLI-only query option `-<compiler>-version`: prints the version of the downstream
         // <compiler> Slang would actually load for that pass-through (via

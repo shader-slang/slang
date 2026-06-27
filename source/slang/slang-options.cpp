@@ -926,6 +926,15 @@ void initCommandOptions(CommandOptions& options)
          "-spirv-sampler-heap-stride <stride>",
          "Specify the byte stride for the sampler descriptor heap when generating SPIRV with "
          "spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(OpTypeSampler)."},
+        {OptionKind::SPIRVUnifiedDescriptorHeapStride,
+         "-spirv-unified-descriptor-heap-stride",
+         nullptr,
+         "When generating SPIRV with spvDescriptorHeapEXT, emit each resource descriptor-heap "
+         "runtime array's ArrayStride as the maximum of image and buffer descriptor sizes, so "
+         "a single heap shared by buffers and images is indexed at the device's unified stride. "
+         "Only affects the default OpConstantSizeOfEXT path (used when -spirv-resource-heap-stride "
+         "is 0); mutually exclusive with a non-zero -spirv-resource-heap-stride (combining the two "
+         "is an error). Does not affect the sampler heap or acceleration-structure entries."},
         {OptionKind::EmitSeparateDebug,
          "-separate-debug-info",
          nullptr,
@@ -2746,6 +2755,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::TraceFunctionCoverage:
         case OptionKind::TraceBranchCoverage:
         case OptionKind::TraceCoverageBoolean:
+        case OptionKind::SPIRVUnifiedDescriptorHeapStride:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:
@@ -4406,6 +4416,18 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     .target =
                         TypeTextUtil::getCompileTargetName(SlangCompileTarget(rawTarget.format))});
             }
+        }
+
+        // `-spirv-unified-descriptor-heap-stride` and an explicit non-zero
+        // `-spirv-resource-heap-stride` express contradictory strides for the same resource heap,
+        // so reject the combination here, as soon as the options are parsed, rather than waiting
+        // until SPIR-V emission. An explicit stride of 0 selects the default `OpConstantSizeOfEXT`
+        // path that the unified option modifies and is therefore not a conflict.
+        if (linkage->m_optionSet.getBoolOption(
+                CompilerOptionName::SPIRVUnifiedDescriptorHeapStride) &&
+            linkage->m_optionSet.getIntOption(CompilerOptionName::SPIRVResourceHeapStride) != 0)
+        {
+            m_sink->diagnose(Diagnostics::SpirvConflictingDescriptorHeapStrideOptions{});
         }
 
         // TODO: do we need to require that a target must have a profile specified,
