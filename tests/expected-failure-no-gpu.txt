@@ -11,3 +11,7 @@ gfx-unit-test-tool/neuralSlangNetworkConverterCUDA.internal
 
 # CPU gfx smoke imports the gfx module, which is not available on no-GPU hosted runners
 tests/cpu-program/gfx-smoke.slang (cpu)
+
+# fp8 scalar float constants hit an unsupported-width assert in the SPIR-V optimizer
+# (spirv-tools folding_rules.cpp GetWordsFromScalarFloatConstant requires width 16/32/64)
+tests/hlsl-intrinsic/scalar-fp8.slang (vk)

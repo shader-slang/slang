@@ -9,75 +9,13 @@
 // underlying bug is fixed.
 
 #include "../../source/core/slang-process.h"
+#include "scoped-env-var.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
-#include <stdlib.h>
-
 using namespace Slang;
-
-static int _writeEnvironmentVariable(const char* key, const char* val)
-{
-#ifdef _WIN32
-    String var = String(key) + "=" + val;
-    return _putenv(var.getBuffer());
-#else
-    return setenv(key, val, 1);
-#endif
-}
-
-static int _unsetEnvironmentVariable(const char* key)
-{
-#ifdef _WIN32
-    // On Windows, setting KEY= clears it for the process.
-    String var = String(key) + "=";
-    return _putenv(var.getBuffer());
-#else
-    return unsetenv(key);
-#endif
-}
-
-struct ScopedEnvVar
-{
-    const char* key;
-    bool hadOldValue = false;
-    String oldValue;
-
-    ScopedEnvVar(const char* inKey, const char* inVal)
-        : key(inKey)
-    {
-#ifdef _WIN32
-        char* v = nullptr;
-        size_t len = 0;
-        if (_dupenv_s(&v, &len, key) == 0 && v)
-        {
-            hadOldValue = true;
-            oldValue = v;
-            free(v);
-        }
-#else
-        if (const char* v = getenv(key))
-        {
-            hadOldValue = true;
-            oldValue = v;
-        }
-#endif
-        _writeEnvironmentVariable(key, inVal);
-    }
-
-    ~ScopedEnvVar()
-    {
-        if (hadOldValue)
-        {
-            _writeEnvironmentVariable(key, oldValue.getBuffer());
-        }
-        else
-        {
-            _unsetEnvironmentVariable(key);
-        }
-    }
-};
+using SlangUnitTest::ScopedEnvVar;
 
 SLANG_UNIT_TEST(spirvInterfaceDefaultInitValidation)
 {

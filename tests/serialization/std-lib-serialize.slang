@@ -1,4 +1,6 @@
 //TEST:COMPILE: -save-core-module slang-core-module.zip
+//TEST:COMPILE: -load-core-module slang-core-module.zip -save-glsl-module-bin-source slang-glsl-module-generated.h
+//TEST:COMPILE: -save-core-module-bin-source slang-core-module-generated.h
 //TEST:COMPARE_COMPUTE: -compile-arg -load-core-module -compile-arg slang-core-module.zip -shaderobj
 
 struct A

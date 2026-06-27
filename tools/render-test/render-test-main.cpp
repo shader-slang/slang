@@ -1769,8 +1769,10 @@ static SlangResult _innerMain(
         }
     }
 
-    static renderer_test::CoreToRHIDebugBridge debugCallback;
-    debugCallback.setCoreCallback(stdWriters->getDebugCallback());
+    auto debugCallback = renderer_test::createRetainedCoreToRHIDebugBridge();
+    renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
+        *debugCallback,
+        stdWriters->getDebugCallback());
 
     // Use the profile name set on options if set
     input.profile = options.profileName.getLength() ? options.profileName : input.profile;
@@ -1907,7 +1909,7 @@ static SlangResult _innerMain(
         desc.deviceType = options.deviceType;
 
         desc.enableValidation = options.enableDebugLayers;
-        desc.debugCallback = &debugCallback;
+        desc.debugCallback = debugCallback.Ptr();
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)

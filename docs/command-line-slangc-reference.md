@@ -699,6 +699,16 @@ Specify path to a downstream [&lt;compiler&gt;](#compiler) executable or library
 
 
 
+<a id="none-version"></a>
+### -&lt;compiler&gt;-version
+
+**-&lt;[compiler](#compiler)&gt;-version**
+
+Print the version of the downstream [&lt;compiler&gt;](#compiler) that Slang would load for that pass-through, then continue. Reports "not found" if the compiler cannot be located. Takes no value. 
+
+
+
+
 <a id="default-downstream-compiler"></a>
 ### -default-downstream-compiler
 
@@ -1424,6 +1434,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvShaderInvocationReorderNV` 
 * `spvRayTracingClusterAccelerationStructureNV` 
 * `spvRayTracingLinearSweptSpheresGeometryNV` 
+* `spvRayTracingSpheresGeometryNV` 
 * `spvShaderClockKHR` 
 * `spvShaderNonUniformEXT` 
 * `spvShaderNonUniform` 
@@ -1562,6 +1573,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_NV_compute_shader_derivatives` : enables the GL_NV_compute_shader_derivatives extension 
 * `GL_NV_fragment_shader_barycentric` : enables the GL_NV_fragment_shader_barycentric extension 
 * `GL_NV_gpu_shader5` : enables the GL_NV_gpu_shader5 extension 
+* `GL_NV_linear_swept_spheres` : enables the GL_NV_linear_swept_spheres extension 
 * `GL_NV_ray_tracing` : enables the GL_NV_ray_tracing extension 
 * `GL_NV_ray_tracing_motion_blur` : enables the GL_NV_ray_tracing_motion_blur extension 
 * `GL_NV_shader_atomic_fp16_vector` : enables the GL_NV_shader_atomic_fp16_vector extension 
@@ -1772,6 +1784,7 @@ A capability describes an optional feature that a target may or may not support.
 * `shader5_sm_5_0` 
 * `pack_vector` 
 * `subgroup_basic` 
+* `subgroup_workgroup_index` 
 * `subgroup_ballot` 
 * `subgroup_ballot_activemask` 
 * `subgroup_basic_ballot` 
@@ -1798,6 +1811,8 @@ A capability describes an optional feature that a target may or may not support.
 * `raytracing_intersection` 
 * `raytracing_anyhit_closesthit` 
 * `raytracing_lss` 
+* `rayquery_sphere_nv` 
+* `rayquery_lss_nv` 
 * `raytracing_lss_ho` 
 * `raytracing_anyhit_closesthit_intersection` 
 * `raytracing_object_space_ray` 
