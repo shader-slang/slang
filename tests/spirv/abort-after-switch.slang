@@ -33,14 +33,16 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 
 // `switchValue` is not inlined, and the abort/case0/default/merge blocks are
 // not guaranteed to be laid out in source order, so the facts below are
-// checked independently (DAG) rather than via block adjacency: the switch
-// routes to all 3 blocks, the abort block contains OpAbortKHR, and -- the
-// actual regression this test guards -- the merge phi has exactly the 2
-// non-aborting predecessors (no stray edge from the stripped abort branch).
+// mostly checked independently (DAG) rather than via block order: the switch
+// routes to all 3 blocks, the abort block reaches OpAbortKHR with no stray
+// branch edge, and -- the actual regression this test guards -- the merge phi
+// has exactly the 2 non-aborting predecessors (no stray edge from the stripped
+// abort branch).
 // CHECK: OpSelectionMerge
 // CHECK: OpSwitch {{.*}} [[DEFAULT:%[a-zA-Z0-9_]+]] 0 [[CASE0:%[a-zA-Z0-9_]+]] 1 [[ABORT:%[a-zA-Z0-9_]+]]
-// CHECK-DAG: [[ABORT]] = OpLabel
-// CHECK-DAG: OpAbortKHR
+// CHECK: [[ABORT]] = OpLabel
+// CHECK-NOT: OpBranch
+// CHECK: OpAbortKHR
 // CHECK-DAG: [[CASE0]] = OpLabel
 // CHECK-DAG: [[DEFAULT]] = OpLabel
 // CHECK-DAG: OpPhi %float %float_3 [[DEFAULT]] %float_1 [[CASE0]]{{$}}

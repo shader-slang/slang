@@ -99,20 +99,20 @@ void main(uint3 pixelIndex : SV_DispatchThreadID)
     // nonuniform-index specializations (decorated); `func_1`/`func_2_i1_` is
     // the uniform-index specialization (NOT decorated -- its access chain
     // line ends right after the index, with no "; NonUniform" annotation).
-    // CHECK_SPV: %func = OpFunction
+    // CHECK_SPV-LABEL: %func = OpFunction
     // CHECK_SPV: OpAccessChain {{.*}} %globalBuffer {{.*}} ; NonUniform
-    // CHECK_SPV: %func_0 = OpFunction
+    // CHECK_SPV-LABEL: %func_0 = OpFunction
     // CHECK_SPV: OpAccessChain {{.*}} %globalBuffer {{.*}} ; NonUniform
-    // CHECK_SPV: %func_1 = OpFunction
+    // CHECK_SPV-LABEL: %func_1 = OpFunction
     // CHECK_SPV: OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %globalBuffer %{{[A-Za-z0-9_]+}}{{[[:space:]]*$}}
 
-    // CHECK_GLSL_SPV: %func_0_u1_ = OpFunction
+    // CHECK_GLSL_SPV-LABEL: %func_0_u1_ = OpFunction
     // CHECK_GLSL_SPV: OpCopyObject %uint %{{.*}} ; NonUniform
     // CHECK_GLSL_SPV: OpAccessChain {{.*}} %globalBuffer_0 {{.*}} ; NonUniform
-    // CHECK_GLSL_SPV: %func_1_i1_ = OpFunction
+    // CHECK_GLSL_SPV-LABEL: %func_1_i1_ = OpFunction
     // CHECK_GLSL_SPV: OpCopyObject %int %{{.*}} ; NonUniform
     // CHECK_GLSL_SPV: OpAccessChain {{.*}} %globalBuffer_0 {{.*}} ; NonUniform
-    // CHECK_GLSL_SPV: %func_2_i1_ = OpFunction
+    // CHECK_GLSL_SPV-LABEL: %func_2_i1_ = OpFunction
     // CHECK_GLSL_SPV: OpAccessChain %_ptr_Uniform_uint %globalBuffer_0 %{{[A-Za-z0-9_]+}} %int_0 %int_0{{[[:space:]]*$}}
 
     outputBuffer[0] = uint3(myStruct.a, myStruct.b, myStruct.c);

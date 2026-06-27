@@ -25,14 +25,20 @@
 // CHECK: OpFunctionCall %void %CoopVec_store %[[VAL_140]] %int_0
 // CHECK: OpFunctionCall %void %CoopVec_store_0 %[[VAL_430]] %int_0
 
+// CHECK-LABEL: %CoopVec_load = OpFunction
 // CHECK: %[[INPUT_140:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_ARRAY_140]] %input140 %int_0
 // CHECK: OpCooperativeVectorLoadNV %[[COOP_VEC]] %[[INPUT_140]] {{.*}} None
+// CHECK-LABEL: %CoopVec_load_0 = OpFunction
 // CHECK: %[[INPUT_430:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_ARRAY_430]] %input430 %int_0
 // CHECK: OpCooperativeVectorLoadNV %[[COOP_VEC]] %[[INPUT_430]] {{.*}} None
+// CHECK-LABEL: %CoopVec_store = OpFunction
+// CHECK: %[[STORE_VAL_140:[A-Za-z0-9_]+]] = OpFunctionParameter %[[COOP_VEC]]
 // CHECK: %[[OUTPUT_140:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_ARRAY_140]] %output140 %int_0
-// CHECK: OpCooperativeVectorStoreNV %[[OUTPUT_140]] {{.*}} None
+// CHECK: OpCooperativeVectorStoreNV %[[OUTPUT_140]] {{.*}} %[[STORE_VAL_140]] None
+// CHECK-LABEL: %CoopVec_store_0 = OpFunction
+// CHECK: %[[STORE_VAL_430:[A-Za-z0-9_]+]] = OpFunctionParameter %[[COOP_VEC]]
 // CHECK: %[[OUTPUT_430:[A-Za-z0-9_]+]] = OpAccessChain %[[PTR_ARRAY_430]] %output430 %int_0
-// CHECK: OpCooperativeVectorStoreNV %[[OUTPUT_430]] {{.*}} None
+// CHECK: OpCooperativeVectorStoreNV %[[OUTPUT_430]] {{.*}} %[[STORE_VAL_430]] None
 
 
 StructuredBuffer<float, Std140DataLayout> input140;
