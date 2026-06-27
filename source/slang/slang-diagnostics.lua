@@ -4548,6 +4548,13 @@ err(
     span { loc = "location", message = "can have at most one 'shader record' attributed constant buffer; found ~count:Int." }
 )
 
+err(
+    "vk-location-on-non-varying-parameter",
+    39021,
+    "vk::location not allowed on non-varying parameter",
+    span { loc = "location", message = "'[[vk::location(...)]]' is not allowed on '~paramName:Name', which is not a varying (stage input/output) parameter; use '[[vk::binding(...)]]' to set the binding of a constant buffer or resource." }
+)
+
 warning(
     "vk-index-without-vk-location",
     39022,
