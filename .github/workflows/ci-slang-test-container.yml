@@ -168,6 +168,15 @@ jobs:
 
           "$bin_dir/slang-test" "${test_roots[@]}" "${slang_test_args[@]}"
 
+      - name: Check slang-test worktree cleanliness
+        run: |
+          status="$(git status --short --untracked-files=all -- . ':(exclude)artifacts/**')"
+          if [[ -n "$status" ]]; then
+            echo "::error::slang-test left generated or modified files in the worktree"
+            printf '%s\n' "$status"
+            exit 1
+          fi
+
       - name: Run slangc tests
         if: inputs.gpu-tier == 't4'
         run: |
@@ -190,6 +199,16 @@ jobs:
             -expected-failure-list tests/expected-failure-github.txt \
             -expected-failure-list tests/expected-failure-linux.txt \
             -expected-failure-list tests/expected-failure-linux-gpu.txt
+
+      - name: Check via-glsl slang-test worktree cleanliness
+        if: inputs.gpu-tier == 't4' && inputs.config == 'release' && github.event_name == 'pull_request'
+        run: |
+          status="$(git status --short --untracked-files=all -- . ':(exclude)artifacts/**')"
+          if [[ -n "$status" ]]; then
+            echo "::error::slang-test left generated or modified files in the worktree"
+            printf '%s\n' "$status"
+            exit 1
+          fi
 
       # Extract gdb backtraces from any cores written to /var/cores during
       # the test steps above. /var/cores lives on the host (bind-mounted in
