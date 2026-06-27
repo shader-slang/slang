@@ -286,7 +286,7 @@ Once a PR is created against `shader-slang/slang:master`, the PR will be merged 
 
 When the conditions above are all met, you will have a chance to rewrite the commit message. Since the Slang repo uses the "squash" strategy for merging, multiple commits in your PR will become one commit. By default, GitHub will concatenate all of the commit messages sequentially, but often it is not readable. Please rewrite the final commit message in a way that people can easily understand what the purpose of the commit is.
 
-> **Maintainers:** PRs are tracked on a shared project board whose status is updated automatically as your PR progresses. If you are assigned to shepherd or review PRs, see [The Slang PR Tracking board](docs/maintainers/pr-review-board.md).
+> **Committers:** PRs are tracked on a shared project board whose status is updated automatically as a PR progresses. The board is an org project visible only to `shader-slang` org members, so outside contributors won't see it — that's expected. If you are a committer assigned to shepherd or review PRs, see [The Slang PR Tracking board](docs/maintainers/pr-review-board.md).
 
 There are two cases where the workflow may fail for reasons that are not directly related to the change:
 

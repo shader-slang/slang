@@ -7,7 +7,11 @@ name: PR Maintenance
 #
 #   uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
 #
-# See .github/workflows/pr-board-sync.yml for the board IDs and required secrets.
+# pull_request_target and check_suite are privileged events that receive the
+# secret even for fork PRs, so they run here directly. pull_request_review only
+# receives the secret for ORIGIN PRs, so the job below skips it for forks; fork
+# reviews are handled by the pr-review-fork-bridge.yml -> pr-review-fork-apply.yml
+# (workflow_run) relay. See pr-board-sync.yml for the board IDs and the secret.
 
 on:
   pull_request_target:
@@ -30,6 +34,11 @@ on:
 
 jobs:
   board-sync:
+    # Run directly for everything except a fork PR's review (no secret there);
+    # fork reviews go through the workflow_run relay instead.
+    if: >-
+      github.event_name != 'pull_request_review' ||
+      github.event.pull_request.head.repo.fork == false
     uses: ./.github/workflows/pr-board-sync.yml
     secrets:
       SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}

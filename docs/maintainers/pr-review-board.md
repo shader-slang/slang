@@ -7,6 +7,10 @@ board. It explains what the board's fields mean, what each `Status` tells you,
 and when a PR actually needs your attention. (If you're just opening a PR, you
 don't need this — see [CONTRIBUTING.md](../../CONTRIBUTING.md).)
 
+> The board is a `shader-slang` org project, so it is only visible to **org
+> members (committers)**. Outside contributors can't see it — that's expected;
+> their PRs are still tracked on it by the committers who shepherd them.
+
 You never set the board fields by hand: they are maintained automatically from
 PR activity (open/close, pushes, reviews, CI results, merge-queue changes). Your
 job is to **read the state and act when it asks you to**.
@@ -16,7 +20,10 @@ job is to **read the state and act when it asks you to**.
 Every PR carries a **`Source`** — one of:
 
 - **Internal** — opened by someone with write access to the repo. The **author
-  drives it**; they're the assignee. No oversight is added.
+  drives it**; they're the assignee, and **they are expected to identify and
+  request their own reviewer** (no reviewer is auto-requested for Internal PRs).
+  If you're a newer committer and unsure who to ask, pick someone who has
+  recently touched the same files, or ask in the team channel.
 - **Community** — opened by an outside contributor. A maintainer (you) is
   assigned to shepherd it and arrange review.
 - **Bot** — opened by an automated coworker. A maintainer is assigned to
@@ -58,84 +65,36 @@ Two things worth knowing:
 - The **only** difference between the Bot and human flows is what a **CI failure**
   does (Bot → `Revising`, human → `Snagged`); everything else is identical.
 
-## State diagrams
+## The decision, as a flowchart
 
-### Community / Internal (human) PRs
-
-```mermaid
-stateDiagram-v2
-    [*] --> InReview: opened (ready for review)
-    [*] --> Revising: opened as draft
-
-    InReview: In Review
-    Revising: Revising
-    Snagged: Snagged
-    Approved: Approved
-    Done: Done
-
-    InReview --> Revising: changes requested
-    InReview --> Snagged: CI failed / CI needs approval
-    InReview --> Approved: approved (CI pending or in queue)
-    InReview --> Snagged: approved + CI green + not queued
-
-    Revising --> InReview: new commit / marked ready
-    Revising --> Snagged: CI failed / CI needs approval
-    Revising --> Approved: approved (CI pending or in queue)
-
-    Snagged --> InReview: new commit / CI back to green
-    Snagged --> Revising: changes requested
-    Snagged --> Approved: approved (CI pending or in queue)
-
-    Approved --> Snagged: CI failed / dequeued / green + not queued
-    Approved --> Revising: changes requested
-    Approved --> InReview: new commit
-
-    InReview --> Done: closed
-    Revising --> Done: closed
-    Snagged --> Done: closed
-    Approved --> Done: closed
-    Done --> [*]
-```
-
-### Bot PRs
+The board does not move a PR along edges between states — it **recomputes** the
+status from the PR's current signals on every event. So the priority rules above
+are best read as a decision tree (first match wins):
 
 ```mermaid
-stateDiagram-v2
-    [*] --> InReview: opened (incl. draft - kept visible)
-
-    InReview: In Review
-    Revising: Revising
-    Snagged: Snagged
-    Approved: Approved
-    Done: Done
-
-    InReview --> Revising: changes requested / CI failed
-    InReview --> Snagged: CI needs approval
-    InReview --> Approved: approved (CI pending or in queue)
-    InReview --> Snagged: approved + CI green + not queued
-
-    Revising --> InReview: new commit / CI back to green
-    Revising --> Approved: approved (CI pending or in queue)
-
-    Snagged --> InReview: new commit
-    Snagged --> Revising: changes requested / CI failed
-    Snagged --> Approved: approved (CI pending or in queue)
-
-    Approved --> Revising: changes requested / CI failed
-    Approved --> Snagged: dequeued / green + not queued
-    Approved --> InReview: new commit
-
-    InReview --> Done: closed
-    Revising --> Done: closed
-    Snagged --> Done: closed
-    Approved --> Done: closed
-    Done --> [*]
+flowchart TD
+  ev([PR event - recompute]) --> closed{"Closed?"}
+  closed -->|yes| done["Done"]
+  closed -->|no| cr{"Changes requested<br/>on current commit?"}
+  cr -->|yes| rev["Revising"]
+  cr -->|no| draft{"Draft?"}
+  draft -->|"yes (human)"| rev
+  draft -->|"yes (bot)"| inrev["In Review"]
+  draft -->|no| ciappr{"CI awaiting approval?"}
+  ciappr -->|yes| snag["Snagged"]
+  ciappr -->|no| cifail{"CI failed?"}
+  cifail -->|"yes (bot)"| rev
+  cifail -->|"yes (human)"| snag
+  cifail -->|no| appr{"Approved?"}
+  appr -->|"yes, green and not queued"| snag
+  appr -->|"yes, pending or queued"| approved["Approved"]
+  appr -->|no| inrev
 ```
 
 ## Source of truth
 
-These diagrams are an illustration. The authoritative rules live in the
+This flowchart is an illustration. The authoritative rules live in the
 `computeTarget` function in
 [`.github/workflows/pr-board-sync.yml`](../../.github/workflows/pr-board-sync.yml),
-which sets the board `Status` from PR events. If a diagram here ever disagrees
+which sets the board `Status` from PR events. If the diagram here ever disagrees
 with that function, the function is correct — please fix the diagram.

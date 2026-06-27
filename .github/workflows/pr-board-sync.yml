@@ -36,10 +36,11 @@ name: PR Board Sync (reusable)
 # inlined into the Reconcile step (so this reusable workflow needs no checkout
 # when called from another repo). That inlined block is the single source of
 # truth; .github/scripts/{pr-signal,pr-assign}.test.js extract it from this YAML
-# (via extract-workflow-js.js) and unit-test it. scripts/pr_sweep.py (run on a
-# cadence) remains the idempotent safety net for events this workflow cannot see
-# -- e.g. fork-PR CI, missed webhooks, a manual issue link, or repos not yet
-# onboarded -- and for board drift reconciliation.
+# (via extract-workflow-js.js) and unit-test it. A periodic sweep (run on a
+# cadence; see pr-sweep-nightly.yml / mode: sweep) remains the idempotent safety
+# net for what events cannot deliver -- missed webhooks or failed runs, a
+# manually linked issue or post-hoc issue assignment, board drift, repos not yet
+# onboarded -- and reconciles the whole board.
 #
 # Cross-repo reuse: any shader-slang repo adds a thin caller workflow that
 # declares the PR event triggers and calls this one, mapping the single required
@@ -66,7 +67,17 @@ name: PR Board Sync (reusable)
 #
 # Safety: every job runs only on PR metadata / API calls and never checks out or
 # executes PR code, so `pull_request_target` (secrets available for fork PRs) is
-# safe here.
+# safe here. This is also why the privileged `workflow_run` path (below) is safe.
+#
+# Triggers and fork secrets (PUBLIC repo): callers drive this via privileged
+# events that DO receive the secret for fork PRs -- `pull_request_target` (PR
+# lifecycle/commits), `check_suite` (CI), `workflow_run` (the fork-review relay),
+# and `schedule` (the sweep). `pull_request_review` only receives the secret for
+# ORIGIN PRs; a fork review runs the fork head with no secret, so the caller
+# routes fork reviews through an unprivileged bridge whose completion fires a
+# privileged `workflow_run` here (see the dispatch's `workflow_run` branch). When
+# no token is delivered, every privileged step is gated off (HAS_TOKEN) and the
+# run skips cleanly; the sweep is the backstop.
 
 on:
   workflow_call:
@@ -156,11 +167,30 @@ jobs:
     concurrency:
       group: pr-board-sync-${{ github.event.pull_request.number || github.event.check_suite.head_sha || github.run_id }}
       cancel-in-progress: false
+    # HAS_TOKEN is false when SLANG_PR_BOT_TOKEN is not delivered to the run. On a
+    # PUBLIC repo, GitHub withholds secrets from fork-PR head-context events
+    # (pull_request_review / pull_request); it also fails to resolve for a repo
+    # that has not configured the secret. github-script hard-errors on an empty
+    # github-token, so every privileged step is gated on this and skips cleanly --
+    # the nightly sweep, a later pull_request_target event, or (for fork reviews)
+    # the workflow_run path reconciles instead. pull_request_target, check_suite,
+    # workflow_run, and schedule are privileged and DO receive the secret for forks.
+    env:
+      HAS_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN != '' }}
     steps:
+      # --- No-token breadcrumb: explain a skipped run -------------------------
+      - name: Note skipped (no token)
+        if: ${{ env.HAS_TOKEN != 'true' }}
+        run: |
+          echo "Skipping board sync: SLANG_PR_BOT_TOKEN is not available to this run."
+          echo "(Fork-PR head-context event on a public repo, or unconfigured repo.)"
+          echo "The nightly sweep / a later pull_request_target / the workflow_run path will reconcile."
+
       # --- Classify Source (repo write-access read; opened/reopened only) ------
       - name: Classify PR Source
         id: classify
         if: >-
+          env.HAS_TOKEN == 'true' &&
           github.event_name == 'pull_request_target' &&
           (github.event.action == 'opened' || github.event.action == 'reopened')
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
@@ -209,6 +239,7 @@ jobs:
 
       # --- Board writes: add + Source + Status (ProjectsV2 PAT) ---------------
       - name: Reconcile board (add, Source, Status)
+        if: ${{ env.HAS_TOKEN == 'true' }}
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           MODE: ${{ inputs.mode }}
@@ -1137,6 +1168,29 @@ jobs:
               }
             }
 
+            // Resolve a commit SHA (and any pre-listed PRs) to its open PR(s) and
+            // reconcile each. check_suite and workflow_run are both commit-scoped
+            // and their pull_requests array is empty for fork PRs, so resolve via
+            // the API too. (One commit can head several PRs, hence a set.)
+            async function reconcileByCommit(headSha, prNodes) {
+              const numbers = new Set();
+              for (const p of (prNodes || [])) {
+                if (!p.state || p.state === "open") numbers.add(p.number);
+              }
+              if (headSha) {
+                try {
+                  const assoc = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                    owner: context.repo.owner, repo: context.repo.repo, commit_sha: headSha });
+                  for (const p of (assoc.data || [])) {
+                    if (p.state === "open") numbers.add(p.number);
+                  }
+                } catch (error) {
+                  core.warning(`could not resolve PRs for ${headSha} (${error.status})`);
+                }
+              }
+              for (const number of numbers) await reconcileStatus(number, null);
+            }
+
             // --- Dispatch on the triggering event ----------------------------
             const ev = context.eventName;
             const action = context.payload.action;
@@ -1190,35 +1244,19 @@ jobs:
               const itemId = await ensureItem(pr.node_id);
               if (itemId) await reconcileStatus(pr.number, pr.node_id, itemId);
             } else if (ev === "check_suite") {
-              // check_suite is commit-scoped, not PR-scoped. GitHub only lists
-              // *same-repo* PRs in check_suite.pull_requests (it is empty for fork
-              // PRs), so also resolve the suite's head SHA to its open PR(s) via
-              // the API - that covers fork PRs - and union the two. A CI
-              // completion recomputes the target, so a green run also recovers a
-              // Snagged/Revising PR. (One commit can head several PRs, hence a set.)
+              // check_suite is commit-scoped: a CI completion recomputes the
+              // target, so a green run also recovers a Snagged/Revising PR. Its
+              // pull_requests array is empty for fork PRs, so resolve by head SHA.
               const suite = context.payload.check_suite || {};
-              const numbers = new Set();
-              for (const p of (suite.pull_requests || [])) {
-                if (!p.state || p.state === "open") numbers.add(p.number);
-              }
-              if (suite.head_sha) {
-                try {
-                  const assoc = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    commit_sha: suite.head_sha,
-                  });
-                  for (const p of (assoc.data || [])) {
-                    if (p.state === "open") numbers.add(p.number);
-                  }
-                } catch (error) {
-                  core.warning(
-                    `could not resolve PRs for ${suite.head_sha} (${error.status})`);
-                }
-              }
-              for (const number of numbers) {
-                await reconcileStatus(number, null);
-              }
+              await reconcileByCommit(suite.head_sha, suite.pull_requests);
+            } else if (ev === "workflow_run") {
+              // Stage 2 of the fork-review relay (see header): a fork PR's review
+              // can't get secrets, so an unprivileged caller bridge fires on the
+              // review and completes; this privileged run resolves the PR from the
+              // upstream run's head SHA and reconciles. Metadata only -- NEVER add a
+              // checkout here (the upstream ran fork-controlled context).
+              const wr = context.payload.workflow_run || {};
+              await reconcileByCommit(wr.head_sha, wr.pull_requests);
             }
 
       # --- Unrequest auto-assigned non-approver reviewers --------------------
@@ -1232,6 +1270,7 @@ jobs:
       # cadence sweep (scripts/pr_sweep.py) remains the backstop for both.
       - name: Unrequest ignored reviewers
         if: >-
+          env.HAS_TOKEN == 'true' &&
           github.event_name == 'pull_request_target' &&
           (github.event.action == 'opened' || github.event.action == 'reopened')
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
