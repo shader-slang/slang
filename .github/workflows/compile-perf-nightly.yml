@@ -7,12 +7,8 @@ name: Compile Perf — Nightly ToT
 # tools/compile-perf/DESIGN.md.
 
 on:
-  # The daily schedule is intentionally DISABLED for now — do not enable it in
-  # this phase. Re-enable (uncomment) once the suite is validated on the runner
-  # and the results repo is seeded; until then the job is manual-only via
-  # workflow_dispatch.
-  # schedule:
-  #   - cron: "0 6 * * *" # daily 06:00 UTC
+  schedule:
+    - cron: "0 5 * * *" # daily 05:00 UTC
   workflow_dispatch:
     inputs:
       ref:

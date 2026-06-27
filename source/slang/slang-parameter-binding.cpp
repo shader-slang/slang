@@ -1183,6 +1183,20 @@ static void addExplicitParameterBindings_GLSL(
     //
     if (isKhronosTarget(context->getTargetRequest()) || isWGPUTarget(context->getTargetRequest()))
     {
+        // `[[vk::location]]` is varying-only; on a descriptor-bound resource it
+        // is silently ignored, so error and point at `[[vk::binding]]`. Keying on
+        // `DescriptorTableSlot` keeps the error off varying and ray-tracing
+        // parameters, which do not consume a descriptor slot.
+        if (auto locationAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
+        {
+            if (typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
+            {
+                getSink(context)->diagnose(Diagnostics::VkLocationOnNonVaryingParameter{
+                    .paramName = varDecl.getName(),
+                    .location = locationAttr->loc});
+            }
+        }
+
         // The catch in GLSL is that the expected resource type
         // is implied by the parameter declaration itself, and
         // the `layout` modifier is only allowed to adjust

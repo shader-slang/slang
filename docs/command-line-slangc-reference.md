@@ -699,6 +699,16 @@ Specify path to a downstream [&lt;compiler&gt;](#compiler) executable or library
 
 
 
+<a id="none-version"></a>
+### -&lt;compiler&gt;-version
+
+**-&lt;[compiler](#compiler)&gt;-version**
+
+Print the version of the downstream [&lt;compiler&gt;](#compiler) that Slang would load for that pass-through, then continue. Reports "not found" if the compiler cannot be located. Takes no value. 
+
+
+
+
 <a id="default-downstream-compiler"></a>
 ### -default-downstream-compiler
 
@@ -1774,6 +1784,7 @@ A capability describes an optional feature that a target may or may not support.
 * `shader5_sm_5_0` 
 * `pack_vector` 
 * `subgroup_basic` 
+* `subgroup_workgroup_index` 
 * `subgroup_ballot` 
 * `subgroup_ballot_activemask` 
 * `subgroup_basic_ballot` 
