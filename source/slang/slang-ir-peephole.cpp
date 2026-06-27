@@ -1212,6 +1212,30 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_CastUntypedResourceHandleToUInt:
+            {
+                // unwrap(wrap(x)) --> x for an untyped resource-heap handle: after the
+                // descriptor-heap subscript and conversion ctor are inlined, the index
+                // round-trips through the untyped handle, so collapse it back to the index.
+                if (auto wrap = as<IRCastUIntToUntypedResourceHandle>(inst->getOperand(0)))
+                {
+                    inst->replaceUsesWith(wrap->getOperand(0));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_CastUntypedSamplerHandleToUInt:
+            {
+                // unwrap(wrap(x)) --> x for an untyped sampler-heap handle (see above).
+                if (auto wrap = as<IRCastUIntToUntypedSamplerHandle>(inst->getOperand(0)))
+                {
+                    inst->replaceUsesWith(wrap->getOperand(0));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
         case kIROp_UnpackAnyValue:
             {
                 if (inst->getOperand(0)->getOp() == kIROp_PackAnyValue)

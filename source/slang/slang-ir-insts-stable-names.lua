@@ -839,5 +839,11 @@ return {
 	["ImageTexelPointer"] = 862,
 	["Type.MetalPackedVec"] = 863,
 	["Decoration.glslFragDepthGreater"] = 865,
-	["Decoration.glslFragDepthLess"] = 866
+	["Decoration.glslFragDepthLess"] = 866,
+	["Type.UntypedResourceHandle"] = 867,
+	["Type.UntypedSamplerHandle"] = 868,
+	["CastUIntToUntypedResourceHandle"] = 869,
+	["CastUntypedResourceHandleToUInt"] = 870,
+	["CastUIntToUntypedSamplerHandle"] = 871,
+	["CastUntypedSamplerHandleToUInt"] = 872
 }

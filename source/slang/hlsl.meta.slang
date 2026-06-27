@@ -27349,6 +27349,17 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     {
         return getDescriptorFromHandle(bindless);
     }
+
+    // Family 1: recover the concrete texture type from `ResourceDescriptorHeap[i]`.
+    // The untyped handle carries only the heap index; `This` supplies the type, so we
+    // rebuild a `DescriptorHandle<This>` and ride the existing `getDescriptorFromHandle`
+    // lowering (single source of truth for the target switch).
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(UntypedResourceHandle h)
+    {
+        return getDescriptorFromHandle(DescriptorHandle<This>(uint2(__getUntypedResourceHandleIndex(h), 0)));
+    }
 }
 
 ${
@@ -27381,6 +27392,12 @@ for (auto type : kDynamicResourceCastableTypes) {
     auto kind = type.kind;
     auto typeName = type.name;
     auto access = type.access;
+    // Pick the matching untyped descriptor-heap handle for Family-1 conversion:
+    // sampler-kind types come from `SamplerDescriptorHeap`, everything else from
+    // `ResourceDescriptorHeap`.
+    bool isSampler = (strcmp(dynamicKind, "Sampler") == 0);
+    auto untypedHandleType = isSampler ? "UntypedSamplerHandle" : "UntypedResourceHandle";
+    auto untypedHandleIndexFn = isSampler ? "__getUntypedSamplerHandleIndex" : "__getUntypedResourceHandleIndex";
     if (strstr(typeName, "<T, L>"))
         sb << "__generic<T, L : IBufferDataLayout>\n";
     else if (strstr(typeName, "<T>"))
@@ -27403,6 +27420,16 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
     __init(DescriptorHandle<$(typeName)> bindless)
     {
         return getDescriptorFromHandle(bindless);
+    }
+
+    // Family 1: recover the concrete type from `ResourceDescriptorHeap[i]` /
+    // `SamplerDescriptorHeap[j]`. `$(typeName)` supplies the type that the untyped handle
+    // lacks; we rebuild the typed handle and reuse the shared `getDescriptorFromHandle`.
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init($(untypedHandleType) h)
+    {
+        return getDescriptorFromHandle(DescriptorHandle<$(typeName)>(uint2($(untypedHandleIndexFn)(h), 0)));
     }
 }
 
@@ -27504,6 +27531,77 @@ __generic<T:IOpaqueDescriptor>
 __prefix T operator*(DescriptorHandle<T> value)
 {
     return getDescriptorFromHandle(value);
+}
+
+// HLSL SM6.6 descriptor-heap source-compatibility surface.
+//
+// `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` produce an opaque, untyped
+// handle that wraps the `uint` heap index. A naive generic subscript returning
+// `DescriptorHandle<T>` cannot type-check (T appears only in return position, so it can
+// never be inferred -> E39999). Instead the subscript returns a non-generic untyped handle,
+// and the concrete resource/sampler type is recovered from the *conversion target* via the
+// implicit conversions defined below. An untyped handle that no conversion consumes lowers
+// to `uint` before emit.
+__magic_type(UntypedResourceHandleType)
+__intrinsic_type($(kIROp_UntypedResourceHandleType))
+struct UntypedResourceHandle
+{
+    __intrinsic_op($(kIROp_CastUIntToUntypedResourceHandle))
+    __init(uint index);
+}
+
+__magic_type(UntypedSamplerHandleType)
+__intrinsic_type($(kIROp_UntypedSamplerHandleType))
+struct UntypedSamplerHandle
+{
+    __intrinsic_op($(kIROp_CastUIntToUntypedSamplerHandle))
+    __init(uint index);
+}
+
+// Recover the `uint` heap index stored in an untyped handle.
+__intrinsic_op($(kIROp_CastUntypedResourceHandleToUInt))
+uint __getUntypedResourceHandleIndex(UntypedResourceHandle h);
+
+__intrinsic_op($(kIROp_CastUntypedSamplerHandleToUInt))
+uint __getUntypedSamplerHandleIndex(UntypedSamplerHandle h);
+
+struct __ResourceDescriptorHeapType
+{
+    __subscript(uint index) -> UntypedResourceHandle
+    {
+        [ForceInline] get { return UntypedResourceHandle(index); }
+    }
+}
+
+struct __SamplerDescriptorHeapType
+{
+    __subscript(uint index) -> UntypedSamplerHandle
+    {
+        [ForceInline] get { return UntypedSamplerHandle(index); }
+    }
+}
+
+static const __ResourceDescriptorHeapType ResourceDescriptorHeap = {};
+static const __SamplerDescriptorHeapType SamplerDescriptorHeap = {};
+
+// Family 2: convert an untyped handle to a `DescriptorHandle<T>` / `.Handle`. The target T
+// is known from the conversion target here, so we rebuild the typed handle directly.
+__generic<T : IOpaqueDescriptor>
+extension DescriptorHandle<T>
+{
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(UntypedResourceHandle h)
+    {
+        return DescriptorHandle<T>(uint2(__getUntypedResourceHandleIndex(h), 0));
+    }
+
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(UntypedSamplerHandle h)
+    {
+        return DescriptorHandle<T>(uint2(__getUntypedSamplerHandleIndex(h), 0));
+    }
 }
 
 // https://registry.khronos.org/vulkan/specs/latest/man/html/VkDescriptorType.html
