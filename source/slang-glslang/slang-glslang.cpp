@@ -346,12 +346,12 @@ static int glslang_optimizeSPIRV(
 #if SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
             optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
-            optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
 #endif
 
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass()); // 3
 
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
 
             optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(100));
 
