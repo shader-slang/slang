@@ -2128,6 +2128,10 @@ static LegalVal legalizeInst(
         result = legalizeRetVal(context, args[0], (IRReturn*)inst);
         break;
     case kIROp_CastDescriptorHandleToResource:
+    case kIROp_CastUIntToUntypedResourceHandle:
+    case kIROp_CastUntypedResourceHandleToUInt:
+    case kIROp_CastUIntToUntypedSamplerHandle:
+    case kIROp_CastUntypedSamplerHandleToUInt:
         result = LegalVal::simple(inst);
         break;
     case kIROp_DebugVar:
