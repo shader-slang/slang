@@ -167,7 +167,7 @@ jobs:
 
       - name: Check slang-test worktree cleanliness
         run: |
-          status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**')"
+          status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**' ':(exclude)external/**')"
           if [[ -n "$status" ]]; then
             echo "::error::slang-test left generated or modified files in the worktree"
             printf '%s\n' "$status"
@@ -214,7 +214,7 @@ jobs:
         # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
         if: inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
         run: |
-          status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**')"
+          status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**' ':(exclude)external/**')"
           if [[ -n "$status" ]]; then
             echo "::error::slang-test left generated or modified files in the worktree"
             printf '%s\n' "$status"

@@ -1239,6 +1239,8 @@ static SlangResult _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(UnitTe
         return SLANG_FAIL;
     if (!_containsDiagnostic(result, "E00109", "requires an output file path"))
         return SLANG_FAIL;
+    if (result.standardOutput.getLength() != 0)
+        return SLANG_FAIL;
 
     List<String> debugFilesAfter;
     SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(currentPath, debugFilesAfter));

@@ -602,7 +602,7 @@ String EndToEndCompileRequest::_getDebugArtifactPath(
 {
     // Separate debug info is a sidecar for an emitted file. Callers diagnose stdout output before
     // asking for the sidecar path.
-    SLANG_ASSERT(path.getLength() != 0);
+    SLANG_RELEASE_ASSERT(path.getLength() != 0);
 
     if (!targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
         return String();
@@ -628,6 +628,58 @@ String EndToEndCompileRequest::_getDebugArtifactPath(
     return dbgPath;
 }
 
+SlangResult EndToEndCompileRequest::_validateDebugArtifactOutputPaths()
+{
+    auto linkage = getLinkage();
+    auto program = getSpecializedGlobalAndEntryPointsComponentType();
+
+    auto validateArtifactPath =
+        [&](TargetProgram* targetProgram, const String& path, IArtifact* artifact) -> SlangResult
+    {
+        if (!targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
+            return SLANG_OK;
+
+        if (!getSeparateDbgArtifact(artifact))
+            return SLANG_OK;
+
+        if (path.getLength() != 0)
+            return SLANG_OK;
+
+        getSink()->diagnose(Diagnostics::SeparateDebugInfoRequiresOutputPath{});
+        return SLANG_FAIL;
+    };
+
+    for (auto targetReq : linkage->targets)
+    {
+        auto targetProgram = program->getTargetProgram(targetReq);
+
+        if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
+        {
+            if (const auto artifact = targetProgram->getExistingWholeProgramResult())
+            {
+                SLANG_RETURN_ON_FAIL(
+                    validateArtifactPath(targetProgram, _getWholeProgramPath(targetReq), artifact));
+            }
+        }
+        else
+        {
+            Index entryPointCount = program->getEntryPointCount();
+            for (Index ee = 0; ee < entryPointCount; ++ee)
+            {
+                if (const auto artifact = targetProgram->getExistingEntryPointResult(ee))
+                {
+                    SLANG_RETURN_ON_FAIL(validateArtifactPath(
+                        targetProgram,
+                        _getEntryPointPath(targetReq, ee),
+                        artifact));
+                }
+            }
+        }
+    }
+
+    return SLANG_OK;
+}
+
 SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
     TargetProgram* targetProgram,
     const String& path,
@@ -639,14 +691,10 @@ SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
         // Check if a debug artifact was actually created (only for SPIR-V targets)
         if (dbgArtifact)
         {
-            if (path.getLength() == 0)
-            {
-                getSink()->diagnose(Diagnostics::SeparateDebugInfoRequiresOutputPath{});
-                return SLANG_FAIL;
-            }
+            SLANG_RELEASE_ASSERT(path.getLength() != 0);
 
             String dbgPath = _getDebugArtifactPath(targetProgram, path, artifact);
-            SLANG_ASSERT(dbgPath.getLength() != 0);
+            SLANG_RELEASE_ASSERT(dbgPath.getLength() != 0);
             return _maybeWriteArtifact(dbgPath, dbgArtifact);
         }
         // If no debug artifact exists (e.g., for non-SPIR-V targets), just silently succeed
@@ -1025,6 +1073,9 @@ void EndToEndCompileRequest::generateOutput()
     if (m_isCommandLineCompile && m_containerFormat == ContainerFormat::None)
     {
         if (SLANG_FAILED(_validateCoverageManifestOutputPaths()))
+            return;
+
+        if (SLANG_FAILED(_validateDebugArtifactOutputPaths()))
             return;
 
         auto linkage = getLinkage();

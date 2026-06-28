@@ -32,6 +32,7 @@
 #include "slangc-tool.h"
 #include "slangi-tool.h"
 #include "test-context.h"
+#include "test-output-path-util.h"
 #include "test-reporter.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -559,43 +560,9 @@ static void applyMacroSubstitution(String filePath, TestDetails& details)
     }
 }
 
-static bool hasArg(const List<String>& args, const char* option)
-{
-    for (const auto& arg : args)
-    {
-        if (arg == option)
-            return true;
-    }
-    return false;
-}
-
-// Interprets bare test output paths as output next to the test file.
 static void normalizeTestOutputPaths(String filePath, TestDetails& details)
 {
-    String testDirectory = Path::getParentDirectory(filePath);
-    if (testDirectory.getLength() == 0)
-        return;
-
-    for (Index i = 0; i + 1 < details.options.args.getCount(); ++i)
-    {
-        if (details.options.args[i] != "-o")
-            continue;
-
-        auto& outputPath = details.options.args[i + 1];
-        if (outputPath != "-" && !Path::hasPath(outputPath))
-            outputPath = Path::combine(testDirectory, outputPath);
-
-        ++i;
-    }
-
-    if (hasArg(details.options.args, "-dump-intermediates") &&
-        !hasArg(details.options.args, "-dump-intermediate-prefix"))
-    {
-        String dumpPrefix =
-            Path::combine(testDirectory, Path::getFileNameWithoutExt(filePath) + String("-"));
-        details.options.args.add("-dump-intermediate-prefix");
-        details.options.args.add(dumpPrefix);
-    }
+    normalizeTestOutputPathsForTestFile(filePath, details.options.args);
 }
 
 // Try to read command-line options from the test file itself
