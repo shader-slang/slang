@@ -61,6 +61,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          submodules: "recursive"
+
+      - name: Check submodule state
+        run: bash extras/ci/check-submodule-state.sh
 
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
@@ -167,7 +172,7 @@ jobs:
 
       - name: Check slang-test worktree cleanliness
         run: |
-          status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**' ':(exclude)external/**')"
+          status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**')"
           if [[ -n "$status" ]]; then
             echo "::error::slang-test left generated or modified files in the worktree"
             printf '%s\n' "$status"
@@ -214,7 +219,7 @@ jobs:
         # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
         if: inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
         run: |
-          status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**' ':(exclude)external/**')"
+          status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**')"
           if [[ -n "$status" ]]; then
             echo "::error::slang-test left generated or modified files in the worktree"
             printf '%s\n' "$status"

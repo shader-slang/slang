@@ -84,6 +84,41 @@ SLANG_UNIT_TEST(slangTestOutputPathNormalization)
         List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
         normalizeTestOutputPathsForTestFile(testPath, args);
 
+        const char* expected[] = {
+            "-target",
+            "spirv",
+            "-dump-intermediates",
+            "-dump-intermediate-prefix",
+            "tests/diagnostics/explicit-",
+        };
+        checkArgs(args, expected, SLANG_COUNT_OF(expected));
+    }
+
+    {
+        const char* values[] = {
+            "-target",
+            "spirv",
+            "-dump-intermediates",
+            "-dump-intermediate-prefix",
+            "nested/explicit-",
+        };
+        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
+        normalizeTestOutputPathsForTestFile(testPath, args);
+
         checkArgs(args, values, SLANG_COUNT_OF(values));
+    }
+
+    {
+        const char* values[] = {"-o", "a.dxbc", "-o", "b.dxbc"};
+        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
+        normalizeTestOutputPathsForTestFile(testPath, args);
+
+        const char* expected[] = {
+            "-o",
+            "tests/diagnostics/a.dxbc",
+            "-o",
+            "tests/diagnostics/b.dxbc",
+        };
+        checkArgs(args, expected, SLANG_COUNT_OF(expected));
     }
 }

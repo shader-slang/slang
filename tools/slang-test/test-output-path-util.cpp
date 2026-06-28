@@ -5,14 +5,10 @@
 namespace Slang
 {
 
-static bool hasArg(const List<String>& args, const char* option)
+static void normalizeBareTestPath(const String& testDirectory, String& path)
 {
-    for (const auto& arg : args)
-    {
-        if (arg == option)
-            return true;
-    }
-    return false;
+    if (!Path::hasPath(path))
+        path = Path::combine(testDirectory, path);
 }
 
 void normalizeTestOutputPathsForTestFile(const String& filePath, List<String>& args)
@@ -21,19 +17,38 @@ void normalizeTestOutputPathsForTestFile(const String& filePath, List<String>& a
     if (testDirectory.getLength() == 0)
         return;
 
-    for (Index i = 0; i + 1 < args.getCount(); ++i)
+    bool hasDumpIntermediates = false;
+    bool hasDumpIntermediatePrefix = false;
+
+    for (Index i = 0; i < args.getCount(); ++i)
     {
-        if (args[i] != "-o")
+        if (args[i] == "-dump-intermediates")
+        {
+            hasDumpIntermediates = true;
+            continue;
+        }
+
+        if (args[i] == "-dump-intermediate-prefix")
+        {
+            hasDumpIntermediatePrefix = true;
+            if (i + 1 < args.getCount())
+            {
+                normalizeBareTestPath(testDirectory, args[i + 1]);
+                ++i;
+            }
+            continue;
+        }
+
+        if (args[i] != "-o" || i + 1 >= args.getCount())
             continue;
 
         auto& outputPath = args[i + 1];
-        if (outputPath != "-" && !Path::hasPath(outputPath))
-            outputPath = Path::combine(testDirectory, outputPath);
-
+        if (outputPath != "-")
+            normalizeBareTestPath(testDirectory, outputPath);
         ++i;
     }
 
-    if (hasArg(args, "-dump-intermediates") && !hasArg(args, "-dump-intermediate-prefix"))
+    if (hasDumpIntermediates && !hasDumpIntermediatePrefix)
     {
         String dumpPrefix =
             Path::combine(testDirectory, Path::getFileNameWithoutExt(filePath) + String("-"));

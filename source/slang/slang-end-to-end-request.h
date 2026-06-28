@@ -390,11 +390,22 @@ private:
     SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
     /// Returns the path slangc would use for a separate-debug-info artifact for this
     /// target/artifact pair, or empty if none will be emitted. The main artifact path must be
-    /// non-empty.
+    /// non-empty. Empty return means either separate debug info is disabled or the target did not
+    /// produce a debug artifact.
     String _getDebugArtifactPath(
         TargetProgram* targetProgram,
         const String& path,
         IArtifact* artifact);
+    /// Preflight-validates one candidate separate-debug-info sidecar path before any artifact
+    /// write. Emits E00109 when `-separate-debug-info` is requested but the main artifact path is
+    /// empty or `-`, such as when command-line output is going to stdout.
+    SlangResult _validateDebugArtifactOutputPath(
+        TargetProgram* targetProgram,
+        const String& path,
+        IArtifact* artifact);
+    /// Preflight-validates `-separate-debug-info` before any artifact write. Walks the
+    /// command-line whole-program or per-entry-point outputs for all targets before
+    /// `_validateCoverageManifestOutputPaths`.
     SlangResult _validateDebugArtifactOutputPaths();
     SlangResult _maybeWriteDebugArtifact(
         TargetProgram* targetProgram,

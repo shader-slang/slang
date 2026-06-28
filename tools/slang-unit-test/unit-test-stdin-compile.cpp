@@ -1218,7 +1218,9 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
     return SLANG_OK;
 }
 
-static SlangResult _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(UnitTestContext* context)
+static SlangResult _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(
+    UnitTestContext* context,
+    bool useExplicitStdout)
 {
     TempCoverageCliFiles files;
     SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
@@ -1232,6 +1234,11 @@ static SlangResult _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(UnitTe
     args.add("-g2");
     args.add("-emit-spirv-directly");
     args.add("-separate-debug-info");
+    if (useExplicitStdout)
+    {
+        args.add("-o");
+        args.add("-");
+    }
 
     ExecuteResult result;
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
@@ -1254,7 +1261,8 @@ static SlangResult _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(UnitTe
 }
 
 static SlangResult _testSeparateDebugInfoStdoutWholeProgramFailsWithoutWritingSidecar(
-    UnitTestContext* context)
+    UnitTestContext* context,
+    bool useExplicitStdout)
 {
     TempCoverageCliFiles files;
     SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
@@ -1269,6 +1277,11 @@ static SlangResult _testSeparateDebugInfoStdoutWholeProgramFailsWithoutWritingSi
     args.add("-g2");
     args.add("-emit-spirv-directly");
     args.add("-separate-debug-info");
+    if (useExplicitStdout)
+    {
+        args.add("-o");
+        args.add("-");
+    }
 
     ExecuteResult result;
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
@@ -1684,10 +1697,15 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
 
 SLANG_UNIT_TEST(SlangcSeparateDebugInfoOutput)
 {
-    SLANG_CHECK(
-        SLANG_SUCCEEDED(_testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(
-        _testSeparateDebugInfoStdoutWholeProgramFailsWithoutWritingSidecar(unitTestContext)));
+        _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(unitTestContext, false)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(unitTestContext, true)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testSeparateDebugInfoStdoutWholeProgramFailsWithoutWritingSidecar(
+        unitTestContext,
+        false)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoStdoutWholeProgramFailsWithoutWritingSidecar(unitTestContext, true)));
 }
 
 SLANG_UNIT_TEST(SlangcCoverageManifestOutput)

@@ -508,6 +508,11 @@ static bool _areOutputPathsEquivalent(const String& left, const String& right)
 #endif
 }
 
+static bool _isStdoutArtifactPath(const String& path)
+{
+    return path.getLength() == 0 || path == "-";
+}
+
 SlangResult EndToEndCompileRequest::_maybeWriteCoverageManifest(
     const String& path,
     IArtifact* artifact)
@@ -628,26 +633,28 @@ String EndToEndCompileRequest::_getDebugArtifactPath(
     return dbgPath;
 }
 
+SlangResult EndToEndCompileRequest::_validateDebugArtifactOutputPath(
+    TargetProgram* targetProgram,
+    const String& path,
+    IArtifact* artifact)
+{
+    if (!targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
+        return SLANG_OK;
+
+    if (!getSeparateDbgArtifact(artifact))
+        return SLANG_OK;
+
+    if (!_isStdoutArtifactPath(path))
+        return SLANG_OK;
+
+    getSink()->diagnose(Diagnostics::SeparateDebugInfoRequiresOutputPath{});
+    return SLANG_FAIL;
+}
+
 SlangResult EndToEndCompileRequest::_validateDebugArtifactOutputPaths()
 {
     auto linkage = getLinkage();
     auto program = getSpecializedGlobalAndEntryPointsComponentType();
-
-    auto validateArtifactPath =
-        [&](TargetProgram* targetProgram, const String& path, IArtifact* artifact) -> SlangResult
-    {
-        if (!targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
-            return SLANG_OK;
-
-        if (!getSeparateDbgArtifact(artifact))
-            return SLANG_OK;
-
-        if (path.getLength() != 0)
-            return SLANG_OK;
-
-        getSink()->diagnose(Diagnostics::SeparateDebugInfoRequiresOutputPath{});
-        return SLANG_FAIL;
-    };
 
     for (auto targetReq : linkage->targets)
     {
@@ -657,8 +664,10 @@ SlangResult EndToEndCompileRequest::_validateDebugArtifactOutputPaths()
         {
             if (const auto artifact = targetProgram->getExistingWholeProgramResult())
             {
-                SLANG_RETURN_ON_FAIL(
-                    validateArtifactPath(targetProgram, _getWholeProgramPath(targetReq), artifact));
+                SLANG_RETURN_ON_FAIL(_validateDebugArtifactOutputPath(
+                    targetProgram,
+                    _getWholeProgramPath(targetReq),
+                    artifact));
             }
         }
         else
@@ -668,7 +677,7 @@ SlangResult EndToEndCompileRequest::_validateDebugArtifactOutputPaths()
             {
                 if (const auto artifact = targetProgram->getExistingEntryPointResult(ee))
                 {
-                    SLANG_RETURN_ON_FAIL(validateArtifactPath(
+                    SLANG_RETURN_ON_FAIL(_validateDebugArtifactOutputPath(
                         targetProgram,
                         _getEntryPointPath(targetReq, ee),
                         artifact));
