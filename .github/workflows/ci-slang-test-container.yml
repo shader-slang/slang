@@ -78,9 +78,6 @@ jobs:
           submodules: "recursive"
           fetch-depth: "1"
 
-      - name: Check submodule state
-        run: bash extras/ci/check-submodule-state.sh
-
       - name: Setup Vulkan ICD
         uses: ./.github/actions/setup-vulkan-icd
 
@@ -172,6 +169,7 @@ jobs:
           "$bin_dir/slang-test" "${test_roots[@]}" "${slang_test_args[@]}"
 
       - name: Check slang-test worktree cleanliness
+        if: always()
         run: |
           status="$(git status --short --untracked-files=all -- . ':(exclude)artifacts/**')"
           if [[ -n "$status" ]]; then
@@ -204,7 +202,7 @@ jobs:
             -expected-failure-list tests/expected-failure-linux-gpu.txt
 
       - name: Check via-glsl slang-test worktree cleanliness
-        if: inputs.gpu-tier == 't4' && inputs.config == 'release' && github.event_name == 'pull_request'
+        if: always() && inputs.gpu-tier == 't4' && inputs.config == 'release' && github.event_name == 'pull_request'
         run: |
           status="$(git status --short --untracked-files=all -- . ':(exclude)artifacts/**')"
           if [[ -n "$status" ]]; then

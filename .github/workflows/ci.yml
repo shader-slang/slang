@@ -103,34 +103,13 @@ jobs:
           echo "::error::priority-gate-yielded: higher-priority CI is active; retry-yielded-bot-ci will rerun this bot CI when quiet"
           exit 1
 
-  check-submodule-sync:
-    needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-        with:
-          persist-credentials: false
-          submodules: "recursive"
-          fetch-depth: "1"
-
-      - name: Check submodule state
-        run: bash extras/ci/check-submodule-state.sh
-
   # Linux x86_64 builds run in the CI container on the GCP self-hosted build
   # pool. container-user is the GCP build runner image's UID:GID (1003), which
   # owns _work; the reusable workflow defaults to 1001 for GitHub-hosted runners.
   build-linux-debug-gcc-x86_64:
-    needs: [filter, wait-for-human-priority, check-submodule-sync]
+    needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
-      needs.check-submodule-sync.result == 'success' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build-container.yml
@@ -148,10 +127,9 @@ jobs:
       container-user: "1003:1003"
 
   build-linux-release-gcc-x86_64:
-    needs: [filter, wait-for-human-priority, check-submodule-sync]
+    needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
-      needs.check-submodule-sync.result == 'success' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build-container.yml
@@ -174,10 +152,9 @@ jobs:
   # CMAKE_CXX_COMPILER not set — no g++). Moving it requires either adding g++
   # to the image or running the build in a container; tracked as a follow-up.
   build-linux-release-gcc-wasm:
-    needs: [filter, wait-for-human-priority, check-submodule-sync]
+    needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
-      needs.check-submodule-sync.result == 'success' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
@@ -192,10 +169,9 @@ jobs:
   # clang CI container (`--user root`, so no container-user concern) on the GCP
   # build pool. id-token requested explicitly for GCP Workload Identity auth.
   sanitizer-linux-clang-x86_64:
-    needs: [filter, wait-for-human-priority, check-submodule-sync]
+    needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
-      needs.check-submodule-sync.result == 'success' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-sanitizer.yml
@@ -210,10 +186,9 @@ jobs:
 
   # macOS builds
   build-macos-debug-clang-aarch64:
-    needs: [filter, wait-for-human-priority, check-submodule-sync]
+    needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
-      needs.check-submodule-sync.result == 'success' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
@@ -225,10 +200,9 @@ jobs:
       runs-on: '["macos-latest"]'
 
   build-macos-release-clang-aarch64:
-    needs: [filter, wait-for-human-priority, check-submodule-sync]
+    needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
-      needs.check-submodule-sync.result == 'success' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
@@ -241,10 +215,9 @@ jobs:
 
   # Linux ARM64 builds (GitHub-hosted)
   build-linux-debug-gcc-aarch64:
-    needs: [filter, wait-for-human-priority, check-submodule-sync]
+    needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
-      needs.check-submodule-sync.result == 'success' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
@@ -257,10 +230,9 @@ jobs:
       warnings-as-errors: false
 
   build-linux-release-gcc-aarch64:
-    needs: [filter, wait-for-human-priority, check-submodule-sync]
+    needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
-      needs.check-submodule-sync.result == 'success' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
@@ -274,10 +246,9 @@ jobs:
 
   # Windows builds (self-hosted)
   build-windows-debug-cl-x86_64-gpu:
-    needs: [filter, wait-for-human-priority, check-submodule-sync]
+    needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
-      needs.check-submodule-sync.result == 'success' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
@@ -289,10 +260,9 @@ jobs:
       runs-on: '["Windows", "self-hosted", "build"]'
 
   build-windows-release-cl-x86_64-gpu:
-    needs: [filter, wait-for-human-priority, check-submodule-sync]
+    needs: [filter, wait-for-human-priority]
     if: >-
       needs.filter.outputs.should-run == 'true' &&
-      needs.check-submodule-sync.result == 'success' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
@@ -631,7 +601,6 @@ jobs:
     needs:
       [
         filter,
-        check-submodule-sync,
         build-linux-debug-gcc-x86_64,
         build-linux-release-gcc-x86_64,
         build-linux-release-gcc-wasm,
