@@ -1072,10 +1072,10 @@ void EndToEndCompileRequest::generateOutput()
 
     if (m_isCommandLineCompile && m_containerFormat == ContainerFormat::None)
     {
-        if (SLANG_FAILED(_validateCoverageManifestOutputPaths()))
+        if (SLANG_FAILED(_validateDebugArtifactOutputPaths()))
             return;
 
-        if (SLANG_FAILED(_validateDebugArtifactOutputPaths()))
+        if (SLANG_FAILED(_validateCoverageManifestOutputPaths()))
             return;
 
         auto linkage = getLinkage();

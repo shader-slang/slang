@@ -7,8 +7,12 @@
 namespace Slang
 {
 
+// This helper rewrites bare `-o <file>` outputs so test-owned artifacts stay beside
+// `filePath`, while preserving explicit paths and `-o -`. For example, `tests/a/b.slang`
+// with `-o out.spv -dump-intermediates` becomes
+// `-o tests/a/out.spv -dump-intermediate-prefix tests/a/b-`.
 void normalizeTestOutputPathsForTestFile(const String& filePath, List<String>& args);
 
-}
+} // namespace Slang
 
 #endif

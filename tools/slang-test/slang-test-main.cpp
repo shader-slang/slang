@@ -737,7 +737,6 @@ static SlangResult _gatherTestsForFile(
                 return testRes;
             }
             applyMacroSubstitution(filePath, testDetails);
-            normalizeTestOutputPaths(filePath, testDetails);
 
             // See if the type of test needs certain APIs available
             const RenderApiFlags testRequiredApis =
@@ -746,6 +745,7 @@ static SlangResult _gatherTestsForFile(
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
+            normalizeTestOutputPaths(filePath, testDetails);
 
             outTestList->tests.add(testDetails);
         }
@@ -773,10 +773,10 @@ static SlangResult _gatherTestsForFile(
                 return diagRes;
             }
             applyMacroSubstitution(filePath, testDetails);
-            normalizeTestOutputPaths(filePath, testDetails);
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
+            normalizeTestOutputPaths(filePath, testDetails);
 
             // Mark that it is a diagnostic test
             testDetails.options.type = TestOptions::Type::Diagnostic;

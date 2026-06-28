@@ -1253,6 +1253,43 @@ static SlangResult _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(UnitTe
     return SLANG_OK;
 }
 
+static SlangResult _testSeparateDebugInfoStdoutWholeProgramFailsWithoutWritingSidecar(
+    UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    String currentPath = Path::getCurrentPath();
+    List<String> debugFilesBefore;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(currentPath, debugFilesBefore));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    args.add("-whole-program");
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00109", "requires an output file path"))
+        return SLANG_FAIL;
+    if (result.standardOutput.getLength() != 0)
+        return SLANG_FAIL;
+
+    List<String> debugFilesAfter;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(currentPath, debugFilesAfter));
+    for (const auto& file : debugFilesAfter)
+    {
+        if (!_containsFileName(debugFilesBefore, file))
+            return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
 static SlangResult _testCoverageExplicitSidecarRejectsWholeProgramCollision(
     UnitTestContext* context)
 {
@@ -1649,6 +1686,8 @@ SLANG_UNIT_TEST(SlangcSeparateDebugInfoOutput)
 {
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoStdoutWholeProgramFailsWithoutWritingSidecar(unitTestContext)));
 }
 
 SLANG_UNIT_TEST(SlangcCoverageManifestOutput)
