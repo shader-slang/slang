@@ -559,6 +559,26 @@ static void applyMacroSubstitution(String filePath, TestDetails& details)
     }
 }
 
+// Interprets a bare `-o filename` in a test directive as an output next to the test file.
+static void prefixBareOutputPathsWithTestDirectory(String filePath, TestDetails& details)
+{
+    String testDirectory = Path::getParentDirectory(filePath);
+    if (testDirectory.getLength() == 0)
+        return;
+
+    for (Index i = 0; i + 1 < details.options.args.getCount(); ++i)
+    {
+        if (details.options.args[i] != "-o")
+            continue;
+
+        auto& outputPath = details.options.args[i + 1];
+        if (outputPath != "-" && !Path::hasPath(outputPath))
+            outputPath = Path::combine(testDirectory, outputPath);
+
+        ++i;
+    }
+}
+
 // Try to read command-line options from the test file itself
 static SlangResult _gatherTestsForFile(
     TestCategorySet* categorySet,
@@ -731,6 +751,7 @@ static SlangResult _gatherTestsForFile(
                 return testRes;
             }
             applyMacroSubstitution(filePath, testDetails);
+            prefixBareOutputPathsWithTestDirectory(filePath, testDetails);
 
             // See if the type of test needs certain APIs available
             const RenderApiFlags testRequiredApis =
@@ -766,6 +787,7 @@ static SlangResult _gatherTestsForFile(
                 return diagRes;
             }
             applyMacroSubstitution(filePath, testDetails);
+            prefixBareOutputPathsWithTestDirectory(filePath, testDetails);
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);

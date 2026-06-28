@@ -1,6 +1,6 @@
 //TEST:COMPILE: tests/bugs/link-time-constant-array-size-lib.slang -o tests/bugs/link-time-constant-array-size-lib.slang-module
 //TEST:COMPILE: tests/bugs/link-time-constant-array-size-main.slang -o tests/bugs/link-time-constant-array-size-main.slang-module
-//TEST:SIMPLE(filecheck=SPIRV): -r tests/bugs/link-time-constant-array-size-main.slang-module -r tests/bugs/link-time-constant-array-size-lib.slang-module -target spirv -o tests/bugs/link-time-constant-array-size.spv -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=SPIRV): -r tests/bugs/link-time-constant-array-size-main.slang-module -r tests/bugs/link-time-constant-array-size-lib.slang-module -target spirv -o out.spv -stage compute -entry computeMain
 
 // Check that linked constant array sizes still lower into SPIR-V.
 
