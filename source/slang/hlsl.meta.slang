@@ -468,8 +468,11 @@ struct ByteAddressBuffer
     ///@param alignment The known alignment of `location` in bytes; a compile-time constant.
     ///@return The value loaded from the buffer.
     ///@remarks
-    /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
-    /// On other targets, `alignment` is forwarded to the lowered load instruction.
+    /// `alignment` selects the widest power-of-two-width access it permits: a single wide load
+    /// when it covers the whole `T`, otherwise the widest aligned chunks with per-component loads
+    /// for any remainder. This applies on every target, including HLSL (e.g. two `.Load<float2>`
+    /// instead of one `.Load<float4>`); targets whose lowered load takes an alignment operand are
+    /// also given it.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
@@ -6457,8 +6460,11 @@ struct $(item.name)
     ///@param alignment The known alignment of `location` in bytes; a compile-time constant.
     ///@return The value loaded from the buffer.
     ///@remarks
-    /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
-    /// On other targets, `alignment` is forwarded to the lowered load instruction.
+    /// `alignment` selects the widest power-of-two-width access it permits: a single wide load
+    /// when it covers the whole `T`, otherwise the widest aligned chunks with per-component loads
+    /// for any remainder. This applies on every target, including HLSL (e.g. two `.Load<float2>`
+    /// instead of one `.Load<float4>`); targets whose lowered load takes an alignment operand are
+    /// also given it.
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
