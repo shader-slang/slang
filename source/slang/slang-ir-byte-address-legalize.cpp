@@ -352,6 +352,150 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
+    // Return the largest power of two that is not greater than `n` (for n >= 1).
+    static IRIntegerValue largestPow2AtMost(IRIntegerValue n)
+    {
+        IRIntegerValue p = 1;
+        while ((p * 2) <= n)
+            p *= 2;
+        return p;
+    }
+
+    // Choose the widest power-of-two chunk width whose byte size (`width * elementStride`) is
+    // aligned at `chunkOffset`, capped at `kMaxByteAddressVectorWidth` (the widest single
+    // byte-address vector access). Width 1 is always valid, so the result is in
+    // `[1, min(largestPow2AtMost(remaining), 4)]`. Shared by both chunkers so the load/store
+    // mirrors cannot drift apart under later edits.
+    IRIntegerValue chooseChunkWidth(
+        IRInst* baseOffset,
+        IRIntegerValue chunkOffset,
+        IRInst* alignment,
+        IRIntegerValue elementStride,
+        IRIntegerValue remaining)
+    {
+        static const IRIntegerValue kMaxByteAddressVectorWidth = 4;
+        IRIntegerValue maxWidth =
+            remaining < kMaxByteAddressVectorWidth ? remaining : kMaxByteAddressVectorWidth;
+        for (IRIntegerValue cand = largestPow2AtMost(maxWidth); cand >= 2; cand /= 2)
+        {
+            if (isWideAccessAligned(baseOffset, chunkOffset, alignment, cand * elementStride))
+                return cand;
+        }
+        return 1;
+    }
+
+    // Load a vector of `elementCount` elements of `elementType` from `buffer` by emitting the
+    // widest power-of-two-width sub-vector load the alignment permits at each step, falling back
+    // to per-component loads for any remainder, then reassembling the full vector.
+    //
+    // This realizes the "widest access the alignment permits, chunked when necessary" rule
+    // (issue #11545, point 5). For example, a `half4` (scalar stride 2) promised alignment 4 can
+    // only do 4-byte-aligned accesses, so it is emitted as two `half2` loads; a `float3`
+    // promised alignment 8 is emitted as one `float2` plus one scalar `float`. The whole-vector
+    // single-load case is handled by the caller before reaching here, so each chosen `width` is
+    // strictly smaller than the whole-vector width the caller already rejected as unaligned. That
+    // bound gives two guarantees: progress (so this routine emits at least two accesses), and that
+    // the recursive `emitLegalLoad` on the sub-vector re-enters on an aligned chunk and so takes
+    // the single-access fast path rather than recursing back into the chunker.
+    IRInst* emitLegalChunkedVectorLoad(
+        IRType* vecType,
+        IRInst* buffer,
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* alignment,
+        IRType* elementType,
+        IRIntegerValue elementStride,
+        IRIntegerValue elementCount)
+    {
+        List<IRInst*> components;
+        for (IRIntegerValue done = 0; done < elementCount;)
+        {
+            IRIntegerValue remaining = elementCount - done;
+            IRIntegerValue chunkOffset = immediateOffset + done * elementStride;
+
+            IRIntegerValue width =
+                chooseChunkWidth(baseOffset, chunkOffset, alignment, elementStride, remaining);
+
+            if (width == 1)
+            {
+                auto elementVal =
+                    emitLegalLoad(elementType, buffer, baseOffset, chunkOffset, alignment);
+                if (!elementVal)
+                    return nullptr;
+                components.add(elementVal);
+            }
+            else
+            {
+                auto chunkType = m_builder.getVectorType(elementType, width);
+                auto chunkVal =
+                    emitLegalLoad(chunkType, buffer, baseOffset, chunkOffset, alignment);
+                if (!chunkVal)
+                    return nullptr;
+                for (IRIntegerValue i = 0; i < width; ++i)
+                    components.add(m_builder.emitElementExtract(chunkVal, i));
+            }
+
+            done += width;
+        }
+
+        return m_builder.emitMakeVector(vecType, components);
+    }
+
+    // Store a vector `value` by emitting the widest power-of-two-width sub-vector store the
+    // alignment permits at each step, falling back to per-component stores for any remainder.
+    // This is the store mirror of `emitLegalChunkedVectorLoad` (issue #11545, point 5); the
+    // whole-vector single-store case is handled by the caller before reaching here.
+    Result emitLegalChunkedVectorStore(
+        IRInst* buffer,
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* alignment,
+        IRInst* value,
+        IRType* elementType,
+        IRIntegerValue elementStride,
+        IRIntegerValue elementCount)
+    {
+        for (IRIntegerValue done = 0; done < elementCount;)
+        {
+            IRIntegerValue remaining = elementCount - done;
+            IRIntegerValue chunkOffset = immediateOffset + done * elementStride;
+
+            IRIntegerValue width =
+                chooseChunkWidth(baseOffset, chunkOffset, alignment, elementStride, remaining);
+
+            if (width == 1)
+            {
+                auto elementVal = m_builder.emitElementExtract(value, done);
+                SLANG_RETURN_ON_FAIL(emitLegalStore(
+                    elementType,
+                    buffer,
+                    baseOffset,
+                    chunkOffset,
+                    alignment,
+                    elementVal));
+            }
+            else
+            {
+                auto chunkType = m_builder.getVectorType(elementType, width);
+                List<IRInst*> chunkComponents;
+                for (IRIntegerValue i = 0; i < width; ++i)
+                    chunkComponents.add(m_builder.emitElementExtract(value, done + i));
+                auto chunkVal = m_builder.emitMakeVector(chunkType, chunkComponents);
+                SLANG_RETURN_ON_FAIL(emitLegalStore(
+                    chunkType,
+                    buffer,
+                    baseOffset,
+                    chunkOffset,
+                    alignment,
+                    chunkVal));
+            }
+
+            done += width;
+        }
+
+        return SLANG_OK;
+    }
+
     IRType* getDescriptorHandleStorageType()
     {
         if (!m_options.translateToStructuredBufferOps)
@@ -621,8 +765,7 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (m_options.scalarizeVectorLoadStore ||
-                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (m_options.scalarizeVectorLoadStore)
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -634,10 +777,23 @@ struct ByteAddressBufferLegalizationContext
                         elementCountInst->getValue(),
                         alignment);
                 }
-                else
+                if (isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
                 }
+                // The whole vector is not aligned for a single wide load, but a narrower
+                // power-of-two-width access may still be: emit the widest chunks the alignment
+                // permits and fall back to per-component loads for the remainder (issue
+                // #11545, point 5 — e.g. a `half4` at alignment 4 becomes two `half2` loads).
+                return emitLegalChunkedVectorLoad(
+                    vecType,
+                    buffer,
+                    baseOffset,
+                    immediateOffset,
+                    alignment,
+                    vecType->getElementType(),
+                    elementStride,
+                    elementCountInst->getValue());
             }
 
             // If we aren't scalarizing a vetor load then we next need
@@ -1580,8 +1736,7 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (m_options.scalarizeVectorLoadStore ||
-                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                if (m_options.scalarizeVectorLoadStore)
                 {
                     return emitLegalSequenceStore(
                         buffer,
@@ -1592,7 +1747,7 @@ struct ByteAddressBufferLegalizationContext
                         elementCountInst->getValue(),
                         alignment);
                 }
-                else
+                if (isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitSimpleStore(
                         value->getDataType(),
@@ -1601,6 +1756,19 @@ struct ByteAddressBufferLegalizationContext
                         immediateOffset,
                         value);
                 }
+                // The whole vector is not aligned for a single wide store, but a narrower
+                // power-of-two-width access may still be: store the widest chunks the alignment
+                // permits and fall back to per-component stores for the remainder (issue
+                // #11545, point 5 — the store mirror of `emitLegalChunkedVectorLoad`).
+                return emitLegalChunkedVectorStore(
+                    buffer,
+                    baseOffset,
+                    immediateOffset,
+                    alignment,
+                    value,
+                    vecType->getElementType(),
+                    elementStride,
+                    elementCountInst->getValue());
             }
 
             if (m_options.useBitCastFromUInt)
