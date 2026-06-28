@@ -1218,7 +1218,8 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
     return SLANG_OK;
 }
 
-static SlangResult _testSeparateDebugInfoStdoutDoesNotWriteSidecar(UnitTestContext* context)
+static SlangResult _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(
+    UnitTestContext* context)
 {
     TempCoverageCliFiles files;
     SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
@@ -1235,7 +1236,9 @@ static SlangResult _testSeparateDebugInfoStdoutDoesNotWriteSidecar(UnitTestConte
 
     ExecuteResult result;
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
-    if (result.resultCode != 0)
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00109", "requires an output file path"))
         return SLANG_FAIL;
 
     List<String> debugFilesAfter;
@@ -1643,7 +1646,8 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
 
 SLANG_UNIT_TEST(SlangcSeparateDebugInfoOutput)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(_testSeparateDebugInfoStdoutDoesNotWriteSidecar(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(unitTestContext)));
 }
 
 SLANG_UNIT_TEST(SlangcCoverageManifestOutput)

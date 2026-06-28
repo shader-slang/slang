@@ -205,6 +205,12 @@ warning(
 )
 
 err(
+    "separate-debug-info-requires-output-path",
+    109,
+    "`-separate-debug-info` requires an output file path; use `-o <path>` instead of writing the main artifact to stdout"
+)
+
+err(
     "unknown-source-language",
     19,
     "unknown source language '~language'",

@@ -559,8 +559,18 @@ static void applyMacroSubstitution(String filePath, TestDetails& details)
     }
 }
 
-// Interprets a bare `-o filename` in a test directive as an output next to the test file.
-static void prefixBareOutputPathsWithTestDirectory(String filePath, TestDetails& details)
+static bool hasArg(const List<String>& args, const char* option)
+{
+    for (const auto& arg : args)
+    {
+        if (arg == option)
+            return true;
+    }
+    return false;
+}
+
+// Interprets bare test output paths as output next to the test file.
+static void normalizeTestOutputPaths(String filePath, TestDetails& details)
 {
     String testDirectory = Path::getParentDirectory(filePath);
     if (testDirectory.getLength() == 0)
@@ -576,6 +586,16 @@ static void prefixBareOutputPathsWithTestDirectory(String filePath, TestDetails&
             outputPath = Path::combine(testDirectory, outputPath);
 
         ++i;
+    }
+
+    if (hasArg(details.options.args, "-dump-intermediates") &&
+        !hasArg(details.options.args, "-dump-intermediate-prefix"))
+    {
+        String dumpPrefix = Path::combine(
+            testDirectory,
+            Path::getFileNameWithoutExt(filePath) + String("-"));
+        details.options.args.add("-dump-intermediate-prefix");
+        details.options.args.add(dumpPrefix);
     }
 }
 
@@ -751,7 +771,7 @@ static SlangResult _gatherTestsForFile(
                 return testRes;
             }
             applyMacroSubstitution(filePath, testDetails);
-            prefixBareOutputPathsWithTestDirectory(filePath, testDetails);
+            normalizeTestOutputPaths(filePath, testDetails);
 
             // See if the type of test needs certain APIs available
             const RenderApiFlags testRequiredApis =
@@ -787,7 +807,7 @@ static SlangResult _gatherTestsForFile(
                 return diagRes;
             }
             applyMacroSubstitution(filePath, testDetails);
-            prefixBareOutputPathsWithTestDirectory(filePath, testDetails);
+            normalizeTestOutputPaths(filePath, testDetails);
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);

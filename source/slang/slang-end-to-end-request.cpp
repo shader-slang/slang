@@ -601,8 +601,7 @@ String EndToEndCompileRequest::_getDebugArtifactPath(
     IArtifact* artifact)
 {
     // Separate debug info is a sidecar for an emitted file. When the main artifact is written to
-    // stdout there is no stable neighboring path, so do not invent one in the process working
-    // directory.
+    // stdout there is no stable neighboring path; the caller diagnoses that request before writing.
     if (path.getLength() == 0)
         return String();
 
@@ -641,9 +640,15 @@ SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
         // Check if a debug artifact was actually created (only for SPIR-V targets)
         if (dbgArtifact)
         {
+            if (path.getLength() == 0)
+            {
+                getSink()->diagnose(Diagnostics::SeparateDebugInfoRequiresOutputPath{});
+                return SLANG_FAIL;
+            }
+
             String dbgPath = _getDebugArtifactPath(targetProgram, path, artifact);
             if (dbgPath.getLength() == 0)
-                return SLANG_OK;
+                return SLANG_FAIL;
             return _maybeWriteArtifact(dbgPath, dbgArtifact);
         }
         // If no debug artifact exists (e.g., for non-SPIR-V targets), just silently succeed
