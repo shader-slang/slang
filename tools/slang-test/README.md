@@ -106,6 +106,31 @@ Deprecated test types (do not create new tests of these kinds, and we need to sl
 - `HLSL_COMPUTE`: Runs render-test with "-hlsl-rewrite -compute" options and compares text file outputs
 - `CROSS_COMPILE`: Compiles using GLSL pass-through and through Slang, then compares the outputs
 
+## Compiler Optimization in Tests
+
+`slang-test` adds `-O0` when it builds a Slang compiler command line and the
+test directive does not already specify an optimization option. This keeps
+ordinary test runs fast and avoids expected-output churn from optimizer changes.
+
+Compiler-backed tests, such as `SIMPLE`, `CROSS_COMPILE`, and diagnostic tests,
+can opt in to optimized output with a normal slangc option:
+
+```text
+//TEST:SIMPLE: -target spirv -O3
+```
+
+Render-test-backed tests, such as `COMPARE_COMPUTE_EX`, must forward the
+optimization option to slangc:
+
+```text
+//TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -Xslang -O3
+```
+
+For diagnostic tests that intentionally leave an option without its required
+argument, put the explicit optimization option before that dangling option.
+`slang-test` appends its default after the directive arguments, so relying on
+the default in that case can change which option receives the diagnostic.
+
 ## Unit Tests
 In addition to the above test tools, there are also `slang-unit-test-tool` and `gfx-unit-test-tool`, which are invoked as in the following examples; but note that the unit tests do get run as part of `slang-test` as well.
 

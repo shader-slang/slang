@@ -172,11 +172,18 @@ static void _addRenderTestOptions(
     CommandLine& ioCmdLine,
     bool allowCacheRHI);
 
+/// Returns true when an argument is a slangc optimization-level option.
+///
+/// This uses the exact spellings recognized by slangc so unrelated options with a `-O` prefix do
+/// not accidentally opt a test out of the slang-test default.
 static bool _isSlangOptimizationArg(const String& arg)
 {
-    return arg.startsWith(UnownedStringSlice::fromLiteral("-O"));
+    return arg == "-O" || arg == "-O0" || arg == "-Onone" || arg == "-O1" ||
+           arg == "-Odefault" || arg == "-O2" || arg == "-Ohigh" || arg == "-O3" ||
+           arg == "-Omaximal";
 }
 
+/// Returns true when a compiler command line already specifies an optimization level.
 static bool _hasSlangOptimizationArg(const List<String>& args)
 {
     for (const auto& arg : args)
@@ -187,6 +194,10 @@ static bool _hasSlangOptimizationArg(const List<String>& args)
     return false;
 }
 
+/// Adds the slang-test default optimization level unless the test already specifies one.
+///
+/// Most compiler-based tests do not need optimized output, and keeping them at `-O0` avoids
+/// optimizer time and SPIR-V optimizer output churn.
 static void _addDefaultSlangOptimization(CommandLine& ioCmdLine)
 {
     if (!_hasSlangOptimizationArg(ioCmdLine.m_args))
@@ -195,6 +206,11 @@ static void _addDefaultSlangOptimization(CommandLine& ioCmdLine)
     }
 }
 
+/// Returns true when a render-test command forwards an optimization level to slangc.
+///
+/// Render-test accepts several forwarding forms, including single-argument forwarding and
+/// `-Xslang...` blocks, so slang-test checks each forwarded slangc argument before adding its
+/// default.
 static bool _hasRenderTestSlangOptimizationArg(const List<String>& args)
 {
     for (Index i = 0; i < args.getCount(); ++i)
@@ -217,6 +233,9 @@ static bool _hasRenderTestSlangOptimizationArg(const List<String>& args)
     return false;
 }
 
+/// Adds the slang-test default optimization level to render-test commands.
+///
+/// The option is forwarded with `-Xslang` because render-test options are not slangc options.
 static void _addDefaultRenderTestSlangOptimization(CommandLine& ioCmdLine)
 {
     if (_hasRenderTestSlangOptimizationArg(ioCmdLine.m_args))

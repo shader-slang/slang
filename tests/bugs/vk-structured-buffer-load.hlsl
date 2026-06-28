@@ -1,6 +1,6 @@
 //TEST:CROSS_COMPILE: -profile glsl_460+GL_NV_ray_tracing -entry HitMain -stage closesthit -target spirv-assembly -O3
-//TEST:SIMPLE(filecheck=DXIL): -target dxil -entry HitMain -stage closesthit -profile sm_6_5
-//TEST:SIMPLE(filecheck=SPV): -target spirv
+//TEST:SIMPLE(filecheck=DXIL): -target dxil -entry HitMain -stage closesthit -profile sm_6_5 -O3
+//TEST:SIMPLE(filecheck=SPV): -target spirv -O3
 
 // DXIL: define void @
 // SPV: OpEntryPoint
