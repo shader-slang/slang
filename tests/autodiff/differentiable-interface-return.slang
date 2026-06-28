@@ -9,7 +9,7 @@
 // `-target hlsl` and an ICE on `-target spirv`.
 
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -stage compute -entry main
-//TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv-asm -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv-asm -stage compute -entry main -O3
 //TEST:INTERPRET(filecheck=CHECK_INTERP): -entry interpretMain
 
 // The fix should ensure `this_type` (the unresolved IR placeholder) does not

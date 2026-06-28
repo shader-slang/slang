@@ -1,5 +1,5 @@
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -slang -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -slang -compute -shaderobj -output-using-type -Xslang -O3
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
@@ -36,7 +36,7 @@ void run(
         }
 
         if (idx == 0)
-        { 
+        {
             x = x * 2.0f;
         }
     }
@@ -53,8 +53,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // bwd_diff
     DifferentialPair<float> dpa = DifferentialPair<float>(1.0, 0.0);
     bwd_diff(run)(dispatchThreadID.x, dpa);
-    outputBuffer[dispatchThreadID.x] = dpa.d; 
-    
+    outputBuffer[dispatchThreadID.x] = dpa.d;
+
     // CHECK: type: float
     // CHECK: 2.0
 }
