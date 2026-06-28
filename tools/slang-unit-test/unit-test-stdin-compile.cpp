@@ -1218,8 +1218,7 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
     return SLANG_OK;
 }
 
-static SlangResult _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(
-    UnitTestContext* context)
+static SlangResult _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(UnitTestContext* context)
 {
     TempCoverageCliFiles files;
     SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
@@ -1646,8 +1645,8 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
 
 SLANG_UNIT_TEST(SlangcSeparateDebugInfoOutput)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(
-        _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(unitTestContext)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(unitTestContext)));
 }
 
 SLANG_UNIT_TEST(SlangcCoverageManifestOutput)

@@ -591,9 +591,8 @@ static void normalizeTestOutputPaths(String filePath, TestDetails& details)
     if (hasArg(details.options.args, "-dump-intermediates") &&
         !hasArg(details.options.args, "-dump-intermediate-prefix"))
     {
-        String dumpPrefix = Path::combine(
-            testDirectory,
-            Path::getFileNameWithoutExt(filePath) + String("-"));
+        String dumpPrefix =
+            Path::combine(testDirectory, Path::getFileNameWithoutExt(filePath) + String("-"));
         details.options.args.add("-dump-intermediate-prefix");
         details.options.args.add(dumpPrefix);
     }
