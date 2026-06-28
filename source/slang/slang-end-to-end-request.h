@@ -390,8 +390,9 @@ private:
     SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
     /// Returns the path slangc would use for a separate-debug-info artifact for this
     /// target/artifact pair, or empty if none will be emitted. Used by both the debug artifact
-    /// writer and coverage-manifest preflight collision checks. Empty means either separate debug
-    /// info is disabled or the target did not produce a debug artifact.
+    /// writer and coverage-manifest preflight collision checks. The main artifact path must be
+    /// non-empty; empty means either separate debug info is disabled or the target did not produce
+    /// a debug artifact.
     String _getDebugArtifactPath(
         TargetProgram* targetProgram,
         const String& path,

@@ -600,10 +600,9 @@ String EndToEndCompileRequest::_getDebugArtifactPath(
     const String& path,
     IArtifact* artifact)
 {
-    // Separate debug info is a sidecar for an emitted file. When the main artifact is written to
-    // stdout there is no stable neighboring path; the caller diagnoses that request before writing.
-    if (path.getLength() == 0)
-        return String();
+    // Separate debug info is a sidecar for an emitted file. Callers diagnose stdout output before
+    // asking for the sidecar path.
+    SLANG_ASSERT(path.getLength() != 0);
 
     if (!targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
         return String();
@@ -647,8 +646,7 @@ SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
             }
 
             String dbgPath = _getDebugArtifactPath(targetProgram, path, artifact);
-            if (dbgPath.getLength() == 0)
-                return SLANG_FAIL;
+            SLANG_ASSERT(dbgPath.getLength() != 0);
             return _maybeWriteArtifact(dbgPath, dbgArtifact);
         }
         // If no debug artifact exists (e.g., for non-SPIR-V targets), just silently succeed
@@ -686,12 +684,14 @@ SlangResult EndToEndCompileRequest::_validateCoverageManifestOutputPaths()
             return;
         // Stdout artifacts have no file path to collide with.
         if (artifactPath.getLength() != 0)
+        {
             emittedArtifactPaths.add(artifactPath);
 
-        String dbgPath = _getDebugArtifactPath(targetProgram, artifactPath, artifact);
-        // Targets that did not emit separate debug info have no debug path to collide with.
-        if (dbgPath.getLength() != 0)
-            emittedArtifactPaths.add(dbgPath);
+            String dbgPath = _getDebugArtifactPath(targetProgram, artifactPath, artifact);
+            // Targets that did not emit separate debug info have no debug path to collide with.
+            if (dbgPath.getLength() != 0)
+                emittedArtifactPaths.add(dbgPath);
+        }
 
         if (_findCoverageTracingMetadata(artifact))
             coverageArtifactCount++;
