@@ -14,7 +14,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECKFWD,non-exhaustive): -target hlsl -entry computeMainFwd -stage compute
 
-//TEST_INPUT:ubuffer(data=[0], stride=16):out
+//TEST_INPUT:ubuffer(data=[0], stride=4):out
 RWStructuredBuffer<float> outputBuffer;
 
 // --- Backward-derivative variant (inverse placement) ---
