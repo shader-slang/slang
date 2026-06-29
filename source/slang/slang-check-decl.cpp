@@ -20384,6 +20384,51 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         }
     }
 
+    // A user-defined derivative declared with the inverse placement
+    // `[ForwardDerivativeOf(primal)]` / `[BackwardDerivativeOf(primal)]` records a
+    // derivative *association* on the primal (see `checkDerivativeOfAttributeImpl`,
+    // which calls `registerAssociatedDecl`) rather than a `[ForwardDerivative]` /
+    // `[BackwardDerivative]` modifier on the primal. Because differentiating the primal
+    // invokes the derivative, the primal must carry the derivative's capability
+    // requirements; as with the forward `[ForwardDerivative]` / `[BackwardDerivative]`
+    // placement, the requirement is reflected onto the primal *unconditionally* — it
+    // applies to every use of the primal, not only to a differentiated call (the
+    // regression test raises E36107 from a plain `testC(2.0)`). Without this, a
+    // `[require]` on an inverse-placed derivative is silently dropped.
+    for (auto assoc : getShared()->getAssociatedDeclsForDecl(funcDecl))
+    {
+        if (assoc->kind != DeclAssociationKind::ForwardDerivativeFunc &&
+            assoc->kind != DeclAssociationKind::BackwardDerivativeFunc)
+            continue;
+        auto derivativeFuncDecl = assoc->decl;
+        // Gate on the derivative carrying an explicit `[require]`. This is a gate, not
+        // a payload filter: once a derivative qualifies we propagate its full
+        // `inferredCapabilityRequirements` (the declared `[require]` plus anything its
+        // body infers) — the same payload the other propagation sites in this function
+        // use — not just the declared `[require]` set. The gate exists because the core
+        // module attaches all-targets derivative families to builtins through inverse
+        // placement (the `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]` overloads
+        // for transpose/mul/dot and the math intrinsics in diff.meta.slang); those
+        // derivatives carry no `[require]`, so unconditionally joining their inferred
+        // requirements onto an all-targets builtin primal would over-constrain it (in
+        // practice it breaks core-module compilation). Restricting propagation to an
+        // explicit `[require]` keeps it to deliberate user declarations; a derivative
+        // that only *infers* a target dependency without `[require]` is intentionally
+        // not propagated.
+        if (!derivativeFuncDecl->findModifier<RequireCapabilityAttribute>())
+            continue;
+        ensureDecl(derivativeFuncDecl, DeclCheckState::CapabilityChecked);
+        // Point the provenance note at the derivative function, which is where the
+        // user declared both the `[require]` and the `[*DerivativeOf]` linkage.
+        _propagateRequirement(
+            this,
+            mutableFuncDeclCapSet,
+            funcDecl,
+            derivativeFuncDecl,
+            derivativeFuncDecl->inferredCapabilityRequirements,
+            derivativeFuncDecl->loc);
+    }
+
     // non-static function join's capabilities with parent
     // to become a superset of the parent.
     if (!isEffectivelyStatic(funcDecl))
