@@ -945,7 +945,10 @@ warning(
     "keyword-used-as-name",
     20103,
     "keyword used as a name",
-    span { loc = "location", message = "'~name:Name' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts" }
+    span { loc = "location", message = "'~name:Name' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts" },
+    -- Pedantic: using a type keyword as a name is legal and usually works; this is a
+    -- style/portability hint rather than a likely bug, so it belongs in the pedantic group.
+    pedantic
 )
 
 err(
@@ -1678,14 +1681,11 @@ warning(
     span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' is not recommended" }
 )
 
--- Pedantic: this is a purely advisory performance hint (the conversion is well-defined and
--- correct), so it is opt-in behind -Wpedantic rather than emitted by default.
 warning(
     "implicit-conversion-to-double",
     30082,
     "implicit float-to-double conversion",
-    span { loc = "expr:Expr", message = "implicit float-to-double conversion may cause unexpected performance issues, use explicit cast if intended." },
-    pedantic
+    span { loc = "expr:Expr", message = "implicit float-to-double conversion may cause unexpected performance issues, use explicit cast if intended." }
 )
 
 -- try/throw diagnostics

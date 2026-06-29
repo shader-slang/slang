@@ -474,7 +474,12 @@ protected:
 
     // Bitmask of enabled warning groups, indexed by `WarningLevel`. The `Default` group is always
     // on and is not represented here; other groups are opt-in (see enableWarningLevel).
-    uint32_t m_enabledWarningLevels = 0;
+    //
+    // The `Pedantic` group is enabled by default for now, so tagging a warning `pedantic` does not
+    // yet change its visibility -- it only records the group. A follow-up will flip pedantic to
+    // off-by-default (and decide which existing warnings belong in each group); this staging lets
+    // the grouping land without silently dropping any warning from today's output.
+    uint32_t m_enabledWarningLevels = (uint32_t(1) << uint32_t(WarningLevel::Pedantic));
 
     RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
 
