@@ -1568,6 +1568,32 @@ static String getNameForNameHint(IRGenContext* context, Decl* decl)
     if (auto moduleParentDecl = as<ModuleDecl>(parentDecl))
         parentDecl = moduleParentDecl->parentDecl;
 
+    // An `extension` declaration is anonymous, so its recursive name hint would
+    // be empty; without special handling a method in `extension Example { ... }`
+    // would get the bare hint `extensionMethod` rather than the qualified
+    // `Example.extensionMethod` that struct-body methods receive. Base the
+    // qualifier on the extended type instead — the same target-type basis that
+    // symbol mangling uses for an `ExtensionDecl` (`emitQualifiedName`,
+    // slang-mangle.cpp).
+    //
+    // Extensions can only target nominal types: the checker rejects anything
+    // else (e.g. `extension<T> T` → error 30850, "type 'T' cannot be extended"),
+    // so every `ExtensionDecl` reaching here has a `targetType` that is a
+    // `DeclRefType` of a `ContainerDecl` — named structs/interfaces/enums,
+    // builtins (`float`), vectors (`vector`), typedefs (resolved to the
+    // underlying type's decl), and generic instances (qualified by the
+    // un-specialized name, `Box`). All of those qualify. The `as<ContainerDecl>`
+    // cast is required because `parentDecl` is `ContainerDecl*` while `getDecl()`
+    // returns `Decl*`; its null result, caught by the existing `if (!parentDecl)`
+    // guard below, is a defensive soft-fallback rather than an assert — a name
+    // hint is cosmetic, so an unforeseen target shape degrading to the
+    // unqualified leaf is harmless, whereas crashing here would not be.
+    if (auto extensionParentDecl = as<ExtensionDecl>(parentDecl))
+    {
+        if (auto targetDeclRefType = as<DeclRefType>(extensionParentDecl->targetType))
+            parentDecl = as<ContainerDecl>(targetDeclRefType->getDeclRef().getDecl());
+    }
+
     if (!parentDecl)
     {
         return leafName->text;
