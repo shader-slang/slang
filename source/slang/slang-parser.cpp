@@ -8714,7 +8714,7 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
         break;
 
     default:
-        SLANG_ASSERT(!"Unhandled floating point literal type");
+        SLANG_RELEASE_ASSERT(!"Unhandled floating point literal type");
         // fall-through
     case FloatingPointLiteralType::BadSignificand:
         parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralNumber{
