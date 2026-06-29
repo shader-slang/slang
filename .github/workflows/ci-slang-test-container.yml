@@ -80,12 +80,7 @@ jobs:
 
       - name: Clean inherited checkout state
         run: |
-          # actions/checkout cleans before it checks out this ref. On
-          # self-hosted runners, submodule worktrees from an older checkout can
-          # therefore survive into this job even though this test workflow does
-          # not request submodules. Remove initialized submodules and then
-          # clean again under the checked-out ref so removed submodule paths,
-          # such as external/slang-binaries, cannot trip the post-test check.
+          # Testing step should not need any of the submodules.
           git submodule deinit --all --force
           git clean -ffdx
           git reset --hard HEAD
