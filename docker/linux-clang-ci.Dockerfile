@@ -8,11 +8,12 @@
 # - .github/workflows/ci-slang-coverage.yml  (future)
 #
 # Build and push:
-#   docker build -f docker/linux-clang-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1 .
-#   docker push ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
+#   docker build -f docker/linux-clang-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.2 .
+#   docker push ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.2
 
 FROM ubuntu:22.04
 
+# TEST: publisher workflow smoke-test marker (reverted before any merge).
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install essential tools required for GitHub Actions
