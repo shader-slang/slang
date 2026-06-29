@@ -141,9 +141,8 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 -DSLANG_USE_SCCACHE=OFF \
                 $SLANG_CI_DXC_BUILD_FROM_SOURCE \
-                -LA 2>/dev/null \
-              | grep -E "^${option}:(BOOL|STRING)=" \
-              | sed 's/.*=//' \
+                -LA \
+              | sed -n -E "s/^${option}:(BOOL|STRING)=//p" \
               | tr '[:upper:]' '[:lower:]'
             )
             case "$defaultVal" in
