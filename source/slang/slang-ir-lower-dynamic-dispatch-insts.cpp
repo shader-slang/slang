@@ -1607,28 +1607,58 @@ struct ExistentialLoweringContext : public InstPassBase
         return true;
     }
 
-    // Whether dynamic-dispatch handle types (WitnessTableID / RTTIHandle) are
-    // lowered to a scalar `ulong` rather than `uint2`. This is the single source
-    // of truth for the handle representation; the type lowering
-    // (lowerHandleTypes) and every site that constructs or decomposes a handle
-    // value must agree on it. See lowerHandleTypes() for why Metal differs.
+    // The dynamic-dispatch handle types (WitnessTableID / RTTIHandle) are lowered
+    // to a fixed-layout 64-bit integer carrier. The carrier type and the code
+    // that builds/reads handle values must agree on one representation; the three
+    // helpers below own that choice so that call sites never have to branch on
+    // (or even know) the actual representation.
+    //
+    // `uint2` was the original carrier (PR #9386) so that SPIR-V output would not
+    // require the Int64 capability. Metal, however, disallows casting a vector to
+    // a pointer: a handle later bit-cast to a `device T*` (e.g. a serialized
+    // existential's RTTI/witness slot reconstructed as a pointer) emits
+    // `(device T*)(uint2)`, which MSL rejects. Metal fully supports `ulong`, and a
+    // scalar `ulong`->pointer cast is legal, so on Metal the carrier is `ulong`
+    // instead. The byte size (8) is unchanged either way, so the in-memory layout
+    // of a serialized existential is identical across targets. See issue #11313.
     bool useUInt64HandleRepresentation() { return isMetalTarget(targetProgram->getTargetReq()); }
 
-    // Replace all WitnessTableID type or RTTIHandleType with a fixed-layout
-    // 64-bit integer representation: `uint2` on most targets, but `ulong`
-    // (UInt64) on Metal.
-    //
-    // `uint2` was chosen originally (PR #9386) so that SPIR-V output would not
-    // require the Int64 capability. Metal, however, disallows casting a vector
-    // to a pointer: a handle that is later bit-cast to a `device T*` (e.g. a
-    // serialized existential's RTTI/witness slot reconstructed as a pointer)
-    // emits `(device T*)(uint2)`, which MSL rejects. Metal fully supports
-    // `ulong`, and a scalar `ulong`->pointer cast is legal, so on Metal we lower
-    // these handles to `ulong` instead. The byte size (8) is unchanged, so the
-    // memory layout of serialized existentials is preserved. See issue #11313.
+    // Return the lowered IR type that carries a dynamic-dispatch handle: a scalar
+    // `ulong` on Metal, or a `uint2` elsewhere.
+    IRType* getLoweredHandleType(IRBuilder& builder)
+    {
+        if (useUInt64HandleRepresentation())
+            return builder.getUInt64Type();
+        return builder.getVectorType(
+            builder.getUIntType(),
+            builder.getIntValue(builder.getIntType(), 2));
+    }
+
+    // Build a lowered handle value carrying the 32-bit `id` in its low bits, to
+    // match getLoweredHandleType(): zero-extend `id` into a `ulong` on Metal, or
+    // pack it into element 0 of a `uint2` (element 1 = 0) elsewhere.
+    IRInst* makeHandleFromID(IRBuilder& builder, IRInst* id)
+    {
+        if (useUInt64HandleRepresentation())
+            return builder.emitCast(builder.getUInt64Type(), id);
+        IRInst* args[] = {id, builder.getIntValue(builder.getUIntType(), 0)};
+        return builder.emitMakeVector(getLoweredHandleType(builder), 2, args);
+    }
+
+    // Read the 32-bit id back out of a lowered handle value produced by
+    // makeHandleFromID(): truncate the `ulong` to `uint` on Metal, or extract
+    // element 0 of the `uint2` elsewhere.
+    IRInst* getIDFromHandle(IRBuilder& builder, IRInst* handle)
+    {
+        if (useUInt64HandleRepresentation())
+            return builder.emitCast(builder.getUIntType(), handle);
+        UInt index = 0;
+        return builder.emitSwizzle(builder.getUIntType(), handle, 1, &index);
+    }
+
+    // Replace every WitnessTableID / RTTIHandle type with its lowered carrier.
     void lowerHandleTypes()
     {
-        const bool useUInt64 = useUInt64HandleRepresentation();
         List<IRInst*> instsToRemove;
         for (auto inst : module->getGlobalInsts())
         {
@@ -1642,18 +1672,7 @@ struct ExistentialLoweringContext : public InstPassBase
                 {
                     IRBuilder builder(module);
                     builder.setInsertBefore(inst);
-                    IRType* loweredType = nullptr;
-                    if (useUInt64)
-                    {
-                        loweredType = builder.getUInt64Type();
-                    }
-                    else
-                    {
-                        loweredType = builder.getVectorType(
-                            builder.getUIntType(),
-                            builder.getIntValue(builder.getIntType(), 2));
-                    }
-                    inst->replaceUsesWith(loweredType);
+                    inst->replaceUsesWith(getLoweredHandleType(builder));
                     instsToRemove.add(inst);
                 }
                 break;
@@ -1894,8 +1913,9 @@ struct ExistentialLoweringContext : public InstPassBase
     bool lowerCreateExistentialObject(IRCreateExistentialObject* inst)
     {
         // Turn an instruction of the form `IRCreateExistentialObject(witnessTableID, value)`
-        // into a `MakeTuple(makeVector(rttiHandleType, 0, 0), makeVector(witnessTableIDType,
-        // witnessTableId, 0), reinterpret(targetValueType, value))`.
+        // into a `MakeTuple(rttiHandle, witnessTableIDHandle, reinterpret(targetValueType,
+        // value))`, where the two handles are built by the handle helpers (the RTTI handle
+        // is a zero placeholder; the witness handle carries the witness-table id).
         //
 
         IRBuilder builder(module);
@@ -1904,34 +1924,12 @@ struct ExistentialLoweringContext : public InstPassBase
         auto witnessTableID = inst->getOperand(0);
         auto value = inst->getOperand(1);
 
-        // Build the RTTI and witness-table-ID handle values to match the lowered
-        // handle representation chosen in lowerHandleTypes(): on Metal a scalar
-        // `ulong`, elsewhere a `uint2` (low element = id, high element = 0). The
-        // RTTI handle is a zero placeholder. The witness table id occupies the
-        // low 32 bits; on Metal it is zero-extended into the `ulong`.
-        IRInst* rttiHandle = nullptr;
-        IRInst* witnessTableIDHandle = nullptr;
-        if (useUInt64HandleRepresentation())
-        {
-            rttiHandle = builder.getIntValue(builder.getUInt64Type(), 0);
-            witnessTableIDHandle = builder.emitCast(builder.getUInt64Type(), witnessTableID);
-        }
-        else
-        {
-            auto uint2Type = builder.getVectorType(
-                builder.getUIntType(),
-                builder.getIntValue(builder.getIntType(), 2));
-
-            IRInst* rttiHandleArgs[] = {
-                builder.getIntValue(builder.getUIntType(), 0),
-                builder.getIntValue(builder.getUIntType(), 0)};
-            rttiHandle = builder.emitMakeVector(uint2Type, 2, rttiHandleArgs);
-
-            IRInst* witnessTableIDArgs[] = {
-                witnessTableID,
-                builder.getIntValue(builder.getUIntType(), 0)};
-            witnessTableIDHandle = builder.emitMakeVector(uint2Type, 2, witnessTableIDArgs);
-        }
+        // Build the RTTI and witness-table-ID handle values via the handle
+        // helpers, so this site does not depend on the lowered representation.
+        // The RTTI handle is a zero placeholder; the witness handle carries the
+        // witness-table id in its low 32 bits.
+        auto rttiHandle = makeHandleFromID(builder, builder.getIntValue(builder.getUIntType(), 0));
+        auto witnessTableIDHandle = makeHandleFromID(builder, witnessTableID);
 
         // Get the target value type from the existential tuple type
         auto tupleType = as<IRTupleType>(inst->getDataType());
@@ -1952,10 +1950,9 @@ struct ExistentialLoweringContext : public InstPassBase
 
     bool processGetSequentialIDInst(IRGetSequentialID* inst)
     {
-        // If the operand is a witness table, it has already been replaced with the
-        // lowered handle representation chosen by lowerHandleTypes() — a `uint2`
-        // (id in element 0) on most targets, or a scalar `ulong` (id in the low 32
-        // bits) on Metal. The id is read back accordingly below.
+        // If the operand is a witness table, it has already been lowered to a witness
+        // handle by lowerHandleTypes(); read the sequential id back out of it with
+        // getIDFromHandle() (which knows the representation, so this site need not).
         //
 
         IRBuilder builder(module);
@@ -1971,20 +1968,10 @@ struct ExistentialLoweringContext : public InstPassBase
             return true;
         }
 
-        // The sequential id is the low 32 bits of the lowered witness handle.
-        // For the `uint2` representation that is element 0; for the scalar
-        // `ulong` representation (Metal) a swizzle is not valid, so truncate to
-        // `uint` instead. See lowerHandleTypes() and useUInt64HandleRepresentation().
-        IRInst* id = nullptr;
-        if (useUInt64HandleRepresentation())
-        {
-            id = builder.emitCast(builder.getUIntType(), inst->getRTTIOperand());
-        }
-        else
-        {
-            UInt index = 0;
-            id = builder.emitSwizzle(builder.getUIntType(), inst->getRTTIOperand(), 1, &index);
-        }
+        // The sequential id is the low 32 bits of the lowered witness handle; the
+        // handle helper reads it back out without this site needing to know the
+        // representation.
+        auto id = getIDFromHandle(builder, inst->getRTTIOperand());
         inst->replaceUsesWith(id);
         inst->removeAndDeallocate();
         return true;
