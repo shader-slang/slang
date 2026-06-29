@@ -214,7 +214,7 @@ enum class FloatingPointLiteralType
 //
 // When outIsOutOfRange is true, the return value is either:
 // - 0        - underflow (between 0 and denormal min)
-// - INFINITY - overflow (above maximum double value)
+// - INFINITY - overflow (above maximum value for the literal type)
 //
 // When outPrecisionLost is true, the significand was truncated. Reported only
 // for hex floats and when outIsOutOfRange is false.
