@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <vector>
 
 using namespace rhi;
@@ -476,8 +477,13 @@ static int64_t getStaticInt(slang::ProgramLayout* layout, const char* typeName, 
     auto var = layout->findVarByNameInType(type, varName);
     SLANG_CHECK_ABORT(var != nullptr);
 
-    int64_t value = 0;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(var->getDefaultValueInt(&value)));
+    Slang::ComPtr<slang::IBlob> blob;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(var->getDefaultValueBlob(blob.writeRef())));
+    SLANG_CHECK_ABORT(blob != nullptr);
+    SLANG_CHECK_ABORT(blob->getBufferSize() == sizeof(int32_t));
+
+    int32_t value = 0;
+    memcpy(&value, blob->getBufferPointer(), sizeof(value));
     return value;
 }
 

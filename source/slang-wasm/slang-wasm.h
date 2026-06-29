@@ -143,6 +143,7 @@ public:
     // slang::wgsl::UserAttribute* findUserAttributeByName(SlangSession* globalSession, std::string
     // name);
     bool hasDefaultValue();
+    emscripten::val getDefaultValueBlob();
     // slang::wgsl::GenericReflection* getGenericContainer();
     // slang::wgsl::VariableReflection* applySpecializations(slang::wgsl::GenericReflection*
     // generic);
@@ -205,6 +206,11 @@ public:
     slang::wgsl::EntryPointReflection* findEntryPointByName(std::string name);
 
     slang::wgsl::FunctionReflection* findFunctionByName(std::string name);
+
+    slang::wgsl::TypeReflection* findTypeByName(std::string name);
+    slang::wgsl::VariableReflection* findVarByNameInType(
+        slang::wgsl::TypeReflection* type,
+        std::string name);
 
     slang::ProgramLayout* interface() const { return (slang::ProgramLayout*)this; }
 

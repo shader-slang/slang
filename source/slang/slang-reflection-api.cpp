@@ -1865,8 +1865,9 @@ SlangBindingType _calcResourceBindingType(Type* type)
             return SlangBindingType(SLANG_BINDING_TYPE_TYPED_BUFFER | mutableFlag);
         }
     }
-    else if (const auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type);
-             structuredBufferType)
+    else if (
+        const auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type);
+        structuredBufferType)
     {
         if (as<HLSLStructuredBufferType>(type))
         {
@@ -3354,6 +3355,7 @@ SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inV
     return false;
 }
 
+// Removes cast wrappers that do not change which initializer value should be serialized.
 static Expr* unwrapDefaultValueExpr(Expr* expr)
 {
     for (;;)
@@ -3375,6 +3377,7 @@ static Expr* unwrapDefaultValueExpr(Expr* expr)
     }
 }
 
+// Counts initializer arguments after removing AST wrappers that do not change the value.
 static Count getDefaultValueArgCount(Expr* expr)
 {
     expr = unwrapDefaultValueExpr(expr);
@@ -3385,6 +3388,7 @@ static Count getDefaultValueArgCount(Expr* expr)
     return 0;
 }
 
+// Gets one initializer argument after the same value-preserving unwrap as the count helper.
 static Expr* getDefaultValueArg(Expr* expr, Index index)
 {
     expr = unwrapDefaultValueExpr(expr);
@@ -3395,6 +3399,7 @@ static Expr* getDefaultValueArg(Expr* expr, Index index)
     return nullptr;
 }
 
+// Appends one scalar value using its serialized blob type, not any destination layout stride.
 template<typename T>
 static void appendDefaultValueBytes(List<uint8_t>& outBytes, T value)
 {
@@ -3403,6 +3408,7 @@ static void appendDefaultValueBytes(List<uint8_t>& outBytes, T value)
     memcpy(outBytes.getBuffer() + offset, &value, sizeof(T));
 }
 
+// Appends a bool as the 32-bit scalar representation used by Slang's GPU scalar layout.
 static void appendDefaultBoolValue(List<uint8_t>& outBytes, bool value)
 {
     appendDefaultValueBytes(outBytes, uint32_t(value ? 1 : 0));
@@ -3411,11 +3417,13 @@ static void appendDefaultBoolValue(List<uint8_t>& outBytes, bool value)
 static constexpr Index kMaxDefaultValueBlobBytes = 16 * 1024 * 1024;
 static constexpr Index kMaxDefaultValueEnumIndirections = 64;
 
+// Checks the global blob size cap that prevents reflection from producing very large blobs.
 static bool hasDefaultValueBlobCapacity(List<uint8_t> const& bytes)
 {
     return bytes.getCount() <= kMaxDefaultValueBlobBytes;
 }
 
+// Finds the AST builder that can resolve types and generic substitutions for a reflected decl.
 static bool getDefaultValueASTBuilder(Decl* decl, ASTBuilder*& outASTBuilder)
 {
     outASTBuilder = nullptr;
@@ -3432,6 +3440,7 @@ static bool getDefaultValueASTBuilder(Decl* decl, ASTBuilder*& outASTBuilder)
     return outASTBuilder != nullptr;
 }
 
+// Appends an integer literal converted to the requested serialized scalar type.
 template<typename T>
 static bool appendIntegerLiteralDefaultValue(IntegerLiteralExpr* expr, List<uint8_t>& outBytes)
 {
@@ -3442,6 +3451,7 @@ static bool appendIntegerLiteralDefaultValue(IntegerLiteralExpr* expr, List<uint
     return true;
 }
 
+// Appends an integer-like literal, accepting bool literals where Slang permits bool-to-int casts.
 template<typename T>
 static bool appendIntegerLikeLiteralDefaultValue(
     IntegerLiteralExpr* intLiteral,
@@ -3456,6 +3466,7 @@ static bool appendIntegerLikeLiteralDefaultValue(
     return appendIntegerLiteralDefaultValue<T>(intLiteral, outBytes);
 }
 
+// Appends a semantically resolved integer constant using the serialized scalar type.
 static bool appendIntegerDefaultValue(
     BasicExpressionType* type,
     IntegerLiteralValue value,
@@ -3491,16 +3502,17 @@ static bool appendIntegerDefaultValue(
         appendDefaultValueBytes(outBytes, uint64_t(value));
         return true;
     case BaseType::IntPtr:
-        appendDefaultValueBytes(outBytes, intptr_t(value));
+        appendDefaultValueBytes(outBytes, int64_t(value));
         return true;
     case BaseType::UIntPtr:
-        appendDefaultValueBytes(outBytes, uintptr_t(value));
+        appendDefaultValueBytes(outBytes, uint64_t(value));
         return true;
     default:
         return false;
     }
 }
 
+// Appends a numeric literal converted through Slang's scalar literal conversion rules.
 template<typename T>
 static bool appendNumericLiteralDefaultValue(
     IntegerLiteralExpr* intLiteral,
@@ -3516,6 +3528,7 @@ static bool appendNumericLiteralDefaultValue(
     return appendIntegerLikeLiteralDefaultValue<T>(intLiteral, boolLiteral, outBytes);
 }
 
+// Appends a half literal after converting supported scalar literal forms to IEEE half bits.
 static bool appendHalfLiteralDefaultValue(
     IntegerLiteralExpr* intLiteral,
     FloatingPointLiteralExpr* floatLiteral,
@@ -3540,6 +3553,7 @@ static bool appendHalfLiteralDefaultValue(
     return false;
 }
 
+// Appends non-basic packed floating-point literal types that are represented by custom Type nodes.
 static bool appendSpecialFloatLiteralDefaultValue(Type* type, Expr* expr, List<uint8_t>& outBytes)
 {
     expr = unwrapDefaultValueExpr(expr);
@@ -3580,6 +3594,7 @@ static bool appendSpecialFloatLiteralDefaultValue(Type* type, Expr* expr, List<u
     return false;
 }
 
+// Appends a zero-initialized scalar of the requested serialized type.
 template<typename T>
 static bool appendDefaultConstructedScalarValue(List<uint8_t>& outBytes)
 {
@@ -3587,6 +3602,7 @@ static bool appendDefaultConstructedScalarValue(List<uint8_t>& outBytes)
     return true;
 }
 
+// Appends zero for packed floating-point types that are represented outside BasicExpressionType.
 static bool appendSpecialFloatDefaultConstructedValue(Type* type, List<uint8_t>& outBytes)
 {
     if (as<BFloat16Type>(type))
@@ -3596,6 +3612,7 @@ static bool appendSpecialFloatDefaultConstructedValue(Type* type, List<uint8_t>&
     return false;
 }
 
+// Removes type wrappers that do not change the default-value byte representation.
 static Type* unwrapDefaultValueType(Type* type)
 {
     for (;;)
@@ -3619,6 +3636,7 @@ static Type* unwrapDefaultValueType(Type* type)
     }
 }
 
+// Resolves a compile-time element count; byte limits are enforced while bytes are appended.
 static bool getDefaultValueKnownCount(IntVal* countVal, Index& outCount)
 {
     auto constantVal = as<ConstantIntVal>(countVal);
@@ -3635,6 +3653,7 @@ static bool getDefaultValueKnownCount(IntVal* countVal, Index& outCount)
     return true;
 }
 
+// Resolves a sized array count.
 static bool getDefaultValueArrayElementCount(ArrayExpressionType* arrayType, Index& outElementCount)
 {
     if (arrayType->isUnsized())
@@ -3647,6 +3666,7 @@ static bool appendIntegerConstantDefaultValue(IntVal* value, Type* type, List<ui
 static bool appendDefaultConstructedValue(Type* type, List<uint8_t>& outBytes);
 static bool appendDefaultValue(Type* type, Expr* expr, List<uint8_t>& outBytes);
 
+// Emits a reflected variable's default by preferring resolved constant values over raw syntax.
 static bool appendDefaultValueFromDecl(DeclRef<VarDeclBase> decl, List<uint8_t>& outBytes)
 {
     auto varDecl = decl.getDecl();
@@ -3676,6 +3696,7 @@ static bool appendDefaultValueFromDecl(DeclRef<VarDeclBase> decl, List<uint8_t>&
     return appendDefaultConstructedValue(type, outBytes);
 }
 
+// Emits zero for every basic scalar type using the blob's fixed scalar byte contract.
 static bool appendScalarDefaultConstructedValue(BasicExpressionType* type, List<uint8_t>& outBytes)
 {
     switch (type->getBaseType())
@@ -3699,14 +3720,15 @@ static bool appendScalarDefaultConstructedValue(BasicExpressionType* type, List<
     case BaseType::Double:
         return appendDefaultConstructedScalarValue<uint64_t>(outBytes);
     case BaseType::IntPtr:
-        return appendDefaultConstructedScalarValue<intptr_t>(outBytes);
+        return appendDefaultConstructedScalarValue<int64_t>(outBytes);
     case BaseType::UIntPtr:
-        return appendDefaultConstructedScalarValue<uintptr_t>(outBytes);
+        return appendDefaultConstructedScalarValue<uint64_t>(outBytes);
     default:
         return false;
     }
 }
 
+// Emits one basic scalar initializer, accepting only literal forms that can be represented.
 static bool appendScalarDefaultValue(BasicExpressionType* type, Expr* expr, List<uint8_t>& outBytes)
 {
     expr = unwrapDefaultValueExpr(expr);
@@ -3746,34 +3768,67 @@ static bool appendScalarDefaultValue(BasicExpressionType* type, Expr* expr, List
         return appendHalfLiteralDefaultValue(intLiteral, floatLiteral, boolLiteral, outBytes);
 
     case BaseType::Int:
-        return appendNumericLiteralDefaultValue<int32_t>(intLiteral, floatLiteral, boolLiteral, outBytes);
+        return appendNumericLiteralDefaultValue<int32_t>(
+            intLiteral,
+            floatLiteral,
+            boolLiteral,
+            outBytes);
 
     case BaseType::UInt:
-        return appendNumericLiteralDefaultValue<uint32_t>(intLiteral, floatLiteral, boolLiteral, outBytes);
+        return appendNumericLiteralDefaultValue<uint32_t>(
+            intLiteral,
+            floatLiteral,
+            boolLiteral,
+            outBytes);
 
     case BaseType::Int64:
-        return appendNumericLiteralDefaultValue<int64_t>(intLiteral, floatLiteral, boolLiteral, outBytes);
+        return appendNumericLiteralDefaultValue<int64_t>(
+            intLiteral,
+            floatLiteral,
+            boolLiteral,
+            outBytes);
 
     case BaseType::UInt64:
-        return appendNumericLiteralDefaultValue<uint64_t>(intLiteral, floatLiteral, boolLiteral, outBytes);
+        return appendNumericLiteralDefaultValue<uint64_t>(
+            intLiteral,
+            floatLiteral,
+            boolLiteral,
+            outBytes);
 
     case BaseType::IntPtr:
-        return appendNumericLiteralDefaultValue<intptr_t>(intLiteral, floatLiteral, boolLiteral, outBytes);
+        return appendNumericLiteralDefaultValue<int64_t>(
+            intLiteral,
+            floatLiteral,
+            boolLiteral,
+            outBytes);
 
     case BaseType::UIntPtr:
-        return appendNumericLiteralDefaultValue<uintptr_t>(intLiteral, floatLiteral, boolLiteral, outBytes);
+        return appendNumericLiteralDefaultValue<uint64_t>(
+            intLiteral,
+            floatLiteral,
+            boolLiteral,
+            outBytes);
 
     case BaseType::Float:
-        return appendNumericLiteralDefaultValue<float>(intLiteral, floatLiteral, boolLiteral, outBytes);
+        return appendNumericLiteralDefaultValue<float>(
+            intLiteral,
+            floatLiteral,
+            boolLiteral,
+            outBytes);
 
     case BaseType::Double:
-        return appendNumericLiteralDefaultValue<double>(intLiteral, floatLiteral, boolLiteral, outBytes);
+        return appendNumericLiteralDefaultValue<double>(
+            intLiteral,
+            floatLiteral,
+            boolLiteral,
+            outBytes);
 
     default:
         return false;
     }
 }
 
+// Emits a semantically resolved constant integer after unwrapping aliases around its type.
 static bool appendIntegerConstantDefaultValue(IntVal* value, Type* type, List<uint8_t>& outBytes)
 {
     auto basicType = as<BasicExpressionType>(unwrapDefaultValueType(type));
@@ -3784,6 +3839,7 @@ static bool appendIntegerConstantDefaultValue(IntVal* value, Type* type, List<ui
     return appendIntegerDefaultValue(basicType, constantVal->getValue(), outBytes);
 }
 
+// Emits enum defaults and follows enum-valued aliases with a small recursion guard.
 static bool appendEnumDefaultValue(
     DeclRef<Decl> declRef,
     Type* tagType,
@@ -3794,7 +3850,10 @@ static bool appendEnumDefaultValue(
         return false;
 
     if (auto enumCaseDeclRef = declRef.as<EnumCaseDecl>())
-        return appendIntegerConstantDefaultValue(enumCaseDeclRef.getDecl()->tagVal, tagType, outBytes);
+        return appendIntegerConstantDefaultValue(
+            enumCaseDeclRef.getDecl()->tagVal,
+            tagType,
+            outBytes);
 
     auto varDecl = as<VarDeclBase>(declRef.getDecl());
     if (!varDecl)
@@ -3811,7 +3870,12 @@ static bool appendEnumDefaultValue(
     return appendIntegerConstantDefaultValue(varDecl->val, tagType, outBytes);
 }
 
-static bool appendRepeatedScalarDefaultValue(Type* type, Expr* expr, Index repeatCount, List<uint8_t>& outBytes)
+// Repeats a scalar initializer to support vector splats and default scalar fills.
+static bool appendRepeatedScalarDefaultValue(
+    Type* type,
+    Expr* expr,
+    Index repeatCount,
+    List<uint8_t>& outBytes)
 {
     if (!isScalarType(unwrapDefaultValueType(type)))
         return false;
@@ -3820,10 +3884,13 @@ static bool appendRepeatedScalarDefaultValue(Type* type, Expr* expr, Index repea
     {
         if (!appendDefaultValue(type, expr, outBytes))
             return false;
+        if (!hasDefaultValueBlobCapacity(outBytes))
+            return false;
     }
     return true;
 }
 
+// Emits sequence-like initializers, default-constructing any omitted trailing elements.
 static bool appendSequentialDefaultValue(
     Type* elementType,
     Index elementCount,
@@ -3851,6 +3918,7 @@ static bool appendSequentialDefaultValue(
     return true;
 }
 
+// Emits default-constructed values for a sequence of elements.
 static bool appendSequentialDefaultConstructedValue(
     Type* elementType,
     Index elementCount,
@@ -3866,6 +3934,7 @@ static bool appendSequentialDefaultConstructedValue(
     return true;
 }
 
+// Emits vector defaults, including constructor splats and initializer-list sequencing.
 static bool appendVectorDefaultValue(
     VectorExpressionType* vectorType,
     Expr* expr,
@@ -3873,21 +3942,29 @@ static bool appendVectorDefaultValue(
     List<uint8_t>& outBytes)
 {
     Index elementCount = 0;
+    auto elementType = vectorType->getElementType();
     if (!getDefaultValueKnownCount(vectorType->getElementCount(), elementCount))
         return false;
 
-    auto elementType = vectorType->getElementType();
     const auto argCount = getDefaultValueArgCount(expr);
     if (argCount == 0)
         return appendRepeatedScalarDefaultValue(elementType, expr, elementCount, outBytes);
 
     if (!isInitializerList && argCount == 1 && elementCount > 1)
-        return appendRepeatedScalarDefaultValue(elementType, getDefaultValueArg(expr, 0), elementCount, outBytes);
+        return appendRepeatedScalarDefaultValue(
+            elementType,
+            getDefaultValueArg(expr, 0),
+            elementCount,
+            outBytes);
 
     return appendSequentialDefaultValue(elementType, elementCount, expr, outBytes);
 }
 
-static bool appendArrayDefaultValue(ArrayExpressionType* arrayType, Expr* expr, List<uint8_t>& outBytes)
+// Emits fixed-size array defaults while rejecting arrays that exceed the blob byte cap.
+static bool appendArrayDefaultValue(
+    ArrayExpressionType* arrayType,
+    Expr* expr,
+    List<uint8_t>& outBytes)
 {
     Index elementCount = 0;
     if (!getDefaultValueArrayElementCount(arrayType, elementCount))
@@ -3896,7 +3973,11 @@ static bool appendArrayDefaultValue(ArrayExpressionType* arrayType, Expr* expr, 
     return appendSequentialDefaultValue(arrayType->getElementType(), elementCount, expr, outBytes);
 }
 
-static bool appendMatrixDefaultValue(MatrixExpressionType* matrixType, Expr* expr, List<uint8_t>& outBytes)
+// Emits matrices as a sequence of row vectors, matching the documented blob order.
+static bool appendMatrixDefaultValue(
+    MatrixExpressionType* matrixType,
+    Expr* expr,
+    List<uint8_t>& outBytes)
 {
     Index rowCount = 0;
     if (!getDefaultValueKnownCount(matrixType->getRowCount(), rowCount))
@@ -3905,7 +3986,11 @@ static bool appendMatrixDefaultValue(MatrixExpressionType* matrixType, Expr* exp
     return appendSequentialDefaultValue(matrixType->getRowType(), rowCount, expr, outBytes);
 }
 
-static bool appendStructDefaultValue(DeclRef<AggTypeDecl> aggTypeDeclRef, Expr* expr, List<uint8_t>& outBytes)
+// Emits aggregate defaults with base fields first, then initializer/default field values.
+static bool appendStructDefaultValue(
+    DeclRef<AggTypeDecl> aggTypeDeclRef,
+    Expr* expr,
+    List<uint8_t>& outBytes)
 {
     const auto argCount = getDefaultValueArgCount(expr);
     Index argIndex = 0;
@@ -3925,11 +4010,15 @@ static bool appendStructDefaultValue(DeclRef<AggTypeDecl> aggTypeDeclRef, Expr* 
         }
     }
 
-    for (auto field : getMembersOfType<VarDecl>(astBuilder, aggTypeDeclRef, MemberFilterStyle::Instance))
+    for (auto field :
+         getMembersOfType<VarDecl>(astBuilder, aggTypeDeclRef, MemberFilterStyle::Instance))
     {
         if (argIndex < argCount)
         {
-            if (!appendDefaultValue(getType(astBuilder, field), getDefaultValueArg(expr, argIndex), outBytes))
+            if (!appendDefaultValue(
+                    getType(astBuilder, field),
+                    getDefaultValueArg(expr, argIndex),
+                    outBytes))
                 return false;
         }
         else if (!appendDefaultValueFromDecl(field, outBytes))
@@ -3944,6 +4033,7 @@ static bool appendStructDefaultValue(DeclRef<AggTypeDecl> aggTypeDeclRef, Expr* 
     return argCount <= argIndex;
 }
 
+// Emits one default expression after dispatching through the unwrapped default-value type.
 static bool appendDefaultValue(Type* type, Expr* expr, List<uint8_t>& outBytes)
 {
     const bool isInitializerList = as<InitializerListExpr>(expr) != nullptr;
@@ -3998,6 +4088,7 @@ static bool appendDefaultValue(Type* type, Expr* expr, List<uint8_t>& outBytes)
     return false;
 }
 
+// Emits the all-zero/default value for a type using the same recursive layout as explicit values.
 static bool appendDefaultConstructedValue(Type* type, List<uint8_t>& outBytes)
 {
     type = unwrapDefaultValueType(type);
@@ -4027,7 +4118,10 @@ static bool appendDefaultConstructedValue(Type* type, List<uint8_t>& outBytes)
         if (!getDefaultValueKnownCount(matrixType->getRowCount(), rowCount))
             return false;
 
-        return appendSequentialDefaultConstructedValue(matrixType->getRowType(), rowCount, outBytes);
+        return appendSequentialDefaultConstructedValue(
+            matrixType->getRowType(),
+            rowCount,
+            outBytes);
     }
 
     if (auto arrayType = as<ArrayExpressionType>(type))
