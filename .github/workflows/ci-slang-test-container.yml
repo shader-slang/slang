@@ -75,16 +75,18 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
-          submodules: "recursive"
+          submodules: "false"
           fetch-depth: "1"
 
       - name: Clean inherited checkout state
         run: |
-          # actions/checkout cleans before it checks out this ref. Clean again
-          # after checkout so stale submodule worktrees inherited from a
-          # previous self-hosted runner job cannot trip the post-test worktree
-          # check. This workflow keeps its requested submodules initialized.
-          git submodule foreach --recursive 'git reset --hard && git clean -ffdx'
+          # actions/checkout cleans before it checks out this ref. On
+          # self-hosted runners, submodule worktrees from an older checkout can
+          # therefore survive into this job even though this test workflow does
+          # not request submodules. Remove initialized submodules and then
+          # clean again under the checked-out ref so removed submodule paths,
+          # such as external/slang-binaries, cannot trip the post-test check.
+          git submodule deinit --all --force
           git clean -ffdx
           git reset --hard HEAD
 
