@@ -5,7 +5,7 @@
 // When a shader-terminating ray intrinsic (AcceptHitAndEndSearch / IgnoreHit) is reachable from an
 // `anyhit` entry point only through a *recursive* callee, the CUDA legalizer's pre-pass cannot
 // flatten the call by inlining (a recursive chain would not terminate). Rather than silently
-// dropping the payload write-back, it emits E55213 with actionable guidance.
+// dropping the payload write-back, it emits E55214 with actionable guidance.
 //
 // Such recursion is normally rejected earlier by E55201 ("recursion not allowed"), so this test
 // passes -disable-non-essential-validations to let the recursive chain reach the CUDA legalizer
