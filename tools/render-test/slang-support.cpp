@@ -762,7 +762,9 @@ static SlangResult compileProgram(
         default:
             {
                 ShaderCompileRequest::EntryPoint computeEntryPoint;
-                computeEntryPoint.name = computeEntryPointName;
+                computeEntryPoint.name = options.entryPointName.getLength()
+                                             ? options.entryPointName.getBuffer()
+                                             : computeEntryPointName;
                 computeEntryPoint.slangStage = SLANG_STAGE_COMPUTE;
                 compileRequest.entryPoints.add(computeEntryPoint);
             }

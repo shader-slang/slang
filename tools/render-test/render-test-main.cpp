@@ -235,17 +235,22 @@ static bool _isShaderAbortRequested(const Options& options)
 /// callback may also collect unrelated validation/driver errors during a device-loss, so this
 /// filters to just the abort lines. Emitting them on render-test's stdout lets a `filecheck=`
 /// line in the test assert the abort text (the harness FileCheck runs against captured stdout).
-static void _printCapturedShaderAbortMessages(CoreDebugCallback& callback, WriterHelper out)
+static bool _printCapturedShaderAbortMessages(CoreDebugCallback& callback, WriterHelper out)
 {
     const String captured = callback.getString();
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(captured.getUnownedSlice(), lines);
     const UnownedStringSlice prefix = UnownedStringSlice::fromLiteral("Shader abort: ");
+    bool foundMessage = false;
     for (const auto& line : lines)
     {
         if (line.startsWith(prefix))
+        {
             out.print("%.*s\n", (int)line.getLength(), line.begin());
+            foundMessage = true;
+        }
     }
+    return foundMessage;
 }
 
 class ProgramVars;
@@ -1537,8 +1542,8 @@ Result RenderTestApp::update()
         passEncoder->end();
     }
     m_startTicks = Process::getClockTick();
-    m_queue->submit(encoder->finish());
-    m_queue->waitOnHost();
+    SLANG_RETURN_ON_FAIL(m_queue->submit(encoder->finish()));
+    SLANG_RETURN_ON_FAIL(m_queue->waitOnHost());
 
     // If we are in a mode where output is requested, we need to snapshot the back buffer here
     if (m_options.outputPath.getLength() || m_options.performanceProfile)
@@ -1700,6 +1705,12 @@ static SlangResult _innerMain(
     if (options.deviceType == DeviceType::Default)
     {
         return SLANG_OK;
+    }
+    // Shader abort tests intentionally lose the device, so a cached device would poison later
+    // render-test invocations in the same slang-test process.
+    if (_isShaderAbortRequested(options))
+    {
+        options.cacheRhiDevice = false;
     }
 
     ShaderCompilerUtil::Input input;
@@ -2083,6 +2094,7 @@ static SlangResult _innerMain(
         renderDocBeginFrame();
         SLANG_RETURN_ON_FAIL(app.initialize(session, deviceWrapper.get(), options, input));
 
+        bool capturedShaderAbortMessage = false;
         if (shaderAbortMode)
         {
             // Re-route the device's debug bridge to a local capture buffer for the dispatch, so
@@ -2098,15 +2110,21 @@ static SlangResult _innerMain(
                 // print below and the stdout FileCheck can run.
                 app.update();
             }
-            _printCapturedShaderAbortMessages(abortCapture, stdWriters->getOut());
+            capturedShaderAbortMessage =
+                _printCapturedShaderAbortMessages(abortCapture, stdWriters->getOut());
         }
         else
         {
-            app.update();
+            SLANG_RETURN_ON_FAIL(app.update());
         }
 
         renderDocEndFrame();
         app.finalize();
+
+        if (shaderAbortMode && !capturedShaderAbortMessage)
+        {
+            return SLANG_E_NOT_AVAILABLE;
+        }
     }
 
     return SLANG_OK;
