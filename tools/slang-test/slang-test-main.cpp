@@ -93,6 +93,10 @@ struct TestOptions
     {
         return commandOptions.tryGetValue("filecheck", prefix);
     }
+    bool getFileCheckOutputPath(String& path) const
+    {
+        return commandOptions.tryGetValue("filecheck-output", path);
+    }
     bool getFileCheckBufferPrefix(String& prefix) const
     {
         return commandOptions.tryGetValue("filecheck-buffer", prefix);
@@ -191,6 +195,17 @@ static SlangResult _readTestFile(const TestInput& input, const String& suffix, S
     return Slang::File::readAllText(buf, out);
 }
 
+static String _getTestRelativePath(const TestInput& input, const String& path)
+{
+    if (Path::hasPath(path))
+        return path;
+
+    String testDirectory = Path::getParentDirectory(input.filePath);
+    if (testDirectory.getLength() == 0)
+        return path;
+
+    return Path::combine(testDirectory, path);
+}
 
 bool match(char const** ioCursor, char const* expected)
 {
@@ -1851,6 +1866,44 @@ String removeEmbeddedSourceFromSPIRV(const String& spirvOutput)
     return filteredOutput.produceString();
 }
 
+static SlangResult _readFileCheckOutput(
+    TestContext& context,
+    const TestInput& input,
+    const String& path,
+    bool removeEmbeddedSource,
+    String& out)
+{
+    String resolvedPath = _getTestRelativePath(input, path);
+    if (Path::getPathExt(resolvedPath) != "spv")
+        return File::readAllText(resolvedPath, out);
+
+    List<unsigned char> bytes;
+    SLANG_RETURN_ON_FAIL(File::readAllBytes(resolvedPath, bytes));
+    if ((bytes.getCount() % sizeof(uint32_t)) != 0)
+        return SLANG_FAIL;
+
+    List<uint32_t> words;
+    words.setCount(bytes.getCount() / sizeof(uint32_t));
+    memcpy(words.getBuffer(), bytes.getBuffer(), bytes.getCount());
+
+    DownstreamCompilerDesc desc;
+    desc.type = SLANG_PASS_THROUGH_SPIRV_DIS;
+    auto compiler = DownstreamCompilerUtil::findCompiler(
+        context.getCompilerSet(),
+        DownstreamCompilerUtil::MatchType::Newest,
+        desc);
+    if (!compiler)
+        return SLANG_FAIL;
+
+    SLANG_RETURN_ON_FAIL(
+        compiler->disassembleWithResult(words.getBuffer(), int(words.getCount()), out));
+
+    if (removeEmbeddedSource)
+        out = removeEmbeddedSourceFromSPIRV(out);
+
+    return SLANG_OK;
+}
+
 String getOutput(const ExecuteResult& exeRes, bool removeEmbeddedSource = false)
 {
     ExecuteResult::ResultCode resultCode = exeRes.resultCode;
@@ -2715,7 +2768,30 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         ((target == SLANG_SPIRV || target == SLANG_SPIRV_ASM) &&
          input.testOptions->args.indexOf(kPreserveEmbeddedSourceOption) == Index(-1));
 
-    String actualOutput = getOutput(exeRes, needToRemoveEmbeddedSource);
+    String actualOutput;
+    String fileCheckOutputPath;
+    if (exeRes.resultCode == 0 && context->getFileCheck() &&
+        input.testOptions->getFileCheckOutputPath(fileCheckOutputPath))
+    {
+        if (SLANG_FAILED(_readFileCheckOutput(
+                *context,
+                input,
+                fileCheckOutputPath,
+                needToRemoveEmbeddedSource,
+                actualOutput)))
+        {
+            String resolvedPath = _getTestRelativePath(input, fileCheckOutputPath);
+            context->getTestReporter()->messageFormat(
+                TestMessageType::RunError,
+                "failed to read FileCheck output '%s'",
+                resolvedPath.getBuffer());
+            return TestResult::Fail;
+        }
+    }
+    else
+    {
+        actualOutput = getOutput(exeRes, needToRemoveEmbeddedSource);
+    }
 
     return _validateOutput(
         context,

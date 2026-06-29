@@ -651,8 +651,7 @@ When generating SPIRV with spvDescriptorHeapEXT, emit each resource descriptor-h
 
 <a id="separate-debug-info"></a>
 ### -separate-debug-info
-Emit debug data to a separate file, and strip it from the main output file. Requires an output file
-path specified with `-o`; writing the main artifact to stdout is not supported.
+Emit debug data to a separate file, and strip it from the main output file. Requires an output file path specified with `-o`; writing the main artifact to stdout is not supported. 
 
 
 <a id="emit-cpu-via-cpp"></a>
