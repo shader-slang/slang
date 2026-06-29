@@ -5,7 +5,7 @@
 //TEST:INTERPRET(filecheck=CHECK):
 void main()
 {
-    ////// regular positive floats -- round nearest, ties to even //////
+    ////// regular positive floats -- round to nearest, ties to even //////
 
     float f;
 
@@ -28,7 +28,7 @@ void main()
     //CHECK: 0x4b000002
 
 
-    ////// regular positive half-floats -- round nearest, ties to even //////
+    ////// regular positive half-floats -- round to nearest, ties to even //////
 
     half h;
 

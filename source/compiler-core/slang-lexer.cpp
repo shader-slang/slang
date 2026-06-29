@@ -828,10 +828,14 @@ static double _truncateDouble(
             return std::numeric_limits<double>::infinity();
     }
 
+    // Note: there is a seeming off-by-one with exponents. This is because
+    // frexp() returns a fraction between [0.5, 1). That is, a number such as
+    // 3.5 is decomposed as 0.875 * 2^2, instead of 1.75 * 2^1.
     int exp{};
     double fraction = std::frexp(value, &exp);
 
-    // for subnormals - note the exponent off-by-one comment above.
+    // Additional precision reduction for subnormals - note the exponent
+    // off-by-one comment above.
     int precisionLoss = std::max(minNormalExp - (exp - 1), 0);
 
     int exponentShift = static_cast<int>(precisionBits) - precisionLoss;
@@ -855,19 +859,22 @@ static double _truncateDouble(
         }
         else
         {
-            // Tied. The tie breaker is the least significant retained bit: round up to the even
-            // value, otherwise truncate down to it.
+            // Tied. The tie breaker is the least significant retained
+            // bit. Round up or down to make it 0.
 
+            // integerPart / 2:
+            //
             // intege.r00000
-            //        ^
-            //        lsb
+            //        |
+            //        \- The least significant retained bit. Note: Round-off part
+            //           is 0.5 since we're in this branch.
 
             [[maybe_unused]] double unused{};
             double lsb = std::modf(integerPart / 2.0, &unused);
             if (lsb >= 0.5)
-                fraction = std::round(fraction); // integerPart is odd -> round away to even
+                fraction = std::round(fraction); // round up to make integerPart even
             else
-                fraction = std::trunc(fraction); // integerPart is even -> keep it
+                fraction = std::trunc(fraction); // round down to keep integerPart even
         }
     }
     else
