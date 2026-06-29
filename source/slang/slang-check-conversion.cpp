@@ -747,7 +747,14 @@ bool SemanticsVisitor::createCtorInvokeExprForAbstractType(
     return true;
 }
 
-// translation from initializer list to constructor invocation if the struct has constructor.
+// Try to coerce an initializer list to `toType` by invoking one of `toType`'s
+// explicit constructors, e.g. turning `float3 v = {a, b}` into `float3(a, b)`.
+// Returns whether such a coercion is possible. The return value must be the same
+// whether or not `outExpr` is requested: overload resolution first calls this with
+// `outExpr == nullptr` to probe whether a candidate is viable (see `canCoerce`),
+// then again with `outExpr` set to actually build the expression. Reporting success
+// only when `outExpr` is non-null would make the viability probe a false negative and
+// reject an otherwise-valid candidate.
 bool SemanticsVisitor::createInvokeExprForExplicitCtor(
     Type* toType,
     InitializerListExpr* fromInitializerListExpr,
