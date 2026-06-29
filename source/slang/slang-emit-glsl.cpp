@@ -2875,7 +2875,17 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             //
             // GLSL splits array brackets around the (here absent) declarator, so a
             // nested array writes its outermost dimension unsized and inner dimensions
-            // sized: `ivec2[]` for `ivec2[2]`, `int[][3]` for `int[2][3]`.
+            // sized: `ivec2[]` for `ivec2[2]`, `int[][3]` for `int[2][3]`. The C-like
+            // base emitter spells array types via its declarator machinery, but a
+            // constructor prefix has no declarator name to thread through it, so the
+            // bracket sequence is emitted directly here.
+            //
+            // The outermost dimension is left unsized, so the emitted array length is
+            // fixed entirely by the number of constructor arguments below. That is
+            // correct because a MakeArray carries exactly one operand per declared
+            // element (array-literal lowering pads any missing trailing elements with
+            // the default value before building the inst); a short operand list would
+            // otherwise emit an array of the wrong length.
             auto arrayType = cast<IRArrayType>(inst->getDataType());
 
             IRType* elementType = arrayType->getElementType();

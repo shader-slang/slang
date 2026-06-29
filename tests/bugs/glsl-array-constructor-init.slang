@@ -22,6 +22,19 @@ static const int2 a[2] = {{1, 1}, {2, 2}};
 static const int b[3] = {10, 20, 30};
 static const int m[2][3] = {{1, 2, 3}, {4, 5, 6}};
 
+// MakeArrayFromElement coverage. `getDefaultVal` of an array type emits a
+// MakeArrayFromElement (broadcasting the default element) at
+// slang-lower-to-ir.cpp:6526, and simplify-for-emit only decomposes that inst for
+// IRStore users, so this global default-initialized const array (no store user)
+// reaches GLSL emit. It is consumed whole by a helper rather than indexed directly
+// here, so it is not constant-folded away, and emits as the broadcast `int[](0, 0, 0, 0)`.
+static const int z[4] = {};
+
+int sumPair(int arr[4], uint i)
+{
+    return arr[i % 4u] + arr[(i + 1u) % 4u];
+}
+
 struct Result
 {
     float4 pos : SV_Position;
@@ -31,15 +44,19 @@ struct Result
 Result main(uint vid : SV_VertexID)
 {
     Result r;
-    int s = a[vid][0] + b[vid] + m[vid % 2][vid % 3];
+    int s = a[vid][0] + b[vid] + m[vid % 2][vid % 3] + sumPair(z, vid);
     r.pos = float4(float(s), 0, 0, 0);
     return r;
 }
 
 // Array values must use GLSL array-constructor syntax, never C-style brace init.
-// GLSL-DAG: ivec2[](
-// GLSL-DAG: int[](
+// Each check pins a distinct emitted array (specific operands avoid CHECK-DAG
+// collisions): MakeArray (one operand per element) and the MakeArrayFromElement
+// broadcast (the default-initialized z[4] -> `int[](0, 0, 0, 0)`).
+// GLSL-DAG: ivec2[](ivec2(1, 1), ivec2(2, 2))
+// GLSL-DAG: int[](10, 20, 30)
 // GLSL-DAG: int[][3](
+// GLSL-DAG: int[](0, 0, 0, 0)
 
 // The GLSL above compiles through glslang to valid SPIR-V, proving the
 // constructor syntax (including the nested int[][3](...)) is accepted.
