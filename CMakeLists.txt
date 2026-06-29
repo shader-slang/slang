@@ -314,6 +314,11 @@ advanced_option(
     "Build using user defined path for cmark"
     OFF
 )
+advanced_option(
+    SLANG_OVERRIDE_FAST_FLOAT_PATH
+    "Build using user defined path for fast_float"
+    OFF
+)
 
 set(SLANG_EXCLUDE_DAWN_DEFAULT ON)
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")

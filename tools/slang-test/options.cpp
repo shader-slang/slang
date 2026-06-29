@@ -575,7 +575,7 @@ static bool _isSubCommand(const char* arg)
                     fileEntryCount++;
                 }
             }
-            Options::ExpectedFailureFileInfo fileInfo;
+            Options::TestListFileInfo fileInfo;
             fileInfo.fileName = fileName;
             fileInfo.count = fileEntryCount;
             optionsOut->expectedFailureFiles.add(fileInfo);
@@ -593,6 +593,7 @@ static bool _isSubCommand(const char* arg)
             File::readAllText(fileName, text);
             List<UnownedStringSlice> lines;
             StringUtil::split(text.getUnownedSlice(), '\n', lines);
+            int fileEntryCount = 0;
             for (auto line : lines)
             {
                 // Remove comments (everything after '#' character)
@@ -610,8 +611,13 @@ static bool _isSubCommand(const char* arg)
                     Slang::StringBuilder sb;
                     Slang::Path::simplify(trimmedLine, Slang::Path::SimplifyStyle::NoRoot, sb);
                     optionsOut->skipList.add(sb);
+                    fileEntryCount++;
                 }
             }
+            Options::TestListFileInfo fileInfo;
+            fileInfo.fileName = fileName;
+            fileInfo.count = fileEntryCount;
+            optionsOut->skipListFiles.add(fileInfo);
         }
         else if (strcmp(arg, "-test-dir") == 0)
         {
@@ -737,6 +743,15 @@ static bool _isSubCommand(const char* arg)
         for (const auto& fileInfo : optionsOut->expectedFailureFiles)
         {
             stdOut.print(" - %s : %d tests\n", fileInfo.fileName.getBuffer(), fileInfo.count);
+        }
+    }
+
+    if (optionsOut->verbosity >= VerbosityLevel::Info && optionsOut->skipListFiles.getCount() > 0)
+    {
+        stdOut.print("Skip lists:\n");
+        for (const auto& fileInfo : optionsOut->skipListFiles)
+        {
+            stdOut.print(" - %s : %d entries\n", fileInfo.fileName.getBuffer(), fileInfo.count);
         }
     }
 

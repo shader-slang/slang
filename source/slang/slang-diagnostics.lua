@@ -873,6 +873,13 @@ err(
 )
 
 err(
+    "operator-name-used-as-variable-name",
+    20020,
+    "operator name used as variable name",
+    span { loc = "location", message = "an operator name cannot be used as the name of a variable; an 'operator' declaration must be a function" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
@@ -4548,6 +4555,13 @@ err(
     span { loc = "location", message = "can have at most one 'shader record' attributed constant buffer; found ~count:Int." }
 )
 
+err(
+    "vk-location-on-non-varying-parameter",
+    39021,
+    "vk::location not allowed on non-varying parameter",
+    span { loc = "location", message = "'[[vk::location(...)]]' is not allowed on '~paramName:Name', which is not a varying (stage input/output) parameter; use '[[vk::binding(...)]]' to set the binding of a constant buffer or resource." }
+)
+
 warning(
     "vk-index-without-vk-location",
     39022,
@@ -5331,6 +5345,13 @@ err(
 )
 
 err(
+    "string-type-not-supported-on-kernel-target",
+    55213,
+    "'String' is not supported on this target",
+    span { loc = "location", message = "the 'String' type and its operations are not supported when generating kernel code for this target; use 'NativeString' for a null-terminated string, or compile for a host target" }
+)
+
+err(
     "unsupported-recursion",
     55201,
     "recursion not allowed",
@@ -5545,6 +5566,12 @@ err(
     "spirv-resource-heap-stride-too-small",
     57005,
     "SPIR-V resource heap stride '~stride:Int' is too small for RaytracingAccelerationStructure descriptor heap entries; expected at least '~minimumStride:Int' bytes."
+)
+
+err(
+    "spirv-conflicting-descriptor-heap-stride-options",
+    57006,
+    "'-spirv-resource-heap-stride' and '-spirv-unified-descriptor-heap-stride' cannot be used together; an explicit resource heap stride and the unified maximum stride are mutually exclusive."
 )
 
 -- GLSL Compatibility (58001-58003)

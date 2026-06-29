@@ -280,12 +280,33 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
         // in as a out parameter or not
         return getCallUsageType(as<IRCall>(user), inst);
 
-    // These instructions will store data...
     case kIROp_Store:
+    case kIROp_AtomicStore:
     case kIROp_SwizzledStore:
     case kIROp_MatrixSwizzleStore:
+        // Each of these writes to its destination pointer (operand 0) but
+        // *reads* the value/source being stored (operand 1). When the tracked
+        // instruction is that value -- rather than the destination -- the store
+        // reads it, so classify it as a `Load`. This lets a direct copy of an
+        // uninitialized value (e.g. `x = uninit;` or `v.x = uninit;`) be
+        // detected just like feeding it to an expression (`x = uninit + 1.0;`).
+        //
+        // A pointer-typed operand is excluded: a store whose value is an
+        // address (e.g. a variable's own address in `self.self = &self;`, which
+        // lowers to `store(getFieldAddr(self), self)` with the `self` pointer as
+        // the value) stores that address without reading the pointed-to memory,
+        // so it is not a use of the location. This applies the same
+        // pointer-vs-value rule as the `default` case below, but on a different
+        // subject: here it tests the stored value's type
+        // (`inst->getDataType()`), whereas the `default` case tests the using
+        // instruction's type (`user->getDataType()`).
+        if (inst == user->getOperand(1) && !as<IRPtrTypeBase>(inst->getDataType()))
+            return Load;
+        return Store;
+
+    // A SPIR-V asm block is opaque -- its operands have no fixed read/write
+    // role -- so conservatively treat any use by one as a store (a write).
     case kIROp_SPIRVAsm:
-    case kIROp_AtomicStore:
         return Store;
 
     case kIROp_SPIRVAsmOperandInst:
