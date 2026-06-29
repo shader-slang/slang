@@ -1,4 +1,4 @@
-name: Nightly Slang Agentic Test
+name: Nightly Slang Test
 
 # Runs the LLM-generated, doc-anchored test bundles under
 # docs/generated/tests/ via `slang-test -test-dir docs/generated/tests`.
