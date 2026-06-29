@@ -11284,9 +11284,17 @@ void SemanticsVisitor::checkExtensionMemberConflicts(ExtensionDecl* extensionDec
 
     auto const& candidateExtensions = getCandidateExtensions(targetAggDeclRef, this);
     auto thisExtensionIndex = candidateExtensions.indexOf(extensionDecl);
-    // An extension always appears among its own target type's candidate extensions, so we can
-    // assert that invariant and collect strictly-earlier siblings without a fallback.
-    SLANG_ASSERT(thisExtensionIndex >= 0);
+    // An extension whose target was rejected is never registered as a candidate of that target, so
+    // it is absent from `candidateExtensions` and `indexOf` returns -1. The reachable case is
+    // `extension <interface> {...}`: an `InterfaceDecl` is an `AggTypeDecl` (so it passes the
+    // `as<AggTypeDecl>()` guard above), but extending an interface is itself an error
+    // (`InvalidExtensionOnInterface`), so the extension is diagnosed and never registered. Such an
+    // extension is already invalid and has no siblings to compare against, so there is nothing for
+    // this diagnostic to add — return rather than piling a second diagnostic onto broken code.
+    if (thisExtensionIndex < 0)
+        return;
+    // Comparing only against strictly-earlier siblings reports each cross-extension pair exactly
+    // once (by the later extension).
     for (Index ii = 0; ii < thisExtensionIndex; ++ii)
         otherMemberSources.add(candidateExtensions[ii]);
 
@@ -11297,7 +11305,7 @@ void SemanticsVisitor::checkExtensionMemberConflicts(ExtensionDecl* extensionDec
     // yet when we run. Force every declaration whose modifiers we are about to inspect to
     // `ReadyForConformances` so the exemption sees a stable answer; otherwise an `extension`
     // declared before its interface would produce a spurious diagnostic on valid code.
-    ensureDecl(targetAggDecl, DeclCheckState::ReadyForConformances);
+    // (`otherMemberSources[0]` is `targetAggDecl`, so the loop already covers the extended type.)
     for (auto source : otherMemberSources)
         ensureDecl(source, DeclCheckState::ReadyForConformances);
 
@@ -11323,6 +11331,9 @@ void SemanticsVisitor::checkExtensionMemberConflicts(ExtensionDecl* extensionDec
             for (auto rawOther : source->getDirectMemberDecls())
             {
                 auto other = maybeGetInner(rawOther);
+                // `otherMemberSources` is the extended type plus strictly-earlier sibling
+                // extensions — never this extension — so `member` and `other` always come from
+                // different containers; the self-comparison guard is defensive, not load-bearing.
                 if (other == member)
                     continue;
                 if (other->getName() != memberName)

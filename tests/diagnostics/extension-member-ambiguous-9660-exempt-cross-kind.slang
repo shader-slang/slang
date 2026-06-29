@@ -15,6 +15,5 @@ extension CrossKind
     struct sameName { int a; }
 }
 
-// Exhaustive diag=CHECK mode fails on any unannotated diagnostic, so a clean run here proves no
-// 41037 was emitted; the CHECK-NOT documents that intent explicitly against the message text.
-//CHECK-NOT: declared in more than one place
+// Exhaustive diag=CHECK mode fails the test on any unannotated diagnostic, so a clean run here
+// proves no 41037 ("...declared in more than one place...") was emitted for this exempt case.
