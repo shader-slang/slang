@@ -7,9 +7,17 @@
 
 #include "core/slang-char-encode.h"
 #include "core/slang-string-escape-util.h"
+#include "core/slang-string-util.h"
+#include "fast_float/fast_float.h"
 #include "slang-core-diagnostics.h"
 #include "slang-name.h"
 #include "slang-source-loc.h"
+
+#include <algorithm>
+#include <bit>
+#include <cmath>
+#include <cstdint>
+#include <limits>
 
 namespace Slang
 {
@@ -774,132 +782,570 @@ IntegerLiteralValue getIntegerLiteralValue(
     return value;
 }
 
+// Converts a literal in hexadecimal format to double. The return value is truncated
+// in case the significand in the literal cannot be fit.
+//
+// Params:
+//
+//   start            - literal (after 0x)
+//   end              - end of literal; start + strlen(literal)
+//   suffix           - pointer to receive the first unhandled character
+//   outIsOutOfRange  - Whether the value is out of range. Return value is
+//                      either 0 for subnormal underflow or INFINITY for overflow.
+//   outPrecisionLost - Significand was truncated. Only reported if the value was in range.
+//
+// Return:              Parsed value.
+//
+//
+static double _hexFloatLiteralToDouble(
+    const char* start,
+    const char* end,
+    const char*& suffix,
+    bool& outIsOutOfRange,
+    bool& outPrecisionLost)
+{
+    const char* cursor{start};
+    int64_t exponent{};
+    uint64_t significand{};
+    int64_t exponentBias{};
+    bool significandDotSeen{};
+    double ret{};
+    bool isOutOfRange{};
+    bool precisionLost{};
+
+    suffix = start;
+
+    while (cursor != end)
+    {
+        uint64_t digit{};
+        char c = *cursor;
+
+        if ((c >= '0') && (c <= '9'))
+            digit = static_cast<uint64_t>(c - '0');
+        else if ((c >= 'A') && (c <= 'F'))
+            digit = 10U + static_cast<uint64_t>(c - 'A');
+        else if ((c >= 'a') && (c <= 'f'))
+            digit = 10U + static_cast<uint64_t>(c - 'a');
+        else if (!significandDotSeen && (c == '.'))
+        {
+            significandDotSeen = true;
+            ++cursor;
+            continue;
+        }
+        else
+            break;
+
+        // check whether the significand has room for this digit
+        if ((significand & 0xF000000000000000U) == 0U)
+        {
+            significand <<= 4U;
+            significand |= digit;
+
+            if (significandDotSeen)
+                exponentBias -= 4;
+        }
+        else
+        {
+            // No more room, so just update the exponent if we're on the left
+            // side of the dot.
+            if (!significandDotSeen)
+                exponentBias += 4;
+
+            // significand is being truncated
+            if (digit != 0U)
+                precisionLost = true;
+        }
+
+        ++cursor;
+    }
+
+    if (cursor != start)
+        suffix = cursor;
+
+    // do/while for breakable exit
+    do
+    {
+        // significand parsed?
+        if (cursor == start)
+            break;
+
+        // read 'p'/'P'
+        if ((cursor == end) || ((*cursor != 'p') && (*cursor != 'P')))
+            break;
+        ++cursor;
+
+        bool sign{};
+
+        // read optional sign
+        if ((cursor != end) && ((*cursor == '+') || (*cursor == '-')))
+        {
+            sign = (*cursor == '-');
+            ++cursor;
+        }
+
+        while (cursor != end)
+        {
+            int64_t digit{};
+            char c = *cursor;
+            if ((c >= '0') && (c <= '9'))
+                digit = static_cast<int64_t>(c - '0');
+            else
+                break;
+
+            exponent *= 10;
+            exponent += digit;
+            exponent = std::min(exponent, std::numeric_limits<int64_t>::max() / 100);
+
+            ++cursor;
+            suffix = cursor;
+        }
+
+        if (sign)
+            exponent = -exponent;
+
+    } while (false);
+
+    // was something parsed?
+    if (suffix != start)
+    {
+        // start by applying exponent bias
+        exponent += exponentBias;
+
+        if (significand != 0U)
+        {
+            // normalize significand
+            int leadingZeroes = std::countl_zero(significand);
+            significand <<= leadingZeroes;
+            exponent -= leadingZeroes;
+
+            // truncate significand to 53 bits or less in case of subnormals
+            if (significand & 0x7FFU)
+                precisionLost = true;
+
+            significand >>= 11U;
+            exponent += 11;
+
+            // Note: normal exponent range is [-1022, 1023]. Numbers smaller
+            // than 2^-1022 are expressed as subnormals. In case of smaller
+            // exponents, we'll clamp the final exponent range to the normal
+            // range and shift the significand right. This prevents potential
+            // issues with rounding.
+            if (exponent < (-1022 - 52))
+            {
+                int64_t diff = (-1022 - 52) - exponent;
+                if (diff > 52)
+                {
+                    significand = 0;
+                    precisionLost = true;
+                }
+                else
+                {
+                    uint64_t lostBitsMask = (uint64_t{1U} << diff) - 1U;
+                    if (significand & lostBitsMask)
+                        precisionLost = true;
+                    significand >>= diff;
+                }
+
+                exponent = (-1022 - 52);
+            }
+
+            // now calculate the actual value
+            ret = static_cast<double>(significand);
+            ret *= std::exp2(-52);
+            exponent += 52;
+            ret *= std::exp2(exponent); // apply exponent
+
+            // detect underflow/overflow
+            isOutOfRange = (ret == 0.0 || (!std::isfinite(ret)));
+        }
+        else
+        {
+            // if significand is 0, then the value is 0 no matter the exponent
+            ret = 0.0;
+            isOutOfRange = false;
+        }
+    }
+
+    outIsOutOfRange = isOutOfRange;
+    outPrecisionLost = precisionLost && !isOutOfRange;
+    return ret;
+}
+
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
-    UnownedStringSlice* outSuffix)
+    UnownedStringSlice* outSuffix,
+    bool* outIsOutOfRange,
+    bool* outPrecisionLost)
 {
-    FloatingPointLiteralValue value = 0;
+    FloatingPointLiteralValue value{};
+    bool isOutOfRange{}; // underflow/overflow detection
+    bool precisionLost{};
 
     const UnownedStringSlice content = token.getContent();
 
     char const* cursor = content.begin();
     char const* end = content.end();
 
-    int radix = _readOptionalBase(&cursor);
-
-    bool seenDot = false;
-    FloatingPointLiteralValue divisor = 1;
-    for (;;)
+    if (UnownedStringSlice(cursor, end).startsWith("0x") ||
+        UnownedStringSlice(cursor, end).startsWith("0X"))
     {
-        if (*cursor == '.')
+        // Manual implementation for hex-to-double
+        // translation. std::from_chars() does not work reliably on Mac and
+        // fast_float only supports decimal floats. Fortunately, hex-to-double
+        // is reasonably straightforward.
+
+        cursor += 2U;
+        value = _hexFloatLiteralToDouble(cursor, end, cursor, isOutOfRange, precisionLost);
+    }
+    else
+    {
+        // We'll use fast_float to handle decimal float formats. This should
+        // give us bit-exact input regardless of the toolchain used to compile
+        // slang.
+
+        value = 0.0; // default in case of errors. fast_float sets the value
+                     // appropriately in case of result_out_of_range
+        auto result = fast_float::from_chars(cursor, end, value);
+        cursor = result.ptr;
+
+        if (result.ec == std::errc::result_out_of_range)
         {
-            cursor++;
-            seenDot = true;
-            continue;
+            // overflow-to-infinity or underflow-to-zero
+            isOutOfRange = true;
         }
-
-        int digit = _maybeReadDigit(&cursor, radix);
-        if (digit < 0)
-            break;
-
-        value = value * radix + digit;
-
-        if (seenDot)
+        else if (result.ec != std::errc{})
         {
-            divisor *= radix;
+            // We can still fail to parse literals here, since our accepted
+            // floating point format is narrower than the tokenizer general
+            // literal format. This should trigger an invalid suffix error later
+            // on.
+            value = 0.0;
         }
     }
 
-    if (*cursor == '#')
+    // check for special exponent for infinity
+    if ((cursor != end) && (*cursor == '#'))
     {
-        // It must be INF
         const auto inf = toSlice("#INF");
 
         if (UnownedStringSlice(cursor, end).startsWith(inf))
         {
-            if (outSuffix)
-            {
-                *outSuffix = UnownedStringSlice(cursor + inf.getLength(), end);
-            }
-
             value = INFINITY;
-
-            return value;
+            isOutOfRange = false;
+            cursor += inf.getLength();
         }
     }
-
-    // Now read optional exponent
-    if (_isNumberExponent(*cursor, radix))
-    {
-        cursor++;
-
-        bool exponentIsNegative = false;
-        switch (*cursor)
-        {
-        default:
-            break;
-
-        case '-':
-            exponentIsNegative = true;
-            cursor++;
-            break;
-
-        case '+':
-            cursor++;
-            break;
-        }
-
-        int exponentRadix = 10;
-        int exponent = 0;
-
-        for (;;)
-        {
-            int digit = _maybeReadDigit(&cursor, exponentRadix);
-            if (digit < 0)
-                break;
-
-            exponent = exponent * exponentRadix + digit;
-        }
-
-        FloatingPointLiteralValue exponentBase = 10;
-        if (radix == 16)
-        {
-            exponentBase = 2;
-        }
-
-        FloatingPointLiteralValue exponentValue = pow(exponentBase, exponent);
-
-        if (exponentIsNegative)
-        {
-            divisor *= exponentValue;
-        }
-        else
-        {
-            value *= exponentValue;
-        }
-    }
-
-    value /= divisor;
 
     if (outSuffix)
-    {
         *outSuffix = UnownedStringSlice(cursor, end);
-    }
+
+    if (outIsOutOfRange)
+        *outIsOutOfRange = isOutOfRange;
+
+    if (outPrecisionLost)
+        *outPrecisionLost = precisionLost;
 
     return value;
 }
 
-IntegerLiteralValue getCharLiteralValue(Token const& token)
+static bool _isHexDigit(char c)
 {
-    String unquotedContent = StringEscapeUtil::unquote('\'', token.getContent());
-    StringBuilder unescaped(4);
-    auto escapeHandler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp);
-    escapeHandler->appendUnescaped(unquotedContent.getUnownedSlice(), unescaped);
+    return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
+}
 
-    char const* cursor = unescaped.getBuffer();
+static uint32_t _parseHexNumber(
+    const char*& cursor,
+    const char* const e,
+    size_t maxDigits,
+    bool& outOverflow)
+{
+    uint32_t value{};
+    size_t numDigits{};
+    bool overflow{};
 
-    IntegerLiteralValue codepoint = getUnicodePointFromUTF8([&]() { return *cursor++; });
-    return codepoint;
+    while ((cursor != e) && (numDigits < maxDigits) && _isHexDigit(*cursor))
+    {
+        uint8_t digit{};
+        if (*cursor >= '0' && *cursor <= '9')
+            digit = *cursor - '0';
+        else if (*cursor >= 'A' && *cursor <= 'F')
+            digit = 10 + (*cursor - 'A');
+        else
+            digit = 10 + (*cursor - 'a');
+
+        if (value & uint64_t{0xF000'0000})
+            overflow = true;
+
+        value <<= 4U;
+        value |= digit;
+
+        ++numDigits;
+        ++cursor;
+    }
+
+    outOverflow = overflow;
+    return value;
+}
+
+// Decodes string escape sequence, returns -1 on failure
+//
+// Preconditions:
+// - cursor != e      -- there must be at least 1 character
+// - *cursor == '\\'  -- first char of escape sequence must be backslash
+static IntegerLiteralValue _decodeStringEscape(
+    const char*& cursor,
+    const char* const e,
+    bool& outUnicode)
+{
+    bool unicode{};
+    int64_t value{};
+
+    // this should have been already checked before we get here
+    SLANG_ASSERT(*cursor == '\\');
+    SLANG_ASSERT(cursor != e);
+
+    ++cursor;
+
+    // check that there is an escape sequence after '\'
+    if (cursor == e)
+        value = -1;
+    else
+    {
+        uint8_t byte = *cursor++;
+        switch (byte)
+        {
+        case '\'':
+            value = '\'';
+            break;
+
+        case '"':
+            value = '"';
+            break;
+
+        case '\\':
+            value = '\\';
+            break;
+
+        case '?':
+            value = '?';
+            break;
+
+        case 'a':
+            value = 7;
+            break;
+
+        case 'b':
+            value = 8;
+            break;
+
+        case 'f':
+            value = 12;
+            break;
+
+        case 'n':
+            value = 10;
+            break;
+
+        case 'r':
+            value = 13;
+            break;
+
+        case 't':
+            value = 9;
+            break;
+
+        case 'v':
+            value = 11;
+            break;
+
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+            {
+                value = byte - '0';
+                size_t numChars = 1U;
+                while (cursor != e && *cursor >= '0' && *cursor <= '7' && numChars < 3U)
+                {
+                    value <<= 3;
+                    value |= static_cast<uint8_t>(*cursor - '0');
+                    ++cursor;
+                    ++numChars;
+                }
+                break;
+            }
+
+        case 'x':
+            {
+                bool overflow{};
+
+                if ((cursor != e) && (*cursor == '{'))
+                {
+                    // \x{...}
+
+                    ++cursor;
+                    value = _parseHexNumber(cursor, e, 255U, overflow);
+
+                    if ((cursor != e) && (*cursor == '}'))
+                        ++cursor;
+                }
+                else
+                {
+                    // \x...
+                    value = _parseHexNumber(cursor, e, 255U, overflow);
+                }
+
+                if (overflow)
+                    value = -1;
+
+                break;
+            }
+
+        case 'u':
+            {
+                bool overflow{};
+
+                if ((cursor != e) && (*cursor == '{'))
+                {
+                    // \u{...}
+
+                    ++cursor;
+                    value = _parseHexNumber(cursor, e, 255U, overflow);
+
+                    if ((cursor != e) && (*cursor == '}'))
+                        ++cursor;
+
+                    if (overflow)
+                        value = -1;
+                }
+                else
+                {
+                    // \u...
+                    value = _parseHexNumber(cursor, e, 4U, overflow);
+
+                    // note: value cannot overflow here (4 hex digits max), so we'll
+                    // guard this with assert instead of check to avoid unreachable
+                    // branches
+                    SLANG_ASSERT(!overflow);
+                }
+
+                unicode = true;
+                break;
+            }
+
+        case 'U':
+            {
+                bool overflow{};
+                value = _parseHexNumber(cursor, e, 8U, overflow);
+
+                // note: value cannot overflow here (8 hex digits max), so we'll
+                // guard this with assert instead of check to avoid unreachable
+                // branches
+                SLANG_ASSERT(!overflow);
+
+                unicode = true;
+
+                break;
+            }
+
+        default:
+            value = -1;
+        }
+    }
+
+    outUnicode = unicode;
+    return value;
+}
+
+static String _inputToByteSeq(const char* b, const char* e)
+{
+    StringBuilder byteSeqBuilder;
+    for (const char* i = b; i != e; ++i)
+    {
+        if (i == b)
+            StringUtil::appendFormat(
+                byteSeqBuilder,
+                "0x%02X",
+                unsigned{static_cast<unsigned char>(*i)});
+        else
+            StringUtil::appendFormat(
+                byteSeqBuilder,
+                " 0x%02X",
+                unsigned{static_cast<unsigned char>(*i)});
+    }
+    return byteSeqBuilder.toString();
+}
+
+IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink)
+{
+    // See docs/language-reference/expressions-literal.md for the literal format.
+
+    UnownedStringSlice content = token.getContent();
+
+    // sanity check
+    if (content.getLength() < 3U)
+    {
+        diagnose(sink, token.getLoc(), LexerDiagnostics::illegalCharacterLiteral);
+        return -1;
+    }
+
+    // unquoted begin/end pointers
+    const char* const b = content.begin() + 1;
+    const char* const e = content.end() - 1;
+    const char* cursor = b;
+    IntegerLiteralValue ret{};
+
+    if (*cursor == '\\')
+    {
+        // handle escape
+        bool unicode{};
+        const char* literalStart = cursor;
+        ret = _decodeStringEscape(cursor, e, unicode);
+
+        // note: unicode matters only with string literals
+        static_cast<void>(unicode);
+
+        if (ret == -1)
+        {
+            StringBuilder sb;
+            sb.append(literalStart, cursor - literalStart);
+            diagnose(sink, token.getLoc(), LexerDiagnostics::invalidStringEscape, sb.getBuffer());
+        }
+    }
+    else
+    {
+        bool invalid{};
+        ret = getUnicodePointFromUTF8(
+            [&cursor, e]() -> unsigned char
+            {
+                if (cursor < e)
+                    return static_cast<unsigned char>(*cursor++);
+                else
+                {
+                    // 0xFF is invalid byte anywhere in UTF-8, so this will
+                    // trigger an error in the decoder
+                    return 0xFFU;
+                }
+            },
+            &invalid);
+
+        if (invalid)
+        {
+            diagnose(
+                sink,
+                token.getLoc(),
+                LexerDiagnostics::invalidUtf8ByteSequence,
+                _inputToByteSeq(b, cursor).getBuffer());
+
+            ret = -1;
+        }
+    }
+
+    return ret;
 }
 
 static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
@@ -992,26 +1438,100 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
                 }
                 break;
 
+            case 'U':
+            case 'u':
             case 'x':
-                // hexadecimal escape: any number of characters
-                _advance(lexer);
-                for (;;)
                 {
-                    int d = _peek(lexer);
-                    if (('0' <= d) && (d <= '9') || ('a' <= d) && (d <= 'f') ||
-                        ('A' <= d) && (d <= 'F'))
+                    // Hexadecimal 'x' escape has any number of digits.
+                    //
+                    // Unicode 'u' escape has either 4 hex digits or '\u{xxx}' form with
+                    // arbitrary number of digits.
+                    //
+                    // Unicode 'U' escape has either 8 hex digits
+                    StringBuilder sb;
+                    const char escapeChar = static_cast<char>(_peek(lexer));
+
+                    sb.append('\\');
+                    sb.append(escapeChar);
+                    _advance(lexer);
+
+                    bool curlyBraces{};
+                    if ((escapeChar != 'U') && (_peek(lexer) == '{'))
                     {
+                        curlyBraces = true;
                         _advance(lexer);
-                        continue;
+                        sb.append('{');
+                    }
+
+                    size_t numDigits{};
+
+                    for (;;)
+                    {
+                        int d = _peek(lexer);
+                        if (('0' <= d) && (d <= '9') || ('a' <= d) && (d <= 'f') ||
+                            ('A' <= d) && (d <= 'F'))
+                        {
+                            sb.append(static_cast<char>(d));
+                            _advance(lexer);
+                            ++numDigits;
+                            continue;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+
+                    if (curlyBraces)
+                    {
+                        if (_peek(lexer) == '}')
+                        {
+                            sb.append('}');
+                            _advance(lexer);
+
+                            // check that there's at least one digit
+                            if (numDigits == 0U)
+                                diagnose(
+                                    lexer->getDiagnosticSink(),
+                                    _getSourceLoc(lexer),
+                                    LexerDiagnostics::invalidStringEscape,
+                                    sb.getBuffer());
+                        }
+                        else
+                            diagnose(
+                                lexer->getDiagnosticSink(),
+                                _getSourceLoc(lexer),
+                                LexerDiagnostics::invalidStringEscape,
+                                sb.getBuffer());
                     }
                     else
                     {
-                        break;
-                    }
-                }
-                break;
+                        if ((escapeChar == 'x') && (numDigits == 0U))
+                            diagnose(
+                                lexer->getDiagnosticSink(),
+                                _getSourceLoc(lexer),
+                                LexerDiagnostics::invalidStringEscape,
+                                sb.getBuffer());
 
-                // TODO: Unicode escape sequences
+                        if ((escapeChar == 'u') && (numDigits != 4U))
+                            diagnose(
+                                lexer->getDiagnosticSink(),
+                                _getSourceLoc(lexer),
+                                LexerDiagnostics::invalidUnicodeStringEscape,
+                                "u",
+                                4U);
+
+                        if ((escapeChar == 'U') && (numDigits != 8U))
+                            diagnose(
+                                lexer->getDiagnosticSink(),
+                                _getSourceLoc(lexer),
+                                LexerDiagnostics::invalidUnicodeStringEscape,
+                                "U",
+                                8U);
+                    }
+
+                    break;
+                }
             }
             break;
 
@@ -1088,7 +1608,7 @@ UnownedStringSlice getRawStringLiteralTokenValue(Token const& token)
     return UnownedStringSlice(contentBegin, contentEnd);
 }
 
-String getStringLiteralTokenValue(Token const& token)
+String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
 {
     SLANG_ASSERT(token.type == TokenType::StringLiteral || token.type == TokenType::CharLiteral);
 
@@ -1115,11 +1635,12 @@ String getStringLiteralTokenValue(Token const& token)
     StringBuilder valueBuilder;
     while (cursor < end)
     {
-        auto c = *cursor++;
+        auto c = *cursor;
 
         // If we see a closing quote, then we are at the end of the string literal
         if (c == quote)
         {
+            ++cursor;
             SLANG_ASSERT(cursor == end);
             return valueBuilder.produceString();
         }
@@ -1128,122 +1649,66 @@ String getStringLiteralTokenValue(Token const& token)
         // just append them to the buffer and move on.
         if (c != '\\')
         {
+            ++cursor;
             valueBuilder.append(c);
             continue;
         }
 
-        // Now we look at another character to figure out the kind of
-        // escape sequence we are dealing with:
+        // decode escape sequence
+        bool unicode{};
+        const char* literalStart = cursor;
+        IntegerLiteralValue charValue = _decodeStringEscape(cursor, end, unicode);
 
-        if (cursor >= end)
-            break;
-        char d = *cursor++;
-
-        switch (d)
+        if (charValue >= 0)
         {
-        // Simple characters that just needed to be escaped
-        case '\'':
-        case '\"':
-        case '\\':
-        case '?':
-            valueBuilder.append(d);
-            continue;
-
-        // Traditional escape sequences for special characters
-        case 'a':
-            valueBuilder.append('\a');
-            continue;
-        case 'b':
-            valueBuilder.append('\b');
-            continue;
-        case 'f':
-            valueBuilder.append('\f');
-            continue;
-        case 'n':
-            valueBuilder.append('\n');
-            continue;
-        case 'r':
-            valueBuilder.append('\r');
-            continue;
-        case 't':
-            valueBuilder.append('\t');
-            continue;
-        case 'v':
-            valueBuilder.append('\v');
-            continue;
-
-        // Octal escape: up to 3 characters
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
+            if (!unicode)
             {
-                cursor--;
-                int value = 0;
-                for (int ii = 0; ii < 3; ++ii)
+                // single byte
+                if (charValue <= 255)
                 {
-                    if (cursor >= end)
-                        break;
-                    d = *cursor;
-                    if (('0' <= d) && (d <= '7'))
-                    {
-                        value = value * 8 + (d - '0');
-
-                        cursor++;
-                        continue;
-                    }
-                    else
-                    {
-                        break;
-                    }
+                    valueBuilder.append(static_cast<char>(charValue));
                 }
-
-                // TODO: add support for appending an arbitrary code point?
-                valueBuilder.append((char)value);
+                else
+                {
+                    String hexSB;
+                    hexSB.append(charValue, 16);
+                    diagnose(
+                        sink,
+                        token.getLoc(),
+                        LexerDiagnostics::outOfRangeCodeUnit,
+                        charValue,
+                        hexSB.getBuffer());
+                }
             }
-            continue;
-
-        // Hexadecimal escape: any number of characters
-        case 'x':
+            else
             {
-                int value = 0;
-                for (;;)
+                char buffer[4]{};
+                size_t numBytes = encodeUnicodePointToUTF8(static_cast<Char32>(charValue), buffer);
+                SLANG_ASSERT(numBytes <= 4);
+
+                if (numBytes >= 1)
                 {
-                    if (cursor >= end)
-                        break;
-                    d = *cursor++;
-                    int digitValue = 0;
-                    if (('0' <= d) && (d <= '9'))
-                    {
-                        digitValue = d - '0';
-                    }
-                    else if (('a' <= d) && (d <= 'f'))
-                    {
-                        digitValue = d - 'a';
-                    }
-                    else if (('A' <= d) && (d <= 'F'))
-                    {
-                        digitValue = d - 'A';
-                    }
-                    else
-                    {
-                        cursor--;
-                        break;
-                    }
-
-                    value = value * 16 + digitValue;
+                    valueBuilder.append(buffer, numBytes);
                 }
-
-                // TODO: add support for appending an arbitrary code point?
-                valueBuilder.append((char)value);
+                else
+                {
+                    String hexSB;
+                    hexSB.append(charValue, 16);
+                    diagnose(
+                        sink,
+                        token.getLoc(),
+                        LexerDiagnostics::outOfRangeCodePointForUtf8,
+                        charValue,
+                        hexSB.getBuffer());
+                }
             }
-            continue;
+        }
+        else
+        {
+            StringBuilder sb;
+            sb.append(literalStart, cursor - literalStart);
 
-            // TODO: Unicode escape sequences
+            diagnose(sink, token.getLoc(), LexerDiagnostics::invalidStringEscape, sb.getBuffer());
         }
     }
 

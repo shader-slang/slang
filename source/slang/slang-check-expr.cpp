@@ -12,6 +12,7 @@
 // * `slang-check-conversion.cpp` is responsible for the logic of handling type conversion/coercion
 
 #include "../core/slang-math.h"
+#include "../core/slang-string-util.h"
 #include "core/slang-char-util.h"
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
@@ -2758,11 +2759,24 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
         auto witness =
             findThisTypeWitness(SubstitutionSet(declRef), as<InterfaceDecl>(decl->parentDecl));
 
-        auto val = WitnessLookupIntVal::tryFold(
-            m_astBuilder,
-            witness,
-            decl,
-            declRef.substitute(m_astBuilder, decl->type.type));
+        auto foldType = declRef.substitute(m_astBuilder, decl->type.type);
+        auto val = WitnessLookupIntVal::tryFold(m_astBuilder, witness, decl, foldType);
+
+        // A signature-type-position fold (e.g. `float[VALUE::COUNT]`) can run before the
+        // conforming type's witness table is built, leaving a symbolic result; ensure its
+        // conformances and re-fold so the value matches the concrete constant the in-body
+        // path produces.
+        if (as<WitnessLookupIntVal>(val))
+        {
+            SLANG_ASSERT(witness);
+            if (auto subDeclRefType = as<DeclRefType>(witness->getSub()))
+            {
+                ensureDecl(
+                    subDeclRefType->getDeclRef().getDecl(),
+                    DeclCheckState::ReadyForConformances);
+                val = WitnessLookupIntVal::tryFold(m_astBuilder, witness, decl, foldType);
+            }
+        }
         return as<IntVal>(val);
     }
 
@@ -4473,6 +4487,27 @@ static bool _getBuiltinCompositeTypeShape(
     return true;
 }
 
+// When both bitwise/shift operands are builtin scalar/vector/matrix types and at least one has a
+// floating-point element type, return that floating-point operand's type (such an operation has no
+// integer interpretation and is rejected with a dedicated diagnostic). Returns null when either
+// operand is non-builtin -- so user-defined `operator OP` (e.g. `operator|(float, MyType)`) and
+// generics fall through to overload resolution -- or when neither is floating-point (`int << uint`,
+// `bool | bool`).
+static Type* _isBuiltinFloatingPointBitwiseOperands(Type* left, Type* right)
+{
+    BaseType leftBase, rightBase;
+    IntVal *leftRows, *leftCols, *rightRows, *rightCols;
+    if (!_getBuiltinCompositeTypeShape(left, leftBase, leftRows, leftCols))
+        return nullptr;
+    if (!_getBuiltinCompositeTypeShape(right, rightBase, rightRows, rightCols))
+        return nullptr;
+    if ((BaseTypeInfo::getInfo(leftBase).flags & BaseTypeInfo::Flag::FloatingPoint) != 0)
+        return left;
+    if ((BaseTypeInfo::getInfo(rightBase).flags & BaseTypeInfo::Flag::FloatingPoint) != 0)
+        return right;
+    return nullptr;
+}
+
 // Compute the common element base type for `a OP b`, following the "usual arithmetic
 // conversions": float beats int; among floats the larger size wins; among ints the larger
 // size wins and on a size tie the unsigned type wins; bool promotes to the other operand.
@@ -4616,7 +4651,20 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         // `-` => signed/float negate; `~` => integer bitwise-not; `!` => bool logical-not.
         bool uEligible = isNeg ? (uInt || uFloat) : (isBitNot ? uInt : /*isLogicalNot*/ uBool);
         if (!uEligible)
+        {
+            // `~` on a builtin floating-point operand has no integer interpretation; diagnose it
+            // with the same error as the binary case (issue #11648) instead of a confusing "no
+            // overload for 'operator~'". Non-builtin operands already returned above.
+            if (isBitNot && uFloat)
+            {
+                getSink()->diagnose(Diagnostics::BitwiseOperatorRequiresIntegerOperands{
+                    .name = uVarExpr->name,
+                    .type = uOperandType,
+                    .expr = expr});
+                return CreateErrorExpr(expr);
+            }
             return nullptr;
+        }
 
         auto node = m_astBuilder->create<BuiltinOperatorExpr>();
         node->op = uKind;
@@ -4684,6 +4732,24 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
             return nullptr;
     }
 
+    // A bitwise/shift operator with a builtin floating-point operand has no integer interpretation.
+    // Reject it here -- before the mixed-shift early return and common-type coercion below -- so
+    // mixed-type shifts (`float << int`, `int << float`), which skip common-type promotion, are
+    // caught too rather than falling through to a confusing "ambiguous"/"no overload" error
+    // (issue #11648). The both-builtin predicate leaves user `operator OP` and generics untouched.
+    if (isBitwise)
+    {
+        if (Type* floatOperandType =
+                _isBuiltinFloatingPointBitwiseOperands(leftArg->type.type, rightArg->type.type))
+        {
+            getSink()->diagnose(Diagnostics::BitwiseOperatorRequiresIntegerOperands{
+                .name = varExpr->name,
+                .type = floatOperandType,
+                .expr = expr});
+            return CreateErrorExpr(expr);
+        }
+    }
+
     // Shift operators do not promote to a common type: `a << b` keeps the type of `a` (the
     // shift amount `b` is converted independently). That asymmetry is not modeled by the
     // common-type rule, so leave mixed-type shifts to overload resolution.
@@ -4717,6 +4783,8 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     // the element type is not valid for the operator family we return null, so the expression
     // falls back to normal overload resolution (which will either find a user-provided overload
     // or produce the appropriate diagnostic) instead of being lowered as a builtin operation.
+    // (Floating-point bitwise/shift operands are rejected earlier with a dedicated diagnostic, so
+    // a non-integer bitwise operand reaching here is `bool`, which still resolves via `ILogical`.)
     //   - bitwise/shift (`& | ^ << >> ~`): integer only;
     //   - equality (`== !=`): integer, floating-point, or bool;
     //   - arithmetic (`+ - * / %`) and ordering comparison (`< > <= >=`): integer or float.
@@ -5053,6 +5121,127 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     return checkedExpr;
 }
 
+// Find the in-scope identifier whose spelling is closest to `name`, to power a
+// "did you mean ...?" suggestion when `name` failed to resolve. Walks the scope
+// chain (and each scope's sibling chain) collecting the names of direct members,
+// computes the case-insensitive Levenshtein distance to each, and returns the
+// single closest candidate within a small distance threshold. Returns nullptr if
+// nothing is close enough (so the caller can simply omit the suggestion), or if
+// two candidates tie at the closest distance (so the output never depends on
+// import/scope-walk order).
+//
+// Only direct members of the lexical scope chain are considered; inherited and
+// extension members reached via the `this`-parameter breadcrumb in real lookup
+// are deliberately not searched, to keep this off the hot path of successful
+// lookups. `semantics` is used to skip candidates the user could not access.
+static Name* findClosestInScopeName(
+    SemanticsVisitor* semantics,
+    Name* name,
+    Scope* scope,
+    Decl* declToExclude)
+{
+    if (!name)
+        return nullptr;
+
+    const UnownedStringSlice target = getUnownedStringSliceText(name);
+
+    // Scale the allowed edit distance with the identifier length and cap it, so
+    // that we only offer genuinely-close names (e.g. `lenght` -> `length`, or
+    // `f_a` -> `f_b`) and never a wildly different one (e.g. the keyword `case`
+    // -> the module `core`, a distance-2 edit on a 4-char name). The heuristic is
+    // roughly one edit per three characters with a floor of one. Names shorter
+    // than 3 chars are too short to suggest against; and we also refuse
+    // pathologically long names, since suggestions are advisory and not worth an
+    // O(N*M) Levenshtein DP per candidate on an adversarial multi-kilobyte
+    // identifier.
+    if (target.getLength() < 3 || target.getLength() > 256)
+        return nullptr;
+    const Index maxDistance = Math::Min<Index>(3, Math::Max<Index>(1, target.getLength() / 3));
+
+    Index bestDistance = maxDistance + 1;
+    // The *distinct* candidate names sharing the current best distance. Names are
+    // deduped (the "nub" of the candidate list) so that, e.g., two overloads
+    // both called `length` count once: they would print the identical
+    // suggestion, so they are not a genuine ambiguity. A suggestion is offered
+    // only when this set ends up with exactly one name.
+    HashSet<Name*> bestNames;
+
+    for (Scope* s = scope; s; s = s->parent)
+    {
+        for (Scope* sib = s; sib; sib = sib->nextSibling)
+        {
+            auto containerDecl = sib->containerDecl;
+            if (!containerDecl)
+                continue;
+
+            // Don't suggest names from the core module. Its global scope holds
+            // thousands of builtins, so almost any identifier finds a spurious
+            // close match there (e.g. `instance` -> `distance`); restricting to
+            // user-written declarations keeps suggestions quiet and relevant.
+            // Skipping the whole container here (rather than per-member) also
+            // avoids iterating — and, for any on-demand-deserialized core
+            // module, materializing — its members via `getDirectMemberDecls()`.
+            if (isFromCoreModule(containerDecl))
+                continue;
+
+            for (auto candidateDecl : containerDecl->getDirectMemberDecls())
+            {
+                Name* candidateName = candidateDecl->getName();
+                if (!candidateName || candidateName == name)
+                    continue;
+
+                // Skip the declaration currently being checked, mirroring the
+                // `getDeclToExcludeFromLookup()` exclusion that real lookup
+                // applies: suggesting it would name something the same lookup
+                // path still cannot resolve.
+                if (candidateDecl == declToExclude)
+                    continue;
+
+                const UnownedStringSlice candidateText = getUnownedStringSliceText(candidateName);
+                if (candidateText.getLength() == 0)
+                    continue;
+
+                // Cheap length pre-filter: |lenA - lenB| is a lower bound on the
+                // edit distance, so skip candidates that cannot possibly be
+                // within `maxDistance` before paying for the O(lenA*lenB) DP (and
+                // before forcing any lazy member materialization downstream).
+                if (Math::Abs(candidateText.getLength() - target.getLength()) > maxDistance)
+                    continue;
+
+                // Don't suggest a declaration the user could not have referenced:
+                // real lookup already filtered inaccessible (`private`/`internal`)
+                // candidates, so offering one as a "did you mean" would name a
+                // forbidden symbol (and leak imported module contents via typos).
+                if (!semantics->isDeclVisibleFromScope(makeDeclRef(candidateDecl), scope))
+                    continue;
+
+                const Index distance =
+                    StringUtil::calcLevenshteinDistanceCaseInsensitive(target, candidateText);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    bestNames.clear();
+                    bestNames.add(candidateName);
+                }
+                else if (distance == bestDistance)
+                {
+                    bestNames.add(candidateName);
+                }
+            }
+        }
+    }
+
+    // Offer a suggestion only when there is a single, unambiguous closest name.
+    // Multiple distinct names at the best distance would make the chosen one
+    // depend on import/scope-walk order, so suppress the suggestion instead.
+    if (bestDistance > maxDistance || bestNames.getCount() != 1)
+        return nullptr;
+    Name* best = nullptr;
+    for (auto n : bestNames)
+        best = n;
+    return best;
+}
+
 Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
 {
     // If we've already resolved this expression, don't try again.
@@ -5097,8 +5286,19 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
     }
 
     if (!diagnosed)
-        getSink()->diagnose(
-            Diagnostics::UndefinedIdentifier{.name = expr->name, .location = expr->loc});
+    {
+        // If a similarly-spelled identifier is in scope, attach a "did you mean
+        // 'length'?" note to the error; this turns a bare "undefined identifier
+        // 'lenght'" into an actionable hint. The note only renders when
+        // `suggestionLocation` is valid, so a null suggestion is harmless.
+        auto suggestion =
+            findClosestInScopeName(this, expr->name, expr->scope, getDeclToExcludeFromLookup());
+        getSink()->diagnose(Diagnostics::UndefinedIdentifier{
+            .name = expr->name,
+            .suggestion = suggestion,
+            .location = expr->loc,
+            .suggestionLocation = suggestion ? expr->loc : SourceLoc{}});
+    }
 
     return resultExpr;
 }

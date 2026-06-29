@@ -442,6 +442,18 @@ jobs:
           # Generate data exports (CSV and JSON)
           bash ../tools/coverage/generate-data-export.sh reports/history
 
+          # Append today's slangc metrics and regenerate the trend page.
+          # Both steps are non-blocking: a failure emits a warning but does
+          # not abort the deploy of the full coverage report.
+          python3 ../tools/coverage/update-slangc-coverage-history.py \
+            --summary "${REPORT_DIR}/combined-summary.json" \
+            --history reports/slangc-coverage-history.json \
+            || echo "::warning::slangc history update failed; trend page may be stale"
+          python3 ../tools/coverage/generate-slangc-trend.py \
+            --history reports/slangc-coverage-history.json \
+            --output  reports/slangc-coverage-trend.html \
+            || echo "::warning::slangc trend regeneration failed; deploying without updated trend"
+
           # Commit and push if there are changes
           git add reports/ index.html
           if ! git diff --cached --quiet; then

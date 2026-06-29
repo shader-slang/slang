@@ -873,6 +873,13 @@ err(
 )
 
 err(
+    "operator-name-used-as-variable-name",
+    20020,
+    "operator name used as variable name",
+    span { loc = "location", message = "an operator name cannot be used as the name of a variable; an 'operator' declaration must be a function" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
@@ -928,6 +935,20 @@ err(
     span { loc = "location", message = "unexpected function body after signature declaration, is this ';' a typo?" }
 )
 
+warning(
+    "keyword-used-as-name",
+    20103,
+    "keyword used as a name",
+    span { loc = "location", message = "'~name:Name' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts" }
+)
+
+err(
+    "default-value-on-extension-generic-param",
+    20104,
+    "default value on extension generic parameter",
+    span { loc = "location", message = "an extension's generic parameter '~name:Name' is inferred from its target, so it cannot have a default value" }
+)
+
 err(
     "decl-not-allowed",
     30102,
@@ -971,9 +992,15 @@ standalone_note(
     span { loc = "location" }
 )
 
+-- Renumbered from E29104 (#11318) to resolve an integer-code collision
+-- with `MiscDiagnostics::spirvCoreGrammarJSONParseFailure` defined in
+-- `source/compiler-core/slang-misc-diagnostic-defs.h`. Both diagnostics
+-- are alive (~8 emit sites in spirv-core-grammar.cpp for the misc one,
+-- and slang-parser.cpp emits this one), so renumbering is the right
+-- fix; renaming either would break callers.
 err(
     "spirv-instruction-without-result-id",
-    29104,
+    29117,
     "instruction has no result-id operand",
     span { loc = "location", message = "cannot use this 'x = ~opcode ...' syntax because ~opcode does not have a <result-id> operand" }
 )
@@ -1130,7 +1157,10 @@ err(
     "undefined-identifier",
     30015,
     "undefined identifier",
-    span { loc = "location", message = "undefined identifier '~name:Name'." }
+    span { loc = "location", message = "undefined identifier '~name:Name'." },
+    -- Optional "did you mean ...?" note, rendered only when `suggestionLocation`
+    -- is set to a valid location by the caller (i.e. a close in-scope name exists).
+    note { message = "did you mean '~suggestion:Name'?", span { loc = "suggestionLocation" } }
 )
 
 err(
@@ -1912,6 +1942,48 @@ err(
     30437,
     "`countof(...)` pack-count constraint must be written with `countof(...)` on the left side",
     span { loc = "location", message = "write this constraint as `countof(Pack) == IntExpr`" }
+)
+
+err(
+    "generic-specialization-arity-mismatch",
+    30438,
+    "wrong number of arguments in call to generic function",
+    span { loc = "location", message = "could not specialize generic: it expects ~expectedCount:Int parameter(s) but the call provides ~actualCount:Int argument(s)" }
+)
+
+err(
+    "generic-parameter-could-not-be-inferred",
+    30439,
+    "generic parameter could not be inferred",
+    span { loc = "location", message = "could not infer generic argument for parameter '~paramName:Name'" }
+)
+
+err(
+    "generic-argument-does-not-satisfy-constraint",
+    30440,
+    "generic constraint not satisfied",
+    span { loc = "location", message = "could not satisfy the generic constraint '~constraint:String'" }
+)
+
+standalone_note(
+    "see-generic-constraint-declaration",
+    -1,
+    "see generic constraint declaration",
+    span { loc = "location" }
+)
+
+err(
+    "generic-argument-list-arity-mismatch",
+    30441,
+    "wrong number of generic arguments",
+    span { loc = "location", message = "generic '~generic:Decl' expects ~expectedCount:Int generic argument(s) but ~actualCount:Int were provided" }
+)
+
+err(
+    "generic-parameter-unification-conflict",
+    30442,
+    "cannot deduce generic argument",
+    span { loc = "location", message = "cannot deduce generic argument for '~paramName:Name': conflicting requirements '~firstCandidate:String' and '~secondCandidate:String'" }
 )
 
 -- Float bit cast diagnostics
@@ -3765,6 +3837,13 @@ err(
     span { loc = "expr:Expr", message = "ambiguous call to overloaded operation with arguments of type ~args" }
 )
 
+err(
+    "bitwise-operator-requires-integer-operands",
+    39999,
+    "bitwise/shift operator '~name:Name' requires integer operands, but the operand type is ~type:Type",
+    span { loc = "expr:Expr", message = "bitwise/shift operator '~name' requires integer operands" }
+)
+
 standalone_note(
     "overload-candidate",
     40011,
@@ -3936,6 +4015,13 @@ warning(
     span { loc = "location", message = "'~literal' is smaller than the smallest representable value for type ~type, converted to '~convertedValue'" }
 )
 
+warning(
+    "float-hex-literal-precision-lost",
+    40019,
+    "floating-point precision lost",
+    span { loc = "location", message = "significand of '~literal' was truncated, value is now '~truncatedValue'" }
+)
+
 err(
     "matrix-column-or-row-count-is-one",
     39999,
@@ -4015,6 +4101,13 @@ err(
     38012,
     "entry point cannot return array type",
     span { loc = "location", message = "entry point '~entryPoint:Name' cannot return array type '~returnType:Type'" }
+)
+
+err(
+    "entry-point-cannot-be-generic",
+    38014,
+    "generic entry point used without specialization arguments",
+    span { loc = "location", message = "generic entry point '~entryPoint:Name' must be specialized with concrete generic arguments (e.g. via '-specialize' or 'addEntryPointEx'); an unspecialized generic entry point cannot be compiled" }
 )
 
 
@@ -4331,6 +4424,13 @@ err(
 )
 
 err(
+    "unspecialized-global-generic-param-with-uses",
+    38207,
+    "global generic parameter used in code without a concrete binding",
+    span { loc = "location", message = "a global generic parameter ('type_param' / '__generic_value_param') cannot be used in shader code without a concrete binding; such global-scope declarations are intended for reflection and external specialization, not direct use in shader bodies" }
+)
+
+err(
     "cannot-use-resource-type-in-structured-buffer",
     38204,
     "resource type in StructuredBuffer",
@@ -4453,6 +4553,13 @@ err(
     39020,
     "too many shader record constant buffers",
     span { loc = "location", message = "can have at most one 'shader record' attributed constant buffer; found ~count:Int." }
+)
+
+err(
+    "vk-location-on-non-varying-parameter",
+    39021,
+    "vk::location not allowed on non-varying parameter",
+    span { loc = "location", message = "'[[vk::location(...)]]' is not allowed on '~paramName:Name', which is not a varying (stage input/output) parameter; use '[[vk::binding(...)]]' to set the binding of a constant buffer or resource." }
 )
 
 warning(
@@ -5238,6 +5345,13 @@ err(
 )
 
 err(
+    "string-type-not-supported-on-kernel-target",
+    55213,
+    "'String' is not supported on this target",
+    span { loc = "location", message = "the 'String' type and its operations are not supported when generating kernel code for this target; use 'NativeString' for a null-terminated string, or compile for a host target" }
+)
+
+err(
     "unsupported-recursion",
     55201,
     "recursion not allowed",
@@ -5349,6 +5463,13 @@ fatal(
     span { loc = "location", message = "use of uninitialized opaque handle '~handleType:IRInst'." }
 )
 
+err(
+    "opaque-type-in-local-variable-not-allowed-on-khronos",
+    56004,
+    "opaque type in local variable is not supported for Khronos targets",
+    span { loc = "location", message = "a resource or other opaque-typed value ('~type:IRInst') cannot be placed in a function-local variable for Khronos targets (SPIR-V/GLSL) or WGSL; this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function" }
+)
+
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
@@ -5452,6 +5573,12 @@ err(
     "spirv-resource-heap-stride-too-small",
     57005,
     "SPIR-V resource heap stride '~stride:Int' is too small for RaytracingAccelerationStructure descriptor heap entries; expected at least '~minimumStride:Int' bytes."
+)
+
+err(
+    "spirv-conflicting-descriptor-heap-stride-options",
+    57006,
+    "'-spirv-resource-heap-stride' and '-spirv-unified-descriptor-heap-stride' cannot be used together; an explicit resource heap stride and the unified maximum stride are mutually exclusive."
 )
 
 -- GLSL Compatibility (58001-58003)

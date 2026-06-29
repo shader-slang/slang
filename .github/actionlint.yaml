@@ -1,11 +1,13 @@
 self-hosted-runner:
   labels:
-    - arc
+    - analytics
     - benchmark
     - build
     - falcor
+    - GCP
     - GCP-T4
     - GPU
+    - nvrgfx-perf
     - perf
     - regression-test
     - SM80Plus

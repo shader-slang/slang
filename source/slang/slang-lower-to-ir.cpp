@@ -6016,7 +6016,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     }
                     else if (operand.token.type == TokenType::StringLiteral)
                     {
-                        const auto v = getStringLiteralTokenValue(operand.token);
+                        const auto v =
+                            getStringLiteralTokenValue(operand.token, context->getSink());
                         return builder->emitSPIRVAsmOperandLiteral(
                             builder->getStringValue(v.getUnownedSlice()));
                     }
@@ -9637,6 +9638,35 @@ static HumaneSourceLoc _getDebugHumaneLoc(
     return humaneLoc;
 }
 
+// Returns true if `funcDecl` is a constructor that Slang synthesized (a default
+// or member-wise initializer) rather than one the user wrote. Such a function has
+// no user-authored body; its source locations are inherited from the struct and
+// member declarations (see `createCtor` and `synthesizeCtorBodyForMemberVar` in
+// slang-check-decl.cpp). Emitting source-level debug info for it would let a
+// debugger step into the compiler-generated initializer and walk the struct/member
+// declaration lines, so callers suppress debug info for these functions (#11550).
+//
+// Discriminating by flavor (not by the `$init` name) is required: a user-written
+// `__init` is also mangled to `<Type>.$init`, but carries `UserDefined` flavor and
+// must keep its debug info. The IR `IRConstructorDecoration` is attached only after
+// the function's `IRDebugLocationDecoration`, so the AST flavor is what is available in time.
+//
+// The two call sites below (`maybeAddDebugLocationDecoration` on the IRFunc and
+// `maybeEmitDebugLine` on the body) are BOTH load-bearing and non-redundant: a
+// function's `IRDebugLocationDecoration` and its body's `DebugLine`s are produced
+// independently, so neither gate subsumes the other. Both key on `context->funcDecl`,
+// which is the function currently being lowered (the ctor's own IRFunc for the
+// decoration, and the ctor again for the statements lowered under its sub-context);
+// module-level lowering runs with `funcDecl == nullptr`, so the gate is a no-op there.
+static bool isSynthesizedConstructorDecl(FunctionDeclBase* funcDecl)
+{
+    auto ctorDecl = as<ConstructorDecl>(funcDecl);
+    if (!ctorDecl)
+        return false;
+    return ctorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault) ||
+           ctorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
+}
+
 void maybeEmitDebugLine(
     IRGenContext* context,
     StmtLoweringVisitor* visitor,
@@ -9646,6 +9676,11 @@ void maybeEmitDebugLine(
 {
     // Only emit debug line info if debug level is at least Minimal
     if (context->debugInfoLevel == DebugInfoLevel::None)
+        return;
+
+    // A synthesized initializer has no user-authored source, so it must not emit
+    // steppable debug lines (see isSynthesizedConstructorDecl).
+    if (isSynthesizedConstructorDecl(context->funcDecl))
         return;
 
     if (!allowNullStmt)
@@ -9676,6 +9711,13 @@ void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
 {
     // Only emit debug location info if debug level is at least Minimal
     if (context->debugInfoLevel == DebugInfoLevel::None)
+        return;
+
+    // A synthesized initializer must not receive a source-level debug location:
+    // giving its IRFunc one would produce a DebugFunction/DebugScope (and, via
+    // insertDebugValueStore, param DebugVar/DebugValue) and let a debugger step
+    // into compiler-generated code (see isSynthesizedConstructorDecl).
+    if (isSynthesizedConstructorDecl(context->funcDecl))
         return;
 
     IRInst* debugSourceInst = getOrEmitDebugSource(context, inst->sourceLoc);

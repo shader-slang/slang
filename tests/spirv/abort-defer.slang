@@ -1,6 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort -skip-spirv-validation
-// Note: -skip-spirv-validation is required because the bundled spirv-val does not yet
-// know about SPV_KHR_shader_abort. Remove this flag once the validator is updated.
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -capability abort
 
 // Verify that defer lowering inserts cleanup before abort(), even though Abort is
 // represented as a normal intrinsic until SPIR-V legalization turns it into a

@@ -5,9 +5,13 @@ on:
     - cron: "*/15 * * * *" # Every 15 minutes
   workflow_dispatch: {} # Manual trigger
 
+concurrency:
+  group: slang-ci-analytics-publish
+  cancel-in-progress: false
+
 jobs:
   update-health:
-    runs-on: ubuntu-latest
+    runs-on: ["Linux", "self-hosted", "analytics", "GCP"]
     permissions:
       contents: read
       actions: read
@@ -46,12 +50,26 @@ jobs:
 
       - name: Push health page
         run: |
-          cd ci_analytics_repo
+          cd ci_analytics_repo || exit 1
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add health.html status.html
           git add health_snapshots.jsonl 2>/dev/null || true
-          git diff --cached --quiet || {
-            git commit -m "Update CI health $(date -u +%Y-%m-%dT%H:%M)" &&
-            git push
-          }
+          if ! git diff --cached --quiet; then
+            git commit -m "Update CI health $(date -u +%Y-%m-%dT%H:%M)"
+            for attempt in 1 2 3; do
+              if git push; then
+                exit 0
+              fi
+              if [ "$attempt" -eq 3 ]; then
+                break
+              fi
+              echo "Push failed on attempt ${attempt}; rebasing before retry..."
+              git pull --rebase || {
+                echo "Failed to rebase CI health before retry" >&2
+                exit 1
+              }
+            done
+            echo "Failed to push CI health after retries" >&2
+            exit 1
+          fi
