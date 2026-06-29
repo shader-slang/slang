@@ -1,4 +1,4 @@
-name: Retry Yielded Bot CI
+name: CI Retry Yielded Bot
 
 on:
   workflow_run:
@@ -14,7 +14,7 @@ on:
     - cron: "17 * * * *"
 
 concurrency:
-  group: retry-yielded-bot-ci
+  group: ci-retry-yielded-bot
   cancel-in-progress: false
 
 permissions:

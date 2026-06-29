@@ -56,7 +56,7 @@ jobs:
   # gate succeeds immediately and the build jobs (which require this job to
   # succeed) proceed normally. When a throttled bot dispatch must yield to
   # human, merge-queue, or older bot CI, a marker step fails this job so it
-  # consumes no expensive build/test runners; retry-yielded-bot-ci then reruns
+  # consumes no expensive build/test runners; ci-retry-yielded-bot then reruns
   # it once CI is quiet.
   #
   # The job deliberately resolves to success or failure, never 'skipped':
@@ -100,7 +100,7 @@ jobs:
       - name: Stop yielded bot CI
         if: steps.priority.outputs.yielded == 'true'
         run: |
-          echo "::error::priority-gate-yielded: higher-priority CI is active; retry-yielded-bot-ci will rerun this bot CI when quiet"
+          echo "::error::priority-gate-yielded: higher-priority CI is active; ci-retry-yielded-bot will rerun this bot CI when quiet"
           exit 1
 
   # Linux x86_64 builds run in the CI container on the GCP self-hosted build
