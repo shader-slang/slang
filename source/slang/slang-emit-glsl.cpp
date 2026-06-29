@@ -2862,6 +2862,62 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             maybeCloseParens(needClose);
             return true;
         }
+    case kIROp_MakeArray:
+    case kIROp_MakeArrayFromElement:
+        {
+            // GLSL has no C-style brace initializers; an array value must be written
+            // with array-constructor syntax, which is valid since GLSL 1.20. The base
+            // emitter would produce `{ ... }`, which is invalid GLSL, so emit
+            // `elementType[]( e0, e1, ... )` here instead (mirrors the WGSL emitter).
+            //
+            // GLSL splits array brackets around the (here absent) declarator, so a
+            // nested array writes its outermost dimension unsized and inner dimensions
+            // sized: `ivec2[]` for `ivec2[2]`, `int[][3]` for `int[2][3]`.
+            auto arrayType = cast<IRArrayType>(inst->getDataType());
+
+            IRType* elementType = arrayType->getElementType();
+            List<IRInst*> innerDimSizes;
+            while (auto innerArrayType = as<IRArrayType>(elementType))
+            {
+                innerDimSizes.add(innerArrayType->getElementCount());
+                elementType = innerArrayType->getElementType();
+            }
+
+            emitType(elementType);
+            m_writer->emit("[]");
+            for (auto innerDimSize : innerDimSizes)
+            {
+                m_writer->emit("[");
+                emitVal(innerDimSize, getInfo(EmitOp::General));
+                m_writer->emit("]");
+            }
+
+            m_writer->emit("(");
+            if (inst->getOp() == kIROp_MakeArrayFromElement)
+            {
+                // A single element value is broadcast across the outermost dimension.
+                UInt argCount = (UInt)cast<IRIntLit>(arrayType->getElementCount())->getValue();
+                for (UInt aa = 0; aa < argCount; ++aa)
+                {
+                    if (aa != 0)
+                        m_writer->emit(", ");
+                    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                }
+            }
+            else
+            {
+                UInt argCount = inst->getOperandCount();
+                for (UInt aa = 0; aa < argCount; ++aa)
+                {
+                    if (aa != 0)
+                        m_writer->emit(", ");
+                    emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
+                }
+            }
+            m_writer->emit(")");
+
+            return true;
+        }
     default:
         break;
     }
