@@ -4806,10 +4806,10 @@ warning(
 warning(
     "ambiguous-extension-member",
     41037,
-    "member declared with the same signature in more than one place",
+    "member declared in more than one place",
     span {
         loc = "member:Decl",
-        message = "'~member' is declared with the same signature in more than one place (the extended type and/or its 'extension's); which declaration takes effect is currently undefined (see issue #9660)"
+        message = "'~member' is declared in more than one place (the extended type and/or its 'extension's); which declaration takes effect is currently undefined (see issue #9660)"
     },
     note { message = "see the conflicting declaration of '~member' here", span { loc = "conflicting:Decl" } }
 )

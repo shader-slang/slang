@@ -11224,8 +11224,9 @@ void SemanticsVisitor::checkExtensionConformance(ExtensionDecl* decl)
 // categories (e.g. a function and a nested type) is not an ambiguity Slang needs to warn about.
 enum class ExtensionMemberKind
 {
-    Other,    //< Not a member kind we compare (e.g. inheritance clauses, constructors).
-    Callable, //< An ordinary `FuncDecl`, compared by full signature.
+    Other,    //< Not compared for #9660: inheritance clauses, constructors, subscripts, properties
+              //< -- out of scope for this interim diagnostic.
+    Callable, //< An ordinary `FuncDecl`, compared by overlapping signature.
     Type,     //< A nested type, type alias, or associated type, compared by name alone.
     Value,    //< A field or static variable, compared by name alone.
 };
@@ -11283,16 +11284,22 @@ void SemanticsVisitor::checkExtensionMemberConflicts(ExtensionDecl* extensionDec
 
     auto const& candidateExtensions = getCandidateExtensions(targetAggDeclRef, this);
     auto thisExtensionIndex = candidateExtensions.indexOf(extensionDecl);
-    for (Index ii = 0; ii < candidateExtensions.getCount(); ++ii)
-    {
-        // If this extension is not in the candidate list (it should be), fall back to comparing
-        // against all siblings so we still surface conflicts; otherwise only earlier siblings.
-        if (thisExtensionIndex >= 0 && ii >= thisExtensionIndex)
-            break;
-        auto sibling = candidateExtensions[ii];
-        if (sibling != extensionDecl)
-            otherMemberSources.add(sibling);
-    }
+    // An extension always appears among its own target type's candidate extensions, so we can
+    // assert that invariant and collect strictly-earlier siblings without a fallback.
+    SLANG_ASSERT(thisExtensionIndex >= 0);
+    for (Index ii = 0; ii < thisExtensionIndex; ++ii)
+        otherMemberSources.add(candidateExtensions[ii]);
+
+    // The interface-satisfaction exemption below reads `IsOverridingModifier`, which conformance
+    // checking attaches to a member only while the container that owns that member is being
+    // conformance-checked. Module checking advances in source order, so a comparison source
+    // declared textually before its interface-conforming type may not have been conformance-checked
+    // yet when we run. Force every declaration whose modifiers we are about to inspect to
+    // `ReadyForConformances` so the exemption sees a stable answer; otherwise an `extension`
+    // declared before its interface would produce a spurious diagnostic on valid code.
+    ensureDecl(targetAggDecl, DeclCheckState::ReadyForConformances);
+    for (auto source : otherMemberSources)
+        ensureDecl(source, DeclCheckState::ReadyForConformances);
 
     for (auto rawMember : extensionDecl->getDirectMemberDecls())
     {
@@ -11333,6 +11340,13 @@ void SemanticsVisitor::checkExtensionMemberConflicts(ExtensionDecl* extensionDec
                 // conflict.
                 if (memberKind == ExtensionMemberKind::Callable)
                 {
+                    // Generic member functions are out of scope for this interim diagnostic:
+                    // aligning two distinct generic parameter lists is not yet handled, so we skip
+                    // rather than rely on a comparison that would silently never match (the bare,
+                    // unsubstituted `DeclRef`s carry distinct generic parameter decls).
+                    if (as<GenericDecl>(rawMember) || as<GenericDecl>(rawOther))
+                        continue;
+
                     DeclRef<FuncDecl> memberFuncRef(as<FuncDecl>(member));
                     DeclRef<FuncDecl> otherFuncRef(as<FuncDecl>(other));
                     if (!doFunctionSignaturesMatch(memberFuncRef, otherFuncRef))

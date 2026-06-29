@@ -24,8 +24,8 @@ struct ConcreteFunc
 extension ConcreteFunc
 {
     int memFunc() { return 1; }
-//CHECK:^^^^^^^ member declared with the same signature in more than one place
-//CHECK:^^^^^^^ 'memFunc' is declared with the same signature in more than one place (the extended type and/or its 'extension's); which declaration takes effect is currently undefined (see issue #9660)
+//CHECK:^^^^^^^ member declared in more than one place
+//CHECK:^^^^^^^ 'memFunc' is declared in more than one place (the extended type and/or its 'extension's); which declaration takes effect is currently undefined (see issue #9660)
 }
 
 // POSITIVE 2: a nested type declared with the same name on both the primary `struct` and an
@@ -39,6 +39,6 @@ struct ConcreteNested
 extension ConcreteNested
 {
     struct Inner { int b; }
-//CHECK:   ^^^^^ member declared with the same signature in more than one place
-//CHECK:   ^^^^^ 'Inner' is declared with the same signature in more than one place (the extended type and/or its 'extension's); which declaration takes effect is currently undefined (see issue #9660)
+//CHECK:   ^^^^^ member declared in more than one place
+//CHECK:   ^^^^^ 'Inner' is declared in more than one place (the extended type and/or its 'extension's); which declaration takes effect is currently undefined (see issue #9660)
 }
