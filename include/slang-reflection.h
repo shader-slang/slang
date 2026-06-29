@@ -1,9 +1,24 @@
-// `slang.h` is included unconditionally and ahead of this header's include
-// guard on purpose. `slang.h` includes this header so the reflection C-API is
-// declared before `slang.h`'s own C++ reflection wrappers (which call these
-// functions). Letting `slang.h` drive the include order — instead of guarding
-// the include here — keeps these prototypes visible to those wrappers no matter
-// which of the two headers a translation unit includes first.
+// `slang.h` is included unconditionally and *outside* this header's own include
+// guard (`SLANG_REFLECTION_H`) on purpose, because the two headers are mutually
+// dependent: the prototypes below need `slang.h`'s opaque reflection types and
+// `SLANG_API`, while `slang.h`'s C++ reflection wrappers need these prototypes.
+//
+// `slang.h` includes this header from the middle of itself — after its
+// reflection types are defined but before its wrapper classes — so letting
+// `slang.h` drive the include order keeps the prototypes visible to those
+// wrappers no matter which of the two headers a translation unit includes first:
+//
+//   * `slang.h`-first: `slang.h` reaches its `#include "slang-reflection.h"`,
+//     this header is entered for the first time, and the prototypes are declared
+//     ahead of the wrappers that follow.
+//   * `slang-reflection.h`-first: this `#include "slang.h"` runs before our guard
+//     is defined, so `slang.h` is processed top-to-bottom and re-enters this
+//     header at its own include site; `SLANG_REFLECTION_H` is still undefined at
+//     that point, so the prototypes are declared there. Control then returns here
+//     with the guard now set, making the rest of this file a no-op.
+//
+// Recursion terminates because `slang.h` has its own `#ifndef SLANG_H` guard: the
+// nested `#include "slang.h"` above is a no-op once `slang.h` is mid-inclusion.
 #include "slang.h"
 
 #ifndef SLANG_REFLECTION_H
@@ -13,14 +28,15 @@
 
 This header declares the C functions that back Slang's reflection system: the
 `spGetReflection` entry point and the `spReflection*` family. These are the C
-implementation that the C++ reflection wrapper types in `slang.h` (such as
+entry points that the C++ reflection wrapper types in `slang.h` (such as
 `slang::TypeReflection`, `slang::TypeLayoutReflection`, and `slang::ProgramLayout`)
 call into.
 
 These declarations are NOT deprecated. They previously lived in
 `slang-deprecated.h`, which forced `slang.h` to include the deprecated header
-purely to compile its own reflection wrappers. Keeping the reflection C-API in
-its own non-deprecated header lets `slang.h` depend only on active API surface.
+purely to compile its own reflection wrappers. Moving the reflection C-API into
+its own non-deprecated header lets `slang.h`'s reflection wrappers depend on
+active API surface rather than on the deprecated header.
 */
 
 #ifdef __cplusplus
@@ -289,6 +305,9 @@ extern "C"
         SlangReflectionTypeLayout* typeLayout,
         SlangInt subObjectRangeIndex);
 
+// These declarations are intentionally disabled (`#if 0`) and are preserved
+// verbatim from their original home in `slang-deprecated.h`; this header's move
+// does not revive or remove them.
 #if 0
     SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeCount(SlangReflectionTypeLayout* typeLayout);
     SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeObjectCount(SlangReflectionTypeLayout* typeLayout, SlangInt index);
@@ -656,6 +675,10 @@ extern "C"
 }
 #endif
 
+// `spReflection_GetSession` is declared *outside* the `extern "C"` block above
+// because it returns a `slang::ISession*` — a C++ type — so it must keep C++
+// linkage. It is only available when compiling as C++ (hence the `#ifdef
+// __cplusplus`). This split is preserved exactly as it was in `slang-deprecated.h`.
 #ifdef __cplusplus
 SLANG_API slang::ISession* spReflection_GetSession(SlangReflection* reflection);
 #endif

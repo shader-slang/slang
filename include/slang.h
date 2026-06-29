@@ -2338,7 +2338,15 @@ struct ISession;
 }
 #endif
 
+// The reflection C-API (`spReflection*` / `spGetReflection`) lives in
+// `slang-reflection.h` and backs the C++ reflection wrappers defined below, so
+// it must be included before them.
 #include "slang-reflection.h"
+// `slang.h` no longer *calls* anything declared in `slang-deprecated.h`; this
+// include is kept only so that existing consumers who `#include <slang.h>` and
+// then use the legacy C API (e.g. `spCreateSession`) continue to see those
+// declarations transitively, as they did before the reflection C-API was split
+// out into its own header.
 #include "slang-deprecated.h"
 
 #ifdef __cplusplus

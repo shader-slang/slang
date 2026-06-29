@@ -2,7 +2,7 @@ Deploying Experimental API Additions
 ====================================
 
 This page intends to provide guidance to Slang developers when extending the Slang API, particularly when working on experimental features.
-It applies to the "COM-lite" Slang API, rather than the deprecated C Slang API (sp* functions).
+It applies to the "COM-lite" Slang API, rather than the deprecated C Slang API (the legacy `sp*` compile-session functions such as `spCreateSession` and `spCompile`, declared in `slang-deprecated.h`). Note that not every `sp*` function is deprecated: the reflection C-API (`spGetReflection` and the `spReflection*` family, declared in `slang-reflection.h`) is the active C backing for the C++ reflection wrappers and is not covered by this deprecation.
 
 * Note: This guidance relates to Slang API changes, not to language changes. That is, what Slang does with shader source code across releases is not discussed here.
 
