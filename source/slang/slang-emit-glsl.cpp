@@ -2865,10 +2865,13 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
         {
-            // GLSL has no C-style brace initializers; an array value must be written
-            // with array-constructor syntax, which is valid since GLSL 1.20. The base
-            // emitter would produce `{ ... }`, which is invalid GLSL, so emit
-            // `elementType[]( e0, e1, ... )` here instead (mirrors the WGSL emitter).
+            // Emit an array value using GLSL array-constructor syntax
+            // `elementType[]( e0, e1, ... )` rather than the base emitter's C-style
+            // `{ ... }`. Brace/aggregate initializers are only valid in GLSL 4.20+
+            // (GL_ARB_shading_language_420pack), so they break on earlier profiles such
+            // as glsl_330; the constructor form is the portable spelling that is valid
+            // across GLSL versions. Mirrors the WGSL emitter, which overrides the same
+            // ops for the same reason.
             //
             // GLSL splits array brackets around the (here absent) declarator, so a
             // nested array writes its outermost dimension unsized and inner dimensions
