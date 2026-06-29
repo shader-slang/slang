@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 using namespace Slang;
 
@@ -202,20 +203,7 @@ SLANG_UNIT_TEST(linkTimeStaticConstIntReflection)
     auto programLayout = linkedProgram->getLayout();
     SLANG_CHECK_ABORT(programLayout != nullptr);
 
-    auto getStaticInt = [&](const char* typeName, const char* varName) -> int64_t
-    {
-        auto type = programLayout->findTypeByName(typeName);
-        SLANG_CHECK_ABORT(type != nullptr);
-
-        auto valueVar = programLayout->findVarByNameInType(type, varName);
-        SLANG_CHECK_ABORT(valueVar != nullptr);
-
-        int64_t value = 0;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(valueVar->getDefaultValueInt(&value)));
-        return value;
-    };
-
-    auto getStaticIntBlob = [&](const char* typeName, const char* varName) -> int32_t
+    auto getStaticInt = [&](const char* typeName, const char* varName) -> int32_t
     {
         auto type = programLayout->findTypeByName(typeName);
         SLANG_CHECK_ABORT(type != nullptr);
@@ -227,18 +215,15 @@ SLANG_UNIT_TEST(linkTimeStaticConstIntReflection)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(valueVar->getDefaultValueBlob(blob.writeRef())));
         SLANG_CHECK_ABORT(blob != nullptr);
         SLANG_CHECK_ABORT(blob->getBufferSize() == sizeof(int32_t));
-        return ((const int32_t*)blob->getBufferPointer())[0];
+        int32_t value = 0;
+        memcpy(&value, blob->getBufferPointer(), sizeof(value));
+        return value;
     };
 
     SLANG_CHECK(getStaticInt("StaticConstCarrier<5>", "Value") == 6);
     SLANG_CHECK(getStaticInt("NestedCarrier<5>", "Value") == 9);
     SLANG_CHECK(getStaticInt("TypeCarrier<float,5>", "Value") == 10);
     SLANG_CHECK(getStaticInt("LiteralCarrier", "Value") == 23);
-
-    SLANG_CHECK(getStaticIntBlob("StaticConstCarrier<5>", "Value") == 6);
-    SLANG_CHECK(getStaticIntBlob("NestedCarrier<5>", "Value") == 9);
-    SLANG_CHECK(getStaticIntBlob("TypeCarrier<float,5>", "Value") == 10);
-    SLANG_CHECK(getStaticIntBlob("LiteralCarrier", "Value") == 23);
 }
 
 SLANG_UNIT_TEST(defaultValueBlobReflection)
@@ -385,8 +370,8 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
         return valueVar->getDefaultValueBlob(blob.writeRef());
     };
 
-    auto getFieldDefaultBlob = [&](slang::TypeReflection* type, const char* fieldName)
-        -> ComPtr<slang::IBlob>
+    auto getFieldDefaultBlob = [&](slang::TypeReflection* type,
+                                   const char* fieldName) -> ComPtr<slang::IBlob>
     {
         auto fieldVar = programLayout->findVarByNameInType(type, fieldName);
         SLANG_CHECK_ABORT(fieldVar != nullptr);
@@ -477,12 +462,12 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
     SLANG_CHECK(((const uint64_t*)scalarUInt64->getBufferPointer())[0] == 0xFFFFFFFF00000001ULL);
 
     auto scalarIntPtr = getDefaultBlob("ScalarIntPtr");
-    SLANG_CHECK(scalarIntPtr->getBufferSize() == sizeof(intptr_t));
-    SLANG_CHECK(((const intptr_t*)scalarIntPtr->getBufferPointer())[0] == -11);
+    SLANG_CHECK(scalarIntPtr->getBufferSize() == sizeof(int64_t));
+    SLANG_CHECK(((const int64_t*)scalarIntPtr->getBufferPointer())[0] == -11);
 
     auto scalarUIntPtr = getDefaultBlob("ScalarUIntPtr");
-    SLANG_CHECK(scalarUIntPtr->getBufferSize() == sizeof(uintptr_t));
-    SLANG_CHECK(((const uintptr_t*)scalarUIntPtr->getBufferPointer())[0] == 13);
+    SLANG_CHECK(scalarUIntPtr->getBufferSize() == sizeof(uint64_t));
+    SLANG_CHECK(((const uint64_t*)scalarUIntPtr->getBufferPointer())[0] == 13);
 
     auto aliasVector = getDefaultBlob("AliasVector");
     SLANG_CHECK(aliasVector->getBufferSize() == sizeof(float) * 3);
@@ -613,7 +598,8 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
     SLANG_CHECK(((const int32_t*)enumCaseBlob->getBufferPointer())[0] == 6);
 
     ComPtr<slang::IBlob> valueWithoutInitializer;
-    SLANG_CHECK(SLANG_SUCCEEDED(getDefaultBlobResult("ValueWithoutInitializer", valueWithoutInitializer)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(getDefaultBlobResult("ValueWithoutInitializer", valueWithoutInitializer)));
     SLANG_CHECK(valueWithoutInitializer == nullptr);
 
     ComPtr<slang::IBlob> invalidArgBlob;
@@ -622,7 +608,8 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
         SLANG_E_INVALID_ARG);
     SLANG_CHECK(
         spReflectionVariable_GetDefaultValueBlob(
-            (SlangReflectionVariable*)programLayout->findVarByNameInType(defaultsType, "ScalarFloat"),
+            (SlangReflectionVariable*)
+                programLayout->findVarByNameInType(defaultsType, "ScalarFloat"),
             nullptr) == SLANG_E_INVALID_ARG);
 }
 

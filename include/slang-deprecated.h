@@ -719,23 +719,6 @@ extern "C"
     /** DEPRECATED: use `spReflectionVariable_GetDefaultValueBlob` instead. */
     SLANG_API SlangResult
     spReflectionVariable_GetDefaultValueFloat(SlangReflectionVariable* inVar, float* rs);
-    /** Retrieves a variable's default initializer as a blob.
-     *
-     * If no explicit initializer exists, returns `SLANG_OK` and sets `*outBlob` to `nullptr`.
-     * On success with an initializer, `*outBlob` receives an `ISlangBlob*` with an added
-     * reference.
-     *
-     * Supported types include scalar values, vectors, matrices, fixed-size arrays,
-     * structs/aggregates, and enums. The blob stores scalar-layout bytes in natural scalar/field
-     * order without aggregate padding; bool values are emitted as 4-byte values to match Slang's
-     * GPU scalar layout. Matrices are emitted row-by-row, struct base fields are emitted before
-     * derived fields, and enum values use the enum's underlying tag type.
-     *
-     * Returns `SLANG_E_INVALID_ARG` for invalid arguments and `SLANG_E_NOT_AVAILABLE` when the
-     * initializer cannot be represented as a default-value blob.
-     */
-    SLANG_API SlangResult
-    spReflectionVariable_GetDefaultValueBlob(SlangReflectionVariable* inVar, ISlangBlob** outBlob);
     SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(
         SlangReflectionVariable* var);
     SLANG_API SlangReflectionVariable* spReflectionVariable_applySpecializations(
