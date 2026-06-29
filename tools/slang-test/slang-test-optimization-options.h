@@ -4,6 +4,7 @@
 
 #include "core/slang-command-line.h"
 #include "core/slang-render-api-util.h"
+#include "core/slang-type-text-util.h"
 
 namespace Slang
 {
@@ -14,12 +15,23 @@ static constexpr const char* kTestOptimizationOption = "-O0";
 
 /// Returns true when an argument is a slangc optimization-level option.
 ///
-/// This uses the exact spellings recognized by slangc so unrelated options with a `-O` prefix do
-/// not accidentally opt a test out of the slang-test default.
+/// This uses slangc's optimization-level names so unrelated options with a `-O` prefix do not
+/// accidentally opt a test out of the slang-test default.
 inline bool isSlangOptimizationArg(const String& arg)
 {
-    return arg == "-O" || arg == "-O0" || arg == "-Onone" || arg == "-O1" || arg == "-Odefault" ||
-           arg == "-O2" || arg == "-Ohigh" || arg == "-O3" || arg == "-Omaximal";
+    const auto argSlice = arg.getUnownedSlice();
+    const auto optimizationPrefix = UnownedStringSlice::fromLiteral("-O");
+    if (!argSlice.startsWith(optimizationPrefix))
+        return false;
+
+    const auto levelSlice = argSlice.tail(optimizationPrefix.getLength());
+    if (levelSlice.getLength() == 0)
+        return true;
+
+    return NameValueUtil::findValue(
+               TypeTextUtil::getOptimizationLevelInfos(),
+               levelSlice,
+               ValueInt(-1)) != ValueInt(-1);
 }
 
 /// Returns true when a compiler command line already specifies an optimization level.

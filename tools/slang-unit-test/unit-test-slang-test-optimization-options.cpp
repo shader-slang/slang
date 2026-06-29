@@ -132,6 +132,14 @@ SLANG_UNIT_TEST(slangTestRenderOptimizationArgDetection)
         SLANG_CHECK(SlangTest::hasRenderTestRenderApiArg(args, RenderApiType::Metal));
         SLANG_CHECK(!SlangTest::hasRenderTestRenderApiArg(args, RenderApiType::Vulkan));
     }
+
+    {
+        List<String> args;
+        args.add("-metal");
+
+        SLANG_CHECK(SlangTest::hasRenderTestRenderApiArg(args, RenderApiType::Metal));
+        SLANG_CHECK(!SlangTest::hasRenderTestRenderApiArg(args, RenderApiType::Vulkan));
+    }
 }
 
 SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
@@ -229,5 +237,15 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 1);
         SLANG_CHECK(cmdLine.m_args[0] == "-mtl");
+    }
+
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-metal");
+
+        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 1);
+        SLANG_CHECK(cmdLine.m_args[0] == "-metal");
     }
 }
