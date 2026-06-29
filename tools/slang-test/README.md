@@ -128,9 +128,7 @@ optimization option to slangc:
 
 The recognized optimization spellings are `-O`, `-O0`, `-Onone`, `-O1`,
 `-Odefault`, `-O2`, `-Ohigh`, `-O3`, and `-Omaximal`. Prefer the lowest level
-that preserves the test's expected output. Explicit Metal render-test commands
-using `-mtl` or `-metal` keep render-test's existing optimization behavior
-because they do not invoke `spv-opt`.
+that preserves the test's expected output.
 
 For diagnostic tests that intentionally leave an option without its required
 argument, put the explicit optimization option before that dangling option.

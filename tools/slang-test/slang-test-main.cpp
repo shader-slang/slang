@@ -2667,6 +2667,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
             continue;
         cmdLine.addArg(arg);
     }
+
     // If we can't set up for simple compilation, it's because some external resource isn't
     // available such as NVAPI headers. In that case we just ignore the test.
     if (SLANG_FAILED(_initSlangCompiler(context, cmdLine)))

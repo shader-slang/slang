@@ -124,22 +124,6 @@ SLANG_UNIT_TEST(slangTestRenderOptimizationArgDetection)
 
         SLANG_CHECK(!SlangTest::hasRenderTestSlangOptimizationArg(args));
     }
-
-    {
-        List<String> args;
-        args.add("-mtl");
-
-        SLANG_CHECK(SlangTest::hasRenderTestRenderApiArg(args, RenderApiType::Metal));
-        SLANG_CHECK(!SlangTest::hasRenderTestRenderApiArg(args, RenderApiType::Vulkan));
-    }
-
-    {
-        List<String> args;
-        args.add("-metal");
-
-        SLANG_CHECK(SlangTest::hasRenderTestRenderApiArg(args, RenderApiType::Metal));
-        SLANG_CHECK(!SlangTest::hasRenderTestRenderApiArg(args, RenderApiType::Vulkan));
-    }
 }
 
 SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
@@ -235,8 +219,10 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
 
         SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
 
-        SLANG_CHECK(cmdLine.m_args.getCount() == 1);
+        SLANG_CHECK(cmdLine.m_args.getCount() == 3);
         SLANG_CHECK(cmdLine.m_args[0] == "-mtl");
+        SLANG_CHECK(cmdLine.m_args[1] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[2] == SlangTest::kTestOptimizationOption);
     }
 
     {
@@ -245,7 +231,9 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
 
         SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
 
-        SLANG_CHECK(cmdLine.m_args.getCount() == 1);
+        SLANG_CHECK(cmdLine.m_args.getCount() == 3);
         SLANG_CHECK(cmdLine.m_args[0] == "-metal");
+        SLANG_CHECK(cmdLine.m_args[1] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[2] == SlangTest::kTestOptimizationOption);
     }
 }

@@ -3,7 +3,6 @@
 #define SLANG_TEST_OPTIMIZATION_OPTIONS_H
 
 #include "core/slang-command-line.h"
-#include "core/slang-render-api-util.h"
 #include "core/slang-type-text-util.h"
 
 namespace Slang
@@ -84,33 +83,12 @@ inline bool hasRenderTestSlangOptimizationArg(const List<String>& args)
     return false;
 }
 
-/// Returns true when a render-test command explicitly selects the given API.
-inline bool hasRenderTestRenderApiArg(const List<String>& args, RenderApiType apiType)
-{
-    for (const auto& arg : args)
-    {
-        if (arg.getLength() <= 1 || arg[0] != '-')
-            continue;
-
-        UnownedStringSlice name(arg.getUnownedSlice().begin() + 1, arg.getUnownedSlice().end());
-        if (RenderApiUtil::findApiTypeByName(name) == apiType)
-            return true;
-    }
-
-    return false;
-}
-
 /// Adds the slang-test default optimization level to render-test commands.
 ///
 /// The option is forwarded with `-Xslang` because render-test options are not slangc options.
 inline void addDefaultRenderTestSlangOptimization(CommandLine& ioCmdLine)
 {
     if (hasRenderTestSlangOptimizationArg(ioCmdLine.m_args))
-        return;
-
-    // Metal render-test paths do not invoke spv-opt, and many generated Metal CI variants rely on
-    // the optimized output that render-test/slangc uses by default.
-    if (hasRenderTestRenderApiArg(ioCmdLine.m_args, RenderApiType::Metal))
         return;
 
     ioCmdLine.addArg("-Xslang");
