@@ -244,9 +244,11 @@ static bool _printCapturedShaderAbortMessages(CoreDebugCallback& callback, Write
     bool foundMessage = false;
     for (const auto& line : lines)
     {
-        if (line.startsWith(prefix))
+        Index prefixIndex = line.indexOf(prefix);
+        if (prefixIndex != -1)
         {
-            out.print("%.*s\n", (int)line.getLength(), line.begin());
+            UnownedStringSlice message = line.tail(prefixIndex);
+            out.print("%.*s\n", (int)message.getLength(), message.begin());
             foundMessage = true;
         }
     }
@@ -2094,7 +2096,6 @@ static SlangResult _innerMain(
         renderDocBeginFrame();
         SLANG_RETURN_ON_FAIL(app.initialize(session, deviceWrapper.get(), options, input));
 
-        bool capturedShaderAbortMessage = false;
         if (shaderAbortMode)
         {
             // Re-route the device's debug bridge to a local capture buffer for the dispatch, so
@@ -2105,25 +2106,28 @@ static SlangResult _innerMain(
                     *debugCallback,
                     &abortCapture);
 
-                // A shader abort loses the device, so update() is expected to fail here; that is
-                // not a render-test error in this mode. Swallow the result so we still reach the
-                // print below and the stdout FileCheck can run.
-                app.update();
+                // A shader abort loses the device, so update() may fail here. Keep that result
+                // until after cleanup and message printing so a successful capture can still be
+                // checked by stdout FileCheck, while a missing message remains a real failure.
+                SlangResult updateResult = app.update();
+
+                // Keep the abort capture active through cleanup as well. Some drivers surface
+                // the device-fault message when the lost device is finalized, not during the
+                // queue wait itself.
+                renderDocEndFrame();
+                app.finalize();
+                bool capturedShaderAbortMessage =
+                    _printCapturedShaderAbortMessages(abortCapture, stdWriters->getOut());
+                if (SLANG_FAILED(updateResult) && !capturedShaderAbortMessage)
+                    return updateResult;
             }
-            capturedShaderAbortMessage =
-                _printCapturedShaderAbortMessages(abortCapture, stdWriters->getOut());
         }
         else
         {
             SLANG_RETURN_ON_FAIL(app.update());
-        }
 
-        renderDocEndFrame();
-        app.finalize();
-
-        if (shaderAbortMode && !capturedShaderAbortMessage)
-        {
-            return SLANG_E_NOT_AVAILABLE;
+            renderDocEndFrame();
+            app.finalize();
         }
     }
 
