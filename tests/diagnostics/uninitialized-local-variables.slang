@@ -44,6 +44,37 @@ int use_undefined_value(int k)
     return x;
 }
 
+// A loop-carried accumulator reads its uninitialized value on the first
+// iteration. SSA turns `total` into a loop block parameter (phi) that merges the
+// undefined pre-loop value with each iteration's update, so the read is of the phi
+// rather than of the undefined instruction directly; the analysis must follow the
+// undefined value through the phi to see it.
+float loop_carried_accumulator(int n)
+{
+    float total;
+    for (int i = 0; i < n; i++)
+        total += float(i);
+//CHK:        ^^ use of uninitialized variable
+//CHK:        ^^ use of uninitialized variable 'total'
+    // The loop may run zero times (n <= 0), so the post-loop read is also
+    // uninitialized on that path.
+    return total;
+/*CHK:
+    ^^^^^^ use of uninitialized variable
+    ^^^^^^ use of uninitialized variable 'total'
+*/
+}
+
+// A loop variable that is fully assigned before any read inside the loop must NOT
+// warn: the literal initializer (not an undefined value) is what flows into the phi.
+float loop_initialized_first(int n)
+{
+    float total = 0.0f;
+    for (int i = 0; i < n; i++)
+        total += float(i);
+    return total;
+}
+
 // We don't know the exact type of T yet.
 // T may not have any members, and it may not need any initialization.
 __generic<T>

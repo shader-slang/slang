@@ -175,20 +175,102 @@ static bool canIgnoreType(IRType* type, IRType* upper)
     return false;
 }
 
+// If `use` is an initial argument of a `loop` instruction (e.g.
+// `loop(target, break, continue, ..., arg)`), return the loop header parameter (phi)
+// that receives that argument. Returns null otherwise.
+//
+// Loop arguments line up positionally with the header block's parameters, so the
+// argument's offset within the loop's argument list selects the matching header
+// parameter. This lets the uninitialized-value analysis follow an undefined value into
+// the SSA phi a loop introduces for a variable carried across the back-edge, such as a
+// loop-carried accumulator (`float total; for (...) total += a[i];`): the undefined
+// pre-loop value enters the header phi on the loop-entry edge, and the first-iteration
+// read of that phi is a read of the undefined value.
+//
+// Only the `loop`-entry edge is followed, not ordinary merge (`unconditionalBranch`)
+// phis. A merge phi (e.g. the join after `if (c) x = 1;`) carries the undefined value
+// on only one incoming edge, so a use after the merge is read uninitialized on just one
+// path — a *conditional* (must-init) situation that `cancelLoadsByDefiniteAssignment`
+// already classifies. Following merge phis here would misreport those as unconditional
+// (may-init) reads.
+static IRParam* getLoopArgTargetParam(IRUse* use)
+{
+    auto loop = as<IRLoop>(use->getUser());
+    if (!loop)
+        return nullptr;
+
+    // The loop's phi arguments begin at `getArgs()` (operand 3, after the target,
+    // break, and continue blocks). Map the position of `use` within that range to the
+    // corresponding argument index.
+    auto args = loop->getArgs();
+    UInt argCount = loop->getArgCount();
+    if (use < args || use >= args + argCount)
+        return nullptr;
+    UInt argIndex = (UInt)(use - args);
+
+    auto target = loop->getTargetBlock();
+    if (!target)
+        return nullptr;
+
+    UInt paramIndex = 0;
+    for (auto param : target->getParams())
+    {
+        if (paramIndex == argIndex)
+            return param;
+        paramIndex++;
+    }
+    return nullptr;
+}
+
+// Collect `inst` together with every instruction that aliases the same (uninitialized)
+// storage or value: address-derivations like field/element access, and the loop header
+// phi that carries the value into a loop.
+//
+// Following the loop phi is what lets a use of a *loop-carried* variable be seen. When a
+// local is accumulated across loop iterations (`float total; for (...) total += a[i];`),
+// SSA turns `total` into a loop header parameter that merges the undefined pre-loop value
+// with each iteration's update; the first-iteration read of that phi is a read of the
+// undefined value. Without following the phi the only direct use of the undefined
+// instruction is the loop argument, which records no load, so the read escapes detection.
 static List<IRInst*> getAliasableInstructions(IRInst* inst)
 {
     List<IRInst*> addresses;
+    HashSet<IRInst*> visited;
 
-    addresses.add(inst);
-    for (auto use = inst->firstUse; use; use = use->nextUse)
+    List<IRInst*> work;
+    work.add(inst);
+    visited.add(inst);
+
+    while (work.getCount())
     {
-        IRInst* user = use->getUser();
+        IRInst* current = work.getLast();
+        work.removeLast();
+        addresses.add(current);
 
-        // Meta instructions only use the argument type
-        if (isMetaOp(user) || !isAliasable(user))
-            continue;
+        for (auto use = current->firstUse; use; use = use->nextUse)
+        {
+            IRInst* user = use->getUser();
 
-        addresses.addRange(getAliasableInstructions(user));
+            IRInst* alias = nullptr;
+            if (isMetaOp(user))
+            {
+                // Meta instructions only use the argument type.
+                continue;
+            }
+            else if (isAliasable(user))
+            {
+                alias = user;
+            }
+            else if (auto param = getLoopArgTargetParam(use))
+            {
+                // The value flows into a loop header phi; the phi carries it forward
+                // into the loop body.
+                alias = param;
+            }
+
+            if (alias && visited.add(alias))
+                work.add(alias);
+        }
     }
 
     return addresses;
