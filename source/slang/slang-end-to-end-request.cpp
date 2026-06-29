@@ -1843,7 +1843,7 @@ SlangResult EndToEndCompileRequest::compile()
     }
 
     auto reflectionPath = getOptionSet().getStringOption(CompilerOptionName::EmitReflectionJSON);
-    if (reflectionPath.getLength() != 0)
+    if (reflectionPath.getLength() != 0 && SLANG_SUCCEEDED(res))
     {
         auto reflection = this->getReflection();
         if (!reflection)
@@ -2140,13 +2140,15 @@ SlangResult EndToEndCompileRequest::loadRepro(
     const void* data,
     size_t size)
 {
-    List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadState((const uint8_t*)data, size, getSink(), buffer));
+    ComPtr<ISlangBlob> reproBlob;
+    SLANG_RETURN_ON_FAIL(
+        ReproUtil::loadState((const uint8_t*)data, size, getSink(), reproBlob.writeRef()));
 
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
-    ReproUtil::RequestState* requestState = ReproUtil::getRequest(buffer);
+    ReproUtil::RequestState* requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
 
     SLANG_RETURN_ON_FAIL(ReproUtil::load(base, requestState, fileSystem, this));
     return SLANG_OK;
@@ -2184,6 +2186,8 @@ SlangReflection* EndToEndCompileRequest::getReflection()
 {
     auto linkage = getLinkage();
     auto program = getSpecializedGlobalAndEntryPointsComponentType();
+    if (!(linkage && program))
+        return nullptr;
 
     // Note(tfoley): The API signature doesn't let the client
     // specify which target they want to access reflection
@@ -2200,7 +2204,8 @@ SlangReflection* EndToEndCompileRequest::getReflection()
 
     auto targetReq = linkage->targets[targetIndex];
     auto targetProgram = program->getTargetProgram(targetReq);
-
+    if (!targetProgram)
+        return nullptr;
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     auto programLayout = targetProgram->getOrCreateLayout(&sink);
