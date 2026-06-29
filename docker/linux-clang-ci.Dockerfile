@@ -5,7 +5,7 @@
 #
 # Used by:
 # - .github/workflows/ci-slang-sanitizer.yml
-# - .github/workflows/ci-slang-coverage-test.yml  (future)
+# - .github/workflows/ci-slang-coverage.yml  (future)
 #
 # Build and push:
 #   docker build -f docker/linux-clang-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1 .
