@@ -8,6 +8,7 @@ permalink: /user-guide/autodiff
 To support differentiable graphics systems such as Gaussian splatters, neural radiance fields, differentiable path tracers, and more,
 Slang provides first-class support for differentiable programming.
 An overview:
+
 - Slang supports the `fwd_diff` and `bwd_diff` operators that can generate the forward-mode and backward-mode derivative propagation functions for any valid Slang function annotated with the `[Differentiable]` attribute.
 - The `DifferentialPair<T>` built-in generic type is used to pass derivatives associated with each function input.
 - The `IDifferentiable` and the experimental `IDifferentiablePtrType` interfaces denote differentiable value and pointer types respectively, and allow finer control over how types behave under differentiation.
@@ -17,7 +18,9 @@ An overview:
 ## Auto-diff operations `fwd_diff` and `bwd_diff`
 
 In Slang, `fwd_diff` and `bwd_diff` are higher-order functions used to transform Slang functions into their forward or backward derivative methods. To better understand what these methods do, here is a small refresher on differentiable calculus:
+
 ### Mathematical overview: Jacobian and its vector products
+
 Forward and backward derivative methods are two different ways of computing a dot product with the Jacobian of a given function.
 Parts of this overview are based on [JAX's auto-diff cookbook](https://jax.readthedocs.io/en/latest/notebooks/autodiff_cookbook.html#how-it-s-made-two-foundational-autodiff-functions). The relevant [Wikipedia article](https://en.wikipedia.org/wiki/Automatic_differentiation) is also a great resource for understanding auto-diff.
 
@@ -39,13 +42,13 @@ $$ \mathbf{f}(x, y) = \begin{bmatrix} f_0(x, y) & f_1(x, y) & f_2(x, y) \end{bma
 
 Here, $$D\mathbf{f}$$ is a 3x2 matrix with each element containing a partial derivative:
 
-$$ D\mathbf{f}(x, y) = \begin{bmatrix} 
-\partial f_0 / \partial x & \partial f_0 / \partial y \\  
+$$ D\mathbf{f}(x, y) = \begin{bmatrix}
+\partial f_0 / \partial x & \partial f_0 / \partial y \\
 \partial f_1 / \partial x & \partial f_1 / \partial y \\
 \partial f_2 / \partial x & \partial f_2 / \partial y
-\end{bmatrix} = 
-\begin{bmatrix} 
-3x^2  & 0   \\  
+\end{bmatrix} =
+\begin{bmatrix}
+3x^2  & 0   \\
 y^2   & 2yx \\
 0     & 3y^2
 \end{bmatrix} $$
@@ -86,8 +89,8 @@ For forward-diff, to pass the vector $$\mathbf{v}$$ and receive the outputs, we 
 Example of `fwd_diff`:
 ```csharp
 [Differentiable] // Auto-diff requires that functions are marked differentiable
-float2 foo(float a, float b) 
-{ 
+float2 foo(float a, float b)
+{
     return float2(a * b * b, a * a);
 }
 
@@ -130,8 +133,8 @@ The one extra rule is that the derivative corresponding to the return value of t
 Example:
 ```csharp
 [Differentiable] // Auto-diff requires that functions are marked differentiable
-float2 foo(float a, float b) 
-{ 
+float2 foo(float a, float b)
+{
     return float2(a * b * b, a * a);
 }
 
@@ -212,7 +215,7 @@ For instance, for `MyType`, Slang can infer the differential trivially:
 ```csharp
 struct MyType : IDifferentiable
 {
-    // Automatically inserted by Slang from the fact that 
+    // Automatically inserted by Slang from the fact that
     // MyType has 2 floats which are both differentiable
     //
     typealias Differential = MyType;
@@ -227,7 +230,7 @@ struct MyPartialDiffType : IDifferentiable
 {
     // Automatically inserted by Slang based on which fields are differentiable.
     typealias Differential = syn_MyPartialDiffType_Differential;
-    
+
     float x;
     uint y;
 };
@@ -325,6 +328,11 @@ For types conforming to `IDifferentiablePtrType`, the corresponding pair to use 
 #### Example of defining and using an `IDifferentiablePtrType` object.
 Here is an example of creating a differentiable buffer pointer type, and using it within a differentiable function.
 You can find an interactive sample on the Slang playground [here](https://shader-slang.org/slang-playground/?target=WGSL&code=eJy1VF1v2kAQfPevWEWKYhfkmFdMkBrRSpHKhyBSpdIIHfgcTjFn9z4gEeK_d-_ONsZp1L6UF8MxOzszuz62K3KhoMjI27PINU9iTyqhNwrGb_c6TamY5YwrKqAPDyNmDihXjKwzOlPi8a2g3tED_NzewuOWQnKGZFAQpGYSCM_VFikYl4rwDYU8bdOHlkQhH8kYkTBq8ty10bFn4fPvC6tVC5q4_wdplhM1hLVOYwvRiMd2qaQq9k5Yhzq_Mf4CBDZaqnwHCRVsTxTbU295TzYvByKSUX3mI1-yWh-S4Mmz3GAO_HY4Rdd1Yjyhr0EZiaCojEMRopplEToV0HGgJ5Rj1UxyRUFtkRkzgnWpoCELJHvmxJg0WUrFsgwThRvGb9pxM8xxn7MEKtV-M0cc2Awhg5b44aX6LjifyVSryknbrmm7KpTAyRRh4pKuzqzb-kfLNHTuLLE1v7zcpypgqXfTdPFLE0HlIMPiCe4e9h2-T73SVxbmEgVFYVqux3JMXh8QJ_0JTs_icgG-s2qQMT4GMMFHpxNYgKM7U-5JtjJQO3SMiQVxjTDt0I6DfHJP9-_Ja84fcc7u-SXr9-efJyO_F6Guj5eY8UIrrL2s_PFlPl38rdRujym121AItDwmjPsfDdTN8ug6diE6OSO20L_6yoRU0IuMR01lH37yqzKIPybaixqRNniukz5cp1iMQXbLTJUwqQblyErgQu_MHSHdEpivaVtCyXOxLL1oaAhrtndra1Ip9_boInJeqxtsRiTeVvZFMk0LV4dH0g3D3VL4Xq3Mgvvt5oFfO_6X986Zr0UF3bq6F0Zlvs1UzreSEYc9dabgEIrQXR3_ZT61unJKp98JDfhi).
+
+This example uses GPU resource types (`RWStructuredBuffer`) and global shader
+parameters, so compile it with `slangc` to a GPU target (e.g. SPIR-V, DXIL, or
+CUDA). It cannot be run with the `slangi` CPU interpreter, which does not
+support global parameters or GPU resource types.
 ```csharp
 struct MyBufferPointer : IDifferentiablePtrType
 {
@@ -370,7 +378,7 @@ RWStructuredBuffer<float> derivs;
 void main()
 {
     MyBufferPointer ptr = {inputs, 0};
-    print("Sum of squares of first 10 values: ", sumOfSquares<10>(ptr));
+    printf("Sum of squares of first 10 values: %f\n", sumOfSquares<10>(ptr));
 
     MyBufferPointer deriv_ptr = {derivs, 0};
 
@@ -378,10 +386,10 @@ void main()
     bwd_diff(sumOfSquares<10>)(
         DifferentialPtrPair<MyBufferPointer>(ptr, deriv_ptr),
         1.0);
-    
-    print("Derivative of result w.r.t the 10 values: \n");
+
+    printf("Derivative of result w.r.t the 10 values: \n");
     for (uint i = 0; i < 10; i++)
-        print("%d: %f\n", i, load(deriv_ptr, i));
+        printf("%d: %f\n", i, load(deriv_ptr, i));
 }
 ```
 
@@ -482,7 +490,7 @@ void main()
     // But you can also be explicit with < >
     bwd_diff(calcFoo<float4>)(dpa, float4(1.f));
 
-    // x is differentiable for calcBar because 
+    // x is differentiable for calcBar because
     // __BuiltinFloatingPointType : IDifferentiable
     //
     DifferentialPair<double> dpb = /* .. */;
@@ -543,11 +551,11 @@ struct FooImpl2 : IFoo
 float compute(float x, uint obj_id)
 {
     // Create an instance of either FooImpl1 or FooImpl2
-    IFoo foo = createDynamicObject<IFoo>(obj_id); 
-    
+    IFoo foo = createDynamicObject<IFoo>(obj_id);
+
     // Dynamic dispatch to appropriate 'calc'.
     //
-    // Note that foo itself is non-differentiable, and 
+    // Note that foo itself is non-differentiable, and
     // has no differential data, but 'x' and 'result'
     // will carry derivatives.
     //
@@ -576,7 +584,7 @@ interface IFoo : IDifferentiable
 [Differentiable]
 float calc(float x)
 {
-    // Note that since IFoo is differentiable, 
+    // Note that since IFoo is differentiable,
     // any data in the IFoo implementation is differentiable
     // and will carry derivatives.
     //
@@ -601,9 +609,9 @@ The following is a small snippet with bilinear texture sampling. For a full exam
 
 ```csharp
 [PrimalSubstitute(sampleTextureBilinear_reference)]
-float4 sampleTextureBilinear(Texture2D<float4> x, float2 loc) 
-{ 
-    // HW-accelerated sampling intrinsics. 
+float4 sampleTextureBilinear(Texture2D<float4> x, float2 loc)
+{
+    // HW-accelerated sampling intrinsics.
     // Slang does not have access to the body, so cannot differentiate.
     //
     x.Sample(/*...*/)
@@ -621,7 +629,7 @@ float computePixel(Texture2D<float> x, float a, float b)
 {
     // Slang will use HW-accelerated sampleTextureBilinear for standard function
     // call, but differentiate the SW reference interpolation during backprop.
-    // 
+    //
     float4 sample1 = sampleTextureBilinear(x, float2(a, 1));
 }
 ```
@@ -904,3 +912,4 @@ The following built-in functions are differentiable and both their forward and b
 - Matrix transforms: `mul(matrix, vector)`, `mul(vector, matrix)`, `mul(matrix, matrix)`
 - Matrix operations: `transpose`, `determinant`
 - Legacy blending and lighting intrinsics: `dst`, `lit`
+$$
