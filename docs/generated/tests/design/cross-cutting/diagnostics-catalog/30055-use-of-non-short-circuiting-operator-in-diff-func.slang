@@ -11,16 +11,19 @@
 //META: catalog_name=use-of-non-short-circuiting-operator-in-diff-func
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Non-short-circuiting `?:` operator inside a differentiable function triggers the diagnostic.
+// A non-short-circuiting `?:` with a *vector* condition inside a differentiable
+// function triggers E30055. The diagnostic is emitted only on the vector-condition
+// path of `SemanticsExprVisitor::visitSelectExpr`; a scalar (`bool`) condition
+// early-returns with no diagnostic, so the example must use a `bool`N condition.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 [Differentiable]
-float f(float x, bool b)
+float3 f(float3 x, bool3 b)
 {
-    return b ?: 0.0;
+    return b ? x : float3(0.0);
 }
 
 void main() {}
 
-// CHECK: 30055
+//CHECK: 30055

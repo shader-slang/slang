@@ -720,6 +720,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkInterfaceRequirement(Decl* decl);
 
     void checkCallableDeclCommon(CallableDecl* decl);
+    void maybeInferPrefixModifierForOperator(CallableDecl* decl);
     void checkPublicCallableOperandVisibility(CallableDecl* decl);
 
     void checkCallableConstraints(CallableDecl* decl);
@@ -15140,12 +15141,78 @@ bool doesTypeHaveNoDiffModifier(Type* type)
     return false;
 }
 
+// True if `name` is an operator that can appear in prefix (unary) position:
+// `-`, `+`, `~`, or `!`. These are the unary operators the core module declares
+// with `__prefix` and that a user may overload. `~`/`!` are unary-only, while
+// `+`/`-` are also binary and so are only treated as prefix when the
+// declaration's arity matches a unary operator (see
+// `maybeInferPrefixModifierForOperator`).
+static bool isPrefixOperatorName(Name* name)
+{
+    if (!name)
+        return false;
+    auto text = name->text.getUnownedSlice();
+    return text == "-" || text == "+" || text == "~" || text == "!";
+}
+
+// Attaches a `PrefixModifier` to a user-defined unary operator declaration
+// (e.g. `A operator-(A a)`) so it can be used in prefix position.
+//
+// Why this is needed: prefix-expression overload resolution only considers
+// candidates carrying a `PrefixModifier` (see `TryCheckOverloadCandidateFixity`).
+// The `__prefix` keyword that sets this modifier is an internal builtin used by
+// the core module, not part of the documented surface language, yet the user
+// guide documents `operator-`/`operator~`/`operator!` as overloadable unary
+// operators; without this inference such a user operator would never be eligible
+// in prefix position.
+//
+// Consider:
+//
+//     struct A { int x; }
+//     A operator-(A a) { A na = { -a.x }; return na; }
+//     A foo(A a) { return -a; }   // prefix `-a` must find `operator-(A)`
+//
+// A unary operator consumes exactly one operand. The operand is the single
+// explicit parameter for a free-function operator, but for an instance-method
+// operator (a member of an aggregate or an `extension`) the operand is the
+// implicit `this`, so the explicit parameter list is empty. We must account for
+// `this`: otherwise a binary instance-method operator such as
+// `extension T { T operator-(T rhs) }` (one explicit parameter plus `this`)
+// would be wrongly tagged prefix, and binary `a - b` would stop resolving to it.
+// Inference also respects an explicit `__prefix`/`__postfix` if the user wrote
+// one.
+void SemanticsDeclHeaderVisitor::maybeInferPrefixModifierForOperator(CallableDecl* decl)
+{
+    if (!isPrefixOperatorName(decl->getName()))
+        return;
+
+    // Respect an explicit fixity modifier if the user wrote one.
+    if (decl->findModifier<PrefixModifier>() || decl->findModifier<PostfixModifier>())
+        return;
+
+    // Use `getParentAggTypeDeclBase` (which walks past any enclosing
+    // `GenericDecl`) rather than inspecting `decl->parentDecl` directly, so a
+    // generic member/extension operator is still recognized as an instance
+    // method; `isEffectivelyStatic` performs the same generic unwrapping.
+    const bool isInstanceMethod =
+        getParentAggTypeDeclBase(decl) != nullptr && !isEffectivelyStatic(decl);
+    const Count unaryParamCount = isInstanceMethod ? 0 : 1;
+    if (decl->getParameters().getCount() != unaryParamCount)
+        return;
+
+    auto prefixModifier = m_astBuilder->create<PrefixModifier>();
+    prefixModifier->loc = decl->loc;
+    addModifier(decl, prefixModifier);
+}
+
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 {
     for (auto paramDecl : decl->getParameters())
     {
         ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
     }
+
+    maybeInferPrefixModifierForOperator(decl);
 
     // Check that no parameter without a default value follows a parameter with one.
     bool seenDefaultParam = false;
@@ -20315,6 +20382,51 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
                 derivativeFuncDecl->inferredCapabilityRequirements,
                 refLoc);
         }
+    }
+
+    // A user-defined derivative declared with the inverse placement
+    // `[ForwardDerivativeOf(primal)]` / `[BackwardDerivativeOf(primal)]` records a
+    // derivative *association* on the primal (see `checkDerivativeOfAttributeImpl`,
+    // which calls `registerAssociatedDecl`) rather than a `[ForwardDerivative]` /
+    // `[BackwardDerivative]` modifier on the primal. Because differentiating the primal
+    // invokes the derivative, the primal must carry the derivative's capability
+    // requirements; as with the forward `[ForwardDerivative]` / `[BackwardDerivative]`
+    // placement, the requirement is reflected onto the primal *unconditionally* — it
+    // applies to every use of the primal, not only to a differentiated call (the
+    // regression test raises E36107 from a plain `testC(2.0)`). Without this, a
+    // `[require]` on an inverse-placed derivative is silently dropped.
+    for (auto assoc : getShared()->getAssociatedDeclsForDecl(funcDecl))
+    {
+        if (assoc->kind != DeclAssociationKind::ForwardDerivativeFunc &&
+            assoc->kind != DeclAssociationKind::BackwardDerivativeFunc)
+            continue;
+        auto derivativeFuncDecl = assoc->decl;
+        // Gate on the derivative carrying an explicit `[require]`. This is a gate, not
+        // a payload filter: once a derivative qualifies we propagate its full
+        // `inferredCapabilityRequirements` (the declared `[require]` plus anything its
+        // body infers) — the same payload the other propagation sites in this function
+        // use — not just the declared `[require]` set. The gate exists because the core
+        // module attaches all-targets derivative families to builtins through inverse
+        // placement (the `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]` overloads
+        // for transpose/mul/dot and the math intrinsics in diff.meta.slang); those
+        // derivatives carry no `[require]`, so unconditionally joining their inferred
+        // requirements onto an all-targets builtin primal would over-constrain it (in
+        // practice it breaks core-module compilation). Restricting propagation to an
+        // explicit `[require]` keeps it to deliberate user declarations; a derivative
+        // that only *infers* a target dependency without `[require]` is intentionally
+        // not propagated.
+        if (!derivativeFuncDecl->findModifier<RequireCapabilityAttribute>())
+            continue;
+        ensureDecl(derivativeFuncDecl, DeclCheckState::CapabilityChecked);
+        // Point the provenance note at the derivative function, which is where the
+        // user declared both the `[require]` and the `[*DerivativeOf]` linkage.
+        _propagateRequirement(
+            this,
+            mutableFuncDeclCapSet,
+            funcDecl,
+            derivativeFuncDecl,
+            derivativeFuncDecl->inferredCapabilityRequirements,
+            derivativeFuncDecl->loc);
     }
 
     // non-static function join's capabilities with parent
