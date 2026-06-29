@@ -939,8 +939,7 @@ void initCommandOptions(CommandOptions& options)
          "-separate-debug-info",
          nullptr,
          "Emit debug data to a separate file, and strip it from the main output file. Requires an "
-         "output file path specified with `-o`; writing the main artifact to stdout is not "
-         "supported."},
+         "output file path specified with `-o`."},
         {OptionKind::EmitCPUViaCPP,
          "-emit-cpu-via-cpp",
          nullptr,

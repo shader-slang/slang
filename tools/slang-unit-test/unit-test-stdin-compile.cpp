@@ -1188,6 +1188,8 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
     ScopedDebugArtifactFile debugArtifact;
     debugArtifact.path = debugArtifactCandidates[0];
     String debugArtifactPath = debugArtifact.path;
+    if (Path::getParentDirectory(debugArtifactPath) != debugArtifactDirectory)
+        return SLANG_FAIL;
 
     File::remove(files.outputPath);
     File::remove(files.autoManifestPath);

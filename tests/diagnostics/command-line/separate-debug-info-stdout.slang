@@ -12,6 +12,9 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK4):-target spirv -g2 -emit-spirv-directly -separate-debug-info -whole-program -o -
 //CHECK4: 00109
 
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK5, non-exhaustive):-target glsl -o separate-debug-info-stdout.glsl -target spirv -g2 -emit-spirv-directly -separate-debug-info -entry main -stage compute
+//CHECK5: 00109
+
 [numthreads(1, 1, 1)]
 void main()
 {

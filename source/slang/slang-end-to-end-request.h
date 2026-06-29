@@ -389,9 +389,8 @@ private:
     /// Maybe write the artifact to the path (if set), or stdout (if there is no container or path)
     SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
     /// Returns the path slangc would use for a separate-debug-info artifact for this
-    /// target/artifact pair, or empty if none will be emitted. The main artifact path must be
-    /// non-empty. Empty return means either separate debug info is disabled or the target did not
-    /// produce a debug artifact.
+    /// target/artifact pair. Requires a non-empty main artifact path. Returns empty when separate
+    /// debug info is disabled or the target did not produce a debug artifact.
     String _getDebugArtifactPath(
         TargetProgram* targetProgram,
         const String& path,

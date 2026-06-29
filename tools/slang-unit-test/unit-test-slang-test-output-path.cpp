@@ -121,4 +121,20 @@ SLANG_UNIT_TEST(slangTestOutputPathNormalization)
         };
         checkArgs(args, expected, SLANG_COUNT_OF(expected));
     }
+
+    {
+        const char* values[] = {"-target", "spirv", "-o"};
+        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
+        normalizeTestOutputPathsForTestFile(testPath, args);
+
+        checkArgs(args, values, SLANG_COUNT_OF(values));
+    }
+
+    {
+        const char* values[] = {"-target", "spirv", "-dump-intermediate-prefix"};
+        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
+        normalizeTestOutputPathsForTestFile(testPath, args);
+
+        checkArgs(args, values, SLANG_COUNT_OF(values));
+    }
 }
