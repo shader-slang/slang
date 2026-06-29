@@ -113,6 +113,18 @@ local insts = {
 					hoistable = true,
 				},
 			},
+			{
+				-- A vector with element alignment and no padding (12 bytes for a
+				-- 3-vector of 32-bit floats), used as the storage type for vectors
+				-- in Metal device buffers, which use natural (scalar-aligned,
+				-- tightly packed) layout. Emitted as MSL `packed_T<N>` (e.g.
+				-- `packed_float3`).
+				MetalPackedVec = {
+					struct_name = "MetalPackedVectorType",
+					operands = { { "elementType", "IRType" }, { "elementCount" } },
+					hoistable = true,
+				},
+			},
 			{ Conjunction = { struct_name = "ConjunctionType", hoistable = true } },
 			{
 				Attributed = {
@@ -1432,6 +1444,7 @@ local insts = {
 	{ RequireComputeDerivative = {} },
 	{ StaticAssert = { operands = { { "condition" }, { "message" } } } },
 	{ Printf = { operands = { { "format" } } } },
+	{ Abort = { operands = { { "format" } } } },
 	-- Quad control execution modes.
 	{ RequireMaximallyReconverges = {} },
 	{ RequireQuadDerivatives = {} },
@@ -1813,6 +1826,14 @@ local insts = {
 			{ vulkanCallablePayload = { struct_name = "VulkanCallablePayloadDecoration" } },
 			{ vulkanCallablePayloadIn = { struct_name = "VulkanCallablePayloadInDecoration" } },
 			{ earlyDepthStencil = { struct_name = "EarlyDepthStencilDecoration" } },
+			-- Marks a fragment entry point whose `gl_FragDepth` output is constrained to
+			-- only ever increase / decrease the fixed-function depth (HLSL
+			-- SV_DepthGreaterEqual / SV_DepthLessEqual). Carried on the entry point so the
+			-- GLSL emitter can redeclare `layout(depth_greater)` / `layout(depth_less) out
+			-- float gl_FragDepth;`, which glslang maps to the DepthGreater / DepthLess
+			-- SPIR-V execution mode.
+			{ glslFragDepthGreater = { struct_name = "GLSLFragDepthGreaterDecoration" } },
+			{ glslFragDepthLess = { struct_name = "GLSLFragDepthLessDecoration" } },
 			{ precise = { struct_name = "PreciseDecoration" } },
 			{ public = { struct_name = "PublicDecoration" } },
 			{ hlslExport = { struct_name = "HLSLExportDecoration" } },

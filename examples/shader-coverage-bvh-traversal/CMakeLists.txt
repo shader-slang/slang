@@ -1,0 +1,78 @@
+# BVH-traversal coverage demo.
+#
+# See the image-pipeline demo's CMakeLists.txt for the rationale on
+# why this example uses raw Vulkan instead of slang-rhi.
+
+# Vulkan headers come from Slang's bundled Vulkan-Headers submodule (the
+# always-available Vulkan::Headers target, see external/CMakeLists.txt), so
+# this demo only needs to locate the loader library at build time. Prefer the
+# Vulkan SDK's imported target when present; otherwise fall back to the bare
+# runtime loader (e.g. libvulkan.so.1) so the demo still builds on machines
+# that ship only the Vulkan runtime and not a -dev/SDK package.
+find_package(Vulkan QUIET)
+if(TARGET Vulkan::Vulkan)
+    set(_vulkan_loader Vulkan::Vulkan)
+else()
+    find_library(SLANG_VULKAN_LOADER NAMES vulkan vulkan-1 libvulkan.so.1)
+    if(NOT SLANG_VULKAN_LOADER)
+        message(
+            STATUS
+            "examples: skipping shader-coverage-bvh-traversal (Vulkan loader not found)"
+        )
+        return()
+    endif()
+    set(_vulkan_loader ${SLANG_VULKAN_LOADER})
+endif()
+
+set(_asset_files
+    bvh_traverse.slang
+    bvh_types.slang
+    materials.slang
+    ray_intersect.slang
+)
+
+set(_runtime_dir ${CMAKE_CURRENT_BINARY_DIR})
+set(_copy_target shader-coverage-bvh-traversal-copy-assets)
+
+set(_copied_assets "")
+foreach(_asset IN LISTS _asset_files)
+    set(_dst "${_runtime_dir}/${_asset}")
+    add_custom_command(
+        OUTPUT ${_dst}
+        COMMAND
+            ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/${_asset} ${_dst}
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${_asset}
+        COMMENT "Copy ${_asset} to runtime dir"
+    )
+    list(APPEND _copied_assets ${_dst})
+endforeach()
+
+add_custom_target(${_copy_target} DEPENDS ${_copied_assets})
+set_target_properties(${_copy_target} PROPERTIES FOLDER "examples/copy_assets")
+
+add_executable(
+    shader-coverage-bvh-traversal
+    main.cpp
+    vk_compute_demo.h
+    vk_compute_demo.cpp
+)
+add_dependencies(shader-coverage-bvh-traversal ${_copy_target})
+
+target_include_directories(
+    shader-coverage-bvh-traversal
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+)
+target_link_libraries(
+    shader-coverage-bvh-traversal
+    PRIVATE ${_vulkan_loader} Vulkan::Headers slang core
+)
+target_compile_features(shader-coverage-bvh-traversal PRIVATE cxx_std_17)
+set_target_properties(shader-coverage-bvh-traversal PROPERTIES FOLDER examples)
+
+# Wire this demo into the `all-examples` meta target so PR CI that
+# builds `all-examples` catches regressions here. The other examples
+# pick this up implicitly via `slang_add_target(... REQUIRED_BY
+# all-examples)`; this demo uses a raw `add_executable`, so attach it
+# explicitly.
+add_dependencies(all-examples shader-coverage-bvh-traversal)

@@ -1203,6 +1203,18 @@ typedef uint32_t SlangSizeT;
                  //   of `1`, eliminating atomic contention (much faster, and avoids the GPU
                  //   watchdog timeouts heavy coverage can trigger) at the cost of exact
                  //   counts. Off by default.
+        SPIRVUnifiedDescriptorHeapStride =
+            154, // bool: when set, emit each SPIRV resource descriptor-heap runtime array's
+                 //   ArrayStride as the maximum of image and buffer descriptor sizes, so a
+                 //   single heap shared by buffers and images is indexed at the device's unified
+                 //   stride. Opt-in; mutually exclusive with a non-zero
+                 //   `-spirv-resource-heap-stride` (combining the two is an error).
+
+        // CLI-only query option `-<compiler>-version`: prints the version of the downstream
+        // <compiler> Slang would actually load for that pass-through (via
+        // IGlobalSession::getDownstreamCompilerVersion). It takes no value and is never stored on
+        // an option set; it only drives the print-and-continue handler in the command-line parser.
+        CompilerVersion = 153,
 
         CountOf,
     };
@@ -3759,8 +3771,15 @@ struct ShaderReflection
         return spReflection_ToJson((SlangReflection*)this, nullptr, outBlob);
     }
 
-    /** Get the descriptor set/space index allocated for the bindless resource heap.
-     *  Returns -1 if the program does not use bindless resource heap.
+    /** Get the descriptor set/space index reserved for the bindless resource heap.
+     *
+     * This is a layout/reflection reservation made before final target lowering and
+     * optimization. It can remain non-negative even when the emitted target code no
+     * longer uses a bindless heap/resource-handle path. Query `IBindlessResourceMetadata`
+     * from target metadata to determine whether such a path survived in the compiled
+     * target IR.
+     *
+     * Returns -1 only when no bindless heap space was reserved for the program layout.
      */
     SlangInt getBindlessSpaceIndex()
     {
@@ -4185,6 +4204,29 @@ struct IGlobalSession : public ISlangUnknown
         BuiltinModuleName module,
         SlangArchiveType archiveType,
         ISlangBlob** outBlob) = 0;
+
+    /** Get the version of the downstream/pass-through compiler that Slang will actually load and
+    use for `passThrough`, applying the same lazy discovery and library search order used during
+    compilation. This lets a client key its behavior off the exact library Slang selected (for
+    example, the specific NVRTC that will compile CUDA), which can differ from a version the client
+    might discover on its own.
+
+    This is not a cheap accessor: the first call for a given `passThrough` performs discovery and
+    loads the downstream library into the process (then memoizes it for subsequent calls).
+
+    Only some downstream compilers report a numeric version (e.g. NVRTC, DXC, the C/C++ toolchains);
+    others (e.g. the glslang family and Tint) always report `(0,0)`. The version is read uniformly
+    from the loaded compiler's descriptor, so a versionless-but-loaded compiler still returns
+    SLANG_OK with major/minor 0 — which the result alone does not distinguish from a genuine 0.0.
+    @param passThrough The downstream compiler to query (e.g. SLANG_PASS_THROUGH_NVRTC).
+    @param outMajor Receives the major version number. May be null.
+    @param outMinor Receives the minor version number. May be null.
+    @return SLANG_OK if the compiler was located and loaded (see the versionless note above).
+    SLANG_E_NOT_FOUND if the compiler could not be located or loaded, and likewise for
+    SLANG_PASS_THROUGH_NONE or an out-of-range value — the result code alone does not distinguish an
+    invalid argument from a compiler that is simply not installed. */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDownstreamCompilerVersion(SlangPassThrough passThrough, int* outMajor, int* outMinor) = 0;
 };
 
     #define SLANG_UUID_IGlobalSession IGlobalSession::getTypeGuid()
@@ -4565,6 +4607,39 @@ struct IMetadata : public ISlangCastable
     virtual const char* SLANG_MCALL getDebugBuildIdentifier() = 0;
 };
     #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
+
+/** Bindless resource metadata produced for a compiled target.
+
+The bindless space index reported through program reflection is a frontend-predicted reserved
+descriptor space. It remains stable even when later optimization or target lowering removes all
+descriptor-handle heap use from the emitted shader. This metadata interface reports the
+post-lowering usage signal instead.
+
+`usesBindlessResourceHeap()` reports whether the final target IR still contains the
+descriptor-handle/bindless resource path after target-specific lowering. This is a code-generation
+signal, not a complete cross-target host binding policy: targets that lower descriptor handles to
+native resource handles or addresses may not require an explicit descriptor-heap binding even when
+this returns true. Hosts should combine this query with their target binding model when deciding
+whether to bind a heap.
+
+Cast from an artifact-associated `IMetadata*` using `castAs()`.
+*/
+struct IBindlessResourceMetadata : public ISlangCastable
+{
+    SLANG_COM_INTERFACE(
+        0xeafa96d3,
+        0x2352,
+        0x4bf4,
+        {0x88, 0x64, 0x32, 0x28, 0xa4, 0x07, 0x7a, 0x83})
+
+    /// Returns true when the compiled target IR still contains a bindless
+    /// descriptor-heap/resource-handle path after target-specific lowering. This is a
+    /// code-generation signal, not a complete cross-target host binding policy; targets
+    /// that lower descriptor handles to native resource handles or addresses may not require
+    /// an explicit descriptor-heap binding even when this returns true.
+    virtual SLANG_NO_THROW bool SLANG_MCALL usesBindlessResourceHeap() = 0;
+};
+    #define SLANG_UUID_IBindlessResourceMetadata IBindlessResourceMetadata::getTypeGuid()
 
 /** Coverage tracing metadata produced when any shader coverage mode is active.
 
@@ -5485,6 +5560,12 @@ struct IModulePrecompileService_Experimental : public ISlangUnknown
         0x433e,
         {0xaf, 0xcb, 0x13, 0xa0, 0x88, 0xbc, 0x5e, 0xe5})
 
+    /// Precompile this module for a target and embed the resulting target library in the module.
+    ///
+    /// This function is experimental and not thread-safe since it mutates the module by adding
+    /// precompiled target IR and temporary export metadata. Callers must externally synchronize
+    /// access to the module and must not use this API concurrently with other operations on the
+    /// same module or session.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     precompileForTarget(SlangCompileTarget target, ISlangBlob** outDiagnostics) = 0;
 

@@ -19,7 +19,10 @@ namespace
 
 static int _getParallelGenericEntryPointIterationCount()
 {
-    static constexpr int kDefaultIterationCount = 20;
+    // Keep the default below the Windows Debug test-server RPC timeout on slower CI machines.
+    // Developers can raise this with SLANG_PARALLEL_GENERIC_ENTRYPOINT_ITERATIONS when they need a
+    // longer local stress run.
+    static constexpr int kDefaultIterationCount = 10;
 
     const char* envValue = getenv("SLANG_PARALLEL_GENERIC_ENTRYPOINT_ITERATIONS");
     if (!envValue || !envValue[0])

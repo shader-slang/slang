@@ -412,6 +412,7 @@ struct ContainerDeclDirectMemberDeclsInfo
 %   "TryClauseType",
 %   "DeclVisibility",
 %   "BuiltinRequirementKind",
+%   "BuiltinOperationKind",
 %   "ImageFormat",
 %   "PreferRecomputeAttribute::SideEffectBehavior",
 %   "TreatAsDifferentiableExpr::Flavor",

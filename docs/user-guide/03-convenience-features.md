@@ -329,7 +329,7 @@ int test()
     return rs.val; // returns 3.
 }
 ```
-Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators is not supported.
+Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `+`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators is not supported.
 
 In addition, you can overload operator `()` as a member method:
 ```csharp
@@ -668,6 +668,12 @@ Without requesting `spvDescriptorHeapEXT`, Slang introduces a global array of de
 from it. The descriptor set ID of the global descriptor array can be configured with the
 `-bindless-space-index` (or `CompilerOptionName::BindlessSpaceIndex` when using the API) option.
 
+Reflection reports this value as a reserved bindless space for descriptor-handle-capable targets.
+That reservation can be present even when optimization and target lowering remove all descriptor
+handle uses from the emitted shader. Hosts that need to decide whether to bind a descriptor heap
+should query target metadata for `IBindlessResourceMetadata::usesBindlessResourceHeap()` instead of
+using `getBindlessSpaceIndex() >= 0` as the usage test.
+
 Default behavior assigns binding indices based on descriptor types:
 
 | Enum Value             | Vulkan Descriptor Type                    | Binding Index |
@@ -697,14 +703,24 @@ state, and combines the objects with an `OpSampledImage` instruction.
 By default, when using the `spvDescriptorHeapEXT` capability, Slang reinterprets the resource or sampler
 heap as an array of the requested resource type, whose stride is defined by the resource type and obtained
 from the `OpConstantSizeOfEXT` instruction. The user can override this behavior and specify a different
-stride with the `-spirv-resource-heap-stride` or `-spirv-sampler-heap-stride` compiler options.
+stride with the `-spirv-resource-heap-stride` or `-spirv-sampler-heap-stride` compiler options. For
+acceleration-structure entries, an explicit resource heap stride must be at least 8 bytes.
+
+Alternatively, the `-spirv-unified-descriptor-heap-stride` option makes every resource descriptor-heap
+runtime array use a single shared stride equal to the maximum of the image and buffer descriptor sizes,
+so a heap that holds both buffers and images is indexed at the device's unified stride regardless of which
+descriptor type a particular shader accesses. This affects only the default `OpConstantSizeOfEXT` path
+(used when `-spirv-resource-heap-stride` is 0), so it is mutually exclusive with a non-zero
+`-spirv-resource-heap-stride` (combining the two is an error). The sampler heap and acceleration-structure
+entries are unaffected.
 
 > **Note on `RaytracingAccelerationStructure`:** When the `spvDescriptorHeapEXT` capability is active and
 > a `DescriptorHandle<RaytracingAccelerationStructure>` is dereferenced, Slang loads a 64-bit device address
 > from the descriptor heap and converts it to an acceleration structure handle via
-> `OpConvertUToAccelerationStructureKHR`. This matches how GPU drivers expose acceleration structure
-> descriptors in the heap (as device addresses), and requires either the `SPV_KHR_ray_tracing` or
-> `SPV_KHR_ray_query` extension.
+> `OpConvertUToAccelerationStructureKHR`. The heap entry type is `uint64_t`, so the default heap stride is
+> based on the address width rather than the opaque acceleration structure type. This matches how GPU
+> drivers expose acceleration structure descriptors in the heap (as device addresses), and requires either
+> the `SPV_KHR_ray_tracing` or `SPV_KHR_ray_query` extension.
 
 ### Custom Descriptor Fetch
 

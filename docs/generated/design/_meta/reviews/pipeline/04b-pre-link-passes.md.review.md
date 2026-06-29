@@ -1,39 +1,47 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:56:27+00:00
+reviewed_at: 2026-06-12T12:04:49+00:00
 target_doc: pipeline/04b-pre-link-passes.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 18c422c7671f2e36b802b77eaab4617e384c7719e835466116d64fcc7c9bd423
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 5d8f0673fff709ba944e2d5a817256dd08a0b0e59062363746d7886db6baead6
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 2
+finding_count: 0
 severity_breakdown:
   critical: 0
-  major: 1
-  minor: 1
+  major: 0
+  minor: 0
   nit: 0
 ---
 
 # Review report for pipeline/04b-pre-link-passes.md
 
 ## Summary
-The page covers the required pre-link pipeline and most phase-table claims match `generateIRForTranslationUnit`. The most important issue is the mandatory early-inlining loop description: it implies the `performMandatoryEarlyInlining` result is preserved through the iteration, while the source overwrites `changed` with the global peephole result before the final break test. The phase tables also use a non-contract column name.
+
+The pre-link mandatory-pass page is aligned with `generateIRForTranslationUnit` at the recorded source commit. I found no ordered-pass, gate, loop, or link issues.
 
 ## Items checked
-- Ran `regenerate.py show pipeline/04b-pre-link-passes.md` and reviewed the manifest entry, prompt, resolved watched files, and dependencies on `pipeline/03-semantic-check.md`, `pipeline/04-ast-to-ir.md`, `pipeline/05-ir-passes.md`, and `ir-reference/index.md`.
-- Verified front matter fields and resolved all 75 relative links.
-- Checked the required sections and table shape against `pipeline-04b-pre-link-passes.md` and the pre-link mandatory-pass contract in `_common.md`.
-- Spot-checked 32 source-alignment claims, including Phase A-D source ranges, all phase table calls, debug/minimum-optimization/non-essential-validation/obfuscation/language-version gates, adjacent constructs, line-number citations for `generateIRForTranslationUnit`, `SpecializedComponentTypeIRGenContext::process`, `TargetProgram::createIRModuleForLayout`, the per-function DCE sweep, and the mandatory early-inlining loop.
+
+- Ran `regenerate.py show pipeline/04b-pre-link-passes.md` and read the target page, `_common.md`, `pipeline-04b-pre-link-passes.md`, and dependencies `pipeline/03-semantic-check.md`, `pipeline/04-ast-to-ir.md`, `pipeline/05-ir-passes.md`, and `ir-reference/index.md`.
+- Verified front matter keys, recorded source commit, and 64-character hex watched-path digest.
+- Checked every line-number citation in the body against `source/slang/slang-lower-to-ir.cpp` and sampled linked pass implementation headers/files.
+- Verified the ordered Phase A-D tables against `generateIRForTranslationUnit`, including `prelinkIR`, `lowerErrorHandling`, `lowerDefer`, `synthesizeBitFieldAccessors`, `lowerExpandType`, debug-value insertion, SSA/SCCP/CFG/peephole/DCE, loop inversion, early inlining, non-essential validation, stripping, obfuscation, validation, and mangled-name-map construction.
+- Confirmed the pass-level loop description matches the `for (;;)` body and that the page does not mislabel pre-link calls as `SLANG_PASS` calls.
+- Resolved relative links with `regenerate.py lint` for this assigned doc group; lint reported no issues.
 
 ## Findings
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Loops in the pipeline`, lines 341-349 | The page says the outer loop continues as long as any inner pass reports progress and terminates only when `performMandatoryEarlyInlining` is false and the inner cluster makes no changes. In source, the `performMandatoryEarlyInlining` result is immediately overwritten by the `peepholeOptimizeGlobalScope` result when inlining reports true, and the final break test uses that overwritten value plus any later OR-assignment updates. | `source/slang/slang-lower-to-ir.cpp:14957` assigns `changed` from `performMandatoryEarlyInlining`; `source/slang/slang-lower-to-ir.cpp:14960` overwrites `changed` from `peepholeOptimizeGlobalScope`; `source/slang/slang-lower-to-ir.cpp:14977-14978` breaks when the final `changed` value is false. | Revise the loop diagram and prose to describe the actual `changed` variable flow, including that the inlining result is overwritten before the termination check. |
-| F-002 | minor | Phase A through Phase D tables, lines 121, 159, 197, and 258 | The phase tables use `Call` as the second column header, but the contract requires the ordered table columns to be `#`, `Pass`, `File`, `Gate`, and `Notes`. | `docs/generated/design/_meta/prompts/_common.md:444-445` requires one ordered table per phase with `# / Pass / File / Gate / Notes`; `docs/generated/design/pipeline/04b-pre-link-passes.md:121` shows the first phase table header as `#`, `Call`, `File`, `Gate`, and `Notes`. | Rename the second column header from `Call` to `Pass` in all four phase tables. |
+
+(no findings)
+
+## No-issues notes
+
+- The source line numbers reflect the current shifted locations around `generateIRForTranslationUnit`.
+- The mandatory-early-inlining loop description correctly notes the overwritten `changed` value after `peepholeOptimizeGlobalScope`.
+- The adjacent constructs section stays within the required three constructs.
