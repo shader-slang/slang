@@ -193,7 +193,7 @@ static bool canIgnoreType(IRType* type, IRType* upper)
 // path — a *conditional* (must-init) situation that `cancelLoadsByDefiniteAssignment`
 // already classifies. Following merge phis here would misreport those as unconditional
 // (may-init) reads.
-static IRParam* getLoopArgTargetParam(IRUse* use)
+static IRParam* getLoopArgTargetParam(IRUse* use, IRLoop** outLoop = nullptr)
 {
     auto loop = as<IRLoop>(use->getUser());
     if (!loop)
@@ -216,7 +216,11 @@ static IRParam* getLoopArgTargetParam(IRUse* use)
     for (auto param : target->getParams())
     {
         if (paramIndex == argIndex)
+        {
+            if (outLoop)
+                *outLoop = loop;
             return param;
+        }
         paramIndex++;
     }
     return nullptr;
@@ -232,7 +236,18 @@ static IRParam* getLoopArgTargetParam(IRUse* use)
 // with each iteration's update; the first-iteration read of that phi is a read of the
 // undefined value. Without following the phi the only direct use of the undefined
 // instruction is the loop argument, which records no load, so the read escapes detection.
-static List<IRInst*> getAliasableInstructions(IRInst* inst)
+//
+// When a loop header phi is followed, it is recorded in `loopPhis` (when provided)
+// together with its `IRLoop`. This lets the caller tell a *post-loop* read of the phi
+// apart from an *in-loop* one. A post-loop read — reached only after the loop's break
+// block — sees the undefined value only on the zero-trip path, because the loop body
+// re-defines the variable on every iteration that runs. That is a conditional
+// (must-init) situation, which the established loop-relaxation policy deliberately does
+// not warn on (see `cancelLoadsByDefiniteAssignment`). The genuine first-iteration read
+// *inside* the loop body is not post-loop and is still reported.
+static List<IRInst*> getAliasableInstructions(
+    IRInst* inst,
+    Dictionary<IRInst*, IRLoop*>* loopPhis = nullptr)
 {
     List<IRInst*> addresses;
     HashSet<IRInst*> visited;
@@ -261,11 +276,13 @@ static List<IRInst*> getAliasableInstructions(IRInst* inst)
             {
                 alias = user;
             }
-            else if (auto param = getLoopArgTargetParam(use))
+            else if (IRLoop* loop = nullptr; auto param = getLoopArgTargetParam(use, &loop))
             {
                 // The value flows into a loop header phi; the phi carries it forward
                 // into the loop body.
                 alias = param;
+                if (loopPhis)
+                    loopPhis->addIfNotExists(param, loop);
             }
 
             if (alias && visited.add(alias))
@@ -714,9 +731,13 @@ static void cancelLoadsByDefiniteAssignment(
     }
 }
 
-static void collectAliasableLoadStores(IRInst* inst, List<IRInst*>& stores, List<IRInst*>& loads)
+static void collectAliasableLoadStores(
+    IRInst* inst,
+    List<IRInst*>& stores,
+    List<IRInst*>& loads,
+    Dictionary<IRInst*, IRLoop*>* loopPhis = nullptr)
 {
-    auto addresses = getAliasableInstructions(inst);
+    auto addresses = getAliasableInstructions(inst, loopPhis);
 
     for (auto alias : addresses)
     {
@@ -724,6 +745,38 @@ static void collectAliasableLoadStores(IRInst* inst, List<IRInst*>& stores, List
         for (auto use = alias->firstUse; use; use = use->nextUse)
             collectInstructionByUsage(stores, loads, use->getUser(), alias);
     }
+}
+
+// Returns true if `load` is a *post-loop* read of a loop header phi in `loopPhis`: it
+// uses such a phi and its block is reachable from that phi's loop break block.
+//
+// A loop header phi merges the undefined pre-loop value (loop-entry edge) with the loop
+// body's per-iteration update (back-edge). Reaching a read of the phi only via the break
+// block means every path to it first ran the loop, so the read sees the undefined value
+// only when the loop ran zero times — a conditional (zero-trip) read. The established
+// loop-relaxation policy in `cancelLoadsByDefiniteAssignment` deliberately does not warn
+// on post-loop conditional reads, so the may-init analysis must not report them either.
+// In-loop reads of the phi (the genuine first-iteration read) are not reachable from the
+// break block and are kept.
+static bool isPostLoopPhiRead(
+    ReachabilityContext& reachability,
+    const Dictionary<IRInst*, IRLoop*>& loopPhis,
+    IRInst* load)
+{
+    auto loadBlock = as<IRBlock>(load->getParent());
+    if (!loadBlock)
+        return false;
+
+    for (UInt i = 0; i < load->getOperandCount(); i++)
+    {
+        IRLoop* loop = nullptr;
+        if (!loopPhis.tryGetValue(load->getOperand(i), loop))
+            continue;
+        auto breakBlock = loop->getBreakBlock();
+        if (breakBlock && reachability.isBlockReachable(breakBlock, loadBlock))
+            return true;
+    }
+    return false;
 }
 
 static List<IRInst*> getUnresolvedParamLoads(
@@ -774,13 +827,31 @@ static UninitializedUseLoads getUninitializedUseLoads(
     // Collect the aliasable loads/stores once and derive both violation sets from it.
     List<IRInst*> stores;
     List<IRInst*> allLoads;
-    collectAliasableLoadStores(inst, stores, allLoads);
+    Dictionary<IRInst*, IRLoop*> loopPhis;
+    collectAliasableLoadStores(inst, stores, allLoads, &loopPhis);
 
     UninitializedUseLoads result;
 
     // May-init violations: loads not reachable from any store.
     result.mayInit = allLoads;
     cancelLoads(reachability, stores, result.mayInit);
+
+    // Drop post-loop (zero-trip) reads of a loop-carried phi. The loop body re-defines
+    // the variable every iteration, so such a read is uninitialized only when the loop
+    // ran zero times — a conditional case the loop-relaxation policy does not warn on.
+    // (In SSA the body's per-iteration update is the phi back-edge argument, not an
+    // `IRStore`, so `cancelLoads` above cannot see it; this filter applies the same
+    // policy at the value-flow level.)
+    if (loopPhis.getCount())
+    {
+        for (Index i = 0; i < result.mayInit.getCount();)
+        {
+            if (isPostLoopPhiRead(reachability, loopPhis, result.mayInit[i]))
+                result.mayInit.fastRemoveAt(i);
+            else
+                i++;
+        }
+    }
 
     // Must-init only adds information when there is at least one store (otherwise every
     // load is already a may-init violation) and at least one load.
