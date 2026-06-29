@@ -80,10 +80,15 @@ jobs:
 
       - name: Clean inherited checkout state
         run: |
-          # Testing step should not need any of the submodules.
+          # Remove stale files and stale submodule worktrees inherited by self-hosted runners.
           git submodule deinit --all --force
           git clean -ffdx
           git reset --hard HEAD
+
+      - name: Checkout OptiX headers
+        run: |
+          git submodule sync -- external/optix-dev
+          git submodule update --init --depth=1 external/optix-dev
 
       - name: Setup Vulkan ICD
         uses: ./.github/actions/setup-vulkan-icd

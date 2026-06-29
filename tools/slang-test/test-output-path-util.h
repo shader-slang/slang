@@ -7,6 +7,11 @@
 namespace Slang
 {
 
+// Returns `path` beside `filePath` when `path` is bare, while preserving path-qualified values.
+// For example, `out.spv` for `tests/a/b.slang` becomes `tests/a/out.spv`, while `nested/out.spv`
+// stays unchanged.
+String getTestRelativePath(const String& filePath, const String& path);
+
 // Rewrites every bare `-o <file>` output and bare `-dump-intermediate-prefix <prefix>` value so
 // test-owned artifacts stay beside `filePath`. Path-qualified values with either slash direction
 // and `-o -` are preserved. If `-dump-intermediates` appears without an explicit prefix, the helper

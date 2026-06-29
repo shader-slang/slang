@@ -195,18 +195,6 @@ static SlangResult _readTestFile(const TestInput& input, const String& suffix, S
     return Slang::File::readAllText(buf, out);
 }
 
-static String _getTestRelativePath(const TestInput& input, const String& path)
-{
-    if (Path::hasPath(path))
-        return path;
-
-    String testDirectory = Path::getParentDirectory(input.filePath);
-    if (testDirectory.getLength() == 0)
-        return path;
-
-    return Path::combine(testDirectory, path);
-}
-
 bool match(char const** ioCursor, char const* expected)
 {
     char const* cursor = *ioCursor;
@@ -1873,7 +1861,7 @@ static SlangResult _readFileCheckOutput(
     bool removeEmbeddedSource,
     String& out)
 {
-    String resolvedPath = _getTestRelativePath(input, path);
+    String resolvedPath = getTestRelativePath(input.filePath, path);
     if (Path::getPathExt(resolvedPath) != "spv")
         return File::readAllText(resolvedPath, out);
 
@@ -2780,7 +2768,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
                 needToRemoveEmbeddedSource,
                 actualOutput)))
         {
-            String resolvedPath = _getTestRelativePath(input, fileCheckOutputPath);
+            String resolvedPath = getTestRelativePath(input.filePath, fileCheckOutputPath);
             context->getTestReporter()->messageFormat(
                 TestMessageType::RunError,
                 "failed to read FileCheck output '%s'",

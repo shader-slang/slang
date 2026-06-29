@@ -64,12 +64,42 @@ jobs:
         with:
           submodules: "false"
 
-      - name: Clean inherited checkout state
+      - name: Add Git Bash to PATH
+        if: inputs.os == 'windows'
+        shell: pwsh
         run: |
-          # Testing step should not need any of the submodules.
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+
+      - name: Clean inherited checkout state
+        if: inputs.os != 'windows'
+        run: |
+          # Remove stale files and stale submodule worktrees inherited by self-hosted runners.
           git submodule deinit --all --force
           git clean -ffdx
           git reset --hard HEAD
+
+      - name: Clean inherited checkout state
+        if: inputs.os == 'windows'
+        shell: pwsh
+        run: |
+          # Remove stale files and stale submodule worktrees inherited by self-hosted runners.
+          git submodule deinit --all --force
+          git clean -ffdx
+          git reset --hard HEAD
+
+      - name: Checkout OptiX headers
+        if: (inputs.full-gpu-tests || inputs.gpu-api-only) && inputs.os != 'macos' && inputs.os != 'windows'
+        run: |
+          git submodule sync -- external/optix-dev
+          git submodule update --init --depth=1 external/optix-dev
+
+      - name: Checkout OptiX headers
+        if: (inputs.full-gpu-tests || inputs.gpu-api-only) && inputs.os == 'windows'
+        shell: pwsh
+        run: |
+          git submodule sync -- external/optix-dev
+          git submodule update --init --depth=1 external/optix-dev
 
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup

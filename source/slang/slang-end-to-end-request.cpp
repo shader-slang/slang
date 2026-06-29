@@ -607,7 +607,7 @@ String EndToEndCompileRequest::_getDebugArtifactPath(
 {
     // Separate debug info is a sidecar for an emitted file. Callers diagnose stdout output before
     // asking for the sidecar path.
-    SLANG_RELEASE_ASSERT(path.getLength() != 0);
+    SLANG_RELEASE_ASSERT(!_isStdoutArtifactPath(path));
 
     if (!targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
         return String();
@@ -700,7 +700,7 @@ SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
         // Check if a debug artifact was actually created (only for SPIR-V targets)
         if (dbgArtifact)
         {
-            SLANG_RELEASE_ASSERT(path.getLength() != 0);
+            SLANG_RELEASE_ASSERT(!_isStdoutArtifactPath(path));
 
             String dbgPath = _getDebugArtifactPath(targetProgram, path, artifact);
             SLANG_RELEASE_ASSERT(dbgPath.getLength() != 0);
@@ -740,7 +740,7 @@ SlangResult EndToEndCompileRequest::_validateCoverageManifestOutputPaths()
         if (!artifact)
             return;
         // Stdout artifacts have no file path to collide with.
-        if (artifactPath.getLength() != 0)
+        if (!_isStdoutArtifactPath(artifactPath))
         {
             emittedArtifactPaths.add(artifactPath);
 

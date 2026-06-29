@@ -59,6 +59,28 @@ SLANG_UNIT_TEST(slangTestOutputPathNormalization)
     }
 
     {
+        const char* values[] = {"-target", "spirv", "-o", "../leak.spv"};
+        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
+        normalizeTestOutputPathsForTestFile(testPath, args);
+
+        checkArgs(args, values, SLANG_COUNT_OF(values));
+    }
+
+    {
+        const char* values[] = {
+            "-target",
+            "spirv",
+            "-dump-intermediates",
+            "-dump-intermediate-prefix",
+            "../leaky-",
+        };
+        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
+        normalizeTestOutputPathsForTestFile(testPath, args);
+
+        checkArgs(args, values, SLANG_COUNT_OF(values));
+    }
+
+    {
         const char* values[] = {"-target", "spirv", "-dump-intermediates"};
         List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
         normalizeTestOutputPathsForTestFile(testPath, args);

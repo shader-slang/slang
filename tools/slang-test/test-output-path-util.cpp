@@ -5,10 +5,16 @@
 namespace Slang
 {
 
-static void normalizeBareTestPath(const String& testDirectory, String& path)
+String getTestRelativePath(const String& filePath, const String& path)
 {
-    if (!Path::hasPath(path))
-        path = Path::combine(testDirectory, path);
+    if (Path::hasPath(path))
+        return path;
+
+    String testDirectory = Path::getParentDirectory(filePath);
+    if (testDirectory.getLength() == 0)
+        return path;
+
+    return Path::combine(testDirectory, path);
 }
 
 void normalizeTestOutputPathsForTestFile(const String& filePath, List<String>& args)
@@ -33,7 +39,7 @@ void normalizeTestOutputPathsForTestFile(const String& filePath, List<String>& a
             hasDumpIntermediatePrefix = true;
             if (i + 1 < args.getCount())
             {
-                normalizeBareTestPath(testDirectory, args[i + 1]);
+                args[i + 1] = getTestRelativePath(filePath, args[i + 1]);
                 ++i;
             }
             continue;
@@ -44,7 +50,7 @@ void normalizeTestOutputPathsForTestFile(const String& filePath, List<String>& a
 
         auto& outputPath = args[i + 1];
         if (outputPath != "-")
-            normalizeBareTestPath(testDirectory, outputPath);
+            outputPath = getTestRelativePath(filePath, outputPath);
         ++i;
     }
 
