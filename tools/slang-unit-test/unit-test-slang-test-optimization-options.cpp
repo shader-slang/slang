@@ -1,0 +1,154 @@
+// unit-test-slang-test-optimization-options.cpp
+
+#include "../slang-test/slang-test-optimization-options.h"
+#include "unit-test/slang-unit-test.h"
+
+using namespace Slang;
+
+SLANG_UNIT_TEST(slangTestOptimizationArgDetection)
+{
+    const char* optimizationArgs[] = {
+        "-O",
+        "-O0",
+        "-Onone",
+        "-O1",
+        "-Odefault",
+        "-O2",
+        "-Ohigh",
+        "-O3",
+        "-Omaximal",
+    };
+
+    for (const auto arg : optimizationArgs)
+    {
+        SLANG_CHECK(SlangTest::isSlangOptimizationArg(String(arg)));
+    }
+
+    SLANG_CHECK(!SlangTest::isSlangOptimizationArg(String("-Odump")));
+    SLANG_CHECK(!SlangTest::isSlangOptimizationArg(String("-output")));
+
+    {
+        List<String> args;
+        args.add("-target");
+        args.add("spirv");
+
+        SLANG_CHECK(!SlangTest::hasSlangOptimizationArg(args));
+
+        args.add("-O2");
+
+        SLANG_CHECK(SlangTest::hasSlangOptimizationArg(args));
+    }
+}
+
+SLANG_UNIT_TEST(slangTestRenderOptimizationArgDetection)
+{
+    {
+        List<String> args;
+        args.add("-compile-arg");
+        args.add("-O2");
+
+        SLANG_CHECK(SlangTest::hasRenderTestSlangOptimizationArg(args));
+    }
+
+    {
+        List<String> args;
+        args.add("-xslang");
+        args.add("-Ohigh");
+
+        SLANG_CHECK(SlangTest::hasRenderTestSlangOptimizationArg(args));
+    }
+
+    {
+        List<String> args;
+        args.add("-Xslang");
+        args.add("-O3");
+
+        SLANG_CHECK(SlangTest::hasRenderTestSlangOptimizationArg(args));
+    }
+
+    {
+        List<String> args;
+        args.add("-Xslang...");
+        args.add("-target");
+        args.add("spirv");
+        args.add("-Omaximal");
+        args.add("-X.");
+
+        SLANG_CHECK(SlangTest::hasRenderTestSlangOptimizationArg(args));
+    }
+
+    {
+        List<String> args;
+        args.add("-Xslang...");
+        args.add("-target");
+        args.add("spirv");
+        args.add("-X.");
+        args.add("-O3");
+
+        SLANG_CHECK(!SlangTest::hasRenderTestSlangOptimizationArg(args));
+    }
+
+    {
+        List<String> args;
+        args.add("-mtl");
+
+        SLANG_CHECK(SlangTest::hasRenderTestRenderApiArg(args, RenderApiType::Metal));
+        SLANG_CHECK(!SlangTest::hasRenderTestRenderApiArg(args, RenderApiType::Vulkan));
+    }
+}
+
+SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
+{
+    {
+        CommandLine cmdLine;
+
+        SlangTest::addDefaultSlangOptimization(cmdLine);
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 1);
+        SLANG_CHECK(cmdLine.m_args[0] == SlangTest::kTestOptimizationOption);
+    }
+
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-O3");
+
+        SlangTest::addDefaultSlangOptimization(cmdLine);
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 1);
+        SLANG_CHECK(cmdLine.m_args[0] == "-O3");
+    }
+
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-vk");
+
+        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 3);
+        SLANG_CHECK(cmdLine.m_args[0] == "-vk");
+        SLANG_CHECK(cmdLine.m_args[1] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[2] == SlangTest::kTestOptimizationOption);
+    }
+
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-Xslang");
+        cmdLine.addArg("-O3");
+
+        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 2);
+        SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[1] == "-O3");
+    }
+
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-mtl");
+
+        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 1);
+        SLANG_CHECK(cmdLine.m_args[0] == "-mtl");
+    }
+}

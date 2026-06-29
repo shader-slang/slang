@@ -126,6 +126,12 @@ optimization option to slangc:
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -Xslang -O3
 ```
 
+The recognized optimization spellings are `-O`, `-O0`, `-Onone`, `-O1`,
+`-Odefault`, `-O2`, `-Ohigh`, `-O3`, and `-Omaximal`. Prefer the lowest level
+that preserves the test's expected output. Explicit Metal render-test commands
+keep render-test's existing optimization behavior because they do not invoke
+`spv-opt`.
+
 For diagnostic tests that intentionally leave an option without its required
 argument, put the explicit optimization option before that dangling option.
 `slang-test` appends its default after the directive arguments, so relying on
