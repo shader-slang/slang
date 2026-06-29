@@ -10,6 +10,11 @@
 // emitted GLSL rather than being folded away.
 
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -stage vertex -entry main
+// Also round-trip the emitted GLSL through glslang (-emit-spirv-via-glsl) so this
+// guards validity, not just the textual form: a brace initializer, or a wrongly
+// ordered nested array constructor, would be rejected by glslang and fail to
+// produce SPIR-V.
+//TEST:SIMPLE(filecheck=GLSLSPV): -target spirv-asm -emit-spirv-via-glsl -stage vertex -entry main
 
 static const int2 a[2] = {{1, 1}, {2, 2}};
 static const int b[3] = {10, 20, 30};
@@ -33,3 +38,7 @@ Result main(uint vid : SV_VertexID)
 // GLSL-DAG: ivec2[](
 // GLSL-DAG: int[](
 // GLSL-DAG: int[][3](
+
+// The GLSL above compiles through glslang to valid SPIR-V, proving the
+// constructor syntax (including the nested int[][3](...)) is accepted.
+// GLSLSPV: OpEntryPoint Vertex
