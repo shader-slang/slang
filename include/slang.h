@@ -2338,6 +2338,7 @@ struct ISession;
 }
 #endif
 
+#include "slang-reflection.h"
 #include "slang-deprecated.h"
 
 #ifdef __cplusplus

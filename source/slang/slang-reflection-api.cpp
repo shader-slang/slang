@@ -6,6 +6,7 @@
 #include "slang-compiler.h"
 #include "slang-deprecated.h"
 #include "slang-lookup.h"
+#include "slang-reflection.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang.h"
