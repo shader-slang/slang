@@ -798,11 +798,17 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                 return false;
             }
 
+            // The explicit constructor matched and type-checked, so this is a
+            // valid coercion. Report success even when no output expression was
+            // requested (e.g. the `canCoerce` viability probe passes
+            // `outExpr == nullptr`); otherwise overload resolution would treat
+            // the conversion as impossible and reject an otherwise-viable
+            // candidate. This mirrors `createInvokeExprForSynthesizedCtor` and
+            // `createCtorInvokeExprForAbstractType`, which return `true`
+            // independent of `outExpr`.
             if (outExpr)
-            {
                 *outExpr = ctorInvokeExpr;
-                return true;
-            }
+            return true;
         }
     }
     return false;
