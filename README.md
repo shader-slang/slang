@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: The Khronos Group, Inc.
+SPDX-License-Identifier: CC-BY-4.0
+-->
+
 Slang
 =====
 ![CI Status](https://github.com/shader-slang/slang/actions/workflows/ci.yml/badge.svg?branch=master)

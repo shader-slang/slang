@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: The Khronos Group, Inc.
+SPDX-License-Identifier: CC-BY-4.0
+-->
+
 # PR Review Protocol
 
 > For AI review agents (Claude GitHub Actions + CodeRabbit), not humans.
