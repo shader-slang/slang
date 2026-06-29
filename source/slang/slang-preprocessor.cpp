@@ -4208,7 +4208,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         break;
 
     case TokenType::StringLiteral:
-        file = getStringLiteralTokenValue(AdvanceToken(context));
+        file = getStringLiteralTokenValue(AdvanceToken(context), GetSink(context));
         break;
 
     case TokenType::IntegerLiteral:
