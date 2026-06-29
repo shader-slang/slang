@@ -2631,6 +2631,15 @@ public:
 
     void checkExtensionConformance(ExtensionDecl* decl);
 
+    /// Warn when a member of `extensionDecl` is declared with the same name and an overlapping
+    /// signature as a member already declared on the extended type's primary declaration or on
+    /// an earlier sibling `extension` of that same type. Slang does not currently define which of
+    /// two such same-signature declarations takes effect (issue #9660), so this surfaces the
+    /// conflict to the user symmetrically without stating which one is used. Members that satisfy
+    /// an interface requirement and free-form generic extensions of a type parameter are exempt,
+    /// because those are intentional, well-defined patterns.
+    void checkExtensionMemberConflicts(ExtensionDecl* extensionDecl);
+
     void calcOverridableCompletionCandidates(
         Type* aggType,
         ContainerDecl* aggTypeDecl,

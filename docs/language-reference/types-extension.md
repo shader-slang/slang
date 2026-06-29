@@ -126,8 +126,10 @@ void main(uint3 id : SV_DispatchThreadID)
 }
 ```
 
-> ⚠️ **Warning:** When an extension and the base type contain a member with the same signature, it is
-> currently undefined which member takes effect. ([Issue #9660](https://github.com/shader-slang/slang/issues/9660))
+> ⚠️ **Warning:** When an extension and the base type (or two `extension`s of the same type) contain a
+> member with the same signature, it is currently undefined which member takes effect; the compiler
+> now emits a diagnostic flagging this conflict, without determining which declaration is used.
+> ([Issue #9660](https://github.com/shader-slang/slang/issues/9660))
 
 
 ## Enumeration Extension {#enum}

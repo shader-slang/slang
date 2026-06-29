@@ -4930,6 +4930,11 @@ struct SemanticsDeclConformancesVisitor : public SemanticsDeclVisitorBase,
         }
 
         checkExtensionConformance(extensionDecl);
+
+        // Conformance checking has now marked any extension members that satisfy an interface
+        // requirement, so it is safe to look for same-signature collisions with the extended type
+        // (those interface-satisfying members are exempt).
+        checkExtensionMemberConflicts(extensionDecl);
     }
 
     // Build witness tables for generic type constraints to establish canonical
@@ -11211,6 +11216,137 @@ void SemanticsVisitor::checkExtensionConformance(ExtensionDecl* decl)
             continue;
 
         checkConformance(targetType, inheritanceDecl, decl);
+    }
+}
+
+// The broad kind of a member declaration, used to decide whether two same-named members can
+// collide. Two members only conflict when they fall in the same category; a name shared across
+// categories (e.g. a function and a nested type) is not an ambiguity Slang needs to warn about.
+enum class ExtensionMemberKind
+{
+    Other,    //< Not a member kind we compare (e.g. inheritance clauses, constructors).
+    Callable, //< An ordinary `FuncDecl`, compared by full signature.
+    Type,     //< A nested type, type alias, or associated type, compared by name alone.
+    Value,    //< A field or static variable, compared by name alone.
+};
+
+// Classify `member` into the category used for extension-member conflict detection. Returns
+// `Other` for declarations that should never participate in a conflict (so the caller can skip
+// them cheaply). For example a `struct`, `typedef`, and `associatedtype` are all `Type`, while a
+// member function is `Callable`.
+static ExtensionMemberKind getExtensionMemberKind(Decl* member)
+{
+    if (as<FuncDecl>(member))
+        return ExtensionMemberKind::Callable;
+    if (as<AggTypeDecl>(member) || as<SimpleTypeDecl>(member))
+        return ExtensionMemberKind::Type;
+    if (as<VarDeclBase>(member))
+        return ExtensionMemberKind::Value;
+    return ExtensionMemberKind::Other;
+}
+
+void SemanticsVisitor::checkExtensionMemberConflicts(ExtensionDecl* extensionDecl)
+{
+    // The builtin core/standard modules intentionally declare overlapping-signature members across
+    // the primary type and its 'extension's (for example a shared `__Element` typealias on several
+    // extensions of a builtin type), so this user-facing diagnostic does not apply to them.
+    if (isFromCoreModule(extensionDecl))
+        return;
+
+    // Exemption (ii): a free-form generic extension of a bare type parameter, e.g.
+    // `extension<T : IFoo> T { int defaulted() {...} }`, legitimately supplies default members to
+    // every conforming type, so its members are not in conflict with anything.
+    if (isDeclRefTypeOf<GenericTypeParamDecl>(extensionDecl->targetType))
+        return;
+
+    // Resolve the primary aggregate type declaration being extended. If the extension does not
+    // target a nominal aggregate type (e.g. it extends a builtin or a non-aggregate), there is no
+    // primary member list to compare against and no sibling-extension ordering to reason about.
+    auto declRefType = as<DeclRefType>(extensionDecl->targetType);
+    if (!declRefType)
+        return;
+    auto targetAggDeclRef = declRefType->getDeclRef().as<AggTypeDecl>();
+    if (!targetAggDeclRef)
+        return;
+    auto targetAggDecl = targetAggDeclRef.getDecl();
+
+    // Build the set of "other" member sources to compare each extension member against:
+    //   (a) the primary aggregate declaration's direct members, and
+    //   (b) sibling extensions of the same type that appear *before* this extension in the
+    //       candidate list.
+    //
+    // Comparing only against strictly-earlier siblings means each cross-extension pair is reported
+    // exactly once (by the later extension). The primary declaration is never an extension, so the
+    // base-vs-extension case is always reported here by the extension side.
+    List<ContainerDecl*> otherMemberSources;
+    otherMemberSources.add(targetAggDecl);
+
+    auto const& candidateExtensions = getCandidateExtensions(targetAggDeclRef, this);
+    auto thisExtensionIndex = candidateExtensions.indexOf(extensionDecl);
+    for (Index ii = 0; ii < candidateExtensions.getCount(); ++ii)
+    {
+        // If this extension is not in the candidate list (it should be), fall back to comparing
+        // against all siblings so we still surface conflicts; otherwise only earlier siblings.
+        if (thisExtensionIndex >= 0 && ii >= thisExtensionIndex)
+            break;
+        auto sibling = candidateExtensions[ii];
+        if (sibling != extensionDecl)
+            otherMemberSources.add(sibling);
+    }
+
+    for (auto rawMember : extensionDecl->getDirectMemberDecls())
+    {
+        auto member = maybeGetInner(rawMember);
+        auto memberName = member->getName();
+        if (!memberName)
+            continue;
+
+        auto memberKind = getExtensionMemberKind(member);
+        if (memberKind == ExtensionMemberKind::Other)
+            continue;
+
+        // Exemption (i): a member that satisfies an interface requirement is an intended
+        // interface-implementation, not an ambiguity.
+        if (member->hasModifier<IsOverridingModifier>())
+            continue;
+
+        bool reported = false;
+        for (auto source : otherMemberSources)
+        {
+            for (auto rawOther : source->getDirectMemberDecls())
+            {
+                auto other = maybeGetInner(rawOther);
+                if (other == member)
+                    continue;
+                if (other->getName() != memberName)
+                    continue;
+                if (getExtensionMemberKind(other) != memberKind)
+                    continue;
+
+                // The other side satisfying an interface requirement is likewise intended.
+                if (other->hasModifier<IsOverridingModifier>())
+                    continue;
+
+                // Exemption (iii): callables only conflict when their signatures match.
+                // `doFunctionSignaturesMatch` does not consider the return type, so two members
+                // that differ only in their parameters (a legitimate overload set) are not a
+                // conflict.
+                if (memberKind == ExtensionMemberKind::Callable)
+                {
+                    DeclRef<FuncDecl> memberFuncRef(as<FuncDecl>(member));
+                    DeclRef<FuncDecl> otherFuncRef(as<FuncDecl>(other));
+                    if (!doFunctionSignaturesMatch(memberFuncRef, otherFuncRef))
+                        continue;
+                }
+
+                getSink()->diagnose(
+                    Diagnostics::AmbiguousExtensionMember{.member = member, .conflicting = other});
+                reported = true;
+                break;
+            }
+            if (reported)
+                break;
+        }
     }
 }
 
