@@ -175,9 +175,55 @@ static bool canIgnoreType(IRType* type, IRType* upper)
     return false;
 }
 
-static List<IRInst*> getAliasableInstructions(IRInst* inst)
+// If `argUse` is an *argument* operand of an unconditional branch or loop (i.e. a phi
+// edge value, not one of the branch's target/break/continue block operands), return the
+// target block parameter that receives that argument. Otherwise return null.
+//
+// Branch arguments map positionally to the target block's parameters, so the value passed
+// as the i-th argument becomes the i-th block parameter (the SSA phi) along this edge.
+static IRParam* getBranchArgPhiParam(IRUse* argUse)
 {
-    List<IRInst*> addresses;
+    auto branch = as<IRUnconditionalBranch>(argUse->getUser());
+    if (!branch)
+        return nullptr;
+
+    // `getArgs()` points into the branch's contiguous operand storage and, by
+    // construction, excludes the non-argument operand slots (the target block, plus the
+    // break/continue blocks for an `IRLoop`). So the argument index is just the offset of
+    // `argUse` within that range; anything outside it (e.g. the target/break/continue use)
+    // is not a phi argument.
+    auto args = branch->getArgs();
+    UInt argCount = branch->getArgCount();
+    UInt argIndex = UInt(argUse - args);
+    if (argIndex >= argCount)
+        return nullptr;
+
+    // The target block parameter at the same index receives this argument. In well-formed
+    // IR the target always has at least `argCount` parameters, so `getParamAt` resolves it
+    // (and asserts otherwise).
+    return getParamAt(branch->getTargetBlock(), argIndex);
+}
+
+// Collect all instructions that alias `inst` for the purpose of the uninitialized-use
+// analysis. This follows two kinds of aliasing:
+//
+//  - Address aliasing: instructions like `getElementPtr`/`fieldAddress` produce a
+//    derived reference to the same storage (see `isAliasable`).
+//  - SSA value flow through phis: when `inst` (a value) is passed as a branch/loop
+//    argument, the receiving block parameter is the same value along that edge, so its
+//    uses are uses of `inst`. This is what lets a loop-carried use be seen: an
+//    uninitialized value passed as a loop's initial phi argument flows to the loop-header
+//    parameter, whose first-iteration read is a genuine use of the uninitialized value.
+//
+// A `visited` set guards against the cycles that phi following introduces (a loop-header
+// phi is reachable from its own back-edge argument).
+static void getAliasableInstructionsRec(
+    IRInst* inst,
+    HashSet<IRInst*>& visited,
+    List<IRInst*>& addresses)
+{
+    if (!visited.add(inst))
+        return;
 
     addresses.add(inst);
     for (auto use = inst->firstUse; use; use = use->nextUse)
@@ -185,13 +231,124 @@ static List<IRInst*> getAliasableInstructions(IRInst* inst)
         IRInst* user = use->getUser();
 
         // Meta instructions only use the argument type
-        if (isMetaOp(user) || !isAliasable(user))
+        if (isMetaOp(user))
             continue;
 
-        addresses.addRange(getAliasableInstructions(user));
-    }
+        if (isAliasable(user))
+        {
+            getAliasableInstructionsRec(user, visited, addresses);
+            continue;
+        }
 
+        // Follow SSA value flow through a phi: an argument passed to a branch/loop
+        // becomes the corresponding block parameter, which is the same value along
+        // this edge.
+        if (auto phiParam = getBranchArgPhiParam(use))
+            getAliasableInstructionsRec(phiParam, visited, addresses);
+    }
+}
+
+static List<IRInst*> getAliasableInstructions(IRInst* inst, HashSet<IRInst*>& aliasSet)
+{
+    List<IRInst*> addresses;
+    getAliasableInstructionsRec(inst, aliasSet, addresses);
     return addresses;
+}
+
+static List<IRInst*> getAliasableInstructions(IRInst* inst)
+{
+    HashSet<IRInst*> aliasSet;
+    return getAliasableInstructions(inst, aliasSet);
+}
+
+// Does `inst` depend (transitively, through its operands) on any value in `aliasSet`?
+// Used to tell a genuinely-defined phi argument from one that is merely the tracked
+// uninitialized value carried/derived through computation. For example, with a
+// loop-carried accumulator the back-edge argument is `add(total1, a[i])`, which depends on
+// the loop-header phi `total1` (an alias) and so is *not* a real definition; whereas a
+// conditionally-stored value like `load(candidateProceduralAttrs)` depends on nothing in
+// the alias set and *is* a real definition. A `seen` set bounds the operand walk against
+// cycles (phis can be mutually recursive).
+static bool dependsOnAlias(IRInst* inst, const HashSet<IRInst*>& aliasSet, HashSet<IRInst*>& seen)
+{
+    if (aliasSet.contains(inst))
+        return true;
+    if (!seen.add(inst))
+        return false;
+    // Stop at block boundaries: a block parameter's "operands" are its phi arguments,
+    // which we reach via the predecessors, not via getOperand. Following an alias param is
+    // already handled by aliasSet membership above; any non-alias param is treated as an
+    // independent definition.
+    if (as<IRParam>(inst))
+        return false;
+    for (UInt i = 0, n = inst->getOperandCount(); i < n; i++)
+    {
+        auto operand = inst->getOperand(i);
+        if (operand && dependsOnAlias(operand, aliasSet, seen))
+            return true;
+    }
+    return false;
+}
+
+// Given the set of aliases of the tracked uninitialized value (the values that are the
+// uninitialized value or are it carried along a phi edge), find the phi merge points where
+// a *genuinely defined* value also flows in. Each such incoming argument is reported as a
+// "store": along its edge the variable holds a real, initialized value, so a read reached
+// after it is not a may-init (never-initialized) use.
+//
+// This is what keeps the analysis honest once phi following is enabled. Consider a value
+// that is assigned only on some paths and then read after a loop:
+//
+//     MyAttrs attrs;                       // uninitialized
+//     for (;;) { ...; if (cond) attrs = computed; ... }
+//     use(attrs);                          // reads the loop-header phi
+//
+// The loop-header phi merges the undefined pre-loop value with `computed`. Without this,
+// the post-loop read would be flagged may-init (no IR `store` exists for an SSA value),
+// even though a defined value reaches it on the assigning path — making it a conditional
+// (must-init) situation that the definite-assignment pass deliberately suppresses for
+// zero-trip loops. Registering `computed` as a store lets `cancelLoads` reclassify the read
+// out of may-init. A purely loop-carried accumulator (`total += a[i]`) has no such defined
+// incoming value -- its only non-undefined phi argument, `add(total1, a[i])`, depends on
+// the phi itself -- so `dependsOnAlias` rejects it and the accumulator correctly stays a
+// may-init violation.
+static void collectPhiMergeStores(
+    const HashSet<IRInst*>& aliasSet,
+    const List<IRInst*>& aliases,
+    List<IRInst*>& stores)
+{
+    for (auto alias : aliases)
+    {
+        auto param = as<IRParam>(alias);
+        if (!param)
+            continue;
+        auto block = as<IRBlock>(param->getParent());
+        if (!block)
+            continue;
+        Index paramIndex = getParamIndexInBlock(param);
+        if (paramIndex < 0)
+            continue;
+
+        for (auto pred : block->getPredecessors())
+        {
+            auto branch = as<IRUnconditionalBranch>(pred->getTerminator());
+            if (!branch || UInt(paramIndex) >= branch->getArgCount())
+                continue;
+            auto arg = branch->getArg(UInt(paramIndex));
+            // Only an argument that does not derive from the tracked uninitialized value is
+            // a genuine definition reaching this merge point.
+            HashSet<IRInst*> seen;
+            if (dependsOnAlias(arg, aliasSet, seen))
+                continue;
+            // Record the store at the predecessor edge (its terminator), not at the
+            // argument's definition. The variable becomes initialized only on this incoming
+            // edge; the value `arg` may have been defined earlier (e.g. `float y = 1; if
+            // (cond) x = y;`), and using its definition point as the store would make the
+            // definite-assignment walk treat the unassigned edge as initialized too,
+            // suppressing the legitimate "may be uninitialized" diagnostic.
+            stores.add(branch);
+        }
+    }
 }
 
 enum InstructionUsageType
@@ -634,7 +791,8 @@ static void cancelLoadsByDefiniteAssignment(
 
 static void collectAliasableLoadStores(IRInst* inst, List<IRInst*>& stores, List<IRInst*>& loads)
 {
-    auto addresses = getAliasableInstructions(inst);
+    HashSet<IRInst*> aliasSet;
+    auto addresses = getAliasableInstructions(inst, aliasSet);
 
     for (auto alias : addresses)
     {
@@ -642,6 +800,11 @@ static void collectAliasableLoadStores(IRInst* inst, List<IRInst*>& stores, List
         for (auto use = alias->firstUse; use; use = use->nextUse)
             collectInstructionByUsage(stores, loads, use->getUser(), alias);
     }
+
+    // A defined value flowing into a phi alias is a store of an initialized value reaching
+    // that merge point; record it so reads after it are not mistaken for never-initialized
+    // (may-init) uses.
+    collectPhiMergeStores(aliasSet, addresses, stores);
 }
 
 static List<IRInst*> getUnresolvedParamLoads(
