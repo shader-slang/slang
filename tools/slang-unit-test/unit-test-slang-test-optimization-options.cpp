@@ -1,6 +1,6 @@
 // unit-test-slang-test-optimization-options.cpp
 
-#include "../slang-test/slang-test-optimization-options.h"
+#include "slang-test/slang-test-optimization-options.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -90,6 +90,43 @@ SLANG_UNIT_TEST(slangTestRenderOptimizationArgDetection)
 
     {
         List<String> args;
+        args.add("-Xslang...");
+        args.add("-target");
+        args.add("spirv");
+
+        SLANG_CHECK(!SlangTest::hasRenderTestSlangOptimizationArg(args));
+    }
+
+    {
+        List<String> args;
+        args.add("-compile-arg");
+
+        SLANG_CHECK(!SlangTest::hasRenderTestSlangOptimizationArg(args));
+    }
+
+    {
+        List<String> args;
+        args.add("-xslang");
+
+        SLANG_CHECK(!SlangTest::hasRenderTestSlangOptimizationArg(args));
+    }
+
+    {
+        List<String> args;
+        args.add("-Xslang");
+
+        SLANG_CHECK(!SlangTest::hasRenderTestSlangOptimizationArg(args));
+    }
+
+    {
+        List<String> args;
+        args.add("-Xslang...");
+
+        SLANG_CHECK(!SlangTest::hasRenderTestSlangOptimizationArg(args));
+    }
+
+    {
+        List<String> args;
         args.add("-mtl");
 
         SLANG_CHECK(SlangTest::hasRenderTestRenderApiArg(args, RenderApiType::Metal));
@@ -140,6 +177,48 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         SLANG_CHECK(cmdLine.m_args.getCount() == 2);
         SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
         SLANG_CHECK(cmdLine.m_args[1] == "-O3");
+    }
+
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-compile-arg");
+        cmdLine.addArg("-O2");
+
+        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 2);
+        SLANG_CHECK(cmdLine.m_args[0] == "-compile-arg");
+        SLANG_CHECK(cmdLine.m_args[1] == "-O2");
+    }
+
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-xslang");
+        cmdLine.addArg("-Ohigh");
+
+        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 2);
+        SLANG_CHECK(cmdLine.m_args[0] == "-xslang");
+        SLANG_CHECK(cmdLine.m_args[1] == "-Ohigh");
+    }
+
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-Xslang...");
+        cmdLine.addArg("-target");
+        cmdLine.addArg("spirv");
+        cmdLine.addArg("-O3");
+        cmdLine.addArg("-X.");
+
+        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 5);
+        SLANG_CHECK(cmdLine.m_args[0] == "-Xslang...");
+        SLANG_CHECK(cmdLine.m_args[1] == "-target");
+        SLANG_CHECK(cmdLine.m_args[2] == "spirv");
+        SLANG_CHECK(cmdLine.m_args[3] == "-O3");
+        SLANG_CHECK(cmdLine.m_args[4] == "-X.");
     }
 
     {
