@@ -3984,6 +3984,9 @@ static bool doesEntryPointParameterResourceNeedDefaultSpace(LayoutResourceKind k
     }
 }
 
+// Return true if `fieldLayout` (a single entry-point parameter) carries an
+// explicit `[[vk::binding(...)]]` annotation that places its `kind` resource,
+// on a target that honors such annotations on entry-point parameters.
 static bool isEntryPointParameterResourceExplicitlyBoundByVkBinding(
     SharedParameterBindingContext& sharedContext,
     VarLayout* fieldLayout,
@@ -4004,6 +4007,48 @@ static bool isEntryPointParameterResourceExplicitlyBoundByVkBinding(
 
     auto explicitResourceInfo = findVkBindingEntryPointParameterResourceInfo(fieldLayout);
     return explicitResourceInfo && explicitResourceInfo->kind == kind;
+}
+
+// Return true if every entry-point parameter of `entryPoint` that consumes
+// `kind` has an explicit `[[vk::binding(...)]]` annotation for that kind. When
+// this holds, the kind is fully placed by the explicit sets requested by the
+// user, so no default space is needed for it; when it does not (a mix of
+// explicit and implicit, or all implicit), the implicitly-bound fields still
+// need a default space. Used by `_calcNeedsDefaultSpace` to subtract explicitly
+// bound entry-point parameters from the aggregate default-space requirement.
+static bool allEntryPointParametersOfKindAreExplicitlyVkBound(
+    SharedParameterBindingContext& sharedContext,
+    EntryPointLayout* entryPoint,
+    LayoutResourceKind kind)
+{
+    // Only meaningful for the resource kinds that explicit entry-point
+    // `[[vk::binding(...)]]` annotations actually place. For any other kind
+    // (e.g. a promoted push constant or a uniform that landed in a default
+    // constant buffer), no entry-point parameter can be "explicitly bound" for
+    // it, so the aggregate requirement stands.
+    if (!isVkBindingEntryPointParameterResourceKind(kind))
+        return false;
+
+    auto paramsStructLayout = getScopeStructLayout(entryPoint);
+    bool sawConsumingField = false;
+    for (auto fieldLayout : paramsStructLayout->fields)
+    {
+        // Only fields that actually consume `kind` are relevant to whether a
+        // default space is needed for it.
+        if (!fieldLayout->typeLayout->FindResourceInfo(kind))
+            continue;
+
+        sawConsumingField = true;
+        if (!isEntryPointParameterResourceExplicitlyBoundByVkBinding(
+                sharedContext,
+                fieldLayout,
+                kind))
+            return false;
+    }
+
+    // If the aggregate reports consumption of `kind` but no individual field
+    // claims it, be conservative and keep the default-space requirement.
+    return sawConsumingField;
 }
 
 static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
@@ -4071,24 +4116,39 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
     // We also need a default space for any entry-point parameters
     // that consume appropriate resource kinds.
     //
+    // We make this determination from the *aggregate* entry-point parameter
+    // layout (`parametersLayout`) rather than per-field, because that aggregate
+    // layout reflects how the parameters are actually realized after promotion.
+    // For example, a scalar `uniform` entry-point parameter is promoted to a
+    // push constant on Khronos targets, so the aggregate layout reports a
+    // `PushConstantBuffer` resource (which needs no default space) even though
+    // the individual field's type layout still reports plain `Uniform` bytes.
+    // Iterating per-field would miss that promotion and wrongly force a default
+    // space (see `tests/spirv/push-constant-space.slang`).
+    //
     for (auto& entryPoint : sharedContext.programLayout->entryPoints)
     {
-        auto paramsStructLayout = getScopeStructLayout(entryPoint);
-        for (auto fieldLayout : paramsStructLayout->fields)
+        auto paramsLayout = entryPoint->parametersLayout->getTypeLayout();
+        for (auto resInfo : paramsLayout->resourceInfos)
         {
-            for (auto resInfo : fieldLayout->typeLayout->resourceInfos)
-            {
-                if (!doesEntryPointParameterResourceNeedDefaultSpace(resInfo.kind))
-                    continue;
+            if (!doesEntryPointParameterResourceNeedDefaultSpace(resInfo.kind))
+                continue;
 
-                if (isEntryPointParameterResourceExplicitlyBoundByVkBinding(
-                        sharedContext,
-                        fieldLayout,
-                        resInfo.kind))
-                    continue;
+            // The aggregate layout cannot tell us *which* field contributed this
+            // resource kind, so it cannot itself account for explicit
+            // `[[vk::binding(...)]]` annotations. If every field that consumes
+            // this kind has an explicit binding, the kind is fully placed by the
+            // explicit sets and needs no default space; otherwise (a mix of
+            // explicit and implicit, or all implicit) a default space is still
+            // required for the implicitly-bound fields.
+            //
+            if (allEntryPointParametersOfKindAreExplicitlyVkBound(
+                    sharedContext,
+                    entryPoint,
+                    resInfo.kind))
+                continue;
 
-                return true;
-            }
+            return true;
         }
     }
 
