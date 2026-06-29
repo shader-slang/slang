@@ -54,6 +54,12 @@ protected:
     // those to be index-based as part of translation to the IR.
     //
     Index m_argIndexOffset = 0;
+
+    // Set by the `$X` marker when a combined texture-sampler has been lowered into a
+    // `{texture, sampler}` pair, which inserts a sampler operand at index 1. Texture-only
+    // queries (e.g. `GetDimensions`) take no sampler, so their positional `$N` (for N >= 1)
+    // indices must skip over that injected sampler operand. See shader-slang/slang#11669.
+    bool m_skipCombinedSamplerOperand = false;
 };
 
 } // namespace Slang

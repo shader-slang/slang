@@ -256,14 +256,19 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             StringBuilder params;
             int paramCount = 0;
 
+            // Prefix these texture-only `GetDimensions` strings with the `$X` marker. On targets
+            // that lower a combined `Sampler2D` into a `{texture, sampler}` pair, it makes the
+            // positional `$N` accessors skip the injected sampler operand; on a plain texture it is
+            // a no-op. See `IntrinsicExpandContext::_emitSpecial` and shader-slang/slang#11669.
             StringBuilder metal;
+            metal << "$X";
             const char* metalMipLevel = "0";
 
             StringBuilder cuda;
-            cuda << "{";
+            cuda << "$X{";
 
             StringBuilder wgsl;
-            wgsl << "{";
+            wgsl << "$X{";
 
             if (includeMipInfo)
             {
