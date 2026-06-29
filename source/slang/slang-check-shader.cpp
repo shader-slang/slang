@@ -764,7 +764,13 @@ bool isUniformParameterType(Type* type)
     return false;
 }
 
-bool isVkBindingCompatibleEntryPointParameterType(Type* type)
+// Return whether `type`, used as an entry-point parameter, can actually have its
+// binding placed by a `[[vk::binding(...)]]` annotation, i.e. it consumes a
+// descriptor-shaped resource. This gates the "attribute ignored" diagnostic: the
+// warning is suppressed only for parameters we can honor, and still fires for
+// parameter kinds (e.g. plain varying scalars) where the annotation has no effect.
+// Arrays and modified types defer to their element/base type.
+static bool isVkBindingCompatibleEntryPointParameterType(Type* type)
 {
     if (as<ResourceType>(type))
         return true;
