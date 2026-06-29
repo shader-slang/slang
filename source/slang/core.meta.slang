@@ -2087,7 +2087,12 @@ T __attachToNativeRef(NativeRef<T> nativeVal)
 //@public:
 
 /// Represents a string.
-/// This type can only be used on the CPU target.
+/// This type is backed by the Slang core runtime (`Slang::String`), which is
+/// available on host CPU targets (e.g. `-target host-cpp`) and the LLVM-backed
+/// CPU path (`-emit-cpu-via-llvm`). It is explicitly rejected when generating
+/// kernel C++/CUDA output (`-target cpp`, `-target cuda`, `-target ptx`); use
+/// `NativeString` (a null-terminated `const char*`) there instead. On other
+/// GPU/shader targets `String` is not a supported value type.
 __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
 struct String

@@ -1,0 +1,352 @@
+name: Publish CI Container Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      allow_existing_tags:
+        description: "Allow overwriting existing GHCR tags. Use only for recovery from a failed publish."
+        required: false
+        type: boolean
+        default: false
+  pull_request:
+    # PRs validate the tag/version contract only. They intentionally do not
+    # build Dockerfiles, because Dockerfile RUN commands would execute PR code
+    # on self-hosted runners.
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "docker/linux-clang-ci.Dockerfile"
+      - "docker/linux-gpu-ci.Dockerfile"
+      - "docker/print-env-info.sh"
+  push:
+    branches: [master]
+    paths:
+      - "docker/linux-clang-ci.Dockerfile"
+      - "docker/linux-gpu-ci.Dockerfile"
+      - "docker/print-env-info.sh"
+
+permissions:
+  contents: read # Required for actions/checkout in validation jobs.
+
+concurrency:
+  group: publish-ci-container-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.repository == 'shader-slang/slang' && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
+    name: Validate tag policy ${{ matrix.name }}
+    runs-on: ["Linux", "self-hosted", "build", "GCP"]
+    timeout-minutes: 120
+    permissions:
+      contents: read # Required for actions/checkout.
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The immutable semver tag comes from each Dockerfile's commented
+          # build command, matching the existing manual release process.
+          - name: linux-clang-ci
+            dockerfile: docker/linux-clang-ci.Dockerfile
+            image: ghcr.io/shader-slang/slang-linux-clang-ci
+            watched_paths: docker/linux-clang-ci.Dockerfile
+          - name: linux-gpu-ci
+            dockerfile: docker/linux-gpu-ci.Dockerfile
+            image: ghcr.io/shader-slang/slang-linux-gpu-ci
+            watched_paths: |
+              docker/linux-gpu-ci.Dockerfile
+              docker/print-env-info.sh
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Report disk space
+        run: df -h
+
+      - name: Check whether image inputs changed
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          WATCHED_PATHS: ${{ matrix.watched_paths }}
+        run: |
+          set -euo pipefail
+
+          compare_sha="${BEFORE_SHA:-}"
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            compare_sha="${BASE_SHA:-}"
+          fi
+
+          changed=false
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || -z "$compare_sha" ]]; then
+            changed=true
+          elif [[ "$compare_sha" =~ ^0+$ ]]; then
+            changed=true
+          else
+            while IFS= read -r path; do
+              [[ -z "$path" ]] && continue
+              if ! git diff --quiet "$compare_sha" "$GITHUB_SHA" -- "$path"; then
+                changed=true
+                break
+              fi
+            done <<< "$WATCHED_PATHS"
+          fi
+
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "Image inputs changed: $changed"
+
+      - name: Resolve image tag
+        if: steps.changes.outputs.changed == 'true'
+        id: image
+        env:
+          DOCKERFILE: ${{ matrix.dockerfile }}
+          IMAGE_NAME: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+
+          image_ref="$(sed -nE 's/^#   docker build .* -t ([^[:space:]]+) \.$/\1/p' "$DOCKERFILE" | head -n 1)"
+          if [[ -z "$image_ref" ]]; then
+            echo "::error file=$DOCKERFILE::Could not find Dockerfile build command with image tag"
+            exit 1
+          fi
+
+          case "$image_ref" in
+            "$IMAGE_NAME":*) image_tag="${image_ref#"$IMAGE_NAME:"}" ;;
+            *)
+              echo "::error file=$DOCKERFILE::Dockerfile tag '$image_ref' does not match expected image '$IMAGE_NAME'"
+              exit 1
+              ;;
+          esac
+
+          if [[ ! "$image_tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+            echo "::error file=$DOCKERFILE::Dockerfile tag '$image_ref' must match '$IMAGE_NAME:vMAJOR.MINOR.PATCH'"
+            exit 1
+          fi
+
+          echo "image-ref=$image_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Validate version bump
+        if: steps.changes.outputs.changed == 'true' && github.event_name != 'workflow_dispatch'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          DOCKERFILE: ${{ matrix.dockerfile }}
+          IMAGE_REF: ${{ steps.image.outputs.image-ref }}
+        run: |
+          set -euo pipefail
+
+          compare_sha="${BEFORE_SHA:-}"
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            compare_sha="${BASE_SHA:-}"
+          fi
+
+          if [[ -z "$compare_sha" || "$compare_sha" =~ ^0+$ ]]; then
+            echo "No previous revision available; skipping version bump check."
+            exit 0
+          fi
+
+          if ! git cat-file -e "$compare_sha:$DOCKERFILE" 2>/dev/null; then
+            echo "Dockerfile did not exist at previous revision; skipping version bump check."
+            exit 0
+          fi
+
+          previous_image_ref="$(git show "$compare_sha:$DOCKERFILE" \
+            | sed -nE 's/^#   docker build .* -t ([^[:space:]]+) \.$/\1/p' \
+            | head -n 1)"
+
+          if [[ -n "$previous_image_ref" && "$previous_image_ref" == "$IMAGE_REF" ]]; then
+            echo "::error file=$DOCKERFILE::Image inputs changed but the image tag stayed at '$IMAGE_REF'. Bump the Dockerfile tag before merging."
+            exit 1
+          fi
+
+      - name: Check tag availability
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          ALLOW_EXISTING_TAGS: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_existing_tags }}
+          IMAGE_REF: ${{ steps.image.outputs.image-ref }}
+        run: |
+          set -euo pipefail
+
+          manifest_err="$(mktemp)"
+          if docker manifest inspect "$IMAGE_REF" >/dev/null 2>"$manifest_err"; then
+            if [[ "$ALLOW_EXISTING_TAGS" == "true" ]]; then
+              echo "::warning::Overwriting existing image tag '$IMAGE_REF'."
+            else
+              echo "::error::Image tag '$IMAGE_REF' already exists in GHCR. Bump the version or rerun manually with allow_existing_tags for recovery."
+              exit 1
+            fi
+          elif ! grep -Eiq "(manifest unknown|no such manifest|not found|404)" "$manifest_err"; then
+            cat "$manifest_err" >&2
+            echo "::error::Could not verify GHCR tag availability for '$IMAGE_REF'; refusing to continue."
+            exit 1
+          fi
+
+  publish:
+    needs: validate
+    # Publishing is restricted to master. PRs never build or push container
+    # images, and manual dispatches from non-master refs only run validation.
+    if: github.repository == 'shader-slang/slang' && github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    name: Publish ${{ matrix.name }}
+    runs-on: ["Linux", "self-hosted", "build", "GCP"]
+    timeout-minutes: 120
+    permissions:
+      contents: read # Required for actions/checkout.
+      packages: write # Required to push CI container images to GHCR.
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The immutable semver tag comes from each Dockerfile's commented
+          # build command, matching the existing manual release process.
+          - name: linux-clang-ci
+            dockerfile: docker/linux-clang-ci.Dockerfile
+            image: ghcr.io/shader-slang/slang-linux-clang-ci
+            watched_paths: docker/linux-clang-ci.Dockerfile
+          - name: linux-gpu-ci
+            dockerfile: docker/linux-gpu-ci.Dockerfile
+            image: ghcr.io/shader-slang/slang-linux-gpu-ci
+            watched_paths: |
+              docker/linux-gpu-ci.Dockerfile
+              docker/print-env-info.sh
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Report disk space
+        run: df -h
+
+      - name: Check whether image inputs changed
+        id: changes
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          WATCHED_PATHS: ${{ matrix.watched_paths }}
+        run: |
+          set -euo pipefail
+
+          changed=false
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || -z "${BEFORE_SHA:-}" ]]; then
+            changed=true
+          elif [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
+            changed=true
+          else
+            while IFS= read -r path; do
+              [[ -z "$path" ]] && continue
+              if ! git diff --quiet "$BEFORE_SHA" "$GITHUB_SHA" -- "$path"; then
+                changed=true
+                break
+              fi
+            done <<< "$WATCHED_PATHS"
+          fi
+
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "Image inputs changed: $changed"
+
+      - name: Log in to GHCR
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Resolve image tag
+        if: steps.changes.outputs.changed == 'true'
+        id: image
+        env:
+          DOCKERFILE: ${{ matrix.dockerfile }}
+          IMAGE_NAME: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+
+          image_ref="$(sed -nE 's/^#   docker build .* -t ([^[:space:]]+) \.$/\1/p' "$DOCKERFILE" | head -n 1)"
+          if [[ -z "$image_ref" ]]; then
+            echo "::error file=$DOCKERFILE::Could not find Dockerfile build command with image tag"
+            exit 1
+          fi
+
+          case "$image_ref" in
+            "$IMAGE_NAME":*) image_tag="${image_ref#"$IMAGE_NAME:"}" ;;
+            *)
+              echo "::error file=$DOCKERFILE::Dockerfile tag '$image_ref' does not match expected image '$IMAGE_NAME'"
+              exit 1
+              ;;
+          esac
+
+          if [[ ! "$image_tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+            echo "::error file=$DOCKERFILE::Dockerfile tag '$image_ref' must match '$IMAGE_NAME:vMAJOR.MINOR.PATCH'"
+            exit 1
+          fi
+
+          echo "image-ref=$image_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Check tag availability
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          ALLOW_EXISTING_TAGS: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_existing_tags }}
+          IMAGE_REF: ${{ steps.image.outputs.image-ref }}
+        run: |
+          set -euo pipefail
+
+          manifest_err="$(mktemp)"
+          if docker manifest inspect "$IMAGE_REF" >/dev/null 2>"$manifest_err"; then
+            if [[ "$ALLOW_EXISTING_TAGS" == "true" ]]; then
+              echo "::warning::Overwriting existing image tag '$IMAGE_REF'."
+            else
+              echo "::error::Image tag '$IMAGE_REF' already exists in GHCR. Bump the version or rerun manually with allow_existing_tags for recovery."
+              exit 1
+            fi
+          elif ! grep -Eiq "(manifest unknown|no such manifest|not found|404)" "$manifest_err"; then
+            cat "$manifest_err" >&2
+            echo "::error::Could not verify GHCR tag availability for '$IMAGE_REF'; refusing to publish."
+            exit 1
+          fi
+
+      - name: Build image
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          DOCKERFILE: ${{ matrix.dockerfile }}
+          IMAGE_REF: ${{ steps.image.outputs.image-ref }}
+        run: |
+          set -euo pipefail
+
+          created="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          docker build \
+            --pull \
+            --platform linux/amd64 \
+            --label "org.opencontainers.image.created=$created" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            -f "$DOCKERFILE" \
+            -t "$IMAGE_REF" \
+            .
+
+      - name: Push image
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.image-ref }}
+        run: |
+          set -euo pipefail
+          docker push "$IMAGE_REF"
+
+      - name: Report pushed image
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.image-ref }}
+        run: |
+          set -euo pipefail
+          echo "Published $IMAGE_REF"

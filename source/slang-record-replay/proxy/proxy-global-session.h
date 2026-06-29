@@ -257,6 +257,24 @@ public:
         RECORD_RETURN(result);
     }
 
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDownstreamCompilerVersion(
+        SlangPassThrough passThrough,
+        int* outMajor,
+        int* outMinor) override
+    {
+        RECORD_CALL();
+        RECORD_INPUT(passThrough);
+        PREPARE_POINTER_OUTPUT(outMajor);
+        PREPARE_POINTER_OUTPUT(outMinor);
+        auto result = getActual<slang::IGlobalSession>()->getDownstreamCompilerVersion(
+            passThrough,
+            outMajor,
+            outMinor);
+        RECORD_OUTPUT(outMajor);
+        RECORD_OUTPUT(outMinor);
+        RECORD_RETURN(result);
+    }
+
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     compileCoreModule(slang::CompileCoreModuleFlags flags) override
     {

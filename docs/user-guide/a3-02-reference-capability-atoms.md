@@ -572,6 +572,9 @@ Extensions
 `GL_NV_gpu_shader5`
 > Represents the GL_NV_gpu_shader5 extension.
 
+`GL_NV_linear_swept_spheres`
+> Represents the GL_NV_linear_swept_spheres extension.
+
 `GL_NV_ray_tracing`
 > Represents the GL_NV_ray_tracing extension.
 
@@ -876,6 +879,9 @@ Extensions
 
 `spvRayTracingPositionFetchKHR`
 > Represents the SPIR-V capability for ray tracing position fetch.
+
+`spvRayTracingSpheresGeometryNV`
+> Represents the SPIR-V capability for sphere geometry.
 
 `spvReplicatedCompositesEXT`
 > Represents the SPIR-V capability for replicated composites
@@ -1312,8 +1318,28 @@ Compound Capabilities
 `rayquery`
 > Capabilities needed for compute-shader rayquery
 
+`rayquery_lss_nv`
+> Collection of capabilities for the NV line-swept-spheres (LSS) accessors of
+> an inline ray query. These are vendor (NV) extensions on every target, so the
+> alias carries the `NV` suffix. Available on any RayQuery-capable stage, but
+> each target must carry its LSS geometry support: GLSL requires
+> `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR` together with
+> `spvRayTracingLinearSweptSpheresGeometryNV` (so a SPIR-V caller cannot satisfy
+> this with plain ray query alone, and a sphere-only caller cannot reach the
+> LSS accessors); HLSL/NVAPI carries the geometry support implicitly (`_sm_6_3`).
+
 `rayquery_position`
 > Collection of capabilities for rayquery + ray_tracing_position_fetch.
+
+`rayquery_sphere_nv`
+> Collection of capabilities for the NV sphere-geometry accessors of an inline
+> ray query. These are vendor (NV) extensions on every target, so the alias
+> carries the `NV` suffix. Available on any RayQuery-capable stage, but each
+> target must carry its sphere geometry support: GLSL requires
+> `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR` together with
+> `spvRayTracingSpheresGeometryNV` (so a SPIR-V caller cannot satisfy this with
+> plain ray query alone, and an LSS-only caller cannot reach the sphere
+> accessors); HLSL/NVAPI carries the geometry support implicitly (`_sm_6_3`).
 
 `raytracing`
 > Capabilities needed for minimal raytracing support
@@ -1500,6 +1526,16 @@ Compound Capabilities
 
 `subgroup_vote`
 > Capabilities required to use GLSL-style subgroup operations 'subgroup_vote'
+
+`subgroup_workgroup_index`
+> Capabilities required to use the subgroup-within-workgroup queries
+> 'WaveGetWaveIndex' / 'WaveGetNumWaves'. These lower to GLSL
+> gl_SubgroupID / gl_NumSubgroups and SPIR-V BuiltIn SubgroupId /
+> NumSubgroups, which the GLSL and Vulkan SPIR-V environment specs
+> restrict to compute-class execution models (compute, mesh,
+> amplification/task); the restriction is encoded here so misuse is
+> caught by the capability system rather than producing invalid
+> GLSL / SPIR-V.
 
 `subpass`
 > Capabilities required to use Subpass-Input's
