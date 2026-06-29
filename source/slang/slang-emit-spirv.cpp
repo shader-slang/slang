@@ -4283,6 +4283,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     // after this inst in the block, because OpKill is a terminator inst.
                     break;
                 }
+                if (irInst->getOp() == kIROp_Abort)
+                {
+                    // OpAbortKHR is a terminator inst; stop emitting further instructions.
+                    break;
+                }
             }
         }
 
@@ -4348,6 +4353,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                 case AddressSpace::StorageBuffer:
                 case AddressSpace::UserPointer:
+                case AddressSpace::Uniform:
                     memoryClass = SpvMemorySemanticsUniformMemoryMask;
                     break;
                 case AddressSpace::Image:
@@ -4674,6 +4680,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
         case AddressSpace::Global:
         case AddressSpace::StorageBuffer:
+        case AddressSpace::Uniform:
         case AddressSpace::UserPointer:
         case AddressSpace::GroupShared:
         case AddressSpace::Image:
@@ -4780,6 +4787,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+
+    /// Emit `OpAbortKHR` (VK_KHR_shader_abort) for an `Abort` instruction.
+    /// The instruction's single operand is the packed message struct prepared by
+    /// `processAbort` in slang-ir-spirv-legalize.cpp; its type goes through the
+    /// regular type-emission path, which provides the explicit layout
+    /// decorations (member `Offset`s and `ArrayStride`) the payload requires.
+    SpvInst* emitAbort(SpvInstParent* parent, IRInst* inst)
+    {
+        ensureExtensionDeclaration(toSlice("SPV_KHR_abort"));
+        requireSPIRVCapability(SpvCapabilityAbortKHR);
+
+        auto message = inst->getOperand(0);
+        return emitOpAbortKHR(parent, inst, message->getDataType(), message);
+    }
 
     // The instructions that appear inside the basic blocks of
     // functions are what we will call "local" instructions.
@@ -4941,7 +4962,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto loadDesc = as<IRSPIRVLoadTexelPointerFromHeap>(inst);
                 auto resourceType = loadDesc->getTextureType();
-                auto resourceArrayType = getDescriptorRuntimeArrayType(ensureInst(resourceType));
+                auto descriptorElementType = ensureInst(resourceType);
+                auto resourceArrayType = getDescriptorRuntimeArrayType(
+                    descriptorElementType,
+                    getDescriptorHeapArrayStride(descriptorElementType));
                 auto imagePtr = emitInst(
                     parent,
                     nullptr,
@@ -5603,6 +5627,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     SpvLiteralInteger::from32(1),
                     operands.getArrayView());
             }
+            break;
+        case kIROp_Abort:
+            result = emitAbort(parent, inst);
             break;
         // Debug instructions are now handled by processDebugLocalInst()
         case kIROp_DebugLine:
@@ -6943,9 +6970,38 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     };
     Dictionary<BuiltinSpvVarKey, SpvInst*> m_builtinGlobalVars;
+    struct DescriptorRuntimeArrayKey
+    {
+        SpvInst* descriptorElementType = nullptr;
+        int arrayStride = 0;
+
+        bool operator==(const DescriptorRuntimeArrayKey& other) const
+        {
+            return descriptorElementType == other.descriptorElementType &&
+                   arrayStride == other.arrayStride;
+        }
+
+        HashCode getHashCode() const
+        {
+            return combineHash(
+                Slang::getHashCode(descriptorElementType),
+                Slang::getHashCode(arrayStride));
+        }
+    };
+
     SpvInst* m_descriptorHeapUntypedPointerType = nullptr;
     Dictionary<SpvStorageClass, SpvInst*> m_descriptorHeapBufferDescriptorTypes;
-    Dictionary<SpvInst*, SpvInst*> m_descriptorHeapRuntimeArrayTypes;
+    Dictionary<DescriptorRuntimeArrayKey, SpvInst*> m_descriptorHeapRuntimeArrayTypes;
+    bool m_didDiagnoseAccelerationStructureDescriptorHeapStrideTooSmall = false;
+
+    // The single fixed `ArrayStrideIdEXT` stride shared by every resource descriptor-heap runtime
+    // array when `-spirv-unified-descriptor-heap-stride` is set. It is the canonical
+    // `max(sizeof(image descriptor), sizeof(buffer descriptor))` sequence from the
+    // SPV_EXT_descriptor_heap proposal (built by `getUnifiedResourceHeapStride`), not a value
+    // derived from the descriptor types a given shader happens to use: the host packs the resource
+    // heap at this stride over every resource descriptor category, so a shader that references only
+    // one category must still advertise the same stride. Emitted lazily on first use and memoized.
+    SpvInst* m_unifiedResourceHeapStride = nullptr;
 
 
     bool isInstUsedInStage(IRInst* inst, Stage s)
@@ -7118,24 +7174,115 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return type;
     }
 
-    SpvInst* getDescriptorRuntimeArrayType(SpvInst* descriptorElementType)
+    // Returns whether resource descriptor-heap runtime arrays should advertise a single unified
+    // maximum `ArrayStride` (opt-in via `-spirv-unified-descriptor-heap-stride`). This only affects
+    // the auto stride path, i.e. when `-spirv-resource-heap-stride` is 0. Combining it with a
+    // non-zero `-spirv-resource-heap-stride` is a conflict (the two express contradictory strides),
+    // rejected up front during option processing for the CLI (`OptionsParser` in
+    // `slang-options.cpp`) and re-checked here by `diagnoseConflictingDescriptorHeapStrideOptions`
+    // for the compile-API path; an explicit stride of 0 selects that same auto path, not a
+    // conflict.
+    bool isUnifiedResourceHeapStrideEnabled()
     {
-        if (auto found = m_descriptorHeapRuntimeArrayTypes.tryGetValue(descriptorElementType))
-            return *found;
+        return m_targetProgram->getOptionSet().getBoolOption(
+            CompilerOptionName::SPIRVUnifiedDescriptorHeapStride);
+    }
 
-        SpvInst* stride = nullptr;
-        int userDefinedStride = 0;
+    // Selects the configured heap stride for a non-acceleration-structure descriptor element.
+    // Keeping this lookup at the call site makes `getDescriptorRuntimeArrayType` consume only a
+    // caller-chosen stride; for example, sampler heaps use `SPIRVSamplerHeapStride`, while
+    // texture and buffer resource heaps use `SPIRVResourceHeapStride`.
+    int getDescriptorHeapArrayStride(SpvInst* descriptorElementType)
+    {
         if (descriptorElementType->opcode == SpvOpTypeSampler)
         {
-            userDefinedStride = m_targetProgram->getOptionSet().getIntOption(
+            return m_targetProgram->getOptionSet().getIntOption(
                 CompilerOptionName::SPIRVSamplerHeapStride);
         }
-        else
-        {
-            userDefinedStride = m_targetProgram->getOptionSet().getIntOption(
-                CompilerOptionName::SPIRVResourceHeapStride);
-        }
-        if (userDefinedStride == 0)
+
+        return m_targetProgram->getOptionSet().getIntOption(
+            CompilerOptionName::SPIRVResourceHeapStride);
+    }
+
+    // Emits (once, memoized) the fixed unified resource descriptor-heap stride from the
+    // SPV_EXT_descriptor_heap proposal: the canonical
+    // `max(sizeof(image descriptor), sizeof(buffer descriptor))`, emitted regardless of which
+    // descriptor categories the shader uses. `OpConstantSizeOfEXT` is device-defined, so the
+    // maximum is symbolic: `max(a, b) = Select(UGreaterThan(a, b), a, b)`.
+    SpvInst* getUnifiedResourceHeapStride()
+    {
+        if (m_unifiedResourceHeapStride)
+            return m_unifiedResourceHeapStride;
+
+        IRBuilder builder(m_irModule);
+        builder.setInsertInto(m_irModule->getModuleInst());
+        auto uintType = builder.getUIntType();
+        auto boolType = builder.getBoolType();
+
+        auto imageType = emitOpTypeImage(
+            nullptr,
+            builder.getFloatType(),
+            SpvDim2D,
+            SpvLiteralInteger::from32(ImageOpConstants::unknownDepthImage),
+            SpvLiteralInteger::from32(ImageOpConstants::notArrayed),
+            SpvLiteralInteger::from32(ImageOpConstants::notMultisampled),
+            SpvLiteralInteger::from32(ImageOpConstants::sampledImage),
+            SpvImageFormatUnknown);
+        auto bufferType = ensureDescriptorHeapBufferDescriptorType(SpvStorageClassUniform);
+
+        auto imageSize = emitOpConstantSizeOfEXT(nullptr, uintType, imageType);
+        auto bufferSize = emitOpConstantSizeOfEXT(nullptr, uintType, bufferType);
+        auto imageIsBigger = emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            nullptr,
+            SpvOpSpecConstantOp,
+            boolType,
+            kResultID,
+            SpvOpUGreaterThan,
+            imageSize,
+            bufferSize);
+        m_unifiedResourceHeapStride = emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            nullptr,
+            SpvOpSpecConstantOp,
+            uintType,
+            kResultID,
+            SpvOpSelect,
+            imageIsBigger,
+            imageSize,
+            bufferSize);
+        return m_unifiedResourceHeapStride;
+    }
+
+    // Builds or reuses the descriptor runtime array for a specific element type and stride.
+    // A zero stride emits an `ArrayStrideIdEXT`: in unified mode
+    // (`-spirv-unified-descriptor-heap-stride`) every resource heap array shares the single fixed
+    // stride from `getUnifiedResourceHeapStride`; otherwise the stride is this element type's own
+    // `OpConstantSizeOfEXT`. Acceleration-structure heap entries instead pass the explicit `uint64`
+    // stride computed by `getAccelerationStructureDescriptorHeapStride`.
+    SpvInst* getDescriptorRuntimeArrayType(SpvInst* descriptorElementType, int arrayStride)
+    {
+        SLANG_RELEASE_ASSERT(
+            descriptorElementType->opcode != SpvOpTypeAccelerationStructureKHR &&
+            "acceleration structure descriptor heaps must use uint64 elements");
+
+        DescriptorRuntimeArrayKey key;
+        key.descriptorElementType = descriptorElementType;
+        key.arrayStride = arrayStride;
+        if (auto found = m_descriptorHeapRuntimeArrayTypes.tryGetValue(key))
+            return *found;
+
+        // In unified mode, every resource descriptor-heap array (anything other than the separate
+        // sampler heap; acceleration-structure heaps never reach the auto path because they pass a
+        // non-zero stride) shares the one fixed maximum stride. Build it before the array so its
+        // `<id>` precedes the array, satisfying the `ArrayStrideIdEXT` operand-ordering rule.
+        const bool isResourceElement = descriptorElementType->opcode != SpvOpTypeSampler;
+        const bool useUnifiedStride =
+            arrayStride == 0 && isResourceElement && isUnifiedResourceHeapStrideEnabled();
+        SpvInst* unifiedStride = useUnifiedStride ? getUnifiedResourceHeapStride() : nullptr;
+
+        SpvInst* stride = nullptr;
+        if (arrayStride == 0 && !useUnifiedStride)
         {
             IRBuilder builder(m_irModule);
             builder.setInsertInto(m_irModule->getModuleInst());
@@ -7144,15 +7291,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
 
         auto runtimeArrayType = emitOpTypeRuntimeArray(nullptr, descriptorElementType);
-        m_descriptorHeapRuntimeArrayTypes[descriptorElementType] = runtimeArrayType;
+        m_descriptorHeapRuntimeArrayTypes[key] = runtimeArrayType;
 
-        if (stride)
+        SpvInst* strideId = useUnifiedStride ? unifiedStride : stride;
+        if (strideId)
         {
             emitOpDecorateArrayStrideIdEXT(
                 getSection(SpvLogicalSectionID::Annotations),
                 nullptr,
                 runtimeArrayType,
-                stride);
+                strideId);
         }
         else
         {
@@ -7160,9 +7308,52 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 getSection(SpvLogicalSectionID::Annotations),
                 nullptr,
                 runtimeArrayType,
-                SpvLiteralInteger::from32(userDefinedStride));
+                SpvLiteralInteger::from32(arrayStride));
         }
         return runtimeArrayType;
+    }
+
+    // Diagnoses the `-spirv-resource-heap-stride` / `-spirv-unified-descriptor-heap-stride`
+    // conflict for the compile-API path. The CLI rejects this at option-parse time (`OptionsParser`
+    // in `slang-options.cpp`), which aborts before emission; but options set directly through the
+    // public compile API do not flow through that parser, so this re-checks at emit time and fails
+    // loudly rather than silently honoring the explicit stride. The condition matches the parser:
+    // unified enabled and a non-zero `SPIRVResourceHeapStride` (an explicit 0 selects the default
+    // `OpConstantSizeOfEXT` path the unified option modifies, so it is not a conflict).
+    void diagnoseConflictingDescriptorHeapStrideOptions()
+    {
+        if (isUnifiedResourceHeapStrideEnabled() &&
+            m_targetProgram->getOptionSet().getIntOption(
+                CompilerOptionName::SPIRVResourceHeapStride) != 0)
+        {
+            m_sink->diagnose(Diagnostics::SpirvConflictingDescriptorHeapStrideOptions{});
+        }
+    }
+
+    int getAccelerationStructureDescriptorHeapStride()
+    {
+        static const int kAccelerationStructureDescriptorHeapStride = 8;
+
+        auto userDefinedStride = m_targetProgram->getOptionSet().getIntOption(
+            CompilerOptionName::SPIRVResourceHeapStride);
+        if (userDefinedStride == 0)
+        {
+            userDefinedStride = kAccelerationStructureDescriptorHeapStride;
+        }
+        else if (userDefinedStride < kAccelerationStructureDescriptorHeapStride)
+        {
+            if (!m_didDiagnoseAccelerationStructureDescriptorHeapStrideTooSmall)
+            {
+                m_sink->diagnose(Diagnostics::SpirvResourceHeapStrideTooSmall{
+                    .stride = userDefinedStride,
+                    .minimumStride = kAccelerationStructureDescriptorHeapStride,
+                });
+                m_didDiagnoseAccelerationStructureDescriptorHeapStrideTooSmall = true;
+            }
+            userDefinedStride = kAccelerationStructureDescriptorHeapStride;
+        }
+
+        return userDefinedStride;
     }
 
     SpvInst* getDescriptorHeapBaseType(IRType* valueType, bool* outIsBufferResource = nullptr)
@@ -7172,11 +7363,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         switch (valueType->getOp())
         {
         case kIROp_TextureType:
-        case kIROp_RaytracingAccelerationStructureType:
         case kIROp_SamplerStateType:
         case kIROp_SamplerComparisonStateType:
             descriptorElementType = ensureInst(valueType);
             break;
+        case kIROp_RaytracingAccelerationStructureType:
+            {
+                if (outIsBufferResource)
+                    *outIsBufferResource = false;
+
+                IRBuilder builder(m_irModule);
+                builder.setInsertInto(m_irModule->getModuleInst());
+
+                // Acceleration structure heap entries are 64-bit device addresses that are
+                // converted to acceleration structure handles after loading.
+                descriptorElementType = ensureInst(builder.getUInt64Type());
+                auto arrayStride = getAccelerationStructureDescriptorHeapStride();
+                return getDescriptorRuntimeArrayType(descriptorElementType, arrayStride);
+            }
         default:
             isBufferResource = true;
             descriptorElementType = ensureDescriptorHeapBufferDescriptorType(
@@ -7187,7 +7391,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (outIsBufferResource)
             *outIsBufferResource = isBufferResource;
 
-        return getDescriptorRuntimeArrayType(descriptorElementType);
+        auto arrayStride = getDescriptorHeapArrayStride(descriptorElementType);
+        return getDescriptorRuntimeArrayType(descriptorElementType, arrayStride);
     }
 
     SpvInst* emitAccelerationStructureFromDescriptorHeap(
@@ -11773,6 +11978,8 @@ SlangResult emitSPIRVFromIR(
             parent->addInst(spvPtrType);
         }
     } while (context.m_forwardDeclaredPointers.getCount() != 0);
+
+    context.diagnoseConflictingDescriptorHeapStrideOptions();
 
     // Emit extensions and capabilities for which there are multiple options available.
     // This is delayed to avoid emitting unnecessary extensions and capabilities if

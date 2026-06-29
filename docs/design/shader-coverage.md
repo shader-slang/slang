@@ -476,10 +476,11 @@ source ranges, function names, and branch site/arm ids live on
 the size of the runtime counter buffer. Region entries may later use
 direct counters, shared counters, derived counter expressions, or
 counterless metadata entries represented through tail-extended fields
-or a derived metadata interface. `CoverageCounterMode` currently
-defines only `Count`; additional counter interpretations such as
-binary hit/not-hit and warp/group-aggregated modes should be appended
-when a concrete mode is implemented. LCOV remains a
+or a derived metadata interface. `CoverageCounterMode` currently defines `Count` (exact execution counts
+via atomic add, the default) and `Boolean` (hit/not-hit via a plain
+non-atomic store of 1, selected by `-trace-coverage-boolean`).
+Warp/group-aggregated and other modes may be appended in future
+extensions. LCOV remains a
 compatibility export (`DA:`, `FN/FNDA:`, `BRDA:`), not the only
 internal coverage model.
 

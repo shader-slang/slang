@@ -463,8 +463,8 @@ struct ByteAddressBuffer
 
     /// Load a value with type `T` from the buffer at the specified location with a known alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
+    ///@param location The input address in bytes, which must be a multiple of `alignment`.
+    ///@param alignment The known alignment of `location` in bytes; a compile-time constant.
     ///@return The value loaded from the buffer.
     ///@remarks
     /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
@@ -472,7 +472,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
-    T LoadAligned<T>(uint location, uint alignment)
+    T LoadAligned<T>(uint location, constexpr uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
@@ -5894,23 +5894,23 @@ uint64_t __asuint64(uint2 i)
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
-T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, uint offset, uint alignment);
+T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, uint offset, constexpr uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, uint offset, uint alignment);
+T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, uint offset, constexpr uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment);
+T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, constexpr uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, uint offset, uint alignment, T value);
+void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, uint offset, constexpr uint alignment, T value);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment, T value);
+void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, constexpr uint alignment, T value);
 
 __intrinsic_op($(kIROp_GetUntypedBufferPtr))
 [require(cpp_cuda, byteaddressbuffer)]
@@ -6442,8 +6442,8 @@ struct $(item.name)
 
     /// Load a value with type `T` from the buffer at the specified location with a known alignment.
     ///@param T The type of the value to load from the buffer.
-    ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment The known alignment of `location`, which must be a multiple of 4 and compatible with `T`.
+    ///@param location The input address in bytes, which must be a multiple of `alignment`.
+    ///@param alignment The known alignment of `location` in bytes; a compile-time constant.
     ///@return The value loaded from the buffer.
     ///@remarks
     /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
@@ -6451,7 +6451,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-    T LoadAligned<T>(uint location, uint alignment)
+    T LoadAligned<T>(uint location, constexpr uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
@@ -7142,7 +7142,7 @@ $}
 
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-    void Store<T>(uint address, T value, uint alignment)
+    void Store<T>(uint address, T value, constexpr uint alignment)
     {
         __byteAddressBufferStore(this, address, alignment, value);
     }
@@ -14094,6 +14094,26 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 __intrinsic_op($(kIROp_Printf))
 void printf<each T>(NativeString format, expand each T args);
 
+/// Abort shader execution with a debug message (VK_KHR_shader_abort).
+/// @param T The variadic type pack parameter for the arguments to be included in the message.
+/// @param format The format string. Must be a string literal.
+/// @param args (optional) Scalar and vector basic-type arguments to include in the message.
+/// @remarks The function maps to `abortEXT` for GLSL targets and emits `OpAbortKHR` for SPIR-V
+/// targets. When executed, shader execution terminates and the message is surfaced to the host
+/// through the retrieval mechanism defined by the VK_KHR_shader_abort extension (for example,
+/// the Vulkan device fault mechanism). Struct, matrix, array, pointer, resource, cooperative
+/// vector, and cooperative matrix arguments are rejected with diagnostic E55211.
+/// @example
+/// ```cpp
+/// void test(uint val)
+/// {
+///     abort("Unexpected value: %u", val);
+/// }
+/// ```
+[require(abort)]
+__intrinsic_op($(kIROp_Abort))
+void abort<each T>(NativeString format, expand each T args);
+
 // Tessellation factor fixup routines
 /// @category tessellation Tessellation functions
 [require(hlsl, sm_5_0)]
@@ -17217,10 +17237,14 @@ uint WaveGetLaneIndex()
 
 /// Returns the number of waves (subgroups) in the current workgroup.
 /// Equivalent to GLSL gl_NumSubgroups.
+///
+/// On GLSL and SPIR-V this lowers to gl_NumSubgroups / BuiltIn NumSubgroups,
+/// which are restricted to compute-class execution models (compute, mesh,
+/// amplification); using it from any other stage is a capability error.
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_workgroup_index)]
 uint WaveGetNumWaves()
 {
     __target_switch
@@ -17253,12 +17277,16 @@ uint WaveGetNumWaves()
 
 /// Returns the index of the current wave (subgroup) within the workgroup.
 /// Equivalent to GLSL gl_SubgroupID / Metal simdgroup_index_in_threadgroup.
+///
+/// On GLSL and SPIR-V this lowers to gl_SubgroupID / BuiltIn SubgroupId,
+/// which are restricted to compute-class execution models (compute, mesh,
+/// amplification); using it from any other stage is a capability error.
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
 [ForceInline]
-[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_workgroup_index)]
 uint WaveGetWaveIndex()
 {
     __target_switch
@@ -22296,6 +22324,328 @@ $}
             };
         }
     };
+
+    // --------------------------------------------------------------------
+    // Line-swept-spheres (LSS) and sphere geometry ray-query accessors.
+    //
+    // These expose the inline-ray-query side of the LSS feature added with
+    // the SPV_NV_linear_swept_spheres SPIR-V extension and the NVAPI NvRt*
+    // ray-query calls. Each accessor has a "candidate" form (the primitive
+    // currently being considered during traversal) and a "committed" form
+    // (the closest accepted hit). The IsNonOpaque* candidate checks report
+    // whether a candidate sphere/LSS is non-opaque so the shader can decide
+    // whether to commit it; their committed counterparts report the hit type.
+    //
+    // Targets: HLSL (via NVAPI), GLSL, and SPIR-V (SPV_NV_linear_swept_spheres).
+    // SPIR-V encodes candidate vs committed via the Intersection operand
+    // (candidate == 0, committed == 1); GLSL via the boolean second argument
+    // (false == candidate, true == committed).
+    // --------------------------------------------------------------------
+
+    /// Gets the object-space center position (xyz) and radius (w) of the
+    /// candidate sphere primitive.
+    /// @return float4 where xyz is the sphere center and w is the radius
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    float4 CandidateSphereObjectPositionAndRadiusNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateSphereObjectPositionAndRadius";
+        case glsl: __intrinsic_asm "vec4(rayQueryGetIntersectionSpherePositionNV($0, false), rayQueryGetIntersectionSphereRadiusNV($0, false))";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingSpheresGeometryNV;
+                %pos:$$float3 = OpRayQueryGetIntersectionSpherePositionNV &this $iCandidate;
+                %rad:$$float = OpRayQueryGetIntersectionSphereRadiusNV &this $iCandidate;
+                result:$$float4 = OpCompositeConstruct %pos %rad;
+            };
+        }
+    }
+
+    /// Gets the object-space center position (xyz) and radius (w) of the
+    /// committed sphere primitive.
+    /// @return float4 where xyz is the sphere center and w is the radius
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    float4 CommittedSphereObjectPositionAndRadiusNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedSphereObjectPositionAndRadius";
+        case glsl: __intrinsic_asm "vec4(rayQueryGetIntersectionSpherePositionNV($0, true), rayQueryGetIntersectionSphereRadiusNV($0, true))";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingSpheresGeometryNV;
+                %pos:$$float3 = OpRayQueryGetIntersectionSpherePositionNV &this $iCommitted;
+                %rad:$$float = OpRayQueryGetIntersectionSphereRadiusNV &this $iCommitted;
+                result:$$float4 = OpCompositeConstruct %pos %rad;
+            };
+        }
+    }
+
+    /// Gets the object-space endpoint positions and radii of the candidate
+    /// line-swept-sphere (LSS) primitive.
+    /// @return float2x4 whose rows are (endpoint.xyz, radius) for the two LSS endpoints
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float2x4 CandidateLssObjectPositionsAndRadiiNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateLssObjectPositionsAndRadii";
+        case glsl:
+            // glslang requires the candidate/committed selector to be a
+            // compile-time constant, so the literal is baked into a dedicated
+            // helper rather than passed as a runtime argument.
+            __requirePrelude(R"(
+                mat2x4 _slang_rayQueryGetCandidateLssPositionsAndRadii(rayQueryEXT rq) {
+                    vec3 _slang_lss_p[2];
+                    float _slang_lss_r[2];
+                    rayQueryGetIntersectionLSSPositionsNV(rq, false, _slang_lss_p);
+                    rayQueryGetIntersectionLSSRadiiNV(rq, false, _slang_lss_r);
+                    return mat2x4(vec4(_slang_lss_p[0], _slang_lss_r[0]), vec4(_slang_lss_p[1], _slang_lss_r[1]));
+                }
+            )");
+            __intrinsic_asm "_slang_rayQueryGetCandidateLssPositionsAndRadii($0)";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                %positions:$$float3[2] = OpRayQueryGetIntersectionLSSPositionsNV &this $iCandidate;
+                %radii:$$float[2] = OpRayQueryGetIntersectionLSSRadiiNV &this $iCandidate;
+                %p0:$$float3 = OpCompositeExtract %positions 0;
+                %p1:$$float3 = OpCompositeExtract %positions 1;
+                %r0:$$float = OpCompositeExtract %radii 0;
+                %r1:$$float = OpCompositeExtract %radii 1;
+                %a:$$float4 = OpCompositeConstruct %p0 %r0;
+                %b:$$float4 = OpCompositeConstruct %p1 %r1;
+                result:$$float2x4 = OpCompositeConstruct %a %b;
+            };
+        }
+    }
+
+    /// Gets the object-space endpoint positions and radii of the committed
+    /// line-swept-sphere (LSS) primitive.
+    /// @return float2x4 whose rows are (endpoint.xyz, radius) for the two LSS endpoints
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float2x4 CommittedLssObjectPositionsAndRadiiNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedLssObjectPositionsAndRadii";
+        case glsl:
+            // glslang requires the candidate/committed selector to be a
+            // compile-time constant, so the literal is baked into a dedicated
+            // helper rather than passed as a runtime argument.
+            __requirePrelude(R"(
+                mat2x4 _slang_rayQueryGetCommittedLssPositionsAndRadii(rayQueryEXT rq) {
+                    vec3 _slang_lss_p[2];
+                    float _slang_lss_r[2];
+                    rayQueryGetIntersectionLSSPositionsNV(rq, true, _slang_lss_p);
+                    rayQueryGetIntersectionLSSRadiiNV(rq, true, _slang_lss_r);
+                    return mat2x4(vec4(_slang_lss_p[0], _slang_lss_r[0]), vec4(_slang_lss_p[1], _slang_lss_r[1]));
+                }
+            )");
+            __intrinsic_asm "_slang_rayQueryGetCommittedLssPositionsAndRadii($0)";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                %positions:$$float3[2] = OpRayQueryGetIntersectionLSSPositionsNV &this $iCommitted;
+                %radii:$$float[2] = OpRayQueryGetIntersectionLSSRadiiNV &this $iCommitted;
+                %p0:$$float3 = OpCompositeExtract %positions 0;
+                %p1:$$float3 = OpCompositeExtract %positions 1;
+                %r0:$$float = OpCompositeExtract %radii 0;
+                %r1:$$float = OpCompositeExtract %radii 1;
+                %a:$$float4 = OpCompositeConstruct %p0 %r0;
+                %b:$$float4 = OpCompositeConstruct %p1 %r1;
+                result:$$float2x4 = OpCompositeConstruct %a %b;
+            };
+        }
+    }
+
+    /// Gets the hit parameter (position along the LSS axis, in [0,1]) for the
+    /// candidate line-swept-sphere intersection.
+    /// @return Scalar hit parameter along the candidate LSS primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float CandidateLssHitParameterNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateLssHitParameter";
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionLSSHitValueNV($0, false)";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$float = OpRayQueryGetIntersectionLSSHitValueNV &this $iCandidate;
+            };
+        }
+    }
+
+    /// Gets the hit parameter (position along the LSS axis, in [0,1]) for the
+    /// committed line-swept-sphere intersection.
+    /// @return Scalar hit parameter along the committed LSS primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float CommittedLssHitParameterNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedLssHitParameter";
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionLSSHitValueNV($0, true)";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$float = OpRayQueryGetIntersectionLSSHitValueNV &this $iCommitted;
+            };
+        }
+    }
+
+    /// Checks whether the candidate intersection is a non-opaque line-swept
+    /// sphere (LSS) primitive.
+    /// @return true if the candidate is a non-opaque LSS primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    bool CandidateIsNonOpaqueLssNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateIsNonOpaqueLss";
+        case glsl: __intrinsic_asm "rayQueryIsLSSHitNV($0, false)";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$bool = OpRayQueryIsLSSHitNV &this $iCandidate;
+            };
+        }
+    }
+
+    /// Checks whether the committed intersection is a line-swept-sphere (LSS)
+    /// primitive.
+    /// @return true if the committed hit is an LSS primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    bool CommittedIsLssNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedIsLss";
+        case glsl: __intrinsic_asm "rayQueryIsLSSHitNV($0, true)";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$bool = OpRayQueryIsLSSHitNV &this $iCommitted;
+            };
+        }
+    }
+
+    /// Checks whether the candidate intersection is a non-opaque sphere
+    /// primitive.
+    /// @return true if the candidate is a non-opaque sphere primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    bool CandidateIsNonOpaqueSphereNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateIsNonOpaqueSphere";
+        case glsl: __intrinsic_asm "rayQueryIsSphereHitNV($0, false)";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingSpheresGeometryNV;
+                result:$$bool = OpRayQueryIsSphereHitNV &this $iCandidate;
+            };
+        }
+    }
+
+    /// Checks whether the committed intersection is a sphere primitive.
+    /// @return true if the committed hit is a sphere primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    bool CommittedIsSphereNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedIsSphere";
+        case glsl: __intrinsic_asm "rayQueryIsSphereHitNV($0, true)";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingSpheresGeometryNV;
+                result:$$bool = OpRayQueryIsSphereHitNV &this $iCommitted;
+            };
+        }
+    }
 }
 
 //
@@ -30205,14 +30555,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         this.copyFrom(other);
     }
 
-    [ForceInline]
-    [require(cooperative_vector)]
-    __init<each U : __BuiltinArithmeticType>(expand each U args)
-    {
-        static_assert(countof(U) == N, "number of arguments to CoopVec constructor must match number of elements");
-        this = __makeCoopVec<T, N>(expand (__arithmetic_cast<T>(each args)));
-    }
-
     [OverloadRank(-10)]
     [ForceInline]
     [require(cooperative_vector)]
@@ -31181,6 +31523,266 @@ ${
 $}
 }
 
+// Only floating-point CoopVec instantiations are differentiable. Integer CoopVec types
+// intentionally do not get this conformance, so they still diagnose in AD entry points.
+__generic<T : __BuiltinFloatingPointType, let N : int>
+extension CoopVec<T, N> : IDifferentiable
+{
+    typealias Differential = CoopVec<T, N>;
+
+    [Differentiable]
+    static Differential dzero()
+    {
+        return __default<Differential>();
+    }
+
+    [Differentiable]
+    static Differential dadd(Differential a, Differential b)
+    {
+        return __internal_add(a, b);
+    }
+}
+
+// Keep the general value-pack constructor as an extension so overload resolution compares it
+// against the floating differentiable constructor using extension-to-extension rules.
+extension<T : __BuiltinArithmeticType, let N : int> CoopVec<T, N>
+{
+    [OverloadRank(-1)]
+    [ForceInline]
+    [require(cooperative_vector)]
+    __init<each U : __BuiltinArithmeticType>(expand each U args)
+    {
+        // This preserves the existing arithmetic constructor behavior while letting the floating
+        // overload below win by overload rank for differentiable element and argument types.
+        static_assert(countof(U) == N, "number of arguments to CoopVec constructor must match number of elements");
+        this = __makeCoopVec<T, N>(expand (__arithmetic_cast<T>(each args)));
+    }
+}
+
+// Keep the differentiable value-pack constructor in the floating CoopVec extension.
+// The general constructor is also an extension, while this overload is only
+// available when both the CoopVec element type and constructor operands are differentiable.
+// The direct [Differentiable] annotation lets autodiff synthesize the constructor derivative.
+extension<T : __BuiltinFloatingPointType, let N : int> CoopVec<T, N>
+{
+    [OverloadRank(1)]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [Differentiable]
+    __init<each U : __BuiltinFloatingPointType>(expand each U args)
+    {
+        static_assert(countof(U) == N, "number of arguments to CoopVec constructor must match number of elements");
+        // Use the direct floating cast intrinsic so autodiff can transpose the constructor
+        // operands through kIROp_FloatCast instead of a wrapper call around __arithmetic_cast.
+        this = __makeCoopVec<T, N>(expand (__real_cast<T>(each args)));
+    }
+}
+
+// These arithmetic witnesses copy the normal CoopVec target-switch implementations.
+// The specialization is only here to satisfy differentiable arithmetic requirements.
+__generic<T : __BuiltinFloatingPointType, let N : int>
+extension CoopVec<T, N> : IDifferentiableArithmetic
+{
+    [Differentiable]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [require(optix_coopvec)]
+    This add(This other)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 + $1";
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecAdd($0, $1)";
+        default: return __pureAdd(other);
+        }
+    }
+
+    [Differentiable]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [require(optix_coopvec)]
+    This sub(This other)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 - $1";
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecSub($0, $1)";
+        default: return __pureSub(other);
+        }
+    }
+
+    [Differentiable]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [require(optix_coopvec)]
+    This mul(This other)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 * $1";
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecMul($0, $1)";
+        default: return __pureMul(other);
+        }
+    }
+
+    [Differentiable]
+    [ForceInline]
+    [require(cooperative_vector)]
+    This div(This other)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 / $1";
+        default: return __pureDiv(other);
+        }
+    }
+
+    [Differentiable]
+    [require(cooperative_vector)]
+    This neg()
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "-$0";
+        default: return __pureNeg(this);
+        }
+    }
+}
+
+// Conditional custom derivatives for floating-point CoopVec arithmetic. Keeping these
+// as __func_extension declarations avoids differentiating the target-switch method bodies.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::add)(
+    DifferentialPair<CoopVec<T, N>> self,
+    DifferentialPair<CoopVec<T, N>> other) -> DifferentialPair<CoopVec<T, N>>
+{
+    return diffPair(self.p.add(other.p), self.d.add(other.d));
+}
+
+// Addition sends the incoming reverse gradient unchanged to both operands.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::add)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    inout DifferentialPair<CoopVec<T, N>> other,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    self = diffPair(self.p, dOut);
+    other = diffPair(other.p, dOut);
+}
+
+// Subtraction is element-wise, so the primal and tangent paths both subtract component-wise.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::sub)(
+    DifferentialPair<CoopVec<T, N>> self,
+    DifferentialPair<CoopVec<T, N>> other) -> DifferentialPair<CoopVec<T, N>>
+{
+    return diffPair(self.p.sub(other.p), self.d.sub(other.d));
+}
+
+// Reverse subtraction flips the contribution flowing to the right operand.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::sub)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    inout DifferentialPair<CoopVec<T, N>> other,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    self = diffPair(self.p, dOut);
+    other = diffPair(other.p, dOut.neg());
+}
+
+// Multiplication applies the product rule component-wise.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::mul)(
+    DifferentialPair<CoopVec<T, N>> self,
+    DifferentialPair<CoopVec<T, N>> other) -> DifferentialPair<CoopVec<T, N>>
+{
+    let d = self.d.mul(other.p).add(self.p.mul(other.d));
+    return diffPair(self.p.mul(other.p), d);
+}
+
+// Reverse multiplication uses the saved primal operands as the local scale factors.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::mul)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    inout DifferentialPair<CoopVec<T, N>> other,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    let selfP = self.p;
+    let otherP = other.p;
+    self = diffPair(selfP, otherP.mul(dOut));
+    other = diffPair(otherP, selfP.mul(dOut));
+}
+
+// Division applies the quotient rule component-wise.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::div)(
+    DifferentialPair<CoopVec<T, N>> self,
+    DifferentialPair<CoopVec<T, N>> other) -> DifferentialPair<CoopVec<T, N>>
+{
+    let numerator = self.d.mul(other.p).sub(self.p.mul(other.d));
+    let denominator = other.p.mul(other.p);
+    return diffPair(self.p.div(other.p), numerator.div(denominator));
+}
+
+// Reverse division keeps primal values before mutating the differential pairs.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::div)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    inout DifferentialPair<CoopVec<T, N>> other,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    let selfP = self.p;
+    let otherP = other.p;
+    let denominator = otherP.mul(otherP);
+    self = diffPair(selfP, dOut.div(otherP));
+    other = diffPair(otherP, selfP.neg().mul(dOut).div(denominator));
+}
+
+// Negation forwards the negated primal and tangent.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::neg)(
+    DifferentialPair<CoopVec<T, N>> self) -> DifferentialPair<CoopVec<T, N>>
+{
+    return diffPair(self.p.neg(), self.d.neg());
+}
+
+// Reverse negation only flips the incoming gradient sign.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::neg)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    self = diffPair(self.p, dOut.neg());
+}
+
 __intrinsic_op($(kIROp_MakeCoopVectorFromValuePack))
 CoopVec<T, N> __makeCoopVec<T : __BuiltinArithmeticType, let N : int, each U>(expand each U args);
 
@@ -31430,6 +32032,48 @@ CoopVec<T, N> step<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> ed
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
             ret[i] = step(edge[i], x[i]);
+        return ret;
+    }
+}
+
+// Provide CoopVec trig overloads needed by common differentiable math. HLSL/SPIR-V
+// lower natively when available; the fallback preserves element-wise semantics.
+[require(cooperative_vector)]
+CoopVec<T, N> sin<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "sin($0)";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$CoopVec<T, N> = OpExtInst glsl450 Sin $x;
+        };
+    default:
+        CoopVec<T, N> ret;
+        for(int i = 0; i < N; ++i)
+            ret[i] = sin(x[i]);
+        return ret;
+    }
+}
+
+[require(cooperative_vector)]
+CoopVec<T, N> cos<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "cos($0)";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$CoopVec<T, N> = OpExtInst glsl450 Cos $x;
+        };
+    default:
+        CoopVec<T, N> ret;
+        for(int i = 0; i < N; ++i)
+            ret[i] = cos(x[i]);
         return ret;
     }
 }

@@ -1,0 +1,236 @@
+name: Compile Perf — Nightly ToT
+
+# Daily tip-of-tree compile-time sweep. Builds master HEAD on the dedicated
+# benchmark runner, runs the perf suite, stores the day's results in the
+# perf-results repo under daily/<date>-<sha>/, and rebuilds the tracking series
+# (per-release history ++ post-release daily points). See
+# tools/compile-perf/DESIGN.md.
+
+on:
+  schedule:
+    - cron: "0 5 * * *" # daily 05:00 UTC
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "commit SHA or branch to build (blank = master HEAD)"
+        default: ""
+      samples:
+        description: "timed samples per run"
+        default: "5"
+      only:
+        description: "comma-separated workload subset (blank = full suite)"
+        default: ""
+
+concurrency:
+  group: compile-perf-nightly
+  cancel-in-progress: false # never cancel a running benchmark — timing must be clean
+
+env:
+  # Dedicated results repo (mirrors the MDL slang-material-modules-benchmark
+  # pattern). Requires a PAT secret SLANG_COMPILE_PERF_PAT with push access.
+  PERF_RESULTS_REPO: shader-slang/slang-compile-perf
+
+permissions:
+  contents: read # GITHUB_TOKEN read-only; writes use SLANG_COMPILE_PERF_PAT
+
+jobs:
+  nightly:
+    # The quiesced NVIDIA RGFX perf pool (runner group nvrgfx) — the SAME runner
+    # the release history is swept on, so absolute timings stay comparable.
+    runs-on:
+      group: nvrgfx
+      labels: [Windows, X64, nvrgfx-perf]
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+          persist-credentials: false
+          submodules: "recursive"
+          fetch-depth: "0"
+
+      - name: Common setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: windows
+          compiler: cl
+          platform: x86_64
+          config: release
+          build-llvm: false
+
+      - name: Build Slang (tip of tree)
+        run: |
+          # Match release.yml flags so daily ToT timings are directly comparable to the
+          # release history. LTO is the critical flag: a plain Release build runs sema
+          # ~1.5x slower than the official LTO binaries, producing a build-method step
+          # at the release->daily boundary rather than a real regression.
+          # SLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF also matches release.yml.
+          # LLVM is disabled: the prebuilt slang-llvm artifact links against a newer
+          # MSVC CRT than is available on the nvrgfx-perf runner, causing LNK2001
+          # linker errors. The perf suite only uses SPIRV/Metal/WGSL targets which
+          # do not need the LLVM backend.
+          cmake --preset default --fresh `
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE `
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=false `
+            -DSLANG_ENABLE_RELEASE_LTO=ON `
+            -DSLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF
+          cmake --workflow --preset release
+
+      - name: Checkout MDL-SDK corpus
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: "shader-slang/MDL-SDK"
+          # Pin to a known-good commit so corpus drift doesn't silently shift
+          # mdl_dxr timings. Update this pin intentionally when refreshing the
+          # corpus, then resync history (compile-perf-release-sweep force=true).
+          ref: "446562493bed1b175e7cf105425ca3596764652f"
+          path: "external/MDL-SDK"
+          persist-credentials: false
+          sparse-checkout: |
+            ./examples/mdl_sdk/dxr/content/slangified
+
+      # NB: persist-credentials stays on (default) here — the "Push results" step
+      # below relies on the PAT credential this checkout persists in .git/config.
+      - name: Checkout perf results repo
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: ${{ env.PERF_RESULTS_REPO }}
+          path: "perf-results"
+          token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+
+      - name: Run nightly sweep + update tracking
+        shell: bash
+        # Inputs arrive via env and are never interpolated into the script, so a
+        # value with shell metacharacters can't break out — it's just an argv item.
+        env:
+          SAMPLES: ${{ github.event.inputs.samples || '5' }}
+          ONLY: ${{ github.event.inputs.only }}
+        run: |
+          set -euo pipefail
+          SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
+          RESULTS="$GITHUB_WORKSPACE/perf-results"
+          SLANGC="$GITHUB_WORKSPACE/build/Release/bin/slangc.exe"
+          LABEL="$(git log -1 --format=%cs HEAD)-$(git rev-parse --short HEAD)"
+          COMMIT="$(git rev-parse HEAD)"
+          CORPUS_SHA="$(git -C "$GITHUB_WORKSPACE/external/MDL-SDK" rev-parse HEAD)"
+
+          # MDL corpus for the mdl_dxr workload.
+          mkdir -p "$SUITE/corpus/mdl"
+          cp external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang "$SUITE/corpus/mdl/"
+
+          cd "$SUITE"
+          args=(--slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" --samples "$SAMPLES" --warmup 1)
+          [ -n "$ONLY" ] && args+=(--only "$ONLY")
+          # Daily ToT sweep -> perf-results/daily/<label>/results.json
+          python bench.py "${args[@]}"
+          # Stamp meta + rebuild perf-results/tracking/tracking.json
+          python track.py register --results "$RESULTS" --index "$RESULTS/index.json" \
+            --label "$LABEL" --commit "$COMMIT" --corpus-sha "$CORPUS_SHA"
+
+      - name: Push results
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/perf-results"
+          git config user.name "slang-perf-bot"
+          git config user.email "slang-perf-bot@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "nightly ToT $(date -u +%Y-%m-%d) ($(cd "$GITHUB_WORKSPACE" && git rev-parse --short HEAD))"
+          git push
+
+      # Remove the PAT credential that actions/checkout baked into perf-results'
+      # .git/config — on a persistent self-hosted runner this would otherwise
+      # outlive the job and be readable by subsequent jobs.
+      - name: Revoke PAT from perf-results git config
+        if: always()
+        shell: bash
+        run: |
+          git -C "$GITHUB_WORKSPACE/perf-results" config --unset \
+            http."https://github.com/".extraheader 2>/dev/null || true
+
+      # Generate HTML reports from ALL data in the results repo and deploy to
+      # the gh-pages branch of slang-compile-perf, which is served at
+      # shader-slang.org/slang-compile-perf. continue-on-error so a report
+      # failure never blocks the trend check below.
+      - name: Generate HTML reports
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
+          RESULTS="$GITHUB_WORKSPACE/perf-results"
+          if [ ! -f "$RESULTS/index.json" ]; then
+            echo "No index.json in results repo; skipping report generation"
+            exit 0
+          fi
+          cd "$SUITE"
+          python report.py --results "$RESULTS" --index "$RESULTS/index.json"
+
+      - name: Checkout gh-pages branch
+        continue-on-error: true
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: ${{ env.PERF_RESULTS_REPO }}
+          ref: gh-pages
+          path: perf-pages
+          token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+
+      - name: Deploy HTML reports to GitHub Pages
+        continue-on-error: true
+        shell: bash
+        env:
+          SLANG_COMPILE_PERF_PAT: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+        run: |
+          set -euo pipefail
+          ANALYSIS="$GITHUB_WORKSPACE/perf-results/analysis"
+          PAGES="$GITHUB_WORKSPACE/perf-pages"
+
+          if [ ! -d "$ANALYSIS" ]; then
+            echo "No analysis dir; skipping pages deploy"
+            exit 0
+          fi
+
+          if [ -d "$PAGES/.git" ]; then
+            cd "$PAGES"
+            # Remove all tracked files so stale workload pages don't linger
+            git rm -rf . --quiet || true
+          else
+            # gh-pages branch doesn't exist yet — create it as an orphan
+            mkdir -p "$PAGES"
+            cd "$PAGES"
+            git init
+            git checkout --orphan gh-pages
+            git remote add origin "https://x-access-token:${SLANG_COMPILE_PERF_PAT}@github.com/${{ env.PERF_RESULTS_REPO }}.git"
+          fi
+
+          git config user.name "slang-perf-bot"
+          git config user.email "slang-perf-bot@users.noreply.github.com"
+
+          cp -r "$ANALYSIS/." .
+          mv report_per_workload.html index.html
+          # _combined_index.json is a derived intermediate — no need to serve it
+          rm -f _combined_index.json
+
+          git add -A
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "perf report $(date -u +%Y-%m-%d)"
+          git push origin gh-pages
+
+      - name: Revoke PAT from perf-pages git config
+        if: always()
+        shell: bash
+        run: |
+          git -C "$GITHUB_WORKSPACE/perf-pages" config --unset \
+            http."https://github.com/".extraheader 2>/dev/null || true
+          git -C "$GITHUB_WORKSPACE/perf-pages" remote set-url origin \
+            "https://github.com/${{ env.PERF_RESULTS_REPO }}.git" 2>/dev/null || true
+
+      # Runs AFTER the push so the data is stored even when this step fails the
+      # job. trend.py exits non-zero (job red + ::error:: annotations) when a
+      # primary timer drifts past threshold vs the trailing median.
+      - name: Check trend (fail on regression)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/tools/compile-perf"
+          python trend.py --results "$GITHUB_WORKSPACE/perf-results"

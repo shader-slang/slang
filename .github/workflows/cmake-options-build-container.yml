@@ -28,7 +28,7 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
           sparse-checkout: .github/cmake-options-matrix.json
@@ -47,7 +47,7 @@ jobs:
     timeout-minutes: 180
     permissions:
       contents: read
-      packages: read # Required to pull container from ghcr.io
+      packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
       # Current callers use GitHub-hosted Ubuntu, where the mounted workspace is
@@ -63,7 +63,7 @@ jobs:
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
           submodules: "recursive"
@@ -146,3 +146,67 @@ jobs:
           # don't abort the build when ASAN is enabled. No-op for other options.
           ASAN_OPTIONS: detect_leaks=0
         run: cmake --build build --config "$cmake_config"
+
+      - name: Verify slangc version (${{ matrix.option }})
+        if: matrix.windows_only != 'true'
+        run: |
+          slangc_enabled=$(
+            sed -n 's/^SLANG_ENABLE_SLANGC:[^=]*=//p' build/CMakeCache.txt \
+            | tr '[:upper:]' '[:lower:]'
+          )
+          case "$slangc_enabled" in
+            on|true|1|yes) ;;
+            off|false|0|no)
+              echo "SLANG_ENABLE_SLANGC is ${slangc_enabled}; skipping slangc runtime check."
+              exit 0
+              ;;
+            *)
+              echo "ERROR: could not determine SLANG_ENABLE_SLANGC from build/CMakeCache.txt"
+              exit 1
+              ;;
+          esac
+
+          slangc_path="build/$cmake_config/bin/slangc"
+          bin_dir="$PWD/build/$cmake_config/bin"
+          lib_dir="$PWD/build/$cmake_config/lib"
+
+          if [[ ! -f "$slangc_path" ]]; then
+            echo "ERROR: expected slangc at $slangc_path"
+            ls -la "$bin_dir" || true
+            exit 1
+          fi
+
+          export PATH="$bin_dir:$PATH"
+          if [[ -d "$lib_dir" ]]; then
+            export LD_LIBRARY_PATH="$lib_dir:${LD_LIBRARY_PATH:-}"
+          fi
+
+          "$slangc_path" -v
+
+      # Exercise `cmake --install` and a `find_package(slang)` consumer for
+      # entries that opt in via install_test. The static-lib build
+      # (SLANG_LIB_TYPE=STATIC) used to skip the install(EXPORT ...) step
+      # entirely, so a broken export would not have been caught by a plain
+      # configure+build. The find_package smoke test additionally guards the
+      # consumer path that actually broke in #11359: `cmake --install` can
+      # succeed while silently omitting slangTargets.cmake, and that only
+      # surfaces when a downstream calls find_package(slang). See issue #11359.
+      - name: Install Slang and verify find_package (${{ matrix.option }})
+        if: matrix.install_test == 'true' && matrix.windows_only != 'true'
+        run: |
+          cmake --install build --config "$cmake_config" --prefix install
+          # Minimal consumer that resolves the exported slang::slang target.
+          mkdir -p consumer
+          cat >consumer/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.25)
+          project(slang-find-package-smoke LANGUAGES CXX)
+          find_package(slang CONFIG REQUIRED)
+          if(NOT TARGET slang::slang)
+              message(FATAL_ERROR "find_package(slang) did not define slang::slang")
+          endif()
+          EOF
+          # CMAKE_PREFIX_PATH lets find_package locate the package config under
+          # the install prefix regardless of the OS-specific config dir
+          # (`cmake` on Windows, `${CMAKE_INSTALL_LIBDIR}/cmake/slang`
+          # elsewhere; see SLANG_CMAKE_CONFIG_DIR in CMakeLists.txt).
+          cmake -S consumer -B consumer/build -DCMAKE_PREFIX_PATH="$PWD/install"

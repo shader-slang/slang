@@ -10,7 +10,7 @@
 #include "../core/slang-type-text-util.h"
 #include "slang-com-helper.h"
 
-#ifdef SLANG_VC
+#if SLANG_VC
 #include "windows/slang-win-visual-studio-util.h"
 #endif
 

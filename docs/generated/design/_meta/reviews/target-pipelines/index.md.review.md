@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T15:05:26+00:00
+reviewed_at: 2026-06-12T13:16:39+00:00
 target_doc: target-pipelines/index.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 79d77df3a1037f04643bcb85b77033ae0519e608f7d87b8700499b1d91026561
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 88909e4def1133ca5cd3ccb36f17d01f8bcc633abff88b21acd9208e1a05d1f2
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
   factual_accuracy: pass
   cross_references: pass
@@ -24,16 +24,16 @@ severity_breakdown:
 # Review report for target-pipelines/index.md
 
 ## Summary
-The index has the required navigation sections, peer-page list, and comparison table, and all checked links resolve at the recorded source commit. One small contract issue remains: a paragraph after the table explains individual pass behavior even though the index prompt says not to document per-pass details.
+The index has the required navigation sections, links all five peer target pages, and its cross-target facts match the peer pages and spot-checked source. One contract issue remains: two comparison-table cells expand the HLSL and CUDA "no single entry" cases into individual pass names, even though the index prompt requires compact exact labels and forbids per-pass detail.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show target-pipelines/index.md` and used the target front matter source commit and digest in this report.
-- Read the index doc, `_common.md`, `target-pipelines-index.md`, and all five peer target-pipeline docs listed under `depends_on`.
-- Resolved all 24 relative Markdown links at `52339028a2aa703271533454c6b9528a534bac31`; no dangling links were found.
-- Checked the required index sections, peer page coverage, comparison-table column order, front matter keys, size cap, and shared `linkAndOptimizeIR` reference.
-- Verified at least 10 factual claims against the peer docs and source, including the five peer page links, the five target enum groups, Phase C entry names, Phase D emitter names, downstream tool summaries, and loop summaries.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show target-pipelines/index.md` and used the target front matter source commit and watched-path digest in this report.
+- Read the target document, `_common.md`, `target-pipelines-index.md`, and all five dependency peer docs: `spirv.md`, `hlsl.md`, `metal.md`, `wgsl.md`, and `cuda.md`.
+- Checked every relative link visible in the index, including the five peer-page links, source-file links, prompt link, and See also links; no dangling links were found.
+- Verified the required index sections, table column order, peer-page coverage, front matter keys, and size cap.
+- Spot-checked more than 10 factual claims against peer docs and source, including `linkAndOptimizeIR` at `source/slang/slang-emit.cpp:895`, emitter construction for HLSL/CUDA/Metal/WGSL, SPIR-V direct emit, CUDA existential/resource legalization gating, the CUDA/Metal `undoParameterCopy` arm, SPIR-V loop bounds, downstream tool summaries, and the five loop-summary cells.
 
 ## Findings
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## Cross-target comparison` | The paragraph after the comparison table documents pass-level behavior, including `eliminatePhis` register-allocation settings and address-space propagation pass placement. The index contract says this page is a navigation hub and forbids per-pass details. | `docs/generated/design/_meta/prompts/_common.md` under "Target-pipeline index contract" says the index "does not document any pass" and forbids "per-pass details"; the target doc currently names `eliminatePhis`, `specializeAddressSpaceForMetal`, and `specializeAddressSpaceForWGSL` immediately after the table. | Keep the comparison table, but delete or generalize the extra paragraph so detailed pass behavior remains in the per-target pages. |
+| F-001 | minor | `## Cross-target comparison`, HLSL and CUDA rows | The Phase C entry cells include pass-level inventories: `per-pass HLSL arms: wrapStructuredBuffersOfMatrices, legalizeNonStructParameterToStructForHLSL, ...` and `per-pass CUDA arms: synthesizeActiveMask, legalizeEntryPointVaryingParamsForCUDA, ...`. The index prompt asks for compact exact entries for these rows and the index contract forbids per-pass details. | `docs/generated/design/_meta/prompts/target-pipelines-index.md:46-54` says to use `(no single entry; per-pass HLSL arms)` and `(no single entry; per-pass CUDA arms)`. `docs/generated/design/_meta/prompts/_common.md:412-414` says the index must not include per-pass details or duplicated target-page content. | Replace the HLSL and CUDA Phase C entry cells with the exact compact labels from the prompt; leave the detailed pass names on the peer target pages. |

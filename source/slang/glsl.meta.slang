@@ -7280,19 +7280,21 @@ void setupExtForSubgroupBallotBuiltIn() {
     }
 }
 
+[require(glsl_spirv, subgroup_workgroup_index)]
 public property uint gl_NumSubgroups
 {
     [ForceInline]
-    [require(glsl_spirv, subgroup_basic)]
+    [require(glsl_spirv, subgroup_workgroup_index)]
     get {
         return WaveGetNumWaves();
     }
 }
 
+[require(glsl_spirv, subgroup_workgroup_index)]
 public property uint gl_SubgroupID
 {
     [ForceInline]
-    [require(glsl_spirv, subgroup_basic)]
+    [require(glsl_spirv, subgroup_workgroup_index)]
     get {
         return WaveGetWaveIndex();
     }

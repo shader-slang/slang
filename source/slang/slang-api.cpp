@@ -1002,16 +1002,18 @@ SLANG_API SlangResult spExtractRepro(
     DiagnosticSink sink;
     sink.init(nullptr, nullptr);
 
-    List<uint8_t> buffer;
-    {
-        MemoryStreamBase memoryStream(FileAccess::Read, reproData, reproDataSize);
-        SLANG_RETURN_ON_FAIL(ReproUtil::loadState(&memoryStream, &sink, buffer));
-    }
+    ComPtr<ISlangBlob> reproBlob;
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(
+        static_cast<const uint8_t*>(reproData),
+        reproDataSize,
+        &sink,
+        reproBlob.writeRef()));
 
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
-    ReproUtil::RequestState* requestState = ReproUtil::getRequest(buffer);
+    ReproUtil::RequestState* requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
     return ReproUtil::extractFiles(base, requestState, fileSystem);
 }
 
@@ -1029,14 +1031,17 @@ SLANG_API SlangResult spLoadReproAsFileSystem(
     DiagnosticSink sink;
     sink.init(nullptr, nullptr);
 
-    MemoryStreamBase stream(FileAccess::Read, reproData, reproDataSize);
+    ComPtr<ISlangBlob> reproBlob;
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(
+        static_cast<const uint8_t*>(reproData),
+        reproDataSize,
+        &sink,
+        reproBlob.writeRef()));
 
-    List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(&stream, &sink, buffer));
-
-    auto requestState = ReproUtil::getRequest(buffer);
+    auto requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
     ComPtr<ISlangFileSystemExt> fileSystem;
     SLANG_RETURN_ON_FAIL(
@@ -1165,6 +1170,8 @@ static const char* _getCoverageCounterModeName(slang::CoverageCounterMode mode)
     {
     case slang::CoverageCounterMode::Count:
         return "count";
+    case slang::CoverageCounterMode::Boolean:
+        return "boolean";
     default:
         return "unknown";
     }

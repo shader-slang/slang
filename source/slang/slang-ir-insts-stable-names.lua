@@ -295,6 +295,7 @@ return {
 	["RequireComputeDerivative"] = 297,
 	["StaticAssert"] = 298,
 	["Printf"] = 299,
+	["Abort"] = 864,
 	["RequireMaximallyReconverges"] = 300,
 	["RequireQuadDerivatives"] = 301,
 	["add"] = 302,
@@ -835,5 +836,8 @@ return {
 	["IncrementBranchCoverageCounter"] = 859,
 	["Decoration.BuiltinRequirementDecoration"] = 860,
 	["builtinRequirementKey"] = 861,
-	["ImageTexelPointer"] = 862
+	["ImageTexelPointer"] = 862,
+	["Type.MetalPackedVec"] = 863,
+	["Decoration.glslFragDepthGreater"] = 865,
+	["Decoration.glslFragDepthLess"] = 866
 }

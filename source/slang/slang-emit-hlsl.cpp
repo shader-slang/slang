@@ -2222,6 +2222,60 @@ void HLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
 
 void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
+    auto emitMeshOutputParam = [&]
+    {
+        auto modifier = param->findDecoration<IRMeshOutputDecoration>();
+        if (!modifier)
+            return false;
+
+        auto func = getParentFunc(param);
+        if (!func || !func->findDecoration<IREntryPointDecoration>())
+            return false;
+
+        // HLSL mesh-output parameter syntax is only valid on mesh entry points.
+        // Helper functions that receive mesh outputs are legalized to ordinary array params.
+        auto paramName = getName(param);
+        auto paramType = param->getDataType();
+
+        if (auto layoutDecoration = param->findDecoration<IRLayoutDecoration>())
+        {
+            auto layout = as<IRVarLayout>(layoutDecoration->getLayout());
+            SLANG_ASSERT(layout);
+
+            if (layout->usesResourceKind(LayoutResourceKind::VaryingInput) ||
+                layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
+            {
+                emitInterpolationModifiers(param, paramType, layout);
+            }
+        }
+
+        const char* prefix = as<IRVerticesDecoration>(modifier)     ? "out vertices "
+                             : as<IRIndicesDecoration>(modifier)    ? "out indices "
+                             : as<IRPrimitivesDecoration>(modifier) ? "out primitives "
+                                                                    : nullptr;
+        SLANG_ASSERT(prefix && "Unhandled type of mesh output decoration");
+
+        auto valueType = paramType;
+        if (auto outType = as<IROutParamTypeBase>(valueType))
+        {
+            valueType = outType->getValueType();
+        }
+        else if (auto refType = as<IRRefParamType>(valueType))
+        {
+            valueType = refType->getValueType();
+        }
+        else if (auto constRefType = as<IRBorrowInParamType>(valueType))
+        {
+            valueType = constRefType->getValueType();
+        }
+
+        m_writer->emit(prefix);
+        emitType(valueType, paramName);
+        emitSemantics(param);
+        emitPostDeclarationAttributesForType(paramType);
+        return true;
+    };
+
     // A mesh shader input payload has it's own weird stuff going on, handled
     // in emitMeshShaderModifiers, skip this bit which will introduce an
     // invalid "groupshared" keyword.
@@ -2252,6 +2306,9 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             break;
         }
     }
+
+    if (emitMeshOutputParam())
+        return;
 
     Super::emitSimpleFuncParamImpl(param);
 }
@@ -2293,16 +2350,6 @@ void HLSLSourceEmitter::emitPackOffsetModifier(
 
 void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 {
-    if (auto modifier = varInst->findDecoration<IRMeshOutputDecoration>())
-    {
-        // DXC requires that mesh payload parameters have "out" specified
-        const char* s = as<IRVerticesDecoration>(modifier)     ? "out vertices "
-                        : as<IRIndicesDecoration>(modifier)    ? "out indices "
-                        : as<IRPrimitivesDecoration>(modifier) ? "out primitives "
-                                                               : nullptr;
-        SLANG_ASSERT(s && "Unhandled type of mesh output decoration");
-        m_writer->emit(s);
-    }
     if (varInst->findDecoration<IRHLSLMeshPayloadDecoration>())
     {
         // DXC requires that mesh payload parameters have "in" specified

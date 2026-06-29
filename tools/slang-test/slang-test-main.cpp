@@ -5556,16 +5556,17 @@ static SlangResult runUnitTestModule(
         return SLANG_FAIL;
 
     renderer_test::CoreDebugCallback coreDebugCallback;
-    renderer_test::CoreToRHIDebugBridge rhiDebugBridge;
-    rhiDebugBridge.setCoreCallback(&coreDebugCallback);
 
     UnitTestContext unitTestContext;
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
-    unitTestContext.enabledApis = context->options.enabledApis;
+    // Intersect with probed available APIs so unit tests skip instead of fail
+    // when the required device type is not present on the current machine.
+    unitTestContext.enabledApis =
+        context->options.enabledApis & _getAvailableRenderApiFlags(context);
     unitTestContext.enableDebugLayers = context->options.enableDebugLayers;
     unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
-    unitTestContext.debugCallback = &rhiDebugBridge;
+    unitTestContext.debugCallback = nullptr;
 
     auto testCount = testModule->getTestCount();
 
@@ -5613,7 +5614,7 @@ static SlangResult runUnitTestModule(
             spawnType == SpawnType::UseFullyIsolatedTestServer)
         {
             TestServerProtocol::ExecuteUnitTestArgs args;
-            args.enabledApis = context->options.enabledApis;
+            args.enabledApis = context->options.enabledApis & _getAvailableRenderApiFlags(context);
             args.enableDebugLayers = context->options.enableDebugLayers;
             args.moduleName = moduleName;
             args.testName = test.testName;
@@ -5638,6 +5639,7 @@ static SlangResult runUnitTestModule(
                 // If the rpc failed, output an error message
                 if (SLANG_FAILED(rpcRes))
                 {
+                    testResult = TestResult::Fail;
                     reporter->message(TestMessageType::RunError, "rpc failed");
                 }
 
@@ -5683,6 +5685,11 @@ static SlangResult runUnitTestModule(
 
             // Clear any previous debug messages
             coreDebugCallback.clear();
+            auto rhiDebugBridge = renderer_test::createRetainedCoreToRHIDebugBridge();
+            unitTestContext.debugCallback = rhiDebugBridge.Ptr();
+            renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
+                *rhiDebugBridge,
+                &coreDebugCallback);
 
             try
             {

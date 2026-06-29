@@ -158,6 +158,9 @@ WGSL requires explicit address space qualifiers. Slang automatically assigns app
 | Group Shared          | `workgroup`         |
 | Parameter Blocks      | `uniform`           |
 
+Module-scope `static const` globals are emitted as a WGSL `const` (a compile-time value) when their type is a scalar, vector, or matrix.
+A `static const` global of **array** type is instead emitted as a `var<private>` (with the same initializer), because a WGSL `const` is a compile-time value that may only be indexed by a const-expression, whereas a `var<private>` is addressable and so can be indexed by a runtime value (for example `positions[vertexID]`).
+
 
 Matrix type translation
 -----------------------
