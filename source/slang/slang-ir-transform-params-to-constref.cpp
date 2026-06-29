@@ -428,10 +428,46 @@ SlangResult transformParamsToConstRef(IRModule* module, DiagnosticSink* sink)
     return context.processModule();
 }
 
+// Returns true if `param` is a fixed-size array of resources that is indexed by a runtime
+// (non-literal) value. On a CUDA target such a uniform entry-point parameter is passed by value in
+// the `.param` kernel-argument space, which ptxas cannot dynamically index, so a runtime index
+// (`arr[indices[tid]]`) lowers to a serial `ld.param` chain. Passing the parameter by reference
+// makes `arr[i]` an ordinary dynamically-addressable load. The runtime-index check avoids
+// transforming statically-indexed arrays (e.g. `arr[0]`), which do not suffer the slowdown.
+static bool isRuntimeIndexedResourceArrayParam(IRParam* param)
+{
+    // Fixed-size array only (`IRArrayType`, not `IRUnsizedArrayType`); `isResourceType` unwraps the
+    // array(s) and confirms the element bottoms out in a resource.
+    auto arrayType = as<IRArrayType>(param->getDataType());
+    if (!arrayType)
+        return false;
+    if (!isResourceType(arrayType))
+        return false;
+
+    // Require at least one runtime (non-literal) index into the array.
+    for (auto use = param->firstUse; use; use = use->nextUse)
+    {
+        auto getElement = as<IRGetElement>(use->getUser());
+        if (!getElement)
+            continue;
+        if (getElement->getIndex() && !as<IRIntLit>(getElement->getIndex()))
+            return true;
+    }
+    return false;
+}
+
 struct EntryPointInParamToBorrowContext : public TransformParamsToConstRefContext
 {
-    EntryPointInParamToBorrowContext(IRModule* module, DiagnosticSink* sink)
+    // When true (CUDA targets), a runtime-indexed fixed-size resource-array uniform is also
+    // rewritten to `borrow in`; see `isRuntimeIndexedResourceArrayParam`.
+    bool m_transformCudaResourceArrayUniforms = false;
+
+    EntryPointInParamToBorrowContext(
+        IRModule* module,
+        DiagnosticSink* sink,
+        bool transformCudaResourceArrayUniforms)
         : TransformParamsToConstRefContext(module, sink)
+        , m_transformCudaResourceArrayUniforms(transformCudaResourceArrayUniforms)
     {
     }
     virtual bool shouldProcessFunction(IRFunc* func) override
@@ -468,7 +504,13 @@ struct EntryPointInParamToBorrowContext : public TransformParamsToConstRefContex
         if (!paramLayout)
             return false;
         if (!isVaryingParameter(paramLayout))
-            return false;
+        {
+            // Entry-point uniforms are normally left by value. The one exception is a CUDA
+            // runtime-indexed fixed-size resource array, which must be passed by reference to avoid
+            // the serial `.param` `ld.param` chain (see `isRuntimeIndexedResourceArrayParam`).
+            return m_transformCudaResourceArrayUniforms &&
+                   isRuntimeIndexedResourceArrayParam(param);
+        }
 
         // If we reach here, we are dealing with a varying in parameter.
         // We need to rewrite it to be a `borrow in` parameter.
@@ -476,9 +518,12 @@ struct EntryPointInParamToBorrowContext : public TransformParamsToConstRefContex
     }
 };
 
-SlangResult translateEntryPointInParamToBorrow(IRModule* module, DiagnosticSink* sink)
+SlangResult translateEntryPointInParamToBorrow(
+    IRModule* module,
+    DiagnosticSink* sink,
+    bool transformCudaResourceArrayUniforms)
 {
-    EntryPointInParamToBorrowContext context(module, sink);
+    EntryPointInParamToBorrowContext context(module, sink, transformCudaResourceArrayUniforms);
     return context.processModule();
 }
 
