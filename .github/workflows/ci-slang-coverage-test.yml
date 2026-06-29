@@ -1,4 +1,4 @@
-name: CI Coverage Workflow
+name: CI Slang Coverage Test Workflow
 
 on:
   workflow_call:
@@ -276,7 +276,7 @@ jobs:
           # docs/generated/tests/ into the merged coverage report.
           # run-coverage.sh passes -expected-failure-list pointing at
           # docs/generated/tests/_meta/expected-failures.txt, so the
-          # agentic pass uses the same gate as ci-agentic-tests-nightly
+          # agentic pass uses the same gate as nightly-slang-test.yml
           # (only unexpected failures surface, and they're tolerated
           # here so coverage data is collected either way).
           # Retry once on failure to handle intermittent test failures.
@@ -493,7 +493,7 @@ jobs:
         run: |
           # OpenCppCoverage has already produced the Cobertura XML via
           # run-coverage-windows.ps1. Parse it for the JSON summary used by
-          # coverage-nightly.yml's merge step. Only line-level metrics are
+          # nightly-slang-coverage-test.yml's merge step. Only line-level metrics are
           # available from Cobertura (no region/function/branch -- those are
           # llvm-cov-only), so those fields are omitted on Windows.
           $covDir = "build\coverage-data"

@@ -1,4 +1,4 @@
-name: MaterialX Integration Tests
+name: CI MaterialX Regression Test Workflow
 
 on:
   workflow_call:
@@ -20,7 +20,7 @@ on:
         type: string
 
 jobs:
-  materialx-integration:
+  test-materialx-regression:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 15
     defaults:

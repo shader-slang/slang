@@ -1,5 +1,12 @@
 name: CI
 
+# Reusable workflow files called from CI and nightly aggregators follow this
+# naming shape:
+#   {ci,nightly}-{repo}[-{name}]-{build|test|build-container|test-container}.yml
+# `repo` is the owning/integrated project, such as slang, falcor, rhi, remix,
+# slangpy, mdl, or materialx. `name` is used for a specific suite or purpose,
+# such as perf, vkglcts, sascha, sanitizer, regression, coverage, trigger, or benchmark.
+
 on:
   workflow_dispatch:
   merge_group:
@@ -461,11 +468,11 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
-  # MaterialX Integration Tests (Windows only for initial validation)
-  test-materialx-windows-release:
+  # MaterialX integration test (Windows only for initial validation).
+  test-materialx-regression-windows-release:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/materialx-test.yml
+    uses: ./.github/workflows/ci-materialx-regression-test.yml
     with:
       os: windows
       compiler: cl
@@ -574,21 +581,21 @@ jobs:
       actions: read
     uses: ./.github/workflows/ci-falcor-test.yml
 
-  test-compile-regression:
+  test-slang-regression:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     permissions:
       contents: read
       actions: read
-    uses: ./.github/workflows/ci-compile-test.yml
+    uses: ./.github/workflows/ci-slang-regression-test.yml
 
-  test-benchmark:
+  test-mdl-benchmark:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     permissions:
       contents: read
       actions: read
-    uses: ./.github/workflows/ci-benchmark-test.yml
+    uses: ./.github/workflows/ci-mdl-benchmark-test.yml
 
   # Aggregate gate required by branch protection / the merge queue.
   #
@@ -626,13 +633,13 @@ jobs:
         test-linux-debug-gcc-x86_64-rhi,
         test-linux-release-gcc-aarch64,
         test-linux-debug-gcc-aarch64,
-        test-materialx-windows-release,
+        test-materialx-regression-windows-release,
         sanitizer-linux-clang-x86_64,
         check-cmdline-ref,
         check-capability-atoms-ref,
         test-falcor,
-        test-compile-regression,
-        test-benchmark,
+        test-slang-regression,
+        test-mdl-benchmark,
         wait-for-human-priority,
       ]
     runs-on: ubuntu-latest

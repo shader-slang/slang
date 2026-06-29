@@ -1,4 +1,4 @@
-name: CI Compile Regression Test Workflow
+name: CI Slang Regression Test Workflow
 
 on:
   workflow_call:
@@ -8,7 +8,7 @@ permissions:
   actions: read
 
 jobs:
-  test-compile-regression:
+  test-slang-regression:
     name: Test (Compile Regression)
     timeout-minutes: 60
     runs-on: [Windows, self-hosted, regression-test]

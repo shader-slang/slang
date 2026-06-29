@@ -1,4 +1,4 @@
-name: Coverage (Nightly)
+name: Nightly Slang Coverage Test
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   coverage-linux:
-    uses: ./.github/workflows/ci-slang-coverage.yml
+    uses: ./.github/workflows/ci-slang-coverage-test.yml
     with:
       os: linux
       compiler: clang-18
@@ -32,7 +32,7 @@ jobs:
     secrets: inherit
 
   coverage-macos:
-    uses: ./.github/workflows/ci-slang-coverage.yml
+    uses: ./.github/workflows/ci-slang-coverage-test.yml
     with:
       os: macos
       compiler: clang
@@ -45,7 +45,7 @@ jobs:
     secrets: inherit
 
   coverage-windows:
-    uses: ./.github/workflows/ci-slang-coverage.yml
+    uses: ./.github/workflows/ci-slang-coverage-test.yml
     with:
       os: windows
       compiler: cl
@@ -153,7 +153,7 @@ jobs:
 
           # Locate the per-OS gzipped LCOV artifacts. The compiler-suffixed
           # artifact names (e.g. coverage-lcov-linux-x86_64-clang-18) are set
-          # by ci-slang-coverage.yml's "Upload LCOV Report" step.
+          # by ci-slang-coverage-test.yml's "Upload LCOV Report" step.
           shopt -s nullglob
           LINUX_GZ=( $ART/coverage-lcov-linux-*/coverage.lcov.gz )
           MACOS_GZ=( $ART/coverage-lcov-macos-*/coverage.lcov.gz )

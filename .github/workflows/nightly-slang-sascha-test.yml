@@ -1,4 +1,4 @@
-name: Sascha Willems Vulkan Shaders (Nightly)
+name: Nightly Slang Sascha Test
 
 on:
   workflow_dispatch:

@@ -1,4 +1,4 @@
-name: Test SPIRV-Tools ToT
+name: Check SPIRV-Tools ToT
 
 # This is a placeholder workflow file.
 # The full implementation will be added in a subsequent PR.
