@@ -1,12 +1,5 @@
 name: CI
 
-# Reusable workflow files called from CI and nightly aggregators follow this
-# naming shape:
-#   {ci,nightly}-{repo}[-{name}]-{build|test|build-container|test-container}.yml
-# `repo` is the owning/integrated project, such as slang, falcor, rhi, remix,
-# slangpy, mdl, or materialx. `name` is used for a specific suite or purpose,
-# such as perf, vkglcts, sascha, sanitizer, regression, coverage, trigger, or benchmark.
-
 on:
   workflow_dispatch:
   merge_group:
