@@ -430,6 +430,13 @@ void applySettingsToDiagnosticSink(
                 Severity::Warning,
                 Severity::Error);
     }
+    // Enable each requested warning group (-Wall/-Wextra/-Wpedantic). These are additive, so a
+    // diagnostic tagged with any enabled group becomes visible.
+    auto warningLevelArray = options.getArray(CompilerOptionName::WarningLevel);
+    for (auto& element : warningLevelArray)
+    {
+        targetSink->enableWarningLevel((WarningLevel)element.intValue);
+    }
     if (options.shouldEmitRichDiagnostics())
     {
         targetSink->setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);

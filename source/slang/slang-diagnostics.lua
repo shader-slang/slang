@@ -122,6 +122,12 @@ local err = helpers.err
 local warning = helpers.warning
 local internal = helpers.internal
 local fatal = helpers.fatal
+-- Warning-level (group) sentinels: pass one positionally to warning() to make that warning
+-- opt-in behind -Wall/-Wextra/-Wpedantic respectively, e.g.
+--   warning("my-warning", 123, "message", span{...}, pedantic)
+local all = helpers.all
+local extra = helpers.extra
+local pedantic = helpers.pedantic
 
 --
 -- 0xxxx - Command line and interaction with host platform APIs.
@@ -1672,11 +1678,14 @@ warning(
     span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' is not recommended" }
 )
 
+-- Pedantic: this is a purely advisory performance hint (the conversion is well-defined and
+-- correct), so it is opt-in behind -Wpedantic rather than emitted by default.
 warning(
     "implicit-conversion-to-double",
     30082,
     "implicit float-to-double conversion",
-    span { loc = "expr:Expr", message = "implicit float-to-double conversion may cause unexpected performance issues, use explicit cast if intended." }
+    span { loc = "expr:Expr", message = "implicit float-to-double conversion may cause unexpected performance issues, use explicit cast if intended." },
+    pedantic
 )
 
 -- try/throw diagnostics
