@@ -587,7 +587,9 @@ slang::wgsl::UserAttribute* VariableReflection::getUserAttributeByIndex(uint32_t
 
 bool VariableReflection::hasDefaultValue()
 {
-    return interface()->hasDefaultValue();
+    Slang::ComPtr<ISlangBlob> defaultValueBlob;
+    return SLANG_SUCCEEDED(interface()->getDefaultValueBlob(defaultValueBlob.writeRef())) &&
+           defaultValueBlob != nullptr;
 }
 
 slang::wgsl::TypeReflection* VariableReflection::getType()
