@@ -3182,11 +3182,11 @@ static SlangResult createArtifactFromIR(
     const bool needsDownstreamCompiler =
         needsLink || needsOptimization || needsValidation || needsSeparateDebugInfo;
 
-    IDownstreamCompiler* compiler =
-        needsDownstreamCompiler ? codeGenContext->getSession()->getOrLoadDownstreamCompiler(
-                                      PassThroughMode::SpirvOpt,
-                                      codeGenContext->getSink())
-                                : nullptr;
+    IDownstreamCompiler* compiler = needsDownstreamCompiler
+                                        ? codeGenContext->getSession()->getOrLoadDownstreamCompiler(
+                                              PassThroughMode::SpirvOpt,
+                                              codeGenContext->getSink())
+                                        : nullptr;
     if (compiler)
     {
 #if 0
