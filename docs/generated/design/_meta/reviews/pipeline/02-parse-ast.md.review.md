@@ -1,23 +1,23 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-12T12:04:49+00:00
+reviewed_at: 2026-06-30T13:33:18+00:00
 target_doc: pipeline/02-parse-ast.md
-target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_watched_paths_digest: 723594a42095f62fd08e8a2b4425d9775c105e0d4a0f5882282a816aa7314537
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: 08a85b2139e6f95014abd9994f69cdb88937d3ed412d5d370aa4c584aca92640
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
-  factual_accuracy: pass
+  factual_accuracy: partial
   cross_references: pass
   completeness: pass
   style_consistency: pass
-  source_alignment: pass
+  source_alignment: partial
   front_matter_validity: pass
-finding_count: 0
+finding_count: 1
 severity_breakdown:
   critical: 0
   major: 0
-  minor: 0
+  minor: 1
   nit: 0
 ---
 
@@ -25,22 +25,23 @@ severity_breakdown:
 
 ## Summary
 
-The parse/AST page satisfies its prompt contract and matched the sampled parser and AST sources. I did not find factual, link, completeness, or front-matter issues that require remediation.
+The page largely matches the parse/AST prompt and the watched parser and AST sources. The only issue I found is a small but concrete source-location error: the page says the `Val` family is rooted in `slang-ast-val.h`, but the base `Val` class is declared in `slang-ast-base.h`. Links, front matter, required sections, and the main two-stage parsing and syntax-declaration descriptions otherwise checked out.
 
 ## Items checked
 
-- Ran `regenerate.py show pipeline/02-parse-ast.md` and read the target page, `_common.md`, `pipeline-02-parse-ast.md`, and dependency `pipeline/01-lex-preprocess.md`.
-- Verified front matter keys, recorded source commit, and 64-character hex watched-path digest.
-- Spot-checked 14 parser/AST claims against `source/slang/slang-parser.h`, `source/slang/slang-parser.cpp`, and related AST headers, including `parseSourceFile`, `parseUnparsedStmt`, `ParsingStage::Decl`/`Body`, `SyntaxParseInfo`, `g_parseSyntaxEntries`, `parseAssocType`, `parseInterfaceConstraintDecl`, and `populateBaseLanguageModule`.
-- Checked the required sections from `pipeline-02-parse-ast.md`: inputs/outputs, parser, AST data model, generics ambiguity, modifier parsing, and failure modes.
-- Resolved relative links with `regenerate.py lint` for this assigned doc group; lint reported no issues.
+- Verified the target front matter, including `source_commit` and `watched_paths_digest`, against the document's own recorded values.
+- Ran a targeted relative-link resolution check for all 39 Markdown links in `pipeline/02-parse-ast.md`; all resolved in the workspace.
+- Spot-checked 20 concrete claims against source: `parseSourceFile`, `parseUnparsedStmt`, `ParsingStage::Decl` / `Body`, `parseOptBody`, `UnparsedStmt`, `tryParseGenericApp`, `SyntaxParseInfo`, `g_parseSyntaxEntries`, `populateBaseLanguageModule`, parser recovery state, `maybeDiagnoseKeywordUsedAsName`, `BuiltinOperatorExpr`, `convertToBuiltinArithmeticOp`, `ASTBuilder::create`, `ASTBuilder::getOrCreate`, `parseOptionalGenericConstraints`, `maybeParseGenericConstraints`, `parseAssocType`, `parseInterfaceConstraintDecl`, and `isDeclAllowed`.
+- Checked that the required prompt sections are present: inputs/outputs, parser, two-stage parsing, syntax-as-declaration, AST data model, generics ambiguity, modifier parsing, and failure modes.
 
 ## Findings
 
-(no findings)
+| ID | Severity | Location | Description | Evidence | Recommendation |
+| --- | --- | --- | --- | --- | --- |
+| F-001 | minor | `## AST data model`, lines 173-178 | The page says `Val` is "rooted in [slang-ast-val.h]", but the `Val` base class is declared in `slang-ast-base.h`; `slang-ast-val.h` contains concrete value-related classes and helpers, not the root. | `source/slang/slang-ast-base.h:374` declares `// Base class for compile-time values`, followed by `class Val : public NodeBase` at `source/slang/slang-ast-base.h:379-380`. | Change the `Val` bullet to cite `slang-ast-base.h` for the root class, optionally mentioning `slang-ast-val.h` only for concrete value subclasses. |
 
 ## No-issues notes
 
-- The two-stage parsing description matches `parseSourceFile` using `ParsingStage::Decl` and `parseUnparsedStmt` using `ParsingStage::Body`.
-- The associated-type constraint relocation text matches the implementation comments and calls in `parseAssocType`.
-- The syntax-as-declaration summary is supported by the `SyntaxParseInfo` table and `populateBaseLanguageModule` registration loop.
+- The two-stage parsing description matches `parseSourceFile` setting `ParsingStage::Decl` and `parseUnparsedStmt` setting `ParsingStage::Body`.
+- The syntax-as-declaration section matches `tryLookUpSyntaxDecl`, `tryParseUsingSyntaxDecl`, `g_parseSyntaxEntries`, and `populateBaseLanguageModule`.
+- The generic-constraint details match the parser helpers for `nonempty`, `countof`, reversed `countof` diagnostics, `__hasDiffTypeInfo`, associated-type relocation, and `__constraint`.
