@@ -72,6 +72,81 @@ void invertYOfPositionOutput(IRModule* module)
     }
 }
 
+// Return `originalVector` with its z (index 2) component remapped from the OpenGL clip-space
+// depth range [-w, w] to the standard [0, w] range (NDC z in [-1, 1] -> [0, 1] after the
+// perspective divide), computing z' = (z + w) / 2. Unlike `_invertYOfVector`, the map is
+// affine and reads both z and w, so it must operate on the full position vector.
+static IRInst* _remapZOfVector(IRBuilder& builder, IRInst* originalVector)
+{
+    auto vectorType = as<IRVectorType>(originalVector->getDataType());
+    SLANG_ASSERT(vectorType);
+    auto elementType = vectorType->getElementType();
+    UInt elementIndexZ = 2;
+    UInt elementIndexW = 3;
+    auto originalZ = builder.emitSwizzle(elementType, originalVector, 1, &elementIndexZ);
+    auto originalW = builder.emitSwizzle(elementType, originalVector, 1, &elementIndexW);
+    auto sum = builder.emitAdd(elementType, originalZ, originalW);
+    auto remappedZ = builder.emitDiv(elementType, sum, builder.getFloatValue(elementType, 2.0));
+    auto newVal = builder.emitSwizzleSet(
+        originalVector->getDataType(),
+        originalVector,
+        remappedZ,
+        1,
+        &elementIndexZ);
+    return newVal;
+}
+
+// Find outputs to SV_Position and remap their clip-space z right before the write, so a shader
+// authored against the OpenGL [-1, 1] NDC depth convention emits the standard [0, 1] depth. This
+// reuses `invertYOfPositionOutput`'s store/getElementPtr traversal but transforms only the value
+// written to the position output; unlike `invertYOfPositionOutput` it intentionally does NOT fix
+// up `IRLoad` uses of the global. invert-y handles loads so that a shader which reads its negated
+// `y` back observes the value it wrote; the analogous concern here is that a read-back would
+// observe the remapped `z`. Omitting the load branch is therefore correct only under the invariant
+// that a gated GLSL vertex `gl_Position` is not read back within the shader after the output write
+// (the ordinary case: the position is computed, written, and not re-read). If a future IR shape
+// routed a post-write `gl_Position` load through this pass, a load fix-up mirroring invert-y would
+// be required -- and note `_remapZOfVector` could not simply be reused for it, since z' = (z + w) /
+// 2 is not its own inverse (that non-involutivity explains the helper-reuse limit, not the
+// omission's correctness). The position output is lowered as a single full-`float4` store, so the
+// store value is always a vector and `_remapZOfVector` asserts that invariant rather than this pass
+// guarding against it. The pass is scheduled exclusively for the GLSL target on vertex entry points
+// (see linkAndOptimizeIR in slang-emit.cpp), so it performs no target/stage checks of its own.
+void remapZOfPositionOutput(IRModule* module)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (globalInst->findDecoration<IRGLPositionOutputDecoration>())
+        {
+            // Find all stores to it (including those reached through a getElementPtr).
+            IRBuilder builder(module);
+            List<IRUse*> useWorkList;
+            auto processUse = [&](IRUse* use)
+            {
+                if (auto store = as<IRStore>(use->getUser()))
+                {
+                    if (getRootAddr(store->getPtr()) != globalInst)
+                        return;
+
+                    builder.setInsertBefore(store);
+                    auto originalVal = store->getVal();
+                    auto remappedVal = _remapZOfVector(builder, originalVal);
+                    builder.replaceOperand(&store->val, remappedVal);
+                }
+                else if (auto getElementPtr = as<IRGetElementPtr>(use->getUser()))
+                {
+                    traverseUses(getElementPtr, [&](IRUse* use) { useWorkList.add(use); });
+                }
+            };
+            traverseUses(globalInst, processUse);
+            for (Index i = 0; i < useWorkList.getCount(); i++)
+            {
+                processUse(useWorkList[i]);
+            }
+        }
+    }
+}
+
 
 static IRInst* _invertWOfVector(IRBuilder& builder, IRInst* originalVector)
 {

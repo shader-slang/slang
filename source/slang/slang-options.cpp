@@ -876,6 +876,11 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Reciprocates (multiplicatively inverts) SV_Position.w after reading from stage input. "
          "For use in fragment shaders only."},
+        {OptionKind::GLSLRemapZ,
+         "-fgl-remap-z",
+         nullptr,
+         "Remaps SV_Position.z from OpenGL clip space [-w, w] to standard [0, w] via "
+         "z' = (z + w) / 2 before writing to stage output. GLSL target, vertex stage only."},
         {OptionKind::VulkanUseEntryPointName,
          "-fvk-use-entrypoint-name",
          nullptr,
@@ -2767,6 +2772,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::DumpIr:
         case OptionKind::VulkanInvertY:
         case OptionKind::VulkanUseDxPositionW:
+        case OptionKind::GLSLRemapZ:
         case OptionKind::VulkanUseEntryPointName:
         case OptionKind::VulkanUseGLLayout:
         case OptionKind::VulkanEmitReflection:

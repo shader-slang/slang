@@ -580,6 +580,11 @@ Negates (additively inverts) SV_Position.y before writing to stage output.
 Reciprocates (multiplicatively inverts) SV_Position.w after reading from stage input. For use in fragment shaders only. 
 
 
+<a id="fgl-remap-z"></a>
+### -fgl-remap-z
+Remaps SV_Position.z from OpenGL clip space \[-w, w\] to standard \[0, w\] via z' = (z + w) / 2 before writing to stage output. GLSL target, vertex stage only. 
+
+
 <a id="fvk-use-entrypoint-name"></a>
 ### -fvk-use-entrypoint-name
 Uses the entrypoint name from the source instead of 'main' in the spirv output. 

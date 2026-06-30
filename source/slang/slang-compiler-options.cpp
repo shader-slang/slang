@@ -163,6 +163,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::MatrixLayoutColumn:
         case CompilerOptionName::VulkanInvertY:
         case CompilerOptionName::VulkanUseDxPositionW:
+        case CompilerOptionName::GLSLRemapZ:
         case CompilerOptionName::VulkanUseEntryPointName:
         case CompilerOptionName::VulkanUseGLLayout:
         case CompilerOptionName::VulkanEmitReflection:

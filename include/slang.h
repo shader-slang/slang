@@ -1216,6 +1216,9 @@ typedef uint32_t SlangSizeT;
         // an option set; it only drives the print-and-continue handler in the command-line parser.
         CompilerVersion = 153,
 
+        GLSLRemapZ = 153, // bool: GLSL vertex output only. Remap SV_Position.z from OpenGL
+                          //   clip space [-w, w] to standard [0, w] via z' = (z + w) / 2.
+
         CountOf,
     };
 
