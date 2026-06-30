@@ -340,7 +340,8 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
-        INCLUDE_FROM_PRIVATE imgui slang-rhi
+        INCLUDE_FROM_PRIVATE slang-rhi
+        INCLUDE_FROM_PUBLIC imgui
         INCLUDE_DIRECTORIES_PUBLIC
             .
             platform
