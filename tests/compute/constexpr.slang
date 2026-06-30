@@ -95,7 +95,7 @@ FragmentStageOutput fragmentMain(FragmentStageInput input)
 	// infer `const`-ness.
 
 	uint a = 0;
-	constexpr uint b = 1;
+	const uint b = 1;
 
 	uint2 ab = uint2(a,b);
 

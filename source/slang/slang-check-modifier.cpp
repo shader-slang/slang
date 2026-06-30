@@ -1631,6 +1631,10 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
 
     case ASTNodeType::ConstModifier:
     case ASTNodeType::HLSLStaticModifier:
+    // ConstExprModifier is intentionally allowed on VarDeclBase (in addition to
+    // CallableDecl/ParamDecl) so that checkModifier() can intercept it, emit
+    // E31227, and replace it with ConstModifier. Without this, the parser-level
+    // modifier would be rejected before checkModifier() ever runs.
     case ASTNodeType::ConstExprModifier:
     case ASTNodeType::PreciseModifier:
         return as<VarDeclBase>(decl) || as<CallableDecl>(decl);
@@ -1806,6 +1810,35 @@ Modifier* SemanticsVisitor::checkModifier(
         }
     }
 
+    if (as<ConstExprModifier>(m))
+    {
+        // `constexpr` on a parameter is a supported Slang feature meaning
+        // "must be a compile-time constant at the call site". On a variable
+        // declaration it is not supported — warn and treat it as `const` so
+        // that common idioms like `static constexpr uint N = 4` compile.
+        // On a function declaration, `constexpr` is silently accepted and
+        // ignored (no warning), intentionally: warning on function-level
+        // constexpr is out of scope for this PR and would be a separate
+        // diagnostic with its own discussion.
+        if (as<VarDeclBase>(syntaxNode) && !as<ParamDecl>(syntaxNode))
+        {
+            // Reject `constexpr T* p;` — C-style pointer const is disallowed
+            // regardless of whether the modifier was written `const` or `constexpr`.
+            if (auto varDeclBase = as<VarDeclBase>(syntaxNode))
+            {
+                if (as<PointerTypeExpr>(varDeclBase->type.exp))
+                {
+                    getSink()->diagnose(
+                        Diagnostics::ConstNotAllowedOnCStylePtrDecl{.location = m->loc});
+                    return nullptr;
+                }
+            }
+            getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = m});
+            auto constMod = m_astBuilder->create<ConstModifier>();
+            constMod->loc = m->loc;
+            return constMod;
+        }
+    }
     if (as<ConstModifier>(m))
     {
         if (auto varDeclBase = as<VarDeclBase>(syntaxNode))
@@ -2252,6 +2285,25 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
 
     // We will keep track of the modifiers for each conflict group.
     Dictionary<ASTNodeType, Modifier*> mapExclusiveGroupToModifier;
+
+    // Pre-scan: if both `constexpr` and explicit `const` appear on a non-param
+    // VarDecl, emit the warning for `constexpr` and remove it from the list
+    // before the main loop so that the main loop does not see `constexpr` and
+    // produce a spurious duplicate-ConstModifier error (E31202).
+    // This must be done before the loop because the main loop zeroes
+    // `modifier->next` before each `checkModifier` call, which would defeat
+    // `findModifier` if we tried to do this inside the loop.
+    if (as<VarDeclBase>(syntaxNode) && !as<ParamDecl>(syntaxNode))
+    {
+        if (auto ceM = syntaxNode->findModifier<ConstExprModifier>())
+        {
+            if (syntaxNode->findModifier<ConstModifier>())
+            {
+                getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = ceM});
+                removeModifier(syntaxNode, ceM);
+            }
+        }
+    }
 
     Modifier* modifier = syntaxNode->modifiers.first;
     bool ignoreUnallowedModifier = false;
