@@ -1439,6 +1439,10 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     switch (type->getOp())
                     {
                     case kIROp_HalfType:
+                        // The `HF` literal suffix is gated behind
+                        // GL_EXT_shader_explicit_arithmetic_types, so register the requirement
+                        // here just as the integer-literal cases above do for their suffixes.
+                        _requireBaseType(BaseType::Half);
                         m_writer->emit("HF");
                         break;
                     case kIROp_DoubleType:
