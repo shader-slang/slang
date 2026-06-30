@@ -19604,7 +19604,19 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
             backingMember->nameAndLoc.name =
                 getName(String("$bit_field_backing_") + String(backing_nonce));
             backing_nonce++;
-            backingMember->initExpr = nullptr;
+            // Give the synthesized backing storage an explicit zero initializer.
+            // The backing field is created after the constructor signature has
+            // been collected, so it is never a constructor parameter (it is not in
+            // `m_membersVisibleInCtor`). Without an init expression the synthesized
+            // constructor body skips it (synthesizeCtorBodyForMemberVar early-outs
+            // on a null initExpr for non-parameter members), so `Foo f = {}` on a
+            // struct that mixes bitfields with a normal field would leave the
+            // bitfield members reading uninitialized memory. See issue #11844.
+            auto zeroBackingInit = m_astBuilder->create<IntegerLiteralExpr>();
+            zeroBackingInit->type = QualType(backingMember->type.type);
+            zeroBackingInit->value = 0;
+            zeroBackingInit->loc = structDecl->loc;
+            backingMember->initExpr = zeroBackingInit;
             backingMember->parentDecl = structDecl;
             const auto backingMemberDeclRef = DeclRef<VarDecl>(backingMember->getDefaultDeclRef());
 
