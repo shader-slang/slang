@@ -3845,6 +3845,7 @@ public:
     CASE(ExtractExistentialValueExpr)
     CASE(OpenRefExpr)
     CASE(MakeOptionalExpr)
+    CASE(CastOptionalExpr)
     CASE(PartiallyAppliedGenericExpr)
     CASE(PackExpr)
 #undef CASE
