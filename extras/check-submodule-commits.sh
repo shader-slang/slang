@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
 # Verify that every submodule pin in this superproject points at a commit that
-# is reachable from the upstream submodule's tracked branch.
+# is reachable from the upstream submodule's tracked ref. The tracked ref is
+# the `branch =` value in .gitmodules if present, otherwise the remote's
+# default branch. That value may name either a branch or a tag: most submodules
+# track a branch, but some pin a release tag (e.g. external/fast_float tracks
+# `v8.2.7`, which exists only as a tag with no same-named branch). A tag pin is
+# a stronger guarantee than a branch pin because a tag is immutable, so both
+# are accepted.
 #
 # Motivated by issue #9335: a PR landed with external/slang-rhi pointing at a
 # developer branch instead of main. Reviewers see only the pointer diff, so
 # this check enforces the invariant in CI.
 #
 # Opt-out: setting `submodule.<name>.slang-skip-pin-check = true` in
-# .gitmodules disables the branch-reachability check for that submodule. The
-# script still verifies that the pinned SHA is fetchable from the URL (so
-# typos and rewritten history are still caught) — it just doesn't insist on
-# branch membership. Use sparingly: this is intended for vendored/forked
-# submodules whose pinned commit deliberately isn't on the upstream's
-# branches (e.g. external/imgui, which carries a slang-local patch).
+# .gitmodules disables the reachability check for that submodule. The script
+# still verifies that the pinned SHA is fetchable from the URL (so typos and
+# rewritten history are still caught) — it just doesn't insist on branch or tag
+# membership. Use sparingly: this is intended for vendored/forked submodules
+# whose pinned commit deliberately isn't on any upstream branch or tag (e.g. a
+# slang-local patch carried on top of a vendored release).
 #
 # See issue #9336.
 
@@ -122,21 +128,24 @@ verify_sha_exists() {
   return 1
 }
 
-# Try fetching with progressively deeper history until the pinned commit is
-# reachable, or until we've done a full unshallow and confirmed it isn't.
-# Returns 0 on success, 1 on definitive failure.
-verify_reachable() {
+# Try fetching one fully-qualified source ref with progressively deeper history
+# until the pinned commit is reachable from it, or until a full unshallow
+# confirms it is not. The source ref (e.g. refs/heads/main or refs/tags/v8.2.7)
+# is fetched into a fixed local tracking ref so ancestry can be tested against
+# it. Returns 0 on success, 1 on definitive failure.
+verify_reachable_from_ref() {
   local repo="$1"
   local url="$2"
-  local branch="$3"
+  local src_ref="$3"
   local sha="$4"
-  local refspec="refs/heads/$branch:refs/remotes/origin/$branch"
+  local local_ref="refs/remotes/origin/pin-check"
+  local refspec="+$src_ref:$local_ref"
 
   local depth
   for depth in 50 500; do
     if git -C "$repo" fetch --quiet --filter=blob:none --depth="$depth" \
       "$url" "$refspec" 2>/dev/null; then
-      if is_ancestor "$repo" "$sha" "refs/remotes/origin/$branch"; then
+      if is_ancestor "$repo" "$sha" "$local_ref"; then
         return 0
       fi
     fi
@@ -148,9 +157,33 @@ verify_reachable() {
     "$url" "$refspec" 2>/dev/null ||
     git -C "$repo" fetch --quiet --filter=blob:none \
       "$url" "$refspec" 2>/dev/null; then
-    if is_ancestor "$repo" "$sha" "refs/remotes/origin/$branch"; then
+    if is_ancestor "$repo" "$sha" "$local_ref"; then
       return 0
     fi
+  fi
+
+  return 1
+}
+
+# Verify the pinned commit is reachable from the tracked ref. The tracked ref
+# named in .gitmodules `branch =` (or the remote default) is usually a branch,
+# but a submodule may legitimately be pinned to a tag instead — e.g.
+# external/fast_float tracks `v8.2.7`, which exists only as refs/tags/v8.2.7
+# with no same-named branch. A tag pin is a stronger guarantee than a branch
+# pin (the tag is immutable), so we accept either: try the branch form first,
+# then fall back to the tag form. Returns 0 on success, 1 on definitive
+# failure.
+verify_reachable() {
+  local repo="$1"
+  local url="$2"
+  local ref_name="$3"
+  local sha="$4"
+
+  if verify_reachable_from_ref "$repo" "$url" "refs/heads/$ref_name" "$sha"; then
+    return 0
+  fi
+  if verify_reachable_from_ref "$repo" "$url" "refs/tags/$ref_name" "$sha"; then
+    return 0
   fi
 
   return 1
@@ -241,7 +274,7 @@ for name in "${SUBMODULE_NAMES[@]}"; do
   if verify_reachable "$repo" "$url" "$branch" "$pinned_sha"; then
     echo "  PASS: $pinned_sha is reachable from $branch."
   else
-    FAILURES+=("$name|$path|$url|$branch|$pinned_sha|pinned commit not reachable from branch")
+    FAILURES+=("$name|$path|$url|$branch|$pinned_sha|pinned commit not reachable from tracked branch or tag")
   fi
   CHECKED+=1
 done
@@ -251,25 +284,25 @@ echo "Submodules checked: $CHECKED  skipped: $SKIPPED  failed: ${#FAILURES[@]}"
 
 if [[ ${#FAILURES[@]} -gt 0 ]]; then
   echo
-  echo "ERROR: one or more submodule pins are not reachable from their tracked branch."
+  echo "ERROR: one or more submodule pins are not reachable from their tracked branch or tag."
   echo
   for entry in "${FAILURES[@]}"; do
     IFS='|' read -r name path url branch sha reason <<<"$entry"
     echo "  Submodule:  $name"
     echo "    path:     $path"
     echo "    url:      $url"
-    echo "    branch:   $branch"
+    echo "    ref:      $branch"
     echo "    pinned:   $sha"
     echo "    reason:   $reason"
-    echo "    fix:      the pinned commit is not reachable from $branch; either land"
-    echo "              the commit on $branch or re-point the submodule to a commit"
-    echo "              that is on $branch. If you intended to pin a tag, note that"
-    echo "              tags are not branches: this check verifies branch reachability,"
-    echo "              so the tagged commit must also exist on $branch."
+    echo "    fix:      the pinned commit is not reachable from the tracked ref '$branch'."
+    echo "              The 'branch =' value in .gitmodules may name either a branch or"
+    echo "              a tag. Either land the commit on '$branch', re-point the submodule"
+    echo "              to a commit reachable from it, or correct the 'branch =' value to"
+    echo "              the branch or tag that actually contains the pinned commit."
     echo
   done
   exit 1
 fi
 
-echo "All submodule pins are reachable from their tracked branches."
+echo "All submodule pins are reachable from their tracked branches or tags."
 exit 0
