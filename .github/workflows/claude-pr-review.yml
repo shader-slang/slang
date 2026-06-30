@@ -102,9 +102,14 @@ jobs:
                     nodes {
                       id
                       isResolved
-                      comments(first: 1) {
+                      isOutdated
+                      path
+                      line
+                      comments(first: 30) {
                         nodes {
                           author { login }
+                          body
+                          createdAt
                         }
                       }
                     }
@@ -146,23 +151,72 @@ jobs:
               }
             }
 
-            // 2. Resolve all Claude-authored unresolved review threads
+            // 2. Harvest prior Claude review threads + maintainer replies, THEN
+            //    resolve only the threads nobody engaged with.
+            //
+            //    Threads that a human replied to carry maintainer verdicts
+            //    ("won't fix", "by design", "unfixable", "no such target", ...).
+            //    We must NOT bury those: they are written to
+            //    tmp/prior-review-threads.json so the next review can suppress
+            //    findings that were already adjudicated (see REVIEW.md Rule 7),
+            //    and left UNRESOLVED so the verdict stays visible in the PR.
+            const fs = require('fs');
+            const priorVerdicts = [];
             const claudeThreads = pr.reviewThreads.nodes.filter(t =>
-              !t.isResolved &&
               t.comments.nodes.length > 0 &&
               CLAUDE_LOGINS.includes(t.comments.nodes[0].author?.login)
             );
             for (const thread of claudeThreads) {
-              try {
-                await github.graphql(`mutation($threadId: ID!) {
-                  resolveReviewThread(input: { threadId: $threadId }) {
-                    thread { isResolved }
-                  }
-                }`, { threadId: thread.id });
-                resolved++;
-              } catch (e) {
-                core.warning(`Could not resolve thread ${thread.id}: ${e.message}`);
+              const finding = thread.comments.nodes[0];
+              const humanReplies = thread.comments.nodes
+                .slice(1)
+                .filter(c => !CLAUDE_LOGINS.includes(c.author?.login));
+
+              priorVerdicts.push({
+                path: thread.path,
+                line: thread.line,
+                resolved: thread.isResolved,
+                // outdated == GitHub re-anchored the thread because its line
+                // changed. Rule 7 treats an outdated verdict as STALE and
+                // re-evaluates the finding instead of suppressing it.
+                outdated: thread.isOutdated,
+                finding: finding.body,
+                humanReplies: humanReplies.map(c => ({
+                  user: c.author?.login,
+                  body: c.body,
+                })),
+              });
+
+              // Only auto-resolve threads NOBODY engaged with. Leaving
+              // human-replied threads alone keeps the maintainer's response
+              // visible and breaks the "re-posts the same finding every push"
+              // busywork loop.
+              if (humanReplies.length === 0 && !thread.isResolved) {
+                try {
+                  await github.graphql(`mutation($threadId: ID!) {
+                    resolveReviewThread(input: { threadId: $threadId }) {
+                      thread { isResolved }
+                    }
+                  }`, { threadId: thread.id });
+                  resolved++;
+                } catch (e) {
+                  core.warning(`Could not resolve thread ${thread.id}: ${e.message}`);
+                }
               }
+            }
+
+            // Hand the prior verdicts to the review step (same workspace).
+            // Best-effort: if this write fails, REVIEW.md Rule 7 treats a missing
+            // file as "no prior verdicts" and the review proceeds normally.
+            try {
+              fs.mkdirSync('tmp', { recursive: true });
+              fs.writeFileSync(
+                'tmp/prior-review-threads.json',
+                JSON.stringify(priorVerdicts, null, 2)
+              );
+              core.info(`Wrote ${priorVerdicts.length} prior thread(s) to tmp/prior-review-threads.json`);
+            } catch (e) {
+              core.warning(`Could not write prior-review-threads.json: ${e.message}`);
             }
 
             // 3. Minimize all bot issue comments (tracking/progress comments)
@@ -213,9 +267,14 @@ jobs:
             However, the PR branch is NOT checked out — to see what the PR actually changes, you MUST
             use `gh pr diff` or GitHub MCP tools. Do NOT assume local files reflect the PR's changes.
 
-            NOTE: Any previous Claude reviews on this PR have been automatically minimized
-            and their threads resolved. You are posting a fresh, self-contained review.
-            Do NOT reference previous reviews — just review the PR as it currently stands.
+            NOTE: Previous Claude review *summaries* on this PR have been minimized, and
+            prior Claude threads that nobody replied to have been resolved. But threads
+            where a maintainer REPLIED are left intact — those replies are maintainer
+            verdicts. The prior threads and replies are saved to
+            `tmp/prior-review-threads.json`. Before posting any finding, apply REVIEW.md
+            Rule 7: do NOT re-post a finding a maintainer has already declined, deferred,
+            or explained. You are still posting one fresh, self-contained review — just do
+            not repeat already-adjudicated findings.
 
           # Execution strategy: dispatch 6 background Agent calls for parallel review.
           # REVIEW.md contains the review protocol (format, tone, severity badges).
@@ -258,6 +317,104 @@ jobs:
             mcp__github__add_issue_comment,
             mcp__github_inline_comment__create_inline_comment,
             mcp__deepwiki__ask_question
+
+      # Safety net: enforce REVIEW.md Rule 7 mechanically. The review step is *asked*
+      # (not forced) to suppress findings a maintainer already adjudicated. This step
+      # minimizes any freshly-posted Gap/Question comment that recurs a still-valid
+      # (non-outdated) human-engaged prior thread at the same location.
+      # 🔴 Bugs are NEVER auto-minimized — a real bug must stay visible even if it recurs.
+      - name: Suppress re-posted adjudicated findings
+        if: always()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const prNumber = context.payload.pull_request?.number
+              || parseInt('${{ github.event.inputs.pr_number }}' || '0');
+            if (!prNumber) return;
+
+            // Prior verdicts harvested by the cleanup step (same workspace).
+            let priors = [];
+            try {
+              priors = JSON.parse(fs.readFileSync('tmp/prior-review-threads.json', 'utf8'));
+            } catch (e) {
+              core.info('No prior-review-threads.json; nothing to enforce.');
+              return;
+            }
+            // Only act on threads a human engaged with, on code that has NOT changed
+            // since (outdated === false). A stale verdict must not suppress a fresh finding.
+            const declined = priors.filter(p =>
+              Array.isArray(p.humanReplies) && p.humanReplies.length > 0 && !p.outdated
+            );
+            if (declined.length === 0) {
+              core.info('No still-valid human-engaged prior verdicts; nothing to enforce.');
+              return;
+            }
+
+            const CLAUDE_LOGINS = ['claude', 'github-actions'];
+            // Compare the first line of two findings, stripped of markdown/emoji.
+            const norm = s => (s || '').split('\n')[0]
+              .replace(/[*_`#>:\-]/g, ' ')
+              .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ')
+              .toLowerCase().replace(/\s+/g, ' ').trim();
+            const words = s => new Set(norm(s).split(' ').filter(w => w.length > 3));
+            const jaccard = (a, b) => {
+              const A = words(a), B = words(b);
+              if (!A.size || !B.size) return 0;
+              let inter = 0; for (const w of A) if (B.has(w)) inter++;
+              return inter / (A.size + B.size - inter);
+            };
+
+            const query = `query($owner:String!,$repo:String!,$pr:Int!){
+              repository(owner:$owner,name:$repo){ pullRequest(number:$pr){
+                reviewThreads(last:100){ nodes {
+                  id isResolved path line
+                  comments(first:5){ nodes { id author{login} body isMinimized } }
+                }}}}}`;
+            const res = await github.graphql(query, {
+              owner: context.repo.owner, repo: context.repo.repo, pr: prNumber
+            });
+            const threads = res.repository.pullRequest.reviewThreads.nodes;
+
+            let suppressed = 0;
+            for (const t of threads) {
+              if (t.isResolved) continue;
+              const c = t.comments.nodes[0];
+              if (!c || c.isMinimized) continue;
+              if (!CLAUDE_LOGINS.includes(c.author?.login)) continue;
+              // Never auto-minimize a real bug — highest-value signal stays visible.
+              if (/🔴/.test(c.body || '')) continue;
+              // Skip threads a human already replied to (the prior, kept-visible one).
+              const hasHuman = t.comments.nodes.some(
+                x => !CLAUDE_LOGINS.includes(x.author?.login)
+              );
+              if (hasHuman) continue;
+
+              const match = declined.find(p => {
+                if (p.path !== t.path) return false;
+                const lineClose = p.line != null && t.line != null
+                  && Math.abs(p.line - t.line) <= 10;
+                const titleClose = jaccard(p.finding, c.body) >= 0.6;
+                return lineClose || titleClose;
+              });
+              if (!match) continue;
+
+              try {
+                await github.graphql(`mutation($id:ID!,$cl:ReportedContentClassifiers!){
+                  minimizeComment(input:{subjectId:$id,classifier:$cl}){ minimizedComment{ isMinimized } }
+                }`, { id: c.id, cl: 'OUTDATED' });
+                await github.graphql(`mutation($t:ID!){
+                  resolveReviewThread(input:{threadId:$t}){ thread{ isResolved } }
+                }`, { t: t.id });
+                suppressed++;
+                core.warning(`Rule 7: suppressed re-posted finding on ${t.path}:${t.line} `
+                  + `(matched prior verdict by @${match.humanReplies[0]?.user})`);
+              } catch (e) {
+                core.warning(`Could not suppress thread ${t.id}: ${e.message}`);
+              }
+            }
+            core.info(`Rule 7 enforcement: suppressed ${suppressed} re-posted finding(s).`);
 
       # Safety net: dismiss any APPROVE or REQUEST_CHANGES reviews from bot accounts.
       # Claude is instructed to use COMMENT only, but prompt-level constraints are not
