@@ -287,15 +287,26 @@ public:
     // itself.
     IRGlobalParam* findReferencedGlobalParam(IRInst* inst)
     {
+        HashSet<IRInst*> visited;
+        return findReferencedGlobalParam(inst, visited);
+    }
+
+    // Worker for findReferencedGlobalParam. `visited` guards against re-walking
+    // shared operands in the global-scope graph, which a global initializer can
+    // reference from several places.
+    IRGlobalParam* findReferencedGlobalParam(IRInst* inst, HashSet<IRInst*>& visited)
+    {
         if (auto globalParam = as<IRGlobalParam>(inst))
             return globalParam;
         // Only global-scope instructions are followed here; an operand at function
         // scope is an ordinary value that ensureInst handles through its normal paths.
         if (!as<IRModuleInst>(inst->getParent()))
             return nullptr;
+        if (!visited.add(inst))
+            return nullptr;
         for (UInt i = 0; i < inst->getOperandCount(); i++)
         {
-            if (auto found = findReferencedGlobalParam(inst->getOperand(i)))
+            if (auto found = findReferencedGlobalParam(inst->getOperand(i), visited))
                 return found;
         }
         return nullptr;
