@@ -4208,7 +4208,10 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         break;
 
     case TokenType::StringLiteral:
-        file = getStringLiteralTokenValue(AdvanceToken(context), GetSink(context));
+        // The `#line` filename is a path, not a string literal: read it raw (no escape
+        // processing) so a Windows-style path keeps its backslashes verbatim, the same way
+        // `#include` does via getFileNameTokenValue. See #11829.
+        file = getFileNameTokenValue(AdvanceToken(context));
         break;
 
     case TokenType::IntegerLiteral:

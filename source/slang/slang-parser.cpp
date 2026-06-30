@@ -1320,7 +1320,12 @@ static void parseFileReferenceDeclBase(Parser* parser, FileReferenceDeclBase* de
     if (peekTokenType(parser) == TokenType::StringLiteral)
     {
         auto nameToken = parser->ReadToken(TokenType::StringLiteral);
-        auto nameString = getStringLiteralTokenValue(nameToken, parser->sink);
+        // A module/file reference (`import`/`__include`/`implementing "..."`) is a path,
+        // not a string literal, so read it raw -- with no escape processing -- the same
+        // way `#include` does via getFileNameTokenValue. A Windows-style path such as
+        // "rtx\utility\foo" must keep its backslashes verbatim rather than have `\u`/`\n`
+        // interpreted (or rejected) as string escapes. See #11829.
+        auto nameString = getFileNameTokenValue(nameToken);
         auto moduleName = getName(parser, nameString);
 
         decl->moduleNameAndLoc = NameLoc(moduleName, nameToken.loc);
@@ -1387,8 +1392,9 @@ static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
     else if (parser->LookAheadToken(TokenType::StringLiteral))
     {
         auto nameToken = parser->ReadToken(TokenType::StringLiteral);
-        decl->nameAndLoc.name =
-            parser->getNamePool()->getName(getStringLiteralTokenValue(nameToken, parser->sink));
+        // A `module "..."` name is a path-like identifier, not a string literal; read it
+        // raw (no escape processing), consistent with `import`/`#include`. See #11829.
+        decl->nameAndLoc.name = parser->getNamePool()->getName(getFileNameTokenValue(nameToken));
         decl->nameAndLoc.loc = nameToken.loc;
         if (moduleDecl)
             moduleDecl->nameAndLoc = decl->nameAndLoc;

@@ -43,4 +43,12 @@ void main()
     // A braced escape must be terminated with a closing brace.
     uint i = '\u{12';
     //CHECK: invalid string escape: '\u{12'
+
+    // An overlong '\u' (more than 4 hex digits) is also wrong.
+    uint j = '\u12345';
+    //CHECK: \u must be followed by 4 hex digits
+
+    // An overlong '\U' (more than 8 hex digits) is also wrong.
+    uint k = '\U123456789';
+    //CHECK: \U must be followed by 8 hex digits
 }

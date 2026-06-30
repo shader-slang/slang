@@ -1,10 +1,12 @@
-// Diagnostic test for malformed escape sequences in string literals that are
-// rejected during lexing.
+// Diagnostic test for malformed escape sequences in string literals.
 //
-// These mirror the lexer-phase cases in char-literal-errors.slang. Unlike a
-// character literal, a string literal has no single-character constraint, so an
-// unknown escape or an out-of-range escape value is instead diagnosed during
-// parsing -- those cases live in string-literal-errors-value.slang.
+// String-literal escapes are validated when the literal is decoded (during
+// parsing), not during lexing: a string-literal token may in fact be a
+// quote-form #include path, which is consumed raw and never decoded, so the
+// lexer must not validate escapes in it (see #11829). These mirror the cases in
+// char-literal-errors.slang -- character literals are never include paths, so
+// those are validated at lex time. Unknown-escape and out-of-range-value cases
+// live in string-literal-errors-value.slang.
 //
 // See docs/language-reference/expressions-literal.md for the literal format.
 //
@@ -34,4 +36,12 @@ void main()
     // A braced escape must be terminated with a closing brace.
     String f = "\u{12";
     //CHECK: invalid string escape: '\u{12'
+    // An overlong '\u' (more than 4 hex digits) is also wrong.
+    String g = "\u12345";
+    //CHECK: \u must be followed by 4 hex digits
+
+    // An overlong '\U' (more than 8 hex digits) is also wrong.
+    String h = "\U123456789";
+    //CHECK: \U must be followed by 8 hex digits
+
 }

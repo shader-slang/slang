@@ -1087,7 +1087,31 @@ static uint32_t _parseHexNumber(
     return value;
 }
 
-// Decodes string escape sequence, returns -1 on failure
+// Classifies why a string/char escape failed to decode, so the caller can emit
+// the matching diagnostic: the generic invalidStringEscape (10007) for a
+// malformed escape, or invalidUnicodeStringEscape (10008) for a `\u`/`\U` escape
+// that is not followed by the required count of hex digits.
+enum class StringEscapeError
+{
+    None,    // decode succeeded
+    Invalid, // malformed escape -> invalidStringEscape (10007)
+    // The two Unicode forms map to invalidUnicodeStringEscape (10008) and apply only to the
+    // fixed-width *non-braced* spelling; a malformed *braced* `\u{...}`/`\U{...}`/`\x{...}`
+    // (empty or unterminated) is `Invalid` (10007) instead.
+    Unicode4, // `\u` not followed by exactly 4 hex digits
+    Unicode8, // `\U` not followed by exactly 8 hex digits
+};
+
+// Decodes one escape sequence to its code point, advancing `cursor`; returns -1 on failure and
+// sets `outError` to the failure category so the caller can emit the matching diagnostic (10007
+// vs 10008). This is the single source of truth for the escape grammar, and after #11829 it is
+// invoked from three phases with different intents: the string decode pass
+// (getStringLiteralTokenValue), the char decode pass (getCharLiteralValue), and -- for character
+// literals only -- the lexer scan pass (_lexStringLiteralBody, over a re-extracted buffer), so
+// that char-escape errors are reported at lex time. Note the division of labor with the scan
+// loop in _lexStringLiteralBody: that loop deliberately over-accepts any number of hex digits
+// after `\u`/`\U`/`\x`, and *this* function is the authority on the exact count -- edit one
+// without the other at your peril.
 //
 // Preconditions:
 // - cursor != e      -- there must be at least 1 character
@@ -1095,10 +1119,12 @@ static uint32_t _parseHexNumber(
 static IntegerLiteralValue _decodeStringEscape(
     const char*& cursor,
     const char* const e,
-    bool& outUnicode)
+    bool& outUnicode,
+    StringEscapeError& outError)
 {
     bool unicode{};
     int64_t value{};
+    StringEscapeError error = StringEscapeError::None;
 
     // this should have been already checked before we get here
     SLANG_ASSERT(*cursor == '\\');
@@ -1108,7 +1134,10 @@ static IntegerLiteralValue _decodeStringEscape(
 
     // check that there is an escape sequence after '\'
     if (cursor == e)
+    {
         value = -1;
+        error = StringEscapeError::Invalid;
+    }
     else
     {
         uint8_t byte = *cursor++;
@@ -1185,22 +1214,28 @@ static IntegerLiteralValue _decodeStringEscape(
 
                 if ((cursor != e) && (*cursor == '{'))
                 {
-                    // \x{...}
-
+                    // \x{...} -- at least one hex digit, terminated by '}'
                     ++cursor;
+                    const char* const digits = cursor;
                     value = _parseHexNumber(cursor, e, 255U, overflow);
-
-                    if ((cursor != e) && (*cursor == '}'))
+                    const bool empty = (cursor == digits);
+                    const bool closed = (cursor != e) && (*cursor == '}');
+                    if (closed)
                         ++cursor;
+                    if (overflow || empty || !closed)
+                        value = -1;
                 }
                 else
                 {
-                    // \x...
+                    // \x... -- at least one hex digit
+                    const char* const digits = cursor;
                     value = _parseHexNumber(cursor, e, 255U, overflow);
+                    if (overflow || (cursor == digits))
+                        value = -1;
                 }
 
-                if (overflow)
-                    value = -1;
+                if (value < 0)
+                    error = StringEscapeError::Invalid;
 
                 break;
             }
@@ -1211,26 +1246,38 @@ static IntegerLiteralValue _decodeStringEscape(
 
                 if ((cursor != e) && (*cursor == '{'))
                 {
-                    // \u{...}
-
+                    // \u{...} -- at least one hex digit, terminated by '}'
                     ++cursor;
+                    const char* const digits = cursor;
                     value = _parseHexNumber(cursor, e, 255U, overflow);
-
-                    if ((cursor != e) && (*cursor == '}'))
+                    const bool empty = (cursor == digits);
+                    const bool closed = (cursor != e) && (*cursor == '}');
+                    if (closed)
                         ++cursor;
-
-                    if (overflow)
+                    if (overflow || empty || !closed)
+                    {
                         value = -1;
+                        error = StringEscapeError::Invalid;
+                    }
                 }
                 else
                 {
-                    // \u...
+                    // \u... -- exactly 4 hex digits. _parseHexNumber consumes at
+                    // most 4, so we reject both too few (fewer than 4 consumed)
+                    // and too many (a 5th hex digit immediately follows).
+                    const char* const digits = cursor;
                     value = _parseHexNumber(cursor, e, 4U, overflow);
 
-                    // note: value cannot overflow here (4 hex digits max), so we'll
-                    // guard this with assert instead of check to avoid unreachable
-                    // branches
+                    // note: value cannot overflow here (4 hex digits max), so we
+                    // guard this with assert instead of a check to avoid an
+                    // unreachable branch
                     SLANG_ASSERT(!overflow);
+
+                    if ((cursor - digits) != 4 || ((cursor != e) && _isHexDigit(*cursor)))
+                    {
+                        value = -1;
+                        error = StringEscapeError::Unicode4;
+                    }
                 }
 
                 unicode = true;
@@ -1240,12 +1287,21 @@ static IntegerLiteralValue _decodeStringEscape(
         case 'U':
             {
                 bool overflow{};
+                // \U... -- exactly 8 hex digits; reject too few and a 9th hex
+                // digit (too many), mirroring the \u case above.
+                const char* const digits = cursor;
                 value = _parseHexNumber(cursor, e, 8U, overflow);
 
-                // note: value cannot overflow here (8 hex digits max), so we'll
-                // guard this with assert instead of check to avoid unreachable
-                // branches
+                // note: value cannot overflow here (8 hex digits max), so we
+                // guard this with assert instead of a check to avoid an
+                // unreachable branch
                 SLANG_ASSERT(!overflow);
+
+                if ((cursor - digits) != 8 || ((cursor != e) && _isHexDigit(*cursor)))
+                {
+                    value = -1;
+                    error = StringEscapeError::Unicode8;
+                }
 
                 unicode = true;
 
@@ -1254,11 +1310,50 @@ static IntegerLiteralValue _decodeStringEscape(
 
         default:
             value = -1;
+            error = StringEscapeError::Invalid;
         }
     }
 
     outUnicode = unicode;
+    outError = error;
     return value;
+}
+
+// Emit the diagnostic for an escape sequence that _decodeStringEscape rejected.
+// `error` selects the form: invalidUnicodeStringEscape (10008) for a `\u`/`\U`
+// escape with the wrong hex-digit count, otherwise the generic
+// invalidStringEscape (10007) whose `$0` is the offending escape text
+// [literalStart, literalEnd).
+static void _diagnoseInvalidStringEscape(
+    DiagnosticSink* sink,
+    SourceLoc loc,
+    StringEscapeError error,
+    const char* literalStart,
+    const char* literalEnd)
+{
+    // This helper is only called after _decodeStringEscape returned -1, and every such path
+    // sets `error` to a non-None category; `None` here would mean diagnosing a decode that
+    // actually succeeded. Fail loudly rather than silently emitting a misleading 10007.
+    SLANG_ASSERT(error != StringEscapeError::None);
+
+    switch (error)
+    {
+    case StringEscapeError::Unicode4:
+        diagnose(sink, loc, LexerDiagnostics::invalidUnicodeStringEscape, "u", 4U);
+        break;
+
+    case StringEscapeError::Unicode8:
+        diagnose(sink, loc, LexerDiagnostics::invalidUnicodeStringEscape, "U", 8U);
+        break;
+
+    default:
+        {
+            StringBuilder sb;
+            sb.append(literalStart, literalEnd - literalStart);
+            diagnose(sink, loc, LexerDiagnostics::invalidStringEscape, sb.getBuffer());
+        }
+        break;
+    }
 }
 
 static String _inputToByteSeq(const char* b, const char* e)
@@ -1303,18 +1398,21 @@ IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink
     {
         // handle escape
         bool unicode{};
+        StringEscapeError escapeError{};
         const char* literalStart = cursor;
-        ret = _decodeStringEscape(cursor, e, unicode);
+        ret = _decodeStringEscape(cursor, e, unicode, escapeError);
 
         // note: unicode matters only with string literals
         static_cast<void>(unicode);
 
+        // In the normal compile pipeline a character literal with an undecodable escape is
+        // already diagnosed at lex time (the singleChar branch in _lexStringLiteralBody), and
+        // parsing does not reach this token carrying that escape, so this branch is not hit for
+        // those cases (the committed exhaustive char-literal-errors.slang confirms there is no
+        // duplicate diagnostic). It is retained because getCharLiteralValue is exported in
+        // slang-lexer.h and may be called directly (e.g. by tooling) on a raw token.
         if (ret == -1)
-        {
-            StringBuilder sb;
-            sb.append(literalStart, cursor - literalStart);
-            diagnose(sink, token.getLoc(), LexerDiagnostics::invalidStringEscape, sb.getBuffer());
-        }
+            _diagnoseInvalidStringEscape(sink, token.getLoc(), escapeError, literalStart, cursor);
     }
     else
     {
@@ -1442,28 +1540,40 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
             case 'u':
             case 'x':
                 {
-                    // Hexadecimal 'x' escape has any number of digits.
+                    // Consume the whole escape as a single unit -- the
+                    // introducer, an optional '{...}' braced form, and the run
+                    // of hex digits -- so that the closing quote is located
+                    // correctly and a multi-digit escape counts as one character
+                    // in a character literal.
                     //
-                    // Unicode 'u' escape has either 4 hex digits or '\u{xxx}' form with
-                    // arbitrary number of digits.
+                    // For a STRING literal, escape *validation* is deferred to
+                    // the decode pass (getStringLiteralTokenValue), the layer
+                    // that actually interprets escapes: a string-literal token
+                    // may in fact be a quote-form `#include` path, which is read
+                    // raw by getFileNameTokenValue and never decoded, so
+                    // validating its escapes here would wrongly reject Windows
+                    // backslash paths (see #11829).
                     //
-                    // Unicode 'U' escape has either 8 hex digits
-                    StringBuilder sb;
+                    // A CHARACTER literal is never an include path, so validating its
+                    // escape here at lex time is safe -- and necessary. By the time
+                    // getCharLiteralValue would decode it (during parsing) the malformed
+                    // literal no longer reaches that path: a lex error puts the parser into
+                    // recovery and the broken token does not survive as a clean char-literal
+                    // expression, so a parse-time check would not fire. We reuse
+                    // _decodeStringEscape on the consumed escape text so the escape grammar
+                    // stays a single source of truth.
+                    StringBuilder escapeText;
                     const char escapeChar = static_cast<char>(_peek(lexer));
-
-                    sb.append('\\');
-                    sb.append(escapeChar);
+                    escapeText.append('\\');
+                    escapeText.append(escapeChar);
                     _advance(lexer);
 
-                    bool curlyBraces{};
-                    if ((escapeChar != 'U') && (_peek(lexer) == '{'))
+                    const bool curlyBraces = (escapeChar != 'U') && (_peek(lexer) == '{');
+                    if (curlyBraces)
                     {
-                        curlyBraces = true;
+                        escapeText.append('{');
                         _advance(lexer);
-                        sb.append('{');
                     }
-
-                    size_t numDigits{};
 
                     for (;;)
                     {
@@ -1471,9 +1581,8 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
                         if (('0' <= d) && (d <= '9') || ('a' <= d) && (d <= 'f') ||
                             ('A' <= d) && (d <= 'F'))
                         {
-                            sb.append(static_cast<char>(d));
+                            escapeText.append(static_cast<char>(d));
                             _advance(lexer);
-                            ++numDigits;
                             continue;
                         }
                         else
@@ -1482,52 +1591,37 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
                         }
                     }
 
-                    if (curlyBraces)
+                    if (curlyBraces && (_peek(lexer) == '}'))
                     {
-                        if (_peek(lexer) == '}')
-                        {
-                            sb.append('}');
-                            _advance(lexer);
-
-                            // check that there's at least one digit
-                            if (numDigits == 0U)
-                                diagnose(
-                                    lexer->getDiagnosticSink(),
-                                    _getSourceLoc(lexer),
-                                    LexerDiagnostics::invalidStringEscape,
-                                    sb.getBuffer());
-                        }
-                        else
-                            diagnose(
-                                lexer->getDiagnosticSink(),
-                                _getSourceLoc(lexer),
-                                LexerDiagnostics::invalidStringEscape,
-                                sb.getBuffer());
+                        escapeText.append('}');
+                        _advance(lexer);
                     }
-                    else
+
+                    // The escape text was accumulated above for both literal kinds, but the
+                    // scan is deliberately permissive about the hex-digit count; only a
+                    // CHARACTER literal re-validates it here (_decodeStringEscape is the
+                    // authority on the exact count). For a STRING literal the buffer is
+                    // discarded -- the _advance calls above already moved past the escape so
+                    // the closing quote can be found.
+                    if (singleChar)
                     {
-                        if ((escapeChar == 'x') && (numDigits == 0U))
-                            diagnose(
+                        const char* cursor = escapeText.getBuffer();
+                        const char* const escapeEnd = cursor + escapeText.getLength();
+                        bool escapeUnicode = false;
+                        StringEscapeError escapeError = StringEscapeError::None;
+                        const IntegerLiteralValue decoded =
+                            _decodeStringEscape(cursor, escapeEnd, escapeUnicode, escapeError);
+                        if (decoded == -1)
+                            _diagnoseInvalidStringEscape(
                                 lexer->getDiagnosticSink(),
                                 _getSourceLoc(lexer),
-                                LexerDiagnostics::invalidStringEscape,
-                                sb.getBuffer());
-
-                        if ((escapeChar == 'u') && (numDigits != 4U))
-                            diagnose(
-                                lexer->getDiagnosticSink(),
-                                _getSourceLoc(lexer),
-                                LexerDiagnostics::invalidUnicodeStringEscape,
-                                "u",
-                                4U);
-
-                        if ((escapeChar == 'U') && (numDigits != 8U))
-                            diagnose(
-                                lexer->getDiagnosticSink(),
-                                _getSourceLoc(lexer),
-                                LexerDiagnostics::invalidUnicodeStringEscape,
-                                "U",
-                                8U);
+                                escapeError,
+                                escapeText.getBuffer(),
+                                escapeText.getBuffer() + escapeText.getLength());
+                        // _decodeStringEscape ran only for its failure classification here;
+                        // the decoded value and unicode-ness are unused at lex time (unicode
+                        // matters only when building a string value), so both are discarded.
+                        static_cast<void>(escapeUnicode);
                     }
 
                     break;
@@ -1656,8 +1750,9 @@ String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
 
         // decode escape sequence
         bool unicode{};
+        StringEscapeError escapeError{};
         const char* literalStart = cursor;
-        IntegerLiteralValue charValue = _decodeStringEscape(cursor, end, unicode);
+        IntegerLiteralValue charValue = _decodeStringEscape(cursor, end, unicode, escapeError);
 
         if (charValue >= 0)
         {
@@ -1705,10 +1800,7 @@ String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
         }
         else
         {
-            StringBuilder sb;
-            sb.append(literalStart, cursor - literalStart);
-
-            diagnose(sink, token.getLoc(), LexerDiagnostics::invalidStringEscape, sb.getBuffer());
+            _diagnoseInvalidStringEscape(sink, token.getLoc(), escapeError, literalStart, cursor);
         }
     }
 
