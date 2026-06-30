@@ -1,0 +1,45 @@
+name: PR CI Complete Sync
+
+# Reconciles a PR's board Status when its CI finishes, by relaying the "CI"
+# workflow's completion into the reusable board-sync.
+#
+# Why this exists (and why pr-maintenance.yml's check_suite trigger is not
+# enough): GitHub deliberately does NOT deliver check_suite/check_run events for
+# suites created by GitHub Actions, to prevent recursive workflow runs. This
+# repo's CI is GitHub Actions, so the check_suite trigger never fires for it --
+# a PR whose CI fails (or recovers) after its last push would otherwise sit in
+# the wrong column (e.g. stuck in "In Review" instead of moving to "Snagged")
+# until the nightly sweep. workflow_run IS delivered for Actions-created runs, so
+# it is the event that actually carries "CI finished" for this repo.
+#
+# Targeting just "CI": ci.yml is the heavyweight umbrella that runs the build and
+# test matrix and is the last gating workflow to finish, so when it completes the
+# commit's full check rollup has settled. The reusable workflow recomputes the
+# target from that whole rollup, so a lighter gating workflow that already failed
+# (formatting, labels, ToC, ...) is reflected too. The rare case of a check that
+# fails strictly after CI completes is left to the nightly sweep backstop. Do not
+# add the board-sync's own workflows here ("PR Maintenance", "PR Review Fork *",
+# this one) -- a workflow_run keyed on them would trigger this caller in a loop.
+#
+# A workflow_run workflow runs in the base repo's PRIVILEGED context with secrets
+# even when the upstream CI ran for a fork PR, which is exactly what the board
+# write needs. The reusable workflow's workflow_run dispatch branch resolves the
+# PR from the upstream run's head SHA (its pull_requests array is empty for fork
+# PRs) and recomputes the target Status. It does NO checkout (metadata only), so
+# running it in this privileged context is not a pwn-request vector.
+#
+# No conclusion guard: we react to every completion (failure -> Snagged, success
+# -> recovery to In Review/Approved); the recompute is idempotent. (workflow_run
+# only fires for workflow files on the default branch, so this activates once
+# merged to the default branch.)
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+jobs:
+  board-sync:
+    uses: ./.github/workflows/pr-board-sync.yml
+    secrets:
+      SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}

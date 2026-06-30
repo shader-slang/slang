@@ -71,13 +71,22 @@ name: PR Board Sync (reusable)
 #
 # Triggers and fork secrets (PUBLIC repo): callers drive this via privileged
 # events that DO receive the secret for fork PRs -- `pull_request_target` (PR
-# lifecycle/commits), `check_suite` (CI), `workflow_run` (the fork-review relay),
-# and `schedule` (the sweep). `pull_request_review` only receives the secret for
+# lifecycle/commits), `workflow_run` (CI completion + the fork-review relay), and
+# `schedule` (the sweep). `pull_request_review` only receives the secret for
 # ORIGIN PRs; a fork review runs the fork head with no secret, so the caller
 # routes fork reviews through an unprivileged bridge whose completion fires a
 # privileged `workflow_run` here (see the dispatch's `workflow_run` branch). When
 # no token is delivered, every privileged step is gated off (HAS_TOKEN) and the
 # run skips cleanly; the sweep is the backstop.
+#
+# CI completion uses `workflow_run`, NOT `check_suite`: GitHub deliberately does
+# not deliver `check_suite`/`check_run` events for suites created by GitHub
+# Actions (recursion prevention), so a `check_suite` trigger never fires for this
+# repo's Actions-based CI. `workflow_run` IS delivered for Actions runs, so it is
+# the event that actually carries "CI finished" -- a CI failure (or recovery)
+# that lands after a PR's last push reaches the board in real time instead of
+# waiting for the nightly sweep. A caller may still subscribe to `check_suite`
+# for any non-Actions, GitHub-App-created suites; the dispatch handles it.
 
 on:
   workflow_call:
@@ -1250,11 +1259,19 @@ jobs:
               const suite = context.payload.check_suite || {};
               await reconcileByCommit(suite.head_sha, suite.pull_requests);
             } else if (ev === "workflow_run") {
-              // Stage 2 of the fork-review relay (see header): a fork PR's review
-              // can't get secrets, so an unprivileged caller bridge fires on the
-              // review and completes; this privileged run resolves the PR from the
-              // upstream run's head SHA and reconciles. Metadata only -- NEVER add a
-              // checkout here (the upstream ran fork-controlled context).
+              // Two privileged uses, both resolved the same way (by the upstream
+              // run's head SHA, since its pull_requests array is empty for fork
+              // PRs):
+              //   1. CI completion: GitHub does not deliver check_suite for
+              //      Actions-created CI (recursion prevention), so a caller relays
+              //      the "CI" workflow's completion here to recompute the target --
+              //      a CI failure goes to Snagged, a green run recovers it.
+              //   2. Stage 2 of the fork-review relay (see header): a fork PR's
+              //      review can't get secrets, so an unprivileged caller bridge
+              //      fires on the review and completes; this privileged run picks
+              //      that up.
+              // Metadata only -- NEVER add a checkout here (the upstream may have
+              // run in a fork-controlled context).
               const wr = context.payload.workflow_run || {};
               await reconcileByCommit(wr.head_sha, wr.pull_requests);
             }
