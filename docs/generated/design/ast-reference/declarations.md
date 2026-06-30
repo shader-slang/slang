@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:15:49Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: ad2a7f5a76a091d730e7cbf54483a1de9f01f4aeeb2e3ec0963d4e400436f2b6
+generated_at: 2026-06-29T15:19:27Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 4edc6b90abd358684a288a1139580cde8c06f54b81ac587b2fb00f57fb475a83
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -23,7 +23,7 @@ All declarations in this page are declared in
 [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h). The parser
 functions that produce them live in
 [slang-parser.cpp](../../../../source/slang/slang-parser.cpp); the
-top-level dispatch is `parseDecl()` and the syntax-decl table is
+top-level dispatch is `ParseDecl` and the syntax-decl table is
 `SyntaxParseInfo` (see
 [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md)).
 
@@ -128,6 +128,7 @@ carry no FIDDLE concrete tag. Concrete leaves below.
 | `GenericTypeConstraintDecl` | `TypeConstraintDecl` | `sub: TypeExp`, `sup: TypeExp`, `isEqualityConstraint: bool` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | A constraint `T : U` or `T == U`; produced by a generic `where` / `<T : I>` clause, an interface `__constraint`, or a relocated `associatedtype` bound. |
 | `TypeCoercionConstraintDecl` | `Decl` | `fromType: TypeExp`, `toType: TypeExp` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | A coercion constraint in a `where` clause. |
 | `NonEmptyPackConstraintDecl` | `Decl` | `packExpr: Expr*` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | Constraint that a type pack is non-empty. |
+| `GenericVariadicPackCountConstraintDecl` | `Decl` | `packExpr: Expr*`, `expectedCountExpr: Expr*`, `expectedCountVal: IntVal*` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | Constraint that a variadic pack's element count equals a value (`where countof(Pack) == N`). |
 | `HasDiffTypeInfoConstraintDecl` | `Decl` | `type: TypeExp` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | Differentiable-type constraint. |
 | `EmptyDecl` | `Decl` | (no additional state) | (none) | An empty declaration that exists only to carry modifiers (e.g. GLSL `layout(...) in;`). |
 | `SyntaxDecl` | `Decl` | `syntaxClass: SyntaxClass<NodeBase>`, `parseCallback: SyntaxParseCallback` | (none) | Binds a keyword to a parser callback; see `## Notable nodes` and [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md). |
@@ -165,10 +166,7 @@ definition. The parser stores the target as a higher-order `Expr*`
 (e.g. a `ForwardDifferentiateExpr` wrapping the function reference)
 and the user-written body as an `innerFunc: FuncDecl*`; semantic
 checking desugars the whole thing into an `ExtensionDecl` so the
-rest of the pipeline never sees the shorthand. The IR lowering
-visitor treats the `FuncExtensionDecl` itself as ignored
-(`IGNORED_CASE` in
-[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)).
+rest of the pipeline never sees the shorthand.
 
 ### AggTypeDecl, StructDecl, ClassDecl, EnumDecl
 
@@ -225,9 +223,11 @@ enclosing enum.
 ### AccessorDecl family
 
 `GetterDecl`, `SetterDecl`, and `RefAccessorDecl` model the accessors
-on a `PropertyDecl` or `SubscriptDecl`. The parser will synthesize a
-default `GetterDecl` for `PropertyDecl`s that have an initializer but
-no explicit accessor block. The body of each accessor is parsed
+on a `PropertyDecl` or `SubscriptDecl`. The parser only creates an
+accessor when an explicit `get`/`set`/`ref` keyword is present; an
+empty property or subscript body is recorded as a case to be treated
+like `{ get; }`, and semantic checking later materializes the implicit
+`GetterDecl`. The body of each accessor is parsed
 lazily, like any other function body, by the two-stage parser.
 
 ### RequirementDecl-style nodes inside InterfaceDecl
@@ -282,7 +282,7 @@ by `isDeclAllowed` in
 - [values.md](values.md) — `WitnessTable` referenced by
   `InheritanceDecl` and `GenericTypeConstraintDecl`.
 - [../pipeline/02-parse-ast.md](../pipeline/02-parse-ast.md) —
-  parsing of declarations (entry points such as `parseDecl`,
+  parsing of declarations (entry points such as `ParseDecl`,
   `parseAggTypeDecl`, `parseGenericDecl`).
 - [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md)
   — declaration checking and witness-table construction.
