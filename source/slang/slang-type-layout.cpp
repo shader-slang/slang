@@ -4493,6 +4493,10 @@ Type* findGlobalGenericSpecializationArg(
     TypeLayoutContext const& context,
     GlobalGenericParamDecl* decl)
 {
+    // `programLayout` is null on the program-less reflection path
+    // (`ISession::getTypeLayout`), where there is no linked program to supply a
+    // global-generic specialization argument. With no argument available the
+    // parameter is simply left unspecialized, which is correct for that path.
     if (!context.programLayout)
         return nullptr;
     Val* arg = nullptr;
@@ -5062,8 +5066,16 @@ static TypeLayoutResult _createTypeLayoutForGlobalGenericTypeParam(
     info.kind = LayoutResourceKind::GenericResource;
 
     RefPtr<GenericParamTypeLayout> typeLayout = new GenericParamTypeLayout();
-    // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
-    // so we can find the index of this generic param decl in the list
+    // We should have already populated ProgramLayout::genericEntryPointParams list at this point,
+    // so we can find the index of this generic param decl in the list.
+    //
+    // On the program-less reflection path (`ISession::getTypeLayout`) there is no
+    // global ordering of generic parameters to index into, so we record -1
+    // ("no global index available"). This shares the integer value of the
+    // reflection sentinel for "not a generic param type", but the two are not
+    // ambiguous in practice: that sentinel is produced for non-generic-param
+    // type layouts, whereas this branch only runs for a GlobalGenericParamDecl
+    // type queried without a program, where no meaningful global index exists.
     typeLayout->type = type;
     typeLayout->paramIndex = context.programLayout ? findGlobalGenericSpecializationParamIndex(
                                                          context.programLayout->getProgram(),
@@ -6531,6 +6543,16 @@ void TypeLayoutContext::buildExternTypeMap()
 {
     externTypeMap.emplace();
 
+    // `programLayout` is null on the program-less reflection path
+    // (`ISession::getTypeLayout`), where there is no linked program to supply
+    // `extern` definitions. Leave `externTypeMap` empty so that
+    // `lookupExternDeclRefType` leaves any `extern` reference unresolved, which
+    // is the correct behavior when no link-time definitions are available.
+    //
+    // The reflection path that DOES have a program (`spReflection_GetTypeLayout`)
+    // now threads its `ProgramLayout` through `TargetRequest::getTypeLayout`, so
+    // there `programLayout` is non-null and `extern` members resolve to their
+    // concrete definitions rather than falling into this early return.
     if (!programLayout)
         return;
 

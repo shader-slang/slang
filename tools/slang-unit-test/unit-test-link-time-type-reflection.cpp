@@ -330,7 +330,8 @@ SLANG_UNIT_TEST(linkTimeConditionalReflection)
 
 // Test for issue #10749: Link-time type specialization of a struct member results in segfault.
 // When an extern struct is used as a direct member of another struct, computing the type layout
-// should not crash.
+// should not crash, and reflecting the type via findTypeByName + getTypeLayout should resolve the
+// extern member to its concrete link-time definition.
 
 SLANG_UNIT_TEST(linkTimeTypeReflectionStructMember)
 {
@@ -400,7 +401,8 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionStructMember)
     compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
     SLANG_CHECK_ABORT(linkedProgram != nullptr);
 
-    // This getLayout() call triggered the segfault in lookupExternDeclRefType.
+    // Computing the layout for `Scene` (which has an extern struct member) used to
+    // segfault in lookupExternDeclRefType; now it succeeds.
     auto programLayout = linkedProgram->getLayout();
     SLANG_CHECK(programLayout != nullptr);
 
@@ -411,13 +413,30 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionStructMember)
     auto typeLayout = var0->getTypeLayout();
     SLANG_CHECK(typeLayout != nullptr);
 
-    // Also test the findTypeByName + getTypeLayout path which passes programLayout=nullptr.
+    // Now exercise the findTypeByName + getTypeLayout reflection path. Because
+    // spReflection_GetTypeLayout threads the ProgramLayout through to
+    // TargetRequest::getTypeLayout, the extern `AccelerationStructure` member must
+    // resolve to its concrete link-time definition (HWAccelerationStructure), not
+    // the bare unresolved extern declaration. We assert the resolved shape so a
+    // regression that silently produces an empty (zero-field) layout is caught,
+    // rather than only checking for non-null.
     auto sceneType = programLayout->findTypeByName("Scene");
     SLANG_CHECK(sceneType != nullptr);
     if (sceneType)
     {
         auto sceneLayout = programLayout->getTypeLayout(sceneType);
         SLANG_CHECK(sceneLayout != nullptr);
+        SLANG_CHECK(sceneLayout->getFieldCount() == 1);
+        if (sceneLayout->getFieldCount() == 1)
+        {
+            // Scene.accelStruct resolves to HWAccelerationStructure, which has one
+            // field (uint bufferHandle).
+            auto accelStructFieldLayout = sceneLayout->getFieldByIndex(0);
+            SLANG_CHECK(accelStructFieldLayout != nullptr);
+            auto accelStructTypeLayout = accelStructFieldLayout->getTypeLayout();
+            SLANG_CHECK(accelStructTypeLayout != nullptr);
+            SLANG_CHECK(accelStructTypeLayout->getFieldCount() == 1);
+        }
     }
 }
 
@@ -501,10 +520,12 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberAssocType)
     auto programLayout = linkedProgram->getLayout();
     SLANG_CHECK(programLayout != nullptr);
 
-    // Also test getTypeLayout() on the Scene type directly via findTypeByName +
-    // getTypeLayout. This code path passes programLayout=nullptr to
-    // getInitialLayoutContextForTarget, which can crash in buildExternTypeMap when
-    // it dereferences programLayout.
+    // Exercise getTypeLayout() on the Scene type directly via findTypeByName +
+    // getTypeLayout. This is the user's actual scenario: the extern struct `SceneAS`
+    // implements an interface with an associated type and resolves to
+    // HWAccelerationStructure. spReflection_GetTypeLayout threads the ProgramLayout
+    // through, so the extern member resolves to its concrete linked type; we assert
+    // the resolved field count so a silently-empty layout regression is caught.
     if (programLayout)
     {
         auto sceneType = programLayout->findTypeByName("Scene");
@@ -513,6 +534,17 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberAssocType)
         {
             auto sceneLayout = programLayout->getTypeLayout(sceneType);
             SLANG_CHECK(sceneLayout != nullptr);
+            SLANG_CHECK(sceneLayout->getFieldCount() == 1);
+            if (sceneLayout->getFieldCount() == 1)
+            {
+                // Scene.as resolves to HWAccelerationStructure, which has one field
+                // (RaytracingAccelerationStructure rtAS).
+                auto asFieldLayout = sceneLayout->getFieldByIndex(0);
+                SLANG_CHECK(asFieldLayout != nullptr);
+                auto asTypeLayout = asFieldLayout->getTypeLayout();
+                SLANG_CHECK(asTypeLayout != nullptr);
+                SLANG_CHECK(asTypeLayout->getFieldCount() == 1);
+            }
         }
     }
 }
