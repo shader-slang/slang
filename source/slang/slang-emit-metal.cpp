@@ -1154,29 +1154,38 @@ void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 break;
             }
 
-            // Emit the MSL type suffix for finite half/float literals: MSL reads
-            // a bare decimal as a 64-bit `double`, so a suffix-less half literal
-            // becomes a double and breaks size-sensitive uses such as
-            // `as_type<ushort>(h)`. MSL has no `double`, so other base types (and
-            // untyped literals) fall through to the bare base emitter.
+            // Append the MSL type suffix for finite half/float literals: MSL is
+            // C++14-based, so a bare decimal is typed `double` (64-bit), and a
+            // suffix-less half/float literal silently becomes a double. That
+            // breaks size-sensitive uses such as `as_type<ushort>(h)` (a
+            // 64-bit -> 16-bit bit-cast MSL rejects -- the #11837 failure).
+            //
+            // Scope is finite literals only. The NaN/Inf cases handled above
+            // deliberately keep emitting the bare double-typed `(0.0 / 0.0)` /
+            // `(+/-1.0 / 0.0)` forms, so a half/float NaN or Inf in a
+            // size-sensitive context still mismatches; that is a known remaining
+            // gap of #11837, not an oversight, left for a follow-up. `Double`
+            // (caught loudly in emitSimpleTypeImpl) and any float literal whose
+            // type is not an `IRBasicType` fall through to the bare base emitter.
             if (auto basicType = as<IRBasicType>(inst->getDataType()))
             {
+                const char* suffix = nullptr;
                 switch (basicType->getBaseType())
                 {
                 case BaseType::Half:
-                    {
-                        m_writer->emit(constantInst->value.floatVal);
-                        m_writer->emit("h");
-                        return;
-                    }
+                    suffix = "h";
+                    break;
                 case BaseType::Float:
-                    {
-                        m_writer->emit(constantInst->value.floatVal);
-                        m_writer->emit("f");
-                        return;
-                    }
+                    suffix = "f";
+                    break;
                 default:
                     break;
+                }
+                if (suffix)
+                {
+                    m_writer->emit(constantInst->value.floatVal);
+                    m_writer->emit(suffix);
+                    return;
                 }
             }
             break;

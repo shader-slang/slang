@@ -1,4 +1,9 @@
 //TEST:SIMPLE(filecheck=METAL): -stage compute -entry computeMain -target metal
+// The metallib command compiles the emitted MSL with the Metal toolchain, so it
+// reproduces the actual #11837 *compile* failure (a 64->16-bit as_type) rather
+// than only a text difference. It auto-skips on hosts without the Metal compiler
+// (free on the no-Metal CI tier; runs on macOS runners).
+//TEST:SIMPLE(filecheck=METALLIB): -stage compute -entry computeMain -target metallib
 
 // Regression test for https://github.com/shader-slang/slang/issues/11837
 //
@@ -8,6 +13,9 @@
 // suffix a half/float literal silently becomes a double. That breaks
 // size-sensitive contexts: e.g. `as_type<ushort>(half_literal)` compiled to a
 // bare double becomes a 64-bit -> 16-bit bit-cast, which MSL rejects.
+
+// METALLIB: define void @computeMain
+// METALLIB-NOT: error
 
 RWStructuredBuffer<uint> outputBuffer;
 RWStructuredBuffer<float> floatBuffer;
@@ -20,6 +28,8 @@ void computeMain()
     // bit-cast that does not compile.
     half h = 61440.hf;
     // METAL: as_type<ushort>(61440.0h)
+    // The bare, unsuffixed form (the #11837 bug) must not reappear.
+    // METAL-NOT: as_type<ushort>(61440.0)
     outputBuffer[0] = uint(bit_cast<uint16_t>(h));
 
     // A float literal must be emitted with the `f` suffix.
