@@ -1,27 +1,22 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.8
-remediated_at: 2026-06-05T15:45:00Z
+remediated_at: 2026-06-12T14:14:20Z
 target_doc: name-resolution/index.md
 review_report: ../../reviews/name-resolution/index.md.review.md
-target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
-actions:
-  fixed: 1
-  rejected_bogus: 0
-  rejected_out_of_scope: 0
-  deferred: 0
-  escalated: 0
+target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+actions: { fixed: 1, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 0, escalated: 0 }
 ---
 
 # Remediation report for name-resolution/index.md
 
 ## Summary
 
-The review reported one minor factual finding, which was fixed. The pipeline-context paragraph claimed breadcrumb chains become IR access patterns during AST-to-IR lowering, but `ConstructLookupResultExpr` in `source/slang/slang-check-expr.cpp:873` expands breadcrumbs into AST access expressions during semantic checking (loop at line 895). The sentence now attributes breadcrumb expansion to semantic checking and links to `lookup.md`, keeping the page within the name-resolution contract.
+The review raised a single minor completeness finding, which I fixed. No findings were rejected-bogus, rejected-out-of-scope, deferred, or escalated. The one action edits prose only, so the doc's source commit is unchanged.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `source/slang/slang-check-expr.cpp:891-895` expands breadcrumbs in the checker (`ConstructLookupResultExpr`), not in the lowerer. | Reworded the downstream paragraph to say breadcrumbs are expanded into AST access expressions during semantic checking before lowering; linked `lookup.md`. |
+| F-001 | fixed | Verified against the contract at `docs/generated/design/_meta/prompts/name-resolution-index.md:68-69`, which requires every peer page to be reachable from a section beyond `## Pages`. In the original doc, `visibility.md` and `overload-resolution.md` appeared outside the table only as Mermaid label text and plain-text prose, not as Markdown links, so the finding holds. | Converted the plain-text peer mentions in the `## Flow diagram` explanation into Markdown links and added a link to `overload-resolution.md`, so both pages are now reachable from a second section. |

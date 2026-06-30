@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T10:25:25+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 17a141b9faa0ddd9e6fc9cf12a80084dc633df2e889700f9139cdd980e671b52
+generated_at: 2026-06-12T10:34:34Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 71774435a40512fdfeaa2771405f426a01abae3299e7b7ac5b896252ae444cc5
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -12,7 +12,7 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 This page documents the **layout IR module** built by
 `TargetProgram::createIRModuleForLayout`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line ~15661). The layout IR module is a sibling of the
+line ~15788). The layout IR module is a sibling of the
 per-translation-unit executable IR module described in
 [04-ast-to-ir.md](04-ast-to-ir.md); its only job is to carry
 `IRLayoutDecoration`s on stub globals and entry-point functions for
@@ -24,9 +24,9 @@ guarantees this module does (and does not) provide.
 ## Source
 
 - [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-  — `TargetProgram::createIRModuleForLayout` (line ~15661) is the
-  constructor; the obfuscation gate is at line ~15810; the cache
-  store is at line ~15827.
+  — `TargetProgram::createIRModuleForLayout` (line ~15788) is the
+  constructor; the obfuscation gate is at line ~15937; the cache
+  store is at line ~15955.
 - [slang-target-program.h](../../../../source/slang/slang-target-program.h)
   — declares the cache field `m_irModuleForLayout` (line ~147),
   the lazy accessor `getOrCreateIRModuleForLayout` (line ~109),
@@ -54,15 +54,16 @@ guarantees this module does (and does not) provide.
 
 ## When it is built
 
-- **Lazy.** The first call to
-  `TargetProgram::getOrCreateIRModuleForLayout(sink)` on a
-  `TargetProgram` instance builds the module and stores it on
-  `m_irModuleForLayout`; subsequent calls return the cached
-  reference (line 15663-15664).
+- **Lazy.** `TargetProgram::getOrCreateIRModuleForLayout(sink)`
+  first calls `getOrCreateLayout(sink)` and then returns
+  `m_irModuleForLayout` (line 15440-15444). `createIRModuleForLayout`
+  itself returns the cached module immediately if one already exists
+  (line 15790-15791) and otherwise builds it and stores it on
+  `m_irModuleForLayout`.
 - The caller must first ensure that `m_layout` (the
   `ProgramLayout`) has been computed; the function `SLANG_ASSERT`s
-  that `m_layout` is non-null (line 15667) and then bails out with
-  `nullptr` if it would somehow have been cleared (line 15670-15671).
+  that `m_layout` is non-null (line 15794) and then bails out with
+  `nullptr` if it would somehow have been cleared (line 15797-15798).
 - Built **after** semantic check, parameter binding, and per-module
   IR generation — that is, after all the
   [04-ast-to-ir.md](04-ast-to-ir.md) and
@@ -107,7 +108,7 @@ flowchart TD
 ## Per-global-parameter steps
 
 For each `varLayout` in `globalStructLayout->fields` (lines
-15708-15728 of `createIRModuleForLayout`):
+15835-15854 of `createIRModuleForLayout`):
 
 | # | Step | Function | Notes |
 |---|---|---|---|
@@ -129,7 +130,7 @@ auto irGlobalStructTypeLayout =
 When the global scope is wrapped in a parameter group (a constant
 buffer or push-constant block), the module's layout decoration is
 an `IRParameterGroupTypeLayout` rather than the raw struct layout
-(lines 15735-15753). The parameter-group builder calls:
+(lines 15862-15885). The parameter-group builder calls:
 
 - `setContainerVarLayout(lowerVarLayout(context, paramGroupTypeLayout->containerVarLayout))`
 - `setElementVarLayout(irElementVarLayout)` where
@@ -146,7 +147,7 @@ builder->addLayoutDecoration(irModule->getModuleInst(), irGlobalScopeVarLayout);
 ## Per-entry-point steps
 
 For each `entryPointLayout` in `programLayout->entryPoints` (lines
-15763-15807):
+15890-15908):
 
 | # | Step | Function | Notes |
 |---|---|---|---|
@@ -162,7 +163,7 @@ For each `entryPointLayout` in `programLayout->entryPoints` (lines
 ## Optional obfuscation pass
 
 When `linkage->m_optionSet.shouldObfuscateCode()` is true (lines
-15810-15826):
+15937-15953):
 
 ```cpp
 IRStripOptions stripOptions;
@@ -240,10 +241,10 @@ it returns `nullptr` when nothing has been built yet.
 - **`m_layout` must be set.** Callers that bypass
   `getOrCreateIRModuleForLayout` and invoke
   `createIRModuleForLayout` directly will crash on the
-  `SLANG_ASSERT(m_layout)` at line 15667 if the program layout has
+  `SLANG_ASSERT(m_layout)` at line 15794 if the program layout has
   not been built.
 - **Capability decorations are SPIR-V- and Metal-only.** The atom
-  filter at lines 15796-15797
+  filter at lines 15923-15924
   (`atom >= _spirv_1_0 && atom <= latestSpirvAtom`,
   `atom >= metallib_2_3 && atom <= latestMetalAtom`) means HLSL,
   WGSL, and CUDA layout-module entry points do **not** carry
@@ -253,7 +254,7 @@ it returns `nullptr` when nothing has been built yet.
   directly.
 - **`buildMangledNameToGlobalInstMap` runs unconditionally.** Even
   in the no-obfuscation path, the function ends with
-  `irModule->buildMangledNameToGlobalInstMap()` (line 15827) so
+  `irModule->buildMangledNameToGlobalInstMap()` (line 15954) so
   consumers always get a usable mangled-name index.
 
 ## See also

@@ -4311,27 +4311,10 @@ struct TypeFlowSpecializationContext
 
     IRFuncType* maybeExpandFuncType(IRFuncType* funcType)
     {
-        List<IRType*> newArgTypes;
-
-        for (auto paramType : funcType->getParamTypes())
-        {
-            if (auto typePack = as<IRTypePack>(paramType))
-            {
-                for (UInt elementIndex = 0; elementIndex < typePack->getOperandCount();
-                     elementIndex++)
-                {
-                    newArgTypes.add((IRType*)typePack->getOperand(elementIndex));
-                }
-            }
-            else
-            {
-                newArgTypes.add(paramType);
-            }
-        }
-
         IRBuilder builder(module);
-        return as<IRFuncType>(
-            builder.getFuncType(newArgTypes.getArrayView(), funcType->getResultType()));
+        // Keep typeflow call-site analysis on the same concrete-pack expansion helper used by
+        // autodiff, so both paths flatten only already-specialized `IRTypePack` parameters.
+        return maybeExpandConcreteFuncTypePacks(&builder, funcType);
     }
 
     void expandPacksInFunc(IRFunc* func)

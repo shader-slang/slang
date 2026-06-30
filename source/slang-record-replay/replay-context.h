@@ -407,6 +407,9 @@ public:
         requireReplayArenaAllocation(offset, size);
     }
 
+    /// Allocates replay-owned arena storage from the module that owns the replay context.
+    SLANG_API void* allocateReplayArena(size_t sizeInBytes, size_t alignment);
+
     /// Lock the context for thread-safe access.
     /// Returns an RAII lock guard.
     SLANG_API std::unique_lock<std::recursive_mutex> lock()
@@ -831,7 +834,7 @@ T* ReplayContext::readArrayInPlayback(RecordFlag flags, CountT& count)
     size_t sizeCount = static_cast<size_t>(arrayCount);
     size_t allocationSize = sizeCount * sizeof(T);
     requireReplayArenaAllocation(countOffset, allocationSize);
-    T* buf = m_arena.allocateArray<T>(sizeCount);
+    T* buf = reinterpret_cast<T*>(allocateReplayArena(allocationSize, alignof(T)));
     for (size_t i = 0; i < sizeCount; ++i)
     {
         new (&buf[i]) T{};

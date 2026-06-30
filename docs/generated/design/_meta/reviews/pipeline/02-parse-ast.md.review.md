@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:15:42+00:00
+reviewed_at: 2026-06-12T12:04:49+00:00
 target_doc: pipeline/02-parse-ast.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: d21a76a8273d89c3084ce7ab14317bb6c3306843578006bdf09a9bc0860cfb4a
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 723594a42095f62fd08e8a2b4425d9775c105e0d4a0f5882282a816aa7314537
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
   factual_accuracy: pass
   cross_references: pass
@@ -24,13 +24,23 @@ severity_breakdown:
 # Review report for pipeline/02-parse-ast.md
 
 ## Summary
-No findings were identified in this pass. The document has the required sections, its links resolve, and the sampled parser and AST data-model claims match the recorded source commit.
+
+The parse/AST page satisfies its prompt contract and matched the sampled parser and AST sources. I did not find factual, link, completeness, or front-matter issues that require remediation.
 
 ## Items checked
-- Ran `regenerate.py show pipeline/02-parse-ast.md` and reviewed the manifest entry, per-doc prompt, resolved watched files, and dependency on `pipeline/01-lex-preprocess.md`.
-- Verified front matter fields and resolved all 31 relative links.
-- Checked `parseSourceFile`, `parseUnparsedStmt`, `TokenReader` cursor/lookahead APIs, `UnparsedStmt` creation, deferred body parsing, and generic-application speculation in `slang-parser.cpp`.
-- Checked `SyntaxParseInfo` / `getSyntaxParseInfos`, base-language syntax population, `NodeBase`, `FIDDLE`, `SyntaxClass`-based `as<T>`, major AST families, and `ASTBuilder` allocation/type uniquing claims.
+
+- Ran `regenerate.py show pipeline/02-parse-ast.md` and read the target page, `_common.md`, `pipeline-02-parse-ast.md`, and dependency `pipeline/01-lex-preprocess.md`.
+- Verified front matter keys, recorded source commit, and 64-character hex watched-path digest.
+- Spot-checked 14 parser/AST claims against `source/slang/slang-parser.h`, `source/slang/slang-parser.cpp`, and related AST headers, including `parseSourceFile`, `parseUnparsedStmt`, `ParsingStage::Decl`/`Body`, `SyntaxParseInfo`, `g_parseSyntaxEntries`, `parseAssocType`, `parseInterfaceConstraintDecl`, and `populateBaseLanguageModule`.
+- Checked the required sections from `pipeline-02-parse-ast.md`: inputs/outputs, parser, AST data model, generics ambiguity, modifier parsing, and failure modes.
+- Resolved relative links with `regenerate.py lint` for this assigned doc group; lint reported no issues.
 
 ## Findings
+
 (no findings)
+
+## No-issues notes
+
+- The two-stage parsing description matches `parseSourceFile` using `ParsingStage::Decl` and `parseUnparsedStmt` using `ParsingStage::Body`.
+- The associated-type constraint relocation text matches the implementation comments and calls in `parseAssocType`.
+- The syntax-as-declaration summary is supported by the `SyntaxParseInfo` table and `populateBaseLanguageModule` registration loop.

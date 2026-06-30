@@ -873,6 +873,13 @@ err(
 )
 
 err(
+    "operator-name-used-as-variable-name",
+    20020,
+    "operator name used as variable name",
+    span { loc = "location", message = "an operator name cannot be used as the name of a variable; an 'operator' declaration must be a function" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
@@ -928,6 +935,20 @@ err(
     span { loc = "location", message = "unexpected function body after signature declaration, is this ';' a typo?" }
 )
 
+warning(
+    "keyword-used-as-name",
+    20103,
+    "keyword used as a name",
+    span { loc = "location", message = "'~name:Name' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts" }
+)
+
+err(
+    "default-value-on-extension-generic-param",
+    20104,
+    "default value on extension generic parameter",
+    span { loc = "location", message = "an extension's generic parameter '~name:Name' is inferred from its target, so it cannot have a default value" }
+)
+
 err(
     "decl-not-allowed",
     30102,
@@ -971,9 +992,15 @@ standalone_note(
     span { loc = "location" }
 )
 
+-- Renumbered from E29104 (#11318) to resolve an integer-code collision
+-- with `MiscDiagnostics::spirvCoreGrammarJSONParseFailure` defined in
+-- `source/compiler-core/slang-misc-diagnostic-defs.h`. Both diagnostics
+-- are alive (~8 emit sites in spirv-core-grammar.cpp for the misc one,
+-- and slang-parser.cpp emits this one), so renumbering is the right
+-- fix; renaming either would break callers.
 err(
     "spirv-instruction-without-result-id",
-    29104,
+    29117,
     "instruction has no result-id operand",
     span { loc = "location", message = "cannot use this 'x = ~opcode ...' syntax because ~opcode does not have a <result-id> operand" }
 )
@@ -1130,7 +1157,10 @@ err(
     "undefined-identifier",
     30015,
     "undefined identifier",
-    span { loc = "location", message = "undefined identifier '~name:Name'." }
+    span { loc = "location", message = "undefined identifier '~name:Name'." },
+    -- Optional "did you mean ...?" note, rendered only when `suggestionLocation`
+    -- is set to a valid location by the caller (i.e. a close in-scope name exists).
+    note { message = "did you mean '~suggestion:Name'?", span { loc = "suggestionLocation" } }
 )
 
 err(
@@ -1291,6 +1321,20 @@ warning(
     30058,
     "result of '==' not used",
     span { loc = "expr:Expr", message = "result of '==' not used, did you intend '='?" }
+)
+
+err(
+    "discarded-no-discard-result",
+    30059,
+    "result of '[NoDiscard]' function is discarded",
+    span { loc = "expr:Expr", message = "the result of calling '~name:Name' is discarded; this function is marked '[NoDiscard]'." }
+)
+
+err(
+    "no-discard-on-void-function",
+    30069,
+    "'[NoDiscard]' applied to a function returning 'void'",
+    span { loc = "decl:Decl", message = "'[NoDiscard]' is not allowed on a function that returns 'void'; there is no result to discard." }
 )
 
 err(
@@ -1842,6 +1886,104 @@ err(
     30416,
     "`nonempty(...)` target must be a generic pack parameter declared in the current generic",
     span { loc = "expr:Expr", message = "this pack parameter is declared outside the current generic" }
+)
+
+err(
+    "invalid-variadic-pack-count-constraint-target",
+    30430,
+    "`countof(...)` pack-count constraint requires a generic type pack or value pack parameter",
+    span { loc = "expr:Expr", message = "expected a direct reference to a generic pack parameter here" }
+)
+
+err(
+    "variadic-pack-count-constraint-target-must-be-from-current-generic",
+    30431,
+    "`countof(...)` pack-count constraint target must be declared in the current generic",
+    span { loc = "expr:Expr", message = "this pack parameter is declared outside the current generic" }
+)
+
+err(
+    "invalid-variadic-pack-count-constraint-count",
+    30432,
+    "`countof(...)` pack-count constraint requires a compile-time integer count",
+    span { loc = "expr:Expr", message = "expected a compile-time integer expression here" }
+)
+
+err(
+    "variadic-pack-count-does-not-match",
+    30433,
+    "pack count does not satisfy `countof(...)` constraint",
+    span { loc = "location", message = "expected ~expectedCount:Int elements, but pack argument has ~actualCount:Int" }
+)
+
+err(
+    "optional-variadic-pack-count-constraint-is-invalid",
+    30434,
+    "`optional countof(...)` pack-count constraint is not meaningful",
+    span { loc = "expr:Expr", message = "remove `optional` from this `countof(...)` constraint" }
+)
+
+err(
+    "variadic-pack-count-proof-unavailable",
+    30435,
+    "`countof(...)` pack-count constraint is not satisfied",
+    span { loc = "expr:Expr", message = "cannot prove the required `countof(...)` pack-count constraint for this specialization" }
+)
+
+err(
+    "variadic-pack-count-constraint-requires-equality",
+    30436,
+    "`countof(...)` pack-count constraint requires '=='",
+    span { loc = "location", message = "use '==' for a `countof(...)` pack-count constraint" }
+)
+
+err(
+    "variadic-pack-count-constraint-requires-countof-on-left",
+    30437,
+    "`countof(...)` pack-count constraint must be written with `countof(...)` on the left side",
+    span { loc = "location", message = "write this constraint as `countof(Pack) == IntExpr`" }
+)
+
+err(
+    "generic-specialization-arity-mismatch",
+    30438,
+    "wrong number of arguments in call to generic function",
+    span { loc = "location", message = "could not specialize generic: it expects ~expectedCount:Int parameter(s) but the call provides ~actualCount:Int argument(s)" }
+)
+
+err(
+    "generic-parameter-could-not-be-inferred",
+    30439,
+    "generic parameter could not be inferred",
+    span { loc = "location", message = "could not infer generic argument for parameter '~paramName:Name'" }
+)
+
+err(
+    "generic-argument-does-not-satisfy-constraint",
+    30440,
+    "generic constraint not satisfied",
+    span { loc = "location", message = "could not satisfy the generic constraint '~constraint:String'" }
+)
+
+standalone_note(
+    "see-generic-constraint-declaration",
+    -1,
+    "see generic constraint declaration",
+    span { loc = "location" }
+)
+
+err(
+    "generic-argument-list-arity-mismatch",
+    30441,
+    "wrong number of generic arguments",
+    span { loc = "location", message = "generic '~generic:Decl' expects ~expectedCount:Int generic argument(s) but ~actualCount:Int were provided" }
+)
+
+err(
+    "generic-parameter-unification-conflict",
+    30442,
+    "cannot deduce generic argument",
+    span { loc = "location", message = "cannot deduce generic argument for '~paramName:Name': conflicting requirements '~firstCandidate:String' and '~secondCandidate:String'" }
 )
 
 -- Float bit cast diagnostics
@@ -2443,7 +2585,7 @@ warning(
     "special-type-member-leaks-from-parameter-group",
     31107,
     "This member cannot be included in the same binding as some other parts of this struct, and will be moved into another parameter binding slot.",
-    span { loc = "member:IRInst", message = "This member will leak into a separate binding slot." }
+    span { loc = "location", message = "This member will leak into a separate binding slot." }
 )
 
 err(
@@ -2983,6 +3125,16 @@ err(
     30317,
     "interface requirement has body",
     span { loc = "decl:Decl", message = "non-method interface requirement cannot have a body." }
+)
+
+err(
+    "partial-interface-accessor-default-implementation",
+    30318,
+    "partial interface accessor default implementation",
+    span {
+        loc = "decl:Decl",
+        message = "interface accessor default implementation is incomplete; define all accessors or none."
+    }
 )
 
 err(
@@ -3685,6 +3837,13 @@ err(
     span { loc = "expr:Expr", message = "ambiguous call to overloaded operation with arguments of type ~args" }
 )
 
+err(
+    "bitwise-operator-requires-integer-operands",
+    39999,
+    "bitwise/shift operator '~name:Name' requires integer operands, but the operand type is ~type:Type",
+    span { loc = "expr:Expr", message = "bitwise/shift operator '~name' requires integer operands" }
+)
+
 standalone_note(
     "overload-candidate",
     40011,
@@ -3703,6 +3862,13 @@ standalone_note(
     "more-overload-candidates",
     40015,
     "~count:Int more overload candidates",
+    span { loc = "location" }
+)
+
+standalone_note(
+    "overload-candidate-argument-type-mismatch",
+    40018,
+    "argument ~argIndex:Int does not match: expected '~expectedType:Type', got '~actualType:Type'",
     span { loc = "location" }
 )
 
@@ -3849,6 +4015,13 @@ warning(
     span { loc = "location", message = "'~literal' is smaller than the smallest representable value for type ~type, converted to '~convertedValue'" }
 )
 
+warning(
+    "float-hex-literal-precision-lost",
+    40019,
+    "floating-point precision lost",
+    span { loc = "location", message = "significand of '~literal' was truncated, value is now '~truncatedValue'" }
+)
+
 err(
     "matrix-column-or-row-count-is-one",
     39999,
@@ -3928,6 +4101,13 @@ err(
     38012,
     "entry point cannot return array type",
     span { loc = "location", message = "entry point '~entryPoint:Name' cannot return array type '~returnType:Type'" }
+)
+
+err(
+    "entry-point-cannot-be-generic",
+    38014,
+    "generic entry point used without specialization arguments",
+    span { loc = "location", message = "generic entry point '~entryPoint:Name' must be specialized with concrete generic arguments (e.g. via '-specialize' or 'addEntryPointEx'); an unspecialized generic entry point cannot be compiled" }
 )
 
 
@@ -4244,6 +4424,13 @@ err(
 )
 
 err(
+    "unspecialized-global-generic-param-with-uses",
+    38207,
+    "global generic parameter used in code without a concrete binding",
+    span { loc = "location", message = "a global generic parameter ('type_param' / '__generic_value_param') cannot be used in shader code without a concrete binding; such global-scope declarations are intended for reflection and external specialization, not direct use in shader bodies" }
+)
+
+err(
     "cannot-use-resource-type-in-structured-buffer",
     38204,
     "resource type in StructuredBuffer",
@@ -4366,6 +4553,13 @@ err(
     39020,
     "too many shader record constant buffers",
     span { loc = "location", message = "can have at most one 'shader record' attributed constant buffer; found ~count:Int." }
+)
+
+err(
+    "vk-location-on-non-varying-parameter",
+    39021,
+    "vk::location not allowed on non-varying parameter",
+    span { loc = "location", message = "'[[vk::location(...)]]' is not allowed on '~paramName:Name', which is not a varying (stage input/output) parameter; use '[[vk::binding(...)]]' to set the binding of a constant buffer or resource." }
 )
 
 warning(
@@ -4586,6 +4780,20 @@ warning(
     41033,
     "use of uninitialized value",
     span { loc = "location", message = "use of uninitialized value of type '~typeName'" }
+)
+
+warning(
+    "possibly-using-uninitialized-variable",
+    41035,
+    "possible use of uninitialized variable",
+    span { loc = "location", message = "variable '~varName' may be uninitialized on some paths; it is only conditionally assigned" }
+)
+
+warning(
+    "possibly-using-uninitialized-value",
+    41036,
+    "possible use of uninitialized value",
+    span { loc = "location", message = "value of type '~typeName' may be uninitialized on some paths; it is only conditionally assigned" }
 )
 
 warning(
@@ -4838,6 +5046,19 @@ err(
     "coverage-manifest-output-without-coverage-data",
     45112,
     "`-coverage-manifest-output` path '~path' was requested, but the selected target did not produce coverage metadata"
+)
+
+err(
+    "coverage-counter-width-invalid",
+    45113,
+    "`-trace-coverage-counter-width` value is invalid",
+    span { loc = "location", message = "option `-trace-coverage-counter-width` accepts only `32` or `64`, but got `~parsedValue:Int`. uint64 (the default) effectively cannot wrap; uint32 wraps silently at 2^32 hits per slot but is needed when the runtime driver does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon)." }
+)
+
+err(
+    "coverage-counter-width-bytes-invalid",
+    45114,
+    "coverage counter width API option value is invalid: the `CompilerOptionName::TraceCoverageCounterByteWidth` API option accepts only `4` (uint32) or `8` (uint64), but got `~byteWidth:Int`. This is the API-path counterpart to `E45113` (the CLI parser, which validates bits 32/64 before storing the byte width here); a host setting the API option directly must pass the byte width (divide bits by 8), not the bit width."
 )
 
 -- 41xxx - Semantic checking (continued)
@@ -5124,6 +5345,13 @@ err(
 )
 
 err(
+    "string-type-not-supported-on-kernel-target",
+    55213,
+    "'String' is not supported on this target",
+    span { loc = "location", message = "the 'String' type and its operations are not supported when generating kernel code for this target; use 'NativeString' for a null-terminated string, or compile for a host target" }
+)
+
+err(
     "unsupported-recursion",
     55201,
     "recursion not allowed",
@@ -5187,6 +5415,27 @@ err(
 )
 
 err(
+    "abort-format-must-be-string-literal",
+    55210,
+    "abort format string must be a string literal",
+    span { loc = "location", message = "the format string passed to 'abort' must be a string literal." }
+)
+
+err(
+    "abort-argument-type-not-supported",
+    55211,
+    "unsupported abort argument type",
+    span { loc = "location", message = "argument of type '~type:IRInst' is not supported in an abort message; only scalar and vector arguments are allowed." }
+)
+
+err(
+    "abort-not-supported-in-reverse-mode-auto-diff",
+    55212,
+    "abort is not supported in reverse-mode automatic differentiation",
+    span { loc = "location", message = "'abort' cannot currently be used in a function being reverse-differentiated." }
+)
+
+err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
     "CUDA type mapping failed",
@@ -5205,6 +5454,13 @@ fatal(
     56003,
     "use of uninitialized opaque handle",
     span { loc = "location", message = "use of uninitialized opaque handle '~handleType:IRInst'." }
+)
+
+err(
+    "opaque-type-in-local-variable-not-allowed-on-khronos",
+    56004,
+    "opaque type in local variable is not supported for Khronos targets",
+    span { loc = "location", message = "a resource or other opaque-typed value ('~type:IRInst') cannot be placed in a function-local variable for Khronos targets (SPIR-V/GLSL) or WGSL; this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function" }
 )
 
 
@@ -5276,7 +5532,7 @@ err(
     span { loc = "location", message = "SubpassInput cannot be placed inside a ParameterBlock on Metal; framebuffer fetch inputs must be direct entry-point parameters." }
 )
 
--- SPIRV (57001-57004)
+-- SPIRV (57001-57005)
 
 warning(
     "spirv-opt-failed",
@@ -5304,6 +5560,18 @@ err(
     57004,
     "SPIR-V output contains no exported symbols",
     span { loc = "location", message = "output SPIR-V contains no exported symbols. Please make sure to specify at least one entrypoint." }
+)
+
+err(
+    "spirv-resource-heap-stride-too-small",
+    57005,
+    "SPIR-V resource heap stride '~stride:Int' is too small for RaytracingAccelerationStructure descriptor heap entries; expected at least '~minimumStride:Int' bytes."
+)
+
+err(
+    "spirv-conflicting-descriptor-heap-stride-options",
+    57006,
+    "'-spirv-resource-heap-stride' and '-spirv-unified-descriptor-heap-stride' cannot be used together; an explicit resource heap stride and the unified maximum stride are mutually exclusive."
 )
 
 -- GLSL Compatibility (58001-58003)

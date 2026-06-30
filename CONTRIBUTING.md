@@ -13,6 +13,10 @@ This document is designed to guide you in contributing to the project. It is int
 - Changes should ideally come in as small pull requests on top of master, coming from your own personal fork of the project.
 - Large features that will involve multiple contributors or a long development time should be discussed in issues and broken down into smaller pieces that can be implemented and checked in stages.
 
+## AI-Assisted Contributions
+
+By submitting a Contribution to this repository, you additionally represent that, to the extent any of Your Contributions were developed with the assistance of artificial intelligence tools or AI-generated code, You have exercised sufficient review, judgment, and creative direction over such tools and resulting material to reasonably consider it Your original creation, and You are not aware of any third-party license, intellectual property claim, or other restriction arising from such use that is associated with any part of Your Contribution or use thereof.
+
 ## Table of Contents
 
 1. [Contribution Process](#contribution-process)
@@ -281,6 +285,8 @@ Once a PR is created against `shader-slang/slang:master`, the PR will be merged 
 1. All of the workflows pass.
 
 When the conditions above are all met, you will have a chance to rewrite the commit message. Since the Slang repo uses the "squash" strategy for merging, multiple commits in your PR will become one commit. By default, GitHub will concatenate all of the commit messages sequentially, but often it is not readable. Please rewrite the final commit message in a way that people can easily understand what the purpose of the commit is.
+
+> **Committers:** PRs are tracked on a shared project board whose status is updated automatically as a PR progresses. The board is an org project visible only to `shader-slang` org members, so outside contributors won't see it — that's expected. If you are a committer assigned to shepherd or review PRs, see [The Slang PR Tracking board](docs/maintainers/pr-review-board.md).
 
 There are two cases where the workflow may fail for reasons that are not directly related to the change:
 

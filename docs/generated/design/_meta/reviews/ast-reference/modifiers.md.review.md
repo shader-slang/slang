@@ -1,41 +1,41 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:58:02+00:00
+reviewed_at: 2026-06-12T13:17:20+00:00
 target_doc: ast-reference/modifiers.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 27e8704d639742ca3f3a7523ba881ce0c549f37a2ecf72d2fba11ec9fd4e0064
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 09bdb006642550c81ee966bcb8ea28e65ed6abdbbb21b36d0fbd18f7f1a7472b
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: pass
-  cross_references: partial
-  completeness: partial
+  factual_accuracy: partial
+  cross_references: pass
+  completeness: pass
   style_consistency: pass
-  source_alignment: pass
+  source_alignment: partial
   front_matter_validity: pass
-finding_count: 1
+finding_count: 2
 severity_breakdown:
   critical: 0
-  major: 1
-  minor: 0
+  major: 0
+  minor: 2
   nit: 0
 ---
 
 # Review report for ast-reference/modifiers.md
 
 ## Summary
-The modifier page is largely aligned with the watched AST header: sampled concrete `FIDDLE()` rows, field summaries, and hierarchy relationships match the source. One issue remains: many grammar-column links point to an anchor that does not exist in the dependency grammar page, so readers cannot jump to the referenced modifier or attribute grammar.
+The modifiers page satisfies the family coverage rule: every concrete `FIDDLE()` class in `slang-ast-modifier.h` appears in the Nodes tables, and abstract classes are not table rows. The remaining issues are small source-alignment errors in the `Key fields` column for two rows.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show ast-reference/modifiers.md` and used the listed watched files at `52339028a2aa703271533454c6b9528a534bac31`.
-- Compared the `## Nodes` table against concrete and abstract `FIDDLE()` declarations in `source/slang/slang-ast-modifier.h`, including the modifier, semantic, layout, unchecked-layout, attribute, capability, target, and differentiability groups.
-- Read the per-document prompt, `_common.md`, and dependency docs `ast-reference/base.md` and `syntax-reference/grammar.md`.
-- Resolved all relative markdown links and heading anchors; only the repeated grammar anchor described below failed.
-- Spot-checked at least 12 source-alignment claims, including `AttributeBase` fields, HLSL semantic classes, `BorrowModifier`, matrix-layout inheritance, `GLSLLayoutModifierGroupBegin`, `NumThreadsAttribute`, `DifferentiableAttribute`, `TargetIntrinsicModifier`, `RequireCapabilityAttribute`, parser modifier registration, core-module syntax declarations, and notable-node statements.
-- Checked required front matter keys and verified that the target digest is a 64-character hex value.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show ast-reference/modifiers.md` and used the listed prompt, dependency docs, and watched files at `eb9403ef595a99c2ff6def1d538dbd7a792d9371`.
+- Compared all 254 concrete `FIDDLE()` classes in `source/slang/slang-ast-modifier.h` against the `## Nodes` tables and verified that no `FIDDLE(abstract)` class appears as a row.
+- Checked immediate parent names in the Nodes tables against the header declarations.
+- Spot-checked source-backed claims for modifier-vs-attribute syntax, HLSL semantics, GLSL layout grouping, intrinsic modifiers, target intrinsic modifiers, capability attributes, memory qualifier aggregation, differentiability attributes, and matrix-layout modifiers.
+- Resolved the relative links and anchors; the body has no source line-number citations.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Nodes` grammar column and `## See also` | The document repeatedly links grammar references to `../syntax-reference/grammar.md#modifiers-and-attributes`, but that anchor is absent from the dependency page and the modifier prompt asks for the separate modifier and attribute anchors. | `docs/generated/design/syntax-reference/grammar.md:220` has `## Modifiers` and `docs/generated/design/syntax-reference/grammar.md:252` has `## Attributes and decorations`; `docs/generated/design/_meta/prompts/ast-reference-modifiers.md:21-24` names `#modifiers` or `#attributes` as the expected targets. | Replace modifier grammar links with `../syntax-reference/grammar.md#modifiers` and attribute grammar links with `../syntax-reference/grammar.md#attributes-and-decorations`, or add a matching compatibility anchor in the grammar page during remediation. |
+| F-001 | minor | `## Nodes`, `IntrinsicOpModifier` row | The `Key fields` cell lists `opcode: int`, `irOp: uint32_t`, but those are not the field names in the watched header. The class stores the parsed token in `opToken` and the IR opcode in `op`. | `source/slang/slang-ast-modifier.h:264-274` declares `Token opToken` and `FIDDLE() uint32_t op = 0` on `IntrinsicOpModifier`. | Change the key fields to `opToken: Token`, `op: uint32_t` or summarize only `op: uint32_t` if the token is not useful for readers. |
+| F-002 | minor | `## Nodes`, `GLSLUnparsedLayoutModifier` row | The `Key fields` cell says `text Token`, but `GLSLUnparsedLayoutModifier` declares no additional fields beyond its `Modifier` base. | `source/slang/slang-ast-modifier.h:416-420` declares `class GLSLUnparsedLayoutModifier : public Modifier` with only `FIDDLE(...)` in the body. | Change the key fields cell to `(no additional state)` and keep the summary focused on its role as a raw layout qualifier placeholder. |

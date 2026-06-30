@@ -17,4 +17,7 @@ int shouldntWork(MyThing thing)
 	return helper(thing);
 }
 
-// CHECK: could not specialize generic for arguments of type
+// `MyThing`'s conformance to `IThing` is provided by `extension_visibility_b`,
+// which is intentionally not imported here, so specialization of `helper`
+// reports the focused non-conformance diagnostic.
+// CHECK: type argument 'MyThing' does not conform to the required interface 'IThing'

@@ -1,7 +1,7 @@
 Slang
 =====
 ![CI Status](https://github.com/shader-slang/slang/actions/workflows/ci.yml/badge.svg?branch=master)
-![CTS Status](https://github.com/shader-slang/slang/actions/workflows/vk-gl-cts-nightly.yml/badge.svg)
+![CTS Status](https://github.com/shader-slang/slang/actions/workflows/nightly-slang-vkglcts-test.yml/badge.svg)
 
 Slang is a shading language that makes it easier to build and maintain large shader codebases in a modular and extensible fashion, while also maintaining the highest possible performance on modern GPUs and graphics APIs.
 Slang is based on years of collaboration between researchers at NVIDIA, Carnegie Mellon University, Stanford, MIT, UCSD and the University of Washington.
@@ -138,12 +138,13 @@ The Slang code itself is under the Apache 2.0 with LLVM Exception license (see [
 
 Builds of the core Slang tools depend on the following projects, either automatically or optionally, which may have their own licenses:
 
+* [`ankerl::unordered_dense::{map, set}`](https://github.com/martinus/unordered_dense) (MIT)
+* [`fast_float`](https://github.com/fastfloat/fast_float) (Apache 2.0 / MIT / Boost)
 * [`glslang`](https://github.com/KhronosGroup/glslang) (BSD)
 * [`lz4`](https://github.com/lz4/lz4) (BSD)
 * [`miniz`](https://github.com/richgel999/miniz) (MIT)
 * [`spirv-headers`](https://github.com/KhronosGroup/SPIRV-Headers) (Modified MIT)
 * [`spirv-tools`](https://github.com/KhronosGroup/SPIRV-Tools) (Apache 2.0)
-* [`ankerl::unordered_dense::{map, set}`](https://github.com/martinus/unordered_dense) (MIT)
 
 Slang releases may include [LLVM](https://github.com/llvm/llvm-project) under the license:
 
