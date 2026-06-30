@@ -3,7 +3,7 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL1): -target glsl -entry main -stage compute -capability _GLSL_420
 //TEST:SIMPLE(filecheck=CHECK_GLSL2): -target glsl -entry main -stage compute -capability _GLSL_330
 //TEST:SIMPLE(filecheck=CHECK_GLSL2_NO_UPGRADE): -target glsl -entry main -stage compute -capability _GLSL_330 -DTURN_OFF_LARGER_GLSL_TARGETS 
-//TEST:SIMPLE(filecheck=CHECK_METAL): -target cpp -entry main -stage compute -capability image_loadstore
+//TEST:SIMPLE(filecheck=CHECK_METAL): -target cpp -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK_WILL_ERROR1): -target glsl -entry main -stage compute -capability image_loadstore -DWILL_ERROR1
 //TEST:SIMPLE(filecheck=CHECK_WILL_ERROR2): -target glsl -entry main -stage compute -capability _GLSL_130 -DWILL_ERROR2
 //TEST:SIMPLE(filecheck=CHECK_GLSL3): -target glsl -entry main -stage compute -capability _GLSL_130

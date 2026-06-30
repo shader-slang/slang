@@ -4,6 +4,7 @@
 #include "../core/slang-type-text-util.h"
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "slang-compiler.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-type-layout.h"
 
 namespace Slang
@@ -63,6 +64,20 @@ void TargetRequest::setTargetCaps(CapabilitySet capSet)
     cookedCapabilities = capSet;
 }
 
+bool TargetRequest::isGLSLBasedTarget()
+{
+    switch (getTarget())
+    {
+    case CodeGenTarget::GLSL:
+        return true;
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+        return !optionSet.shouldEmitSPIRVDirectly();
+    default:
+        return false;
+    }
+}
+
 CapabilitySet TargetRequest::getTargetCaps()
 {
     // Capabilities are derived lazily and shared across entry-point compiles for the same target.
@@ -95,11 +110,10 @@ CapabilitySet TargetRequest::getTargetCaps()
     // a corresponding atom representing the target version from the profile.
     CapabilitySet profileCaps = optionSet.getProfile().getCapabilityName();
 
-    bool isGLSLTarget = false;
+    bool isGLSLTarget = isGLSLBasedTarget();
     switch (getTarget())
     {
     case CodeGenTarget::GLSL:
-        isGLSLTarget = true;
         atoms.add(CapabilityName::glsl);
         break;
     case CodeGenTarget::SPIRV:
@@ -143,7 +157,6 @@ CapabilitySet TargetRequest::getTargetCaps()
         }
         else
         {
-            isGLSLTarget = true;
             atoms.add(CapabilityName::glsl);
             profileCaps.addSpirvVersionFromOtherAsGlslSpirvVersion(profileCaps);
         }
@@ -236,6 +249,69 @@ CapabilitySet TargetRequest::getTargetCaps()
     SLANG_ASSERT(!cookedCapabilities.isInvalid());
 
     return cookedCapabilities;
+}
+
+void TargetRequest::checkCapabilities(DiagnosticSink* sink)
+{
+    if (!sink)
+        return;
+
+    // For GLSL-based targets, SPIRV version and extension atoms are intentionally
+    // converted to their GLSL-SPIRV equivalents by getTargetCaps(), so they are
+    // not an error here.
+    bool isGLSLTarget = isGLSLBasedTarget();
+
+    auto cookedCaps = getTargetCaps();
+    auto& targetOptionSet = getOptionSet();
+
+    for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
+    {
+        CapabilitySet toAdd;
+        String requestedCapName;
+        switch (atomVal.kind)
+        {
+        case CompilerOptionValueKind::Int:
+            if (atomVal.intValue == SLANG_CAPABILITY_UNKNOWN)
+                continue;
+            toAdd = CapabilitySet(CapabilityName(atomVal.intValue));
+            requestedCapName = capabilityNameToString(CapabilityName(atomVal.intValue));
+            break;
+        case CompilerOptionValueKind::String:
+            {
+                auto capName = findCapabilityName(atomVal.stringValue.getUnownedSlice());
+                if (capName == CapabilityName::Invalid)
+                    continue;
+                toAdd = CapabilitySet(capName);
+                requestedCapName = atomVal.stringValue;
+            }
+            break;
+        default:
+            continue;
+        }
+
+        if (toAdd.isEmpty())
+            continue;
+
+        // For GLSL targets, SPIRV-targeted capabilities are auto-converted to their
+        // glsl_spirv_* equivalents by getTargetCaps(); not an error.
+        // Use containsKey rather than getCompileTarget() to avoid relying on dictionary
+        // iteration order when a capability spans multiple target families.
+        if (isGLSLTarget && toAdd.getCapabilityTargetSets().containsKey(CapabilityAtom::spirv))
+            continue;
+
+        if (!cookedCaps.isIncompatibleWith(toAdd))
+            continue;
+
+        // The requested capability is incompatible with the code-gen target.
+        auto targetCapName = capabilityNameToString((CapabilityName)cookedCaps.getCompileTarget());
+        maybeDiagnose(
+            sink,
+            getLinkage()->m_optionSet,
+            DiagnosticCategory::Capability,
+            Diagnostics::RequestedCapabilityIncompatibleWithTarget{
+                .requestedCap = requestedCapName,
+                .target = String(targetCapName)});
+    }
 }
 
 
