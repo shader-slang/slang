@@ -1,0 +1,1341 @@
+/*
+ * JsonTree.js Library v4.7.0
+ *
+ * Copyright 2024 Bunoon
+ * Released under the MIT License
+ */
+:root {
+  --json-tree-js-default-font: system-ui,
+                               -apple-system,
+                               "Segoe UI",
+                               Roboto,
+                               "Helvetica Neue",
+                               "Noto Sans",
+                               "Liberation Sans",
+                               Arial,
+                               sans-serif,
+                               "Apple Color Emoji",
+                               "Segoe UI Emoji",
+                               "Segoe UI Symbol",
+                               "Noto Color Emoji";
+  --json-tree-js-bold-weight-light: 300;
+  --json-tree-js-bold-weight-medium: 600;
+  --json-tree-js-bold-weight-heavy: 900;
+  --json-tree-js-title-bold-weight: var(--json-tree-js-bold-weight-heavy);
+  --json-tree-js-color-dark-black: #1c2128;
+  --json-tree-js-color-black: #3b3a3a;
+  --json-tree-js-color-snow-white: #F5F5F5;
+  --json-tree-js-color-light-gray: #BBBBBB;
+  --json-tree-js-color-array: #F28C28;
+  --json-tree-js-color-object: var(--json-tree-js-color-snow-white);
+  --json-tree-js-color-map: #BDB5D5;
+  --json-tree-js-color-set: #FFD700;
+  --json-tree-js-color-boolean: #FF0000;
+  --json-tree-js-color-float: #e3c868;
+  --json-tree-js-color-number: #666bf9;
+  --json-tree-js-color-bigint: #6495ED;
+  --json-tree-js-color-string: #78b13f;
+  --json-tree-js-color-date: #a656f5;
+  --json-tree-js-color-null: var(--json-tree-js-color-light-gray);
+  --json-tree-js-color-undefined: var(--json-tree-js-color-null);
+  --json-tree-js-color-symbol: #DAA06D;
+  --json-tree-js-color-function: var(--json-tree-js-color-null);
+  --json-tree-js-color-lambda: var(--json-tree-js-color-function);
+  --json-tree-js-color-unknown: var(--json-tree-js-color-null);
+  --json-tree-js-color-guid: #c45600;
+  --json-tree-js-color-regexp: #AA336A;
+  --json-tree-js-color-url: #00FFFF;
+  --json-tree-js-color-email: #FA8072;
+  --json-tree-js-color-link: #89CFF0;
+  --json-tree-js-color-html: #FF00FF;
+  --json-tree-js-editable-text-color: var(--json-tree-js-color-snow-white);
+  --json-tree-js-editable-background-color: #2d333b;
+  --json-tree-js-editable-border-color: #454c56;
+  --json-tree-js-highlight-selected-color: #353e4b;
+  --json-tree-js-highlight-compare-color: #4a5768;
+  --json-tree-js-highlight-selected-border-color: #97a4b5;
+  --json-tree-js-drag-and-drop-color: #F5F5F5;
+  --json-tree-js-tooltip-background-color: var(--json-tree-js-container-background-color);
+  --json-tree-js-tooltip-border-color: var(--json-tree-js-container-border-color);
+  --json-tree-js-tooltip-text-color: var(--json-tree-js-color-snow-white);
+  --json-tree-js-side-menu-width: 320px;
+  --json-tree-js-side-menu-right-border-width: calc( var(--json-tree-js-border-size) * 12 );
+  --json-tree-js-container-background-color: #22272e;
+  --json-tree-js-container-border-color: #454c56;
+  --json-tree-js-container-object-left-border-color: #677180;
+  --json-tree-js-paging-column-background-color: #272e37;
+  --json-tree-js-paging-column-border-color: var(--json-tree-js-container-border-color);
+  --json-tree-js-button-background-color: #2d333b;
+  --json-tree-js-button-border-color: var(--json-tree-js-container-border-color);
+  --json-tree-js-button-text-color: var(--json-tree-js-color-snow-white);
+  --json-tree-js-button-background-color-hover: var(--json-tree-js-container-border-color);
+  --json-tree-js-button-text-color-hover: var(--json-tree-js-color-snow-white);
+  --json-tree-js-button-background-color-active: #616b79;
+  --json-tree-js-button-text-color-active: var(--json-tree-js-color-snow-white);
+  --json-tree-js-button-color-disabled: var(--json-tree-js-container-border-color);
+  --json-tree-js-context-menu-background-color: var(--json-tree-js-container-background-color);
+  --json-tree-js-context-menu-border-color: var(--json-tree-js-container-border-color);
+  --json-tree-js-context-menu-text-color: var(--json-tree-js-color-snow-white);
+  --json-tree-js-context-menu-item-background-color-hover: var(--json-tree-js-container-border-color);
+  --json-tree-js-context-menu-item-text-color-hover: var(--json-tree-js-color-snow-white);
+  --json-tree-js-context-menu-item-background-color-active: var(--json-tree-js-button-background-color-active);
+  --json-tree-js-context-menu-item-text-color-active: var(--json-tree-js-color-snow-white);
+  --json-tree-js-setting-panel-background-color: var(--json-tree-js-button-background-color);
+  --json-tree-js-checkbox-background-color-checked: var(--json-tree-js-color-snow-white);
+  --json-tree-js-checkbox-background-color: var(--json-tree-js-setting-panel-background-color);
+  --json-tree-js-checkbox-border-color-checked: var(--json-tree-js-checkbox-background-color-checked);
+  --json-tree-js-checkbox-border-color: var(--json-tree-js-color-snow-white);
+  --json-tree-js-border-radius-editable: 0.25rem;
+  --json-tree-js-border-radius: 0.5rem;
+  --json-tree-js-border-size: 0.5px;
+  --json-tree-js-border-radius-toggle: 0.15rem;
+  --json-tree-js-spacing: 10px;
+  --json-tree-js-spacing-font-size: 0.85rem;
+  --json-tree-js-spacing-toggle-size: 12px;
+  --json-tree-js-spacing-title-bar: calc( ( var(--json-tree-js-spacing) / 2 ) + 2px );
+  --json-tree-js-transition: all .3s;
+  --json-tree-js-animation-length: 0.5s;
+  --json-tree-js-indentation-size: calc( var(--json-tree-js-spacing) * 2 );
+  --json-tree-js-scroll-bar-size: 6px;
+  --json-tree-js-scroll-bar-border-style: inset 0 0 var(--json-tree-js-scroll-bar-size) var(--json-tree-js-color-black);
+  --json-tree-js-scroll-bar-hover-background-color: var(--json-tree-js-color-snow-white);
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Container
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js {
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+  cursor: default;
+  box-sizing: border-box;
+  line-height: normal;
+  font-family: var(--json-tree-js-default-font) !important;
+  display: inline-block;
+  position: relative;
+  border-radius: var(--json-tree-js-border-radius);
+  background-color: var(--json-tree-js-container-background-color);
+  color: var(--json-tree-js-color-snow-white);
+  border: var(--json-tree-js-border-size) solid var(--json-tree-js-container-border-color);
+  font-size: var(--json-tree-js-spacing-font-size);
+  font-weight: var(--json-tree-js-bold-weight-light);
+  width: 100%;
+  overflow: hidden;
+  margin: 0 !important;
+}
+div.json-tree-js *.draggable-item {
+  overflow: hidden !important;
+}
+div.json-tree-js button {
+  font-family: var(--json-tree-js-default-font);
+}
+div.json-tree-js div.no-click {
+  pointer-events: none !important;
+}
+div.json-tree-js div.page-switch {
+  animation: fade-in-animation var(--json-tree-js-animation-length);
+}
+div.json-tree-js * {
+  box-sizing: border-box;
+  line-height: normal;
+}
+div.json-tree-js *::before, div.json-tree-js *::after {
+  box-sizing: border-box;
+  line-height: normal;
+}
+
+div.full-screen {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  max-width: none;
+  border-radius: 0;
+  border: none;
+  z-index: 1000;
+}
+div.full-screen div.title-bar,
+div.full-screen div.footer-bar {
+  border-radius: 0 !important;
+}
+div.full-screen div.contents {
+  flex-grow: 1;
+  position: relative;
+  max-height: none !important;
+  overflow: auto;
+}
+div.full-screen div.contents div.no-json {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Opening/Closing Arrows
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js div.no-arrow {
+  display: inline-block;
+  width: var(--json-tree-js-spacing-toggle-size);
+  height: 8px;
+  margin-right: calc(var(--json-tree-js-spacing));
+}
+div.json-tree-js div.opened-arrow,
+div.json-tree-js div.closed-arrow {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-right: calc(var(--json-tree-js-spacing));
+  cursor: pointer;
+  transition: var(--json-tree-js-transition);
+  transition-property: opacity;
+}
+div.json-tree-js div.opened-arrow:hover,
+div.json-tree-js div.closed-arrow:hover {
+  opacity: 0.7;
+}
+div.json-tree-js div.opened-arrow {
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid var(--json-tree-js-color-snow-white);
+}
+div.json-tree-js div.closed-arrow {
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: var(--json-tree-js-spacing-toggle-size) solid var(--json-tree-js-color-snow-white);
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Opening/Closing Squares
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js div.no-square,
+div.json-tree-js div.opened-square,
+div.json-tree-js div.closed-square {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 1px;
+  margin-right: calc(var(--json-tree-js-spacing));
+  border-radius: var(--json-tree-js-border-radius-toggle);
+}
+div.json-tree-js div.opened-square {
+  border: 3px solid var(--json-tree-js-color-snow-white);
+}
+div.json-tree-js div.closed-square {
+  background-color: var(--json-tree-js-color-snow-white);
+}
+div.json-tree-js div.opened-square,
+div.json-tree-js div.closed-square {
+  cursor: pointer;
+  transition: var(--json-tree-js-transition);
+  transition-property: opacity;
+}
+div.json-tree-js div.opened-square:hover,
+div.json-tree-js div.closed-square:hover {
+  opacity: 0.7;
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Opening/Closing Circles
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js div.no-circle,
+div.json-tree-js div.opened-circle,
+div.json-tree-js div.closed-circle {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 1px;
+  margin-right: calc(var(--json-tree-js-spacing));
+  border-radius: 50%;
+}
+div.json-tree-js div.opened-circle {
+  border: 3px solid var(--json-tree-js-color-snow-white);
+}
+div.json-tree-js div.closed-circle {
+  background-color: var(--json-tree-js-color-snow-white);
+}
+div.json-tree-js div.opened-circle,
+div.json-tree-js div.closed-circle {
+  cursor: pointer;
+  transition: var(--json-tree-js-transition);
+  transition-property: opacity;
+}
+div.json-tree-js div.opened-circle:hover,
+div.json-tree-js div.closed-circle:hover {
+  opacity: 0.7;
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Opening/Closing Plus/Minus
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js div.no-plus-minus,
+div.json-tree-js div.opened-plus-minus,
+div.json-tree-js div.closed-plus-minus {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 1px;
+  margin-right: calc(var(--json-tree-js-spacing));
+}
+div.json-tree-js div.opened-plus-minus,
+div.json-tree-js div.closed-plus-minus {
+  position: relative;
+}
+div.json-tree-js div.opened-plus-minus::before,
+div.json-tree-js div.closed-plus-minus::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  margin-top: -1.5px;
+  background-color: var(--json-tree-js-color-snow-white);
+  border-radius: var(--json-tree-js-border-radius-toggle);
+}
+div.json-tree-js div.closed-plus-minus::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 3px;
+  height: 100%;
+  margin-left: -1.5px;
+  background-color: var(--json-tree-js-color-snow-white);
+  border-radius: var(--json-tree-js-border-radius-toggle);
+}
+div.json-tree-js div.opened-plus-minus,
+div.json-tree-js div.closed-plus-minus {
+  cursor: pointer;
+  transition: var(--json-tree-js-transition);
+  transition-property: opacity;
+}
+div.json-tree-js div.opened-plus-minus:hover,
+div.json-tree-js div.closed-plus-minus:hover {
+  opacity: 0.7;
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Title Bar
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js div.title-bar {
+  display: flex;
+  padding: var(--json-tree-js-spacing-title-bar);
+  background-color: var(--json-tree-js-color-dark-black);
+  border-radius: var(--json-tree-js-border-radius);
+  border-bottom: var(--json-tree-js-container-border-color) solid var(--json-tree-js-border-size);
+  justify-content: left;
+  align-items: center;
+}
+div.json-tree-js div.title-bar button {
+  background-color: var(--json-tree-js-button-background-color);
+  border: var(--json-tree-js-border-size) solid var(--json-tree-js-button-border-color);
+  color: var(--json-tree-js-button-text-color);
+  border-radius: var(--json-tree-js-border-radius);
+  padding-top: 5px;
+  padding-bottom: 5px;
+  padding-left: 9px;
+  padding-right: 9px;
+  outline: none;
+  transition: var(--json-tree-js-transition);
+}
+div.json-tree-js div.title-bar button:disabled {
+  color: var(--json-tree-js-button-color-disabled);
+}
+div.json-tree-js div.title-bar button:not(.active):not(:disabled):active {
+  background: var(--json-tree-js-button-background-color-active) !important;
+  color: var(--json-tree-js-button-text-color-active) !important;
+}
+div.json-tree-js div.title-bar button:not(.active):not(:disabled):hover {
+  cursor: pointer;
+  background: var(--json-tree-js-button-background-color-hover);
+  color: var(--json-tree-js-button-text-color-hover);
+}
+div.json-tree-js div.title-bar button {
+  font-weight: var(--json-tree-js-bold-weight-heavy);
+  min-width: 30px;
+  min-height: 30px;
+  text-align: center;
+}
+div.json-tree-js div.title-bar button.side-menu {
+  margin-right: calc(var(--json-tree-js-spacing) / 2) !important;
+}
+div.json-tree-js div.title-bar div.title {
+  text-align: left;
+  width: auto;
+  font-weight: var(--json-tree-js-title-bold-weight);
+  font-size: 1.2rem;
+  margin: 3px;
+  margin-left: calc(var(--json-tree-js-spacing) / 2);
+}
+div.json-tree-js div.title-bar div.controls {
+  margin-left: calc(var(--json-tree-js-spacing) * 2);
+  flex-grow: 1;
+  text-align: right;
+  white-space: nowrap;
+}
+div.json-tree-js div.title-bar div.controls button {
+  margin-left: var(--json-tree-js-spacing-title-bar) !important;
+}
+div.json-tree-js div.title-bar div.controls button.copy-all {
+  display: none;
+}
+@media (min-width: 768px) {
+  div.json-tree-js div.title-bar div.controls button.copy-all {
+    display: inline-block;
+  }
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Footer Bar
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js div.footer-bar {
+  display: flex;
+  padding: calc(var(--json-tree-js-spacing));
+  background-color: var(--json-tree-js-color-dark-black);
+  border-radius: var(--json-tree-js-border-radius);
+  border-top: var(--json-tree-js-container-border-color) solid var(--json-tree-js-border-size);
+  justify-content: left;
+  align-items: center;
+}
+div.json-tree-js div.footer-bar div.status-text {
+  flex-grow: 1;
+  text-align: left !important;
+}
+div.json-tree-js div.footer-bar div.status-value-data-type,
+div.json-tree-js div.footer-bar div.status-value-length,
+div.json-tree-js div.footer-bar div.status-value-size,
+div.json-tree-js div.footer-bar div.status-page-index {
+  margin-left: calc(var(--json-tree-js-spacing) * 3);
+}
+div.json-tree-js div.footer-bar div.status-value-data-type,
+div.json-tree-js div.footer-bar div.status-value-length,
+div.json-tree-js div.footer-bar div.status-value-size {
+  animation: fade-in-animation var(--json-tree-js-animation-length);
+}
+div.json-tree-js div.footer-bar span.status-count {
+  font-weight: var(--json-tree-js-bold-weight-heavy);
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Disabled Background
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js div.disabled-background {
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.3);
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  z-index: 1000;
+  display: none;
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Side Menu
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js div.side-menu {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  height: 100%;
+  top: 0;
+  z-index: 1500;
+  transition: var(--json-tree-js-transition);
+  background-color: var(--json-tree-js-container-background-color);
+  border-right: var(--json-tree-js-side-menu-right-border-width) solid var(--json-tree-js-color-snow-white);
+  border-radius: var(--json-tree-js-border-radius);
+  width: var(--json-tree-js-side-menu-width);
+  left: calc(0px - (var(--json-tree-js-side-menu-width) + var(--json-tree-js-side-menu-right-border-width)));
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+div.json-tree-js div.side-menu div.side-menu-title-bar {
+  display: flex;
+  padding: var(--json-tree-js-spacing-title-bar);
+  background-color: var(--json-tree-js-color-dark-black);
+  border-radius: var(--json-tree-js-border-radius);
+  border-bottom: var(--json-tree-js-container-border-color) solid var(--json-tree-js-border-size);
+  justify-content: left;
+  align-items: center;
+}
+div.json-tree-js div.side-menu div.side-menu-title-bar div.side-menu-title-bar-text {
+  text-align: left;
+  width: auto;
+  font-weight: var(--json-tree-js-title-bold-weight);
+  font-size: 1.2rem;
+  margin: 3px;
+  margin-left: calc(var(--json-tree-js-spacing) / 2);
+}
+div.json-tree-js div.side-menu div.side-menu-title-bar div.side-menu-title-controls {
+  margin-left: calc(var(--json-tree-js-spacing) * 3);
+  flex-grow: 1;
+  text-align: right;
+  white-space: nowrap;
+}
+div.json-tree-js div.side-menu div.side-menu-title-bar div.side-menu-title-controls button {
+  background-color: var(--json-tree-js-button-background-color);
+  border: var(--json-tree-js-border-size) solid var(--json-tree-js-button-border-color);
+  color: var(--json-tree-js-button-text-color);
+  border-radius: var(--json-tree-js-border-radius);
+  padding-top: 5px;
+  padding-bottom: 5px;
+  padding-left: 9px;
+  padding-right: 9px;
+  outline: none;
+  transition: var(--json-tree-js-transition);
+}
+div.json-tree-js div.side-menu div.side-menu-title-bar div.side-menu-title-controls button:disabled {
+  color: var(--json-tree-js-button-color-disabled);
+}
+div.json-tree-js div.side-menu div.side-menu-title-bar div.side-menu-title-controls button:not(.active):not(:disabled):active {
+  background: var(--json-tree-js-button-background-color-active) !important;
+  color: var(--json-tree-js-button-text-color-active) !important;
+}
+div.json-tree-js div.side-menu div.side-menu-title-bar div.side-menu-title-controls button:not(.active):not(:disabled):hover {
+  cursor: pointer;
+  background: var(--json-tree-js-button-background-color-hover);
+  color: var(--json-tree-js-button-text-color-hover);
+}
+div.json-tree-js div.side-menu div.side-menu-title-bar div.side-menu-title-controls button {
+  margin-left: var(--json-tree-js-spacing-title-bar) !important;
+  font-weight: var(--json-tree-js-bold-weight-heavy);
+  min-width: 30px;
+  min-height: 30px;
+  text-align: center;
+}
+div.json-tree-js div.side-menu div.side-menu-contents {
+  flex-grow: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  margin: var(--json-tree-js-spacing);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel {
+  padding: var(--json-tree-js-spacing);
+  background-color: var(--json-tree-js-setting-panel-background-color);
+  color: var(--json-tree-js-color-snow-white);
+  border-radius: var(--json-tree-js-border-radius);
+  border: var(--json-tree-js-border-size) solid var(--json-tree-js-container-border-color);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-title-bar {
+  display: flex;
+  justify-content: left;
+  align-items: center;
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-title-bar div.settings-panel-title-text {
+  text-align: left;
+  font-weight: var(--json-tree-js-title-bold-weight);
+  font-size: 0.9rem;
+  margin: 3px;
+  color: var(--json-tree-js-color-snow-white);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-title-bar div.settings-panel-control-buttons {
+  flex-grow: 1;
+  text-align: right;
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-title-bar div.settings-panel-control-buttons div.settings-panel-control-button {
+  margin-left: calc(var(--json-tree-js-spacing) / 2);
+  border: 4px solid var(--json-tree-js-color-snow-white);
+  height: 15px;
+  width: 15px;
+  border-radius: var(--json-tree-js-border-radius-editable);
+  display: inline-block;
+  transition: var(--json-tree-js-transition);
+  transition-property: opacity;
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-title-bar div.settings-panel-control-buttons div.settings-panel-control-button:not(.no-hover):hover {
+  cursor: pointer;
+  opacity: 0.7;
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-title-bar div.settings-panel-control-buttons div.settings-panel-fill {
+  background-color: var(--json-tree-js-color-snow-white);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents {
+  margin-top: var(--json-tree-js-spacing);
+  margin-left: var(--json-tree-js-spacing);
+  text-align: left;
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.array {
+  color: var(--json-tree-js-color-array);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.object {
+  color: var(--json-tree-js-color-object);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.map {
+  color: var(--json-tree-js-color-map);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.set {
+  color: var(--json-tree-js-color-set);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.boolean {
+  color: var(--json-tree-js-color-boolean);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.float {
+  color: var(--json-tree-js-color-float);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.number {
+  color: var(--json-tree-js-color-number);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.bigint {
+  color: var(--json-tree-js-color-bigint);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.string {
+  color: var(--json-tree-js-color-string);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.date {
+  color: var(--json-tree-js-color-date);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.symbol {
+  color: var(--json-tree-js-color-symbol);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.function {
+  color: var(--json-tree-js-color-function);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.unknown {
+  color: var(--json-tree-js-color-unknown);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.guid {
+  color: var(--json-tree-js-color-guid);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.regexp {
+  color: var(--json-tree-js-color-regexp);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.url {
+  color: var(--json-tree-js-color-url);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.email {
+  color: var(--json-tree-js-color-email);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.html {
+  color: var(--json-tree-js-color-html);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.lambda {
+  color: var(--json-tree-js-color-lambda);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.null,
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents span.undefined {
+  background-color: var(--json-tree-js-color-null);
+  border-radius: var(--json-tree-js-border-radius-editable);
+  padding-left: 3px;
+  padding-right: 3px;
+  color: var(--json-tree-js-color-dark-black);
+}
+div.json-tree-js div.side-menu div.side-menu-contents div.settings-panel div.settings-panel-contents div.checkbox:last-child {
+  margin-bottom: 0;
+}
+div.json-tree-js div.side-menu-open {
+  left: 0 !important;
+  transition: var(--json-tree-js-transition);
+  box-shadow: 0 0 10px 10px var(--json-tree-js-color-black);
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Contents
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js div.editable {
+  cursor: text !important;
+  outline: none;
+  box-shadow: none;
+  white-space: pre !important;
+}
+div.json-tree-js div.contents {
+  display: flex;
+  padding: var(--json-tree-js-spacing);
+  margin: 0 !important;
+  width: 100%;
+}
+div.json-tree-js div.contents div.contents-column div.column-control-buttons {
+  border-radius: var(--json-tree-js-border-radius);
+  border: var(--json-tree-js-border-size) solid var(--json-tree-js-paging-column-border-color);
+}
+div.json-tree-js div.contents div.contents-column,
+div.json-tree-js div.contents div.contents-column-multiple {
+  position: relative;
+  flex-basis: 100%;
+  overflow: auto;
+  padding-right: var(--json-tree-js-spacing);
+  margin-right: var(--json-tree-js-spacing);
+  white-space: nowrap;
+  text-align: left;
+}
+div.json-tree-js div.contents div.contents-column div.contents-column-line-numbers,
+div.json-tree-js div.contents div.contents-column-multiple div.contents-column-line-numbers {
+  position: sticky;
+  vertical-align: top;
+  display: inline-block;
+  left: 0;
+  z-index: 2;
+}
+div.json-tree-js div.contents div.contents-column div.contents-column-line-numbers div.contents-column-line-number,
+div.json-tree-js div.contents div.contents-column-multiple div.contents-column-line-numbers div.contents-column-line-number {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  left: 0;
+  padding-right: var(--json-tree-js-spacing);
+}
+div.json-tree-js div.contents div.contents-column div.contents-column-lines,
+div.json-tree-js div.contents div.contents-column-multiple div.contents-column-lines {
+  vertical-align: top;
+  display: inline-block;
+  width: fit-content;
+  height: fit-content;
+  z-index: 1;
+}
+div.json-tree-js div.contents div.contents-column div.column-control-buttons,
+div.json-tree-js div.contents div.contents-column-multiple div.column-control-buttons {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  top: 0;
+  right: 0;
+  background-color: var(--json-tree-js-color-dark-black);
+  border-bottom-left-radius: var(--json-tree-js-border-radius);
+  border-bottom: var(--json-tree-js-border-size) solid var(--json-tree-js-paging-column-border-color);
+  border-left: var(--json-tree-js-border-size) solid var(--json-tree-js-paging-column-border-color);
+  z-index: 50;
+  overflow: hidden;
+}
+div.json-tree-js div.contents div.contents-column div.column-control-buttons button,
+div.json-tree-js div.contents div.contents-column-multiple div.column-control-buttons button {
+  background-color: var(--json-tree-js-button-background-color);
+  border: var(--json-tree-js-border-size) solid var(--json-tree-js-button-border-color);
+  color: var(--json-tree-js-button-text-color);
+  border-radius: var(--json-tree-js-border-radius);
+  padding-top: 5px;
+  padding-bottom: 5px;
+  padding-left: 9px;
+  padding-right: 9px;
+  outline: none;
+  transition: var(--json-tree-js-transition);
+}
+div.json-tree-js div.contents div.contents-column div.column-control-buttons button:disabled,
+div.json-tree-js div.contents div.contents-column-multiple div.column-control-buttons button:disabled {
+  color: var(--json-tree-js-button-color-disabled);
+}
+div.json-tree-js div.contents div.contents-column div.column-control-buttons button:not(.active):not(:disabled):active,
+div.json-tree-js div.contents div.contents-column-multiple div.column-control-buttons button:not(.active):not(:disabled):active {
+  background: var(--json-tree-js-button-background-color-active) !important;
+  color: var(--json-tree-js-button-text-color-active) !important;
+}
+div.json-tree-js div.contents div.contents-column div.column-control-buttons button:not(.active):not(:disabled):hover,
+div.json-tree-js div.contents div.contents-column-multiple div.column-control-buttons button:not(.active):not(:disabled):hover {
+  cursor: pointer;
+  background: var(--json-tree-js-button-background-color-hover);
+  color: var(--json-tree-js-button-text-color-hover);
+}
+div.json-tree-js div.contents div.contents-column div.column-control-buttons button,
+div.json-tree-js div.contents div.contents-column-multiple div.column-control-buttons button {
+  margin: var(--json-tree-js-spacing-title-bar);
+  margin-top: 0;
+  font-weight: var(--json-tree-js-bold-weight-heavy);
+  min-width: 30px;
+  min-height: 30px;
+  text-align: center;
+}
+div.json-tree-js div.contents div.contents-column div.column-control-buttons button:first-child,
+div.json-tree-js div.contents div.contents-column-multiple div.column-control-buttons button:first-child {
+  margin-top: var(--json-tree-js-spacing-title-bar);
+}
+div.json-tree-js div.contents div.contents-column div.column-control-buttons button.expander,
+div.json-tree-js div.contents div.contents-column div.column-control-buttons button.expander-closed,
+div.json-tree-js div.contents div.contents-column-multiple div.column-control-buttons button.expander,
+div.json-tree-js div.contents div.contents-column-multiple div.column-control-buttons button.expander-closed {
+  margin-top: var(--json-tree-js-spacing-title-bar);
+  margin: 0;
+  min-width: calc(30px + var(--json-tree-js-spacing-title-bar) * 2 + var(--json-tree-js-border-size) * 4);
+  width: 100%;
+  border: none;
+  border-top: var(--json-tree-js-border-size) solid var(--json-tree-js-paging-column-border-color);
+  border-radius: 0;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  min-height: 0 !important;
+  font-size: smaller;
+}
+div.json-tree-js div.contents div.contents-column div.column-control-buttons button.expander-closed,
+div.json-tree-js div.contents div.contents-column-multiple div.column-control-buttons button.expander-closed {
+  border-top: none;
+}
+div.json-tree-js div.contents div.contents-column:last-child,
+div.json-tree-js div.contents div.contents-column-multiple:last-child {
+  padding-right: 0;
+  margin-right: 0;
+}
+div.json-tree-js div.contents div.contents-column div.contents-column-line-numbers {
+  background-color: var(--json-tree-js-container-background-color);
+}
+div.json-tree-js div.contents div.contents-column-multiple {
+  background-color: var(--json-tree-js-paging-column-background-color);
+  border: var(--json-tree-js-border-size) solid var(--json-tree-js-paging-column-border-color);
+  padding: var(--json-tree-js-spacing);
+  border-radius: var(--json-tree-js-border-radius);
+}
+div.json-tree-js div.contents div.contents-column-multiple div.contents-column-line-numbers {
+  background-color: var(--json-tree-js-paging-column-background-color);
+  margin-left: calc(-1 * var(--json-tree-js-spacing));
+  left: calc(-1 * var(--json-tree-js-spacing));
+}
+div.json-tree-js div.contents div.contents-column-multiple div.contents-column-line-numbers div.contents-column-line-number {
+  padding-left: var(--json-tree-js-spacing);
+}
+div.json-tree-js div.contents span.array {
+  color: var(--json-tree-js-color-array);
+}
+div.json-tree-js div.contents span.object {
+  color: var(--json-tree-js-color-object);
+}
+div.json-tree-js div.contents span.map {
+  color: var(--json-tree-js-color-map);
+}
+div.json-tree-js div.contents span.set {
+  color: var(--json-tree-js-color-set);
+}
+div.json-tree-js div.contents span.boolean {
+  color: var(--json-tree-js-color-boolean);
+}
+div.json-tree-js div.contents span.float {
+  color: var(--json-tree-js-color-float);
+}
+div.json-tree-js div.contents span.number {
+  color: var(--json-tree-js-color-number);
+}
+div.json-tree-js div.contents span.bigint {
+  color: var(--json-tree-js-color-bigint);
+}
+div.json-tree-js div.contents span.string {
+  color: var(--json-tree-js-color-string);
+}
+div.json-tree-js div.contents span.date {
+  color: var(--json-tree-js-color-date);
+}
+div.json-tree-js div.contents span.symbol {
+  color: var(--json-tree-js-color-symbol);
+}
+div.json-tree-js div.contents span.function {
+  color: var(--json-tree-js-color-function);
+}
+div.json-tree-js div.contents span.unknown {
+  color: var(--json-tree-js-color-unknown);
+}
+div.json-tree-js div.contents span.guid {
+  color: var(--json-tree-js-color-guid);
+}
+div.json-tree-js div.contents span.regexp {
+  color: var(--json-tree-js-color-regexp);
+}
+div.json-tree-js div.contents span.url {
+  color: var(--json-tree-js-color-url);
+}
+div.json-tree-js div.contents span.email {
+  color: var(--json-tree-js-color-email);
+}
+div.json-tree-js div.contents span.html {
+  color: var(--json-tree-js-color-html);
+}
+div.json-tree-js div.contents span.lambda {
+  color: var(--json-tree-js-color-lambda);
+}
+div.json-tree-js div.contents span.null,
+div.json-tree-js div.contents span.undefined {
+  background-color: var(--json-tree-js-color-null);
+  border-radius: var(--json-tree-js-border-radius-editable);
+  padding-left: 3px;
+  padding-right: 3px;
+  color: var(--json-tree-js-color-dark-black);
+}
+div.json-tree-js div.contents span.size {
+  margin-left: calc(var(--json-tree-js-spacing) / 2);
+  font-weight: var(--json-tree-js-bold-weight-light);
+}
+div.json-tree-js div.contents div.last-item {
+  margin-bottom: 0 !important;
+}
+div.json-tree-js div.contents div.no-json {
+  font-style: italic;
+}
+div.json-tree-js div.contents div.no-json span.no-json-text {
+  color: var(--json-tree-js-color-light-gray) !important;
+}
+div.json-tree-js div.contents div.no-json span.no-json-import-text {
+  margin-left: calc(var(--json-tree-js-spacing) / 2);
+  text-decoration: underline;
+  transition: var(--json-tree-js-transition);
+  transition-property: opacity;
+}
+div.json-tree-js div.contents div.no-json span.no-json-import-text:not(.no-hover):hover {
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Drag & Drop
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js div.drag-and-drop-background {
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.7);
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  z-index: 1000;
+  display: none;
+  text-align: center;
+  color: var(--json-tree-js-drag-and-drop-color);
+}
+div.json-tree-js div.drag-and-drop-background div.notice-text {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1rem;
+  pointer-events: none;
+}
+div.json-tree-js div.drag-and-drop-background div.notice-text p {
+  margin: 0;
+  padding: 0;
+}
+div.json-tree-js div.drag-and-drop-background div.notice-text p.notice-text-symbol {
+  font-size: 4.5rem;
+  font-weight: var(--json-tree-js-bold-weight-light);
+}
+div.json-tree-js div.drag-and-drop-background div.notice-text p.notice-text-title {
+  margin-top: calc(var(--json-tree-js-spacing));
+  font-weight: var(--json-tree-js-title-bold-weight);
+}
+div.json-tree-js div.drag-and-drop-background div.notice-text p.notice-text-description {
+  margin-top: calc(var(--json-tree-js-spacing));
+  font-weight: var(--json-tree-js-bold-weight-light);
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Object Type Title
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js div.object-type-title {
+  font-weight: var(--json-tree-js-bold-weight-heavy);
+  text-align: left !important;
+  width: fit-content;
+}
+div.json-tree-js div.object-type-title span.main-title {
+  transition: var(--json-tree-js-transition);
+  transition-property: opacity;
+}
+div.json-tree-js div.object-type-title span.main-title:not(.no-hover):hover {
+  cursor: pointer;
+  opacity: 0.7;
+}
+div.json-tree-js div.object-type-title span.root-name {
+  margin-right: calc(var(--json-tree-js-spacing) / 2);
+  font-weight: var(--json-tree-js-bold-weight-light);
+}
+div.json-tree-js div.object-type-title span.data-array-index {
+  margin-right: calc(var(--json-tree-js-spacing) / 2);
+  font-weight: var(--json-tree-js-bold-weight-light);
+}
+div.json-tree-js div.object-type-title span.split {
+  margin-right: calc(var(--json-tree-js-spacing) / 2);
+  font-weight: var(--json-tree-js-bold-weight-light);
+}
+div.json-tree-js div.object-type-title span.opening-symbol,
+div.json-tree-js div.object-type-title span.closed-symbols {
+  margin-left: calc(var(--json-tree-js-spacing) / 2);
+  font-weight: var(--json-tree-js-bold-weight-light);
+  color: var(--json-tree-js-color-snow-white) !important;
+}
+div.json-tree-js div.object-type-title span.closed-symbols:hover {
+  transition: var(--json-tree-js-transition);
+  transition-property: opacity;
+}
+div.json-tree-js div.object-type-title span.closed-symbols:hover:not(.no-hover):not(.editable):hover {
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Object Type Contents
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js div.object-type-contents {
+  margin-top: calc(var(--json-tree-js-spacing) / 2);
+  text-align: left !important;
+  width: fit-content;
+  margin-bottom: var(--json-tree-js-spacing);
+  position: relative;
+}
+div.json-tree-js div.object-type-contents img {
+  height: 30px;
+  width: 30px;
+  border-radius: var(--json-tree-js-border-radius-editable);
+}
+div.json-tree-js div.object-border {
+  border-left: var(--json-tree-js-border-size) dotted var(--json-tree-js-container-object-left-border-color);
+  margin-left: 5.5px;
+}
+div.json-tree-js div.object-border-no-toggles {
+  margin-left: var(--json-tree-js-border-size);
+}
+div.json-tree-js div.object-border-bottom {
+  position: absolute;
+  bottom: 0;
+  left: var(--json-tree-js-border-size);
+  height: var(--json-tree-js-border-size);
+  width: var(--json-tree-js-spacing-toggle-size);
+  border-bottom: var(--json-tree-js-border-size) dotted var(--json-tree-js-container-object-left-border-color);
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Object Type Contents - Values
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js div.object-type-contents span.opening-symbol,
+div.json-tree-js div.object-type-contents span.closed-symbols {
+  margin-left: calc(var(--json-tree-js-spacing) / 2);
+  font-weight: var(--json-tree-js-bold-weight-light);
+  color: var(--json-tree-js-color-snow-white) !important;
+}
+div.json-tree-js div.object-type-contents span.closed-symbols {
+  transition: var(--json-tree-js-transition);
+  transition-property: opacity;
+}
+div.json-tree-js div.object-type-contents span.closed-symbols:not(.no-hover):not(.editable):hover {
+  cursor: pointer;
+  opacity: 0.7;
+}
+div.json-tree-js div.object-type-contents div.closing-symbol div {
+  display: inline-block !important;
+}
+div.json-tree-js div.object-type-contents div.closing-symbol div.object-type-end {
+  margin-top: 3px;
+  font-weight: var(--json-tree-js-bold-weight-light);
+}
+div.json-tree-js div.object-type-contents div.object-type-value {
+  white-space: nowrap;
+  margin-top: calc(var(--json-tree-js-spacing) / 2);
+  margin-bottom: calc(var(--json-tree-js-spacing) / 2);
+  margin-left: var(--json-tree-js-indentation-size);
+}
+div.json-tree-js div.object-type-contents div.object-type-value div.object-type-value-title {
+  width: fit-content;
+}
+div.json-tree-js div.object-type-contents div.object-type-value img {
+  vertical-align: middle;
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.split {
+  margin-left: calc(var(--json-tree-js-spacing) / 2);
+  margin-right: calc(var(--json-tree-js-spacing) / 2);
+  font-weight: var(--json-tree-js-bold-weight-light);
+}
+div.json-tree-js div.object-type-contents div.object-type-value div.highlight-selected,
+div.json-tree-js div.object-type-contents div.object-type-value div.highlight-compare {
+  padding: calc(var(--json-tree-js-spacing) / 2);
+  border-radius: var(--json-tree-js-border-radius);
+  transition: var(--json-tree-js-transition);
+  transition-property: background-color;
+}
+div.json-tree-js div.object-type-contents div.object-type-value div.highlight-selected {
+  background-color: var(--json-tree-js-highlight-selected-color);
+  border: var(--json-tree-js-border-size) dashed var(--json-tree-js-highlight-selected-border-color);
+}
+div.json-tree-js div.object-type-contents div.object-type-value div.highlight-compare {
+  background-color: var(--json-tree-js-highlight-compare-color);
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.data-type,
+div.json-tree-js div.object-type-contents div.object-type-value span.data-type-color {
+  margin-left: calc(var(--json-tree-js-spacing) / 2);
+  font-style: italic;
+  font-size: smaller;
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.data-type-color {
+  color: var(--json-tree-js-color-light-gray);
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.value,
+div.json-tree-js div.object-type-contents div.object-type-value span.main-title {
+  transition: var(--json-tree-js-transition);
+  transition-property: opacity;
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.value:not(.no-hover):not(.editable):hover,
+div.json-tree-js div.object-type-contents div.object-type-value span.main-title:not(.no-hover):not(.editable):hover {
+  cursor: pointer;
+  opacity: 0.7;
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.editable,
+div.json-tree-js div.object-type-contents div.object-type-value span.editable-name {
+  display: inline-block;
+  background-color: var(--json-tree-js-editable-background-color) !important;
+  color: var(--json-tree-js-editable-text-color) !important;
+  border: var(--json-tree-js-border-size) solid var(--json-tree-js-editable-border-color);
+  outline: none !important;
+  box-shadow: none !important;
+  padding: calc(var(--json-tree-js-spacing) / 2) !important;
+  border-radius: var(--json-tree-js-border-radius-editable) !important;
+  max-width: 250px;
+  cursor: text !important;
+  overflow-x: auto;
+  vertical-align: middle;
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.editable {
+  min-width: 70px;
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.main-title {
+  font-weight: var(--json-tree-js-bold-weight-heavy);
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.non-value {
+  font-style: italic;
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.undefined-or-null {
+  font-style: italic;
+  padding-right: 4px;
+  text-transform: uppercase;
+  font-weight: var(--json-tree-js-bold-weight-medium);
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.no-properties-text {
+  font-style: italic;
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.comma {
+  color: var(--json-tree-js-color-snow-white);
+  font-weight: var(--json-tree-js-bold-weight-medium);
+  margin-left: 2px;
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.open-button,
+div.json-tree-js div.object-type-contents div.object-type-value span.open-button-color {
+  margin-left: calc(var(--json-tree-js-spacing) * 2);
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.open-button:hover,
+div.json-tree-js div.object-type-contents div.object-type-value span.open-button-color:hover {
+  text-decoration: underline;
+  cursor: pointer;
+}
+div.json-tree-js div.object-type-contents div.object-type-value span.open-button-color {
+  color: var(--json-tree-js-color-link);
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Check Box
+    -------------------------------------------------------------------------
+*/
+div.json-tree-js div.checkbox {
+  margin-bottom: calc(var(--json-tree-js-spacing) / 3);
+}
+div.json-tree-js div.checkbox label.checkbox {
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+  cursor: default;
+  display: inline-block;
+  position: relative;
+  padding-left: 20px;
+  padding-top: 1px;
+  padding-bottom: 2px;
+  color: var(--json-tree-js-color-snow-white);
+}
+div.json-tree-js div.checkbox label.checkbox input {
+  display: none !important;
+}
+div.json-tree-js div.checkbox label.checkbox input:checked ~ span.check-mark {
+  background-color: var(--json-tree-js-checkbox-background-color-checked);
+  border: var(--json-tree-js-border-size) solid var(--json-tree-js-checkbox-border-color-checked);
+}
+div.json-tree-js div.checkbox label.checkbox input:checked ~ span.check-mark::before {
+  display: block;
+}
+div.json-tree-js div.checkbox label.checkbox input:disabled ~ span.check-mark, div.json-tree-js div.checkbox label.checkbox input:disabled ~ span.text {
+  opacity: 0.5;
+}
+div.json-tree-js div.checkbox label.checkbox input:disabled ~ span.check-mark {
+  border: var(--json-tree-js-border-size) solid var(--json-tree-js-color-black) !important;
+}
+div.json-tree-js div.checkbox label.checkbox span.text {
+  margin-left: calc(var(--json-tree-js-spacing) / 3);
+}
+div.json-tree-js div.checkbox label.checkbox span.additional-text {
+  margin-left: calc(var(--json-tree-js-spacing) / 2);
+}
+div.json-tree-js div.checkbox label.checkbox span.check-mark {
+  position: absolute;
+  top: 1px;
+  left: 0;
+  height: 15px;
+  width: 15px;
+  background-color: var(--json-tree-js-checkbox-background-color);
+  border-radius: var(--json-tree-js-border-radius-editable);
+  border: var(--json-tree-js-border-size) solid var(--json-tree-js-checkbox-border-color);
+  transition: var(--json-tree-js-transition);
+}
+div.json-tree-js div.checkbox label.checkbox span.check-mark::before {
+  content: "";
+  transform: rotate(45deg);
+  position: absolute;
+  display: none;
+  left: 4px;
+  top: 0.5px;
+  width: 6px;
+  height: 11px;
+  border: solid var(--json-tree-js-color-black);
+  border-width: 0 3px 3px 0;
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Context Menu
+    -------------------------------------------------------------------------
+*/
+div.jsontree-js-context-menu {
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+  cursor: default;
+  box-sizing: border-box;
+  line-height: normal;
+  font-family: var(--json-tree-js-default-font);
+  animation: fade-in-animation var(--json-tree-js-animation-length);
+  position: absolute;
+  background-color: var(--json-tree-js-context-menu-background-color);
+  border: var(--json-tree-js-border-size) solid var(--json-tree-js-context-menu-border-color);
+  color: var(--json-tree-js-context-menu-text-color);
+  border-radius: var(--json-tree-js-border-radius);
+  z-index: 2000;
+  max-width: 300px;
+  font-size: var(--json-tree-js-spacing-font-size);
+  font-weight: var(--json-tree-js-bold-weight-light);
+  overflow: hidden;
+  display: none;
+}
+div.jsontree-js-context-menu div.context-menu-item {
+  border-bottom: var(--json-tree-js-border-size) dotted var(--json-tree-js-tooltip-border-color);
+  padding: var(--json-tree-js-spacing);
+  transition: var(--json-tree-js-transition);
+  transition-property: background-color, color;
+  padding-right: 40px;
+}
+div.jsontree-js-context-menu div.context-menu-item span.symbol {
+  margin-right: var(--json-tree-js-spacing);
+  font-weight: var(--json-tree-js-bold-weight-heavy);
+}
+div.jsontree-js-context-menu div.context-menu-item span.text {
+  font-weight: var(--json-tree-js-bold-weight-light);
+}
+div.jsontree-js-context-menu div.context-menu-item:active {
+  background: var(--json-tree-js-context-menu-item-background-color-active) !important;
+  color: var(--json-tree-js-context-menu-item-text-color-active) !important;
+}
+div.jsontree-js-context-menu div.context-menu-item:hover {
+  cursor: pointer;
+  background: var(--json-tree-js-context-menu-item-background-color-hover);
+  color: var(--json-tree-js-context-menu-item-text-color-hover);
+}
+div.jsontree-js-context-menu div.context-menu-item:last-child {
+  border-bottom: none;
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - ToolTip
+    -------------------------------------------------------------------------
+*/
+div.jsontree-js-tooltip,
+div.jsontree-js-tooltip-value {
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+  cursor: default;
+  box-sizing: border-box;
+  line-height: normal;
+  font-family: var(--json-tree-js-default-font);
+  animation: fade-in-animation var(--json-tree-js-animation-length);
+  position: absolute;
+  background-color: var(--json-tree-js-tooltip-background-color);
+  border: var(--json-tree-js-border-size) solid var(--json-tree-js-tooltip-border-color);
+  color: var(--json-tree-js-tooltip-text-color);
+  border-radius: var(--json-tree-js-border-radius);
+  z-index: 2000;
+  max-width: 300px;
+  padding: var(--json-tree-js-spacing);
+  font-size: var(--json-tree-js-spacing-font-size);
+  font-weight: var(--json-tree-js-bold-weight-light);
+  display: none;
+}
+
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Animations
+    -------------------------------------------------------------------------
+*/
+@keyframes fade-in-animation {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+/*
+    -------------------------------------------------------------------------
+    JsonTree.js - Scroll Bars
+    -------------------------------------------------------------------------
+*/
+.jsontree-js-scroll-bars::-webkit-scrollbar {
+  width: var(--json-tree-js-scroll-bar-size);
+  height: var(--json-tree-js-scroll-bar-size);
+  border-radius: var(--json-tree-js-border-radius);
+}
+.jsontree-js-scroll-bars::-webkit-scrollbar-track {
+  -webkit-box-shadow: var(--json-tree-js-scroll-bar-border-style);
+  box-shadow: var(--json-tree-js-scroll-bar-border-style);
+  border-radius: var(--json-tree-js-border-radius);
+}
+.jsontree-js-scroll-bars::-webkit-scrollbar-thumb {
+  -webkit-box-shadow: var(--json-tree-js-scroll-bar-border-style);
+  box-shadow: var(--json-tree-js-scroll-bar-border-style);
+  background: var(--json-tree-js-color-snow-white);
+  border-radius: var(--json-tree-js-border-radius);
+}
+.jsontree-js-scroll-bars::-webkit-scrollbar-thumb:hover {
+  background-color: var(--json-tree-js-scroll-bar-hover-background-color);
+}
+.jsontree-js-scroll-bars::-webkit-scrollbar-thumb:active {
+  background-color: var(--json-tree-js-color-light-gray);
+}
+.jsontree-js-scroll-bars::-webkit-scrollbar-corner {
+  background-color: transparent;
+}
+
+/*# sourceMappingURL=jsontree.js.css.map */
