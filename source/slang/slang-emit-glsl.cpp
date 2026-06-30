@@ -1446,6 +1446,9 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         m_writer->emit("HF");
                         break;
                     case kIROp_DoubleType:
+                        // No `_requireBaseType` here: double is gated by GLSL `#version`, not by an
+                        // extension, and `ShaderExtensionTracker` has no `BaseType::Double` mapping,
+                        // so registering it would be a no-op.
                         m_writer->emit("LF");
                         break;
                     default:

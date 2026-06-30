@@ -1,4 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target glsl -profile glsl_450 -capability GL_EXT_shader_explicit_arithmetic_types -stage compute -entry computeMain
+// Also round-trip the emitted GLSL through glslang (-emit-spirv-via-glsl) so this guards validity,
+// not just the textual form: if the `#extension` directive were missing, glslang would reject the
+// `HF` suffix and produce no SPIR-V, failing the OpEntryPoint check below.
+//TEST:SIMPLE(filecheck=GLSLSPV): -target spirv-asm -emit-spirv-via-glsl -profile glsl_450 -capability GL_EXT_shader_explicit_arithmetic_types -stage compute -entry computeMain
 
 // Regression test for issue #11836.
 //
@@ -28,3 +32,7 @@ void computeMain()
 // ...and the half literal that requires it must actually survive to emission (the exact float
 // spelling is left loose, but the `HF` suffix is the point).
 // CHECK: {{61440[.0-9]*HF}}
+
+// The glslang round-trip must succeed (it would fail to produce SPIR-V if the extension directive
+// were missing, since glslang rejects the `HF` suffix without it).
+// GLSLSPV: OpEntryPoint GLCompute
