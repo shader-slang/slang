@@ -34,18 +34,6 @@ struct PropagateConstExprContext
     DiagnosticSink* getSink() { return sink; }
 };
 
-bool isConstExpr(IRType* fullType)
-{
-    if (auto rateQualifiedType = as<IRRateQualifiedType>(fullType))
-    {
-        auto rate = rateQualifiedType->getRate();
-        if (const auto constExprRate = as<IRConstExprRate>(rate); constExprRate)
-            return true;
-    }
-
-    return false;
-}
-
 bool isConstExpr(IRInst* value)
 {
     // Certain IR value ops are implicitly `constexpr`
@@ -71,7 +59,7 @@ bool isConstExpr(IRInst* value)
         break;
     }
 
-    if (isConstExpr(value->getFullType()))
+    if (isConstExprRateQualifiedType(value->getFullType()))
         return true;
 
     return false;
@@ -505,7 +493,7 @@ bool propagateConstExprBackward(PropagateConstExprContext* context, IRGlobalValu
                         for (UInt pp = 0; pp < paramCount; ++pp)
                         {
                             auto paramType = caleeFuncType->getParamType(pp);
-                            if (isConstExpr(paramType))
+                            if (isConstExprRateQualifiedType(paramType))
                             {
                                 auto arg = callInst->getOperand(firstCallArg + pp);
                                 if (maybeMarkConstExprBackwardPass(context, arg))
