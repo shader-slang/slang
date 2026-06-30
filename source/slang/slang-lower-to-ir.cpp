@@ -1568,6 +1568,32 @@ static String getNameForNameHint(IRGenContext* context, Decl* decl)
     if (auto moduleParentDecl = as<ModuleDecl>(parentDecl))
         parentDecl = moduleParentDecl->parentDecl;
 
+    // An `extension` declaration is anonymous, so its recursive name hint would
+    // be empty; without special handling a method in `extension Example { ... }`
+    // would get the bare hint `extensionMethod` rather than the qualified
+    // `Example.extensionMethod` that struct-body methods receive. Base the
+    // qualifier on the extended type instead — the same target-type basis that
+    // symbol mangling uses for an `ExtensionDecl` (`emitQualifiedName`,
+    // slang-mangle.cpp).
+    //
+    // Extensions can only target nominal types: the checker rejects anything
+    // else (e.g. `extension<T> T` → error 30850, "type 'T' cannot be extended"),
+    // so every `ExtensionDecl` reaching here has a `targetType` that is a
+    // `DeclRefType` of a `ContainerDecl` — named structs/interfaces/enums,
+    // builtins (`float`), vectors (`vector`), typedefs (resolved to the
+    // underlying type's decl), and generic instances (qualified by the
+    // un-specialized name, `Box`). All of those qualify. The `as<ContainerDecl>`
+    // cast is required because `parentDecl` is `ContainerDecl*` while `getDecl()`
+    // returns `Decl*`; its null result, caught by the existing `if (!parentDecl)`
+    // guard below, is a defensive soft-fallback rather than an assert — a name
+    // hint is cosmetic, so an unforeseen target shape degrading to the
+    // unqualified leaf is harmless, whereas crashing here would not be.
+    if (auto extensionParentDecl = as<ExtensionDecl>(parentDecl))
+    {
+        if (auto targetDeclRefType = as<DeclRefType>(extensionParentDecl->targetType))
+            parentDecl = as<ContainerDecl>(targetDeclRefType->getDeclRef().getDecl());
+    }
+
     if (!parentDecl)
     {
         return leafName->text;
@@ -6016,7 +6042,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     }
                     else if (operand.token.type == TokenType::StringLiteral)
                     {
-                        const auto v = getStringLiteralTokenValue(operand.token);
+                        const auto v =
+                            getStringLiteralTokenValue(operand.token, context->getSink());
                         return builder->emitSPIRVAsmOperandLiteral(
                             builder->getStringValue(v.getUnownedSlice()));
                     }
@@ -9637,6 +9664,38 @@ static HumaneSourceLoc _getDebugHumaneLoc(
     return humaneLoc;
 }
 
+// Returns true if `funcDecl` is a constructor that Slang synthesized (a default
+// or member-wise initializer) rather than one the user wrote. Such a function has
+// no user-authored body; its source locations are inherited from the struct and
+// member declarations (see `createCtor` and `synthesizeCtorBodyForMemberVar` in
+// slang-check-decl.cpp). Emitting source-level debug info for it would let a
+// debugger step into the compiler-generated initializer and walk the struct/member
+// declaration lines, so callers suppress debug info for these functions (#11550).
+//
+// Discriminating by flavor (not by the `$init` name) is required: a user-written
+// `__init` is also mangled to `<Type>.$init`, but carries `UserDefined` flavor and
+// must keep its debug info. The IR `IRConstructorDecoration` is attached only after
+// the function's `IRDebugLocationDecoration`, so the AST flavor is what is available in time.
+//
+// The two `maybe*` call sites below (`maybeAddDebugLocationDecoration` on the IRFunc
+// and `maybeEmitDebugLine` on the body) self-gate on this predicate and are BOTH
+// load-bearing and non-redundant: a function's `IRDebugLocationDecoration` and its
+// body's `DebugLine`s are produced independently, so neither gate subsumes the other.
+// They key on `context->funcDecl`, which is the function currently being lowered (the
+// ctor's own IRFunc for the decoration, and the ctor again for the statements lowered
+// under its sub-context); module-level lowering runs with `funcDecl == nullptr`, so the
+// gate is a no-op there. A third caller, at the constructor-lowering site, gates the
+// `this` debug-variable emission (#11565); it is independently load-bearing because the
+// `addNameHint` there, unlike these two helpers, has no internal synthesized-ctor gate.
+static bool isSynthesizedConstructorDecl(FunctionDeclBase* funcDecl)
+{
+    auto ctorDecl = as<ConstructorDecl>(funcDecl);
+    if (!ctorDecl)
+        return false;
+    return ctorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault) ||
+           ctorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
+}
+
 void maybeEmitDebugLine(
     IRGenContext* context,
     StmtLoweringVisitor* visitor,
@@ -9646,6 +9705,11 @@ void maybeEmitDebugLine(
 {
     // Only emit debug line info if debug level is at least Minimal
     if (context->debugInfoLevel == DebugInfoLevel::None)
+        return;
+
+    // A synthesized initializer has no user-authored source, so it must not emit
+    // steppable debug lines (see isSynthesizedConstructorDecl).
+    if (isSynthesizedConstructorDecl(context->funcDecl))
         return;
 
     if (!allowNullStmt)
@@ -9676,6 +9740,13 @@ void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
 {
     // Only emit debug location info if debug level is at least Minimal
     if (context->debugInfoLevel == DebugInfoLevel::None)
+        return;
+
+    // A synthesized initializer must not receive a source-level debug location:
+    // giving its IRFunc one would produce a DebugFunction/DebugScope (and, via
+    // insertDebugValueStore, param DebugVar/DebugValue) and let a debugger step
+    // into compiler-generated code (see isSynthesizedConstructorDecl).
+    if (isSynthesizedConstructorDecl(context->funcDecl))
         return;
 
     IRInst* debugSourceInst = getOrEmitDebugSource(context, inst->sourceLoc);
@@ -14013,18 +14084,67 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto constructorDecl = as<ConstructorDecl>(decl);
             if (constructorDecl)
             {
+                // The IR value that stands for `this` inside the initializer body: either a
+                // caller-provided return-destination out-parameter (for a non-copyable result
+                // type, see `maybeAddReturnDestinationParam`) or, in the common by-value case, a
+                // fresh local holding the value the initializer constructs and returns.
+                IRInst* thisStorage = nullptr;
                 if (subContext->returnDestination.flavor != LoweredValInfo::Flavor::None)
+                {
                     subContext->thisVal = subContext->returnDestination;
+                    // The return destination is always an l-value pointer:
+                    // maybeAddReturnDestinationParam lowers it as an `Out` parameter, which
+                    // becomes `LoweredValInfo::ptr(...)`. Assert that invariant and read `.val`
+                    // (the `LoweredValInfo` union holds an `IRInst*` in `val` only for
+                    // Ptr/Simple) — that pointer is the object under construction.
+                    SLANG_ASSERT(
+                        subContext->returnDestination.flavor == LoweredValInfo::Flavor::Ptr);
+                    thisStorage = subContext->returnDestination.val;
+                }
                 else
                 {
                     auto thisVar = subContext->irBuilder->emitVar(irResultType);
                     subContext->thisVal = LoweredValInfo::ptr(thisVar);
+                    thisStorage = thisVar;
 
                     // For class-typed objects, we need to allocate it from heap.
                     if (isClassType(irResultType))
                     {
                         auto allocatedObj = subContext->irBuilder->emitAllocObj(irResultType);
                         subContext->irBuilder->emitStore(thisVar, allocatedObj);
+                    }
+                }
+
+                // For a user-written initializer compiled with debug info, expose the object
+                // under construction as a `this` debug variable, so a debugger stopped inside
+                // `__init` can inspect the members being initialized just as it can inside a
+                // `[mutating]` method. `thisStorage` is exactly that object (the value the
+                // initializer constructs and returns). Naming it lets the debug-var pass in
+                // slang-ir-insert-debug-value-store.cpp surface it: a return-destination
+                // parameter is emitted by that pass's parameter loop, whereas a fresh local is
+                // emitted by its local-var loop only if it also carries an
+                // IRDebugLocationDecoration, which we add below. Synthesized initializers are
+                // excluded via the shared isSynthesizedConstructorDecl() predicate: they have no
+                // user-authored body, so a steppable `this` would only expose compiler-generated
+                // code (the same rationale that suppresses their debug lines for #11550). Unlike
+                // maybeAddDebugLocationDecoration/maybeEmitDebugLine, addNameHint has no internal
+                // synthesized-ctor gate, so this outer check is the only thing keeping a
+                // synthesized initializer's object from being named `this`.
+                if (thisStorage && !isSynthesizedConstructorDecl(constructorDecl) &&
+                    subContext->debugInfoLevel != DebugInfoLevel::None)
+                {
+                    addNameHint(subContext, thisStorage, "this");
+
+                    // The fresh by-value local is surfaced by the pass's local-var loop only if
+                    // it carries an IRDebugLocationDecoration, so add one.
+                    // maybeAddDebugLocationDecoration reads the var's sourceLoc, which emitVar
+                    // stamps from the IR builder's current source location — established by the
+                    // enclosing function lowering, not in this block. A return-destination
+                    // parameter is surfaced by the parameter loop instead and needs no such
+                    // decoration.
+                    if (auto thisVar = as<IRVar>(thisStorage))
+                    {
+                        maybeAddDebugLocationDecoration(subContext, thisVar);
                     }
                 }
 

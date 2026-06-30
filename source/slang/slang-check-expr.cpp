@@ -2759,11 +2759,24 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
         auto witness =
             findThisTypeWitness(SubstitutionSet(declRef), as<InterfaceDecl>(decl->parentDecl));
 
-        auto val = WitnessLookupIntVal::tryFold(
-            m_astBuilder,
-            witness,
-            decl,
-            declRef.substitute(m_astBuilder, decl->type.type));
+        auto foldType = declRef.substitute(m_astBuilder, decl->type.type);
+        auto val = WitnessLookupIntVal::tryFold(m_astBuilder, witness, decl, foldType);
+
+        // A signature-type-position fold (e.g. `float[VALUE::COUNT]`) can run before the
+        // conforming type's witness table is built, leaving a symbolic result; ensure its
+        // conformances and re-fold so the value matches the concrete constant the in-body
+        // path produces.
+        if (as<WitnessLookupIntVal>(val))
+        {
+            SLANG_ASSERT(witness);
+            if (auto subDeclRefType = as<DeclRefType>(witness->getSub()))
+            {
+                ensureDecl(
+                    subDeclRefType->getDeclRef().getDecl(),
+                    DeclCheckState::ReadyForConformances);
+                val = WitnessLookupIntVal::tryFold(m_astBuilder, witness, decl, foldType);
+            }
+        }
         return as<IntVal>(val);
     }
 

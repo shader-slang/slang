@@ -250,7 +250,7 @@ extern "C"
     auto succ = glslang_disassembleSPIRVWithResult(contents, contentsSize, &result);
     if (result)
         fprintf(stdout, "%s\n", result);
-    delete result;
+    delete[] result;
     return succ;
 }
 
