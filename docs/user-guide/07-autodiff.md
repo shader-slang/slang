@@ -327,9 +327,9 @@ Here is an example of creating a differentiable buffer pointer type, and using i
 You can find an interactive sample on the Slang playground [here](https://shader-slang.org/slang-playground/?target=WGSL&code=eJy1VF1v2kAQfPevWEWKYhfkmFdMkBrRSpHKhyBSpdIIHfgcTjFn9z4gEeK_d-_ONsZp1L6UF8MxOzszuz62K3KhoMjI27PINU9iTyqhNwrGb_c6TamY5YwrKqAPDyNmDihXjKwzOlPi8a2g3tED_NzewuOWQnKGZFAQpGYSCM_VFikYl4rwDYU8bdOHlkQhH8kYkTBq8ty10bFn4fPvC6tVC5q4_wdplhM1hLVOYwvRiMd2qaQq9k5Yhzq_Mf4CBDZaqnwHCRVsTxTbU295TzYvByKSUX3mI1-yWh-S4Mmz3GAO_HY4Rdd1Yjyhr0EZiaCojEMRopplEToV0HGgJ5Rj1UxyRUFtkRkzgnWpoCELJHvmxJg0WUrFsgwThRvGb9pxM8xxn7MEKtV-M0cc2Awhg5b44aX6LjifyVSryknbrmm7KpTAyRRh4pKuzqzb-kfLNHTuLLE1v7zcpypgqXfTdPFLE0HlIMPiCe4e9h2-T73SVxbmEgVFYVqux3JMXh8QJ_0JTs_icgG-s2qQMT4GMMFHpxNYgKM7U-5JtjJQO3SMiQVxjTDt0I6DfHJP9-_Ja84fcc7u-SXr9-efJyO_F6Guj5eY8UIrrL2s_PFlPl38rdRujym121AItDwmjPsfDdTN8ug6diE6OSO20L_6yoRU0IuMR01lH37yqzKIPybaixqRNniukz5cp1iMQXbLTJUwqQblyErgQu_MHSHdEpivaVtCyXOxLL1oaAhrtndra1Ip9_boInJeqxtsRiTeVvZFMk0LV4dH0g3D3VL4Xq3Mgvvt5oFfO_6X986Zr0UF3bq6F0Zlvs1UzreSEYc9dabgEIrQXR3_ZT61unJKp98JDfhi).
 
 This example uses GPU resource types (`RWStructuredBuffer`) and global shader
-parameters, so compile it with `slangc` to a GPU target (e.g. SPIR-V, DXIL, or
-CUDA). It cannot be run with the `slangi` CPU interpreter, which does not
-support global parameters or GPU resource types.
+parameters, so compile it with `slangc` to a GPU target. It cannot be run with
+the `slangi` CPU interpreter, which does not support global parameters or GPU
+resource types.
 ```csharp
 struct MyBufferPointer : IDifferentiablePtrType
 {

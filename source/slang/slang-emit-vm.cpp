@@ -340,11 +340,21 @@ public:
         bool diagnosed = false;
         for (auto block : func->getBlocks())
         {
+            // Mirror emitFunction, which skips unreachable blocks; an operand reference
+            // in a block that is never emitted cannot cause an abort.
+            if (isUnreachableBlock(block))
+                continue;
+
             for (auto inst : block->getChildren())
             {
                 for (UInt i = 0; i < inst->getOperandCount(); i++)
                 {
-                    if (auto globalParam = as<IRGlobalParam>(inst->getOperand(i)))
+                    // Use findReferencedGlobalParam (not a direct as<IRGlobalParam>) so
+                    // this mirrors the detection in ensureInst: an operand can be a
+                    // global-scope load of the parameter rather than the parameter
+                    // itself, and the consuming instruction's handler may abort before
+                    // ensureInst is reached.
+                    if (auto globalParam = findReferencedGlobalParam(inst->getOperand(i)))
                     {
                         diagnoseGlobalParam(globalParam);
                         diagnosed = true;

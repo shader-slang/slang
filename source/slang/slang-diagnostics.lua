@@ -5284,7 +5284,7 @@ err(
 err(
     "global-param-not-supported-by-interpreter",
     52013,
-    "global shader parameter '~name' is not supported by the Slang interpreter (slangi), which runs on the CPU and does not support global parameters or GPU resource types; compile this program with slangc to a GPU target (e.g. SPIR-V, DXIL, CUDA) instead."
+    "global shader parameter '~name' is not supported by the Slang interpreter (slangi), which runs on the CPU and does not support global parameters or GPU resource types; compile this program with slangc to a GPU target instead."
 )
 
 warning(
