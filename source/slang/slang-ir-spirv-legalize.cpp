@@ -14,6 +14,7 @@
 #include "slang-ir-legalize-composite-select.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-mesh-outputs.h"
+#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-lower-copy-logical.h"
@@ -827,11 +828,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         if (systemValueAttr)
         {
-            // TODO: is this needed?
             String semanticName = systemValueAttr->getName();
             semanticName = semanticName.toLower();
             if (semanticName == "sv_pointsize")
+            {
                 result = AddressSpace::BuiltinInput;
+            }
+            else if (semanticName == "sv_primitiveid" && result == AddressSpace::Generic)
+            {
+                if (isRayTracingHitStage(getReferencingEntryPointStage(varInst)))
+                {
+                    result = AddressSpace::BuiltinInput;
+                }
+            }
         }
 
         switch (result)

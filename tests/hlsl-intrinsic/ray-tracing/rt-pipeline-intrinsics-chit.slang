@@ -2,6 +2,12 @@
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage closesthit
 //   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage closesthit -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_SPIRV):-target spirv-assembly -entry main_sv_primitiveid_uint -stage closesthit
+//TEST:SIMPLE(filecheck=SVPID_DXIL):-target dxil-assembly -entry main_sv_primitiveid_uint -stage closesthit -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_INT_DXIL):-target dxil-assembly -entry main_sv_primitiveid_int -stage closesthit -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_UNUSED_DXIL):-target dxil-assembly -entry main_sv_primitiveid_unused -stage closesthit -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_UNUSED_GLSL):-target glsl -entry main_sv_primitiveid_unused -stage closesthit -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_UNUSED_CUDA):-target cuda -entry main_sv_primitiveid_unused -stage closesthit -DNOMOTION
 
 // SPIRV-NOT: OpCapability RayQueryKHR
 // SPIRV-DAG: RayTracingKHR
@@ -63,6 +69,26 @@
 // DXIL: call i32 @dx.op.hitKind.i32
 
 // DXIL: call void @dx.op.callShader.struct.CallableParams_0
+
+// SVPID_SPIRV: OpEntryPoint ClosestHitKHR
+// SVPID_SPIRV-DAG: OpDecorate %{{.*}} BuiltIn PrimitiveId
+
+// SVPID_DXIL: call i32 @dx.op.primitiveIndex.i32
+
+// SVPID_INT_DXIL: call i32 @dx.op.primitiveIndex.i32
+// SVPID_INT_DXIL: sitofp i32
+
+// SVPID_UNUSED_DXIL: define void @{{.*}}main_sv_primitiveid_unused
+// SVPID_UNUSED_DXIL-NOT: dx.op.primitiveIndex.i32
+// SVPID_UNUSED_DXIL: ret void
+
+// SVPID_UNUSED_GLSL: void main()
+// SVPID_UNUSED_GLSL-NOT: gl_PrimitiveID
+// SVPID_UNUSED_GLSL: payload_0.RayHitT_0 = attribs_0.barycentrics_0.x
+
+// SVPID_UNUSED_CUDA: __global__ void __closesthit__main_sv_primitiveid_unused
+// SVPID_UNUSED_CUDA-NOT: optixGetPrimitiveIndex()
+// SVPID_UNUSED_CUDA: optixSetPayload_0
 
 
 [[vk::binding(0)]]
@@ -284,4 +310,39 @@ void main( inout RayPayload payload, in BuiltInTriangleIntersectionAttributes at
     val += params.value;
 
     payload.RayHitT = val;
+}
+
+[shader("closesthit")]
+void main_sv_primitiveid_uint(
+    inout RayPayload payload,
+    in BuiltInTriangleIntersectionAttributes attribs,
+    uint primitiveID : SV_PrimitiveID)
+{
+    float3 barycentrics = float3(
+        1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
+        attribs.barycentrics.x,
+        attribs.barycentrics.y);
+    payload.RayHitT = float(primitiveID) + barycentrics.x + barycentrics.y + barycentrics.z;
+}
+
+[shader("closesthit")]
+void main_sv_primitiveid_int(
+    inout RayPayload payload,
+    in BuiltInTriangleIntersectionAttributes attribs,
+    int primitiveID : SV_PrimitiveID)
+{
+    float3 barycentrics = float3(
+        1.0 - attribs.barycentrics.x - attribs.barycentrics.y,
+        attribs.barycentrics.x,
+        attribs.barycentrics.y);
+    payload.RayHitT = float(primitiveID) + barycentrics.x + barycentrics.y + barycentrics.z;
+}
+
+[shader("closesthit")]
+void main_sv_primitiveid_unused(
+    inout RayPayload payload,
+    in BuiltInTriangleIntersectionAttributes attribs,
+    uint primitiveID : SV_PrimitiveID)
+{
+    payload.RayHitT = attribs.barycentrics.x + attribs.barycentrics.y;
 }

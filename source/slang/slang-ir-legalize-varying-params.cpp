@@ -37,6 +37,19 @@ SystemValueSemanticName convertSystemValueSemanticNameToEnum(String rawSemanticN
     return systemValueSemanticName;
 }
 
+bool isRayTracingHitStage(Stage stage)
+{
+    switch (stage)
+    {
+    case Stage::Intersection:
+    case Stage::AnyHit:
+    case Stage::ClosestHit:
+        return true;
+    default:
+        return false;
+    }
+}
+
 // This pass implements logic to "legalize" the varying parameter
 // signature of an entry point.
 //
@@ -328,6 +341,884 @@ IRInst* tryConvertValue(IRBuilder& builder, IRInst* val, IRType* toType)
     return builder.emitCast(toType, val);
 }
 
+static bool hasPrimitiveIDSemanticDecoration(IRInst* inst)
+{
+    if (auto semanticDecor = inst->findDecoration<IRSemanticDecoration>())
+    {
+        if (semanticDecor->getSemanticName().caseInsensitiveEquals(toSlice("sv_primitiveid")))
+            return true;
+    }
+
+    return false;
+}
+
+static bool hasPrimitiveIDSystemValueLayout(IRVarLayout* varLayout)
+{
+    if (!varLayout)
+        return false;
+
+    auto systemValueAttr = varLayout->findSystemValueSemanticAttr();
+    if (!systemValueAttr)
+        return false;
+
+    return systemValueAttr->getName().caseInsensitiveEquals(toSlice("sv_primitiveid"));
+}
+
+// Hit-stage SV_PrimitiveID is handled here because it is a runtime-provided
+// ray-tracing builtin that maps to target intrinsics rather than a user varying.
+static bool isPrimitiveIDSystemValueParam(IRParam* param)
+{
+    if (hasPrimitiveIDSemanticDecoration(param))
+        return true;
+
+    auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecor)
+        return false;
+
+    auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+    return hasPrimitiveIDSystemValueLayout(varLayout);
+}
+
+static bool isPrimitiveIDSystemValueStructField(IRStructField* field, IRVarLayout* fieldLayout)
+{
+    return hasPrimitiveIDSemanticDecoration(field->getKey()) ||
+           hasPrimitiveIDSystemValueLayout(fieldLayout);
+}
+
+static bool hasRayTracingPrimitiveIndexTargetIntrinsicDecoration(
+    IRFunc* func,
+    CapabilityName capabilityName,
+    UnownedStringSlice const& definition)
+{
+    auto expectedCaps = CapabilitySet(capabilityName);
+    for (auto decoration : func->getDecorations())
+    {
+        auto targetIntrinsic = as<IRTargetIntrinsicDecoration>(decoration);
+        if (!targetIntrinsic)
+            continue;
+
+        if (targetIntrinsic->getTargetCaps() == expectedCaps &&
+            targetIntrinsic->getDefinition() == definition)
+            return true;
+    }
+
+    return false;
+}
+
+static bool isRayTracingPrimitiveIndexFunc(IRBuilder& builder, IRFunc* func)
+{
+    if (!func->findDecoration<IRBuiltinDecoration>() ||
+        func->findDecoration<IRHighLevelDeclDecoration>() ||
+        func->findDecoration<IRUserExternDecoration>())
+    {
+        return false;
+    }
+
+    auto nameHint = func->findDecoration<IRNameHintDecoration>();
+    if (!nameHint || nameHint->getName() != "__slang_ray_tracing_primitive_index")
+        return false;
+
+    auto funcType = as<IRFuncType>(func->getDataType());
+    if (!funcType || funcType->getParamCount() != 0 ||
+        funcType->getResultType() != builder.getUIntType())
+        return false;
+
+    return hasRayTracingPrimitiveIndexTargetIntrinsicDecoration(
+               func,
+               CapabilityName::hlsl,
+               UnownedStringSlice("PrimitiveIndex")) &&
+           hasRayTracingPrimitiveIndexTargetIntrinsicDecoration(
+               func,
+               CapabilityName::glsl,
+               UnownedStringSlice("(gl_PrimitiveID)")) &&
+           hasRayTracingPrimitiveIndexTargetIntrinsicDecoration(
+               func,
+               CapabilityName::cuda,
+               UnownedStringSlice("optixGetPrimitiveIndex"));
+}
+
+static IRFunc* findRayTracingPrimitiveIndexFunc(IRModule* module, IRBuilder& builder)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+
+        if (isRayTracingPrimitiveIndexFunc(builder, func))
+            return func;
+    }
+
+    return nullptr;
+}
+
+static IRFunc* getRayTracingPrimitiveIndexFunc(IRModule* module)
+{
+    IRBuilder builder(module);
+    if (auto existingFunc = findRayTracingPrimitiveIndexFunc(module, builder))
+        return existingFunc;
+
+    builder.setInsertInto(module->getModuleInst());
+
+    auto primitiveIndexFunc = builder.createFunc();
+    builder.addNameHintDecoration(
+        primitiveIndexFunc,
+        UnownedStringSlice("__slang_ray_tracing_primitive_index"));
+    builder.addBuiltinDecoration(primitiveIndexFunc);
+    builder.setDataType(primitiveIndexFunc, builder.getFuncType(0, nullptr, builder.getUIntType()));
+    builder.addTargetIntrinsicDecoration(
+        primitiveIndexFunc,
+        CapabilitySet(CapabilityName::hlsl),
+        UnownedTerminatedStringSlice("PrimitiveIndex"));
+    builder.addTargetIntrinsicDecoration(
+        primitiveIndexFunc,
+        CapabilitySet(CapabilityName::glsl),
+        UnownedTerminatedStringSlice("(gl_PrimitiveID)"));
+    builder.addTargetIntrinsicDecoration(
+        primitiveIndexFunc,
+        CapabilitySet(CapabilityName::cuda),
+        UnownedTerminatedStringSlice("optixGetPrimitiveIndex"));
+    return primitiveIndexFunc;
+}
+
+static IRInst* emitRayTracingPrimitiveIndexValue(
+    IRModule* module,
+    IRBuilder& builder,
+    IRType* paramType)
+{
+    IRType* valueType = paramType;
+    if (auto borrowInParamType = as<IRBorrowInParamType>(valueType))
+        valueType = borrowInParamType->getValueType();
+    else if (auto ptrType = as<IRPtrTypeBase>(valueType))
+        valueType = ptrType->getValueType();
+
+    auto primitiveIndexCall = builder.emitCallInst(
+        builder.getUIntType(),
+        getRayTracingPrimitiveIndexFunc(module),
+        0,
+        nullptr);
+
+    if (valueType == builder.getUIntType())
+        return primitiveIndexCall;
+
+    return tryConvertValue(builder, primitiveIndexCall, valueType);
+}
+
+static IRInst* emitRayTracingPrimitiveIDValue(
+    IRModule* module,
+    IRBuilder& builder,
+    IRType* paramType,
+    IRStructField* field,
+    IRVarLayout* varLayout,
+    RayTracingPrimitiveIDValueEmitter const* valueEmitter)
+{
+    if (valueEmitter && valueEmitter->func)
+        return valueEmitter
+            ->func(module, builder, paramType, field, varLayout, valueEmitter->userData);
+
+    return emitRayTracingPrimitiveIndexValue(module, builder, paramType);
+}
+
+static void replacePrimitiveIDUses(
+    IRBuilder& builder,
+    IRInst* instToReplace,
+    IRInst* valueReplacement,
+    IRType* valueType,
+    bool needsAddressReplacement)
+{
+    IRInst* addressReplacement = nullptr;
+    auto getAddressReplacement = [&]()
+    {
+        if (!addressReplacement)
+        {
+            addressReplacement = builder.emitVar(valueType);
+            builder.emitStore(addressReplacement, valueReplacement);
+        }
+        return addressReplacement;
+    };
+
+    traverseUses(
+        instToReplace,
+        [&](IRUse* use)
+        {
+            auto user = use->getUser();
+            if (auto load = as<IRLoad>(user))
+            {
+                if (load->getPtr() == instToReplace)
+                {
+                    load->replaceUsesWith(valueReplacement);
+                    load->removeAndDeallocate();
+                    return;
+                }
+            }
+
+            builder.replaceOperand(
+                use,
+                needsAddressReplacement ? getAddressReplacement() : valueReplacement);
+        });
+}
+
+static IRType* unwrapParamValueType(IRType* type)
+{
+    if (auto borrowInParamType = as<IRBorrowInParamType>(type))
+        return borrowInParamType->getValueType();
+    else if (auto ptrType = as<IRPtrTypeBase>(type))
+        return ptrType->getValueType();
+    return type;
+}
+
+static IRStructTypeLayout* getStructTypeLayout(IRVarLayout* varLayout)
+{
+    return varLayout ? as<IRStructTypeLayout>(varLayout->getTypeLayout()) : nullptr;
+}
+
+static IRVarLayout* getFieldLayout(IRStructTypeLayout* structTypeLayout, UInt fieldIndex)
+{
+    if (!structTypeLayout)
+        return nullptr;
+
+    return fieldIndex < structTypeLayout->getFieldCount()
+               ? structTypeLayout->getFieldLayout(fieldIndex)
+               : nullptr;
+}
+
+struct PrimitiveIDFieldAccess
+{
+    IRInst* inst;
+    IRStructField* field;
+    IRVarLayout* fieldLayout;
+};
+
+struct PrimitiveIDStructInfo;
+
+struct PrimitiveIDStructFieldInfo
+{
+    IRStructField* field = nullptr;
+    IRVarLayout* fieldLayout = nullptr;
+    RefPtr<PrimitiveIDStructInfo> nestedInfo;
+    bool isPrimitiveIDField = false;
+    bool containsPrimitiveID = false;
+    bool keepField = false;
+    IRType* ordinaryFieldType = nullptr;
+    IRVarLayout* ordinaryFieldLayout = nullptr;
+};
+
+struct PrimitiveIDStructInfo : RefObject
+{
+    IRStructType* structType = nullptr;
+    IRStructTypeLayout* structTypeLayout = nullptr;
+    List<PrimitiveIDStructFieldInfo> fields;
+    bool containsPrimitiveID = false;
+    bool hasOrdinaryFields = false;
+    IRStructType* ordinaryStructType = nullptr;
+    IRStructTypeLayout* ordinaryStructLayout = nullptr;
+};
+
+struct PrimitiveIDStructFieldAccessTypeUpdate
+{
+    IRInst* inst;
+    IRType* valueType;
+};
+
+struct PrimitiveIDWholeStructUse
+{
+    IRUse* use;
+    IRInst* baseInst;
+    PrimitiveIDStructInfo* info;
+};
+
+struct PrimitiveIDWholeStructReplacement
+{
+    IRInst* baseInst;
+    PrimitiveIDStructInfo* info;
+    IRInst* replacement;
+};
+
+static IRVarLayout* cloneVarLayoutWithNewTypeLayout(
+    IRBuilder& builder,
+    IRVarLayout* oldLayout,
+    IRTypeLayout* newTypeLayout)
+{
+    IRVarLayout::Builder varLayoutBuilder(&builder, newTypeLayout);
+    if (oldLayout)
+    {
+        varLayoutBuilder.cloneEverythingButOffsetsFrom(oldLayout);
+        for (auto offsetAttr : oldLayout->getOffsetAttrs())
+        {
+            auto resInfo = varLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
+            resInfo->offset = offsetAttr->getOffset();
+            resInfo->space = offsetAttr->getSpace();
+        }
+    }
+    return varLayoutBuilder.build();
+}
+
+static RefPtr<PrimitiveIDStructInfo> buildPrimitiveIDStructInfo(
+    IRBuilder& builder,
+    IRStructType* structType,
+    IRStructTypeLayout* structTypeLayout)
+{
+    RefPtr<PrimitiveIDStructInfo> info = new PrimitiveIDStructInfo();
+    info->structType = structType;
+    info->structTypeLayout = structTypeLayout;
+
+    UInt fieldIndex = 0;
+    for (auto field : structType->getFields())
+    {
+        PrimitiveIDStructFieldInfo fieldInfo;
+        fieldInfo.field = field;
+        fieldInfo.fieldLayout = getFieldLayout(structTypeLayout, fieldIndex);
+
+        if (isPrimitiveIDSystemValueStructField(field, fieldInfo.fieldLayout))
+        {
+            fieldInfo.isPrimitiveIDField = true;
+            fieldInfo.containsPrimitiveID = true;
+            info->containsPrimitiveID = true;
+        }
+        else if (auto nestedStructType = as<IRStructType>(field->getFieldType()))
+        {
+            fieldInfo.nestedInfo = buildPrimitiveIDStructInfo(
+                builder,
+                nestedStructType,
+                getStructTypeLayout(fieldInfo.fieldLayout));
+
+            if (fieldInfo.nestedInfo->containsPrimitiveID)
+            {
+                fieldInfo.containsPrimitiveID = true;
+                info->containsPrimitiveID = true;
+
+                if (fieldInfo.nestedInfo->hasOrdinaryFields)
+                {
+                    fieldInfo.keepField = true;
+                    fieldInfo.ordinaryFieldType = fieldInfo.nestedInfo->ordinaryStructType;
+                    fieldInfo.ordinaryFieldLayout = cloneVarLayoutWithNewTypeLayout(
+                        builder,
+                        fieldInfo.fieldLayout,
+                        fieldInfo.nestedInfo->ordinaryStructLayout);
+                    info->hasOrdinaryFields = true;
+                }
+            }
+            else
+            {
+                fieldInfo.keepField = true;
+                fieldInfo.ordinaryFieldType = field->getFieldType();
+                fieldInfo.ordinaryFieldLayout = fieldInfo.fieldLayout;
+                info->hasOrdinaryFields = true;
+            }
+        }
+        else
+        {
+            fieldInfo.keepField = true;
+            fieldInfo.ordinaryFieldType = field->getFieldType();
+            fieldInfo.ordinaryFieldLayout = fieldInfo.fieldLayout;
+            info->hasOrdinaryFields = true;
+        }
+
+        info->fields.add(fieldInfo);
+        fieldIndex++;
+    }
+
+    if (info->containsPrimitiveID && info->hasOrdinaryFields)
+    {
+        info->ordinaryStructType = builder.createStructType();
+        copyNameHintAndDebugDecorations(info->ordinaryStructType, structType);
+
+        IRStructTypeLayout::Builder typeLayoutBuilder(&builder);
+        for (auto fieldInfo : info->fields)
+        {
+            if (!fieldInfo.keepField)
+                continue;
+
+            builder.createStructField(
+                info->ordinaryStructType,
+                fieldInfo.field->getKey(),
+                fieldInfo.ordinaryFieldType);
+
+            if (fieldInfo.ordinaryFieldLayout)
+            {
+                typeLayoutBuilder.addField(
+                    fieldInfo.field->getKey(),
+                    fieldInfo.ordinaryFieldLayout);
+                typeLayoutBuilder.addResourceUsageFrom(
+                    fieldInfo.ordinaryFieldLayout->getTypeLayout());
+            }
+        }
+        info->ordinaryStructLayout = typeLayoutBuilder.build();
+    }
+
+    return info;
+}
+
+static PrimitiveIDStructFieldInfo* findFieldInfoForKey(
+    PrimitiveIDStructInfo* info,
+    IRInst* fieldKey)
+{
+    for (auto& fieldInfo : info->fields)
+    {
+        if (fieldInfo.field->getKey() == fieldKey)
+            return &fieldInfo;
+    }
+
+    return nullptr;
+}
+
+static PrimitiveIDStructFieldInfo* findFieldAccess(
+    IRInst* inst,
+    IRInst* baseInst,
+    PrimitiveIDStructInfo* info)
+{
+    IRInst* base = nullptr;
+    IRInst* fieldKey = nullptr;
+
+    if (auto fieldAddress = as<IRFieldAddress>(inst))
+    {
+        base = fieldAddress->getBase();
+        fieldKey = fieldAddress->getField();
+    }
+    else if (auto fieldExtract = as<IRFieldExtract>(inst))
+    {
+        base = fieldExtract->getBase();
+        fieldKey = fieldExtract->getField();
+    }
+    else
+    {
+        return nullptr;
+    }
+
+    if (base != baseInst)
+        return nullptr;
+
+    return findFieldInfoForKey(info, fieldKey);
+}
+
+static void collectPrimitiveIDStructFieldAccesses(
+    IRInst* baseInst,
+    PrimitiveIDStructInfo* info,
+    List<PrimitiveIDFieldAccess>& primitiveIDFieldAccesses,
+    List<IRInst*>& removableStructFieldAccesses,
+    List<PrimitiveIDStructFieldAccessTypeUpdate>& fieldAccessTypeUpdates,
+    List<PrimitiveIDWholeStructUse>& wholeStructUses)
+{
+    traverseUses(
+        baseInst,
+        [&](IRUse* use)
+        {
+            auto user = use->getUser();
+            auto fieldInfo = findFieldAccess(user, baseInst, info);
+            if (!fieldInfo)
+            {
+                wholeStructUses.add({use, baseInst, info});
+                return;
+            }
+
+            if (fieldInfo->isPrimitiveIDField)
+            {
+                primitiveIDFieldAccesses.add({user, fieldInfo->field, fieldInfo->fieldLayout});
+                return;
+            }
+
+            if (fieldInfo->nestedInfo && fieldInfo->nestedInfo->containsPrimitiveID)
+            {
+                if (fieldInfo->nestedInfo->hasOrdinaryFields)
+                {
+                    fieldAccessTypeUpdates.add({user, fieldInfo->ordinaryFieldType});
+                }
+                else
+                {
+                    removableStructFieldAccesses.add(user);
+                }
+
+                collectPrimitiveIDStructFieldAccesses(
+                    user,
+                    fieldInfo->nestedInfo,
+                    primitiveIDFieldAccesses,
+                    removableStructFieldAccesses,
+                    fieldAccessTypeUpdates,
+                    wholeStructUses);
+            }
+        });
+}
+
+static IRType* replaceParamValueType(IRBuilder& builder, IRType* paramType, IRType* valueType);
+
+static bool isAddressLikeParamType(IRType* type)
+{
+    return as<IRBorrowInParamType>(type) || as<IRPtrTypeBase>(type);
+}
+
+static IRInst* emitStructFieldValue(IRBuilder& builder, IRInst* baseInst, IRStructField* field)
+{
+    auto baseType = baseInst->getFullType();
+    auto fieldType = field->getFieldType();
+    if (isAddressLikeParamType(baseType))
+    {
+        auto fieldAddressType = replaceParamValueType(builder, baseType, fieldType);
+        auto fieldAddress = builder.emitFieldAddress(fieldAddressType, baseInst, field->getKey());
+        return builder.emitLoad(fieldAddress);
+    }
+
+    return builder.emitFieldExtract(fieldType, baseInst, field->getKey());
+}
+
+static IRInst* emitStructFieldAccess(
+    IRBuilder& builder,
+    IRInst* baseInst,
+    IRStructField* field,
+    IRType* fieldType)
+{
+    auto baseType = baseInst->getFullType();
+    if (isAddressLikeParamType(baseType))
+    {
+        auto fieldAddressType = replaceParamValueType(builder, baseType, fieldType);
+        return builder.emitFieldAddress(fieldAddressType, baseInst, field->getKey());
+    }
+
+    return builder.emitFieldExtract(fieldType, baseInst, field->getKey());
+}
+
+static IRInst* emitPrimitiveIDStructValue(
+    IRModule* module,
+    IRBuilder& builder,
+    IRInst* baseInst,
+    PrimitiveIDStructInfo* info,
+    RayTracingPrimitiveIDValueEmitter const* valueEmitter)
+{
+    List<IRInst*> fieldValues;
+    for (auto& fieldInfo : info->fields)
+    {
+        if (fieldInfo.isPrimitiveIDField)
+        {
+            auto primitiveIndex = emitRayTracingPrimitiveIDValue(
+                module,
+                builder,
+                fieldInfo.field->getFieldType(),
+                fieldInfo.field,
+                fieldInfo.fieldLayout,
+                valueEmitter);
+            if (!primitiveIndex)
+                return nullptr;
+
+            fieldValues.add(primitiveIndex);
+            continue;
+        }
+
+        if (fieldInfo.nestedInfo && fieldInfo.nestedInfo->containsPrimitiveID)
+        {
+            IRInst* nestedBase = nullptr;
+            if (fieldInfo.nestedInfo->hasOrdinaryFields)
+            {
+                SLANG_ASSERT(baseInst);
+                nestedBase = emitStructFieldAccess(
+                    builder,
+                    baseInst,
+                    fieldInfo.field,
+                    fieldInfo.ordinaryFieldType);
+            }
+
+            auto nestedValue = emitPrimitiveIDStructValue(
+                module,
+                builder,
+                nestedBase,
+                fieldInfo.nestedInfo,
+                valueEmitter);
+            if (!nestedValue)
+                return nullptr;
+
+            fieldValues.add(nestedValue);
+            continue;
+        }
+
+        SLANG_ASSERT(baseInst);
+        fieldValues.add(emitStructFieldValue(builder, baseInst, fieldInfo.field));
+    }
+
+    return builder.emitMakeStruct(info->structType, fieldValues);
+}
+
+static IRInst* getWholeStructReplacement(
+    IRModule* module,
+    IRBuilder& builder,
+    IRInst* baseInst,
+    PrimitiveIDStructInfo* info,
+    List<PrimitiveIDWholeStructReplacement>& replacements,
+    RayTracingPrimitiveIDValueEmitter const* valueEmitter)
+{
+    for (auto replacement : replacements)
+    {
+        if (replacement.baseInst == baseInst && replacement.info == info)
+            return replacement.replacement;
+    }
+
+    auto structValue = emitPrimitiveIDStructValue(module, builder, baseInst, info, valueEmitter);
+    if (!structValue)
+        return nullptr;
+
+    IRInst* replacement = nullptr;
+    if (isAddressLikeParamType(baseInst->getFullType()))
+    {
+        auto tempVar = builder.emitVar(info->structType);
+        builder.addSimpleDecoration<IRTempCallArgVarDecoration>(tempVar);
+        builder.emitStore(tempVar, structValue);
+        replacement = tempVar;
+    }
+    else
+    {
+        replacement = structValue;
+    }
+
+    replacements.add({baseInst, info, replacement});
+    return replacement;
+}
+
+static IRType* replaceParamValueType(IRBuilder& builder, IRType* paramType, IRType* valueType)
+{
+    if (auto borrowInParamType = as<IRBorrowInParamType>(paramType))
+        return builder.getBorrowInParamType(valueType, borrowInParamType->getAddressSpace());
+
+    if (auto ptrType = as<IRPtrTypeBase>(paramType))
+        return builder.getPtrTypeWithAddressSpace(valueType, ptrType);
+
+    return valueType;
+}
+
+bool tryLegalizeRayTracingPrimitiveIDParam(
+    IRModule* module,
+    IRBuilder& builder,
+    IRParam* param,
+    bool* outParamRemoved)
+{
+    if (outParamRemoved)
+        *outParamRemoved = false;
+
+    if (!isPrimitiveIDSystemValueParam(param))
+        return false;
+
+    auto paramType = param->getFullType();
+    IRType* valueType = paramType;
+    bool needsAddressReplacement = false;
+    if (auto borrowInParamType = as<IRBorrowInParamType>(valueType))
+    {
+        valueType = borrowInParamType->getValueType();
+        needsAddressReplacement = true;
+    }
+    else if (auto ptrType = as<IRPtrTypeBase>(valueType))
+    {
+        valueType = ptrType->getValueType();
+        needsAddressReplacement = true;
+    }
+
+    if (param->hasUses())
+    {
+        auto valueReplacement = emitRayTracingPrimitiveIndexValue(module, builder, paramType);
+        if (!valueReplacement)
+        {
+            // Source-level semantic type validation should reject this. Leave malformed IR
+            // untouched rather than replacing uses with a null value.
+            return false;
+        }
+        replacePrimitiveIDUses(
+            builder,
+            param,
+            valueReplacement,
+            valueType,
+            needsAddressReplacement);
+    }
+
+    param->removeAndDeallocate();
+    if (outParamRemoved)
+        *outParamRemoved = true;
+
+    return true;
+}
+
+bool tryLegalizeRayTracingPrimitiveIDStructParam(
+    IRModule* module,
+    IRBuilder& builder,
+    IRParam* param,
+    bool* outParamRemoved,
+    RayTracingPrimitiveIDValueEmitter const* valueEmitter)
+{
+    if (outParamRemoved)
+        *outParamRemoved = false;
+
+    auto structType = as<IRStructType>(unwrapParamValueType(param->getFullType()));
+    if (!structType)
+        return false;
+
+    auto layoutDecor = param->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecor)
+        return false;
+
+    auto paramLayout = as<IRVarLayout>(layoutDecor->getLayout());
+    if (!paramLayout)
+        return false;
+
+    auto structTypeLayout = as<IRStructTypeLayout>(paramLayout->getTypeLayout());
+    if (!structTypeLayout)
+        return false;
+
+    auto info = buildPrimitiveIDStructInfo(builder, structType, structTypeLayout);
+    if (!info->containsPrimitiveID)
+        return false;
+
+    List<PrimitiveIDFieldAccess> primitiveIDFieldAccesses;
+    List<IRInst*> removableStructFieldAccesses;
+    List<PrimitiveIDStructFieldAccessTypeUpdate> fieldAccessTypeUpdates;
+    List<PrimitiveIDWholeStructUse> wholeStructUses;
+    traverseUses(
+        param,
+        [&](IRUse* use)
+        {
+            auto user = use->getUser();
+            auto fieldInfo = findFieldAccess(user, param, info);
+            if (!fieldInfo)
+            {
+                wholeStructUses.add({use, param, info});
+                return;
+            }
+
+            if (fieldInfo->isPrimitiveIDField)
+            {
+                primitiveIDFieldAccesses.add({user, fieldInfo->field, fieldInfo->fieldLayout});
+                return;
+            }
+
+            if (fieldInfo->nestedInfo && fieldInfo->nestedInfo->containsPrimitiveID)
+            {
+                if (fieldInfo->nestedInfo->hasOrdinaryFields)
+                {
+                    fieldAccessTypeUpdates.add({user, fieldInfo->ordinaryFieldType});
+                }
+                else
+                {
+                    removableStructFieldAccesses.add(user);
+                }
+
+                collectPrimitiveIDStructFieldAccesses(
+                    user,
+                    fieldInfo->nestedInfo,
+                    primitiveIDFieldAccesses,
+                    removableStructFieldAccesses,
+                    fieldAccessTypeUpdates,
+                    wholeStructUses);
+                return;
+            }
+        });
+
+    List<PrimitiveIDWholeStructReplacement> wholeStructReplacements;
+    for (auto wholeStructUse : wholeStructUses)
+    {
+        IRBuilderInsertLocScope insertLocScope(&builder);
+        if (wholeStructUse.baseInst && !as<IRParam>(wholeStructUse.baseInst) &&
+            wholeStructUse.baseInst->parent)
+        {
+            builder.setInsertAfter(wholeStructUse.baseInst);
+        }
+
+        auto replacement = getWholeStructReplacement(
+            module,
+            builder,
+            wholeStructUse.baseInst,
+            wholeStructUse.info,
+            wholeStructReplacements,
+            valueEmitter);
+        if (!replacement)
+            return false;
+
+        builder.replaceOperand(wholeStructUse.use, replacement);
+    }
+
+    List<IRStructField*> replacementFields;
+    List<IRInst*> replacementValues;
+    auto getPrimitiveIDValueReplacement = [&](IRStructField* field) -> IRInst*
+    {
+        for (Index i = 0; i < replacementFields.getCount(); i++)
+        {
+            if (replacementFields[i] == field)
+                return replacementValues[i];
+        }
+
+        IRVarLayout* fieldLayout = nullptr;
+        for (auto access : primitiveIDFieldAccesses)
+        {
+            if (access.field == field)
+            {
+                fieldLayout = access.fieldLayout;
+                break;
+            }
+        }
+
+        auto valueReplacement = emitRayTracingPrimitiveIDValue(
+            module,
+            builder,
+            field->getFieldType(),
+            field,
+            fieldLayout,
+            valueEmitter);
+        if (!valueReplacement)
+            return nullptr;
+
+        replacementFields.add(field);
+        replacementValues.add(valueReplacement);
+        return valueReplacement;
+    };
+
+    for (auto access : primitiveIDFieldAccesses)
+    {
+        if (!getPrimitiveIDValueReplacement(access.field))
+            return false;
+    }
+
+    for (auto update : fieldAccessTypeUpdates)
+    {
+        update.inst->setFullType(
+            replaceParamValueType(builder, update.inst->getFullType(), update.valueType));
+    }
+
+    for (auto access : primitiveIDFieldAccesses)
+    {
+        auto valueReplacement = getPrimitiveIDValueReplacement(access.field);
+        if (!valueReplacement)
+            return false;
+
+        auto needsAddressReplacement = as<IRFieldAddress>(access.inst) != nullptr;
+        replacePrimitiveIDUses(
+            builder,
+            access.inst,
+            valueReplacement,
+            access.field->getFieldType(),
+            needsAddressReplacement);
+
+        if (!access.inst->hasUses())
+            access.inst->removeAndDeallocate();
+    }
+
+    for (Index i = removableStructFieldAccesses.getCount() - 1; i >= 0; i--)
+    {
+        auto fieldAccess = removableStructFieldAccesses[i];
+        if (!fieldAccess->hasUses())
+            fieldAccess->removeAndDeallocate();
+    }
+
+    if (info->hasOrdinaryFields)
+    {
+        auto ordinaryParamLayout =
+            cloneVarLayoutWithNewTypeLayout(builder, paramLayout, info->ordinaryStructLayout);
+        layoutDecor->setOperand(0, ordinaryParamLayout);
+        param->setFullType(
+            replaceParamValueType(builder, param->getFullType(), info->ordinaryStructType));
+        return true;
+    }
+
+    if (param->hasUses())
+        return false;
+
+    param->removeAndDeallocate();
+    if (outParamRemoved)
+        *outParamRemoved = true;
+    return true;
+}
+
 
 /// Context for the IR pass that legalizing entry-point
 /// varying parameters for a target.
@@ -358,6 +1249,8 @@ public:
         //
         beginModuleImpl();
 
+        List<EntryPointInfo> entryPoints;
+
         // We now search for entry-point definitions in the IR module.
         // All entry points should appear at the global scope.
         //
@@ -374,11 +1267,14 @@ public:
             auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
             if (!entryPointDecor)
                 continue;
+            if (!shouldProcessEntryPoint(entryPointDecor))
+                continue;
 
-            // Once we find an entry point we process it immediately.
-            //
-            processEntryPoint(func, entryPointDecor);
+            entryPoints.add({func, entryPointDecor});
         }
+
+        for (auto& entryPoint : entryPoints)
+            processEntryPoint(entryPoint.entryPointFunc, entryPoint.entryPointDecor);
     }
 
 protected:
@@ -387,6 +1283,7 @@ protected:
     // only happen once per module that is processed.
     //
     virtual void beginModuleImpl() {}
+    virtual bool shouldProcessEntryPoint(IREntryPointDecoration*) { return true; }
 
     // We have both per-module and per-entry-point state that
     // needs to be managed. The former is set up in `processModule()`,
@@ -540,7 +1437,7 @@ protected:
     IRParam* m_param = nullptr;
     IRVarLayout* m_paramLayout = nullptr;
 
-    void processParam(IRParam* param)
+    virtual void processParam(IRParam* param)
     {
         m_param = param;
 
@@ -1084,6 +1981,44 @@ protected:
 // With the target-independent core of the pass out of the way, we can
 // turn our attention to the target-specific subtypes that handle
 // translation of "leaf" varying parameters.
+
+struct HLSLRayTracingPrimitiveIDParamLegalizeContext : EntryPointVaryingParamLegalizeContext
+{
+    bool modifiedFuncType = false;
+
+    bool shouldProcessEntryPoint(IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE
+    {
+        return isRayTracingHitStage(entryPointDecor->getProfile().getStage());
+    }
+
+    void beginEntryPointImpl() SLANG_OVERRIDE { modifiedFuncType = false; }
+
+    void processParam(IRParam* param) SLANG_OVERRIDE
+    {
+        IRBuilder builder(m_module);
+        builder.setInsertBefore(m_firstOrdinaryInst);
+        if (tryLegalizeRayTracingPrimitiveIDParam(m_module, builder, param))
+        {
+            modifiedFuncType = true;
+        }
+        else if (tryLegalizeRayTracingPrimitiveIDStructParam(m_module, builder, param))
+        {
+            modifiedFuncType = true;
+        }
+    }
+
+    void endEntryPointImpl() SLANG_OVERRIDE
+    {
+        if (modifiedFuncType)
+            fixUpFuncType(m_entryPointFunc);
+    }
+};
+
+void legalizeRayTracingPrimitiveIDParamsForHLSL(IRModule* module)
+{
+    HLSLRayTracingPrimitiveIDParamLegalizeContext context;
+    context.processModule(module, nullptr);
+}
 
 struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalizeContext
 {
@@ -1949,10 +2884,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     // We will instead synthesize those values on
     // entry to each kernel.
 
+    bool modifiedFuncType = false;
     IRInst* groupThreadIndex = nullptr;
     IRInst* dispatchThreadID = nullptr;
     void beginEntryPointImpl() SLANG_OVERRIDE
     {
+        modifiedFuncType = false;
+
         IRBuilder builder(m_module);
         builder.setInsertBefore(m_firstOrdinaryInst);
 
@@ -1995,12 +2933,50 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
 
     void endEntryPointImpl() SLANG_OVERRIDE
     {
+        if (modifiedFuncType)
+            fixUpFuncType(m_entryPointFunc);
+
         // After all parameters have been processed, emit write-backs
         // for any inline payload registers before return statements.
         emitPayloadWritebacks();
 
         // Clear the writeback list for the next entry point
         m_payloadWritebacks.clear();
+    }
+
+    void processParam(IRParam* param) SLANG_OVERRIDE
+    {
+        if (isRayTracingHitStage(m_stage))
+        {
+            IRBuilder builder(m_module);
+            builder.setInsertBefore(m_firstOrdinaryInst);
+
+            bool paramRemoved = false;
+            if (tryLegalizeRayTracingPrimitiveIDParam(m_module, builder, param, &paramRemoved))
+            {
+                modifiedFuncType = true;
+                if (paramRemoved)
+                    return;
+
+                m_firstOrdinaryInst = m_firstBlock ? m_firstBlock->getFirstOrdinaryInst() : nullptr;
+            }
+
+            paramRemoved = false;
+            if (tryLegalizeRayTracingPrimitiveIDStructParam(
+                    m_module,
+                    builder,
+                    param,
+                    &paramRemoved))
+            {
+                modifiedFuncType = true;
+                if (paramRemoved)
+                    return;
+
+                m_firstOrdinaryInst = m_firstBlock ? m_firstBlock->getFirstOrdinaryInst() : nullptr;
+            }
+        }
+
+        EntryPointVaryingParamLegalizeContext::processParam(param);
     }
 
     LegalizedVaryingVal createLegalSystemVaryingValImpl(VaryingParamInfo const& info) SLANG_OVERRIDE
@@ -2021,6 +2997,19 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             return createLegalizedSystemVaryingValInst(info, groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID:
             return createLegalizedSystemVaryingValInst(info, dispatchThreadID);
+        case SystemValueSemanticName::PrimitiveID:
+            {
+                if (!isRayTracingHitStage(m_stage))
+                    return diagnoseUnsupportedSystemVal(info);
+
+                IRBuilder builder(m_module);
+                builder.setInsertBefore(m_firstOrdinaryInst);
+                auto primitiveIndex =
+                    emitRayTracingPrimitiveIndexValue(m_module, builder, info.type);
+                if (!primitiveIndex)
+                    return diagnoseUnsupportedSystemVal(info);
+                return LegalizedVaryingVal::makeValue(primitiveIndex);
+            }
         default:
             return diagnoseUnsupportedSystemVal(info);
         }

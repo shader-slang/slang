@@ -2,6 +2,10 @@
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage intersection
 //   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage intersection -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_SPIRV):-target spirv-assembly -entry main_sv_primitiveid_uint -stage intersection
+//TEST:SIMPLE(filecheck=SVPID_DXIL):-target dxil-assembly -entry main_sv_primitiveid_uint -stage intersection -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_INT_DXIL):-target dxil-assembly -entry main_sv_primitiveid_int -stage intersection -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=SVPID_UNUSED_DXIL):-target dxil-assembly -entry main_sv_primitiveid_unused -stage intersection -profile sm_6_5 -DNOMOTION
 
 // SPIRV-NOT: OpCapability RayQueryKHR
 // SPIRV-DAG: OpCapability RayTracingKHR
@@ -52,6 +56,20 @@
 // DXIL: call float @dx.op.worldToObject.f32
 
 // DXIL: call i1 @dx.op.reportHit.struct.MyAttributes_0
+
+// SVPID_SPIRV: OpEntryPoint IntersectionKHR
+// SVPID_SPIRV-DAG: OpDecorate %{{.*}} BuiltIn PrimitiveId
+
+// SVPID_DXIL: call i32 @dx.op.primitiveIndex.i32
+// SVPID_DXIL: call i1 @dx.op.reportHit.struct.MyAttributes_0
+
+// SVPID_INT_DXIL: call i32 @dx.op.primitiveIndex.i32
+// SVPID_INT_DXIL: sitofp i32
+// SVPID_INT_DXIL: call i1 @dx.op.reportHit.struct.MyAttributes_0
+
+// SVPID_UNUSED_DXIL: define void @{{.*}}main_sv_primitiveid_unused
+// SVPID_UNUSED_DXIL-NOT: dx.op.primitiveIndex.i32
+// SVPID_UNUSED_DXIL: call i1 @dx.op.reportHit.struct.MyAttributes_0
 
 float CheckRayDispatchValues() // all
 {
@@ -194,4 +212,28 @@ void main()
             ReportHit( (rayTMin <= t1 && t1 < rayTMax) ? t1 : t2, 0, IDs );
         }
     }
+}
+
+[shader("intersection")]
+void main_sv_primitiveid_uint(uint primitiveID : SV_PrimitiveID)
+{
+    MyAttributes IDs;
+    IDs.attr = float(primitiveID);
+    ReportHit(1.0f, 0, IDs);
+}
+
+[shader("intersection")]
+void main_sv_primitiveid_int(int primitiveID : SV_PrimitiveID)
+{
+    MyAttributes IDs;
+    IDs.attr = float(primitiveID);
+    ReportHit(1.0f, 0, IDs);
+}
+
+[shader("intersection")]
+void main_sv_primitiveid_unused(uint primitiveID : SV_PrimitiveID)
+{
+    MyAttributes IDs;
+    IDs.attr = 1.0f;
+    ReportHit(1.0f, 0, IDs);
 }

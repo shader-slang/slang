@@ -1680,11 +1680,12 @@ Result linkAndOptimizeIR(
             SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
         }
 
-        // For DXIL only: unwrap ForceVarIntoRayPayloadStructTemporarily instructions
-        // (must run before legalizeExistentialTypeLayout removes empty struct parameters)
+        // For DXIL/HLSL: rewrite parameters that need backend intrinsics or
+        // temporary structs before existential layout removes empty struct
+        // parameters.
         if (isD3DTarget(targetRequest))
         {
-            SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+            SLANG_PASS(legalizeParametersForHLSL);
         }
 
         if (requiredLoweringPassSet.existentialTypeLayout)

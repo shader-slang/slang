@@ -5,6 +5,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-single-return.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-util.h"
@@ -3037,6 +3038,71 @@ void handleSingleParam(
     builder->addDependsOnDecoration(func, globalParam);
 }
 
+struct DirectSPIRVPrimitiveIDEmitterContext
+{
+    IRFunc* func = nullptr;
+    IRType* canonicalValueType = nullptr;
+    IRGlobalParam* globalParam = nullptr;
+};
+
+static IRType* getPrimitiveIDValueTypeForDirectSPIRV(IRType* type)
+{
+    if (auto borrowInParamType = as<IRBorrowInParamType>(type))
+        return borrowInParamType->getValueType();
+    if (auto ptrType = as<IRPtrTypeBase>(type))
+        return ptrType->getValueType();
+    return type;
+}
+
+static IRInst* emitDirectSPIRVPrimitiveIDValue(
+    IRModule* module,
+    IRBuilder& builder,
+    IRType* type,
+    IRStructField* field,
+    IRVarLayout* layout,
+    void* userData)
+{
+    SLANG_RELEASE_ASSERT(layout);
+
+    auto semanticDecor = field ? field->getKey()->findDecoration<IRSemanticDecoration>() : nullptr;
+    auto systemValueAttr = layout->findSystemValueSemanticAttr();
+    SLANG_RELEASE_ASSERT(
+        (systemValueAttr &&
+         systemValueAttr->getName().caseInsensitiveEquals(toSlice("sv_primitiveid"))) ||
+        (semanticDecor &&
+         semanticDecor->getSemanticName().caseInsensitiveEquals(toSlice("sv_primitiveid"))));
+
+    auto context = static_cast<DirectSPIRVPrimitiveIDEmitterContext*>(userData);
+    auto valueType = getPrimitiveIDValueTypeForDirectSPIRV(type);
+    if (context->globalParam)
+    {
+        auto value = builder.emitLoad(context->globalParam);
+        if (isTypeEqual(context->canonicalValueType, valueType))
+            return value;
+        return builder.emitCast(valueType, value);
+    }
+
+    auto globalParam = addGlobalParam(
+        module,
+        builder.getPtrType(
+            valueType,
+            AccessQualifier::Immutable,
+            AddressSpace::BuiltinInput,
+            builder.getDefaultBufferLayoutType()));
+
+    IRVarLayout::Builder varLayoutBuilder(&builder, layout->getTypeLayout());
+    varLayoutBuilder.cloneEverythingButOffsetsFrom(layout);
+    if (!systemValueAttr && semanticDecor)
+        varLayoutBuilder.setSystemValueSemantic(semanticDecor->getSemanticName(), 0);
+    builder.addLayoutDecoration(globalParam, varLayoutBuilder.build());
+    moveValueBefore(globalParam, context->func);
+    builder.addDependsOnDecoration(context->func, globalParam);
+
+    context->canonicalValueType = valueType;
+    context->globalParam = globalParam;
+    return builder.emitLoad(globalParam);
+}
+
 static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam*>& params)
 {
     auto builder = context->getBuilder();
@@ -3115,7 +3181,12 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
 }
 
 // Consolidate ray tracing parameters for an entry point function
-void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* func)
+void consolidateRayTracingParameters(
+    GLSLLegalizationContext* context,
+    IRFunc* func,
+    bool legalizePrimitiveIDBeforeConsolidation,
+    bool legalizePrimitiveIDStructBeforeConsolidation,
+    RayTracingPrimitiveIDValueEmitter const* primitiveIDStructValueEmitter)
 {
     auto builder = context->getBuilder();
     auto firstBlock = func->getFirstBlock();
@@ -3126,18 +3197,73 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
     List<IRParam*> outParams;
     List<IRParam*> params;
 
-    for (auto param = firstBlock->getFirstParam(); param; param = param->getNextParam())
+    // When requested for SPIR-V via GLSL, canonicalize hit-stage SV_PrimitiveID before
+    // ray-tracing parameter consolidation rewrites entry-point parameters. This changes
+    // a Slang entry point parameter:
+    //
+    //     void main_chit(int primitiveID : SV_PrimitiveID) { use(primitiveID); }
+    //
+    // into GLSL-style body code that reads the builtin:
+    //
+    //     int primitiveID = int(gl_PrimitiveID);
+    //     use(primitiveID);
+    //
+    // and removes the original parameter before consolidation sees payload/attributes.
+    for (auto param = firstBlock->getFirstParam(); param;)
     {
+        auto nextParam = param->getNextParam();
         auto paramLayout = findVarLayout(param);
         if (!isVaryingParameter(paramLayout))
+        {
+            param = nextParam;
             continue;
+        }
+
         builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
+
+        if (legalizePrimitiveIDBeforeConsolidation)
+        {
+            bool paramRemoved = false;
+            if (tryLegalizeRayTracingPrimitiveIDParam(
+                    builder->getModule(),
+                    *builder,
+                    param,
+                    &paramRemoved))
+            {
+                if (paramRemoved)
+                {
+                    param = nextParam;
+                    continue;
+                }
+            }
+        }
+
+        if (legalizePrimitiveIDStructBeforeConsolidation)
+        {
+            bool paramRemoved = false;
+            if (tryLegalizeRayTracingPrimitiveIDStructParam(
+                    builder->getModule(),
+                    *builder,
+                    param,
+                    &paramRemoved,
+                    primitiveIDStructValueEmitter))
+            {
+                if (paramRemoved)
+                {
+                    param = nextParam;
+                    continue;
+                }
+            }
+        }
+
         if (as<IROutParamType>(param->getDataType()) ||
             as<IRBorrowInOutParamType>(param->getDataType()))
         {
             outParams.add(param);
         }
         params.add(param);
+
+        param = nextParam;
     }
 
     // We don't need consolidation here.
@@ -4848,6 +4974,7 @@ void legalizeEntryPointForGLSL(
     SLANG_ASSERT(entryPointDecor);
 
     auto stage = entryPointDecor->getProfile().getStage();
+    const bool isViaGLSL = !codeGenContext->getTargetProgram()->shouldEmitSPIRVDirectly();
 
     auto layoutDecoration = func->findDecoration<IRLayoutDecoration>();
     SLANG_ASSERT(layoutDecoration);
@@ -4946,8 +5073,27 @@ void legalizeEntryPointForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        consolidateRayTracingParameters(&context, func);
-        break;
+        {
+            DirectSPIRVPrimitiveIDEmitterContext directSPIRVPrimitiveIDEmitterContext;
+            directSPIRVPrimitiveIDEmitterContext.func = func;
+
+            RayTracingPrimitiveIDValueEmitter directSPIRVPrimitiveIDEmitter;
+            RayTracingPrimitiveIDValueEmitter const* primitiveIDStructValueEmitter = nullptr;
+            if (isRayTracingHitStage(stage) && !isViaGLSL)
+            {
+                directSPIRVPrimitiveIDEmitter.func = emitDirectSPIRVPrimitiveIDValue;
+                directSPIRVPrimitiveIDEmitter.userData = &directSPIRVPrimitiveIDEmitterContext;
+                primitiveIDStructValueEmitter = &directSPIRVPrimitiveIDEmitter;
+            }
+
+            consolidateRayTracingParameters(
+                &context,
+                func,
+                isRayTracingHitStage(stage) && isViaGLSL,
+                isRayTracingHitStage(stage),
+                primitiveIDStructValueEmitter);
+            break;
+        }
     default:
         break;
     }

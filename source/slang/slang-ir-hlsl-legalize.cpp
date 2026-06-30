@@ -3,11 +3,10 @@
 
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-
-#include <functional>
 
 namespace Slang
 {
@@ -160,7 +159,7 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
     }
 }
 
-void legalizeNonStructParameterToStructForHLSL(IRModule* module)
+void legalizeParametersForHLSL(IRModule* module)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -170,6 +169,8 @@ void legalizeNonStructParameterToStructForHLSL(IRModule* module)
             continue;
         searchChildrenForForceVarIntoStructTemporarily(module, globalInst);
     }
+
+    legalizeRayTracingPrimitiveIDParamsForHLSL(module);
 }
 
 void legalizeEmptyRayPayloadsForHLSL(IRModule* module)

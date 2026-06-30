@@ -3,6 +3,7 @@
 
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "slang-compiler.h"
+#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"
 #include "slang-lookup.h"
@@ -2142,6 +2143,42 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     }
     else
     {
+        // Some system-value semantics are runtime-provided varyings rather than
+        // user-defined `in` parameters, so they should be allowed even in stages
+        // that otherwise reject `in` parameters or route `in` to hit attributes.
+        //
+        // Keep this allowlist matched to the semantic accessor table in
+        // core.meta.slang. Adding to it should be paired with a
+        // [require(<stage>)] entry on the semantic declaration and a regression
+        // test.
+        bool isAllowedRaytracingSystemValueInput = false;
+        bool isRaytracingPrimitiveIDSystemValueInput = false;
+        if (state.optSemanticName)
+        {
+            auto sn = state.optSemanticName->toLower();
+            if (sn == "sv_primitiveid")
+            {
+                if (isRayTracingHitStage(state.stage))
+                {
+                    isRaytracingPrimitiveIDSystemValueInput = true;
+                    if (isD3DTarget(context->getTargetRequest()) ||
+                        isKhronosTarget(context->getTargetRequest()) ||
+                        isCUDATarget(context->getTargetRequest()))
+                    {
+                        isAllowedRaytracingSystemValueInput = true;
+                    }
+                    else
+                    {
+                        getSink(context)->diagnose(Diagnostics::Unimplemented{
+                            .feature =
+                                "SV_PrimitiveID ray-tracing hit-stage inputs are not supported "
+                                "for this target",
+                            .location = state.loc});
+                    }
+                }
+            }
+        }
+
         switch (state.stage)
         {
         default:
@@ -2158,18 +2195,26 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             // an `in` parameter as indicating a payload that the
             // programmer doesn't intend to write to.
             //
-            getSink(context)->diagnose(Diagnostics::DontExpectInParametersForStage{
-                .stage = getStageName(state.stage),
-                .location = state.loc});
+            if (!isAllowedRaytracingSystemValueInput && !isRaytracingPrimitiveIDSystemValueInput)
+            {
+                getSink(context)->diagnose(Diagnostics::DontExpectInParametersForStage{
+                    .stage = getStageName(state.stage),
+                    .location = state.loc});
+            }
             break;
 
         case Stage::AnyHit:
         case Stage::ClosestHit:
-            // `in` parameter is hit attributes
-            return createTypeLayoutWith(
-                context->layoutContext,
-                context->getRulesFamily()->getHitAttributesParameterRules(),
-                type);
+            // `in` parameter is hit attributes. Allowed system-value inputs fall
+            // through to ordinary varying-input handling below.
+            if (!isAllowedRaytracingSystemValueInput && !isRaytracingPrimitiveIDSystemValueInput)
+            {
+                return createTypeLayoutWith(
+                    context->layoutContext,
+                    context->getRulesFamily()->getHitAttributesParameterRules(),
+                    type);
+            }
+            break;
         }
     }
 

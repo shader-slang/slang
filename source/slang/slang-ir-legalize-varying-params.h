@@ -10,6 +10,9 @@ class DiagnosticSink;
 struct IRModule;
 struct IRInst;
 struct IRFunc;
+struct IRParam;
+struct IRStructField;
+struct IRVarLayout;
 struct IRVectorType;
 struct IRBuilder;
 struct IREntryPointDecoration;
@@ -95,5 +98,53 @@ enum class SystemValueSemanticName
 };
 
 SystemValueSemanticName convertSystemValueSemanticNameToEnum(String rawSemanticName);
+
+/// Returns true if `stage` is a ray-tracing hit stage where `SV_PrimitiveID` is a
+/// runtime-provided builtin instead of a user varying or hit attribute.
+bool isRayTracingHitStage(Stage stage);
+
+/// Replaces an `SV_PrimitiveID` hit-stage parameter with the canonical primitive-index helper.
+/// Returns true only when the parameter was removed, so callers must capture the next parameter
+/// before calling because `param` is invalid after a successful call.
+bool tryLegalizeRayTracingPrimitiveIDParam(
+    IRModule* module,
+    IRBuilder& builder,
+    IRParam* param,
+    bool* outParamRemoved = nullptr);
+
+/// Emits the replacement value for an `SV_PrimitiveID` field while rewriting a hit-stage
+/// struct parameter. `type` is the value type required at the use site, `field` and `layout`
+/// identify the source field metadata, and `userData` is backend-owned context.
+/// Return null only when the backend cannot materialize a replacement; the caller treats this as
+/// rewrite failure and does not fall back to the default helper after invoking a custom emitter.
+using RayTracingPrimitiveIDValueEmitterFunc = IRInst* (*)(IRModule* module,
+                                                          IRBuilder& builder,
+                                                          IRType* type,
+                                                          IRStructField* field,
+                                                          IRVarLayout* layout,
+                                                          void* userData);
+
+struct RayTracingPrimitiveIDValueEmitter
+{
+    /// Optional target-specific emitter. When null, legalization uses the shared primitive-index
+    /// helper decorated for the active backend.
+    RayTracingPrimitiveIDValueEmitterFunc func = nullptr;
+    void* userData = nullptr;
+};
+
+/// Rewrites `SV_PrimitiveID` fields in a hit-stage struct parameter.
+/// Returns true when primitive-ID fields were rewritten. `outParamRemoved` is set when the
+/// original parameter had no ordinary fields and was removed; otherwise the parameter is narrowed
+/// to the remaining ordinary fields and must still be legalized by the caller.
+bool tryLegalizeRayTracingPrimitiveIDStructParam(
+    IRModule* module,
+    IRBuilder& builder,
+    IRParam* param,
+    bool* outParamRemoved = nullptr,
+    RayTracingPrimitiveIDValueEmitter const* valueEmitter = nullptr);
+
+/// Legalizes hit-stage `SV_PrimitiveID` parameters before HLSL existential-type-layout
+/// lowering removes empty struct parameters that are still needed for this rewrite.
+void legalizeRayTracingPrimitiveIDParamsForHLSL(IRModule* module);
 
 } // namespace Slang
