@@ -26,4 +26,8 @@ String evaluateLuaExpression(
     String originalFileName,
     String scriptSource,
     DiagnosticSink* sink);
+
+// Test generation mode support
+void setTestGenMode(bool enabled);
+void setTestGenOutputDir(const String& outputDir);
 } // namespace fiddle
