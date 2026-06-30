@@ -35,7 +35,7 @@ struct ObjectPool
     int getObjectIndex(T* object)
     {
         auto id = (int)(object - m_objects.getBuffer());
-        SLANG_ASSERT(id >= 0 && id < m_objects.getCount());
+        SLANG_RELEASE_ASSERT(id >= 0 && id < m_objects.getCount());
         return id;
     }
 
@@ -84,6 +84,35 @@ struct ContainerPool
         return (HashSet<T*>*)m_hashSetPool.getObject();
     }
 
+    bool updateHashSetUnderuseStreakAndShouldRetire(
+        int objectIndex,
+        size_t liveCount,
+        size_t bucketCount)
+    {
+        // Hash sets normally keep their buckets after `clear()` so the next large use can reuse
+        // that storage. On long runs, though, a pool slot can become expensive if one large use is
+        // followed by many tiny uses: every return clears the same large table even though the live
+        // count stays small. Track that pattern per slot and only release the buckets after it
+        // repeats, so an occasional small use after a large pass does not cause allocation churn.
+        bool isUnderused =
+            bucketCount >= kContainerPoolHashSetMinRetireBucketCount &&
+            liveCount <= bucketCount / kContainerPoolHashSetRetireUnderuseDivisor;
+        if (!isUnderused)
+        {
+            m_hashSetUnderuseStreaks[objectIndex] = 0;
+            return false;
+        }
+
+        if (m_hashSetUnderuseStreaks[objectIndex] < kContainerPoolHashSetRetireUnderuseCount)
+            m_hashSetUnderuseStreaks[objectIndex]++;
+
+        if (m_hashSetUnderuseStreaks[objectIndex] < kContainerPoolHashSetRetireUnderuseCount)
+            return false;
+
+        m_hashSetUnderuseStreaks[objectIndex] = 0;
+        return true;
+    }
+
     template<typename T>
     void free(List<T*>* list)
     {
@@ -105,32 +134,14 @@ struct ContainerPool
         auto objectIndex = m_hashSetPool.getObjectIndex(pooledSet);
         auto liveCount = set->getCount();
         auto bucketCount = set->getBucketCount();
-        bool shouldRetire = false;
-
-        // Hash sets normally keep their buckets after `clear()` so the next large use can reuse
-        // that storage. On long runs, though, a pool slot can become expensive if one large use is
-        // followed by many tiny uses: every return clears the same large table even though the live
-        // count stays small. Track that pattern per slot and only release the buckets after it
-        // repeats, so an occasional small use after a large pass does not cause allocation churn.
-        if (bucketCount >= kContainerPoolHashSetMinRetireBucketCount &&
-            liveCount <= bucketCount / kContainerPoolHashSetRetireUnderuseDivisor)
-        {
-            if (m_hashSetUnderuseStreaks[objectIndex] < kContainerPoolHashSetRetireUnderuseCount)
-                m_hashSetUnderuseStreaks[objectIndex]++;
-            shouldRetire =
-                m_hashSetUnderuseStreaks[objectIndex] >= kContainerPoolHashSetRetireUnderuseCount;
-        }
-        else
-        {
-            m_hashSetUnderuseStreaks[objectIndex] = 0;
-        }
+        bool shouldRetire =
+            updateHashSetUnderuseStreakAndShouldRetire(objectIndex, liveCount, bucketCount);
 
         if (shouldRetire)
         {
             // Swap with an empty set instead of clearing first, because the oversized bucket array
             // is exactly the cost we are trying to stop paying on later small uses of this slot.
             set->clearAndDeallocate();
-            m_hashSetUnderuseStreaks[objectIndex] = 0;
         }
         else
         {
