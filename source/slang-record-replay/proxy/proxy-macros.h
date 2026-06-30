@@ -125,27 +125,67 @@ namespace SlangRecord
 // These record user ref-count changes so playback can match object lifetimes
 // =============================================================================
 
-// Override addRef to record the call
+// Override addRef to record the call.
+//
+// The result is recorded with RecordFlag::None (informational), not
+// RecordFlag::ReturnValue. Refcount values observed during recording cannot
+// be verified during playback because the playback layer holds its own
+// keep-alive references on every wrapped proxy (see m_playbackKeepAlive),
+// so the post-decrement value will reliably differ.
+//
+// addRef/release are routinely invoked from C++ destructors (~ComPtr), which
+// are implicitly noexcept. RECORD_CALL / record() can themselves throw
+// (sync-mode mismatch, stream-past-end, etc.), and an exception escaping a
+// noexcept destructor calls std::terminate(). We therefore wrap the recording
+// path in try/catch and ensure the refcount op still runs if recording threw
+// before reaching it.
+//
 // ProxyType is the concrete proxy class (e.g., SessionProxy)
-#define PROXY_ADDREF_IMPL(ProxyType)                      \
-    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override \
-    {                                                     \
-        if (SlangRecord::isRefCountRecordingSuppressed()) \
-            return ProxyBase::addRefImpl();               \
-        RECORD_CALL();                                    \
-        uint32_t result = ProxyBase::addRefImpl();        \
-        RECORD_RETURN(result);                            \
+#define PROXY_ADDREF_IMPL(ProxyType)                             \
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override        \
+    {                                                            \
+        if (SlangRecord::isRefCountRecordingSuppressed())        \
+            return ProxyBase::addRefImpl();                      \
+        bool _didImpl = false;                                   \
+        uint32_t _result = 0;                                    \
+        try                                                      \
+        {                                                        \
+            RECORD_CALL();                                       \
+            _result = ProxyBase::addRefImpl();                   \
+            _didImpl = true;                                     \
+            _ctx.record(SlangRecord::RecordFlag::None, _result); \
+        }                                                        \
+        catch (...)                                              \
+        {                                                        \
+        }                                                        \
+        if (!_didImpl)                                           \
+            _result = ProxyBase::addRefImpl();                   \
+        return _result;                                          \
     }
 
-// Override release to record the call
-#define PROXY_RELEASE_IMPL(ProxyType)                      \
-    SLANG_NO_THROW uint32_t SLANG_MCALL release() override \
-    {                                                      \
-        if (SlangRecord::isRefCountRecordingSuppressed())  \
-            return ProxyBase::releaseImpl();               \
-        RECORD_CALL();                                     \
-        uint32_t result = ProxyBase::releaseImpl();        \
-        RECORD_RETURN(result);                             \
+// Override release to record the call. See PROXY_ADDREF_IMPL for why the
+// return value is recorded as informational rather than as a verified
+// output, and for why we swallow exceptions in the recording path.
+#define PROXY_RELEASE_IMPL(ProxyType)                            \
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() override       \
+    {                                                            \
+        if (SlangRecord::isRefCountRecordingSuppressed())        \
+            return ProxyBase::releaseImpl();                     \
+        bool _didImpl = false;                                   \
+        uint32_t _result = 0;                                    \
+        try                                                      \
+        {                                                        \
+            RECORD_CALL();                                       \
+            _result = ProxyBase::releaseImpl();                  \
+            _didImpl = true;                                     \
+            _ctx.record(SlangRecord::RecordFlag::None, _result); \
+        }                                                        \
+        catch (...)                                              \
+        {                                                        \
+        }                                                        \
+        if (!_didImpl)                                           \
+            _result = ProxyBase::releaseImpl();                  \
+        return _result;                                          \
     }
 
 // Convenience macro to add both overrides
