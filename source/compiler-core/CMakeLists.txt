@@ -4,7 +4,7 @@ slang_add_target(
     EXPORT_MACRO_PREFIX SLANG
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
-    LINK_WITH_PRIVATE core
+    LINK_WITH_PRIVATE core fast_float
     INCLUDE_FROM_PUBLIC SPIRV-Headers::SPIRV-Headers
     INCLUDE_DIRECTORIES_PRIVATE
         ${CMAKE_CURRENT_BINARY_DIR}/../slang/slang-version-header

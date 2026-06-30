@@ -81,6 +81,90 @@ class TestRunnerTypeCoverage(unittest.TestCase):
         self.assertEqual(group, "Linux SM80Plus GPU (GCP)")
         self.assertTrue(self_hosted)
 
+    def test_classify_group_handles_gcp_pinned_linux_gpu_label(self):
+        """The Linux GPU test jobs request the extra "GCP" label to pin them to
+        the GCP scaler pool and exclude the nvrgfx Colossus hosts (see
+        ci-slang-test-container.yml / ci-rhi-test-container.yml). classify_group
+        matches by subset, so the shipped ["Linux","self-hosted","GPU"] entry
+        still classifies the 4-label set as "Linux GPU (GCP)" without a separate
+        config entry. This regression test locks that in so a future reorder or
+        removal of that entry can't silently bucket the pinned jobs into "Other".
+        """
+        config = ci_visualization.load_config()
+
+        # Job-label path (no runner name) and both runner-name paths must all
+        # resolve to the GCP Linux GPU group.
+        for runner_name in ("", "linux-test-abc123", "2u1g-x570-0558"):
+            group, self_hosted = ci_visualization.classify_group(
+                ["Linux", "self-hosted", "GPU", "GCP"],
+                config,
+                runner_name,
+            )
+            self.assertEqual(
+                group,
+                "Linux GPU (GCP)",
+                msg=f"GCP-pinned Linux GPU job misclassified for runner_name={runner_name!r}",
+            )
+            self.assertTrue(self_hosted)
+
+    def test_classify_group_handles_gcp_build_and_analytics_pools(self):
+        """The CPU-only Linux build and analytics scaler pools carry the labels
+        ["Linux","self-hosted","build","GCP"] and
+        ["Linux","self-hosted","analytics","GCP"], and their VMs are named
+        linux-build-* / linux-analytics-*. Both the job-label path and the
+        scale-set runner-name-prefix path (empty labels) must classify into
+        their own GCP groups rather than falling through to "Other". Locks in
+        the shipped config so these pools stay visible in CI analytics.
+        """
+        config = ci_visualization.load_config()
+
+        cases = [
+            (["Linux", "self-hosted", "build", "GCP"], "linux-build-abc123", "Linux Build (GCP)"),
+            (["Linux", "self-hosted", "analytics", "GCP"], "linux-analytics-abc123", "Linux Analytics (GCP)"),
+        ]
+        for labels, runner_name, expected in cases:
+            # Job-label path (no runner name) and the scale-set name-prefix path
+            # (empty labels) must both resolve to the expected GCP group.
+            for name in ("", runner_name):
+                lbls = labels if name == "" else []
+                group, self_hosted = ci_visualization.classify_group(lbls, config, name)
+                self.assertEqual(
+                    group,
+                    expected,
+                    msg=f"misclassified for labels={lbls} runner_name={name!r}",
+                )
+                self.assertTrue(self_hosted)
+
+    def test_shipped_config_classifies_june_2026_runner_labels(self):
+        """The shipped runner_config.json must classify the runner labels
+        introduced by the June 2026 CI refactors, or `classify_group` falls
+        back to ("Other", self_hosted=False) and silently mis-buckets the
+        jobs (under-reporting self-hosted load and corrupting the
+        build-vs-test wait split).
+
+        - `["Windows", "self-hosted", "build"]`: the dedicated Windows build
+          pool that the Falcor/regression/MDL/compile builds were split onto
+          (shader-slang/slang#11562, #11605, #11635, #11640). Must classify
+          as the same group as the `win-build-` runner-name prefix.
+        - `windows-2025` / `windows-2025-vs2026`: GitHub-hosted images used
+          after the windows-latest pin and the VS2026 matrix (#11579).
+        - `ubuntu-24.04`: GitHub-hosted image used by the RHI/test jobs in
+          ci.yml.
+        """
+        config = ci_visualization.load_config()
+
+        cases = [
+            (["Windows", "self-hosted", "build"], "Windows Build (GCP)", True),
+            (["windows-2025"], "Windows (GH)", False),
+            (["windows-2025-vs2026"], "Windows (GH)", False),
+            (["ubuntu-24.04"], "Linux (GH)", False),
+        ]
+        for labels, expected_group, expected_self_hosted in cases:
+            with self.subTest(labels=labels):
+                group, self_hosted = ci_visualization.classify_group(labels, config)
+                self.assertEqual(group, expected_group)
+                self.assertEqual(self_hosted, expected_self_hosted)
+
     def test_record_snapshot_counts_all_gcp_runner_types(self):
         queue_data = {
             "summary": {

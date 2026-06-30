@@ -1234,7 +1234,8 @@ Modifier* SemanticsVisitor::validateAttribute(
         requirePreludeAttr->capabilitySet = CapabilitySet(capName).freeze(getASTBuilder());
         if (auto stringLitExpr = as<StringLiteralExpr>(attr->args[1]))
         {
-            requirePreludeAttr->prelude = getStringLiteralTokenValue(stringLitExpr->token);
+            requirePreludeAttr->prelude =
+                getStringLiteralTokenValue(stringLitExpr->token, getSink());
         }
         else
         {
@@ -1968,6 +1969,11 @@ Modifier* SemanticsVisitor::checkModifier(
                     genDecl->ownedScope);
                 if (!scrutineeResults.isValid())
                 {
+                    // No "did you mean ...?" suggestion here (unlike the
+                    // `VarExpr` path): a `__target_intrinsic` scrutinee names a
+                    // capability/target identifier, not an ordinary in-scope
+                    // declaration, so a Levenshtein match against the lexical
+                    // scope would be misleading.
                     getSink()->diagnose(Diagnostics::UndefinedIdentifier{
                         .name = targetIntrinsic->scrutinee.name,
                         .location = targetIntrinsic->scrutinee.loc});

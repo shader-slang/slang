@@ -250,6 +250,14 @@ In either decimal or hexadecimal form, using `#INF` as the exponent signifies th
 positive infinity. The digits before the exponent are ignored. Negative infinity is expressed by preceding
 the literal with unary minus, e.g. `-1#INFf`.
 
+The literal evaluation rules are as follows:
+
+1. If the literal is too large for its type, its value is infinity and a warning is issued.
+2. If the literal is non-zero and too small for its type, its value is `0` and a warning is issued.
+3. Decimal literals are rounded to the nearest representable value (ties to even). No warning is
+   issued when rounding changes the value.
+4. Hexadecimal literals are truncated (rounded toward zero) to a representable value. A warning is
+   issued when truncation changes the value.
 
 **Examples:**
 
@@ -279,9 +287,6 @@ the literal with unary minus, e.g. `-1#INFf`.
 
 > 📝 **Remark 1:** A floating-point literal expression without a suffix has type `float`.
 
-> 📝 **Remark 2:** The current implementation does not fully conform to the language manual.
-> This is tracked by GitHub issue [#11276](https://github.com/shader-slang/slang/issues/11276).
-
 
 ## String Literal Expressions
 
@@ -297,7 +302,8 @@ the literal with unary minus, e.g. `-1#INFf`.
 > &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharUnquoted`* \|<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuoted`* \|<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedOctal`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedHex`*
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedHex`* \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedUnicode`*
 >
 > *`DStringCharUnquoted`* = **`<[^\\"[:newline:]]>`**
 >
@@ -310,6 +316,11 @@ the literal with unary minus, e.g. `-1#INFf`.
 > *`DStringCharQuotedHex`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`<\\x[0-9A-Fa-f]+>`** \|<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`<\\x\{[0-9A-Fa-f]+\}>`**
+>
+> *`DStringCharQuotedUnicode`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`<\\u[0-9A-Fa-f]{4}>`** \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`<\\U[0-9A-Fa-f]{8}>`** \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`<\\u\{[0-9A-Fa-f]+\}>`**
 >
 > *`RawString`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'R"'`** *`RawStringDelim`* **`'('`**<br>
@@ -327,7 +338,7 @@ the literal with unary minus, e.g. `-1#INFf`.
 > **`')'`** *`RawStringDelim`* **`'"'`**, where *`RawStringDelim`* is the same delimiter
 > token that opened the raw string.
 
-A string literal represents a sequence of 8-bit characters. Its type is
+A string literal represents a sequence of 8-bit bytes in UTF-8 encoding. Its type is
 [String](../../../core-module-reference/types/string-0/index.html). The underlying data format is unspecified.
 
 A string literal expression consists of one or more consecutive string tokens. The value of the string
@@ -367,8 +378,12 @@ Escape sequence                    | Encoded character value
 `\`<em>nnn</em>                    | Octal number specifying an 8-bit character code (1-3 digits)
 `\x`<em>nnn</em>                   | Character code in hexadecimal format (one or more digits)
 `\x{`<em>nnn</em>`}`               | Character code in hexadecimal format (one or more digits)
+`\u`<em>nnnn</em>                  | Unicode code point in hexadecimal format (4 digits)
+`\u{`<em>nnn</em>`}`               | Unicode code point in hexadecimal format (one or more digits)
+`\U`<em>nnnnnnnn</em>              | Unicode code point in hexadecimal format (8 digits)
 
-The octal and hexadecimal numbers in escape sequences must be in the range 0–255.
+In string literals, octal and hexadecimal character codes represent individual bytes, and they must be in the
+range 0–255. Unicode code points are expanded as UTF-8 encoded byte sequences.
 
 A raw string starts with **`'R"'`**, followed by a user-defined delimiter *`RawStringDelim`* and **`'('`**.
 The character sequence *`RawStringContent`* that follows is taken verbatim — no escape processing is performed
@@ -398,6 +413,11 @@ R"(ABC
 DEF)"                   // value: ABC, a newline, then DEF
 
 "123" "456"             // "123456"
+
+"😊"                    // "😊" (UTF-8 bytes 0xF0 0x9F 0x98 0x8A)
+"\u{1F60A}"             // "😊"
+"\U0001F60A"            // "😊"
+"\xF0\x9F\x98\x8A"      // "😊"
 ```
 
 > 📝 **Remark 1:** The recommended encoding of a string literal is UTF-8. This is not enforced.
@@ -415,11 +435,12 @@ DEF)"                   // value: ABC, a newline, then DEF
 > &nbsp;&nbsp;&nbsp;&nbsp;*`SCharUnquoted`* \|<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuoted`* \|<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedOctal`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedHex`*
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedHex`* \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedUnicode`*
 >
 > *`SCharUnquoted`* = **`<[^\'[:newline:]]>`**
 >
-> Note: [:newline:] consists of characters `\r` and `\n`. (See the escape sequence table below.)
+> Note: [:newline:] consists of characters `\r` and `\n`. (See the escape sequence table above.)
 
 A character literal expression evaluates to a single character value. The type of the value is
 [uint](types-fundamental.md#integer). The character literal consists of an *`SChar`* enclosed in single quotes
@@ -427,8 +448,9 @@ A character literal expression evaluates to a single character value. The type o
 character may be a double quote (`"`) but may not be a single quote (`'`). A single quote must be escaped as
 `\'`.
 
-The hexadecimal numbers in escape sequences must be in the range 0–4294967295 (i.e.,
-representable as `uint`). The octal escapes are limited to 0–255.
+The hexadecimal numbers in escape sequences must be in the range 0–4294967295 (i.e., representable as
+`uint`). The octal escapes are limited to 0–255. Unicode code points map to their respective character values.
+
 
 ```hlsl
 '\0'                    // Character 0 (null character)
@@ -440,8 +462,9 @@ representable as `uint`). The octal escapes are limited to 0–255.
 '\\'                    // Character 92 (\)
 '\110'                  // Character 72 (H) via octal escape
 '\x{75bcd15}'           // Character 123456789 via hexadecimal escape
+'\u{75bcd15}'           // Character 123456789 via Unicode code point escape
+'😊'                    // Character 128522 via UTF-8 encoding
 ```
 
-> 📝 **Remark 1:** The current implementation does not fully conform to the language manual.
-> This is tracked by GitHub issues [#11291](https://github.com/shader-slang/slang/issues/11291)
-> and [#11306](https://github.com/shader-slang/slang/issues/11306).
+> 📝 **Remark 1:** Unlike in string literals, there is no practical difference between hexadecimal (`\x{nnn}`)
+> and Unicode code point (`\u{nnn}`) similar escapes in character literals.

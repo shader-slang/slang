@@ -839,6 +839,39 @@ static void _appendHex16(uint32_t value, StringBuilder& out)
     out.append(UnownedStringSlice(buf, 6));
 }
 
+// Parses exactly four hexadecimal digits starting at `cur` into `out`. Returns
+// false (leaving `out` unmodified) if any of the four characters is not a hex
+// digit. The caller is responsible for ensuring four characters are available.
+static bool _parseHex4(const char* cur, uint32_t& out)
+{
+    uint32_t value = 0;
+    for (Index i = 0; i < 4; ++i)
+    {
+        const char digitC = cur[i];
+
+        uint32_t digitValue;
+        if (digitC >= '0' && digitC <= '9')
+        {
+            digitValue = digitC - '0';
+        }
+        else if (digitC >= 'a' && digitC <= 'f')
+        {
+            digitValue = digitC - 'a' + 10;
+        }
+        else if (digitC >= 'A' && digitC <= 'F')
+        {
+            digitValue = digitC - 'A' + 10;
+        }
+        else
+        {
+            return false;
+        }
+        value = (value << 4) | digitValue;
+    }
+    out = value;
+    return true;
+}
+
 SlangResult JSONStringEscapeHandler::appendEscaped(
     const UnownedStringSlice& slice,
     StringBuilder& out)
@@ -877,10 +910,17 @@ SlangResult JSONStringEscapeHandler::appendEscaped(
             UnownedStringSlice remainingSlice(cur, end);
             uint32_t codePoint = _getUnicodePointFromUTF8(remainingSlice);
 
-            // We only support up to 16 bit unicode values for now...
-            SLANG_ASSERT(codePoint < 0x10000);
-
-            _appendHex16(codePoint, out);
+            // JSON only has 16-bit \u escapes, so a code point >= 0x10000 must be
+            // written as a UTF-16 surrogate pair (two \u escapes). Encode the code
+            // point to one or two UTF-16 code units and emit each as \uXXXX. For
+            // example U+10FFFD becomes "􏿽". Truncating to 16 bits here
+            // (as a single \uXXXX) silently corrupts every astral character.
+            Char16 utf16[2];
+            const int utf16Count = encodeUnicodePointToUTF16(Char32(codePoint), utf16);
+            for (int i = 0; i < utf16Count; ++i)
+            {
+                _appendHex16(utf16[i], out);
+            }
 
             cur = remainingSlice.begin() - 1;
             start = cur + 1;
@@ -971,34 +1011,28 @@ SlangResult JSONStringEscapeHandler::appendUnescaped(
                         return SLANG_FAIL;
                     }
 
-                    for (Index i = 0; i < 4; ++i)
+                    if (!_parseHex4(cur, value))
                     {
-                        const char digitC = cur[i];
-
-                        uint32_t digitValue;
-                        if (digitC >= '0' && digitC <= '9')
-                        {
-                            digitValue = digitC - '0';
-                        }
-                        else if (digitC >= 'a' && digitC <= 'f')
-                        {
-                            digitValue = digitC - 'a' + 10;
-                        }
-                        else if (digitC >= 'A' && digitC <= 'F')
-                        {
-                            digitValue = digitC - 'A' + 10;
-                        }
-                        else
-                        {
-                            return SLANG_FAIL;
-                        }
-                        SLANG_ASSERT(digitValue < 0x10);
-                        value = (value << 4) | digitValue;
+                        return SLANG_FAIL;
                     }
                     cur += 4;
 
-                    // NOTE! Strictly speaking we may want to combine 2 UTF16 surrogates to make a
-                    // single UTF8 encoded char.
+                    // A code point >= 0x10000 is encoded in JSON as a UTF-16
+                    // surrogate pair (two consecutive \u escapes). When we read a
+                    // high surrogate (0xD800-0xDBFF) followed by a low surrogate
+                    // (0xDC00-0xDFFF), combine them back into the single code point
+                    // before encoding to UTF-8. Without this each surrogate half
+                    // would be encoded on its own, corrupting the character.
+                    if (value >= 0xD800 && value <= 0xDBFF && cur + 6 <= end && cur[0] == '\\' &&
+                        cur[1] == 'u')
+                    {
+                        uint32_t low = 0;
+                        if (_parseHex4(cur + 2, low) && low >= 0xDC00 && low <= 0xDFFF)
+                        {
+                            value = 0x10000 + ((value - 0xD800) << 10) + (low - 0xDC00);
+                            cur += 6;
+                        }
+                    }
 
                     // Need to encode in UTF8 to concat
 

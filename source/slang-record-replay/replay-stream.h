@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <slang.h>
 
 namespace SlangRecord
 {
@@ -39,107 +40,79 @@ public:
     // =========================================================================
 
     /// Create an empty stream for writing (capture mode).
-    ReplayStream()
-        : m_isReading(false), m_position(0)
-    {
-    }
+    ReplayStream() = default;
+
+    ReplayStream(const ReplayStream&) = delete;
+    ReplayStream& operator=(const ReplayStream&) = delete;
+
+    // =========================================================================
+    // Module-Boundary Operations
+    // =========================================================================
+    //
+    // These methods are intentionally SLANG_API and defined out of line in
+    // replay-stream.cpp. They copy, move, grow, clear, close, or release
+    // heap-backed state in m_buffer or m_mirrorFile, so calls from another DLL
+    // execute in the compiler module that owns the replay stream state.
 
     /// Create a reading stream from existing data.
     /// Makes a copy of the data.
     /// @param data Pointer to the data.
     /// @param size Size of the data in bytes.
-    ReplayStream(const void* data, size_t size)
-        : m_isReading(true), m_position(0)
-    {
-        if (data && size > 0)
-        {
-            m_buffer.setCount(size);
-            std::memcpy(m_buffer.getBuffer(), data, size);
-        }
-    }
+    /// data must be non-null when size is nonzero.
+    SLANG_API ReplayStream(const void* data, size_t size);
 
     /// Create a reading stream by loading entire file into memory.
     /// @param path Path to the file to load.
     /// @return The stream with file contents.
     /// @throws Slang::Exception if file cannot be opened or read.
-    static ReplayStream loadFromFile(const char* path)
-    {
-        List<unsigned char> contents;
-        SlangResult result = File::readAllBytes(String(path), contents);
-        if (SLANG_FAILED(result))
-            throw Slang::Exception(String("Failed to open file for reading: ") + path);
+    SLANG_API static ReplayStream loadFromFile(const char* path);
 
-        ReplayStream stream;
-        stream.m_isReading = true;
-        stream.m_buffer = Slang::_Move(contents);
+    /// Move-construct from another stream.
+    SLANG_API ReplayStream(ReplayStream&& other);
 
-        return stream;
-    }
+    /// Move-assign from another stream.
+    SLANG_API ReplayStream& operator=(ReplayStream&& other);
 
-    // Move-only (no copying)
-    ReplayStream(ReplayStream&&) = default;
-    ReplayStream& operator=(ReplayStream&&) = default;
-    ReplayStream(const ReplayStream&) = delete;
-    ReplayStream& operator=(const ReplayStream&) = delete;
-
-    ~ReplayStream()
-    {
-        // Close mirror file if open
-        closeMirrorFile();
-    }
-
-    // =========================================================================
-    // Reading/Writing
-    // =========================================================================
+    SLANG_API ~ReplayStream();
 
     /// Write data to the stream.
     /// @param data Pointer to the data to write.
     /// @param size Number of bytes to write.
     /// @throws Slang::Exception if this is a reading stream.
-    void write(const void* data, size_t size)
-    {
-        if (m_isReading)
-            throw Slang::Exception("Cannot write to a reading stream");
-
-        size_t newSize = m_position + size;
-        if (newSize > size_t(m_buffer.getCapacity()))
-        {
-            m_buffer.reserve(Slang::Index(newSize) * 2);
-        }
-        if (newSize > size_t(m_buffer.getCount()))
-        {
-            m_buffer.setCount(Slang::Index(newSize));
-        }
-
-        std::memcpy(m_buffer.getBuffer() + m_position, data, size);
-        m_position += size;
-
-        // Mirror to file if enabled
-        if (m_mirrorFile)
-        {
-            m_mirrorFile->write(data, size);
-            m_mirrorFile->flush(); // Ensure data is written immediately
-        }
-    }
+    SLANG_API void write(const void* data, size_t size);
 
     /// Read data from the stream.
     /// @param data Buffer to read into.
     /// @param size Number of bytes to read.
     /// @throws Slang::Exception if this is a writing stream or read past end.
-    void read(void* data, size_t size)
-    {
-        if (!m_isReading)
-            throw Slang::Exception("Cannot read from a writing stream");
+    SLANG_API void read(void* data, size_t size);
 
-        if (m_position + size > size_t(m_buffer.getCount()))
-            throw Slang::Exception("Read past end of stream");
+    /// Reset the stream to initial empty writing state.
+    SLANG_API void reset();
 
-        std::memcpy(data, m_buffer.getBuffer() + m_position, size);
-        m_position += size;
-    }
+    /// Set a mirror file for crash-safe capture.
+    /// All subsequent writes will be immediately written to this file as well.
+    /// @param path Path to the mirror file.
+    /// @throws Slang::Exception if file cannot be opened.
+    SLANG_API void setMirrorFile(const char* path);
+
+    /// Save all data to a file.
+    /// @param path Path to the file to write.
+    /// @throws Slang::Exception if file cannot be opened or written.
+    SLANG_API void saveToFile(const char* path) const;
+
+    /// Close the mirror file (data remains in memory).
+    SLANG_API void closeMirrorFile();
+
+    /// Create a reading stream from this stream's data.
+    /// Makes a copy of the current data.
+    SLANG_API ReplayStream createReader() const;
+
+    /// Clear the stream and reset to writing mode.
+    SLANG_API void clear();
 
     // =========================================================================
-    // Position/Size
+    // Inline State Accessors
     // =========================================================================
 
     /// Get the current position in the stream.
@@ -164,13 +137,8 @@ public:
     /// Returns true if the stream has reached the end.
     bool atEnd() const { return m_position >= size_t(m_buffer.getCount()); }
 
-    /// Reset the stream to initial empty writing state.
-    void reset()
-    {
-        m_buffer.clear();
-        m_position = 0;
-        m_isReading = false;
-    }
+    /// Check if a mirror file is currently active.
+    bool hasMirrorFile() const { return m_mirrorFile != nullptr; }
 
     // =========================================================================
     // Direct Memory Access
@@ -221,81 +189,6 @@ public:
         if (offset >= size_t(m_buffer.getCount()))
             throw Slang::Exception("Offset past end of stream");
         return m_buffer[Slang::Index(offset)];
-    }
-
-    // =========================================================================
-    // File Operations
-    // =========================================================================
-
-    /// Set a mirror file for crash-safe capture.
-    /// All subsequent writes will be immediately written to this file as well.
-    /// @param path Path to the mirror file.
-    /// @throws Slang::Exception if file cannot be opened.
-    void setMirrorFile(const char* path)
-    {
-        closeMirrorFile();
-
-        m_mirrorFile = new FileStream();
-        SlangResult result = m_mirrorFile->init(
-            String(path),
-            FileMode::Create,
-            FileAccess::Write,
-            FileShare::ReadWrite);
-        if (SLANG_FAILED(result))
-        {
-            m_mirrorFile = nullptr;
-            throw Slang::Exception(String("Failed to open mirror file: ") + path);
-        }
-
-        // Write any existing data to the file
-        if (m_buffer.getCount() > 0)
-        {
-            m_mirrorFile->write(m_buffer.getBuffer(), m_buffer.getCount());
-            m_mirrorFile->flush();
-        }
-    }
-
-    /// Save all data to a file.
-    /// @param path Path to the file to write.
-    /// @throws Slang::Exception if file cannot be opened or written.
-    void saveToFile(const char* path) const
-    {
-        SlangResult result =
-            File::writeAllBytes(String(path), m_buffer.getBuffer(), m_buffer.getCount());
-        if (SLANG_FAILED(result))
-            throw Slang::Exception(String("Failed to write to file: ") + path);
-    }
-
-    /// Check if a mirror file is currently active.
-    bool hasMirrorFile() const { return m_mirrorFile != nullptr; }
-
-    /// Close the mirror file (data remains in memory).
-    void closeMirrorFile()
-    {
-        if (m_mirrorFile)
-        {
-            m_mirrorFile->close();
-            m_mirrorFile = nullptr;
-        }
-    }
-
-    // =========================================================================
-    // Utility
-    // =========================================================================
-
-    /// Create a reading stream from this stream's data.
-    /// Makes a copy of the current data.
-    ReplayStream createReader() const
-    {
-        return ReplayStream(m_buffer.getBuffer(), m_buffer.getCount());
-    }
-
-    /// Clear the stream and reset to writing mode.
-    void clear()
-    {
-        m_buffer.clear();
-        m_position = 0;
-        m_isReading = false;
     }
 
 private:
