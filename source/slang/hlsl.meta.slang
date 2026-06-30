@@ -20370,8 +20370,8 @@ float RayCurrentTime()
     case spirv:
         return spirv_asm
         {
-            OpCapability RayTracingMotionBlurNV;
             OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpCapability RayTracingMotionBlurNV;
             result:$$float = OpLoad builtin(CurrentRayTimeNV:float);
         };
     }

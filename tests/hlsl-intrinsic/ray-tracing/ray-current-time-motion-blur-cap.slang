@@ -7,6 +7,9 @@
 // VUID-VkShaderModuleCreateInfo-pCode-08737. Assert both are now emitted.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage closesthit -entry main
+// Also compile to a binary SPIR-V module so CI's SLANG_RUN_SPIRV_VALIDATION=1 runs
+// spirv-val against the real module — the precise validation #11841 reported failing.
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage closesthit -entry main
 
 // CHECK-DAG: OpCapability RayTracingMotionBlurNV
 // CHECK-DAG: OpExtension "SPV_NV_ray_tracing_motion_blur"
