@@ -406,7 +406,9 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
         };
         if (auto varDecl = as<VarDeclBase>(declRef.getDecl()))
         {
-            if (!varDecl->findModifier<ConstModifier>() && !as<LetDecl>(declRef.getDecl()))
+            if (!varDecl->findModifier<ConstModifier>() &&
+                !varDecl->findModifier<ConstExprModifier>() &&
+                !as<LetDecl>(declRef.getDecl()))
                 return printer.getString();
             printInitExpr(getModule(varDecl), varDecl->type, varDecl->initExpr);
         }

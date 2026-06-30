@@ -2709,7 +2709,8 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
         return nullptr;
 
     // In HLSL, `const` is used to mark compile-time constant expressions.
-    if (!decl->hasModifier<ConstModifier>())
+    // `constexpr` carries `ConstExprModifier` and is also a compile-time constant.
+    if (!decl->hasModifier<ConstModifier>() && !decl->hasModifier<ConstExprModifier>())
         return nullptr;
 
     // The values of specialization constants aren't known at compile time even
@@ -3244,9 +3245,10 @@ IntVal* SemanticsVisitor::tryFoldIndexExpr(
     auto arrayType = as<ArrayExpressionType>(type);
     if (!arrayType)
         return nullptr;
-    if (!varDecl->hasModifier<ConstModifier>())
+    if (!varDecl->hasModifier<ConstModifier>() && !varDecl->hasModifier<ConstExprModifier>())
         return nullptr;
-    if (isGlobalDecl(varDecl) && !varDecl->hasModifier<HLSLStaticModifier>())
+    if (isGlobalDecl(varDecl) && !varDecl->hasModifier<HLSLStaticModifier>() &&
+        !varDecl->hasModifier<ConstExprModifier>())
         return nullptr;
     if (!varDecl->initExpr)
         return nullptr;

@@ -1581,6 +1581,10 @@ bool isGlobalShaderParameter(VarDeclBase* decl)
         if (as<HLSLStaticModifier>(modifier))
             return false;
 
+        // A `constexpr` variable is a compile-time constant, not a shader parameter.
+        if (as<ConstExprModifier>(modifier))
+            return false;
+
         // While not normally allowed, out variables are not constant
         // parameters, this can happen for example in GLSL mode
         if (as<OutModifier>(modifier))
@@ -1640,6 +1644,11 @@ QualType getTypeForDeclRef(
 
         bool isLValue = true;
         if (varDeclRef.getDecl()->findModifier<ConstModifier>())
+            isLValue = false;
+        // `constexpr` on a variable declaration (not a parameter) is immutable.
+        // On parameters it means "must be compile-time constant at the call site",
+        // but the parameter itself is still an lvalue inside the function.
+        if (!varDeclRef.is<ParamDecl>() && varDeclRef.getDecl()->findModifier<ConstExprModifier>())
             isLValue = false;
 
         // Global-scope shader parameters should not be writable,
@@ -2731,7 +2740,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         if (as<BasicExpressionType>(varDecl->type.type))
         {
             auto parentDecl = getParentDecl(varDecl);
-            if (varDecl->findModifier<ConstModifier>() &&
+            if ((varDecl->findModifier<ConstModifier>() ||
+                 varDecl->findModifier<ConstExprModifier>()) &&
                 (as<NamespaceDeclBase>(parentDecl) || as<FileDecl>(parentDecl) ||
                  varDecl->findModifier<HLSLStaticModifier>()))
             {
@@ -2830,7 +2840,9 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 break;
             }
         }
-        if (!varDecl->findModifier<HLSLStaticModifier>() || !varDecl->findModifier<ConstModifier>())
+        if (!varDecl->findModifier<ConstExprModifier>() &&
+            (!varDecl->findModifier<HLSLStaticModifier>() ||
+             !varDecl->findModifier<ConstModifier>()))
         {
             getSink()->diagnose(
                 Diagnostics::ValueRequirementMustBeCompileTimeConst{.decl = varDecl});
@@ -3303,8 +3315,10 @@ static bool _initExprIsRuntimeValue(Expr* expr)
     {
         if (auto varDecl = as<VarDeclBase>(declRefExpr->declRef.getDecl()))
         {
-            // References to static const globals are fine — compile-time constants.
-            if (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>())
+            // References to static const or constexpr globals are fine — compile-time constants.
+            if ((varDecl->hasModifier<HLSLStaticModifier>() &&
+                 varDecl->hasModifier<ConstModifier>()) ||
+                varDecl->hasModifier<ConstExprModifier>())
                 return false;
             // Any other global variable (including plain `static float foo`) is mutable.
             if (isGlobalDecl(varDecl))
@@ -3392,9 +3406,10 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
     if (auto initExpr = varDecl->initExpr)
     {
-        // Disable the short-circuiting for static const variable init expression
+        // Disable the short-circuiting for static const or constexpr variable init expression
         bool isStaticConst =
-            varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>();
+            (varDecl->hasModifier<HLSLStaticModifier>() && varDecl->hasModifier<ConstModifier>()) ||
+            varDecl->hasModifier<ConstExprModifier>();
 
         auto subVisitor =
             isStaticConst ? SemanticsVisitor(disableShortCircuitLogicalExpr()) : *this;
@@ -3613,6 +3628,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
         bool isOpaque = (((int)varTypeTags & (int)TypeTag::Opaque) != 0);
         if (isOpaque && isGlobalDecl(varDecl) && !varDecl->hasModifier<ConstModifier>() &&
+            !varDecl->hasModifier<ConstExprModifier>() &&
             varDecl->hasModifier<HLSLStaticModifier>())
         {
             // Opaque type global variable must be const.
