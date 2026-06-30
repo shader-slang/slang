@@ -427,14 +427,15 @@ public:
                 typeLayout = typeLayout->getElementTypeLayout();
                 return typeLayout;
             case slang::TypeReflection::Kind::Resource:
-                {
-                    if (typeLayout->getResourceShape() != SLANG_STRUCTURED_BUFFER)
-                        break;
-                    SLANG_ASSERT(outContainerType == ShaderObjectContainerType::None);
-                    outContainerType = ShaderObjectContainerType::StructuredBuffer;
-                    typeLayout = typeLayout->getElementTypeLayout();
-                }
-                return typeLayout;
+                // Non-container resource (Buffer<T>, Texture*, …): leaf type, return
+                // as-is with `outContainerType == None`, matching the `default:` arm.
+                // A `break` here would only exit the switch and the enclosing for(;;)
+                // would re-spin with `typeLayout` unchanged → infinite loop (#8455).
+                if (typeLayout->getResourceShape() != SLANG_STRUCTURED_BUFFER)
+                    return typeLayout;
+                SLANG_ASSERT(outContainerType == ShaderObjectContainerType::None);
+                outContainerType = ShaderObjectContainerType::StructuredBuffer;
+                return typeLayout->getElementTypeLayout();
             case slang::TypeReflection::Kind::ConstantBuffer:
             case slang::TypeReflection::Kind::ParameterBlock:
                 typeLayout = typeLayout->getElementTypeLayout();
