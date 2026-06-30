@@ -1,4 +1,4 @@
-name: Format
+name: Regenerate Format
 on:
   repository_dispatch:
     types: [format-command]
