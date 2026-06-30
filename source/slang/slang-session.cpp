@@ -112,11 +112,10 @@ Linkage::~Linkage()
         auto globalSession = getSessionImpl();
         std::lock_guard<std::mutex> lock(globalSession->m_typeCheckingCacheMutex);
         if (!globalSession->m_typeCheckingCache ||
-            globalSession->getTypeCheckingCache()->resolvedOperatorOverloadCache.getCount() <
-                getTypeCheckingCache()->resolvedOperatorOverloadCache.getCount())
+            globalSession->getTypeCheckingCache()->conversionCostCache.getCount() <
+                getTypeCheckingCache()->conversionCostCache.getCount())
         {
             globalSession->m_typeCheckingCache = m_typeCheckingCache;
-            getTypeCheckingCache()->version++;
         }
         destroyTypeCheckingCache();
     }
@@ -504,8 +503,15 @@ bool Linkage::isSpecialized(DeclRef<Decl> declRef)
         return true; // no generics => always specialized
 
     auto defaultArgs = getDefaultSubstitutionArgs(getASTBuilder(), &visitor, as<GenericDecl>(decl));
-    auto currentArgs =
-        SubstitutionSet(declRef).findGenericAppDeclRef(as<GenericDecl>(decl))->getArgs();
+
+    // If the declRef carries no generic-application substitution for this
+    // generic at all (e.g. a bare reference to a generic entry point discovered
+    // via `[shader(...)]`), then nothing has been substituted, so it is
+    // unspecialized.
+    auto genericAppDeclRef = SubstitutionSet(declRef).findGenericAppDeclRef(as<GenericDecl>(decl));
+    if (!genericAppDeclRef)
+        return false;
+    auto currentArgs = genericAppDeclRef->getArgs();
 
     if (defaultArgs.getCount() != currentArgs.getCount()) // should really never happen.
         return true;

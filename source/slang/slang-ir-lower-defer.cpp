@@ -33,7 +33,12 @@ struct DeferLoweringContext : InstPassBase
         }
     }
 
-    // Returns the new last block.
+    // Inline the blocks for a `defer` before `beforeInst`, preserving the remaining
+    // instructions in `targetBlock` after the inlined cleanup. If the cleanup has
+    // multiple blocks, this splices cloned defer blocks after `targetBlock`, branches
+    // from `targetBlock` to the first clone, moves `beforeInst` and following
+    // instructions to the cloned block that originally branched to `mergeBlock`, and
+    // returns that new last block so callers can keep mapping the old scope exit.
     IRBlock* inlineDefer(
         IRInst* beforeInst,
         IRBlock* targetBlock,
@@ -125,13 +130,13 @@ struct DeferLoweringContext : InstPassBase
 
     void processFunc(IRGlobalValueWithCode* func)
     {
-        // Iterating over `defer` instructions in reverse order allows us to
+        // Iterating over `defer` instructions in postorder (effectively
+        // reverse, as successors occur before predecessors) allows us to
         // expand them in the correct order, including nested `defer`s.
-        // We also use this to determine scope extents.
-        List<IRBlock*> reverseBlocks = getReversePostorderOnReverseCFG(func);
+        List<IRBlock*> postorderBlocks = getPostorder(func);
         List<IRDefer*> unhandledDefers;
 
-        for (IRBlock* block : reverseBlocks)
+        for (IRBlock* block : postorderBlocks)
         {
             for (auto child = block->getLastChild(); child; child = child->getPrevInst())
             {
@@ -181,6 +186,27 @@ struct DeferLoweringContext : InstPassBase
             // preceded by a copy of the deferBlocks.
             for (IRBlock* block : scopeBlocksSet)
             {
+                // `Abort` is represented as a normal intrinsic until target-specific
+                // legalization, but it exits shader execution. Inline deferred work
+                // before the abort itself so SPIR-V legalization does not strip it
+                // together with the unreachable instructions after the abort.
+                bool handledAbortExit = false;
+                for (IRInst* inst : block->getChildren())
+                {
+                    if (inst->getOp() != kIROp_Abort)
+                        continue;
+
+                    auto newEnd = inlineDefer(inst, block, deferBlocks, mergeBlock, &builder);
+                    if (newEnd != block)
+                    {
+                        mapOldScopeToNew[block] = newEnd;
+                    }
+                    handledAbortExit = true;
+                    break;
+                }
+                if (handledAbortExit)
+                    continue;
+
                 auto terminator = block->getTerminator();
                 SLANG_ASSERT(terminator);
                 bool exits = false;

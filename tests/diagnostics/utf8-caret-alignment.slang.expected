@@ -1,0 +1,35 @@
+result code = -1
+standard error = {
+error[E30015]: undefined identifier
+  --> tests/diagnostics/utf8-caret-alignment.slang:13:15
+   |
+13 | /* αβγ */ bbb;
+   |           ^^^ undefined identifier 'bbb'.
+---'
+error[E30015]: undefined identifier
+  --> tests/diagnostics/utf8-caret-alignment.slang:16:14
+   |
+16 | /* 救命 */ ddd;
+   |            ^^^ undefined identifier 'ddd'.
+---'
+error[E30015]: undefined identifier
+  --> tests/diagnostics/utf8-caret-alignment.slang:21:14
+   |
+21 | /* é */ eee;
+   |         ^^^ undefined identifier 'eee'.
+---'
+error[E30015]: undefined identifier
+  --> tests/diagnostics/utf8-caret-alignment.slang:26:13
+   |
+26 | /*	x */ fff;
+   |         ^^^ undefined identifier 'fff'.
+---'
+error[E30015]: undefined identifier
+  --> tests/diagnostics/utf8-caret-alignment.slang:31:5
+   |
+31 | 救命();
+   | ^^^^ undefined identifier '救命'.
+---'
+}
+standard output = {
+}

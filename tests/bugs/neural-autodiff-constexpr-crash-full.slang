@@ -29,11 +29,20 @@ static const int WARPS_PER_BLOCK = WT_WAVE_WARPS;
 static const float LEAKY_ALPHA = 0.01f;
 
 typealias Storage = TorchTensorViewAddress<half>;
-typealias ShMemSize = SharedMemorySize<half, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, WARPS_PER_BLOCK>;
-typealias ShMemSizeLayer = ShMemSize.OfLayer4<IN_DIM, HIDDEN_DIM, HIDDEN_DIM, HIDDEN_DIM, OUT_DIM>;
-typealias InVec = WaveTangledVector<half, ShMemSizeLayer, IN_DIM, SubgroupSize>;
-typealias HidVec = WaveTangledVector<half, ShMemSizeLayer, HIDDEN_DIM, SubgroupSize>;
-typealias OutVec = WaveTangledVector<half, ShMemSizeLayer, OUT_DIM, SubgroupSize>;
+typealias ShMemSizeLayer = SharedMemorySize<
+    half,
+    TargetEnum.CUDA,
+    ExecutionMode.Training,
+    SubgroupSize,
+    WARPS_PER_BLOCK,
+    IN_DIM,
+    HIDDEN_DIM,
+    HIDDEN_DIM,
+    HIDDEN_DIM,
+    OUT_DIM>;
+typealias InVec = WaveTangledVector<half, ShMemSizeLayer, IN_DIM, SubgroupSize, WARPS_PER_BLOCK>;
+typealias HidVec = WaveTangledVector<half, ShMemSizeLayer, HIDDEN_DIM, SubgroupSize, WARPS_PER_BLOCK>;
+typealias OutVec = WaveTangledVector<half, ShMemSizeLayer, OUT_DIM, SubgroupSize, WARPS_PER_BLOCK>;
 typealias Layer1 = FFLayer<half, InVec, HidVec, LinearLayout, LeakyReLU<half>, true>;
 typealias Layer2 = FFLayer<half, HidVec, HidVec, LinearLayout, LeakyReLU<half>, true>;
 typealias Layer3 = FFLayer<half, HidVec, HidVec, LinearLayout, LeakyReLU<half>, true>;

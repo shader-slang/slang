@@ -22,8 +22,7 @@ public:
     HLSLSourceEmitter(const Desc& desc)
         : Super(desc), m_extensionTracker(new HLSLExtensionTracker)
     {
-        auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
-        m_sm610OrAbove = targetProfile.getVersion() > ProfileVersion::DX_6_9;
+        m_sm610OrAbove = m_effectiveProfile.getVersion() > ProfileVersion::DX_6_9;
     }
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
@@ -148,6 +147,7 @@ protected:
     void _emitHLSLDecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val);
     void _emitHLSLDecorationSingleFloat(const char* name, IRFunc* entryPoint, IRFloatLit* val);
 
+    bool _shouldEmitPayloadAccessQualifiers();
     void _emitStageAccessSemantic(IRStageAccessDecoration* decoration, const char* name);
 
     // HLSL prelude strings for built-in helper functions injected at the top of emitted output.

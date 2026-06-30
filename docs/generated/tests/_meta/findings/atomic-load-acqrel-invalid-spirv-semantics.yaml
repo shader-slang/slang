@@ -1,0 +1,37 @@
+schema_version: 1
+id: atomic-load-acqrel-invalid-spirv-semantics
+bundle: conformance/basics-memory-model-consistency
+suspected_kind: wrong-codegen
+title: "Atomic<T>.load(AcquireRelease) emits OpAtomicLoad with invalid semantics"
+observed_at: "2026-06-02T09:58:23+00:00"
+scope: spirv
+evidence:
+  command: "./build/Release/bin/slangc docs/generated/tests/conformance/basics-memory-model-consistency/atomic-acqrel-spirv-emission.slang -target spirv-asm -entry computeMain -stage compute"
+  source_slang: docs/generated/tests/conformance/basics-memory-model-consistency/atomic-acqrel-spirv-emission.slang
+  observed_summary: |
+    `Atomic<uint>.load(MemoryOrder.AcquireRelease)` emits OpAtomicLoad with memory semantics
+    operand 72 (= UniformMemory|AcquireRelease). SPIRV validation rejects this with
+    VUID-StandaloneSpirv-MemorySemantics-10868: "AtomicLoad: MemorySemantics must not use
+    Release or AcquireRelease memory order with AtomicLoad." The SPIRV spec (1.6 §3.25)
+    mandates that loads only use None or Acquire.
+  exit_code: 255
+  stderr_tail: "error: line 43: [VUID-StandaloneSpirv-MemorySemantics-10868] AtomicLoad: MemorySemantics must not use Release or AcquireRelease memory order with AtomicLoad"
+expected:
+  claim: |
+    The SPIRV specification (section 3.25 Memory Semantics) states that OpAtomicLoad may only
+    use None or Acquire memory semantics; using AcquireRelease is explicitly prohibited.
+    `Atomic<T>.load(MemoryOrder.AcquireRelease)` should either emit Acquire semantics (since
+    load can only observe, not release) or reject the call with a diagnostic at the Slang
+    source level if AcquireRelease is not valid for a load operation.
+  citation_kind: doc
+  citation: docs/language-reference/basics-memory-model-consistency.md
+provenance:
+  agent_model: claude-sonnet-4-6
+  source_commit: 57fb63455095efe1465661001ad147b24b968932
+  doc_anchor: docs/language-reference/basics-memory-model-consistency.md#memory-order
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — the code compiles without error, the issue is only in spirv-val rejection."
+    - "Expected AcquireRelease on load: ruled out — SPIRV spec explicitly prohibits it for AtomicLoad."
+    - "Known issue related to #10683 (Atomic<T> wrong code): possible root cause overlap."

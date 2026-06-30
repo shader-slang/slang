@@ -13,7 +13,7 @@ interface ICOMBase
 }
 
 interface INonCOM : ICOMBase
-//CHECK:            ^^^^^^^^ E31124
+//CHECK:            ^^^^^^^^ E31126
 //CHECK:            ^^^^^^^^ an interface type that inherits from a [COM] interface must itself be a [COM] interface
 {
     float compute();

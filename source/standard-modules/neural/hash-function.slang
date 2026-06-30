@@ -1,10 +1,9 @@
 implementing neural;
 
-#include "common-def.slang"
 
-VISIBILITY_LEVEL typealias uvec<int Dim> = Array<uint32_t, Dim>;
+internal typealias uvec<int Dim> = Array<uint32_t, Dim>;
 
-VISIBILITY_LEVEL enum HashType : uint32_t
+internal enum HashType : uint32_t
 {
 	Prime,
 	CoherentPrime,
@@ -13,7 +12,7 @@ VISIBILITY_LEVEL enum HashType : uint32_t
 	BaseConvert,
 }
 
-VISIBILITY_LEVEL struct Pcg32
+internal struct Pcg32
 {
 	static const uint64_t DefaultState  = 0x853c49e6748fea9bULL;
 	static const uint64_t DefaultStream = 0xda3e39cb94b95bdbULL;
@@ -22,7 +21,7 @@ VISIBILITY_LEVEL struct Pcg32
 	uint64_t state;
 	uint64_t inc;
 
-	VISIBILITY_LEVEL __init(uint64_t initstate, uint64_t initseq = 1)
+	internal __init(uint64_t initstate, uint64_t initseq = 1)
 	{
 		state = 0;
 		inc = (initseq << 1) | 1;
@@ -32,7 +31,7 @@ VISIBILITY_LEVEL struct Pcg32
 	}
 
 	[mutating]
-	VISIBILITY_LEVEL uint32_t nextUint()
+	internal uint32_t nextUint()
 	{
 		uint64_t oldstate = state;
 		state = oldstate * Mult + inc;
@@ -42,7 +41,7 @@ VISIBILITY_LEVEL struct Pcg32
 	}
 
 	[mutating]
-	VISIBILITY_LEVEL void advance(int64_t delta)
+	internal void advance(int64_t delta)
 	{
 		uint64_t curMult = Mult;
 		uint64_t curPlus = inc;
@@ -67,7 +66,7 @@ VISIBILITY_LEVEL struct Pcg32
 
 // LCG hash: XORs position values multiplied by prime factors
 [ForceInline]
-VISIBILITY_LEVEL uint32_t lcgHash<int Dimensions, int PrimeCount>(uvec<Dimensions> posGrid, uint32_t primes[PrimeCount])
+internal uint32_t lcgHash<int Dimensions, int PrimeCount>(uvec<Dimensions> posGrid, uint32_t primes[PrimeCount])
 {
 	uint32_t result = 0;
 	[ForceUnroll]
@@ -79,21 +78,21 @@ VISIBILITY_LEVEL uint32_t lcgHash<int Dimensions, int PrimeCount>(uvec<Dimension
 }
 
 [ForceInline]
-VISIBILITY_LEVEL uint32_t primeHash<int Dimensions>(uvec<Dimensions> posGrid)
+internal uint32_t primeHash<int Dimensions>(uvec<Dimensions> posGrid)
 {
 	uint32_t factors[7] = { 1958374283u, 2654435761u, 805459861u, 3674653429u, 2097192037u, 1434869437u, 2165219737u };
 	return lcgHash<Dimensions, 7>(posGrid, factors);
 }
 
 [ForceInline]
-VISIBILITY_LEVEL uint32_t coherentPrimeHash<int Dimensions>(uvec<Dimensions> posGrid)
+internal uint32_t coherentPrimeHash<int Dimensions>(uvec<Dimensions> posGrid)
 {
 	uint32_t factors[7] = { 1u, 2654435761u, 805459861u, 3674653429u, 2097192037u, 1434869437u, 2165219737u };
 	return lcgHash<Dimensions, 7>(posGrid, factors);
 }
 
 [ForceInline]
-VISIBILITY_LEVEL uint32_t reversedPrimeHash<int Dimensions>(uvec<Dimensions> posGrid)
+internal uint32_t reversedPrimeHash<int Dimensions>(uvec<Dimensions> posGrid)
 {
 	uint32_t factors[7] = { 2165219737u, 1434869437u, 2097192037u, 3674653429u, 805459861u, 2654435761u, 1958374283u };
 	return lcgHash<Dimensions, 7>(posGrid, factors);
@@ -101,7 +100,7 @@ VISIBILITY_LEVEL uint32_t reversedPrimeHash<int Dimensions>(uvec<Dimensions> pos
 
 // Base conversion hash (used in permuto-encoding)
 [ForceInline]
-VISIBILITY_LEVEL uint32_t baseConvertHash<int Dimensions>(uvec<Dimensions> posGrid)
+internal uint32_t baseConvertHash<int Dimensions>(uvec<Dimensions> posGrid)
 {
 	uint32_t k = 0;
 	[ForceUnroll]
@@ -115,7 +114,7 @@ VISIBILITY_LEVEL uint32_t baseConvertHash<int Dimensions>(uvec<Dimensions> posGr
 
 // RNG hash using PCG32
 [ForceInline]
-VISIBILITY_LEVEL uint32_t rngHash<int Dimensions>(uvec<Dimensions> posGrid, uint32_t seed = 1337)
+internal uint32_t rngHash<int Dimensions>(uvec<Dimensions> posGrid, uint32_t seed = 1337)
 {
 	static const int BitsPerDim = 64 / Dimensions;
 	uint64_t step = 0;
@@ -132,7 +131,7 @@ VISIBILITY_LEVEL uint32_t rngHash<int Dimensions>(uvec<Dimensions> posGrid, uint
 }
 
 [ForceInline]
-VISIBILITY_LEVEL uint32_t gridHash<HashType Type, int Dimensions>(uvec<Dimensions> positionGrid)
+internal uint32_t gridHash<HashType Type, int Dimensions>(uvec<Dimensions> positionGrid)
 {
 	switch (Type)
 	{

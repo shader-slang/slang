@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=FUNC1): -target spirv -O0 -entry func1
-//TEST:SIMPLE(filecheck=FUNC2): -target spirv -O0 -entry func2
+//TEST:SIMPLE(filecheck=FUNC1): -target spirv -O0 -entry func1 -warnings-disable 38052
+//TEST:SIMPLE(filecheck=FUNC2): -target spirv -O0 -entry func2 -warnings-disable 38052
 
 // FUNC1: OpEntryPoint Vertex %func1 "main" %entryPointParam_func1_value %entryPointParam_func1_hasValue
 // FUNC1-DAG: OpDecorate %entryPointParam_func1_value Location 0

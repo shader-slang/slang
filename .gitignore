@@ -89,6 +89,7 @@ prelude/*.h.cpp
 /external/slangpy/
 /external/dxvk-remix/
 /external/SaschaWillems-Vulkan/
+/external/falcor/
 
 build/**/*.tlog
 build/**/*.lastbuildstate
@@ -110,9 +111,12 @@ vkd3d-proton.cache.write
 .*.swo
 
 # Claude local settings, memory, and worktrees
+/.claude/scheduled_tasks.lock
 /.claude/settings.local.json
+/.claude/scheduled_tasks.lock
 /.claude/worktrees/
 /issue-*/plan.*.md
+/issue-*/review-guide.md
 /issue-*/claude.log
 /issue-*/claude.*.json
 CLAUDE.local.md

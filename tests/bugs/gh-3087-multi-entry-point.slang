@@ -25,6 +25,7 @@ struct VIn
 
 struct VSOutput
 {
+    float4 pos : SV_Position;
     uint instanceID : SV_InstanceID;
 	float4 color : COLOR;
 };
@@ -32,6 +33,7 @@ struct VSOutput
 [shader("vertex")]
 VSOutput vmain(VIn vin) {
     VSOutput t;
+    t.pos = float4(0);
     t.instanceID = vin.instanceID;
     t.color = float4(0, 0, 0, 0);
     return t;

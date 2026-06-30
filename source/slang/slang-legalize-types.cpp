@@ -1237,8 +1237,14 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
             if (legalElementType.flavor == LegalType::Flavor::pair &&
                 as<IRConstantBufferType>(type))
             {
-                context->m_sink->diagnose(Diagnostics::SpecialTypeLeaksFromParameterGroup{
-                    .location = findFirstUseLoc(type)});
+                // The parameter group type's source location can be empty
+                // (e.g. when it comes from a linked module). Fall back to the
+                // location of the first use so the warning always points
+                // somewhere meaningful.
+                SourceLoc groupLoc = findFirstUseLoc(type);
+
+                context->m_sink->diagnose(
+                    Diagnostics::SpecialTypeLeaksFromParameterGroup{.location = groupLoc});
 
                 // indicate which elements cannot be part of the parameter group
                 auto& specialType = legalElementType.getPair()->specialType;
@@ -1247,9 +1253,15 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
                     auto specialTuple = specialType.getTuple();
                     for (auto specialElement : specialTuple->elements)
                     {
+                        // The member key's location may be empty; fall back to
+                        // the parameter group location computed above.
+                        SourceLoc memberLoc =
+                            specialElement.key ? specialElement.key->sourceLoc : SourceLoc();
+                        if (!memberLoc.isValid())
+                            memberLoc = groupLoc;
                         context->m_sink->diagnose(
                             Diagnostics::SpecialTypeMemberLeaksFromParameterGroup{
-                                .member = specialElement.key});
+                                .location = memberLoc});
                     }
                 }
             }

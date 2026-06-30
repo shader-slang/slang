@@ -193,6 +193,25 @@ static void _outputProfileTime(uint64_t startTicks, uint64_t endTicks)
     out.print("profile-time=%g\n", time);
 }
 
+static rhi::Feature _getFeatureFromName(const UnownedStringSlice& featureName)
+{
+    struct FeatureNameMapEntry
+    {
+        const char* name;
+        rhi::Feature feature;
+    };
+
+#define SLANG_RHI_FEATURES_X(id, name) {name, rhi::Feature::id},
+    static const FeatureNameMapEntry kFeatureNameMap[] = {SLANG_RHI_FEATURES(SLANG_RHI_FEATURES_X)};
+#undef SLANG_RHI_FEATURES_X
+
+    for (auto& entry : kFeatureNameMap)
+        if (featureName == UnownedStringSlice(entry.name))
+            return entry.feature;
+
+    return rhi::Feature::_Count;
+}
+
 class ProgramVars;
 
 struct ShaderOutputPlan
@@ -843,6 +862,17 @@ struct AssignValsFromLayoutContext
         ShaderCursor const& dstCursor,
         ShaderInputLayout::AccelerationStructureVal* srcVal)
     {
+        SLANG_UNUSED(srcVal);
+        if (isDescriptorHandleType(dstCursor))
+        {
+            if (!accelerationStructure)
+                return SLANG_E_NOT_AVAILABLE;
+            DescriptorHandle handle;
+            SLANG_RETURN_ON_FAIL(accelerationStructure->getDescriptorHandle(&handle));
+            SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
+            return SLANG_OK;
+        }
+
         dstCursor.setBinding(accelerationStructure);
         return SLANG_OK;
     }
@@ -1739,8 +1769,10 @@ static SlangResult _innerMain(
         }
     }
 
-    static renderer_test::CoreToRHIDebugBridge debugCallback;
-    debugCallback.setCoreCallback(stdWriters->getDebugCallback());
+    auto debugCallback = renderer_test::createRetainedCoreToRHIDebugBridge();
+    renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
+        *debugCallback,
+        stdWriters->getDebugCallback());
 
     // Use the profile name set on options if set
     input.profile = options.profileName.getLength() ? options.profileName : input.profile;
@@ -1877,7 +1909,7 @@ static SlangResult _innerMain(
         desc.deviceType = options.deviceType;
 
         desc.enableValidation = options.enableDebugLayers;
-        desc.debugCallback = &debugCallback;
+        desc.debugCallback = debugCallback.Ptr();
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)
@@ -1885,9 +1917,9 @@ static SlangResult _innerMain(
         else
             desc.slang.targetFlags = 0;
 
-        List<const char*> requiredFeatureList;
+        List<rhi::Feature> requiredFeatureList;
         for (auto& name : options.renderFeatures)
-            requiredFeatureList.add(name.getBuffer());
+            requiredFeatureList.add(_getFeatureFromName(name.getUnownedSlice()));
 
         desc.requiredFeatures = requiredFeatureList.getBuffer();
         desc.requiredFeatureCount = (int)requiredFeatureList.getCount();

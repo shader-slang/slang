@@ -321,6 +321,117 @@ public:                                                                         
 #include "slang-cpp-scalar-intrinsics.h"
 #include "slang-cpp-types.h"
 
+// Atomic helpers for the CPU target. Needed so kIROp_AtomicAdd and
+// friends can lower to native atomic operations on the host — matching
+// the semantics of HLSL `InterlockedAdd`, SPIR-V `OpAtomicIAdd`, etc.
+// Uses compiler builtins so no <atomic> header is required.
+//
+// Contract for every `_slang_atomic_add_*` helper below (u32/i32/u64/
+// i64): atomically add `val` to `*ptr` and return the PRIOR value (the
+// value before the add), matching HLSL `InterlockedAdd` and GLSL
+// `atomicAdd`. The 64-bit MSVC variants reinterpret the pointer as
+// `volatile long long*` for `_InterlockedExchangeAdd64`, which is sound
+// because `sizeof(long long) == 8` (asserted below).
+//
+// Compiler coverage:
+//   - MSVC:            `_InterlockedExchangeAdd`
+//   - GCC / Clang:     `__atomic_fetch_add`
+//   - SNC / GHS etc.:  falls back to a non-atomic load/add/store.
+//     These are console / embedded toolchains not known to ship
+//     `__atomic_*` builtins; the fallback is racy under concurrency
+//     but keeps the prelude buildable there. Platforms that need
+//     real atomics on those compilers can add a bespoke branch.
+// === MSVC implementations ===
+//
+// Use the `_Interlocked*` intrinsics. The 32-bit overload operates on
+// `long`; the 64-bit overload operates on `long long`. The static
+// asserts above pin the expected widths.
+#if SLANG_VC
+#include <intrin.h>
+static_assert(
+    sizeof(long) == 4,
+    "_InterlockedExchangeAdd uses `long`; MSVC LLP64 requires sizeof(long)==4");
+static_assert(
+    sizeof(long long) == 8,
+    "_InterlockedExchangeAdd64 uses `long long`; expected 8-byte width");
+static inline uint32_t _slang_atomic_add_u32(uint32_t* ptr, uint32_t val)
+{
+    // Returns the PRIOR value, matching HLSL InterlockedAdd and GLSL atomicAdd.
+    return static_cast<uint32_t>(
+        _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(ptr), static_cast<long>(val)));
+}
+static inline int32_t _slang_atomic_add_i32(int32_t* ptr, int32_t val)
+{
+    return static_cast<int32_t>(
+        _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(ptr), static_cast<long>(val)));
+}
+static inline uint64_t _slang_atomic_add_u64(uint64_t* ptr, uint64_t val)
+{
+    return static_cast<uint64_t>(_InterlockedExchangeAdd64(
+        reinterpret_cast<volatile long long*>(ptr),
+        static_cast<long long>(val)));
+}
+static inline int64_t _slang_atomic_add_i64(int64_t* ptr, int64_t val)
+{
+    return static_cast<int64_t>(_InterlockedExchangeAdd64(
+        reinterpret_cast<volatile long long*>(ptr),
+        static_cast<long long>(val)));
+}
+// === GCC / Clang implementations ===
+//
+// Use the `__atomic_fetch_add` built-in with relaxed ordering; the
+// IR-side AtomicAdd emit ignores the memory-order operand and lets
+// each toolchain pick its native default.
+#elif SLANG_GCC || SLANG_CLANG
+static inline uint32_t _slang_atomic_add_u32(uint32_t* ptr, uint32_t val)
+{
+    return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
+}
+static inline int32_t _slang_atomic_add_i32(int32_t* ptr, int32_t val)
+{
+    return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
+}
+static inline uint64_t _slang_atomic_add_u64(uint64_t* ptr, uint64_t val)
+{
+    return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
+}
+static inline int64_t _slang_atomic_add_i64(int64_t* ptr, int64_t val)
+{
+    return __atomic_fetch_add(ptr, val, __ATOMIC_RELAXED);
+}
+// === Non-atomic fallback implementations ===
+//
+// For compilers without a known atomic builtin (Sony SNC, Green Hills
+// MULTI, etc.). Racy under concurrent invocation but keeps the
+// prelude compilable; CPU-target coverage on these platforms is
+// single-threaded in practice.
+#else
+static inline uint32_t _slang_atomic_add_u32(uint32_t* ptr, uint32_t val)
+{
+    uint32_t old = *ptr;
+    *ptr = old + val;
+    return old;
+}
+static inline int32_t _slang_atomic_add_i32(int32_t* ptr, int32_t val)
+{
+    int32_t old = *ptr;
+    *ptr = old + val;
+    return old;
+}
+static inline uint64_t _slang_atomic_add_u64(uint64_t* ptr, uint64_t val)
+{
+    uint64_t old = *ptr;
+    *ptr = old + val;
+    return old;
+}
+static inline int64_t _slang_atomic_add_i64(int64_t* ptr, int64_t val)
+{
+    int64_t old = *ptr;
+    *ptr = old + val;
+    return old;
+}
+#endif
+
 // TODO(JS): Hack! Output C++ code from slang can copy uninitialized variables.
 #if defined(_MSC_VER)
 #pragma warning(disable : 4700)
