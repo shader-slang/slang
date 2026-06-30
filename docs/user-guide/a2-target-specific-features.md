@@ -12,6 +12,7 @@ In this chapter:
 2. [Metal target specific](./a2-02-metal-target-specific.md)
 3. [WGSL target specific](./a2-03-wgsl-target-specific.md)
 4. [GLSL target specific](./a2-04-glsl-target-specific.md)
+5. [CPU target specific](./a2-05-cpu-target-specific.md)
 
 <!-- RTD-TOC-START
 ```{toctree}
@@ -22,5 +23,6 @@ SPIR-V target specific <a2-01-spirv-target-specific>
 Metal target specific <a2-02-metal-target-specific>
 WGSL target specific <a2-03-wgsl-target-specific>
 GLSL target specific <a2-04-glsl-target-specific>
+CPU target specific <a2-05-cpu-target-specific>
 ```
 RTD-TOC-END -->

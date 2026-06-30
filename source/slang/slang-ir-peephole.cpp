@@ -5,6 +5,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-util.h"
+#include "slang-ir-lower-buffer-element-type.h"
 #include "slang-target-program.h"
 
 namespace Slang
@@ -322,12 +323,18 @@ struct PeepholeContext : InstPassBase
 
                 IRTypeLayoutRules* layoutRules = IRTypeLayoutRules::getNatural();
 
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                 if (inst->getOperandCount() >= 2)
                 {
                     auto layoutOp = inst->getOperand(1)->getOp();
 
+                    IRTypeLayoutRuleName defaultRule = getTypeLayoutRuleNameForBuffer(
+                        targetProgram, builder.getPtrType(baseType));
+
                     auto ruleName =
-                        getTypeLayoutRuleNameFromOp(layoutOp, IRTypeLayoutRuleName::Natural);
+                        getTypeLayoutRuleNameFromOp(layoutOp, defaultRule);
 
                     if (!ruleName.has_value())
                         break;
@@ -385,9 +392,6 @@ struct PeepholeContext : InstPassBase
                     break;
                 if (sizeAlignment.size == IRSizeAndAlignment::kIndeterminateSize)
                     break;
-
-                IRBuilder builder(module);
-                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
 
                 builder.setInsertBefore(inst);
                 IRInst* resultVal = nullptr;

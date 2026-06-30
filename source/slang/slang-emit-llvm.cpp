@@ -1123,10 +1123,22 @@ struct LLVMEmitter
     LLVMInst* emitArrayGetElementPtr(
         LLVMInst* llvmPtr,
         LLVMInst* indexInst,
+        bool signedIndex,
         IRType* elemType,
         IRTypeLayoutRules* rules)
     {
         IRSizeAndAlignment sizeAndAlignment = types->getSizeAndAlignment(elemType, rules);
+        if (!signedIndex)
+        {
+            // If we have an unsigned index with less bits than a pointer, LLVM
+            // will sign-extend it while we need zero-extension. So we have to
+            // cast manually to avoid that. Note that emitCast just passes
+            // through if the type is already correct.
+            int pointerBits = builder->getPointerSizeInBits();
+            LLVMType* extendedType = builder->getIntType(pointerBits);
+            indexInst = builder->emitCast(indexInst, extendedType, false, false);
+        }
+
         return builder->emitGetElementPtr(llvmPtr, sizeAndAlignment.getStride(), indexInst);
     }
 
@@ -1173,11 +1185,13 @@ struct LLVMEmitter
                     auto dstElemPtr = emitArrayGetElementPtr(
                         dstPtr,
                         builder->getConstantInt(builder->getIntType(32), elem),
+                        false,
                         elemType,
                         dstLayout);
                     auto srcElemPtr = emitArrayGetElementPtr(
                         srcPtr,
                         builder->getConstantInt(builder->getIntType(32), elem),
+                        false,
                         elemType,
                         srcLayout);
                     last = crossLayoutMemCpy(
@@ -1728,6 +1742,7 @@ struct LLVMEmitter
                 LLVMInst* ptr = emitArrayGetElementPtr(
                     llvmInst,
                     builder->getConstantInt(int32Type, aa),
+                    false,
                     op->getDataType(),
                     defaultPointerRules);
                 emitStore(ptr, findValue(op), op->getDataType(), defaultPointerRules);
@@ -1760,6 +1775,7 @@ struct LLVMEmitter
                     LLVMInst* ptr = emitArrayGetElementPtr(
                         llvmInst,
                         builder->getConstantInt(int32Type, i),
+                        false,
                         element->getDataType(),
                         defaultPointerRules);
                     emitStore(ptr, llvmElement, element->getDataType(), defaultPointerRules);
@@ -1892,6 +1908,7 @@ struct LLVMEmitter
                     auto llvmDstElement = emitArrayGetElementPtr(
                         llvmDst,
                         maybeEmitConstant(irElementIndex),
+                        isSigned(irElementIndex),
                         elementType,
                         rules);
                     auto llvmSrcElement =
@@ -2004,6 +2021,7 @@ struct LLVMEmitter
                 llvmInst = emitArrayGetElementPtr(
                     findValue(baseInst),
                     findValue(indexInst),
+                    isSigned(indexInst),
                     baseType,
                     getBufferLayoutRules(baseInst->getDataType()));
             }
@@ -2040,6 +2058,7 @@ struct LLVMEmitter
                 llvmInst = emitArrayGetElementPtr(
                     findValue(baseInst),
                     findValue(indexInst),
+                    isSigned(indexInst),
                     elemType,
                     getBufferLayoutRules(baseInst->getDataType()));
             }
@@ -2072,6 +2091,7 @@ struct LLVMEmitter
                     LLVMInst* ptr = emitArrayGetElementPtr(
                         llvmVal,
                         findValue(indexInst),
+                        isSigned(indexInst),
                         elemType,
                         defaultPointerRules);
                     llvmInst = emitLoad(ptr, elemType, defaultPointerRules);
@@ -2197,6 +2217,39 @@ struct LLVMEmitter
         case kIROp_MakeString:
             // For now, String == NativeString on the LLVM target.
             llvmInst = findValue(inst->getOperand(0));
+            break;
+
+        case kIROp_Alloca:
+            {
+                auto ptrType = cast<IRPtrType>(inst->getDataType());
+                auto count = findValue(inst->getOperand(0));
+
+                IRSizeAndAlignment sizeAndAlignment = types->getSizeAndAlignment(
+                    ptrType->getValueType(),
+                    getBufferLayoutRules(ptrType));
+
+                // Do size computation in size_t:
+                auto intType = builder->getIntType(builder->getPointerSizeInBits());
+                count = builder->emitCast(count, intType, false, false);
+                auto allocSize = builder->getConstantInt(intType, sizeAndAlignment.getStride());
+                allocSize = builder->emitBinaryOp(LLVMBinaryOp::Mul, allocSize, count);
+
+                // This is a runtime alloca, which the user can assume to
+                // _always_ reserve more memory. Hence, we can't always hoist
+                // it into the header block.
+                //
+                // TODO: We _could_ hoist it when it isn't in a loop (no
+                // transitive successor is a transitive predecessor of this
+                // block) AND the count is a constant. Left for future
+                // improvement.
+                //
+                // The TODO isn't a vital, because it mostly helps mem2reg, but
+                // the cases where language users need this feature are when
+                // they explicitly need to get a stack pointer, preventing
+                // mem2reg anyway.
+
+                llvmInst = builder->emitAlloca(allocSize, sizeAndAlignment.alignment);
+            }
             break;
 
         case kIROp_DebugVar:

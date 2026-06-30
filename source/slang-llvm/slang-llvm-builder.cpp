@@ -148,7 +148,10 @@ class LLVMBuilder : public ComBaseObject, public ILLVMBuilder
     // externally provided.
     enum class ExternalFunc
     {
-        Printf
+        Printf,
+        Malloc,
+        Realloc,
+        Free
         // TODO: Texture sampling, RT functions?
     };
     // Map of external builtins. These are only forward-declared in the emitted
@@ -236,6 +239,7 @@ public:
     SLANG_NO_THROW void SLANG_MCALL endFunction(LLVMInst* func) override;
 
     SLANG_NO_THROW LLVMInst* SLANG_MCALL emitAlloca(int64_t size, int64_t alignment) override;
+    SLANG_NO_THROW LLVMInst* SLANG_MCALL emitAlloca(LLVMInst* size, int64_t alignment) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL
     emitGetElementPtr(LLVMInst* ptr, int64_t stride, LLVMInst* index) override;
     SLANG_NO_THROW LLVMInst* SLANG_MCALL
@@ -783,11 +787,53 @@ llvm::Function* LLVMBuilder::getExternalBuiltin(ExternalFunc extFunc)
     switch (extFunc)
     {
     case ExternalFunc::Printf:
-        func = emitDecl("printf", llvmBuilder->getInt32Ty(), {llvmBuilder->getPtrTy()}, true);
-        llvm::AttrBuilder attrs(*llvmContext);
-        attrs.addCapturesAttr(llvm::CaptureInfo::none());
-        attrs.addAttribute(llvm::Attribute::NoAlias);
-        func->getArg(0)->addAttrs(attrs);
+        {
+            func = emitDecl("printf", llvmBuilder->getInt32Ty(), {llvmBuilder->getPtrTy()}, true);
+            llvm::AttrBuilder attrs(*llvmContext);
+            attrs.addCapturesAttr(llvm::CaptureInfo::none());
+            attrs.addAttribute(llvm::Attribute::NoAlias);
+            func->getArg(0)->addAttrs(attrs);
+        }
+        break;
+    case ExternalFunc::Malloc:
+        {
+            func = emitDecl(
+                "malloc",
+                llvmBuilder->getPtrTy(),
+                {llvmBuilder->getIntPtrTy(targetDataLayout)},
+                false);
+            func->getArg(0)->addAttr(llvm::Attribute::NoUndef);
+            func->addRetAttr(llvm::Attribute::NoAlias);
+            func->addRetAttr(llvm::Attribute::NoUndef);
+        }
+        break;
+    case ExternalFunc::Realloc:
+        {
+            func = emitDecl(
+                "realloc",
+                llvmBuilder->getPtrTy(),
+                {llvmBuilder->getPtrTy(), llvmBuilder->getIntPtrTy(targetDataLayout)},
+                false);
+            llvm::AttrBuilder attrs(*llvmContext);
+            attrs.addCapturesAttr(llvm::CaptureInfo::none());
+            attrs.addAttribute(llvm::Attribute::NoUndef);
+            attrs.addAttribute(llvm::Attribute::AllocatedPointer);
+            func->getArg(0)->addAttrs(attrs);
+            func->getArg(1)->addAttr(llvm::Attribute::NoUndef);
+
+            func->addRetAttr(llvm::Attribute::NoAlias);
+            func->addRetAttr(llvm::Attribute::NoUndef);
+        }
+        break;
+    case ExternalFunc::Free:
+        {
+            func = emitDecl("free", llvmBuilder->getVoidTy(), {llvmBuilder->getPtrTy()}, false);
+            llvm::AttrBuilder attrs(*llvmContext);
+            attrs.addCapturesAttr(llvm::CaptureInfo::none());
+            attrs.addAttribute(llvm::Attribute::AllocatedPointer);
+            attrs.addAttribute(llvm::Attribute::NoUndef);
+            func->getArg(0)->addAttrs(attrs);
+        }
         break;
     }
 
@@ -1063,6 +1109,12 @@ LLVMInst* LLVMBuilder::emitAlloca(int64_t size, int64_t alignment)
         0,
         size > int64_t(INT32_MAX) ? llvmBuilder->getInt64(size) : llvmBuilder->getInt32(size),
         llvm::Align(alignment)));
+}
+
+LLVMInst* LLVMBuilder::emitAlloca(LLVMInst* size, int64_t alignment)
+{
+    return llvmBuilder->Insert(new llvm::AllocaInst(
+        byteType, 0, size, llvm::Align(alignment)));
 }
 
 LLVMInst* LLVMBuilder::emitGetElementPtr(LLVMInst* ptr, int64_t stride, LLVMInst* index)
@@ -1962,9 +2014,26 @@ LLVMInst* LLVMBuilder::emitInlineIRFunction(LLVMInst* func, CharSlice content)
     llvmFunc->setLinkage(llvm::Function::LinkageTypes::ExternalLinkage);
 
     std::string funcName = llvmFunc->getName().str();
+    std::string contentStr = std::string(content.data, content.count);
 
     std::string functionIR;
     llvm::raw_string_ostream expanded(functionIR);
+
+    // Check if the inline contents reference some external builtin that we
+    // need to forward-declare.
+    auto checkBuiltin = [&](const char* name, ExternalFunc id)
+    {
+        if (contentStr.find(name) != std::string::npos)
+        {
+            llvm::Function* func = getExternalBuiltin(id);
+            func->print(expanded, nullptr);
+        }
+    };
+
+    checkBuiltin("@printf(", ExternalFunc::Printf);
+    checkBuiltin("@malloc(", ExternalFunc::Malloc);
+    checkBuiltin("@realloc(", ExternalFunc::Realloc);
+    checkBuiltin("@free(", ExternalFunc::Free);
 
     // This is a bit of a hack. We add a block to the function so that
     // it gets printed as a definition instead of a declaration, and then
@@ -1976,7 +2045,7 @@ LLVMInst* LLVMBuilder::emitInlineIRFunction(LLVMInst* func, CharSlice content)
     while (functionIR.size() > 0 && functionIR.back() != '{')
         functionIR.pop_back();
 
-    expanded << "\nentry:\n" << std::string(content.data, content.count) << "\n}\n";
+    expanded << "\nentry:\n" << contentStr << "\n}\n";
 
     emitGlobalLLVMIR(functionIR);
 
