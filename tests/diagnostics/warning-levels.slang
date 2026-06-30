@@ -10,7 +10,12 @@
 // 2. -Wpedantic explicitly enables the (already-on) pedantic group; still emitted.
 //DIAGNOSTIC_TEST:SIMPLE(diag=ON): -Wpedantic -target hlsl -entry computeMain -stage compute
 
-// 3. An explicit per-id disable suppresses it regardless of the group being enabled.
+// 3. -Wall / -Wextra exercise the other two flag spellings; they enable different groups, so the
+// pedantic warning is unaffected (and still emitted, since pedantic is on by default).
+//DIAGNOSTIC_TEST:SIMPLE(diag=ON): -Wall -target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=ON): -Wextra -target hlsl -entry computeMain -stage compute
+
+// 4. An explicit per-id disable suppresses it regardless of the group being enabled.
 //DIAGNOSTIC_TEST:SIMPLE(diag=OFF): -Wno-keyword-used-as-name -target hlsl -entry computeMain -stage compute
 
 RWStructuredBuffer<int> outputBuffer;

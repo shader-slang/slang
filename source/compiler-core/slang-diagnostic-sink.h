@@ -308,17 +308,26 @@ public:
     /// Enable the given warning group (one of the -Wall/-Wextra/-Wpedantic groups). Warnings
     /// tagged with that group will then be emitted. Enabling is additive; `WarningLevel::Default`
     /// warnings are always emitted and need not be enabled.
+    ///
+    /// The bit index is bounds-checked before shifting so that an out-of-range value (which can
+    /// only arrive from a bogus int cast through the public `CompilerOptionName::WarningLevel`
+    /// option) cannot produce an out-of-range shift, which is undefined behavior. Such values are
+    /// ignored here; `applySettingsToDiagnosticSink` also filters them at the API boundary.
     void enableWarningLevel(WarningLevel level)
     {
-        m_enabledWarningLevels |= (uint32_t(1) << uint32_t(level));
+        const auto bit = uint32_t(level);
+        if (bit < 32)
+            m_enabledWarningLevels |= (uint32_t(1) << bit);
     }
 
     /// Test whether a warning belonging to `level` should currently be emitted: true for the
     /// always-on `Default` group, and for any group that has been enabled via enableWarningLevel.
     bool isWarningLevelEnabled(WarningLevel level) const
     {
-        return level == WarningLevel::Default ||
-               (m_enabledWarningLevels & (uint32_t(1) << uint32_t(level))) != 0;
+        if (level == WarningLevel::Default)
+            return true;
+        const auto bit = uint32_t(level);
+        return bit < 32 && (m_enabledWarningLevels & (uint32_t(1) << bit)) != 0;
     }
 
     /// Get the (optional) diagnostic sink lexer. This is used to

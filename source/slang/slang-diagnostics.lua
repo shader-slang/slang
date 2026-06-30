@@ -122,11 +122,11 @@ local err = helpers.err
 local warning = helpers.warning
 local internal = helpers.internal
 local fatal = helpers.fatal
--- Warning-level (group) sentinels: pass one positionally to warning() to make that warning
--- opt-in behind -Wall/-Wextra/-Wpedantic respectively, e.g.
+-- Warning-level (group) sentinel: pass one positionally to warning() to make that warning
+-- opt-in behind a -W group flag, e.g.
 --   warning("my-warning", 123, "message", span{...}, pedantic)
-local all = helpers.all
-local extra = helpers.extra
+-- Only `pedantic` is used today; `helpers.all` and `helpers.extra` exist for the other groups
+-- and can be bound here when a diagnostic needs them.
 local pedantic = helpers.pedantic
 
 --
