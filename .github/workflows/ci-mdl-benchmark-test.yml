@@ -8,7 +8,7 @@ permissions:
   actions: read
 
 jobs:
-  test-mdl-benchmark:
+  test-benchmark:
     name: Test (Benchmark)
     timeout-minutes: 60
     runs-on: [Windows, self-hosted, benchmark]

@@ -8,7 +8,7 @@ permissions:
   actions: read
 
 jobs:
-  test-slang-regression:
+  test-compile-regression:
     name: Test (Compile Regression)
     timeout-minutes: 60
     runs-on: [Windows, self-hosted, regression-test]

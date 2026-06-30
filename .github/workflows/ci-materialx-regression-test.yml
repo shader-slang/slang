@@ -20,7 +20,7 @@ on:
         type: string
 
 jobs:
-  test-materialx-regression:
+  materialx-integration:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 15
     defaults:

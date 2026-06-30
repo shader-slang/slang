@@ -462,7 +462,7 @@ jobs:
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
   # MaterialX integration test (Windows only for initial validation).
-  test-materialx-regression-windows-release:
+  test-materialx-windows-release:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-materialx-regression-test.yml
@@ -574,7 +574,7 @@ jobs:
       actions: read
     uses: ./.github/workflows/ci-falcor-test.yml
 
-  test-slang-regression:
+  test-compile-regression:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     permissions:
@@ -582,7 +582,7 @@ jobs:
       actions: read
     uses: ./.github/workflows/ci-slang-regression-test.yml
 
-  test-mdl-benchmark:
+  test-benchmark:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     permissions:
@@ -626,13 +626,13 @@ jobs:
         test-linux-debug-gcc-x86_64-rhi,
         test-linux-release-gcc-aarch64,
         test-linux-debug-gcc-aarch64,
-        test-materialx-regression-windows-release,
+        test-materialx-windows-release,
         sanitizer-linux-clang-x86_64,
         check-cmdline-ref,
         check-capability-atoms-ref,
         test-falcor,
-        test-slang-regression,
-        test-mdl-benchmark,
+        test-compile-regression,
+        test-benchmark,
         wait-for-human-priority,
       ]
     runs-on: ubuntu-latest
