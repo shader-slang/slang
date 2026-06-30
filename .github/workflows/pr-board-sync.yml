@@ -1266,10 +1266,11 @@ jobs:
               // Two privileged uses, both resolved the same way (by the upstream
               // run's head SHA, since its pull_requests array is empty for fork
               // PRs):
-              //   1. CI completion: GitHub does not deliver check_suite for
-              //      Actions-created CI (recursion prevention), so a caller relays
-              //      the "CI" workflow's completion here to recompute the target --
-              //      a CI failure goes to Snagged, a green run recovers it.
+              //   1. Gating-check completion: GitHub does not deliver check_suite
+              //      for Actions-created suites (recursion prevention), so a caller
+              //      relays a gating Actions workflow's completion (CI and the
+              //      lighter PR checks) here to recompute the target -- a failed
+              //      check goes to Snagged, a green run recovers it.
               //   2. Stage 2 of the fork-review relay (see header): a fork PR's
               //      review can't get secrets, so an unprivileged caller bridge
               //      fires on the review and completes; this privileged run picks
