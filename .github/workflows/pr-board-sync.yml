@@ -1062,11 +1062,25 @@ jobs:
               }
               if (!assignee) return;                    // no owner and no maintainer
 
+              // For a Community PR, also co-assign the original author. ProjectsV2
+              // has no people-typed custom field, so the built-in Assignees column
+              // is the only place an external contributor renders as a real,
+              // linked identity on the board -- co-assigning them is how we surface
+              // "who wrote it" alongside the owner. The owner stays first so it
+              // remains the "who owns this" pick. Best-effort: GitHub silently
+              // drops a non-assignable user (a PR's own author is assignable, so in
+              // practice this sticks). Bot/Internal PRs are unaffected -- a bot
+              // author is noise, and an Internal author is already the assignee.
+              const toAssign = [assignee];
+              if (source === SOURCE_COMMUNITY && info.authorLogin &&
+                  info.authorLogin.toLowerCase() !== assignee.toLowerCase()) {
+                toAssign.push(info.authorLogin);
+              }
               await github.rest.issues.addAssignees({
                 owner: context.repo.owner, repo: context.repo.repo,
-                issue_number: number, assignees: [assignee],
+                issue_number: number, assignees: toAssign,
               });
-              console.log(`assigned ${assignee} (source ${source})`);
+              console.log(`assigned ${toAssign.join(", ")} (source ${source})`);
 
               // Unrequest auto-assigned non-approvers (e.g. bmillsNV), coupled to
               // assignment exactly as the sweep does.
