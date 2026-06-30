@@ -1607,20 +1607,11 @@ struct ExistentialLoweringContext : public InstPassBase
         return true;
     }
 
-    // The dynamic-dispatch handle types (WitnessTableID / RTTIHandle) are lowered
-    // to a fixed-layout 64-bit integer carrier. The carrier type and the code
-    // that builds/reads handle values must agree on one representation; the three
-    // helpers below own that choice so that call sites never have to branch on
-    // (or even know) the actual representation.
-    //
-    // `uint2` was the original carrier (PR #9386) so that SPIR-V output would not
-    // require the Int64 capability. Metal, however, disallows casting a vector to
-    // a pointer: a handle later bit-cast to a `device T*` (e.g. a serialized
-    // existential's RTTI/witness slot reconstructed as a pointer) emits
-    // `(device T*)(uint2)`, which MSL rejects. Metal fully supports `ulong`, and a
-    // scalar `ulong`->pointer cast is legal, so on Metal the carrier is `ulong`
-    // instead. The byte size (8) is unchanged either way, so the in-memory layout
-    // of a serialized existential is identical across targets. See issue #11313.
+    // Dynamic-dispatch handles are 64-bit, so they need a 64-bit integer carrier.
+    // That carrier is `uint2` (chosen in PR #9386 to avoid requiring the SPIR-V
+    // Int64 capability), except on Metal: MSL cannot cast a vector to a pointer, so
+    // there the carrier is a scalar `ulong` (which can be cast to a `device T*`).
+    // The helpers below own this choice so call sites need not know it. See #11313.
     bool useUInt64HandleRepresentation() { return isMetalTarget(targetProgram->getTargetReq()); }
 
     // Return the lowered IR type that carries a dynamic-dispatch handle: a scalar
