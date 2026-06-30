@@ -1,6 +1,6 @@
 // slang-emit-hlsl-prelude.cpp
 #include "slang-emit-hlsl.h"
-#include "slang-ir-hlsl-util.h"
+#include "slang-ir-hlsl-legalize.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-type-system-shared.h"

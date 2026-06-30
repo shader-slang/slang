@@ -2256,8 +2256,6 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    // Bumped to 23: added workgraph IR instructions and decorations on top of
-    // the upstream version 22 IR set.
     const static UInt k_maxSupportedModuleVersion = 23;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
