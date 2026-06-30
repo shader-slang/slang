@@ -873,6 +873,13 @@ err(
 )
 
 err(
+    "operator-name-used-as-variable-name",
+    20020,
+    "operator name used as variable name",
+    span { loc = "location", message = "an operator name cannot be used as the name of a variable; an 'operator' declaration must be a function" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
@@ -5335,6 +5342,13 @@ err(
     55200,
     "unsupported builtin type",
     span { loc = "location", message = "'~type:IRInst' is not a supported builtin type for the target." }
+)
+
+err(
+    "string-type-not-supported-on-kernel-target",
+    55213,
+    "'String' is not supported on this target",
+    span { loc = "location", message = "the 'String' type and its operations are not supported when generating kernel code for this target; use 'NativeString' for a null-terminated string, or compile for a host target" }
 )
 
 err(

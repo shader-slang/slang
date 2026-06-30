@@ -1,4 +1,4 @@
-name: Compile Perf — Nightly ToT
+name: Nightly MDL Perf Test
 
 # Daily tip-of-tree compile-time sweep. Builds master HEAD on the dedicated
 # benchmark runner, runs the perf suite, stores the day's results in the
@@ -22,7 +22,7 @@ on:
         default: ""
 
 concurrency:
-  group: compile-perf-nightly
+  group: nightly-mdl-perf-test
   cancel-in-progress: false # never cancel a running benchmark — timing must be clean
 
 env:

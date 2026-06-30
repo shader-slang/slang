@@ -1,4 +1,4 @@
-name: CI Compile Regression Test Workflow
+name: CI Slang Regression Test Workflow
 
 on:
   workflow_call:

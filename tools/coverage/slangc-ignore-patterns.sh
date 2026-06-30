@@ -7,7 +7,7 @@
 #   - Record-replay instrumentation
 #   - Language server, documentation generator, unmaintained debug features
 #
-# Shared by run-coverage.sh and ci-slang-coverage.yml to keep the filter
+# Shared by run-coverage.sh and ci-slang-coverage-test.yml to keep the filter
 # definition in a single place.
 
 SLANGC_IGNORE_ARGS=(

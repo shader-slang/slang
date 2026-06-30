@@ -1,4 +1,4 @@
-name: RTX Remix Shaders (Nightly)
+name: Nightly Remix Test
 
 on:
   workflow_dispatch:

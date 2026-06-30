@@ -1,4 +1,4 @@
-name: Nightly Sanitizer
+name: Nightly Slang Sanitizer Test
 
 on:
   schedule:

@@ -1,4 +1,4 @@
-name: Trigger SlangPy CI
+name: CI SlangPy Trigger Test
 
 permissions:
   contents: read

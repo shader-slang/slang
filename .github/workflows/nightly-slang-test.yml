@@ -1,4 +1,4 @@
-name: Agentic Tests (Nightly)
+name: Nightly Slang Test
 
 # Runs the LLM-generated, doc-anchored test bundles under
 # docs/generated/tests/ via `slang-test -test-dir docs/generated/tests`.
@@ -16,7 +16,7 @@ name: Agentic Tests (Nightly)
 on:
   workflow_dispatch:
   schedule:
-    # Run nightly at 4:00 AM UTC, after coverage-nightly's 02:00 slot
+    # Run nightly at 4:00 AM UTC, after nightly-slang-coverage-test's 02:00 slot
     # (which has a 240-min timeout) so they don't fight for the same
     # Linux runner pool. Matches the schedule documented in
     # docs/generated/tests/_meta/regenerate.md § CI integration.

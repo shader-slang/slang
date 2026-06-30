@@ -1,4 +1,4 @@
-name: Comment IR Version Check Results
+name: Check IR Version
 
 on:
   workflow_run:
