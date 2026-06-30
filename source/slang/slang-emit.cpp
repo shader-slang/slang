@@ -550,6 +550,10 @@ void calcRequiredLoweringPassSet(
     case kIROp_IncrementBranchCoverageCounter:
         result.coverageTracing = true;
         break;
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+    case kIROp_GetEnumBarrierSemanticFlags:
+        result.barrierFlagValidation = true;
+        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -1580,7 +1584,8 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    if (target == CodeGenTarget::HLSL || isD3DTarget(targetRequest))
+    if ((target == CodeGenTarget::HLSL || isD3DTarget(targetRequest)) &&
+        requiredLoweringPassSet.barrierFlagValidation)
     {
         SLANG_PASS(validateBarrierFlagsForHLSL, sink);
         if (sink->getErrorCount() != 0)
