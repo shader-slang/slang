@@ -645,14 +645,28 @@ static bool isImageFormatSupportedByGLSL(ImageFormat format)
 
 void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType)
 {
-    SLANG_UNUSED(resourceType);
-
-    // If the user specified a format manually, using `[format(...)]`,
-    // then we will respect that format and emit a matching `layout` modifier.
-    //
-    if (auto formatDecoration = var->findDecoration<IRFormatDecoration>())
+    ImageFormat explicitFormat = ImageFormat::unknown;
+    bool hasExplicitFormat = false;
+    if (resourceType->hasFormat())
     {
-        auto format = formatDecoration->getFormat();
+        explicitFormat = (ImageFormat)getIntVal(resourceType->getFormat());
+        hasExplicitFormat = explicitFormat != ImageFormat::unknown;
+    }
+
+    // If the texture type carries a concrete format, it is the source of truth.
+    // Otherwise, keep supporting the older `[format(...)]` attribute path.
+    if (!hasExplicitFormat)
+    {
+        if (auto formatDecoration = var->findDecoration<IRFormatDecoration>())
+        {
+            explicitFormat = formatDecoration->getFormat();
+            hasExplicitFormat = true;
+        }
+    }
+
+    if (hasExplicitFormat)
+    {
+        auto format = explicitFormat;
         const auto formatInfo = getImageFormatInfo(format);
         if (!isImageFormatSupportedByGLSL(format))
         {
@@ -695,8 +709,8 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
             m_writer->emit(")\n");
         }
 
-        // No matter what, if an explicit `[format(...)]` was given,
-        // then we don't need to emit anything else.
+        // No matter where the explicit format came from, we don't need to infer
+        // a layout from the element type.
         //
         return;
     }

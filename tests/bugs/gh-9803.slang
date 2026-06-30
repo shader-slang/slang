@@ -7,7 +7,7 @@ public struct DescriptorHandleWAR<T : IOpaqueDescriptor>
     public uint2 handle;
 };
 
-__generic< T : ITexelElement, Shape : __ITextureShape, let isArray : int, let isMS : int, let sampleCount : int, let access : int, let isShadow : int, let isCombined : int, let format : int>
+__generic< T : ITexelData, Shape : __ITextureShape, let isArray : int, let isMS : int, let sampleCount : int, let access : int, let isShadow : int, let isCombined : int, let format : int>
 extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format> : __IDynamicResourceCastable<__DynamicResourceKind.General>
 {
     __implicit_conversion(10)

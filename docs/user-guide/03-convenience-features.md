@@ -615,6 +615,18 @@ where `IOpaqueDescriptor` is an interface implemented by all resource types, inc
 
 You may also write `Texture2D.Handle` as a shorthand for `DescriptorHandle<Texture2D>`.
 
+If you want to specify a descriptor handle to a texture with explicit storage type, do not use `[format(...)]` attribute, instead use explicit texture element types, for example:
+
+```slang
+struct Material
+{
+    RWTexture2D<RGBA8Unorm>.Handle colorTexture;
+}
+```
+
+This is equivalent to `DescriptorHandle<RWTexture2D<RGBA8Unorm>>`.
+See a full list of explicit texture element formats [here](02-conventional-features.md#explicit-texture-element-formats).
+
 `DescriptorHandle<T>` can implicitly convert to `T`, for example:
 
 ```slang

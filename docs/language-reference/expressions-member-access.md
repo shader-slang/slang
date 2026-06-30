@@ -1,7 +1,6 @@
 > TODO
 
-Member Expression
------------------
+## Member Expression
 
 A _member expression_ consists of a base expression followed by a dot (`.`) and an identifier naming a member to be accessed:
 
@@ -23,9 +22,9 @@ If the base expression of a member reference is a _pointer-like type_ such as `C
 When the base expression of a member expression is of a vector type `vector<T,N>` then a member expression is a _vector swizzle expression_.
 The member name must conform to these constraints:
 
-* The member name must comprise between one and four ASCII characters
-* The characters must be come either from the set (`x`, `y`, `z`, `w`) or (`r`, `g`, `b`, `a`), corresponding to element indics of (0, 1, 2, 3)
-* The element index corresponding to each character must be less than `N`
+- The member name must comprise between one and four ASCII characters
+- The characters must be come either from the set (`x`, `y`, `z`, `w`) or (`r`, `g`, `b`, `a`), corresponding to element indics of (0, 1, 2, 3)
+- The element index corresponding to each character must be less than `N`
 
 If the member name of a swizzle consists of a single character, then the expression has type `T` and is equivalent to a subscript expression with the corresponding element index.
 

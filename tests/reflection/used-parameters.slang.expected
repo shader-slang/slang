@@ -179,6 +179,7 @@ standard output = {
         {
             "name": "UsedRWTexture",
             "binding": {"kind": "unorderedAccess", "index": 0},
+            "format": "rgba32f",
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
@@ -196,6 +197,7 @@ standard output = {
         {
             "name": "UnusedRWTexture",
             "binding": {"kind": "unorderedAccess", "index": 1},
+            "format": "rgba32f",
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
@@ -343,11 +345,13 @@ standard output = {
                 },
                 {
                     "name": "UsedRWTexture",
-                    "binding": {"kind": "unorderedAccess", "index": 0, "used": 1}
+                    "binding": {"kind": "unorderedAccess", "index": 0, "used": 1},
+                    "format": "rgba32f"
                 },
                 {
                     "name": "UnusedRWTexture",
-                    "binding": {"kind": "unorderedAccess", "index": 1, "used": 0}
+                    "binding": {"kind": "unorderedAccess", "index": 1, "used": 0},
+                    "format": "rgba32f"
                 },
                 {
                     "name": "UsedRWBuffer",
