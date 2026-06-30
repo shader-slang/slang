@@ -549,6 +549,93 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberAssocType)
     }
 }
 
+// Test for issue #10749 (program-less reflection path): `ISession::getTypeLayout`
+// (i.e. `Linkage::getTypeLayout`) computes a layout without a linked `ProgramLayout`,
+// so it reaches the `programLayout == nullptr` branch of `buildExternTypeMap`. This is
+// the path whose unguarded dereference originally segfaulted; this test exercises that
+// guard directly (the other two tests go through the program-ful
+// `spReflection_GetTypeLayout` path, which now threads a non-null `ProgramLayout`).
+//
+// A module is loaded but never linked with a definition for its `extern` member, so
+// there is no link-time type to resolve to. The intended, in-contract behavior for this
+// path is: do not crash, and leave the `extern` member unresolved rather than
+// fabricate a definition. We assert exactly that so a regression in either direction
+// (a re-introduced crash, or a change in the unresolved-layout contract) is caught.
+SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberSessionGetTypeLayout)
+{
+    const char* userSourceBody = R"(
+        interface IAccelerationStructure { int getType(); }
+        extern struct AccelerationStructure : IAccelerationStructure;
+
+        struct Scene {
+            AccelerationStructure accelStruct;
+        }
+    )";
+
+    String moduleName = "linkTimeStructMember_SessionLayout";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        moduleName.getBuffer(),
+        (moduleName + ".slang").getBuffer(),
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    // Module-level reflection: no link step, so there is no resolved program.
+    auto moduleReflection = module->getLayout();
+    SLANG_CHECK_ABORT(moduleReflection != nullptr);
+
+    auto sceneType = moduleReflection->findTypeByName("Scene");
+    SLANG_CHECK_ABORT(sceneType != nullptr);
+
+    // Go through ISession::getTypeLayout (Linkage::getTypeLayout), which passes
+    // programLayout=nullptr to TargetRequest::getTypeLayout. This used to segfault
+    // in buildExternTypeMap for a type with an extern member.
+    ComPtr<slang::IBlob> layoutDiagnostics;
+    auto sceneLayout = session->getTypeLayout(
+        sceneType,
+        0,
+        slang::LayoutRules::Default,
+        layoutDiagnostics.writeRef());
+
+    // Must not crash and must return a layout. The single field (the extern member)
+    // is present, but its element type stays unresolved because there is no linked
+    // definition available on the program-less path.
+    SLANG_CHECK(sceneLayout != nullptr);
+    if (sceneLayout)
+    {
+        SLANG_CHECK(sceneLayout->getFieldCount() == 1);
+        if (sceneLayout->getFieldCount() == 1)
+        {
+            // The extern member is present in the layout, but its element type
+            // stays unresolved on the program-less path: there is no linked
+            // definition, so the extern struct has no fields of its own. This
+            // pins the intended contract so a regression in either direction is
+            // caught -- a re-introduced crash, or an accidental change that
+            // resolves (or drops) the extern member here.
+            auto accelStructFieldLayout = sceneLayout->getFieldByIndex(0);
+            SLANG_CHECK(accelStructFieldLayout != nullptr);
+            auto accelStructTypeLayout =
+                accelStructFieldLayout ? accelStructFieldLayout->getTypeLayout() : nullptr;
+            SLANG_CHECK(accelStructTypeLayout != nullptr);
+            if (accelStructTypeLayout)
+                SLANG_CHECK(accelStructTypeLayout->getFieldCount() == 0);
+        }
+    }
+}
+
 // Test that loading a module that defines an `export` type, but not linking with the module should
 // not affect the type layout.
 
