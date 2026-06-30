@@ -5436,6 +5436,13 @@ err(
 )
 
 err(
+    "shader-terminating-intrinsic-in-noninlinable-callee",
+    55214,
+    "shader-terminating intrinsic in non-inlinable callee",
+    span { loc = "location", message = "a shader-terminating intrinsic ('IgnoreHit' or 'AcceptHitAndEndSearch') is reachable from this ray entry point only through a call that could not be inlined (for example, recursion); mark the intervening function(s) '[ForceInline]' or call the intrinsic directly in the entry point so the ray payload is written back before the ray terminates." }
+)
+
+err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
     "CUDA type mapping failed",
