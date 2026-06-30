@@ -323,6 +323,11 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     #
     # `platform` contains all the platform abstractions for a GUI application.
     #
+    # The public header gui.h includes both imgui.h and slang-rhi.h. imgui is
+    # INCLUDE_FROM_PUBLIC (below) so consumers of gui.h inherit its (override-aware) leaf
+    # include dir, since including gui.h transitively includes imgui.h; slang-rhi stays
+    # INCLUDE_FROM_PRIVATE because every current gui.h consumer links slang-rhi directly.
+    #
     slang_add_target(
         platform
         ${SLANG_LIB_TYPE}
@@ -340,10 +345,6 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
-        # The public header gui.h includes both imgui.h and slang-rhi.h. imgui must be
-        # PUBLIC so consumers of gui.h inherit its (override-aware) leaf include dir, since
-        # including gui.h transitively includes imgui.h; slang-rhi can stay PRIVATE because
-        # every current gui.h consumer links slang-rhi directly.
         INCLUDE_FROM_PRIVATE slang-rhi
         INCLUDE_FROM_PUBLIC imgui
         INCLUDE_DIRECTORIES_PUBLIC
