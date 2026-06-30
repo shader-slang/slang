@@ -2703,25 +2703,20 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
                 context->getTargetRequest()->getOptionSet(),
                 paramType);
         }
-        auto arrayLayout = createTypeLayoutWith(context->layoutContext, layoutRules, paramType);
-
-        // On CUDA a fixed-size resource-array uniform is passed by reference (a pointer) rather
-        // than by value in the un-indexable `.param` kernel-argument space; the matching emit-stage
-        // transform is in slang-ir-transform-params-to-constref.cpp. Reflect it as an 8-byte
-        // pointer (the by-reference ABI) whose pointee is the array layout, so the host binds a
-        // device pointer instead of packing the descriptor array inline.
+        // On CUDA a fixed-size resource-array uniform is passed by reference (a pointer) rather than
+        // by value in the un-indexable `.param` kernel-argument space; the matching emit-stage
+        // transform is in slang-ir-transform-params-to-constref.cpp. Lay it out as a
+        // `ParameterBlock<array>` sub-object so it reflects as a parameter group the slang-rhi host
+        // already recurses into — allocating a device buffer, writing the descriptors, and packing
+        // an 8-byte device pointer at the uniform offset, which is exactly the by-reference binding.
+        // (A bare pointer layout instead collapses the array's resource binding ranges, leaving the
+        // host with no descriptors to bind.)
         if (isCUDATarget(context->getTargetRequest()) && isFixedSizeResourceArrayTypeAST(paramType))
         {
-            RefPtr<PointerTypeLayout> ptrLayout = new PointerTypeLayout();
-            const auto info = layoutRules->GetPointerLayout(context->layoutContext);
-            ptrLayout->type = paramType;
-            ptrLayout->rules = layoutRules;
-            ptrLayout->uniformAlignment = info.alignment;
-            ptrLayout->addResourceUsage(info.kind, info.size);
-            ptrLayout->valueTypeLayout = arrayLayout;
-            return ptrLayout;
+            auto paramBlockType = context->getASTBuilder()->getParameterBlockType(paramType);
+            return createTypeLayoutWith(context->layoutContext, layoutRules, paramBlockType);
         }
-        return arrayLayout;
+        return createTypeLayoutWith(context->layoutContext, layoutRules, paramType);
     }
     else
     {
