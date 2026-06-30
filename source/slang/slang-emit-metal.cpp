@@ -1153,6 +1153,32 @@ void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             default:
                 break;
             }
+
+            // Emit the MSL type suffix for finite half/float literals: MSL reads
+            // a bare decimal as a 64-bit `double`, so a suffix-less half literal
+            // becomes a double and breaks size-sensitive uses such as
+            // `as_type<ushort>(h)`. MSL has no `double`, so other base types (and
+            // untyped literals) fall through to the bare base emitter.
+            if (auto basicType = as<IRBasicType>(inst->getDataType()))
+            {
+                switch (basicType->getBaseType())
+                {
+                case BaseType::Half:
+                    {
+                        m_writer->emit(constantInst->value.floatVal);
+                        m_writer->emit("h");
+                        return;
+                    }
+                case BaseType::Float:
+                    {
+                        m_writer->emit(constantInst->value.floatVal);
+                        m_writer->emit("f");
+                        return;
+                    }
+                default:
+                    break;
+                }
+            }
             break;
         }
 
