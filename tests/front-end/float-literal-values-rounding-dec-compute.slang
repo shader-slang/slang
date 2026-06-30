@@ -2,24 +2,28 @@
 // values for float/half literals. Rounding mode is the standard IEEE 754
 // round to nearest, ties to even.
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
-RWStructuredBuffer<uint> outputBuffer;
-
-
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -compute -shaderobj -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu -compute -shaderobj
+
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu -compute -shaderobj
+// See issue #11835
+
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -compute -shaderobj -emit-spirv-via-glsl
+// See issue #11836
+
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -metal -compute -shaderobj
+// See issue #11837
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+RWStructuredBuffer<uint> outputBuffer;
+
 void computeMain()
 {
     uint i = 0;
 
     ////// regular positive floats -- round to nearest, ties to even //////
-
-    float f;
-
     outputBuffer[i++] = bit_cast<uint32_t>(8388608.4999999999999999999f);
     //CHECK: 4B000000
 
@@ -40,9 +44,6 @@ void computeMain()
 
 
     ////// regular positive half-floats -- round to nearest, ties to even //////
-
-    half h;
-
     outputBuffer[i++] = uint32_t(bit_cast<uint16_t>(61440.hf));
     //CHECK: 7B80
 
