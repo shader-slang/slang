@@ -1216,18 +1216,10 @@ typedef uint32_t SlangSizeT;
                  //   stride. Opt-in; mutually exclusive with a non-zero
                  //   `-spirv-resource-heap-stride` (combining the two is an error).
 
-        CountOf = 155,
+        // Do not assign an explicit value to CountOf. It must remain one past the last option,
+        // which it derives implicitly from the preceding (highest-valued) enumerator.
+        CountOf,
     };
-
-    // CountOf is the terminal sentinel and must remain one greater than the highest compiler
-    // option value (the textually-last enumerator above). A failure here means an option shares
-    // CountOf's value, which silently breaks any caller that sizes an array by, iterates up to,
-    // or range-checks against CountOf. When appending an option, give it the previous enumerator's
-    // value + 1, then bump CountOf and the option named below to match.
-    static_assert(
-        static_cast<int>(CompilerOptionName::CountOf) ==
-        static_cast<int>(CompilerOptionName::SPIRVUnifiedDescriptorHeapStride) + 1,
-        "CompilerOptionName::CountOf must be exactly one past the last option value");
 
     enum class CompilerOptionValueKind
     {
