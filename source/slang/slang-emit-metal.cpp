@@ -1154,19 +1154,9 @@ void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 break;
             }
 
-            // Append the MSL type suffix for finite half/float literals: MSL is
-            // C++14-based, so a bare decimal is typed `double` (64-bit), and a
-            // suffix-less half/float literal silently becomes a double. That
-            // breaks size-sensitive uses such as `as_type<ushort>(h)` (a
-            // 64-bit -> 16-bit bit-cast MSL rejects -- the #11837 failure).
-            //
-            // Scope is finite literals only. The NaN/Inf cases handled above
-            // deliberately keep emitting the bare double-typed `(0.0 / 0.0)` /
-            // `(+/-1.0 / 0.0)` forms, so a half/float NaN or Inf in a
-            // size-sensitive context still mismatches; that is a known remaining
-            // gap of #11837, not an oversight, left for a follow-up. `Double`
-            // (caught loudly in emitSimpleTypeImpl) and any float literal whose
-            // type is not an `IRBasicType` fall through to the bare base emitter.
+            // Suffix finite half/float literals so MSL doesn't type a bare decimal
+            // as `double` (which breaks `as_type<ushort>(h)`, #11837). NaN/Inf and
+            // Double stay bare; non-finite half/float is a known remaining gap.
             if (auto basicType = as<IRBasicType>(inst->getDataType()))
             {
                 const char* suffix = nullptr;
