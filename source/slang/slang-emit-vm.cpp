@@ -243,7 +243,11 @@ public:
 
     VMOperand ensureInst(IRInst* inst)
     {
-        VMOperand operand;
+        // Zero-initialize: the global-parameter branch below diagnoses and returns
+        // without computing a real operand, so it must start from a well-defined
+        // value rather than indeterminate stack bytes (which writeInst would copy
+        // byte-for-byte into the code buffer).
+        VMOperand operand = {};
         if (mapInstToOperand.tryGetValue(inst, operand))
             return operand;
 
