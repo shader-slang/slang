@@ -176,6 +176,8 @@ protected:
 
     void _requireFragmentShaderBarycentric();
 
+    void _requireMeshShader();
+
     void _emitSpecialFloatImpl(IRType* type, const char* valueExpr);
 
     void emitAtomicImageCoord(IRImageSubscript* operand);
