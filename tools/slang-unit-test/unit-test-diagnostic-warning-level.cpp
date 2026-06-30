@@ -14,7 +14,7 @@
 // production warning is tagged with yet, so a regression that ignored
 // `DiagnosticInfo::level` would be caught here.
 
-#include "../../source/compiler-core/slang-diagnostic-sink.h"
+#include "compiler-core/slang-diagnostic-sink.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
