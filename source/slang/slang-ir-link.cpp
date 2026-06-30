@@ -60,6 +60,15 @@ struct IRSharedSpecContext
 
     bool useAutodiff = false;
 
+    // True only for the final code-generation link (`linkIR`), where the linked
+    // module is a throw-away copy built for one target and unused symbols are
+    // dropped on demand / by later DCE. It is false for `prelinkIR` and module
+    // precompilation, which mutate a module that must remain complete and
+    // self-consistent (it may be serialized, e.g. the core module). Auto-diff
+    // link-time pruning (see `cloneAnnotations` / `shouldDeepCloneWitnessTable`)
+    // is only safe in the former case.
+    bool isFinalCodegenLink = false;
+
     IRBuilder builderStorage;
 
     // The "global" specialization environment.
@@ -205,6 +214,21 @@ IRInst* cloneInst(
 static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRInst* originalInst)
 {
     SLANG_UNUSED(clonedInst);
+
+    // `IRAnnotation`s exclusively carry auto-diff trait associations: a target's
+    // derivative functions and differential type/zero/add/pair witnesses (every
+    // `AnnotationKind` is differentiability-related). A program that does not use
+    // auto-diff never reads them, so cloning them here only bloats the linked
+    // module — pulling every differentiable builtin's derivative methods (e.g.
+    // `sin`/`cos`/`sqrt`) and `float`'s differential machinery through every
+    // downstream pass (specialize / simplifyIR / DCE) before they are finally
+    // eliminated as dead. Skip them for the final code-gen link when auto-diff is
+    // not in use; this restores the pre-PR-#9808 behavior where derivative info
+    // was never linked into non-differentiating modules. We must not skip them
+    // during prelink / precompilation, whose output module stays live (and may be
+    // serialized, e.g. the core module) and must keep its annotations.
+    if (context->getShared()->isFinalCodegenLink && !context->getShared()->useAutodiff)
+        return;
 
     // Local annotations will be cloned normally as part of cloning their parent function/generic
     // body. For module-scope annotations, we need to look them up since they won't get
@@ -686,7 +710,39 @@ IRGlobalGenericParam* cloneGlobalGenericParamImpl(
 
 bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* table)
 {
-    SLANG_UNUSED(context);
+    auto conformanceType = getResolvedInstForDecorations(table->getConformanceType());
+
+    // Differentiable-interface witness tables are decided first, *before* the
+    // generic `HLSLExport` / `KeepAlive` rule below. PR #9808 marks these tables
+    // (`IDifferentiable`, `IForwardDifferentiable`, ...) and their entries
+    // `[HLSLExport]` so they can be linked across modules for auto-diff, but that
+    // export would otherwise force a deep clone into *every* program. A shader
+    // that references a differentiable builtin (e.g. `sin`) would then drag the
+    // table's `fwd_diff` / `bwd_diff` / `dadd` / `dzero` entries — and the whole
+    // derivative-function closure they reference — through every downstream pass,
+    // even with no auto-diff in use (the PR #9808 codegen regression). For the
+    // final code-gen link we instead defer the entries and clone only those that
+    // are actually referenced, unless the program uses auto-diff. Prelink /
+    // precompilation must keep the output module complete, so it still deep-clones.
+    for (auto decor : conformanceType->getDecorations())
+    {
+        if (auto knownBuiltin = as<IRKnownBuiltinDecoration>(decor))
+        {
+            switch (knownBuiltin->getName())
+            {
+            case KnownBuiltinDeclName::IDifferentiable:
+            case KnownBuiltinDeclName::IDifferentiablePtr:
+            case KnownBuiltinDeclName::IForwardDifferentiable:
+            case KnownBuiltinDeclName::IBackwardDifferentiable:
+            case KnownBuiltinDeclName::IBwdCallable:
+                return !context->getShared()->isFinalCodegenLink ||
+                       context->getShared()->useAutodiff;
+            default:
+                break;
+            }
+        }
+    }
+
     for (auto decor : table->getDecorations())
     {
         switch (decor->getOp())
@@ -697,27 +753,12 @@ bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* tab
         }
     }
 
-    auto conformanceType = getResolvedInstForDecorations(table->getConformanceType());
     for (auto decor : conformanceType->getDecorations())
     {
         switch (decor->getOp())
         {
         case kIROp_ComInterfaceDecoration:
             return true;
-        case kIROp_KnownBuiltinDecoration:
-            {
-                auto name = as<IRKnownBuiltinDecoration>(decor)->getName();
-                switch (name)
-                {
-                case KnownBuiltinDeclName::IDifferentiable:
-                case KnownBuiltinDeclName::IDifferentiablePtr:
-                case KnownBuiltinDeclName::IForwardDifferentiable:
-                case KnownBuiltinDeclName::IBackwardDifferentiable:
-                case KnownBuiltinDeclName::IBwdCallable:
-                    return true;
-                }
-                break;
-            }
         default:
             break;
         }
@@ -2139,6 +2180,11 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // high-fanout use-list walks.
     for (auto irModule : irModules)
         irModule->_ensureLinkingInfo();
+
+    // This is the final per-target code-generation link, so it is safe to prune
+    // auto-diff artifacts that the program never uses (see `cloneAnnotations` /
+    // `shouldDeepCloneWitnessTable`).
+    sharedContext->isFinalCodegenLink = true;
 
     // Check if any user module uses auto-diff, if so we will need to link
     // additional witnesses and decorations.
