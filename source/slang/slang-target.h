@@ -130,27 +130,39 @@ public:
     }
 
     // TypeLayouts created on the fly by reflection API
+    //
+    // The key includes `programLayout` because the same type laid out with a
+    // `ProgramLayout` in hand can differ from the same type laid out without
+    // one: with a program layout, `extern` members resolve to their concrete
+    // linked definitions, so a cache entry computed for one must not be
+    // returned for the other.
     struct TypeLayoutKey
     {
         Type* type;
         slang::LayoutRules rules;
+        ProgramLayout* programLayout;
         HashCode getHashCode() const
         {
             Hasher hasher;
             hasher.hashValue(type);
             hasher.hashValue(rules);
+            hasher.hashValue(programLayout);
             return hasher.getResult();
         }
         bool operator==(TypeLayoutKey other) const
         {
-            return type == other.type && rules == other.rules;
+            return type == other.type && rules == other.rules &&
+                   programLayout == other.programLayout;
         }
     };
     Dictionary<TypeLayoutKey, RefPtr<TypeLayout>> typeLayouts;
 
     Dictionary<TypeLayoutKey, RefPtr<TypeLayout>>& getTypeLayouts() { return typeLayouts; }
 
-    TypeLayout* getTypeLayout(Type* type, slang::LayoutRules rules);
+    TypeLayout* getTypeLayout(
+        Type* type,
+        slang::LayoutRules rules,
+        ProgramLayout* programLayout = nullptr);
 
     CompilerOptionSet& getOptionSet() { return optionSet; }
 
