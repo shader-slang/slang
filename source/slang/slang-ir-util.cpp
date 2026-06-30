@@ -1866,6 +1866,22 @@ bool isZero(IRInst* inst)
     }
 }
 
+bool isLiteralValue(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_BoolLit:
+    case kIROp_FloatLit:
+    case kIROp_IntLit:
+    case kIROp_PtrLit:
+    case kIROp_StringLit:
+    case kIROp_VoidLit:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool isOne(IRInst* inst)
 {
     switch (inst->getOp())

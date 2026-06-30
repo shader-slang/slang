@@ -574,6 +574,10 @@ struct FunctionParameterSpecializationContext
             // Similarly for other global constants
             ioInfo.key.vals.add(globalConstant);
         }
+        else if (isLiteralValue(oldArg))
+        {
+            ioInfo.key.vals.add(oldArg);
+        }
         else if (isUserPointerType(oldArg->getDataType()))
         {
             // If the arg is a user pointer, we can pass it as an ordinary argument,
@@ -859,6 +863,10 @@ struct FunctionParameterSpecializationContext
             // As above, the identity of the specialized function is sufficient
             // to resolve the uses
             return globalFunc;
+        }
+        if (isLiteralValue(oldArg))
+        {
+            return oldArg;
         }
         else if (isElementAccessInst(oldArg))
         {

@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK): -vk -shaderobj -output-using-type
+//TEST:COMPILE: -target hlsl -profile cs_6_0 -entry computeMain -no-codegen
 
 // A [BackwardDifferentiable] interface method adds callable constraints to
 // the requirement. A direct candidate with only a legacy backward derivative
