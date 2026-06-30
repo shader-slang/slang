@@ -71,22 +71,26 @@ name: PR Board Sync (reusable)
 #
 # Triggers and fork secrets (PUBLIC repo): callers drive this via privileged
 # events that DO receive the secret for fork PRs -- `pull_request_target` (PR
-# lifecycle/commits), `workflow_run` (CI completion + the fork-review relay), and
-# `schedule` (the sweep). `pull_request_review` only receives the secret for
-# ORIGIN PRs; a fork review runs the fork head with no secret, so the caller
-# routes fork reviews through an unprivileged bridge whose completion fires a
-# privileged `workflow_run` here (see the dispatch's `workflow_run` branch). When
-# no token is delivered, every privileged step is gated off (HAS_TOKEN) and the
-# run skips cleanly; the sweep is the backstop.
+# lifecycle/commits), `workflow_run` (CI completion + the fork-review relay),
+# `status` (external commit statuses), and `schedule` (the sweep).
+# `pull_request_review` only receives the secret for ORIGIN PRs; a fork review
+# runs the fork head with no secret, so the caller routes fork reviews through an
+# unprivileged bridge whose completion fires a privileged `workflow_run` here
+# (see the dispatch's `workflow_run` branch). When no token is delivered, every
+# privileged step is gated off (HAS_TOKEN) and the run skips cleanly; the sweep
+# is the backstop.
 #
-# CI completion uses `workflow_run`, NOT `check_suite`: GitHub deliberately does
-# not deliver `check_suite`/`check_run` events for suites created by GitHub
-# Actions (recursion prevention), so a `check_suite` trigger never fires for this
-# repo's Actions-based CI. `workflow_run` IS delivered for Actions runs, so it is
-# the event that actually carries "CI finished" -- a CI failure (or recovery)
-# that lands after a PR's last push reaches the board in real time instead of
-# waiting for the nightly sweep. A caller may still subscribe to `check_suite`
-# for any non-Actions, GitHub-App-created suites; the dispatch handles it.
+# Why CI/check results come via `workflow_run` and `status`, NOT `check_suite`:
+# GitHub deliberately does not deliver `check_suite`/`check_run` events for suites
+# created by GitHub Actions (recursion prevention), so a `check_suite` trigger
+# never fires for this repo's Actions-based CI. `workflow_run` IS delivered for
+# Actions runs, so it carries "an Actions workflow finished" -- a CI failure (or
+# recovery) that lands after a PR's last push reaches the board in real time
+# instead of waiting for the nightly sweep. External, non-Actions checks instead
+# post a commit `status` (e.g. "SlangPy Tests", "license/cla", "CodeRabbit"),
+# which `computeTarget` folds into the CI rollup; the `status` event is the only
+# signal that carries those. A caller may still subscribe to `check_suite` for
+# any non-Actions, GitHub-App-created suites; the dispatch handles it.
 
 on:
   workflow_call:
@@ -1274,6 +1278,14 @@ jobs:
               // run in a fork-controlled context).
               const wr = context.payload.workflow_run || {};
               await reconcileByCommit(wr.head_sha, wr.pull_requests);
+            } else if (ev === "status") {
+              // A commit status posted by an external, non-Actions integration --
+              // e.g. "SlangPy Tests", "license/cla", or "CodeRabbit". computeTarget
+              // folds StatusContext results into the CI rollup (a failure -> the PR
+              // is Snagged), but these are NOT Actions check suites, so neither
+              // check_suite nor workflow_run ever carries them; the status event is
+              // the only signal. It is commit-scoped, so resolve the PR(s) by SHA.
+              await reconcileByCommit(context.payload.sha, null);
             }
 
       # --- Unrequest auto-assigned non-approver reviewers --------------------

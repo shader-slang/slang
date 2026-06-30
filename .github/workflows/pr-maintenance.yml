@@ -34,7 +34,9 @@ on:
         dequeued,
       ]
   pull_request_review:
-    types: [submitted]
+    # dismissed matters too: dismissing a CHANGES_REQUESTED review (with no new
+    # commit) should move the PR out of Revising, and only this event signals it.
+    types: [submitted, dismissed]
   check_suite:
     types: [completed]
 

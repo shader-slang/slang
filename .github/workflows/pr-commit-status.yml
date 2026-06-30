@@ -1,0 +1,32 @@
+name: PR Commit Status Sync
+
+# Reconciles a PR's board Status when an external commit status changes, by
+# relaying the `status` event into the reusable board-sync.
+#
+# Why this exists: some PR checks are not GitHub Actions check runs but external
+# commit statuses -- e.g. "SlangPy Tests", "license/cla", "CodeRabbit". The
+# reusable workflow's computeTarget already folds those StatusContext results
+# into its CI rollup (a failing status -> the PR is Snagged), but nothing drove a
+# real-time recompute when one flipped: check_suite/workflow_run only carry
+# Actions check suites, not external statuses. The `status` event is the only
+# signal that carries them. (Unlike check_suite for Actions CI, the `status`
+# event IS delivered here, because these statuses are posted by external apps/PATs
+# rather than the recursion-suppressed GITHUB_TOKEN.)
+#
+# The `status` event is privileged (repo-scoped, runs in the default-branch
+# context with secrets), so it works for fork PRs too. It is commit-scoped, so
+# the reusable workflow's `status` dispatch branch resolves the PR(s) from the
+# event's SHA and recomputes. Metadata only -- no checkout.
+
+on:
+  status: {}
+
+jobs:
+  board-sync:
+    # Skip the initial "pending" each external check posts; only a settled status
+    # (success -> recovery, failure/error -> Snagged) changes what the recompute
+    # would do, and the recompute is idempotent regardless.
+    if: ${{ github.event.state != 'pending' }}
+    uses: ./.github/workflows/pr-board-sync.yml
+    secrets:
+      SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}
