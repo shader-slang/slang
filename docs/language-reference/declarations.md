@@ -716,6 +716,10 @@ T anotherFunction<T = float, let N : int = 4>(vector<T,N> v);
 For generic type parameters, the default value is a type to use if no argument is specified.
 For generic value parameters, the default value is a value of the same type to use if no argument is specified.
 
+> Note: Generic parameter default values are not allowed on `extension`
+> declarations. In an extension, the parameters are bound by unifying with
+> the target type at the application site, so a default could never be used.
+
 ### Explicit Specialization
 
 A generic is _specialized_ by applying it to _generic arguments_ listed inside angle brackets `<>`:

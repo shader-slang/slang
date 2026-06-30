@@ -15601,6 +15601,38 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
                             .targetType = decl->targetType.type,
                             .decl = member});
                 }
+
+                // Default values on a generic parameter are meaningless on
+                // an extension: the parameters are bound by unifying with
+                // the target type at the application site, so there is no
+                // caller that could leave one unset and have the default
+                // apply (#11330). Only diagnose when the parameter is
+                // otherwise valid (referenced by the target type) so we
+                // don't stack on top of the unreferenced-param diagnostics
+                // E30855 / E30856 above.
+                if (referencedByTargetType)
+                {
+                    if (auto typeParam = as<GenericTypeParamDecl>(member))
+                    {
+                        if (typeParam->initType.exp)
+                        {
+                            getSink()->diagnose(
+                                Diagnostics::DefaultGenericParamNotAllowedInExtension{
+                                    .paramName = typeParam->getName(),
+                                    .decl = typeParam});
+                        }
+                    }
+                    else if (auto valueParam = as<GenericValueParamDecl>(member))
+                    {
+                        if (valueParam->initExpr)
+                        {
+                            getSink()->diagnose(
+                                Diagnostics::DefaultGenericParamNotAllowedInExtension{
+                                    .paramName = valueParam->getName(),
+                                    .decl = valueParam});
+                        }
+                    }
+                }
             }
         }
     }
