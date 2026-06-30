@@ -1203,6 +1203,12 @@ typedef uint32_t SlangSizeT;
                  //   of `1`, eliminating atomic contention (much faster, and avoids the GPU
                  //   watchdog timeouts heavy coverage can trigger) at the cost of exact
                  //   counts. Off by default.
+        // CLI-only query option `-<compiler>-version`: prints the version of the downstream
+        // <compiler> Slang would actually load for that pass-through (via
+        // IGlobalSession::getDownstreamCompilerVersion). It takes no value and is never stored on
+        // an option set; it only drives the print-and-continue handler in the command-line parser.
+        CompilerVersion = 153,
+
         SPIRVUnifiedDescriptorHeapStride =
             154, // bool: when set, emit each SPIRV resource descriptor-heap runtime array's
                  //   ArrayStride as the maximum of image and buffer descriptor sizes, so a
@@ -1210,14 +1216,18 @@ typedef uint32_t SlangSizeT;
                  //   stride. Opt-in; mutually exclusive with a non-zero
                  //   `-spirv-resource-heap-stride` (combining the two is an error).
 
-        // CLI-only query option `-<compiler>-version`: prints the version of the downstream
-        // <compiler> Slang would actually load for that pass-through (via
-        // IGlobalSession::getDownstreamCompilerVersion). It takes no value and is never stored on
-        // an option set; it only drives the print-and-continue handler in the command-line parser.
-        CompilerVersion = 153,
-
-        CountOf,
+        CountOf = 155,
     };
+
+    // CountOf is the terminal sentinel and must remain one greater than the highest compiler
+    // option value (the textually-last enumerator above). A failure here means an option shares
+    // CountOf's value, which silently breaks any caller that sizes an array by, iterates up to,
+    // or range-checks against CountOf. When appending an option, give it the previous enumerator's
+    // value + 1, then bump CountOf and the option named below to match.
+    static_assert(
+        static_cast<int>(CompilerOptionName::CountOf) ==
+        static_cast<int>(CompilerOptionName::SPIRVUnifiedDescriptorHeapStride) + 1,
+        "CompilerOptionName::CountOf must be exactly one past the last option value");
 
     enum class CompilerOptionValueKind
     {
