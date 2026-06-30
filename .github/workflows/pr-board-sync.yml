@@ -173,12 +173,15 @@ jobs:
     runs-on: ubuntu-latest
     # Serialize events for the same PR so two near-simultaneous events (e.g.
     # opened + a fast synchronize) cannot double-write; cancel-in-progress: false
-    # lets the in-flight run finish and queues the next. A check_suite keys on its
-    # head SHA rather than a PR number, so it can still overlap a PR-keyed event --
-    # benign, since the assignment pick is deterministic and the Status writes are
-    # idempotent recomputes.
+    # lets the in-flight run finish and queues the next. The commit-scoped events
+    # (check_suite / workflow_run / status) key on their head SHA rather than a PR
+    # number, so they serialize against each other for the same commit -- which
+    # matters now that pr-ci-complete fans out to several gating workflows whose
+    # completions for one commit would otherwise run concurrently. They can still
+    # overlap a PR-number-keyed event, but that is benign: the assignment pick is
+    # deterministic and the Status writes are idempotent recomputes.
     concurrency:
-      group: pr-board-sync-${{ github.event.pull_request.number || github.event.check_suite.head_sha || github.run_id }}
+      group: pr-board-sync-${{ github.event.pull_request.number || github.event.check_suite.head_sha || github.event.workflow_run.head_sha || github.event.sha || github.run_id }}
       cancel-in-progress: false
     # HAS_TOKEN is false when SLANG_PR_BOT_TOKEN is not delivered to the run. On a
     # PUBLIC repo, GitHub withholds secrets from fork-PR head-context events
