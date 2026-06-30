@@ -11,7 +11,8 @@ else()
     find_path(
         NVAPI_INCLUDE_DIRS
         NAMES nvapi.h
-        PATHS "${slang-SOURCE_DIR}/external/nvapi"
+        PATHS
+            "${CMAKE_BINARY_DIR}/_deps/nvapi-src"
         NO_DEFAULT_PATH
     )
     find_path(NVAPI_INCLUDE_DIRS NAMES nvapi.h)
