@@ -5311,6 +5311,16 @@ static bool trySynthesizeExactDifferentiabilityConformanceForRequirement(
     Type* constraintSub,
     Type* constraintSup);
 
+static bool _hasNoDiffParameterSignature(ParamDecl* decl, Type* type)
+{
+    return decl->findModifier<NoDiffModifier>() || doesTypeHaveNoDiffModifier(type);
+}
+
+static bool _hasNoDiffReturnSignature(CallableDecl* decl, Type* type)
+{
+    return decl->findModifier<NoDiffModifier>() || doesTypeHaveNoDiffModifier(type);
+}
+
 bool SemanticsVisitor::doesSignatureMatchRequirement(
     DeclRef<CallableDecl> satisfyingMemberDeclRef,
     DeclRef<CallableDecl> requiredMemberDeclRef,
@@ -5362,21 +5372,30 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
                                       .as<CallableDecl>();
     }
 
+    if (satisfyingMemberDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>() !=
+        requiredMemberDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>())
+    {
+        // A `[NoDiffThis]` method has a different differentiability signature. Return false so
+        // requirement witness synthesis can build a wrapper with the requirement's exact `this`
+        // differentiability mode when the call itself is otherwise valid.
+        return false;
+    }
+
     if (auto funcType = requiredMemberDeclRef.getDecl()->funcType.type)
     {
         // If the requirement is defined using a funcType, we'll check the effective
         // func-types
         //
-        auto resolvedFuncType =
+        auto resolvedFuncType = as<Type>(
             as<Type>(funcType->substitute(m_astBuilder, SubstitutionSet(requiredMemberDeclRef)))
-                ->resolve();
+                ->resolve());
 
         auto targetFuncType = getTypeForDeclRef(
             m_astBuilder,
             satisfyingMemberDeclRef,
             satisfyingMemberDeclRef.getLoc());
 
-        if (!targetFuncType.type->equals(resolvedFuncType))
+        if (!targetFuncType.type->getCanonicalType()->equals(resolvedFuncType->getCanonicalType()))
             return false;
     }
     else
@@ -5404,6 +5423,12 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
 
             if (!requiredParamType->equals(satisfyingParamType))
                 return false;
+
+            if (_hasNoDiffParameterSignature(requiredParam.getDecl(), requiredParamType) !=
+                _hasNoDiffParameterSignature(satisfyingParam.getDecl(), satisfyingParamType))
+            {
+                return false;
+            }
         }
 
         auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
@@ -5411,157 +5436,19 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         if (!requiredResultType->equals(satisfyingResultType))
             return false;
 
+        if (_hasNoDiffReturnSignature(requiredMemberDeclRef.getDecl(), requiredResultType) !=
+            _hasNoDiffReturnSignature(satisfyingMemberDeclRef.getDecl(), satisfyingResultType))
+        {
+            return false;
+        }
+
         auto requiredErrorType = getErrorCodeType(m_astBuilder, requiredMemberDeclRef);
         auto satisfyingErrorType = getErrorCodeType(m_astBuilder, satisfyingMemberDeclRef);
         if (!requiredErrorType->equals(satisfyingErrorType))
             return false;
     }
 
-    // Generic requirement matching can pass the satisfying callable as the bare inner declaration
-    // so the witness table records the generic requirement value in the shape lowering expects.
-    // Differentiability conformance lookup is different: it queries members of the
-    // callable-as-type, so a generic callable must use its default self-substitution
-    // (`method<T, witnesses...>`) for lookup to see the synthesized derivative extension.
-    auto satisfyingCalleeForDiffLookup =
-        createDefaultSubstitutionsIfNeeded(m_astBuilder, this, satisfyingMemberDeclRef)
-            .as<CallableDecl>();
-    if (!satisfyingCalleeForDiffLookup)
-        satisfyingCalleeForDiffLookup = satisfyingMemberDeclRef;
-
-    auto requiredCalleeForDiffLookup =
-        createDefaultSubstitutionsIfNeeded(m_astBuilder, this, requiredMemberDeclRef)
-            .as<CallableDecl>();
-    if (!requiredCalleeForDiffLookup)
-        requiredCalleeForDiffLookup = requiredMemberDeclRef.as<CallableDecl>();
-
-    auto satisfiesDifferentiabilityRequirement = [&](bool isBackward) -> bool
-    {
-        if (!requiredCalleeForDiffLookup)
-            return false;
-
-        auto satisfyingFuncAsType =
-            DeclRefType::create(m_astBuilder, satisfyingCalleeForDiffLookup);
-        auto requiredFuncAsType = DeclRefType::create(m_astBuilder, requiredCalleeForDiffLookup);
-        auto requirementTypeInfoWitness = getDiffTypeInfoWitness(requiredFuncAsType);
-
-        // The signature requirement and its sibling `FuncConstraintDecl` are both about the
-        // requirement-side callable contract, not necessarily the satisfying method's ambient
-        // differentiability proof. Consider this example from
-        // tests/autodiff/generic-jvp-trivial.slang:
-        //
-        //     interface MyLinearArithmeticType
-        //     {
-        //         [Differentiable]
-        //         static Real ldot(This a, This b);
-        //     }
-        //
-        //     extension myvector<3> : MyLinearArithmeticType
-        //     {
-        //         [Differentiable]
-        //         static float ldot(myvector<3> a, myvector<3> b) { ... }
-        //     }
-        //
-        //     extension myfloat3 : IDifferentiable { ... }
-        //
-        //     [Differentiable]
-        //     T f<T>(T x) where T : MyLinearArithmeticType, IDifferentiable { ... }
-        //
-        // Checking `myvector<3> : MyLinearArithmeticType` compares the concrete
-        // `myvector<3>.ldot` against the requirement `This.ldot`. At the interface declaration,
-        // `This` is not constrained to `IDifferentiable`, so the hidden `DiffTypeInfoWitness` for
-        // `This.ldot(This, This)` marks both `This` parameters `no_diff`. In the later generic
-        // function `f<T>`, the same concrete type is also visible through `T : IDifferentiable`, so
-        // the concrete callable's ambient diff proof may include differentiable parameters. Filter
-        // overload candidates against the requirement-side proof here so signature matching agrees
-        // with the sibling `FuncConstraintDecl` witness that the conformance loop checks next.
-        auto requiredDifferentiabilityInterfaceType =
-            isBackward ? m_astBuilder->getBackwardDiffFuncInterfaceType(
-                             satisfyingFuncAsType,
-                             requirementTypeInfoWitness)
-                       : m_astBuilder->getForwardDiffFuncInterfaceType(
-                             satisfyingFuncAsType,
-                             requirementTypeInfoWitness);
-
-        if (tryGetSubtypeWitness(satisfyingFuncAsType, requiredDifferentiabilityInterfaceType))
-            return true;
-
-        return trySynthesizeExactDifferentiabilityConformanceForRequirement(
-            this,
-            satisfyingFuncAsType,
-            requiredDifferentiabilityInterfaceType);
-    };
-
-    // A hard differentiability requirement is part of the callable's semantic contract, not just a
-    // follow-up witness-table entry. Reject a signature-only match that has no matching derivative
-    // conformance so overload search can continue to another candidate with the same source
-    // signature. The conformance check above uses the requirement's diff-info proof rather than the
-    // satisfying method's ambient proof because interface requirements can intentionally suppress
-    // derivatives with `NoDiffThis`.
-    if (requiredMemberDeclRef.getDecl()->hasModifier<ForwardDifferentiableAttribute>() ||
-        requiredMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>())
-    {
-        if (!satisfiesDifferentiabilityRequirement(false))
-            return false;
-    }
-
-    if (requiredMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>())
-    {
-        if (!satisfiesDifferentiabilityRequirement(true))
-            return false;
-    }
-
-    // Verify that the this-type has matching differentiability modifiers (if the function
-    // is differentiable)
-    //
-    {
-        // A function with [NoDiffThis] has a different signature.
-        auto parentInterfaceDecl =
-            as<InterfaceDecl>(getParentDecl(requiredMemberDeclRef.getDecl()));
-
-        if (!requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
-        {
-            if (parentInterfaceDecl &&
-                (isFuncForwardDifferentiable(satisfyingCalleeForDiffLookup) ||
-                 isFuncBackwardDifferentiable(satisfyingCalleeForDiffLookup)))
-            {
-                bool noDiffThisSatisfying =
-                    (!isTypeDifferentiable(witnessTable->witnessedType) ||
-                     satisfyingMemberDeclRef.getDecl()->findModifier<NoDiffThisAttribute>() !=
-                         nullptr);
-                bool noDiffThisRequirement =
-                    (requiredMemberDeclRef.getDecl()->findModifier<NoDiffThisAttribute>() !=
-                     nullptr);
-                if (noDiffThisRequirement != noDiffThisSatisfying)
-                    return false;
-            }
-        }
-    }
-
-    // Does requirement func have "type" constraints? We need to verify that the target function
-    // satisfies the same constraints.
-    //
-    if (requiredMemberDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>().getCount() >
-        0)
-    {
-        // Add the satisfying member to the witness table so that self-references can be resolved.
-        auto requirementWitness = RequirementWitness(satisfyingMemberDeclRef);
-        witnessTable->m_requirementDictionary[requiredMemberDeclRef.getDecl()] = requirementWitness;
-
-        // We need to check that the satisfying member has the same constraints as the requirement.
-        bool conformance =
-            doesTypeSatisfyConstraintRequirements(requiredMemberDeclRef, witnessTable);
-
-        if (!conformance)
-        {
-            witnessTable->m_requirementDictionary.remove(requiredMemberDeclRef.getDecl());
-            return false;
-        }
-    }
-    else
-    {
-        // Directly add the satisfying member.
-        _addMethodWitness(witnessTable, requiredMemberDeclRef, satisfyingMemberDeclRef);
-    }
+    _addMethodWitness(witnessTable, requiredMemberDeclRef, satisfyingMemberDeclRef);
 
     return true;
 }
@@ -6821,6 +6708,40 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
 }
 
 
+static Type* _moveNoDiffFromTypeToParamDecl(
+    ASTBuilder* astBuilder,
+    Type* type,
+    ParamDecl* paramDecl)
+{
+    if (auto modifiedType = as<ModifiedType>(type))
+    {
+        List<Val*> retainedModifiers;
+        bool foundNoDiffModifier = false;
+        for (Index i = 0; i < modifiedType->getModifierCount(); i++)
+        {
+            auto modifier = modifiedType->getModifier(i);
+            if (as<NoDiffModifierVal>(modifier))
+            {
+                foundNoDiffModifier = true;
+                continue;
+            }
+            retainedModifiers.add(modifier);
+        }
+
+        auto baseType =
+            _moveNoDiffFromTypeToParamDecl(astBuilder, modifiedType->getBase(), paramDecl);
+        if (foundNoDiffModifier && !paramDecl->findModifier<NoDiffModifier>())
+            addModifier(paramDecl, astBuilder->create<NoDiffModifier>());
+
+        if (retainedModifiers.getCount() == 0)
+            return baseType;
+
+        return astBuilder->getModifiedType(baseType, retainedModifiers);
+    }
+
+    return type;
+}
+
 static void populateParams(
     ASTBuilder* astBuilder,
     CallableDecl* decl,
@@ -6856,16 +6777,8 @@ static void populateParams(
             paramDecl->type.type = paramType;
         }
 
-        // If the resolved type is a ModifiedType with NoDiffModifierVal,
-        // move the no_diff from the type to the param decl.
-        if (auto modifiedType = as<ModifiedType>(paramDecl->type.type))
-        {
-            if (modifiedType->findModifier<NoDiffModifierVal>())
-            {
-                paramDecl->type.type = modifiedType->getBase();
-                addModifier(paramDecl, astBuilder->create<NoDiffModifier>());
-            }
-        }
+        paramDecl->type.type =
+            _moveNoDiffFromTypeToParamDecl(astBuilder, paramDecl->type.type, paramDecl);
         decl->addMember(paramDecl);
 
         // Create an expression that references the parameter for use in arguments.
@@ -9410,7 +9323,6 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
 
             if (findLegacyBwdDiffFunc(this, extensionDecl))
             {
-                SLANG_UNEXPECTED("synthesis should not occur if a bwd_diff function is provided.");
                 return false;
             }
 
@@ -10107,6 +10019,64 @@ static bool trySynthesizeExactDifferentiabilityConformanceForRequirement(
     Type* constraintSub,
     Type* constraintSup);
 
+enum class DifferentiabilityConformanceKind
+{
+    None,
+    Forward,
+    Backward,
+};
+
+static DifferentiabilityConformanceKind getDifferentiabilityConformanceKind(
+    Type* type,
+    Type** outBaseFuncType,
+    Witness** outTypeInfoWitness)
+{
+    if (outBaseFuncType)
+        *outBaseFuncType = nullptr;
+    if (outTypeInfoWitness)
+        *outTypeInfoWitness = nullptr;
+
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return DifferentiabilityConformanceKind::None;
+
+    auto declRef = declRefType->getDeclRef();
+    auto genericApp = as<GenericAppDeclRef>(declRef.declRefBase);
+    if (!genericApp || genericApp->getArgCount() < 2)
+        return DifferentiabilityConformanceKind::None;
+
+    auto baseFuncType = as<Type>(genericApp->getArg(0));
+    auto typeInfoWitness = as<Witness>(genericApp->getArg(1));
+    if (!baseFuncType || !typeInfoWitness)
+        return DifferentiabilityConformanceKind::None;
+
+    if (outBaseFuncType)
+        *outBaseFuncType = baseFuncType;
+    if (outTypeInfoWitness)
+        *outTypeInfoWitness = typeInfoWitness;
+
+    auto interfaceDecl = declRef.getDecl();
+    if (isKnownBuiltinDecl(interfaceDecl, KnownBuiltinDeclName::IForwardDifferentiable))
+        return DifferentiabilityConformanceKind::Forward;
+    if (isKnownBuiltinDecl(interfaceDecl, KnownBuiltinDeclName::IBackwardDifferentiable))
+        return DifferentiabilityConformanceKind::Backward;
+
+    return DifferentiabilityConformanceKind::None;
+}
+
+static String getDifferentiabilityConformanceKindText(DifferentiabilityConformanceKind kind)
+{
+    switch (kind)
+    {
+    case DifferentiabilityConformanceKind::Forward:
+        return "forward-differentiable";
+    case DifferentiabilityConformanceKind::Backward:
+        return "backward-differentiable";
+    default:
+        return "differentiability";
+    }
+}
+
 // Walk the witness chain to determine if `targetDecl` appears along the
 // canonical lookup path.  This handles `LookupDeclRef` chains as well as
 // `ExpandSubtypeWitness` / `EachSubtypeWitness` wrappers.
@@ -10313,6 +10283,41 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                     requiredConstraintDeclRef.getDecl(),
                     m_astBuilder->getOrCreate<NoneWitness>());
                 return true;
+            }
+
+            if (auto funcConstraintDecl = as<FuncConstraintDecl>(requiredConstraintDeclRef.getDecl()))
+            {
+                Type* requiredBaseFuncType = nullptr;
+                auto kind = getDifferentiabilityConformanceKind(
+                    constraintSup,
+                    &requiredBaseFuncType,
+                    nullptr);
+                auto constraintSubDeclRefType = as<DeclRefType>(constraintSub);
+                if (kind != DifferentiabilityConformanceKind::None && requiredBaseFuncType &&
+                    constraintSub && requiredBaseFuncType->equals(constraintSub) &&
+                    constraintSubDeclRefType)
+                {
+                    auto callableDeclRef =
+                        constraintSubDeclRefType->getDeclRef().as<CallableDecl>();
+                    if (callableDeclRef)
+                    {
+                        auto callableRequirementDeclRef =
+                            funcConstraintDecl->callableRequirementDeclRef;
+                        Decl* callableRequirementDecl =
+                            callableRequirementDeclRef
+                                ? static_cast<Decl*>(callableRequirementDeclRef.getDecl())
+                                : static_cast<Decl*>(requiredConstraintDeclRef.getDecl());
+
+                        getSink()->diagnose(
+                            Diagnostics::CallableDoesNotSatisfyDifferentiabilityRequirement{
+                                .mode = getDifferentiabilityConformanceKindText(kind),
+                                .requirement = callableRequirementDecl,
+                                .member = callableDeclRef.getDecl()});
+                        getSink()->diagnose(Diagnostics::SeeDeclarationOfInterfaceRequirement{
+                            .decl = callableRequirementDecl});
+                        return false;
+                    }
+                }
             }
 
             getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
@@ -13789,6 +13794,21 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         getSink()->diagnose(Diagnostics::ParamWithoutTypeMustHaveInitializer{.decl = paramDecl});
     }
 
+    if (paramDecl->type.type)
+    {
+        auto hadNoDiffModifier = paramDecl->findModifier<NoDiffModifier>() != nullptr;
+        paramDecl->type.type =
+            _moveNoDiffFromTypeToParamDecl(m_astBuilder, paramDecl->type.type, paramDecl);
+        if (!hadNoDiffModifier)
+        {
+            if (auto noDiffModifier = paramDecl->findModifier<NoDiffModifier>())
+            {
+                noDiffModifier->loc = paramDecl->loc;
+                noDiffModifier->keywordName = getSession()->getNameObj("no_diff");
+            }
+        }
+    }
+
     if (isTypePack(paramDecl->type.type))
     {
         // For now, we only allow parameter packs to be `const`.
@@ -14685,51 +14705,6 @@ static DeclRef<SynthesizedStructDecl> addOrExtendSynthesizedStruct(
     return synStructDeclRef;
 }
 
-enum class DifferentiabilityConformanceKind
-{
-    None,
-    Forward,
-    Backward,
-};
-
-static DifferentiabilityConformanceKind getDifferentiabilityConformanceKind(
-    Type* type,
-    Type** outBaseFuncType,
-    Witness** outTypeInfoWitness)
-{
-    if (outBaseFuncType)
-        *outBaseFuncType = nullptr;
-    if (outTypeInfoWitness)
-        *outTypeInfoWitness = nullptr;
-
-    auto declRefType = as<DeclRefType>(type);
-    if (!declRefType)
-        return DifferentiabilityConformanceKind::None;
-
-    auto declRef = declRefType->getDeclRef();
-    auto genericApp = as<GenericAppDeclRef>(declRef.declRefBase);
-    if (!genericApp || genericApp->getArgCount() < 2)
-        return DifferentiabilityConformanceKind::None;
-
-    auto baseFuncType = as<Type>(genericApp->getArg(0));
-    auto typeInfoWitness = as<Witness>(genericApp->getArg(1));
-    if (!baseFuncType || !typeInfoWitness)
-        return DifferentiabilityConformanceKind::None;
-
-    if (outBaseFuncType)
-        *outBaseFuncType = baseFuncType;
-    if (outTypeInfoWitness)
-        *outTypeInfoWitness = typeInfoWitness;
-
-    auto interfaceDecl = declRef.getDecl();
-    if (isKnownBuiltinDecl(interfaceDecl, KnownBuiltinDeclName::IForwardDifferentiable))
-        return DifferentiabilityConformanceKind::Forward;
-    if (isKnownBuiltinDecl(interfaceDecl, KnownBuiltinDeclName::IBackwardDifferentiable))
-        return DifferentiabilityConformanceKind::Backward;
-
-    return DifferentiabilityConformanceKind::None;
-}
-
 static DeclRef<ExtensionDecl> extendCallableDeclRefForDifferentiabilityRequirement(
     SemanticsVisitor* visitor,
     DeclRef<FunctionDeclBase> callableDeclRef,
@@ -15107,8 +15082,59 @@ static Decl* _moveInterfaceDifferentiabilityRequirementToInterface(
     return outermostDecl;
 }
 
+static bool _callableHasDifferentiabilityHeaderModifier(CallableDecl* decl)
+{
+    return decl->findModifier<DifferentiableAttribute>() ||
+           decl->findModifier<MaybeDifferentiableAttribute>();
+}
+
+static Type* _getThisTypeForImplicitNoDiffThis(SemanticsVisitor* visitor, CallableDecl* decl)
+{
+    if (isInterfaceRequirement(decl))
+    {
+        auto interfaceDecl = findParentInterfaceDecl(decl);
+        if (!interfaceDecl)
+            return nullptr;
+
+        auto interfaceDeclRef = createDefaultSubstitutionsIfNeeded(
+            visitor->getASTBuilder(),
+            visitor,
+            makeDeclRef(interfaceDecl));
+        return DeclRefType::create(visitor->getASTBuilder(), interfaceDeclRef);
+    }
+
+    auto parentDecl = getParentDecl(decl);
+    if (!parentDecl)
+        return nullptr;
+
+    return visitor->calcThisType(makeDeclRef(parentDecl));
+}
+
+static void _maybeAddImplicitNoDiffThisForNonDifferentiableThis(
+    SemanticsVisitor* visitor,
+    CallableDecl* decl)
+{
+    if (!_callableHasDifferentiabilityHeaderModifier(decl) || isEffectivelyStatic(decl) ||
+        decl->hasModifier<NoDiffThisAttribute>())
+    {
+        return;
+    }
+
+    auto thisType = _getThisTypeForImplicitNoDiffThis(visitor, decl);
+    if (!thisType || as<ErrorType>(thisType))
+        return;
+
+    if (!visitor->isTypeDifferentiable(thisType))
+    {
+        auto noDiffThisModifier = visitor->getASTBuilder()->create<NoDiffThisAttribute>();
+        addModifier(decl, noDiffThisModifier);
+    }
+}
+
 void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl* decl)
 {
+    _maybeAddImplicitNoDiffThisForNonDifferentiableThis(this, decl);
+
     // TODO: Need to make this not depend on the attribute, but rather on differentiability
     // in general..
     //
@@ -15184,7 +15210,6 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
             }
         }
     }
-
     //
     // Generate extensions for this function decl that implement
     // the auto-diff interfaces via synthesized declarations.
@@ -15494,33 +15519,6 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
 
             auto funcAsLookupDeclRef = getRequirementAsLookedUpDecl(getCurrentASTBuilder(), decl);
 
-            // If we have any form of differentiability on this requirement, we need to reason about
-            // the differentiability of the this type.
-            // The key issue is that even if the current this-type is non-differentiable, it does
-            // not prevent access via a lookup path from a differentiable type.
-            //
-            // To maintain consistent signatures, we add a `NoDiffThis` attribute if the type
-            // is non-differentiable, which will always
-            // cause any substituted this-type to be considered non-differentiable
-            //
-            if (decl->findModifier<ForwardDifferentiableAttribute>() ||
-                decl->findModifier<BackwardDifferentiableAttribute>() ||
-                decl->findModifier<MaybeDifferentiableAttribute>())
-            {
-                // Add type modifiers to the decl based on the differentiability.
-                auto interfaceDeclRef = createDefaultSubstitutionsIfNeeded(
-                    m_astBuilder,
-                    this,
-                    makeDeclRef(findParentInterfaceDecl(decl)));
-                auto interfaceType = DeclRefType::create(m_astBuilder, interfaceDeclRef);
-                bool noDiffThisRequirement = !isTypeDifferentiable(interfaceType);
-                if (noDiffThisRequirement)
-                {
-                    auto noDiffThisModifier = m_astBuilder->create<NoDiffThisAttribute>();
-                    addModifier(decl, noDiffThisModifier);
-                }
-            }
-
             auto interfaceDecl = findParentInterfaceDecl(decl);
             SLANG_ASSERT(interfaceDecl);
             auto addDifferentiabilityRequirementConstraint =
@@ -15686,17 +15684,6 @@ void SemanticsDeclHeaderVisitor::checkInterfaceRequirement(Decl* decl)
                 Diagnostics::MaybeDifferentiableOnNonInterfaceRequirement{.attr = maybeDiffAttr});
         }
     }
-}
-
-bool doesTypeHaveNoDiffModifier(Type* type)
-{
-    if (auto modifiedType = as<ModifiedType>(type))
-    {
-        if (modifiedType->findModifier<NoDiffModifierVal>() != nullptr)
-            return true;
-        return doesTypeHaveNoDiffModifier(modifiedType->getBase());
-    }
-    return false;
 }
 
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)

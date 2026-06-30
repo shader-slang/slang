@@ -426,6 +426,9 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl);
 ///
 ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
 
+/// Returns true if `type` or one of its modified-type bases carries `no_diff`.
+bool doesTypeHaveNoDiffModifier(Type* type);
+
 inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> declRef)
 {
     return declRef.substitute(astBuilder, declRef.getDecl()->tagType);

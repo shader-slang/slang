@@ -171,14 +171,23 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
         return witness;
     };
 
+    auto paramDecls = callableDeclRef.getDecl()->getParameters();
+    Index paramIndex = 0;
     for (auto paramType : funcType->getParamTypes())
     {
         auto [paramValueType, _] = splitParameterTypeAndDirection(astBuilder, paramType);
-        auto witness = getDiffWitness(paramValueType);
+        auto paramDecl = paramIndex < paramDecls.getCount() ? paramDecls[paramIndex] : nullptr;
+        auto witness = paramDecl && paramDecl->findModifier<NoDiffModifier>()
+                           ? nullptr
+                           : getDiffWitness(paramValueType);
         paramWitnesses.add(witness);
+        paramIndex++;
     }
 
-    SubtypeWitness* returnWitness = getDiffWitness(funcType->getResultType());
+    SubtypeWitness* returnWitness = doesTypeHaveNoDiffModifier(funcType->getResultType()) ||
+                                            callableDeclRef.getDecl()->findModifier<NoDiffModifier>()
+                                        ? nullptr
+                                        : getDiffWitness(funcType->getResultType());
 
     auto thisValueType = getTypeForThisExpr(this, callableDeclRef);
     Type* thisParamType = nullptr;

@@ -2400,6 +2400,10 @@ extension vector<T,N> : IFloat
     [Differentiable] [__unsafeForceInlineEarly]  This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable] [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
 
+    [Differentiable]
+    __intrinsic_op(0)
+    __init(This value);
+
     [OverloadRank(-1)]
     [Differentiable]
     __implicit_conversion($(kConversionCost_Default))
@@ -2463,6 +2467,10 @@ extension matrix<T,N,M,L> : IFloat
     [Differentiable] __intrinsic_op($(kIROp_Neg)) This neg();
     [Differentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
+
+    [Differentiable]
+    __intrinsic_op(0)
+    __init(This value);
 
     [OverloadRank(-1)]
     [Differentiable]
