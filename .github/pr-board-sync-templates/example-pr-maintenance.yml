@@ -1,0 +1,55 @@
+name: PR Maintenance
+
+# Thin caller for the shared PR board-sync reusable workflow. Copy this file to
+# `.github/workflows/pr-maintenance.yml` in the consuming repo. It declares the
+# PR lifecycle / review triggers and delegates all logic to the central reusable
+# workflow in shader-slang/slang. All board IDs default to the shared
+# "Slang PR Tracking" board, so no `with:` block is needed -- map only the one
+# org-level secret (SLANG_PR_BOT_TOKEN).
+#
+# Pair this with the other example callers in this directory for full coverage:
+#   - example-pr-checks-complete.yml  CI / gating-check results -> board
+#   - example-pr-commit-status.yml    external commit statuses -> board
+#   - example-pr-review-fork-bridge.yml + example-pr-review-fork-apply.yml
+#                                     real-time fork-PR review handling
+#
+# Why these triggers: pull_request_target and check_suite receive the secret even
+# for fork PRs, so they run here directly. pull_request_review only receives the
+# secret for ORIGIN PRs, so the job below skips it for forks; fork reviews go
+# through the fork-review relay (the two extra files above). CI completion is NOT
+# handled here -- GitHub does not deliver check_suite for GitHub Actions-created
+# suites (recursion prevention), so Actions-based CI results come via
+# example-pr-checks-complete.yml (workflow_run). The check_suite trigger is kept
+# only for any non-Actions, GitHub-App-created check suites.
+
+on:
+  pull_request_target:
+    types:
+      [
+        opened,
+        reopened,
+        edited,
+        synchronize,
+        closed,
+        ready_for_review,
+        converted_to_draft,
+        enqueued,
+        dequeued,
+      ]
+  pull_request_review:
+    # dismissed matters too: dismissing a CHANGES_REQUESTED review (with no new
+    # commit) should move the PR out of Revising, and only this event signals it.
+    types: [submitted, dismissed]
+  check_suite:
+    types: [completed]
+
+jobs:
+  board-sync:
+    # Run directly for everything except a fork PR's review (no secret there);
+    # fork reviews go through the workflow_run relay instead.
+    if: >-
+      github.event_name != 'pull_request_review' ||
+      github.event.pull_request.head.repo.fork == false
+    uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
+    secrets:
+      SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}
