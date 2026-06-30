@@ -950,7 +950,7 @@ typedef uint32_t SlangSizeT;
     //
     // IMPORTANT: ABI STABILITY POLICY FOR CompilerOptionName
     //
-    // Every enumerator has an explicit integer value. Rules:
+    // Every enumerator except the terminal CountOf sentinel has an explicit integer value. Rules:
     //   1. NEVER insert a new enumerator in the middle of the list.
     //   2. NEVER remove an enumerator; rename to REMOVED_<Name> and keep the value.
     //   3. NEVER reuse an integer value from a removed/deprecated entry.
