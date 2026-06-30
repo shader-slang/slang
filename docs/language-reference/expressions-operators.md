@@ -1,7 +1,7 @@
-> TODO
+# Operator Expressions
 
-Operator Expressions
---------------------
+In Slang:
+- ...
 
 ### Prefix Operator Expressions
 
