@@ -1348,6 +1348,10 @@ IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink
     return ret;
 }
 
+// We use string literals in places where we don't do string escaping other than
+// the bare minimum (\"). Therefore, this function pushes almost all
+// escape-related checking and error handling to getStringLiteralTokenValue()
+// and getCharLiteralValue().
 static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
 {
     int len = 0;
@@ -1369,14 +1373,6 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
 
         len++;
 
-        if (singleChar && len == 2)
-        { // Char literal about to have more than 1 char.
-            if (auto sink = lexer->getDiagnosticSink())
-            {
-                diagnose(sink, _getSourceLoc(lexer), LexerDiagnostics::illegalCharacterLiteral);
-            }
-        }
-
         switch (c)
         {
         case kEOF:
@@ -1395,143 +1391,19 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
             return;
 
         case '\\':
-            // Need to handle various escape sequence cases
+            // We'll do only the bare minimum escape processing to detect
+            // correctly the end of the literal. The escape diagnostics is done
+            // in _decodeStringEscape() invoked by getStringLiteralTokenValue()
+            // and getCharLiteralValue().
             _advance(lexer);
             switch (_peek(lexer))
             {
             case '\'':
             case '\"':
             case '\\':
-            case '?':
-            case 'a':
-            case 'b':
-            case 'f':
-            case 'n':
-            case 'r':
-            case 't':
-            case 'v':
                 _advance(lexer);
                 break;
 
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-                // octal escape: up to 3 characters
-                _advance(lexer);
-                for (int ii = 0; ii < 3; ++ii)
-                {
-                    int d = _peek(lexer);
-                    if (('0' <= d) && (d <= '7'))
-                    {
-                        _advance(lexer);
-                        continue;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-                break;
-
-            case 'U':
-            case 'u':
-            case 'x':
-                {
-                    // Hexadecimal 'x' escape has any number of digits.
-                    //
-                    // Unicode 'u' escape has either 4 hex digits or '\u{xxx}' form with
-                    // arbitrary number of digits.
-                    //
-                    // Unicode 'U' escape has either 8 hex digits
-                    StringBuilder sb;
-                    const char escapeChar = static_cast<char>(_peek(lexer));
-
-                    sb.append('\\');
-                    sb.append(escapeChar);
-                    _advance(lexer);
-
-                    bool curlyBraces{};
-                    if ((escapeChar != 'U') && (_peek(lexer) == '{'))
-                    {
-                        curlyBraces = true;
-                        _advance(lexer);
-                        sb.append('{');
-                    }
-
-                    size_t numDigits{};
-
-                    for (;;)
-                    {
-                        int d = _peek(lexer);
-                        if (('0' <= d) && (d <= '9') || ('a' <= d) && (d <= 'f') ||
-                            ('A' <= d) && (d <= 'F'))
-                        {
-                            sb.append(static_cast<char>(d));
-                            _advance(lexer);
-                            ++numDigits;
-                            continue;
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-
-                    if (curlyBraces)
-                    {
-                        if (_peek(lexer) == '}')
-                        {
-                            sb.append('}');
-                            _advance(lexer);
-
-                            // check that there's at least one digit
-                            if (numDigits == 0U)
-                                diagnose(
-                                    lexer->getDiagnosticSink(),
-                                    _getSourceLoc(lexer),
-                                    LexerDiagnostics::invalidStringEscape,
-                                    sb.getBuffer());
-                        }
-                        else
-                            diagnose(
-                                lexer->getDiagnosticSink(),
-                                _getSourceLoc(lexer),
-                                LexerDiagnostics::invalidStringEscape,
-                                sb.getBuffer());
-                    }
-                    else
-                    {
-                        if ((escapeChar == 'x') && (numDigits == 0U))
-                            diagnose(
-                                lexer->getDiagnosticSink(),
-                                _getSourceLoc(lexer),
-                                LexerDiagnostics::invalidStringEscape,
-                                sb.getBuffer());
-
-                        if ((escapeChar == 'u') && (numDigits != 4U))
-                            diagnose(
-                                lexer->getDiagnosticSink(),
-                                _getSourceLoc(lexer),
-                                LexerDiagnostics::invalidUnicodeStringEscape,
-                                "u",
-                                4U);
-
-                        if ((escapeChar == 'U') && (numDigits != 8U))
-                            diagnose(
-                                lexer->getDiagnosticSink(),
-                                _getSourceLoc(lexer),
-                                LexerDiagnostics::invalidUnicodeStringEscape,
-                                "U",
-                                8U);
-                    }
-
-                    break;
-                }
             }
             break;
 
