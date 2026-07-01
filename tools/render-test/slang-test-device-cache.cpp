@@ -93,8 +93,7 @@ SlangResult DeviceCache::acquireDevice(
     *outDevice = nullptr;
     *outBridge = nullptr;
 
-    // Skip caching for CUDA devices due to crashes. Each call gets a fresh device wired to a fresh
-    // retained bridge (as desc.debugCallback).
+    // CUDA is not cached (crashes); each call gets a fresh device wired to a fresh bridge.
     if (desc.deviceType == rhi::DeviceType::CUDA)
     {
         Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> bridge =
@@ -129,9 +128,7 @@ SlangResult DeviceCache::acquireDevice(
     auto it = deviceCache.find(key);
     if (it != deviceCache.end() && it->second.device)
     {
-        // Return the cached device and the bridge it is actually wired to - COM reference counting
-        // handles the device references. A cached device and its bridge are always stored together
-        // on a miss, so the bridge is never null here.
+        // Hit: return the cached device and the bridge it was created with (stored together).
         SLANG_ASSERT(it->second.bridge);
         *outDevice = it->second.device.get();
         (*outDevice)->addRef();
@@ -139,10 +136,8 @@ SlangResult DeviceCache::acquireDevice(
         return SLANG_OK;
     }
 
-    // Miss: create the device wired to a fresh retained bridge (as desc.debugCallback). The bridge
-    // must outlive the device (retained device state can emit messages after any single
-    // invocation), which createRetainedCoreToRHIDebugBridge() guarantees via a process-global list;
-    // it is cached alongside the device so a later hit hands back the same bridge.
+    // Miss: create the device wired to a fresh retained bridge, and cache them together so a later
+    // hit returns the same bridge.
     Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> bridge =
         renderer_test::createRetainedCoreToRHIDebugBridge();
     rhi::DeviceDesc localDesc = desc;
@@ -176,9 +171,7 @@ SlangResult DeviceCache::acquireDevice(
 void DeviceCache::cleanCache()
 {
     std::lock_guard<std::mutex> lock(getMutex());
-    // Dropping the cache releases each device and our reference to its bridge. The bridge objects
-    // themselves stay alive via createRetainedCoreToRHIDebugBridge()'s process-global list, so any
-    // late message from a now-released device still hits a live (cleared) bridge rather than freed
-    // storage.
+    // Bridges stay alive via the process-global retained list, so a late message from a released
+    // device still hits a live (cleared) bridge, not freed storage.
     getDeviceCache().clear();
 }

@@ -49,15 +49,15 @@ private:
     Slang::IDebugCallback* m_coreCallback = nullptr;
 };
 
-/// Creates an RHI debug bridge that remains alive for process teardown.
+/// Creates an RHI debug bridge and keeps it alive for the lifetime of the process.
 ///
-/// Device descriptors store debug callbacks as raw pointers, and retained RHI
-/// state may emit messages after the harness invocation that created a device.
-/// Each device is created with one such bridge as its debug callback and stays
-/// wired to it for life. A cached device stores its bridge alongside it in the
-/// device cache, and DeviceCache::acquireDevice hands that same bridge back on a
-/// reuse, so an invocation binding to it reaches the device it is actually using
-/// rather than an unrelated fresh bridge (see #11856).
+/// A device holds its bridge as a raw, creation-time-only `debugCallback` pointer,
+/// and retained RHI state may emit messages after the invocation that created the
+/// device; keeping every bridge alive process-wide means such a late message always
+/// reaches a live (possibly cleared) bridge rather than freed storage. This function
+/// only mints and retains the bridge - callers own how it is associated with a device
+/// and rebound to the active per-invocation callback (see DeviceCache::acquireDevice
+/// and #11856).
 inline Slang::RefPtr<CoreToRHIDebugBridge> createRetainedCoreToRHIDebugBridge()
 {
     static std::mutex* mutex = new std::mutex;

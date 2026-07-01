@@ -1899,10 +1899,7 @@ static SlangResult _innerMain(
     }
 
     CachedDeviceWrapper deviceWrapper;
-    // The debug bridge the device is wired to (as desc.debugCallback). Declared at function scope
-    // so a ScopedCoreDebugCallback can be bound to it after the device is acquired and stay active
-    // through rendering. On a cache hit this is the bridge the reused device was created with, not
-    // an unrelated fresh one, so its validation messages reach this invocation's callback (#11856).
+    // The acquired device's debug bridge; bound to this invocation's callback below (#11856).
     Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> deviceBridge;
     {
         DeviceDesc desc = {};
@@ -1960,7 +1957,6 @@ static SlangResult _innerMain(
         desc.nvapiExtUavSlot = uint32_t(nvapiExtnSlot);
         desc.slang.slangGlobalSession = session;
         desc.slang.targetProfile = options.profileName.getBuffer();
-
         {
             if (options.enableDebugLayers)
             {
@@ -1970,8 +1966,6 @@ static SlangResult _innerMain(
             SlangResult res;
             if (options.cacheRhiDevice)
             {
-                // acquireDevice creates or reuses the device and hands back the debug bridge it is
-                // wired to, so a reused device routes messages to this invocation's callback below.
                 res = DeviceCache::acquireDevice(desc, rhiDevice.writeRef(), &deviceBridge);
                 if (SLANG_FAILED(res))
                 {
@@ -1980,8 +1974,7 @@ static SlangResult _innerMain(
             }
             else
             {
-                // Not caching: create the device with a fresh retained bridge as its debug
-                // callback, matching what acquireDevice does internally.
+                // Not caching: create the device wired to a fresh retained bridge.
                 deviceBridge = renderer_test::createRetainedCoreToRHIDebugBridge();
                 desc.debugCallback = deviceBridge.Ptr();
                 res = rhi::getRHI()->createDevice(desc, rhiDevice.writeRef());
@@ -2028,13 +2021,8 @@ static SlangResult _innerMain(
         }
     }
 
-    // Route this invocation's debug messages to the device's bridge for as long as we use the
-    // device (adapter query and rendering below), then clear it on scope exit so a later message
-    // from a retained/cached device is dropped rather than written to a stale callback (#11785).
-    // Binding after the device is acquired (not at function top) is deliberate: the correct bridge
-    // is only known once the device exists. Every return before this point either creates no RHI
-    // device (compile-only, the onlyStartup pre-checks) or is an error bail-out, so none loses an
-    // observable RHI message. Reaching here means a device exists, so its bridge is set.
+    // Bind this invocation's callback to the device's bridge for the adapter query and rendering;
+    // clearing on scope exit lets a later cached-device message with no active scope drop (#11785).
     SLANG_ASSERT(deviceBridge);
     renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
         *deviceBridge,

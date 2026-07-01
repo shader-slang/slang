@@ -144,19 +144,11 @@ SLANG_UNIT_TEST(coreDebugCallbackGetStringReturnsIndependentStorage)
     SLANG_CHECK(first.getStringRepresentation() != second.getStringRepresentation());
 }
 
-// Pins the #11856 fix through DeviceCache::acquireDevice without a GPU: it uses the CPU backend
-// (when enabled) to create a real device, then confirms that a same-key cache hit returns the SAME
-// device and the SAME debug bridge object it was created with, that a distinct key gets a distinct
-// bridge, and that after cleanCache() the key gets a fresh bridge. That bridge identity is
-// the crux of the fix: before it, the harness minted a fresh bridge per invocation while the cached
-// device stayed wired to the first (now cleared) bridge, so a reused device's validation messages
-// were silently dropped (false-green CI).
-//
-// What this GPU-free test does NOT observe is the device actually forwarding a message through its
-// debugCallback (that needs a GPU plus a crafted validation failure). The emitError(*bridge, ...)
-// calls below stand in for that forwarded message and confirm the scoped callback routes it to the
-// current invocation's callback; the device<->debugCallback wiring itself is covered by inspection
-// at the harness layer.
+// Pins the #11856 fix without a GPU: drives the CPU backend through DeviceCache::acquireDevice and
+// checks a same-key hit returns the same device and bridge, a distinct key a distinct bridge, and a
+// post-cleanCache re-acquire a fresh bridge. Before the fix a reused device kept a stale (cleared)
+// bridge and dropped its validation messages. The emitError(*bridge, ...) calls below model a
+// device-forwarded message (real device->debugCallback forwarding needs a GPU).
 SLANG_UNIT_TEST(deviceCacheReusesDebugBridgeAcrossInvocations)
 {
     using namespace renderer_test;
@@ -184,7 +176,8 @@ SLANG_UNIT_TEST(deviceCacheReusesDebugBridgeAcrossInvocations)
     Slang::RefPtr<CoreToRHIDebugBridge> bridgeA;
     if (SLANG_FAILED(DeviceCache::acquireDevice(desc, deviceA.writeRef(), &bridgeA)) || !deviceA)
     {
-        // CPU device unexpectedly unavailable in this environment; nothing to assert.
+        // CPU device unavailable here - skip. (A successful acquire always yields a bridge, so the
+        // check below is a real guard.)
         SLANG_IGNORE_TEST
     }
     SLANG_CHECK(bridgeA != nullptr);
