@@ -57,9 +57,33 @@ static ShaderModelInfo kKnownShaderModels[] = {
     }
     SHADER_MODEL_INFO_DXBC(5, 1),
 #undef SHADER_MODEL_INFO_DXBC
-#define SHADER_MODEL_INFO_DXIL(major, minor)                                    \
-    {                                                                           \
-        (D3D_SHADER_MODEL)0x##major##minor, SLANG_DXIL, "sm_" #major "_" #minor \
+// Minor versions >= 10 must be encoded as a hex digit (D3D_SHADER_MODEL_6_10 == 0x6a),
+// so we run the minor through a lookup table before token-pasting. Two-level indirection
+// is required because `##` does not expand its operands.
+#define _SM_HEX_DIGIT_0 0
+#define _SM_HEX_DIGIT_1 1
+#define _SM_HEX_DIGIT_2 2
+#define _SM_HEX_DIGIT_3 3
+#define _SM_HEX_DIGIT_4 4
+#define _SM_HEX_DIGIT_5 5
+#define _SM_HEX_DIGIT_6 6
+#define _SM_HEX_DIGIT_7 7
+#define _SM_HEX_DIGIT_8 8
+#define _SM_HEX_DIGIT_9 9
+#define _SM_HEX_DIGIT_10 a
+#define _SM_HEX_DIGIT_11 b
+#define _SM_HEX_DIGIT_12 c
+#define _SM_HEX_DIGIT_13 d
+#define _SM_HEX_DIGIT_14 e
+#define _SM_HEX_DIGIT_15 f
+#define _SM_HEX_DIGIT_INDIRECT(x) _SM_HEX_DIGIT_##x
+#define _SM_HEX_DIGIT(x) _SM_HEX_DIGIT_INDIRECT(x)
+#define _SM_CONCAT_PASTE(a, b, c) a##b##c
+#define _SM_CONCAT(a, b, c) _SM_CONCAT_PASTE(a, b, c)
+#define SHADER_MODEL_INFO_DXIL(major, minor)                                          \
+    {                                                                                 \
+        (D3D_SHADER_MODEL)_SM_CONCAT(0x, major, _SM_HEX_DIGIT(minor)),                \
+            SLANG_DXIL, "sm_" #major "_" #minor                                       \
     }
     SHADER_MODEL_INFO_DXIL(6, 0),
     SHADER_MODEL_INFO_DXIL(6, 1),
@@ -70,7 +94,8 @@ static ShaderModelInfo kKnownShaderModels[] = {
     SHADER_MODEL_INFO_DXIL(6, 6),
     SHADER_MODEL_INFO_DXIL(6, 7),
     SHADER_MODEL_INFO_DXIL(6, 8),
-    SHADER_MODEL_INFO_DXIL(6, 9)
+    SHADER_MODEL_INFO_DXIL(6, 9),
+    SHADER_MODEL_INFO_DXIL(6, 10)
 #undef SHADER_MODEL_INFO_DXIL
 };
 
