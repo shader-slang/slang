@@ -14,6 +14,23 @@
 #include <assert.h>
 #include <typeinfo>
 
+// Defensive null guard for Val operand accessors (getValArg, getBasePack, etc.).
+// These should not be null in well-formed AST, but can be transiently null during
+// variadic pack resolution. Returns `this` as a graceful no-op in release;
+// fires a debug assert to catch upstream bugs. See #10561.
+// The null check must come before SLANG_ASSERT because SLANG_ASSERT expands to
+// SLANG_ASSUME in release, which would let the optimizer remove the null check.
+// Note: operand is evaluated twice; all call sites use trivial inline getters.
+#define SLANG_NULL_OPERAND_GUARD(operand) \
+    do                                    \
+    {                                     \
+        if (!(operand))                   \
+        {                                 \
+            SLANG_ASSERT(false);          \
+            return this;                  \
+        }                                 \
+    } while (0)
+
 namespace Slang
 {
 
@@ -2532,7 +2549,10 @@ Val* BuiltinOperationIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*
 void SizeOfIntVal::_toTextOverride(StringBuilder& out)
 {
     out << "sizeof(";
-    getValArg()->toText(out);
+    if (getValArg())
+        getValArg()->toText(out);
+    else
+        out << "<null>";
     out << ")";
 }
 
@@ -2560,6 +2580,7 @@ Val* SizeOfIntVal::_substituteImplOverride(
     SubstitutionSet subst,
     int* ioDiff)
 {
+    SLANG_NULL_OPERAND_GUARD(getValArg());
     int diff = 0;
     auto newType = as<Type>(getValArg()->substituteImpl(astBuilder, subst, &diff));
     if (!diff)
@@ -2571,6 +2592,7 @@ Val* SizeOfIntVal::_substituteImplOverride(
 
 Val* SizeOfIntVal::_resolveImplOverride()
 {
+    SLANG_NULL_OPERAND_GUARD(getValArg());
     auto resolvedArg = getValArg()->resolve();
     if (resolvedArg == getValArg())
         return this;
@@ -2582,7 +2604,10 @@ Val* SizeOfIntVal::_resolveImplOverride()
 void AlignOfIntVal::_toTextOverride(StringBuilder& out)
 {
     out << "alignof(";
-    getValArg()->toText(out);
+    if (getValArg())
+        getValArg()->toText(out);
+    else
+        out << "<null>";
     out << ")";
 }
 
@@ -2610,6 +2635,7 @@ Val* AlignOfIntVal::_substituteImplOverride(
     SubstitutionSet subst,
     int* ioDiff)
 {
+    SLANG_NULL_OPERAND_GUARD(getValArg());
     int diff = 0;
     auto newType = as<Type>(getValArg()->substituteImpl(astBuilder, subst, &diff));
     if (!diff)
@@ -2621,6 +2647,7 @@ Val* AlignOfIntVal::_substituteImplOverride(
 
 Val* AlignOfIntVal::_resolveImplOverride()
 {
+    SLANG_NULL_OPERAND_GUARD(getValArg());
     auto resolvedArg = getValArg()->resolve();
     if (resolvedArg == getValArg())
         return this;
@@ -2632,7 +2659,10 @@ Val* AlignOfIntVal::_resolveImplOverride()
 void CountOfIntVal::_toTextOverride(StringBuilder& out)
 {
     out << "countof(";
-    getValArg()->toText(out);
+    if (getValArg())
+        getValArg()->toText(out);
+    else
+        out << "<null>";
     out << ")";
 }
 
@@ -2677,8 +2707,7 @@ Val* CountOfIntVal::_substituteImplOverride(
     SubstitutionSet subst,
     int* ioDiff)
 {
-    if (!getValArg())
-        return this;
+    SLANG_NULL_OPERAND_GUARD(getValArg());
     int diff = 0;
     auto newVal = getValArg()->substituteImpl(astBuilder, subst, &diff);
     if (!diff)
@@ -2690,8 +2719,7 @@ Val* CountOfIntVal::_substituteImplOverride(
 
 Val* CountOfIntVal::_resolveImplOverride()
 {
-    if (!getValArg())
-        return this;
+    SLANG_NULL_OPERAND_GUARD(getValArg());
     auto resolvedArg = getValArg()->resolve();
     if (resolvedArg == getValArg())
         return this;
@@ -2703,7 +2731,10 @@ Val* CountOfIntVal::_resolveImplOverride()
 void FirstIntVal::_toTextOverride(StringBuilder& out)
 {
     out << "__first(";
-    getBasePack()->toText(out);
+    if (getBasePack())
+        getBasePack()->toText(out);
+    else
+        out << "<null>";
     out << ")";
 }
 
@@ -2712,6 +2743,7 @@ Val* FirstIntVal::_substituteImplOverride(
     SubstitutionSet subst,
     int* ioDiff)
 {
+    SLANG_NULL_OPERAND_GUARD(getBasePack());
     int diff = 0;
     auto substBase = getBasePack()->substituteImpl(astBuilder, subst, &diff);
     if (!diff)
@@ -2722,6 +2754,7 @@ Val* FirstIntVal::_substituteImplOverride(
 
 Val* FirstIntVal::_resolveImplOverride()
 {
+    SLANG_NULL_OPERAND_GUARD(getBasePack());
     auto resolvedArg = getBasePack()->resolve();
     if (resolvedArg == getBasePack())
         return this;
@@ -2733,12 +2766,16 @@ Val* FirstIntVal::_resolveImplOverride()
 void LastIntVal::_toTextOverride(StringBuilder& out)
 {
     out << "__last(";
-    getBasePack()->toText(out);
+    if (getBasePack())
+        getBasePack()->toText(out);
+    else
+        out << "<null>";
     out << ")";
 }
 
 Val* LastIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
+    SLANG_NULL_OPERAND_GUARD(getBasePack());
     int diff = 0;
     auto substBase = getBasePack()->substituteImpl(astBuilder, subst, &diff);
     if (!diff)
@@ -2749,6 +2786,7 @@ Val* LastIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
 
 Val* LastIntVal::_resolveImplOverride()
 {
+    SLANG_NULL_OPERAND_GUARD(getBasePack());
     auto resolvedArg = getBasePack()->resolve();
     if (resolvedArg == getBasePack())
         return this;
@@ -2813,7 +2851,10 @@ Val* ConcreteIntValPack::_resolveImplOverride()
 void TrimFirstIntValPack::_toTextOverride(StringBuilder& out)
 {
     out << "__trimFirst(";
-    getBasePack()->toText(out);
+    if (getBasePack())
+        getBasePack()->toText(out);
+    else
+        out << "<null>";
     out << ")";
 }
 
@@ -2822,6 +2863,7 @@ Val* TrimFirstIntValPack::_substituteImplOverride(
     SubstitutionSet subst,
     int* ioDiff)
 {
+    SLANG_NULL_OPERAND_GUARD(getBasePack());
     int diff = 0;
     auto substBase = getBasePack()->substituteImpl(astBuilder, subst, &diff);
     if (!diff)
@@ -2832,6 +2874,7 @@ Val* TrimFirstIntValPack::_substituteImplOverride(
 
 Val* TrimFirstIntValPack::_resolveImplOverride()
 {
+    SLANG_NULL_OPERAND_GUARD(getBasePack());
     auto resolvedArg = getBasePack()->resolve();
     if (resolvedArg == getBasePack())
         return this;
@@ -2843,7 +2886,10 @@ Val* TrimFirstIntValPack::_resolveImplOverride()
 void TrimLastIntValPack::_toTextOverride(StringBuilder& out)
 {
     out << "__trimLast(";
-    getBasePack()->toText(out);
+    if (getBasePack())
+        getBasePack()->toText(out);
+    else
+        out << "<null>";
     out << ")";
 }
 
@@ -2852,6 +2898,7 @@ Val* TrimLastIntValPack::_substituteImplOverride(
     SubstitutionSet subst,
     int* ioDiff)
 {
+    SLANG_NULL_OPERAND_GUARD(getBasePack());
     int diff = 0;
     auto substBase = getBasePack()->substituteImpl(astBuilder, subst, &diff);
     if (!diff)
@@ -2862,6 +2909,7 @@ Val* TrimLastIntValPack::_substituteImplOverride(
 
 Val* TrimLastIntValPack::_resolveImplOverride()
 {
+    SLANG_NULL_OPERAND_GUARD(getBasePack());
     auto resolvedArg = getBasePack()->resolve();
     if (resolvedArg == getBasePack())
         return this;
@@ -3082,11 +3130,15 @@ Val* ExpandIntValPack::_resolveImplOverride()
 void EachIntVal::_toTextOverride(StringBuilder& out)
 {
     out << "each ";
-    getBasePack()->toText(out);
+    if (getBasePack())
+        getBasePack()->toText(out);
+    else
+        out << "<null>";
 }
 
 Val* EachIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
+    SLANG_NULL_OPERAND_GUARD(getBasePack());
     int diff = 0;
     auto substBase = getBasePack()->substituteImpl(astBuilder, subst, &diff);
     if (!diff)
