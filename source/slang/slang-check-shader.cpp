@@ -864,6 +864,13 @@ bool isUniformParameterType(Type* type)
 // such as `T tex` with `T = Texture2D` is recognized), and a nested struct field is
 // handled by the recursive call.
 //
+// The recursion needs no explicit cycle/depth guard: it only ever descends a finite,
+// acyclic type structure. A by-value struct cycle (`struct S { S next; }`) has
+// unbounded size and is rejected earlier by the front-end nesting limit
+// (`E39997`, `kMaxTypeNestingDepth`), and a cyclic inheritance graph is rejected by
+// `E39999` — both fire before `validateEntryPoint` runs this predicate. So every
+// field/base reached here resolves to a finite, non-recursive type.
+//
 // This list must stay in sync with the binder's contract: an explicit
 // `[[vk::binding(...)]]` can only position a parameter that consumes a
 // `DescriptorTableSlot` or `SubElementRegisterSpace` (see
@@ -903,6 +910,12 @@ static bool isVkBindingCompatibleEntryPointParameterType(ASTBuilder* astBuilder,
     {
         if (auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
         {
+            // `MemberFilterStyle::Instance` selects instance (non-`static`) members, not
+            // own-vs-inherited: `getFields` returns only fields declared directly in this
+            // struct, which is why inheritance needs the separate `findBaseStructType`
+            // branch below rather than being folded in here. `static` members are excluded
+            // deliberately — a static resource is a global, not part of this parameter
+            // value's descriptor layout, so it must not make the struct look bindable.
             for (auto fieldDeclRef :
                  getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
@@ -911,6 +924,8 @@ static bool isVkBindingCompatibleEntryPointParameterType(ASTBuilder* astBuilder,
                         getType(astBuilder, fieldDeclRef)))
                     return true;
             }
+            // Inherited fields also participate in the layout, so a base struct that
+            // consumes a descriptor makes the derived type compatible too.
             if (auto baseStructType = findBaseStructType(astBuilder, structDeclRef))
                 return isVkBindingCompatibleEntryPointParameterType(astBuilder, baseStructType);
         }

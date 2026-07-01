@@ -12,7 +12,7 @@
 //     warning just because a field exists; it must find a genuine descriptor-consuming
 //     leaf, and a pointer is not one.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
 
 RWStructuredBuffer<uint> output;
 
