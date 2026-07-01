@@ -104,6 +104,37 @@ async function runSmokeTest() {
         }
         console.log('SPIRV binary generated successfully');
         console.log('Generated binary length:', spirvBinary.length);
+
+        const layout = linkedProgram.getLayout(0);
+        if (!layout) {
+            throw new Error('Could not get program layout');
+        }
+        const defaultValueType = layout.findTypeByName('WasmDefaultValueSmoke');
+        if (!defaultValueType) {
+            throw new Error('Could not find default-value smoke type');
+        }
+        const answerVar = layout.findVarByNameInType(defaultValueType, 'Answer');
+        if (!answerVar) {
+            throw new Error('Could not find default-value smoke variable');
+        }
+        if (!answerVar.hasDefaultValue()) {
+            throw new Error('Default-value smoke variable did not report a default value');
+        }
+        const defaultValueBlob = answerVar.getDefaultValueBlob();
+        if (!(defaultValueBlob instanceof Uint8Array)) {
+            throw new Error('Default-value blob was not returned as a Uint8Array');
+        }
+        if (defaultValueBlob.length !== 4) {
+            throw new Error(`Unexpected default-value blob size: ${defaultValueBlob.length}`);
+        }
+        const answer = new DataView(
+            defaultValueBlob.buffer,
+            defaultValueBlob.byteOffset,
+            defaultValueBlob.byteLength).getInt32(0, true);
+        if (answer !== 0x12345678) {
+            throw new Error(`Unexpected default-value blob contents: 0x${answer.toString(16)}`);
+        }
+        console.log('Default-value blob reflection smoke test passed');
         
         // Clean up
         linkedProgram.delete();
@@ -120,4 +151,4 @@ async function runSmokeTest() {
     }
 }
 
-runSmokeTest(); 
+runSmokeTest();

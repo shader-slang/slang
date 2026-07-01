@@ -2329,6 +2329,26 @@ public:                                                              \
 
     typedef SlangReflectionVariableLayout SlangReflectionParameter;
 
+    /** Retrieves a variable's default initializer as a blob.
+     *
+     * If no explicit initializer exists, returns `SLANG_OK` and sets `*outBlob` to `nullptr`.
+     * On success with an initializer, `*outBlob` receives an `ISlangBlob*` with an added
+     * reference.
+     *
+     * Supported types include scalar values, vectors, matrices, fixed-size arrays,
+     * structs/aggregates, and enums. The blob stores scalar-layout bytes in natural scalar/field
+     * order without aggregate padding; bool values are emitted as 4-byte values to match Slang's
+     * GPU scalar layout. `intptr_t` and `uintptr_t` values are emitted as fixed 8-byte signed and
+     * unsigned values because the blob API is target-independent; consumers for narrower pointer
+     * targets must narrow explicitly. Matrices are emitted row-by-row, struct base fields are
+     * emitted before derived fields, and enum values use the enum's underlying tag type.
+     *
+     * Returns `SLANG_E_INVALID_ARG` for invalid arguments and `SLANG_E_NOT_AVAILABLE` when the
+     * initializer cannot be represented as a default-value blob.
+     */
+    SLANG_API SlangResult
+    spReflectionVariable_GetDefaultValueBlob(SlangReflectionVariable* inVar, ISlangBlob** outBlob);
+
 #ifdef __cplusplus
 }
 #endif
@@ -3144,25 +3164,49 @@ struct VariableReflection
         return findAttributeByName(globalSession, name);
     }
 
-    bool hasDefaultValue()
+    /// Deprecated: call getDefaultValueBlob and check for a null blob instead.
+    SLANG_DEPRECATED bool hasDefaultValue()
     {
         return spReflectionVariable_HasDefaultValue((SlangReflectionVariable*)this);
     }
 
+    /// Deprecated: use getDefaultValueBlob instead.
     /// Gets an integer default value. For specialized generic static constants,
     /// the semantic value is resolved under the current specialization first;
     /// literal initializers are used as a fallback when no integer value resolves.
-    SlangResult getDefaultValueInt(int64_t* value)
+    SLANG_DEPRECATED SlangResult getDefaultValueInt(int64_t* value)
     {
         return spReflectionVariable_GetDefaultValueInt((SlangReflectionVariable*)this, value);
     }
 
+    /// Deprecated: use getDefaultValueBlob instead.
     /// Gets a floating-point default value from a literal initializer. Unlike
     /// getDefaultValueInt, this API does not currently resolve specialized
     /// generic semantic values before checking the initializer.
-    SlangResult getDefaultValueFloat(float* value)
+    SLANG_DEPRECATED SlangResult getDefaultValueFloat(float* value)
     {
         return spReflectionVariable_GetDefaultValueFloat((SlangReflectionVariable*)this, value);
+    }
+
+    /// Gets default initializer bytes for variables with representable initializers.
+    ///
+    /// If the variable has no explicit initializer, this succeeds with a null blob. On success with
+    /// an initializer, `outBlob` receives an `ISlangBlob*` with an added reference.
+    ///
+    /// Supported types include scalar values, vectors, matrices, fixed-size arrays,
+    /// structs/aggregates, and enums. The returned blob stores scalar-layout bytes in natural
+    /// scalar/field order without aggregate padding; bool values are emitted as 4-byte values to
+    /// match Slang's GPU scalar layout. `intptr_t` and `uintptr_t` values are emitted as fixed
+    /// 8-byte signed and unsigned values because the blob API is target-independent; consumers for
+    /// narrower pointer targets must narrow explicitly. Matrices are emitted row-by-row, struct
+    /// base fields are emitted before derived fields, and enum values use the enum's underlying tag
+    /// type.
+    ///
+    /// Returns SLANG_E_INVALID_ARG for invalid arguments and SLANG_E_NOT_AVAILABLE when an
+    /// initializer cannot be represented as a default-value blob.
+    SlangResult getDefaultValueBlob(ISlangBlob** outBlob)
+    {
+        return spReflectionVariable_GetDefaultValueBlob((SlangReflectionVariable*)this, outBlob);
     }
 
     GenericReflection* getGenericContainer()
