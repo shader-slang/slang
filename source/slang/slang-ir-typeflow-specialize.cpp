@@ -40,14 +40,17 @@ IRFunc* getFuncDefinitionForContext(IRInst* context)
 // This unit has two components: an 'inst' and a 'context' under which we
 // are recording propagation info.
 //
-// The 'inst' must be inside a block (with either generic or func parent), since
-// we assume everything in the global scope is concrete.
-//
-// The 'context' can be one of two cases:
+// The 'context' can be one of these cases:
 // 1. an IRFunc ONLY if it is not generic (func is in the global scope). 'inst' must
 //    be inside the func.
 // 2. an IRSpecialize(generic, ...). 'inst' must be inside the generic. the
 //    specialization args must all be global values (either concrete types/values, or collections).
+// 3. an IRSpecializeExistentialsInFunc wrapping an IRFunc. 'inst' must be inside the underlying
+//    func.
+// 4. an IRModuleInst. 'inst' must be a direct child of the module (a module-scope global inst).
+//    Used to track propagation info for global interface parameters and their derived hoistable
+//    instructions, following the SCCP pattern of processing global scope first and sharing info
+//    with function-scope analysis.
 //
 // All other possibilites for 'context' are illegal.
 // `InstWithContext::validateInstWithContext` enforces these rules.
@@ -120,29 +123,17 @@ struct InstWithContext
 
                 break;
             }
+        case kIROp_ModuleInst:
+            {
+                // Module-scope global inst. 'inst' must be a direct child of the module.
+                SLANG_ASSERT(inst->getParent() == context);
+                break;
+            }
         default:
             {
                 SLANG_UNEXPECTED("Invalid context for InstWithContext");
             }
         }
-    }
-
-    // If a context is not specified, we assume it is not in a generic, and
-    // simply use the parent func.
-    //
-    InstWithContext(IRInst* inst)
-        : inst(inst)
-    {
-        auto block = cast<IRBlock>(inst->getParent());
-        auto func = cast<IRFunc>(block->getParent());
-
-        // If parent func is not a global, then it is not a direct
-        // reference. An explicit IRSpecialize instruction must be provided as
-        // context.
-        //
-        SLANG_ASSERT(func->getParent()->getOp() == kIROp_ModuleInst);
-
-        context = func;
     }
 
     bool operator==(const InstWithContext& other) const
@@ -1119,9 +1110,12 @@ struct TypeFlowSpecializationContext
         if (!inst->getParent())
             return none();
 
-        // Global insts always have no info.
-        if (as<IRModuleInst>(inst->getParent()))
-            return none();
+        // For module-scope instructions, look up info using the module as context.
+        // This is populated during the initial seeding phase of performInformationPropagation
+        // and refined by the worklist, following the SCCP pattern of processing global scope
+        // first and sharing info with function-scope analysis.
+        if (auto moduleInst = as<IRModuleInst>(inst->getParent()))
+            return _tryGetInfo(InstWithContext(moduleInst, inst));
 
         return _tryGetInfo(InstWithContext(context, inst));
     }
@@ -1462,9 +1456,18 @@ struct TypeFlowSpecializationContext
             if (isFuncParam(param))
                 addContextUsersToWorkQueue(context, workQueue);
 
+        bool moduleScopeProducer = as<IRModuleInst>(context) != nullptr;
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
             auto user = use->getUser();
+
+            // For module-scope producers, only enqueue users that are also module-scope.
+            // Function-scope users will pick up the seeded global info via tryGetInfo()
+            // during Phase 1 of performInformationPropagation; enqueueing them here with
+            // module context would violate InstWithContext validation.
+            //
+            if (moduleScopeProducer && !as<IRModuleInst>(user->getParent()))
+                continue;
 
             // If user is in a different block (or the inst is a param), add that block to work
             // queue.
@@ -1564,6 +1567,54 @@ struct TypeFlowSpecializationContext
         return false;
     }
 
+    // Seed propagation info for module-scope interface parameters. Their derived
+    // hoistable instructions (ExtractExistential*, LookupWitnessMethod at module
+    // scope) are handled by the normal worklist: updateInfo enqueues module-scope
+    // users, and processInstForPropagation runs the same analyze* functions it
+    // uses for function-scope insts.
+    //
+    // Only handles bare `uniform IFoo` params where the global param itself has
+    // interface type. ConstantBuffer<IFoo> / ParameterBlock<IFoo> wrappers are
+    // handled by the function-scope analyzeLoad + specializeLoad path, which
+    // already enumerates conformances for resource pointer loads.
+    //
+    void seedGlobalScope(WorkQueue<WorkItem>& workQueue)
+    {
+        auto moduleInst = module->getModuleInst();
+        for (auto inst : module->getGlobalInsts())
+        {
+            auto globalParam = as<IRGlobalParam>(inst);
+            if (!globalParam)
+                continue;
+
+            auto interfaceType = as<IRInterfaceType>(globalParam->getDataType());
+            if (!interfaceType || isComInterfaceType(interfaceType))
+                continue;
+
+            // Collect witness tables for the interface from -conformance flags.
+            IRBuilder builder(module);
+            HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+            collectExistentialTables(interfaceType, tables);
+            if (tables.getCount() > 0)
+            {
+                auto taggedUnion = makeTaggedUnionType(
+                    as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
+                updateInfo(moduleInst, globalParam, taggedUnion, workQueue);
+            }
+            else
+            {
+                // No conformances registered for a bare interface global param.
+                // Emit error 50100 so the user knows they need -conformance flags.
+                StringBuilder typeStr;
+                printDiagnosticArg(typeStr, interfaceType);
+                sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                    .interfaceType = typeStr.produceString(),
+                    .location = globalParam->sourceLoc});
+            }
+            module->getContainerPool().free(&tables);
+        }
+    }
+
     void performInformationPropagation()
     {
         // This method contains the main loop responsible for propagating information across all
@@ -1589,17 +1640,38 @@ struct TypeFlowSpecializationContext
         // Global worklist for interprocedural analysis.
         WorkQueue<WorkItem> workQueue;
 
-        // Add all global functions to worklist. Functions that are invalid existential
-        // specializations are skipped here; the diagnostic for them is emitted when
-        // discoverContext encounters the corresponding IRSpecialize context or when
-        // propagateToCallSite/specializeCall resolves the callee.
+        // Phase 0: Global scope.
+        //
+        // Seed module-scope interface parameters with their TaggedUnionType info
+        // and drain the worklist. Propagation within module scope flows to derived
+        // hoistable instructions (ExtractExistential*, LookupWitnessMethod at
+        // module scope) via the normal processInstForPropagation dispatch.
+        //
+        // This must complete before function-scope analysis so that function-scope
+        // uses of globals pick up the seeded info via tryGetInfo() on first pass.
+        //
+        seedGlobalScope(workQueue);
+        drainWorkQueue(workQueue);
+        if (sink->getErrorCount() > 0)
+            return;
+
+        // Phase 1: Function scope.
+        //
+        // Add all entry points to the worklist. Functions that are invalid
+        // existential specializations are skipped here; the diagnostic for them is
+        // emitted when discoverContext encounters the corresponding IRSpecialize
+        // context or when propagateToCallSite/specializeCall resolves the callee.
         //
         for (auto inst : module->getGlobalInsts())
             if (auto func = as<IRFunc>(inst))
                 if (isEntryPoint(func) && !isInvalidExistentialSpecialization(func))
                     discoverContext(func, workQueue);
 
-        // Process until fixed point.
+        drainWorkQueue(workQueue);
+    }
+
+    void drainWorkQueue(WorkQueue<WorkItem>& workQueue)
+    {
         while (workQueue.hasItems())
         {
             auto item = workQueue.dequeue();
@@ -1890,6 +1962,10 @@ struct TypeFlowSpecializationContext
         // Handle interprocedural edge
         auto callInst = edge.callInst;
         auto targetCallee = edge.targetContext;
+        // If the target has no function body, it is likely an intrinsic method.
+        // There is no callee body for type-flow information to propagate into.
+        if (!getFuncDefinitionForContext(targetCallee))
+            return;
 
         switch (edge.direction)
         {
@@ -3335,15 +3411,28 @@ struct TypeFlowSpecializationContext
                     // TODO: Make 'none witness' values a proper thing instead of three different
                     // possibilities..
                     //
-                    if (as<IRNoneWitnessTableElement>(table) || as<IRVoidLit>(table) ||
-                        (as<IRWitnessTable>(resolvedTable)->getConformanceType()->getOp() ==
-                         kIROp_VoidType))
+                    // Step 1: treat any non-concrete table (the explicit "none"
+                    // sentinels *or* a resolve-result that isn't an
+                    // `IRWitnessTable`) as a no-dispatch void entry.  Separating
+                    // the null guard from the dereference below makes it harder
+                    // for a future refactor to accidentally reorder the
+                    // conditions and reintroduce the crash this code originally
+                    // had.
+                    auto witnessTab = as<IRWitnessTable>(resolvedTable);
+                    if (as<IRNoneWitnessTableElement>(table) || as<IRVoidLit>(table) || !witnessTab)
                     {
                         results.add(builder.getVoidValue());
                         return;
                     }
 
-                    results.add(findWitnessTableEntry(cast<IRWitnessTable>(resolvedTable), key));
+                    // Step 2: it is safe to dereference `witnessTab` now.
+                    if (witnessTab->getConformanceType()->getOp() == kIROp_VoidType)
+                    {
+                        results.add(builder.getVoidValue());
+                        return;
+                    }
+
+                    results.add(findWitnessTableEntry(witnessTab, key));
                 });
 
             auto setOp = getSetOpFromType(inst->getDataType());
@@ -3357,6 +3446,98 @@ struct TypeFlowSpecializationContext
             return none();
 
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeLookupWitnessMethod");
+    }
+
+    // After specialization has lowered every dispatch site it could, walk any
+    // remaining `lookupWitnessMethod` insts whose witness-table operand is not
+    // a concrete `IRWitnessTable` and whose interface has no registered
+    // conformances.  Those insts will ICE in codegen ("Unhandled local inst
+    // lookupWitness") with no indication that the real problem is missing
+    // conformance registration.  Emit E50100 instead.  Catches transitively-
+    // nested cases (e.g. interface field inside a struct loaded from a
+    // `StructuredBuffer`) that the load-site check in `analyzeLoad` misses —
+    // see #9445.
+    //
+    // Skips lookups that have no uses: those are dead code that the
+    // downstream DCE pass will eliminate before codegen, so they cannot
+    // ICE. Imported library modules (e.g. slangpy's `sgl/device/print`)
+    // routinely produce such dead lookups inside generic / variadic helper
+    // functions whose `IPrintable arg` overload is never reached from the
+    // entry point that imports them. Diagnosing those was a regression
+    // against pre-PR behaviour where DCE simply removed them.
+    void diagnoseUnresolvedLookupWitnesses()
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+            // Only diagnose lookups inside top-level functions
+            // that codegen actually emits as standalone callable
+            // bodies — shader entry points plus the various
+            // export decorations (CUDA kernels, DLL exports,
+            // extern-C, etc.). Those are the bodies that survive
+            // into codegen unchanged, so any unresolved lookup
+            // there will reach the unhandled-inst ICE the walker
+            // exists to prevent.
+            //
+            // Use the same `isEntryPoint(func)` predicate that
+            // `performDynamicInstLowering` uses to seed its work-
+            // list, so the walker's diagnostic coverage matches
+            // the lowering pass's coverage exactly.
+            //
+            // For non-entry-point helper functions, the typeflow
+            // pass cannot tell whether the helper is reachable
+            // (callers may exist but be themselves dead) or whether
+            // the helper is going to be inlined / DCE'd before
+            // codegen. Diagnosing those is a false positive — the
+            // canonical example is imported-library helpers like
+            // slangpy's `sgl/device/print.slang::write_arg(IPrintable)`
+            // whose `IPrintable arg` parameter is type-erased only
+            // inside the helper. The actual call sites supply
+            // concrete types via generic-pack expansion, but the
+            // pre-inlined helper body still contains an unresolved
+            // lookup at the moment the walker runs. If a real
+            // unresolved lookup escapes into codegen via a non-
+            // entry-point helper, the underlying ICE still fires
+            // and points at the same source location.
+            if (!isEntryPoint(func))
+                continue;
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    auto lookup = as<IRLookupWitnessMethod>(inst);
+                    if (!lookup)
+                        continue;
+                    if (!lookup->firstUse)
+                        continue;
+                    auto witnessTable = lookup->getWitnessTable();
+                    if (as<IRWitnessTable>(witnessTable))
+                        continue;
+                    auto witnessTableType = as<IRWitnessTableTypeBase>(witnessTable->getDataType());
+                    if (!witnessTableType)
+                        continue;
+                    auto interfaceType =
+                        as<IRInterfaceType>(witnessTableType->getConformanceType());
+                    if (!interfaceType || isComInterfaceType(interfaceType))
+                        continue;
+                    if (!diagnosedNoTypeConformancesInterfaces.add(interfaceType))
+                        continue;
+                    HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+                    collectExistentialTables(interfaceType, tables);
+                    if (tables.getCount() == 0)
+                    {
+                        StringBuilder typeStr;
+                        printDiagnosticArg(typeStr, interfaceType);
+                        sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                            .interfaceType = typeStr.produceString(),
+                            .location = lookup->sourceLoc});
+                    }
+                    module->getContainerPool().free(&tables);
+                }
+            }
+        }
     }
 
     // Check if an existential operand is an entry-point parameter of interface type
@@ -4130,27 +4311,10 @@ struct TypeFlowSpecializationContext
 
     IRFuncType* maybeExpandFuncType(IRFuncType* funcType)
     {
-        List<IRType*> newArgTypes;
-
-        for (auto paramType : funcType->getParamTypes())
-        {
-            if (auto typePack = as<IRTypePack>(paramType))
-            {
-                for (UInt elementIndex = 0; elementIndex < typePack->getOperandCount();
-                     elementIndex++)
-                {
-                    newArgTypes.add((IRType*)typePack->getOperand(elementIndex));
-                }
-            }
-            else
-            {
-                newArgTypes.add(paramType);
-            }
-        }
-
         IRBuilder builder(module);
-        return as<IRFuncType>(
-            builder.getFuncType(newArgTypes.getArrayView(), funcType->getResultType()));
+        // Keep typeflow call-site analysis on the same concrete-pack expansion helper used by
+        // autodiff, so both paths flatten only already-specialized `IRTypePack` parameters.
+        return maybeExpandConcreteFuncTypePacks(&builder, funcType);
     }
 
     void expandPacksInFunc(IRFunc* func)
@@ -4387,6 +4551,13 @@ struct TypeFlowSpecializationContext
                 // An unbounded element represents an unknown function,
                 // so we can't propagate anything in this case.
                 //
+                return;
+            }
+            if (as<IRPoison>(callee))
+            {
+                // A poison callee represents an impossible call path. The rewrite phase
+                // replaces such calls with a default value, so there is no callee body to
+                // discover or propagate into.
                 return;
             }
 
@@ -5241,6 +5412,60 @@ struct TypeFlowSpecializationContext
         return clonedFunc;
     }
 
+    // Specialize module-scope instructions whose typeflow info was computed
+    // during Phase 0 of performInformationPropagation.
+    //
+    // Uses the same specializeInst() dispatch as function-scope lowering, with
+    // the module inst as context so that tryGetInfo() routes to the module-scope
+    // entries in propagationMap.
+    //
+    // Dependency order: global params (type change to TaggedUnionType) →
+    // ExtractExistential* (depend on param type) → LookupWitnessMethod (depends
+    // on witness table type).
+    //
+    bool specializeGlobalInsts(WorkQueue<IRInst*>& globalsWorkList)
+    {
+        auto moduleInst = module->getModuleInst();
+        bool hasChanges = false;
+
+        List<IRInst*> globalParams;
+        List<IRInst*> extractInsts;
+        List<IRInst*> lookupInsts;
+        List<IRInst*> otherInsts;
+
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (!propagationMap.containsKey(InstWithContext(moduleInst, inst)))
+                continue;
+
+            if (as<IRGlobalParam>(inst))
+                globalParams.add(inst);
+            else if (
+                inst->getOp() == kIROp_ExtractExistentialWitnessTable ||
+                inst->getOp() == kIROp_ExtractExistentialType)
+                extractInsts.add(inst);
+            else if (inst->getOp() == kIROp_LookupWitnessMethod)
+                lookupInsts.add(inst);
+            else
+                otherInsts.add(inst);
+        }
+
+        for (auto inst : globalParams)
+            hasChanges |= specializeInst(moduleInst, inst, globalsWorkList);
+        for (auto inst : extractInsts)
+            hasChanges |= specializeInst(moduleInst, inst, globalsWorkList);
+        for (auto inst : lookupInsts)
+            hasChanges |= specializeInst(moduleInst, inst, globalsWorkList);
+        // Any other module-scope insts that received typeflow info run last,
+        // after the known dependency-ordered ones. Today Phase 0 only seeds
+        // params / extracts / lookups, but this keeps the pass forward-compatible
+        // so future additions to Phase 0 don't get silently dropped here.
+        for (auto inst : otherInsts)
+            hasChanges |= specializeInst(moduleInst, inst, globalsWorkList);
+
+        return hasChanges;
+    }
+
     bool performDynamicInstLowering()
     {
         WorkQueue<IRInst*> globalWorkList;
@@ -5263,6 +5488,13 @@ struct TypeFlowSpecializationContext
         //
         for (auto structType : structsToProcess)
             hasChanges |= specializeStructType(structType);
+
+        // Specialize module-scope instructions that had typeflow info seeded
+        // by Phase 0 of performInformationPropagation. Must run before
+        // function-scope specialization so that functions see the lowered
+        // types (SetTagType, TaggedUnionType) on their global operands.
+        //
+        hasChanges |= specializeGlobalInsts(globalWorkList);
 
         HashSet<IRInst*> processedSet;
         while (globalWorkList.hasItems())
@@ -5538,6 +5770,16 @@ struct TypeFlowSpecializationContext
 
     bool specializeLookupWitnessMethod(IRInst* context, IRLookupWitnessMethod* inst)
     {
+        if (as<IRPoison>(inst->getWitnessTable()))
+        {
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            auto poison = builder.getPoison(inst->getDataType());
+            inst->replaceUsesWith(poison);
+            inst->removeAndDeallocate();
+            return true;
+        }
+
         // Handle trivial case where inst's operand is a concrete table.
         if (auto witnessTable = as<IRWitnessTable>(inst->getWitnessTable()))
         {
@@ -5569,7 +5811,7 @@ struct TypeFlowSpecializationContext
         }
         else if (elementOfSetType->getSet()->isEmpty())
         {
-            auto poison = builder.emitPoison(inst->getDataType());
+            auto poison = builder.getPoison(inst->getDataType());
             inst->replaceUsesWith(poison);
             inst->removeAndDeallocate();
             return true;
@@ -5654,7 +5896,7 @@ struct TypeFlowSpecializationContext
             }
             else if (elementOfSetType->getSet()->isEmpty())
             {
-                inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+                inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
                 inst->removeAndDeallocate();
                 return true;
             }
@@ -5699,7 +5941,7 @@ struct TypeFlowSpecializationContext
             IRBuilder builder(inst);
             builder.setInsertAfter(inst);
 
-            inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+            inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
             inst->removeAndDeallocate();
             return true;
         }
@@ -5732,7 +5974,7 @@ struct TypeFlowSpecializationContext
             {
                 IRBuilder builder(inst);
                 builder.setInsertBefore(inst);
-                inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+                inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
                 inst->removeAndDeallocate();
                 return true;
             }
@@ -6125,7 +6367,13 @@ struct TypeFlowSpecializationContext
         };
 
         Kind kind;
-        IRStructKey* lookupKey = nullptr;
+        // A witness-table requirement key. This is `IRInst*` rather than
+        // `IRStructKey*` because a built-in interface requirement (e.g. an
+        // `IDifferentiable`/`IBackwardDifferentiable` method reached through
+        // dynamic dispatch) uses the hoistable `IRBuiltinRequirementKey`, which is
+        // not an `IRStructKey`. It is only used below as a witness-table lookup key
+        // and to read a name hint, both of which accept any `IRInst*`.
+        IRInst* lookupKey = nullptr;
         List<IRInst*> specArgs;
         List<IRInst*> bindings;
     };
@@ -6154,7 +6402,7 @@ struct TypeFlowSpecializationContext
             {
                 DispatchAction action;
                 action.kind = DispatchAction::Kind::Lookup;
-                action.lookupKey = cast<IRStructKey>(mapped->getOperand(1));
+                action.lookupKey = mapped->getOperand(1);
                 actions.add(action);
                 baseOperand = mapped->getOperand(0);
             }
@@ -6460,6 +6708,17 @@ struct TypeFlowSpecializationContext
 
         List<IRInst*>& callArgs = *module->getContainerPool().getList<IRInst>();
 
+        auto replaceCallWithDefaultValue = [&]()
+        {
+            IRBuilder builder(context);
+            builder.setInsertBefore(inst);
+            auto defaultVal = builder.emitDefaultConstruct(inst->getDataType());
+            inst->replaceUsesWith(defaultVal);
+            inst->removeAndDeallocate();
+            module->getContainerPool().free(&callArgs);
+            return true;
+        };
+
         // This is a bit of a workaround for specialized callee's
         // whose function types haven't been specialized yet (can
         // occur for concrete IRSpecialize insts that are created
@@ -6597,20 +6856,14 @@ struct TypeFlowSpecializationContext
             // Occasionally, we will determine that there are absolutely no possible callees
             // for a call site. This typically happens to impossible branches.
             //
-            // If this happens, the inst representing the callee would have been replaced
-            // with a poison value. In this case, we're simply going to replace the entire call
-            // with a default-constructed value of the appropriate type.
+            // If this happens, the inst representing the callee would have been replaced with a
+            // poison value. In this case, we're simply going to replace the entire call with a
+            // default-constructed value of the appropriate type.
             //
             // Note that it doesn't matter what we replace it with since this code should be
             // effectively unreachable.
             //
-            IRBuilder builder(context);
-            builder.setInsertBefore(inst);
-            auto defaultVal = builder.emitDefaultConstruct(inst->getDataType());
-            inst->replaceUsesWith(defaultVal);
-            inst->removeAndDeallocate();
-            module->getContainerPool().free(&callArgs);
-            return true;
+            return replaceCallWithDefaultValue();
         }
         else if (isGlobalInst(callee))
         {
@@ -6622,24 +6875,28 @@ struct TypeFlowSpecializationContext
             }
             auto calleeSet = as<IRElementOfSetType>(*callSiteInfoPtr)->getSet();
             SLANG_ASSERT(calleeSet->isSingleton());
+            auto selectedCallee = calleeSet->getElement(0);
+
+            if (as<IRPoison>(selectedCallee))
+                return replaceCallWithDefaultValue();
 
             if (isIntrinsic(callee))
                 effectiveFuncType = as<IRFuncType>(callee->getDataType());
             else
-                effectiveFuncType = getEffectiveFuncType(calleeSet->getElement(0));
+                effectiveFuncType = getEffectiveFuncType(selectedCallee);
 
             // If we're dealing with bindings, materialize a new function now.
-            if (as<IRSpecializeExistentialsInFunc>(calleeSet->getElement(0)))
+            if (as<IRSpecializeExistentialsInFunc>(selectedCallee))
             {
                 // If our callee is a SpecializeExistentialsInFunc, we need to lower it to get a
                 // concrete
                 // function.
                 callee = lowerSpecializeExistentialsInFunc(
-                    as<IRSpecializeExistentialsInFunc>(calleeSet->getElement(0)));
+                    as<IRSpecializeExistentialsInFunc>(selectedCallee));
             }
             else
             {
-                callee = calleeSet->getElement(0);
+                callee = selectedCallee;
             }
 
             globalsWorkList.enqueue(callee);
@@ -6927,7 +7184,7 @@ struct TypeFlowSpecializationContext
 
         inst->replaceUsesWith(builder.emitMakeTaggedUnion(
             taggedUnionType,
-            builder.emitPoison(makeTagType(typeSet)),
+            builder.getPoison(makeTagType(typeSet)),
             witnessTableTag,
             packedValue));
         inst->removeAndDeallocate();
@@ -7043,7 +7300,7 @@ struct TypeFlowSpecializationContext
 
         auto newInst = builder.emitMakeTaggedUnion(
             (IRType*)taggedUnionType,
-            builder.emitPoison(makeTagType(taggedUnionType->getTypeSet())),
+            builder.getPoison(makeTagType(taggedUnionType->getTypeSet())),
             translatedTag,
             packedValue);
 
@@ -7351,7 +7608,15 @@ struct TypeFlowSpecializationContext
 
         auto loadPtr = as<IRLoad>(inst)->getPtr();
         auto loadPtrType = as<IRPtrTypeBase>(loadPtr->getDataType());
-        auto ptrValType = loadPtrType->getValueType();
+
+        // ConstantBuffer and other PointerLikeTypes derive from IRBuiltinGenericType,
+        // not IRPtrTypeBase. Both store the element type as operand 0.
+        auto pointerLikeType = as<IRPointerLikeType>(loadPtr->getDataType());
+        auto ptrValType = loadPtrType       ? loadPtrType->getValueType()
+                          : pointerLikeType ? pointerLikeType->getElementType()
+                                            : nullptr;
+        if (!ptrValType)
+            return false;
 
         IRType* specializedType = (IRType*)getLoweredType(valInfo);
         if (ptrValType != specializedType)
@@ -7374,8 +7639,14 @@ struct TypeFlowSpecializationContext
                     loadPtr,
                     taggedUnionType->getWitnessTableSet(),
                     taggedUnionType->getTypeSet()};
+                // For PtrTypeBase types, preserve the address space.
+                // For PointerLikeType (ConstantBuffer etc.), use a plain Ptr.
+                auto castPtrType =
+                    loadPtrType
+                        ? (IRType*)builder.getPtrTypeWithAddressSpace(specializedType, loadPtrType)
+                        : (IRType*)builder.getPtrType(specializedType);
                 auto newLoadPtr = builder.emitIntrinsicInst(
-                    builder.getPtrTypeWithAddressSpace(specializedType, loadPtrType),
+                    castPtrType,
                     kIROp_CastInterfaceToTaggedUnionPtr,
                     3,
                     castArgs);
@@ -7411,7 +7682,17 @@ struct TypeFlowSpecializationContext
         SLANG_UNUSED(context);
         SLANG_ASSERT(inst->getVal()->getOp() == kIROp_DefaultConstruct);
         auto ptr = inst->getPtr();
-        auto destInfo = as<IRPtrTypeBase>(ptr->getDataType())->getValueType();
+        // Mirror specializeLoad's element-type extraction: the pointer
+        // can be either an IRPtrTypeBase or an IRPointerLikeType
+        // (ConstantBuffer / ParameterBlock). Both store the element
+        // type as operand 0.
+        auto destPtrType = as<IRPtrTypeBase>(ptr->getDataType());
+        auto destPointerLikeType = as<IRPointerLikeType>(ptr->getDataType());
+        IRType* destInfo = destPtrType           ? destPtrType->getValueType()
+                           : destPointerLikeType ? destPointerLikeType->getElementType()
+                                                 : nullptr;
+        if (!destInfo)
+            return false;
         auto valInfo = inst->getVal()->getDataType();
 
         // "Legalize" the store type.
@@ -7432,7 +7713,16 @@ struct TypeFlowSpecializationContext
         //
 
         auto ptr = inst->getPtr();
-        auto ptrInfo = as<IRPtrTypeBase>(ptr->getDataType())->getValueType();
+        // Mirror specializeLoad's element-type extraction: ConstantBuffer
+        // and other PointerLikeTypes are not IRPtrTypeBase but expose the
+        // element type via getElementType().
+        auto storePtrType = as<IRPtrTypeBase>(ptr->getDataType());
+        auto storePointerLikeType = as<IRPointerLikeType>(ptr->getDataType());
+        IRType* ptrInfo = storePtrType           ? storePtrType->getValueType()
+                          : storePointerLikeType ? storePointerLikeType->getElementType()
+                                                 : nullptr;
+        if (!ptrInfo)
+            return false;
 
         // Special case for default initialization:
         //
@@ -7454,10 +7744,15 @@ struct TypeFlowSpecializationContext
                 ptr,
                 taggedUnionType->getWitnessTableSet(),
                 taggedUnionType->getTypeSet()};
+            // Mirror specializeLoad: preserve address space for plain Ptrs;
+            // use a plain Ptr when the source is a PointerLikeType.
+            auto castPtrType = storePtrType
+                                   ? (IRType*)builder.getPtrTypeWithAddressSpace(
+                                         inst->getVal()->getDataType(),
+                                         storePtrType)
+                                   : (IRType*)builder.getPtrType(inst->getVal()->getDataType());
             auto newPtr = builder.emitIntrinsicInst(
-                builder.getPtrTypeWithAddressSpace(
-                    inst->getVal()->getDataType(),
-                    as<IRPtrTypeBase>(ptr->getDataType())),
+                castPtrType,
                 kIROp_CastInterfaceToTaggedUnionPtr,
                 3,
                 castArgs);
@@ -7732,7 +8027,7 @@ struct TypeFlowSpecializationContext
 
                 auto newTaggedUnion = builder.emitMakeTaggedUnion(
                     getLoweredType(destTaggedUnionType),
-                    builder.emitPoison(makeTagType(destTaggedUnionType->getTypeSet())),
+                    builder.getPoison(makeTagType(destTaggedUnionType->getTypeSet())),
                     downcastedTag,
                     unpackedValue);
 
@@ -7857,6 +8152,9 @@ struct TypeFlowSpecializationContext
         // Part 1: Information Propagation
         //    This phase propagates type information through the module
         //    and records them into different maps in the current context.
+        //    Internally it processes global scope first (seeding module-scope
+        //    interface parameters and propagating to derived hoistable
+        //    instructions), then function scope.
         //
         performInformationPropagation();
 
@@ -7872,6 +8170,18 @@ struct TypeFlowSpecializationContext
         //    type information in the previous phase.
         //
         hasChanges |= performDynamicInstLowering();
+
+        // If lowering reported its own diagnostics, the IR is in a partially
+        // lowered state; don't pile cascade errors from the walker below.
+        if (sink->getErrorCount() > 0)
+            return hasChanges;
+
+        // Part 3: Diagnose unresolved dispatch sites.
+        //    Any `lookupWitnessMethod` that survived specialization with a
+        //    non-concrete witness-table operand would ICE in codegen.  If the
+        //    corresponding interface has no conformances registered, report
+        //    E50100 pointing the user at the real fix.
+        diagnoseUnresolvedLookupWitnesses();
 
         return hasChanges;
     }
@@ -7912,6 +8222,14 @@ struct TypeFlowSpecializationContext
     // non-concrete result types during propagation.
     HashSet<IRInst*> diagnosedBitCasts;
 
+    // Set of interface types already diagnosed with E50100 "no type conformances"
+    // inside `diagnoseUnresolvedLookupWitnesses`, so a single missing conformance
+    // surfacing at multiple surviving `lookupWitnessMethod` sites fires at most
+    // one diagnostic.  Local to the post-specialization walker — `processModule`
+    // bails out on any Part-1 error before that walker runs, so there is no
+    // cross-phase deduplication to coordinate.
+    HashSet<IRInst*> diagnosedNoTypeConformancesInterfaces;
+
     // Emit error 33180 for an invalid existential specialization, deduplicating by `dedupKey`.
     // Returns true if the diagnostic was emitted (first time for this key).
     bool emitExistentialSpecializationDiagnostic(
@@ -7935,7 +8253,10 @@ struct TypeFlowSpecializationContext
         return true;
     }
 
-    // Mapping from (context, inst) --> propagated info
+    // Mapping from (context, inst) --> propagated info.
+    // Module-scope insts are keyed with the IRModuleInst as context, analogous
+    // to SCCP's global-scope lattice entries. Function and generic scopes use
+    // IRFunc / IRSpecialize / IRSpecializeExistentialsInFunc as context.
     Dictionary<InstWithContext, IRWeakUse*> propagationMap;
 
     // Mapping from context --> return value info

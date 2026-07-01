@@ -131,18 +131,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     [ForceUnroll]
     for (uint level = 0; level < N_LEVELS; ++level)
     {
-        // Setup params using prepareLevelInfo which computes all level-specific parameters
-        Encoder.Params params;
-        params.maxLevel = MAX_LEVEL_RATIO * float(N_LEVELS);
-        Encoder.prepareLevelInfo(level, BASE_SCALE, LOG2_PER_LEVEL_SCALE, 1337u, params.levelInfo);
-
-        // Encode - writes to result at offset level * FEATURE_DIM_PER_ENTRY
-        Encoder.encodePerLevel<BindlessAddress<float>>(
-            params,
-            position,
-            featureAddress,
-            result
-        );
+        neural_unittest.testEncodePerLevel<float, N_POS_DIMS, FEATURE_DIM_PER_ENTRY, LOG2_HASHMAP_SIZE, N_LEVELS, InArray, OutArray>(
+            level, MAX_LEVEL_RATIO * float(N_LEVELS), BASE_SCALE, LOG2_PER_LEVEL_SCALE, 1337u,
+            position, featureAddress, result);
     }
 
     // Write output

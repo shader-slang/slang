@@ -1,0 +1,21 @@
+schema_version: 1
+id: diag-code-29104-double-defined
+bundle: cross-cutting/diagnostics-catalog
+suspected_kind: catalog-drift
+observed_at: 2026-05-28T10:30:00+00:00
+evidence:
+  command: grep -n "29104" source/slang/slang-diagnostics.lua source/compiler-core/slang-misc-diagnostic-defs.h
+  source_slang: docs/generated/tests/cross-cutting/diagnostics-catalog/code-29104-double-define-check.slang
+  observed_summary: Diagnostic code 29104 is defined twice in the source — as `spirv-instruction-without-result-id` in source/slang/slang-diagnostics.lua and as `spirvCoreGrammarJSONParseFailure` in source/compiler-core/slang-misc-diagnostic-defs.h. Round-tripping diagnostics by integer code is broken at this code.
+  exit_code: 0
+  stderr_tail: "source/compiler-core/slang-misc-diagnostic-defs.h:57:    29104,\\nsource/slang/slang-diagnostics.lua:976:    29104,"
+expected:
+  claim: Each diagnostic integer code must map to exactly one (name, message) pair across the entire source tree.
+  citation_kind: doc
+  citation: docs/generated/design/cross-cutting/diagnostics.md
+provenance:
+  agent_model: claude-opus-4-7
+  source_commit: fa86e5a04
+  doc_anchor: docs/generated/design/cross-cutting/diagnostics.md
+agent_self_assessment:
+  confidence: high

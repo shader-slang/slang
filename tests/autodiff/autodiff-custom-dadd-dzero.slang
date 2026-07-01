@@ -1,11 +1,7 @@
 // Test that a type conforming to IDifferentiable works without dmul (removed in PR #9808).
 // Only dzero and dadd are required; dmul is no longer part of the interface.
-//
-// BUG: Debug assertion failure "doesSignatureMatch" when type provides custom
-// dzero/dadd without compiler-synthesized defaults. Works in Release builds.
-// TODO(#10806): Re-enable once doesSignatureMatch assertion is fixed in Debug builds.
 
-//DISABLE_TEST:INTERPRET(filecheck=CHECK):
+//TEST:INTERPRET(filecheck=CHECK):
 
 struct MyFloat : IDifferentiable
 {
@@ -13,7 +9,10 @@ struct MyFloat : IDifferentiable
     float val;
 
     // Only dzero and dadd are needed, no dmul.
+    [Differentiable]
     static MyFloat dzero() { return { 0.0 }; }
+
+    [Differentiable]
     static MyFloat dadd(MyFloat a, MyFloat b) { return { a.val + b.val }; }
 }
 

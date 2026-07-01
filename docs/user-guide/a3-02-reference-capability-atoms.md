@@ -179,6 +179,12 @@ Versions
 `cuda_sm_8_0`
 > cuda 8.0 and related capabilities of other targets.
 
+`cuda_sm_8_9`
+> cuda 8.9 (Ada Lovelace) and related capabilities of other targets.  Required
+> for PTX features that landed in PTX ISA 8.7 / SM 8.9, notably the
+> `mma.sync.m16n8k16` instruction with `.e4m3` / `.e5m2` floating-point inputs
+> (FP8 cooperative matrices).
+
 `cuda_sm_9_0`
 > cuda 9.0 and related capabilities of other targets.
 
@@ -468,6 +474,10 @@ Extensions
 `GL_EXT_samplerless_texture_functions`
 > Represents the GL_EXT_samplerless_texture_functions extension.
 
+`GL_EXT_shader_abort`
+> Represents the GL_EXT_shader_abort extension for GLSL targets, or the
+> corresponding spvAbort capability for SPIR-V targets.
+
 `GL_EXT_shader_atomic_float`
 > Represents the GL_EXT_shader_atomic_float extension.
 
@@ -562,6 +572,9 @@ Extensions
 `GL_NV_gpu_shader5`
 > Represents the GL_NV_gpu_shader5 extension.
 
+`GL_NV_linear_swept_spheres`
+> Represents the GL_NV_linear_swept_spheres extension.
+
 `GL_NV_ray_tracing`
 > Represents the GL_NV_ray_tracing extension.
 
@@ -627,6 +640,9 @@ Extensions
 
 `SPV_GOOGLE_user_type`
 > Represents the SPIR-V extension for SPV_GOOGLE_user_type.
+
+`SPV_KHR_abort`
+> Represents the SPIR-V extension for shader abort (SPV_KHR_abort).
 
 `SPV_KHR_bfloat16`
 > Represents the SPIR-V extension for BFloat16 types.
@@ -710,6 +726,9 @@ Extensions
 
 `ser_hlsl_native`
 > DXR 1.3 native SER support (SM 6.9, no NVAPI required)
+
+`spvAbort`
+> Represents the SPIR-V AbortKHR capability for OpAbortKHR.
 
 `spvAtomicFloat16AddEXT`
 > Represents the SPIR-V capability for atomic float 16 add operations.
@@ -861,6 +880,9 @@ Extensions
 `spvRayTracingPositionFetchKHR`
 > Represents the SPIR-V capability for ray tracing position fetch.
 
+`spvRayTracingSpheresGeometryNV`
+> Represents the SPIR-V capability for sphere geometry.
+
 `spvReplicatedCompositesEXT`
 > Represents the SPIR-V capability for replicated composites
 
@@ -903,6 +925,9 @@ Extensions
 Compound Capabilities
 ----------------------
 *Capabilities to specify capabilities created by other capabilities (`raytracing`, `meshshading`...)*
+
+`abort`
+> Capabilities required to use 'abort'
 
 `amplification_mesh`
 > Collection of shader stages
@@ -1162,6 +1187,9 @@ Compound Capabilities
 `cuda_glsl_metal_spirv_wgsl_llvm`
 > CUDA, GLSL, Metal, SPIRV, WGSL and LLVM code-gen targets
 
+`cuda_glsl_nvapi`
+> CUDA, GLSL, and NVAPI code-gen targets
+
 `cuda_glsl_spirv`
 > CUDA, GLSL, and SPIRV code-gen targets
 
@@ -1290,8 +1318,28 @@ Compound Capabilities
 `rayquery`
 > Capabilities needed for compute-shader rayquery
 
+`rayquery_lss_nv`
+> Collection of capabilities for the NV line-swept-spheres (LSS) accessors of
+> an inline ray query. These are vendor (NV) extensions on every target, so the
+> alias carries the `NV` suffix. Available on any RayQuery-capable stage, but
+> each target must carry its LSS geometry support: GLSL requires
+> `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR` together with
+> `spvRayTracingLinearSweptSpheresGeometryNV` (so a SPIR-V caller cannot satisfy
+> this with plain ray query alone, and a sphere-only caller cannot reach the
+> LSS accessors); HLSL/NVAPI carries the geometry support implicitly (`_sm_6_3`).
+
 `rayquery_position`
 > Collection of capabilities for rayquery + ray_tracing_position_fetch.
+
+`rayquery_sphere_nv`
+> Collection of capabilities for the NV sphere-geometry accessors of an inline
+> ray query. These are vendor (NV) extensions on every target, so the alias
+> carries the `NV` suffix. Available on any RayQuery-capable stage, but each
+> target must carry its sphere geometry support: GLSL requires
+> `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR` together with
+> `spvRayTracingSpheresGeometryNV` (so a SPIR-V caller cannot satisfy this with
+> plain ray query alone, and an LSS-only caller cannot reach the sphere
+> accessors); HLSL/NVAPI carries the geometry support implicitly (`_sm_6_3`).
 
 `raytracing`
 > Capabilities needed for minimal raytracing support
@@ -1364,7 +1412,8 @@ Compound Capabilities
 
 `ser`
 > Capabilities needed for shader-execution-reordering (all paths)
-> Includes NVIDIA-specific (NV), cross-vendor standard (EXT), DXR 1.3 native, and CUDA paths
+> Defaults SPIR-V/GLSL to the cross-vendor standard EXT path; explicit NV still satisfies this
+> through the NV-to-EXT capability hierarchy. Use ser_nv for APIs that require NV opcodes.
 
 `ser_any_closesthit_intersection_miss`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, intersection, and miss.
@@ -1478,6 +1527,16 @@ Compound Capabilities
 `subgroup_vote`
 > Capabilities required to use GLSL-style subgroup operations 'subgroup_vote'
 
+`subgroup_workgroup_index`
+> Capabilities required to use the subgroup-within-workgroup queries
+> 'WaveGetWaveIndex' / 'WaveGetNumWaves'. These lower to GLSL
+> gl_SubgroupID / gl_NumSubgroups and SPIR-V BuiltIn SubgroupId /
+> NumSubgroups, which the GLSL and Vulkan SPIR-V environment specs
+> restrict to compute-class execution models (compute, mesh,
+> amplification/task); the restriction is encoded here so misuse is
+> caught by the capability system rather than producing invalid
+> GLSL / SPIR-V.
+
 `subpass`
 > Capabilities required to use Subpass-Input's
 
@@ -1498,7 +1557,14 @@ Compound Capabilities
 > New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 
 `texture_shadowlod`
-> Capabilities required to query shadow texture lod info
+> Capabilities required for shadow texture LOD sampling on types
+> natively supported by GLSL 1.50 (sampler1DShadow, sampler1DArrayShadow,
+> sampler2DShadow).
+
+`texture_shadowlod_ext`
+> Capabilities required for shadow texture LOD sampling on types
+> that need GL_EXT_texture_shadow_lod (sampler2DArrayShadow, samplerCubeShadow,
+> samplerCubeArrayShadow).
 
 `texture_size`
 > Capabilities required to query texture sample info

@@ -147,7 +147,11 @@ runs:
     # Windows-specific setup: MSVC dev tools
     - name: Set up MSVC dev tools (Windows)
       if: runner.os == 'Windows'
-      uses: ilammy/msvc-dev-cmd@v1
+      uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      # msvc-dev-cmd has no Node 24 release yet (upstream ilammy/msvc-dev-cmd#105);
+      # force its node20 runtime onto node24 to clear the deprecation warning.
+      env:
+        FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     # Install dependencies not present in act/self-hosted (pre-installed on GitHub runners)
     - name: Install Linux dependencies
@@ -479,7 +483,7 @@ runs:
     - name: Execute Claude Code Action (NV Inference)
       id: claude-action-nv
       if: steps.auth-token.outputs.auth-provider == 'nv-inference'
-      uses: anthropics/claude-code-action@v1
+      uses: anthropics/claude-code-action@0f97b95b6536c26e5f6bd90faec370d41695beca # v1.0.144
       env:
         # NV Inference Portal uses custom base URL - SDK redirects API calls there
         ANTHROPIC_BASE_URL: ${{ inputs.nv-inference-url }}
@@ -528,7 +532,7 @@ runs:
     - name: Execute Claude Code Action (LLMGW)
       id: claude-action-llmgw
       if: steps.auth-token.outputs.auth-provider == 'llmgw'
-      uses: anthropics/claude-code-action@v1
+      uses: anthropics/claude-code-action@0f97b95b6536c26e5f6bd90faec370d41695beca # v1.0.144
       env:
         # Use Bedrock with bearer token auth (not AWS SigV4)
         ANTHROPIC_BEDROCK_BASE_URL: ${{ inputs.bedrock-base-url || 'https://prod.api.nvidia.com/llm/v1/aws' }}

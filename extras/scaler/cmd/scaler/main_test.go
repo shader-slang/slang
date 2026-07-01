@@ -49,3 +49,25 @@ func TestValidateSessionMaxAgeNegative(t *testing.T) {
 		t.Fatal("validateSessionMaxAge should fail for negative durations")
 	}
 }
+
+// TestDrainStateTransitions verifies the scaler's drain flag is initially
+// false and toggles via setDraining. The scale-set-preservation defer in
+// run() keys off this state to decide whether to delete the scale set on
+// exit (#11067): preserve when draining, delete otherwise.
+func TestDrainStateTransitions(t *testing.T) {
+	s := &gcpRunnerScaler{}
+
+	if s.isDraining() {
+		t.Fatal("new scaler should not be draining")
+	}
+
+	s.setDraining(true)
+	if !s.isDraining() {
+		t.Fatal("setDraining(true) should make isDraining() true")
+	}
+
+	s.setDraining(false)
+	if s.isDraining() {
+		t.Fatal("setDraining(false) should make isDraining() false")
+	}
+}

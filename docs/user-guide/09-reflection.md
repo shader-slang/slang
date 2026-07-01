@@ -98,6 +98,14 @@ type:
   kind: Scalar
 ```
 
+`getName()` and `getFullName()` return the structural type name without any
+type-level modifier wrappers (`no_diff`, `unorm`, `snorm`, ...). For example,
+a `no_diff float3` parameter and a `unorm float4` field both reflect with the
+underlying structural kind (`Scalar`/`Vector`) and a name that omits the
+modifier. To inspect a modifier on a specific declaration, use
+`findModifier()` on the owning `VariableReflection` /
+`FunctionReflection`.
+
 Additional information can be queried from a `TypeReflection`, depending on its kind:
 
 ```c++
@@ -1554,6 +1562,34 @@ program->getEntryPointMetadata(
         entryPointIndex,
         0, // target index
         &entryPointMetadata);
+```
+
+Target-wide post-emit metadata is queried through `IComponentType::getTargetMetadata()`. For
+`DescriptorHandle<T>`, `ProgramLayout::getBindlessSpaceIndex()` reports the frontend-reserved
+bindless space, which can be non-negative even when the emitted target does not use a descriptor
+heap path. Hosts should cast target metadata to `IBindlessResourceMetadata` and use
+`usesBindlessResourceHeap()` as a post-lowering signal, then combine it with the target binding
+model when deciding whether an explicit bindless resource heap binding is required:
+
+```c++
+slang::IComponentType* program = ...;
+Slang::ComPtr<slang::IMetadata> targetMetadata;
+Slang::ComPtr<slang::IBlob> diagnostics;
+if (SLANG_FAILED(program->getTargetMetadata(
+        0, // target index
+        targetMetadata.writeRef(),
+        diagnostics.writeRef())))
+{
+    // Handle error.
+    return;
+}
+
+auto bindlessMetadata = static_cast<slang::IBindlessResourceMetadata*>(
+    targetMetadata->castAs(slang::IBindlessResourceMetadata::getTypeGuid()));
+if (bindlessMetadata && bindlessMetadata->usesBindlessResourceHeap())
+{
+    // Bind the descriptor heap for this compiled target.
+}
 ```
 
 When traversal of reflection data reaches a leaf parameter, the application can use `IMetadata::isParameterLocationUsed()` with the absolute location of that parameter for a given layout unit:

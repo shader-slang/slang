@@ -5,7 +5,6 @@
 #include "slang-emit-source-writer.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-util.h"
-#include "slang-mangled-lexer.h"
 #include "slang-rich-diagnostics.h"
 
 #include <assert.h>
@@ -137,18 +136,27 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 {
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
     if (!layoutDecoration)
+    {
+        if (param->findDecoration<IRTargetSystemValueDecoration>())
+            maybeEmitSystemSemantic(param);
         return;
+    }
     auto layout = as<IRVarLayout>(layoutDecoration->getLayout());
     if (!layout)
         return;
+
+    // DescriptorHandle<T> is bindless on Metal and has T's layout, so unwrap
+    // it before the per-kind type tests below.
+    IRType* paramType = param->getDataType();
+    if (auto handleType = as<IRDescriptorHandleType>(paramType))
+        paramType = handleType->getResourceType();
 
     for (auto rr : layout->getOffsetAttrs())
     {
         switch (rr->getResourceKind())
         {
         case LayoutResourceKind::MetalTexture:
-            if (as<IRTextureTypeBase>(param->getDataType()) ||
-                as<IRTextureBufferType>(param->getDataType()))
+            if (as<IRTextureTypeBase>(paramType) || as<IRTextureBufferType>(paramType))
             {
                 m_writer->emit(" [[texture(");
                 m_writer->emit(rr->getOffset());
@@ -156,11 +164,10 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::MetalBuffer:
-            if (as<IRPtrTypeBase>(param->getDataType()) ||
-                as<IRHLSLStructuredBufferTypeBase>(param->getDataType()) ||
-                as<IRByteAddressBufferTypeBase>(param->getDataType()) ||
-                as<IRUniformParameterGroupType>(param->getDataType()) ||
-                as<IRRaytracingAccelerationStructureType>(param->getDataType()))
+            if (as<IRPtrTypeBase>(paramType) || as<IRHLSLStructuredBufferTypeBase>(paramType) ||
+                as<IRByteAddressBufferTypeBase>(paramType) ||
+                as<IRUniformParameterGroupType>(paramType) ||
+                as<IRRaytracingAccelerationStructureType>(paramType))
             {
                 m_writer->emit(" [[buffer(");
                 m_writer->emit(rr->getOffset());
@@ -168,7 +175,7 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::SamplerState:
-            if (as<IRSamplerStateTypeBase>(param->getDataType()))
+            if (as<IRSamplerStateTypeBase>(paramType))
             {
                 m_writer->emit(" [[sampler(");
                 m_writer->emit(rr->getOffset());
@@ -422,6 +429,12 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
     case kIROp_Discard:
         m_writer->emit("discard_fragment();\n");
+        return true;
+    case kIROp_SubpassLoad:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            inst,
+            "SubpassLoad should have been lowered before Metal emission");
         return true;
     case kIROp_MetalAtomicCast:
         {
@@ -1020,6 +1033,12 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit("nullptr");
             return true;
         }
+    case kIROp_SubpassLoad:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            inst,
+            "SubpassLoad should have been lowered before Metal emission");
+        return true;
     default:
         break;
     }
@@ -1134,6 +1153,31 @@ void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             default:
                 break;
             }
+
+            // Suffix finite half/float literals so MSL doesn't type a bare decimal
+            // as `double` (which breaks `as_type<ushort>(h)`, #11837). NaN/Inf and
+            // Double stay bare; non-finite half/float is a known remaining gap.
+            if (auto basicType = as<IRBasicType>(inst->getDataType()))
+            {
+                const char* suffix = nullptr;
+                switch (basicType->getBaseType())
+                {
+                case BaseType::Half:
+                    suffix = "h";
+                    break;
+                case BaseType::Float:
+                    suffix = "f";
+                    break;
+                default:
+                    break;
+                }
+                if (suffix)
+                {
+                    m_writer->emit(constantInst->value.floatVal);
+                    m_writer->emit(suffix);
+                    return;
+                }
+            }
             break;
         }
 
@@ -1229,6 +1273,15 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             emitVectorTypeNameImpl(
                 vecType->getElementType(),
                 getIntVal(vecType->getElementCount()));
+            return;
+        }
+    case kIROp_MetalPackedVectorType:
+        {
+            auto packedVecType = (IRMetalPackedVectorType*)type;
+            m_writer->emit("packed_");
+            emitVectorTypeNameImpl(
+                packedVecType->getElementType(),
+                getIntVal(packedVecType->getElementCount()));
             return;
         }
     case kIROp_MatrixType:
@@ -1348,6 +1401,12 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             ensurePrelude(kMetalBuiltinPreludeSimdgroupMatrixOps);
             return;
         }
+    case kIROp_SubpassInputType:
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            type,
+            "SubpassInputType should have been lowered before Metal emission");
+        return;
     default:
         break;
     }

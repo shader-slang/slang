@@ -1022,8 +1022,20 @@ class CallAttribute : public Attribute
 };
 // `[call]`
 
+// Marks an enum declaration as unscoped. Added by the parser either from the
+// user-written `[UnscopedEnum]` attribute, or implicitly when a non-generic
+// plain `enum` is compiled with `-unscoped-enum`. Generic enums do not carry
+// this attribute even when `-unscoped-enum` is in effect.
 FIDDLE()
 class UnscopedEnumAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+// Marker for enum class declarations, used to detect conflicting explicit
+// unscoped/scoped enum declarations. This modifier has no further semantics.
+FIDDLE()
+class EnumClassModifier : public Modifier
 {
     FIDDLE(...)
 };
@@ -1369,6 +1381,19 @@ class MutatingAttribute : public Attribute
 //
 FIDDLE()
 class NonmutatingAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+// A `[NoDiscard]` attribute, which indicates that the result of a
+// function call should not be discarded. When a call to a function
+// marked with this attribute is made in a context where its result is
+// discarded — an expression statement, or a `for` loop's side-effect
+// expression, including through parentheses and pass-through operands —
+// the compiler emits an error.
+//
+FIDDLE()
+class NoDiscardAttribute : public Attribute
 {
     FIDDLE(...)
 };

@@ -473,6 +473,9 @@ class ParseLlvmCovReportTests(unittest.TestCase):
         self.assertEqual(foo.branch_total, 80)
         self.assertEqual(foo.branch_missed, 32)
         self.assertEqual(foo.branch_hit, 48)
+        self.assertEqual(foo.region_total, 109)
+        self.assertEqual(foo.region_missed, 31)
+        self.assertEqual(foo.region_hit, 78)
 
     def test_total_row_captured(self):
         s = renderer.parse_llvm_cov_report(self.path)
@@ -482,6 +485,8 @@ class ParseLlvmCovReportTests(unittest.TestCase):
         self.assertEqual(s.total.func_missed, 11)
         self.assertEqual(s.total.branch_total, 130)
         self.assertEqual(s.total.branch_missed, 34)
+        self.assertEqual(s.total.region_total, 160)
+        self.assertEqual(s.total.region_missed, 36)
 
     def test_dash_in_cover_column_is_tolerated(self):
         # The third file row has '-' in the branch Cover column
@@ -602,6 +607,27 @@ class MergeAuthSummariesTests(unittest.TestCase):
         self.assertEqual(merged.files["foo.cpp"].line_total, 100)
         self.assertEqual(merged.files["foo.cpp"].line_missed, 20)
 
+    def test_regions_merge_skipping_windows_zero_entries(self):
+        # Regions are only present on Linux/macOS; Windows
+        # OpenCppCoverage emits no Regions row. The merger should
+        # treat the Windows entry's region_total=0 as "no info" so
+        # the merged value comes from the OSes that have data.
+        linux = renderer.AuthSummary()
+        linux.files["foo.cpp"] = renderer.AuthFileSummary(
+            line_total=100, line_missed=20,
+            region_total=80, region_missed=15,
+        )
+        windows = renderer.AuthSummary()
+        windows.files["foo.cpp"] = renderer.AuthFileSummary(
+            line_total=100, line_missed=25,
+            region_total=0, region_missed=0,
+        )
+        merged = renderer.merge_auth_summaries([linux, windows])
+        fs = merged.files["foo.cpp"]
+        self.assertEqual(fs.region_total, 80)
+        self.assertEqual(fs.region_missed, 15)
+        self.assertEqual(fs.region_hit, 65)
+
 
 class WriteLlvmCovReportTests(unittest.TestCase):
     def test_round_trip_preserves_numbers(self):
@@ -631,8 +657,12 @@ class WriteLlvmCovReportTests(unittest.TestCase):
             self.assertEqual(r.func_missed, fs.func_missed)
             self.assertEqual(r.branch_total, fs.branch_total)
             self.assertEqual(r.branch_missed, fs.branch_missed)
+            self.assertEqual(r.region_total, fs.region_total)
+            self.assertEqual(r.region_missed, fs.region_missed)
         self.assertEqual(roundtrip.total.line_total, original.total.line_total)
         self.assertEqual(roundtrip.total.line_missed, original.total.line_missed)
+        self.assertEqual(roundtrip.total.region_total, original.total.region_total)
+        self.assertEqual(roundtrip.total.region_missed, original.total.region_missed)
 
 
 if __name__ == "__main__":

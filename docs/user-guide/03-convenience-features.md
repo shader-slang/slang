@@ -329,7 +329,7 @@ int test()
     return rs.val; // returns 3.
 }
 ```
-Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators is not supported.
+Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `+`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators is not supported.
 
 In addition, you can overload operator `()` as a member method:
 ```csharp
@@ -661,10 +661,18 @@ void test()
 
 When targeting SPIR-V, Slang can generate two flavors of code for descriptor handles depending on whether
 the `spvDescriptorHeapEXT` capability is declared or requested on the compilation request.
-By default (without requesting `spvDescriptorHeapEXT`), Slang introduces a global array of descriptors and
-fetches from the global array.
-The descriptor set ID of the global descriptor array can be configured with the `-bindless-space-index`
-(or `CompilerOptionName::BindlessSpaceIndex` when using the API) option.
+
+### Default Slang Behavior
+
+Without requesting `spvDescriptorHeapEXT`, Slang introduces a global array of descriptors and fetches
+from it. The descriptor set ID of the global descriptor array can be configured with the
+`-bindless-space-index` (or `CompilerOptionName::BindlessSpaceIndex` when using the API) option.
+
+Reflection reports this value as a reserved bindless space for descriptor-handle-capable targets.
+That reservation can be present even when optimization and target lowering remove all descriptor
+handle uses from the emitted shader. Hosts that need to decide whether to bind a descriptor heap
+should query target metadata for `IBindlessResourceMetadata::usesBindlessResourceHeap()` instead of
+using `getBindlessSpaceIndex() >= 0` as the usage test.
 
 Default behavior assigns binding indices based on descriptor types:
 
@@ -682,13 +690,42 @@ Default behavior assigns binding indices based on descriptor types:
 
 > `ACCELERATION_STRUCTURE` is excluded from the list of types since Slang by default uses the handle to a `RaytracingAccelerationStructure` as a GPU address, casting the handle to a `RaytracingAccelerationStructure`. This removes the need for a binding-slot of `RaytracingAccelerationStructure`.
 
-When the `spvDescriptorHeapEXT` capability is requested (either via the `-capability` command-line option or via the compilation API), Slang will map descriptor handles to the `SPV_EXT_descriptor_heap` extension
-without declaring any explicit descriptor sets. Descriptor handles are still lowered to `uint2`.
-For resources other than `CombinedTextureSampler`, Slang uses `uint2.x` as the index to access the global sampler or resource heap.
-For `CombinedTextureSampler` handles, Slang uses `uint2.x` to index into the resource heap to obtain the texture, and `uint2.y` to index into the sampler
-heap to obtain the sampler state, and combines the objects with an `OpSampledImage` instruction. By default, when using the `spvDescriptorHeapEXT` capability, Slang will reinterpret the resource or sampler heap as an array of requested resource type, whose stride is defined by the resource type, obtained from `OpConstantSizeOfEXT` instruction. The user can override this behavior and specify a different stride with the `-spirv-resource-heap-stride` or `-spirv-sampler-heap-stride` compiler options.
+### SPIR-V with `spvDescriptorHeapEXT`
 
-Additionally, if none of the above behaviors are desired, users can customize the conversion logic from descriptor handle to resource objects by providing a `getDescriptorFromHandle` in user code. For example:
+When the `spvDescriptorHeapEXT` capability is requested (either via the `-capability` command-line option
+or via the compilation API), Slang maps descriptor handles to the `SPV_EXT_descriptor_heap` extension
+without declaring any explicit descriptor sets. Descriptor handles are still lowered to `uint2`.
+For resources other than `CombinedTextureSampler`, Slang uses `uint2.x` as the index to access the global
+sampler or resource heap. For `CombinedTextureSampler` handles, Slang uses `uint2.x` to index into the
+resource heap to obtain the texture, and `uint2.y` to index into the sampler heap to obtain the sampler
+state, and combines the objects with an `OpSampledImage` instruction.
+
+By default, when using the `spvDescriptorHeapEXT` capability, Slang reinterprets the resource or sampler
+heap as an array of the requested resource type, whose stride is defined by the resource type and obtained
+from the `OpConstantSizeOfEXT` instruction. The user can override this behavior and specify a different
+stride with the `-spirv-resource-heap-stride` or `-spirv-sampler-heap-stride` compiler options. For
+acceleration-structure entries, an explicit resource heap stride must be at least 8 bytes.
+
+Alternatively, the `-spirv-unified-descriptor-heap-stride` option makes every resource descriptor-heap
+runtime array use a single shared stride equal to the maximum of the image and buffer descriptor sizes,
+so a heap that holds both buffers and images is indexed at the device's unified stride regardless of which
+descriptor type a particular shader accesses. This affects only the default `OpConstantSizeOfEXT` path
+(used when `-spirv-resource-heap-stride` is 0), so it is mutually exclusive with a non-zero
+`-spirv-resource-heap-stride` (combining the two is an error). The sampler heap and acceleration-structure
+entries are unaffected.
+
+> **Note on `RaytracingAccelerationStructure`:** When the `spvDescriptorHeapEXT` capability is active and
+> a `DescriptorHandle<RaytracingAccelerationStructure>` is dereferenced, Slang loads a 64-bit device address
+> from the descriptor heap and converts it to an acceleration structure handle via
+> `OpConvertUToAccelerationStructureKHR`. The heap entry type is `uint64_t`, so the default heap stride is
+> based on the address width rather than the opaque acceleration structure type. This matches how GPU
+> drivers expose acceleration structure descriptors in the heap (as device addresses), and requires either
+> the `SPV_KHR_ray_tracing` or `SPV_KHR_ray_query` extension.
+
+### Custom Descriptor Fetch
+
+If none of the above behaviors are desired, users can customize the conversion logic from descriptor handle
+to resource objects by providing a `getDescriptorFromHandle` in user code. For example:
 
 ```slang
 // All texture and buffer handles are defined in descriptor set 100.
@@ -992,6 +1029,109 @@ __file_decl
     }
 }
 ```
+
+Lambda Expressions (Experimental)
+-------------------
+
+> **Note:** Lambda support is experimental. Syntax and capture semantics may change in future versions.
+
+Slang supports lambda expressions for passing small callable values to higher-order functions. A lambda has the form:
+
+```csharp
+(parameterList) => expression
+(parameterList) => { statements; return expression; }
+```
+
+Parameter types must be written explicitly. In the single-expression form, the expression's type is the return type. In the block form, all `return` statements must return the same type.
+
+### Basic usage
+
+Lambdas implement the `IFunc<TReturn, TArgs...>` interface (or `IMutatingFunc<...>` for mutating variants). Any function or method that takes an `IFunc` can be called with a matching lambda:
+
+```csharp
+struct Matrix
+{
+    float data[16];
+
+    [mutating]
+    void map(IFunc<float, float> f)
+    {
+        for (int i = 0; i < 16; ++i)
+            data[i] = f(data[i]);
+    }
+}
+
+void scale(inout Matrix m)
+{
+    int c = 2;
+    m.map((float x) => (float)(x * c));
+}
+```
+
+### Coercion to `IFunc`
+
+A lambda is implicitly converted to `IFunc<TReturn, TArgs...>` when passed to a function expecting that interface. Lambdas passed as `IFunc` may capture variables from the enclosing scope:
+
+```csharp
+func apply(f: IFunc<float, float>) -> float
+{
+    return f(2.0);
+}
+
+float scale = 3;
+let result = apply((float x) => x * scale);  // OK: 'scale' is captured
+```
+
+### Coercion to `functype`
+
+Lambdas can also be passed to functions expecting an explicit function type spelled with the `functype` keyword. Unlike `IFunc`, `functype` is more restrictive: only **non-capturing** lambdas can coerce to `functype`. A lambda that references any variable from the enclosing scope cannot coerce and the compiler reports an error:
+
+```csharp
+func sum(f: functype(int, int) -> float) -> float
+{
+    return f(2, 3);
+}
+
+let result = sum((int x, int y) => x + y); // OK: no captures, result == 5.0
+
+int bias = 1;
+let result2 = sum((int x, int y) => x + y + bias); // error: capturing lambda cannot coerce to functype
+```
+
+Parameter types must also match the `functype` signature exactly. The return type may be implicitly converted (for example, a lambda returning `int` can satisfy a `functype` with return type `float`).
+
+### Capture semantics
+
+A lambda body may reference variables from the enclosing scope. **Captured variables are read-only inside the lambda body.** Attempting to assign to a captured variable is an error:
+
+```csharp
+int c = 2;
+let f = (int x) => { c = x; return 0; };  // error: cannot assign to captured 'c'
+```
+
+If you need to mutate state, pass the state as a parameter or accumulate the result and assign after the lambda returns.
+
+### Interaction with generic type inference
+
+Lambdas participate in generic-argument inference. A generic function whose parameter is a function type can infer the generic argument from the lambda's return type:
+
+```csharp
+func foo<let N : int>(f: functype() -> vector<float, N>) -> vector<float, N>
+{
+    return f();
+}
+
+let v1 = foo(() => 2);                    // 2 is implicitly converted to vector<float, 1>; infers N = 1
+let v2 = foo(() => vector<float, 1>(3));  // infers N = 1 explicitly
+```
+
+Named function-object types (conforming to `IFunc`) work in the same position as lambdas.
+
+### Limitations
+
+- Lambdas are experimental; supported targets currently include SPIR-V, the CPU backend, and the Slang interpreter. Other targets may reject some lambda forms.
+- Captured variables are read-only (see above).
+- Each lambda expression has a unique anonymous type; two lambdas with the same signature are not directly interconvertible.
 
 User-Defined Attributes (Experimental)
 -------------------

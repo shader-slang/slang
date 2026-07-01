@@ -665,7 +665,7 @@ SLANG_UNIT_TEST(vtableISlangProfiler)
 }
 
 // ---------------------------------------------------------------------------
-// IGlobalSession : ISlangUnknown  (own slots 3-31)
+// IGlobalSession : ISlangUnknown  (own slots 3-32)
 // ---------------------------------------------------------------------------
 struct IGlobalSessionProbe : IGlobalSession
 {
@@ -841,6 +841,12 @@ struct IGlobalSessionProbe : IGlobalSession
         lastSlot = 31;
         return SLANG_OK;
     }
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDownstreamCompilerVersion(SlangPassThrough, int*, int*) SLANG_OVERRIDE
+    {
+        lastSlot = 32;
+        return SLANG_OK;
+    }
 };
 
 SLANG_UNIT_TEST(vtableIGlobalSession)
@@ -862,6 +868,8 @@ SLANG_UNIT_TEST(vtableIGlobalSession)
     SLANG_CHECK(p.lastSlot == 26); // setSPIRVCoreGrammar
     callSlot(&p, 31);
     SLANG_CHECK(p.lastSlot == 31); // saveBuiltinModule
+    callSlot(&p, 32);
+    SLANG_CHECK(p.lastSlot == 32); // getDownstreamCompilerVersion
 }
 
 // ---------------------------------------------------------------------------
@@ -912,6 +920,168 @@ SLANG_UNIT_TEST(vtableIMetadata)
     SLANG_CHECK(p.lastSlot == 4); // isParameterLocationUsed
     callSlot(&p, 5);
     SLANG_CHECK(p.lastSlot == 5); // getDebugBuildIdentifier
+}
+
+// ---------------------------------------------------------------------------
+// IBindlessResourceMetadata : ISlangCastable  (own slot 4)
+// ---------------------------------------------------------------------------
+struct IBindlessResourceMetadataProbe : IBindlessResourceMetadata
+{
+    int lastSlot = -1;
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const&, void**) SLANG_OVERRIDE
+    {
+        lastSlot = 0;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
+    {
+        lastSlot = 1;
+        return 1;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        lastSlot = 2;
+        return 1;
+    }
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID&) SLANG_OVERRIDE
+    {
+        lastSlot = 3;
+        return nullptr;
+    }
+    SLANG_NO_THROW bool SLANG_MCALL usesBindlessResourceHeap() SLANG_OVERRIDE
+    {
+        lastSlot = 4;
+        return false;
+    }
+};
+
+SLANG_UNIT_TEST(vtableIBindlessResourceMetadata)
+{
+    IBindlessResourceMetadataProbe p;
+    callSlot(&p, 3);
+    SLANG_CHECK(p.lastSlot == 3); // castAs
+    callSlot(&p, 4);
+    SLANG_CHECK(p.lastSlot == 4); // usesBindlessResourceHeap
+}
+
+// ---------------------------------------------------------------------------
+// ICoverageTracingMetadata : ISlangCastable  (own slots 4-7)
+// ---------------------------------------------------------------------------
+struct ICoverageTracingMetadataProbe : ICoverageTracingMetadata
+{
+    int lastSlot = -1;
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const&, void**) SLANG_OVERRIDE
+    {
+        lastSlot = 0;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
+    {
+        lastSlot = 1;
+        return 1;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        lastSlot = 2;
+        return 1;
+    }
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID&) SLANG_OVERRIDE
+    {
+        lastSlot = 3;
+        return nullptr;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE
+    {
+        lastSlot = 4;
+        return 0;
+    }
+    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryInfo(uint32_t, CoverageEntryInfo*) SLANG_OVERRIDE
+    {
+        lastSlot = 5;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo*) SLANG_OVERRIDE
+    {
+        lastSlot = 6;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() SLANG_OVERRIDE
+    {
+        lastSlot = 7;
+        return 0;
+    }
+};
+
+SLANG_UNIT_TEST(vtableICoverageTracingMetadata)
+{
+    ICoverageTracingMetadataProbe p;
+    callSlot(&p, 3);
+    SLANG_CHECK(p.lastSlot == 3); // castAs
+    callSlot(&p, 4);
+    SLANG_CHECK(p.lastSlot == 4); // getCounterCount
+    callSlot(&p, 5);
+    SLANG_CHECK(p.lastSlot == 5); // getEntryInfo
+    callSlot(&p, 6);
+    SLANG_CHECK(p.lastSlot == 6); // getBufferInfo
+    callSlot(&p, 7);
+    SLANG_CHECK(p.lastSlot == 7); // getEntryCount
+}
+
+// ---------------------------------------------------------------------------
+// ISyntheticResourceMetadata : ISlangCastable  (own slots 4-6)
+// ---------------------------------------------------------------------------
+struct ISyntheticResourceMetadataProbe : ISyntheticResourceMetadata
+{
+    int lastSlot = -1;
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const&, void**) SLANG_OVERRIDE
+    {
+        lastSlot = 0;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
+    {
+        lastSlot = 1;
+        return 1;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        lastSlot = 2;
+        return 1;
+    }
+    SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID&) SLANG_OVERRIDE
+    {
+        lastSlot = 3;
+        return nullptr;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL getResourceCount() SLANG_OVERRIDE
+    {
+        lastSlot = 4;
+        return 0;
+    }
+    SLANG_NO_THROW SlangResult SLANG_MCALL getResourceInfo(uint32_t, SyntheticResourceInfo*)
+        SLANG_OVERRIDE
+    {
+        lastSlot = 5;
+        return SLANG_OK;
+    }
+    SLANG_NO_THROW SlangResult SLANG_MCALL findResourceIndexByID(uint32_t, uint32_t*) SLANG_OVERRIDE
+    {
+        lastSlot = 6;
+        return SLANG_OK;
+    }
+};
+
+SLANG_UNIT_TEST(vtableISyntheticResourceMetadata)
+{
+    ISyntheticResourceMetadataProbe p;
+    callSlot(&p, 3);
+    SLANG_CHECK(p.lastSlot == 3); // castAs
+    callSlot(&p, 4);
+    SLANG_CHECK(p.lastSlot == 4); // getResourceCount
+    callSlot(&p, 5);
+    SLANG_CHECK(p.lastSlot == 5); // getResourceInfo
+    callSlot(&p, 6);
+    SLANG_CHECK(p.lastSlot == 6); // findResourceIndexByID
 }
 
 // ---------------------------------------------------------------------------

@@ -142,6 +142,8 @@ enum
     kStartOffset = uint32_t(sizeof(uint64_t)), ///< The offset to the first contained thing
 };
 
+static const uint32_t kMax32Offset = 0xFFFFFFFFu;
+
 template<typename T>
 class Offset32Ref;
 
@@ -277,12 +279,16 @@ public:
 
     Offset32Ref<const T> operator[](Index i) const
     {
-        SLANG_ASSERT(i >= 0 && uint32_t(i) < m_count);
+        // Serialized repro data can drive these offsets in release builds, so this must remain a
+        // release assert rather than a debug-only SLANG_ASSERT.
+        SLANG_RELEASE_ASSERT(i >= 0 && uint32_t(i) < m_count);
         return Offset32Ref<const T>((m_data + i).m_offset);
     }
     Offset32Ref<T> operator[](Index i)
     {
-        SLANG_ASSERT(i >= 0 && uint32_t(i) < m_count);
+        // Serialized repro data can drive these offsets in release builds, so this must remain a
+        // release assert rather than a debug-only SLANG_ASSERT.
+        SLANG_RELEASE_ASSERT(i >= 0 && uint32_t(i) < m_count);
         return Offset32Ref<T>((m_data + i).m_offset);
     }
 
@@ -340,16 +346,24 @@ class OffsetBase
 public:
     typedef OffsetBase ThisType;
 
-    /// Turn an offset into a raw regular pointer or reference
+    /// Turn an offset into a raw regular pointer or reference.
+    ///
+    /// This validates that the fixed-size object header fits in the backing buffer. Types with
+    /// variable-length trailing data, such as OffsetString, must still validate their payload
+    /// before consuming it.
     template<typename T>
     T* asRaw(const Offset32Ptr<T>& ptr)
     {
-        return (T*)_getRaw(ptr.m_offset);
+        return (T*)_getRaw(ptr.m_offset, sizeof(T));
     }
     template<typename T>
     T& asRaw(const Offset32Ref<T>& ref)
     {
-        return *(T*)_getRaw(ref.m_offset);
+        uint8_t* raw = _getRaw(ref.m_offset, sizeof(T));
+        // Offset32Ref is non-null by construction; an invalid deserialized offset must trap in
+        // release builds before forming a reference.
+        SLANG_RELEASE_ASSERT(raw);
+        return *(T*)raw;
     }
 
     /// A more terse way to get a raw pointer/reference. Using the [] operator can be seen as
@@ -358,12 +372,16 @@ public:
     template<typename T>
     T* operator[](const Offset32Ptr<T>& ptr)
     {
-        return (T*)_getRaw(ptr.m_offset);
+        return (T*)_getRaw(ptr.m_offset, sizeof(T));
     }
     template<typename T>
     T& operator[](const Offset32Ref<T>& ref)
     {
-        return *(T*)_getRaw(ref.m_offset);
+        uint8_t* raw = _getRaw(ref.m_offset, sizeof(T));
+        // Offset32Ref is non-null by construction; an invalid deserialized offset must trap in
+        // release builds before forming a reference.
+        SLANG_RELEASE_ASSERT(raw);
+        return *(T*)raw;
     }
 
     template<typename T>
@@ -400,10 +418,28 @@ public:
     /// Get the first allocated thing. Typically the root of the structure contained
     void* getFirst() { return (m_dataSize < kStartOffset) ? nullptr : (m_data + kStartOffset); }
 
-    /// Get a raw pointer from the offset
-    uint8_t* _getRaw(uint32_t offset)
+    /// Get a raw pointer from the offset if [offset, offset + size) is inside the backing buffer.
+    /// Returns nullptr for the null offset, missing backing data, or an out-of-bounds range.
+    /// The size covers only the fixed-size object being requested; variable-length trailing data
+    /// must be validated by the consumer before it is read.
+    uint8_t* _getRaw(uint32_t offset, size_t size)
     {
-        return (offset == kNull32Offset) ? nullptr : (m_data + offset);
+        if (offset == kNull32Offset)
+        {
+            return nullptr;
+        }
+
+        if (!m_data)
+        {
+            return nullptr;
+        }
+
+        if (offset > m_dataSize || size > m_dataSize - offset)
+        {
+            return nullptr;
+        }
+
+        return m_data + offset;
     }
 
     OffsetBase()
@@ -446,6 +482,10 @@ public:
     Offset32Ptr<T> newObject()
     {
         void* data = allocate(sizeof(T), alignof(T));
+        if (!data)
+        {
+            return Offset32Ptr<T>();
+        }
         new (data) T();
         return Offset32Ptr<T>(getOffset(data));
     }
@@ -457,7 +497,16 @@ public:
         {
             return Offset32Array<T>();
         }
+        // The SIZE_MAX term is needed on 32-bit hosts before computing sizeof(T) * size.
+        if (size > size_t(kMax32Offset) || size > SIZE_MAX / sizeof(T))
+        {
+            return Offset32Array<T>();
+        }
         T* data = (T*)allocate(sizeof(T) * size, alignof(T));
+        if (!data)
+        {
+            return Offset32Array<T>();
+        }
         for (size_t i = 0; i < size; ++i)
         {
             new (data + i) T();
@@ -470,7 +519,9 @@ public:
 
     /// Allocate without alignment (effectively 1)
     void* allocate(size_t size);
+
     void* allocate(size_t size, size_t alignment);
+
     void* allocateAndZero(size_t size, size_t alignment);
 
     void fixAlignment(size_t alignment);
@@ -481,6 +532,10 @@ public:
     /// Ctor
     OffsetContainer();
     ~OffsetContainer();
+
+    /// Returns the current backing-buffer capacity. Exposed primarily so tests can
+    /// verify that the rejection paths in allocate() do not mutate the buffer.
+    size_t getCapacity() const { return m_capacity; }
 
 protected:
     size_t m_capacity;

@@ -4,19 +4,19 @@
 
 StructuredBuffer<Texture2D<float>> textureBuffer;
 //CHECK:                           ^^^^^^^^^^^^^ resource type in StructuredBuffer
-//CHECK:                           ^^^^^^^^^^^^^ StructuredBuffer element type 'Texture2D' cannot contain resource or opaque handle types
+//CHECK:                           ^^^^^^^^^^^^^ StructuredBuffer element type 'Texture2D' must not be a resource type or contain an opaque handle type
 
 StructuredBuffer<SamplerState> samplerBuffer;
 //CHECK:                       ^^^^^^^^^^^^^ resource type in StructuredBuffer
-//CHECK:                       ^^^^^^^^^^^^^ StructuredBuffer element type 'SamplerState' cannot contain resource or opaque handle types
+//CHECK:                       ^^^^^^^^^^^^^ StructuredBuffer element type 'SamplerState' must not be a resource type or contain an opaque handle type
 
 StructuredBuffer<StructuredBuffer<float>> nestedBuffer;
 //CHECK:                                  ^^^^^^^^^^^^ resource type in StructuredBuffer
-//CHECK:                                  ^^^^^^^^^^^^ StructuredBuffer element type 'StructuredBuffer<float>' cannot contain resource or opaque handle types
+//CHECK:                                  ^^^^^^^^^^^^ StructuredBuffer element type 'StructuredBuffer<float>' must not be a resource type or contain an opaque handle type
 
 RWStructuredBuffer<Texture2D<float>> rwTextureBuffer;
 //CHECK:                             ^^^^^^^^^^^^^^^ resource type in StructuredBuffer
-//CHECK:                             ^^^^^^^^^^^^^^^ StructuredBuffer element type 'Texture2D' cannot contain resource or opaque handle types
+//CHECK:                             ^^^^^^^^^^^^^^^ StructuredBuffer element type 'Texture2D' must not be a resource type or contain an opaque handle type
 
 RWStructuredBuffer<float> output;
 
