@@ -11,9 +11,9 @@
 namespace Slang
 {
 static const int kContainerPoolSize = 1024;
-static const size_t kContainerPoolHashSetMinRetireBucketCount = 4096;
-static const size_t kContainerPoolHashSetRetireUnderuseDivisor = 8;
-static const int kContainerPoolHashSetRetireUnderuseCount = 2;
+static const size_t kContainerPoolMinRetireBucketCount = 4096;
+static const size_t kContainerPoolRetireUnderuseDivisor = 8;
+static const int kContainerPoolRetireUnderuseCount = 2;
 
 template<typename T>
 struct ObjectPool
@@ -54,6 +54,7 @@ struct ContainerPool
     ObjectPool<List<void*>> m_listPool;
     ObjectPool<Dictionary<void*, void*>> m_dictionaryPool;
     ObjectPool<HashSet<void*>> m_hashSetPool;
+    List<int> m_dictionaryUnderuseStreaks;
     List<int> m_hashSetUnderuseStreaks;
 
     ContainerPool()
@@ -61,9 +62,13 @@ struct ContainerPool
         , m_dictionaryPool(kContainerPoolSize)
         , m_hashSetPool(kContainerPoolSize)
     {
+        m_dictionaryUnderuseStreaks.setCount(kContainerPoolSize);
         m_hashSetUnderuseStreaks.setCount(kContainerPoolSize);
         for (Index i = 0; i < kContainerPoolSize; i++)
+        {
+            m_dictionaryUnderuseStreaks[i] = 0;
             m_hashSetUnderuseStreaks[i] = 0;
+        }
     }
 
     template<typename T>
@@ -84,31 +89,33 @@ struct ContainerPool
         return (HashSet<T*>*)m_hashSetPool.getObject();
     }
 
-    bool updateHashSetUnderuseStreakAndShouldRetire(
+    bool updateUnderuseStreakAndShouldRetire(
+        List<int>& underuseStreaks,
         int objectIndex,
         size_t liveCount,
         size_t bucketCount)
     {
-        // Hash sets normally keep their buckets after `clear()` so the next large use can reuse
-        // that storage. On long runs, though, a pool slot can become expensive if one large use is
-        // followed by many tiny uses: every return clears the same large table even though the live
-        // count stays small. Track that pattern per slot and only release the buckets after it
-        // repeats, so an occasional small use after a large pass does not cause allocation churn.
-        bool isUnderused = bucketCount >= kContainerPoolHashSetMinRetireBucketCount &&
-                           liveCount <= bucketCount / kContainerPoolHashSetRetireUnderuseDivisor;
+        // Dictionaries and hash sets normally keep their buckets after `clear()` so the next large
+        // use can reuse that storage. On long runs, though, a pool slot can become expensive if one
+        // large use is followed by many tiny uses: every return clears the same large table even
+        // though the live count stays small. Track that pattern per slot and only release the
+        // buckets after it repeats, so an occasional small use after a large pass does not cause
+        // allocation churn.
+        bool isUnderused = bucketCount >= kContainerPoolMinRetireBucketCount &&
+                           liveCount <= bucketCount / kContainerPoolRetireUnderuseDivisor;
         if (!isUnderused)
         {
-            m_hashSetUnderuseStreaks[objectIndex] = 0;
+            underuseStreaks[objectIndex] = 0;
             return false;
         }
 
-        if (m_hashSetUnderuseStreaks[objectIndex] < kContainerPoolHashSetRetireUnderuseCount)
-            m_hashSetUnderuseStreaks[objectIndex]++;
+        if (underuseStreaks[objectIndex] < kContainerPoolRetireUnderuseCount)
+            underuseStreaks[objectIndex]++;
 
-        if (m_hashSetUnderuseStreaks[objectIndex] < kContainerPoolHashSetRetireUnderuseCount)
+        if (underuseStreaks[objectIndex] < kContainerPoolRetireUnderuseCount)
             return false;
 
-        m_hashSetUnderuseStreaks[objectIndex] = 0;
+        underuseStreaks[objectIndex] = 0;
         return true;
     }
 
@@ -122,8 +129,25 @@ struct ContainerPool
     template<typename T, typename U>
     void free(Dictionary<T*, U*>* dict)
     {
-        dict->clear();
-        m_dictionaryPool.freeObject((Dictionary<void*, void*>*)dict);
+        auto pooledDict = (Dictionary<void*, void*>*)dict;
+        auto objectIndex = m_dictionaryPool.getObjectIndex(pooledDict);
+        auto liveCount = dict->getCount();
+        auto bucketCount = dict->getBucketCount();
+        bool shouldRetire = updateUnderuseStreakAndShouldRetire(
+            m_dictionaryUnderuseStreaks,
+            objectIndex,
+            liveCount,
+            bucketCount);
+
+        if (shouldRetire)
+        {
+            dict->clearAndDeallocate();
+        }
+        else
+        {
+            dict->clear();
+        }
+        m_dictionaryPool.freeObject(pooledDict);
     }
 
     template<typename T>
@@ -133,8 +157,11 @@ struct ContainerPool
         auto objectIndex = m_hashSetPool.getObjectIndex(pooledSet);
         auto liveCount = set->getCount();
         auto bucketCount = set->getBucketCount();
-        bool shouldRetire =
-            updateHashSetUnderuseStreakAndShouldRetire(objectIndex, liveCount, bucketCount);
+        bool shouldRetire = updateUnderuseStreakAndShouldRetire(
+            m_hashSetUnderuseStreaks,
+            objectIndex,
+            liveCount,
+            bucketCount);
 
         if (shouldRetire)
         {
