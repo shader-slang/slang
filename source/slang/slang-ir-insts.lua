@@ -370,6 +370,23 @@ local insts = {
 				},
 			},
 			{
+				UntypedResourceHandle = {
+					-- An opaque, untyped handle produced by `ResourceDescriptorHeap[i]`. It is nullary:
+					-- the heap index lives in the value, not the type. It is emitted directly as `uint`
+					-- (backends print the type as uint; there is no separate pre-emit lowering pass).
+					struct_name = "UntypedResourceHandleType",
+					hoistable = true,
+				},
+			},
+			{
+				UntypedSamplerHandle = {
+					-- An opaque, untyped handle produced by `SamplerDescriptorHeap[j]`. Nullary, like
+					-- `UntypedResourceHandle`; emitted directly as `uint` (no pre-emit lowering pass).
+					struct_name = "UntypedSamplerHandleType",
+					hoistable = true,
+				},
+			},
+			{
 				GLSLAtomicUint = {
 					-- An AtomicUint is a placeholder type for a storage buffer, and will be mangled during compiling.
 					struct_name = "GLSLAtomicUintType",
@@ -2609,6 +2626,12 @@ local insts = {
 	-- already concrete types.
 	{ CastDescriptorHandleToResource = { operands = { { "handle" } } } },
 	{ CastResourceToDescriptorHandle = { operands = { { "resource" } } } },
+	-- Wrap/unwrap a `uint` heap index in an untyped descriptor-heap handle. Both the operand
+	-- and the result lower to `uint`, so these emit as pass-throughs of their single operand.
+	{ CastUIntToUntypedResourceHandle = { operands = { { "index" } } } },
+	{ CastUntypedResourceHandleToUInt = { operands = { { "handle" } } } },
+	{ CastUIntToUntypedSamplerHandle = { operands = { { "index" } } } },
+	{ CastUntypedSamplerHandleToUInt = { operands = { { "handle" } } } },
 	{ TreatAsDynamicUniform = { operands = { { "value" } } } },
 	{ sizeOf = { operands = { { "type" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },
 	{ alignOf = { operands = { { "baseOp" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },

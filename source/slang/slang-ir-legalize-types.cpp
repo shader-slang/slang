@@ -2128,6 +2128,12 @@ static LegalVal legalizeInst(
         result = legalizeRetVal(context, args[0], (IRReturn*)inst);
         break;
     case kIROp_CastDescriptorHandleToResource:
+    // The untyped-handle casts need no type legalization: both operand and result legalize to
+    // a plain `uint`, so the cast is already a simple value (it forwards its operand at emit).
+    case kIROp_CastUIntToUntypedResourceHandle:
+    case kIROp_CastUntypedResourceHandleToUInt:
+    case kIROp_CastUIntToUntypedSamplerHandle:
+    case kIROp_CastUntypedSamplerHandleToUInt:
         result = LegalVal::simple(inst);
         break;
     case kIROp_DebugVar:

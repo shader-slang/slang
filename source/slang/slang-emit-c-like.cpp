@@ -459,6 +459,17 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
         }
         break;
 
+    case kIROp_UntypedResourceHandleType:
+    case kIROp_UntypedSamplerHandleType:
+        {
+            // An untyped descriptor-heap handle that no implicit conversion consumed lowers
+            // to its underlying `uint` heap index.
+            IRBuilder builder(type);
+            builder.setInsertBefore(type);
+            emitSimpleTypeAndDeclarator(builder.getUIntType(), declarator);
+        }
+        break;
+
     case kIROp_ArrayType:
         {
             auto arrayType = cast<IRArrayType>(type);
@@ -2568,6 +2579,12 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_CastResourceToDescriptorHandle:
     case kIROp_CastUInt64ToDescriptorHandle:
     case kIROp_CastDescriptorHandleToUInt64:
+    // The untyped-handle casts wrap/unwrap a `uint` that both sides lower to, so they are
+    // no-ops at emit and just forward their single operand.
+    case kIROp_CastUIntToUntypedResourceHandle:
+    case kIROp_CastUntypedResourceHandleToUInt:
+    case kIROp_CastUIntToUntypedSamplerHandle:
+    case kIROp_CastUntypedSamplerHandleToUInt:
         emitOperand(inst->getOperand(0), outerPrec);
         break;
     // Binary ops

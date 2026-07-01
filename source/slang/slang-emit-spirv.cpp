@@ -2709,6 +2709,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         SpvLiteralInteger::from32(2));
                 }
             }
+        case kIROp_UntypedResourceHandleType:
+        case kIROp_UntypedSamplerHandleType:
+            // An untyped descriptor-heap handle that survives to emit is just its underlying
+            // `uint` heap index (OpTypeInt 32 0).
+            return emitOpTypeInt(inst, SpvLiteralInteger::from32(32), SpvLiteralInteger::from32(0));
         case kIROp_SubpassInputType:
             return ensureSubpassInputType(inst, cast<IRSubpassInputType>(inst));
         case kIROp_TextureType:
@@ -2829,6 +2834,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_CastUInt2ToDescriptorHandle:
         case kIROp_CastUInt64ToDescriptorHandle:
         case kIROp_CastDescriptorHandleToUInt64:
+        case kIROp_CastUIntToUntypedResourceHandle:
+        case kIROp_CastUntypedResourceHandleToUInt:
+        case kIROp_CastUIntToUntypedSamplerHandle:
+        case kIROp_CastUntypedSamplerHandleToUInt:
         case kIROp_GlobalValueRef:
             {
                 auto inner = ensureInst(inst->getOperand(0));
@@ -5076,6 +5085,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_GlobalValueRef:
         case kIROp_CastUInt64ToDescriptorHandle:
         case kIROp_CastDescriptorHandleToUInt64:
+        case kIROp_CastUIntToUntypedResourceHandle:
+        case kIROp_CastUntypedResourceHandleToUInt:
+        case kIROp_CastUIntToUntypedSamplerHandle:
+        case kIROp_CastUntypedSamplerHandleToUInt:
             {
                 auto inner = ensureInst(inst->getOperand(0));
                 registerInst(inst, inner);

@@ -481,6 +481,29 @@ class DescriptorHandleType : public PointerLikeType
     FIDDLE(...)
 };
 
+// An opaque, untyped resource handle produced by indexing `ResourceDescriptorHeap[i]`.
+// It wraps a single `uint` heap index and only ever implicit-converts to a concrete
+// resource (CBV_SRV_UAV) type or to a resource-family `DescriptorHandle<T>`; the concrete
+// type is recovered from the conversion target. It is a plain builtin (not a
+// `PointerLikeType`) because it does not dereference. A handle that no conversion consumes
+// is emitted directly as its underlying `uint` (there is no separate lowering pass).
+FIDDLE()
+class UntypedResourceHandleType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+// An opaque, untyped sampler handle produced by indexing `SamplerDescriptorHeap[j]`.
+// Behaves exactly like `UntypedResourceHandleType` but only converts to sampler types or to
+// a sampler-family `DescriptorHandle<T>` (the resource/sampler heap families are kept
+// disjoint by the per-kind conversions in hlsl.meta.slang). It too is emitted as `uint` if
+// it survives to emit.
+FIDDLE()
+class UntypedSamplerHandleType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
 // Base class for types used when desugaring parameter block
 // declarations, includeing HLSL `cbuffer` or GLSL `uniform` blocks.
 FIDDLE(abstract)
