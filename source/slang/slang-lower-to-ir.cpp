@@ -3033,6 +3033,18 @@ IRType* lowerType(IRGenContext* context, Type* type)
     return loweredType;
 }
 
+// Emits a kIROp_NodeIDDecoration on `inst` from a checked NodeIDAttribute.
+// The decoration stores the lowered name string and array index operands consumed by HLSL emit.
+static void addNodeIDDecoration(IRGenContext* context, IRInst* inst, NodeIDAttribute* nodeIDAttr)
+{
+    auto builder = context->irBuilder;
+    IRStringLit* nameLit = builder->getStringValue(nodeIDAttr->name.getUnownedSlice());
+    SLANG_ASSERT(nodeIDAttr->arrayIndex);
+    IRInst* indexVal = getSimpleVal(context, lowerVal(context, nodeIDAttr->arrayIndex));
+    IRInst* ops[2] = {nameLit, indexVal};
+    builder->addDecoration(inst, kIROp_NodeIDDecoration, ops, 2);
+}
+
 void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
 {
     auto builder = context->irBuilder;
@@ -3176,6 +3188,24 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
             }
             if (op != kIROp_Invalid)
                 builder->addDecoration(inst, op);
+        }
+        else if (auto maxRecAttr = as<MaxRecordsAttribute>(mod))
+        {
+            IRInst* val = getSimpleVal(context, lowerVal(context, maxRecAttr->value));
+            builder->addDecoration(inst, kIROp_MaxRecordsDecoration, val);
+        }
+        else if (auto nodeIDAttr = as<NodeIDAttribute>(mod))
+        {
+            addNodeIDDecoration(context, inst, nodeIDAttr);
+        }
+        else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(mod))
+        {
+            IRInst* val = getSimpleVal(context, lowerVal(context, nodeArraySizeAttr->count));
+            builder->addDecoration(inst, kIROp_NodeArraySizeDecoration, val);
+        }
+        else if (as<AllowSparseNodesAttribute>(mod))
+        {
+            builder->addSimpleDecoration<IRAllowSparseNodesDecoration>(inst);
         }
         // TODO: what are other modifiers we need to propagate through?
     }
@@ -14331,6 +14361,47 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addWaveSizeDecoration(
                     irFunc,
                     getSimpleVal(subContext, lowerVal(subContext, waveSizeAttr->numLanes)));
+            }
+            else if (auto nodeLaunchAttr = as<NodeLaunchAttribute>(modifier))
+            {
+                IRStringLit* lit =
+                    getBuilder()->getStringValue(nodeLaunchAttr->mode.getUnownedSlice());
+                getBuilder()->addDecoration(irFunc, kIROp_NodeLaunchDecoration, lit);
+            }
+            else if (auto nodeIDAttr = as<NodeIDAttribute>(modifier))
+            {
+                subContext->irBuilder->setInsertBefore(irFunc);
+                addNodeIDDecoration(subContext, irFunc, nodeIDAttr);
+            }
+            else if (as<NodeIsProgramEntryAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRNodeIsProgramEntryDecoration>(irFunc);
+            }
+            else if (auto gridAttr = as<NodeMaxDispatchGridAttribute>(modifier))
+            {
+                subContext->irBuilder->setInsertBefore(irFunc);
+                IRInst* ops[3] = {
+                    getSimpleVal(subContext, lowerVal(subContext, gridAttr->x)),
+                    getSimpleVal(subContext, lowerVal(subContext, gridAttr->y)),
+                    getSimpleVal(subContext, lowerVal(subContext, gridAttr->z)),
+                };
+                getBuilder()->addDecoration(irFunc, kIROp_NodeMaxDispatchGridDecoration, ops, 3);
+            }
+            else if (auto fixedGridAttr = as<NodeDispatchGridAttribute>(modifier))
+            {
+                subContext->irBuilder->setInsertBefore(irFunc);
+                IRInst* ops[3] = {
+                    getSimpleVal(subContext, lowerVal(subContext, fixedGridAttr->x)),
+                    getSimpleVal(subContext, lowerVal(subContext, fixedGridAttr->y)),
+                    getSimpleVal(subContext, lowerVal(subContext, fixedGridAttr->z)),
+                };
+                getBuilder()->addDecoration(irFunc, kIROp_NodeDispatchGridDecoration, ops, 3);
+            }
+            else if (auto maxRecAttr = as<MaxRecordsAttribute>(modifier))
+            {
+                subContext->irBuilder->setInsertBefore(irFunc);
+                IRInst* val = getSimpleVal(subContext, lowerVal(subContext, maxRecAttr->value));
+                getBuilder()->addDecoration(irFunc, kIROp_MaxRecordsDecoration, val);
             }
             else if (as<ReadNoneAttribute>(modifier))
             {

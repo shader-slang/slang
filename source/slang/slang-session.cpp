@@ -20,7 +20,7 @@
 namespace Slang
 {
 
-// Helper function to find the neural.slang module path
+// Helper function to find the standard module root path.
 static String getStandardModuleDirPath()
 {
     // Get the path of the currently loaded libslang.so/slang.dll by using a known exported symbol
@@ -34,15 +34,15 @@ static String getStandardModuleDirPath()
     if (libslangDir.getLength() == 0)
         return String();
 
-    // TODO: Change this to SLANG_STANDARD_MODULE_DIR_NAME directory if we add more standard modules
     String stdModuleDirPath = Path::combine(libslangDir, SLANG_STANDARD_MODULE_DIR_NAME);
     return stdModuleDirPath;
 }
 
 static String findStandardModulePath(String const& stdModuleDirPath, String const& moduleName)
 {
-    // The neural module is always in the same directory as libslang.so/slang.dll
-    // e.g., bin/slang-standard-module/ on Windows, lib/slang-standard-module/ on Linux/Mac
+    // Standard modules are co-located with libslang.so/slang.dll under
+    // SLANG_STANDARD_MODULE_DIR_NAME.
+    // Hierarchical imports map to subdirectories, e.g. "slang/neural" or "experimental/workgraph".
     String stdModulePath = Path::combine(stdModuleDirPath, moduleName + ".slang-module");
 
     if (File::exists(stdModulePath))

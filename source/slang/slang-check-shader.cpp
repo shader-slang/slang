@@ -17,6 +17,9 @@
 namespace Slang
 {
 
+static constexpr char const* kNodeLaunchModeBroadcasting = "broadcasting";
+static constexpr char const* kNodeLaunchModeThread = "thread";
+
 // Direction of a semantic value (input from previous stage, or output to next stage)
 enum class SemanticDirection
 {
@@ -817,6 +820,11 @@ bool isBuiltinParameterType(Type* type)
 // which have no dedicated AST type class but carry an `IntrinsicTypeModifier`.
 static bool isIntrinsicTypeWithOp(Type* type, IROp op)
 {
+    SLANG_ASSERT(type);
+    type = as<Type>(type->resolve());
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+
     auto declRefType = as<DeclRefType>(type);
     if (!declRefType)
         return false;
@@ -1803,7 +1811,44 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // itself. GLSL allows each axis to be specified in a separate declaration,
     // so we merge all GLSLLayoutLocalSizeAttribute values into a single
     // NumThreadsAttribute.
-    if ((stage == Stage::Compute || stage == Stage::Mesh || stage == Stage::Amplification) &&
+    // Node shaders in thread-launch mode do not require [numthreads].
+    bool isThreadLaunchNode = false;
+    bool hasUncheckedNodeLaunchAttr = false;
+    if (stage == Stage::Node)
+    {
+        auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
+        for (auto modifier = entryPointFuncDecl->modifiers.first; modifier;
+             modifier = modifier->next)
+        {
+            auto uncheckedAttr = as<UncheckedAttribute>(modifier);
+            if (!uncheckedAttr || !uncheckedAttr->keywordName)
+                continue;
+
+            if (uncheckedAttr->keywordName->text.getUnownedSlice() == toSlice("NodeLaunch"))
+            {
+                hasUncheckedNodeLaunchAttr = true;
+                break;
+            }
+        }
+        if (!launchAttr && !hasUncheckedNodeLaunchAttr)
+        {
+            sink->diagnose(Diagnostics::NodeLaunchAttributeRequired{.decl = entryPointFuncDecl});
+        }
+        isThreadLaunchNode = launchAttr && launchAttr->mode == kNodeLaunchModeThread;
+    }
+
+    if (isThreadLaunchNode)
+    {
+        if (auto numThreadsAttr = entryPointFuncDecl->findModifier<NumThreadsAttribute>())
+        {
+            sink->diagnose(
+                Diagnostics::NumThreadsDisallowedOnThreadLaunchNode{.attr = numThreadsAttr});
+        }
+    }
+
+    bool needsNumThreads = stage == Stage::Compute || stage == Stage::Mesh ||
+                           stage == Stage::Amplification || stage == Stage::Node;
+    if (needsNumThreads && !isThreadLaunchNode && !hasUncheckedNodeLaunchAttr &&
         !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
     {
         auto parentDecl = entryPointFuncDecl->parentDecl;
@@ -1854,6 +1899,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             if (numThreads)
                 addModifier(entryPointFuncDecl, numThreads);
         }
+        if (stage == Stage::Node && !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
+        {
+            sink->diagnose(
+                Diagnostics::NodeNumThreadsAttributeRequired{.decl = entryPointFuncDecl});
+        }
     }
 
     bool canHaveVaryingInput = false;
@@ -1875,12 +1925,42 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     case Stage::Dispatch:
         shouldWarnOnNonUniformParam = false;
         break;
+    case Stage::Node:
+        {
+            canHaveVaryingInput = true;
+            auto hasMaxGrid = entryPointFuncDecl->findModifier<NodeMaxDispatchGridAttribute>();
+            auto hasFixedGrid = entryPointFuncDecl->findModifier<NodeDispatchGridAttribute>();
+            auto launchAttr = entryPointFuncDecl->findModifier<NodeLaunchAttribute>();
+            // Fixed and maximum dispatch-grid attributes are valid only on broadcasting nodes,
+            // e.g. `[NodeLaunch("broadcasting")] [NodeDispatchGrid(1, 1, 1)]`.
+            if ((hasMaxGrid || hasFixedGrid) && launchAttr &&
+                launchAttr->mode != kNodeLaunchModeBroadcasting)
+            {
+                sink->diagnose(
+                    Diagnostics::NodeGridAttributeRequiresBroadcasting{.decl = entryPointFuncDecl});
+            }
+            break;
+        }
     default:
         break;
     }
 
     for (const auto& param : entryPointFuncDecl->getParameters())
     {
+        if (auto allowSparseNodesAttr = param->findModifier<AllowSparseNodesAttribute>())
+        {
+            // `[AllowSparseNodes]` is valid on node output arrays, e.g.
+            // `[AllowSparseNodes] NodeOutputArray<MyRecord> outputs` or
+            // `[AllowSparseNodes] EmptyNodeOutputArray outputs`.
+            auto paramType = param->getType();
+            if (!isIntrinsicTypeWithOp(paramType, kIROp_NodeOutputArrayType) &&
+                !isIntrinsicTypeWithOp(paramType, kIROp_EmptyNodeOutputArrayType))
+            {
+                sink->diagnose(Diagnostics::AllowSparseNodesRequiresNodeOutputArray{
+                    .attr = allowSparseNodesAttr});
+            }
+        }
+
         if (isUniformParameterType(param->getType()))
         {
             // Automatically add `uniform` modifier to entry point parameters.
