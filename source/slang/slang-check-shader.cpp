@@ -852,6 +852,18 @@ bool isUniformParameterType(Type* type)
 // parameter kinds (e.g. plain varying scalars) where the annotation has no effect.
 // Arrays and modified types defer to their element/base type.
 //
+// A `struct` is compatible iff at least one of its fields — transitively, and
+// including fields inherited from a base struct — is compatible. This mirrors the
+// binder, which decomposes an aggregate through its computed type layout: a struct
+// whose fields include a texture/sampler accumulates a `DescriptorTableSlot` and so
+// the binder positions those fields. Consider `struct Resources { Texture2D tex;
+// SamplerState samp; }` used as `[[vk::binding(2,1)]] uniform Resources r`: the
+// binder places `r.tex` at (binding 2, set 1) and `r.samp` at (binding 3, set 1),
+// so the annotation is honored and the E38010 "ignored" warning must not fire.
+// Field types are substituted through the struct's `DeclRef` (so a generic field
+// such as `T tex` with `T = Texture2D` is recognized), and a nested struct field is
+// handled by the recursive call.
+//
 // This list must stay in sync with the binder's contract: an explicit
 // `[[vk::binding(...)]]` can only position a parameter that consumes a
 // `DescriptorTableSlot` or `SubElementRegisterSpace` (see
@@ -860,8 +872,10 @@ bool isUniformParameterType(Type* type)
 // here: a raw pointer is a buffer-device-address value in push-constant/uniform
 // storage with no descriptor slot to position, so the binder never honors a
 // binding on it. Listing it would silently suppress the E38010 diagnostic
-// (regression #11857).
-static bool isVkBindingCompatibleEntryPointParameterType(Type* type)
+// (regression #11857). The struct case relies on that same subset property: it
+// returns `true` only when a genuine descriptor-consuming leaf is found, so a
+// struct of only pointers or plain data still (correctly) warns.
+static bool isVkBindingCompatibleEntryPointParameterType(ASTBuilder* astBuilder, Type* type)
 {
     if (as<ResourceType>(type))
         return true;
@@ -880,9 +894,27 @@ static bool isVkBindingCompatibleEntryPointParameterType(Type* type)
     if (as<DynamicResourceType>(type))
         return true;
     if (auto arrayType = as<ArrayExpressionType>(type))
-        return isVkBindingCompatibleEntryPointParameterType(arrayType->getElementType());
+        return isVkBindingCompatibleEntryPointParameterType(
+            astBuilder,
+            arrayType->getElementType());
     if (auto modType = as<ModifiedType>(type))
-        return isVkBindingCompatibleEntryPointParameterType(modType->getBase());
+        return isVkBindingCompatibleEntryPointParameterType(astBuilder, modType->getBase());
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
+        {
+            for (auto fieldDeclRef :
+                 getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+            {
+                if (isVkBindingCompatibleEntryPointParameterType(
+                        astBuilder,
+                        getType(astBuilder, fieldDeclRef)))
+                    return true;
+            }
+            if (auto baseStructType = findBaseStructType(astBuilder, structDeclRef))
+                return isVkBindingCompatibleEntryPointParameterType(astBuilder, baseStructType);
+        }
+    }
     return false;
 }
 
@@ -2243,11 +2275,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // Note that this only checks when they're used on entry point parameters.
     bool supportsVkBindingOnEntryPointParameters =
         _allTargetsSupportVkBindingOnEntryPointParameters(linkage);
+    auto astBuilder = linkage->getASTBuilder();
     for (const auto& param : entryPointFuncDecl->getParameters())
     {
         bool supportsVkBindingOnParameter =
             supportsVkBindingOnEntryPointParameters &&
-            isVkBindingCompatibleEntryPointParameterType(param->getType());
+            isVkBindingCompatibleEntryPointParameterType(astBuilder, param->getType());
         if (!supportsVkBindingOnParameter && param->findModifier<GLSLBindingAttribute>())
         {
             sink->diagnose(Diagnostics::UnhandledModOnEntryPointParameter{
