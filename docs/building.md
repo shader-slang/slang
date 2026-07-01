@@ -246,6 +246,7 @@ works for any given binary.
 | `SLANG_VERSION`                       | Latest `v*` tag               | The project version, detected using git if available                                                                                     |
 | `SLANG_DXC_BINARY_URL`                | Stable DXC release URL        | URL of the prebuilt DXC binary archive to download; overrides the default release URL and skips GLIBC auto-detection on Linux            |
 | `SLANG_DXC_BUILD_FROM_SOURCE`         | Unset                         | `ON`: build DXC from source on Windows, Linux, and macOS; `OFF`: use prebuilt when available; unset: build from source on macOS and auto-select on native Linux x86_64 (see [DXC GLIBC auto-detection](#dxc-glibc-auto-detection)) |
+| `DXC_ROOT_DIR`                        | ``                            | Hint for `find_package(DXC)` when `SLANG_USE_SYSTEM_DXC=ON`: a DXC install prefix laid out as `include/dxc/dxcapi.h`, `lib/` for the linker library, and (on Windows) `bin/` for the `.dll` runtime. |
 | `SLANG_EMBED_CORE_MODULE`             | `TRUE`                        | Build slang with an embedded version of the core module                                                                                  |
 | `SLANG_EMBED_CORE_MODULE_SOURCE`      | `TRUE`                        | Embed the core module source in the binary                                                                                               |
 | `SLANG_ENABLE_DXIL`                   | `TRUE`                        | Enable generating DXIL using DXC                                                                                                         |
@@ -276,23 +277,40 @@ works for any given binary.
 | `SLANG_GENERATORS_PATH`               | ``                            | Path to an installed `all-generators` target for cross compilation                                                                       |
 | `SLANG_IGNORE_ABORT_MSG`              | `FALSE`                       | Suppress the Windows modal abort dialog at compile time (baked into all built executables; recommended for unattended/LLM-driven builds) |
 
-#### DXC GLIBC auto-detection
+#### DXC acquisition
 
-When `SLANG_DXC_BUILD_FROM_SOURCE` is unset on native Linux x86_64 (and
-`SLANG_DXC_BINARY_URL` is not set), CMake downloads the prebuilt DXC binary at
-configure time and inspects the GLIBC requirements of both `libdxcompiler.so`
-and `libdxil.so`. If either library requires a newer GLIBC than the system
-provides, or if the requirement or system GLIBC version cannot be detected, DXC
-is built from source instead. Successful detection results are cached in stamp
-files so subsequent reconfigures are fast. For example, if a DXC Linux prebuilt
-requires GLIBC 2.38 and the host provides an older GLIBC, CMake selects the
-source-build path. On macOS, Microsoft does not publish a prebuilt DXC package,
-so the default configuration builds DXC from source unless
+When `SLANG_ENABLE_DXIL=ON`, DXC is acquired by the first applicable rule:
+
+1. `SLANG_USE_SYSTEM_DXC=ON` — `find_package(DXC)` against an installed
+   DXC (hint with `DXC_ROOT_DIR`). Requires `dxc/dxcapi.h` and
+   `libdxcompiler`, plus `dxil` on Windows. A version mismatch against
+   the pinned tag is a warning, not an error.
+2. `SLANG_DXC_BUILD_FROM_SOURCE=ON` — build the pinned DXC from source.
+3. `SLANG_DXC_BINARY_URL=<url>` — download a custom prebuilt archive.
+4. Otherwise: on macOS, build from source (no Microsoft prebuilt exists);
+   elsewhere download the official Microsoft prebuilt, falling back to
+   source on native Linux x86_64 when GLIBC requirements are not met
+   (see below).
+
+##### DXC GLIBC auto-detection
+
+When the build reaches the auto-select branch on native Linux x86_64, CMake
+downloads the prebuilt DXC binary at configure time and inspects the GLIBC
+requirements of both `libdxcompiler.so` and `libdxil.so`. If either library
+requires a newer GLIBC than the system provides, or if the requirement or
+system GLIBC version cannot be detected, DXC is built from source instead.
+Successful detection results are cached in stamp files so subsequent
+reconfigures are fast. For example, if a DXC Linux prebuilt requires
+GLIBC 2.38 and the host provides an older GLIBC, CMake selects the
+source-build path. On macOS, Microsoft does not publish a prebuilt DXC
+package, so the default configuration builds DXC from source unless
 `SLANG_DXC_BINARY_URL` is set to a custom archive.
 
 ```mermaid
 flowchart TD
-    Start["Configure DXC support"] --> BuildFromSource{"SLANG_DXC_BUILD_FROM_SOURCE"}
+    Start["Configure DXC support"] --> UseSystem{"SLANG_USE_SYSTEM_DXC"}
+    UseSystem -->|ON| System["find_package(DXC); use installed DXC"]
+    UseSystem -->|OFF| BuildFromSource{"SLANG_DXC_BUILD_FROM_SOURCE"}
     BuildFromSource -->|ON| Source["Build DXC from source"]
     BuildFromSource -->|OFF| Prebuilt["Use a prebuilt binary when available"]
     BuildFromSource -->|unset| CustomUrl{"SLANG_DXC_BINARY_URL set?"}
@@ -338,23 +356,24 @@ error if they can't be found.
 
 ### Advanced options
 
-| Option                              | Default                              | Description                                                                                                                 |
-| ----------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `SLANG_ENABLE_DX_ON_VK`             | `FALSE`                              | Enable running the DX11 and DX12 tests on non-WARP Windows platforms via vkd3d-proton, requires system-provided d3d headers |
-| `SLANG_ENABLE_SLANG_RHI`            | `TRUE`                               | Enable building and using [slang-rhi](https://github.com/shader-slang/slang-rhi) for tests                                  |
-| `SLANG_USE_SYSTEM_MINIZ`            | `FALSE`                              | Build using system Miniz library instead of the bundled version in [./external](./external)                                 |
-| `SLANG_USE_SYSTEM_LZ4`              | `FALSE`                              | Build using system LZ4 library instead of the bundled version in [./external](./external)                                   |
-| `SLANG_USE_SYSTEM_VULKAN_HEADERS`   | `FALSE`                              | Build using system Vulkan headers instead of the bundled version in [./external](./external)                                |
-| `SLANG_USE_SYSTEM_SPIRV_HEADERS`    | `FALSE`                              | Build using system SPIR-V headers instead of the bundled version in [./external](./external)                                |
-| `SLANG_USE_SYSTEM_UNORDERED_DENSE`  | `FALSE`                              | Build using system unordered dense instead of the bundled version in [./external](./external)                               |
-| `SLANG_USE_SYSTEM_SPIRV_TOOLS`      | `FALSE`                              | Build using system SPIR-V tools library instead of the bundled version in [./external](./external)                          |
-| `SLANG_USE_SYSTEM_GLSLANG`          | `FALSE`                              | Build using system glslang library instead of the bundled version in [./external](./external)                               |
-| `SLANG_SPIRV_HEADERS_INCLUDE_DIR`   | ``                                   | Use this specific path to SPIR-V headers instead of the bundled version in [./external](./external)                         |
-| `SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC` | `FALSE` (`TRUE` on Windows)          | Enable mimalloc allocator for SPIRV-Tools to improve compilation performance                                                |
-| `SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN` | `TRUE`                             | **Will be removed.** Register the paired SPIRV-Tools `MergeReturnPass` + `InlineExhaustivePass` sequence in the slang-glslang SPIR-V optimizer pipeline; the `TRUE` default preserves existing SPIR-V output, and `FALSE` opts into the temporary workaround for [SPIRV-Tools#6711](https://github.com/KhronosGroup/SPIRV-Tools/issues/6711) |
-| `SLANG_EXCLUDE_DAWN`                | `FALSE` on Windows, `TRUE` elsewhere | Exclude Dawn WebGPU support from the build                                                                                  |
-| `SLANG_EXCLUDE_TINT`                | `FALSE`                              | Exclude slang-tint from the build (only relevant on Windows x64)                                                            |
-| `SLANG_ENABLE_TIME_TRACE`           | `FALSE`                              | Enable Clang time trace profiling for build analysis (Clang only)                                                           |
+| Option                                | Default                              | Description                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SLANG_ENABLE_DX_ON_VK`               | `FALSE`                              | Enable running the DX11 and DX12 tests on non-WARP Windows platforms via vkd3d-proton, requires system-provided d3d headers                                                                                                                                                                                                                  |
+| `SLANG_ENABLE_SLANG_RHI`              | `TRUE`                               | Enable building and using [slang-rhi](https://github.com/shader-slang/slang-rhi) for tests                                                                                                                                                                                                                                                   |
+| `SLANG_USE_SYSTEM_MINIZ`              | `FALSE`                              | Build using system Miniz library instead of the bundled version in [./external](./external)                                                                                                                                                                                                                                                  |
+| `SLANG_USE_SYSTEM_LZ4`                | `FALSE`                              | Build using system LZ4 library instead of the bundled version in [./external](./external)                                                                                                                                                                                                                                                    |
+| `SLANG_USE_SYSTEM_VULKAN_HEADERS`     | `FALSE`                              | Build using system Vulkan headers instead of the bundled version in [./external](./external)                                                                                                                                                                                                                                                 |
+| `SLANG_USE_SYSTEM_SPIRV_HEADERS`      | `FALSE`                              | Build using system SPIR-V headers instead of the bundled version in [./external](./external)                                                                                                                                                                                                                                                 |
+| `SLANG_USE_SYSTEM_UNORDERED_DENSE`    | `FALSE`                              | Build using system unordered dense instead of the bundled version in [./external](./external)                                                                                                                                                                                                                                                |
+| `SLANG_USE_SYSTEM_SPIRV_TOOLS`        | `FALSE`                              | Build using system SPIR-V tools library instead of the bundled version in [./external](./external)                                                                                                                                                                                                                                           |
+| `SLANG_USE_SYSTEM_GLSLANG`            | `FALSE`                              | Build using system glslang library instead of the bundled version in [./external](./external)                                                                                                                                                                                                                                                |
+| `SLANG_USE_SYSTEM_DXC`                | `FALSE`                              | Build using system DXC instead of the fetch / source-build paths in [`cmake/FetchDXC.cmake`](../cmake/FetchDXC.cmake); see [DXC acquisition](#dxc-acquisition)                                                                                                                                                                               |
+| `SLANG_SPIRV_HEADERS_INCLUDE_DIR`     | ``                                   | Use this specific path to SPIR-V headers instead of the bundled version in [./external](./external)                                                                                                                                                                                                                                          |
+| `SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC`   | `FALSE` (`TRUE` on Windows)          | Enable mimalloc allocator for SPIRV-Tools to improve compilation performance                                                                                                                                                                                                                                                                 |
+| `SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN` | `TRUE`                               | **Will be removed.** Register the paired SPIRV-Tools `MergeReturnPass` + `InlineExhaustivePass` sequence in the slang-glslang SPIR-V optimizer pipeline; the `TRUE` default preserves existing SPIR-V output, and `FALSE` opts into the temporary workaround for [SPIRV-Tools#6711](https://github.com/KhronosGroup/SPIRV-Tools/issues/6711) |
+| `SLANG_EXCLUDE_DAWN`                  | `FALSE` on Windows, `TRUE` elsewhere | Exclude Dawn WebGPU support from the build                                                                                                                                                                                                                                                                                                   |
+| `SLANG_EXCLUDE_TINT`                  | `FALSE`                              | Exclude slang-tint from the build (only relevant on Windows x64)                                                                                                                                                                                                                                                                             |
+| `SLANG_ENABLE_TIME_TRACE`             | `FALSE`                              | Enable Clang time trace profiling for build analysis (Clang only)                                                                                                                                                                                                                                                                            |
 
 ### LLVM Support
 
