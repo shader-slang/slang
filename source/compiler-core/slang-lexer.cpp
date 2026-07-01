@@ -1395,6 +1395,7 @@ IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink
     if ((cursor != e) && (ret != -1))
     {
         diagnose(sink, token.getLoc(), LexerDiagnostics::illegalCharacterLiteral);
+        ret = -1;
     }
 
     return ret;
