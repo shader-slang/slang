@@ -1233,9 +1233,24 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
             legalElementType = legalizeType(context, originalElementType);
 
             // When special types leak out of a parameter group, they need to
-            // be bound differently. Warn the user when this happens.
+            // be bound differently. Warn the user when this happens -- but only for
+            // source-authored groups (`cbuffer` / `ConstantBuffer<S>` /
+            // push_constants), where the user can actually restructure the type.
+            //
+            // Compiler-synthesized parameter groups -- the implicit
+            // `ConstantBuffer<EntryPointParams>` / `ConstantBuffer<GlobalParams>` that
+            // CollectEntryPointUniformParams and the global-uniform pass build to hold
+            // entry-point/global `uniform` data alongside resources -- are not authored
+            // by the user, so resources moving to separate binding slots is expected and
+            // the warning is just noise (issue #11825). Those two synthesized structs are
+            // the only types that carry `IRBinaryInterfaceTypeDecoration` (added at their
+            // creation in slang-ir-entry-point-uniforms.cpp / slang-ir-collect-global-uniforms.cpp),
+            // so we use that marker to identify and skip them. If a future producer marks
+            // some other type as a binary-interface struct, revisit whether this warning
+            // should still fire for it.
             if (legalElementType.flavor == LegalType::Flavor::pair &&
-                as<IRConstantBufferType>(type))
+                as<IRConstantBufferType>(type) &&
+                !originalElementType->findDecoration<IRBinaryInterfaceTypeDecoration>())
             {
                 // The parameter group type's source location can be empty
                 // (e.g. when it comes from a linked module). Fall back to the
