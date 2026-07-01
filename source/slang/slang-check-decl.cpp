@@ -18585,6 +18585,25 @@ static void checkDerivativeAttribute(
     FunctionDeclBase* funcDecl,
     PrimalSubstituteAttribute* attr);
 
+static Expr* _tryCreateImaginaryThisArgForDerivativeOfAttribute(
+    SemanticsVisitor* visitor,
+    FunctionDeclBase* funcDecl,
+    SourceLoc loc)
+{
+    // `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]` validate the current derivative
+    // method by making an imaginary call to `fwd_diff(original)` or `bwd_diff(original)`.
+    // If the derivative method has an implicit `this`, that imaginary call needs the same
+    // value as its first argument.
+    auto thisType = getTypeForThisExpr(visitor, funcDecl);
+    if (!thisType.type)
+        return nullptr;
+
+    auto thisArg = visitor->getASTBuilder()->create<VarExpr>();
+    thisArg->type = thisType;
+    thisArg->loc = loc;
+    return thisArg;
+}
+
 template<typename TDerivativeAttr, typename TDifferentiateExpr, typename TDerivativeOfAttr>
 void checkDerivativeOfAttributeImpl(
     SemanticsVisitor* visitor,
@@ -18612,6 +18631,13 @@ void checkDerivativeOfAttributeImpl(
     }
     List<Expr*> imaginaryArgs =
         getImaginaryArgsToFunc(astBuilder, funcDecl, derivativeOfAttr->loc).args;
+    if (auto thisArg = _tryCreateImaginaryThisArgForDerivativeOfAttribute(
+            visitor,
+            funcDecl,
+            derivativeOfAttr->loc))
+    {
+        imaginaryArgs.insert(0, thisArg);
+    }
     auto invokeExpr =
         visitor->constructUncheckedInvokeExpr(checkedHigherOrderFuncExpr, imaginaryArgs);
     SemanticsContext::ExprLocalScope scope;
