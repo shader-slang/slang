@@ -1,6 +1,7 @@
 // slang-ir-spirv-legalize.cpp
 #include "slang-ir-spirv-legalize.h"
 
+#include "slang-compiler.h"
 #include "slang-emit-base.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-clone.h"
@@ -2947,7 +2948,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // For SPIR-V, we don't skip this validation, because we might then be generating
         // invalid SPIR-V.
         bool skipFuncParamValidation = false;
-        validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
+        validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst(), true);
     }
 
     void updateFunctionTypes()

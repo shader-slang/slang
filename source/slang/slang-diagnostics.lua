@@ -5215,6 +5215,20 @@ warning(
 )
 
 err(
+    "spirv-fp16-vector-atomic-unsupported-width",
+    50013,
+    "invalid SPIR-V fp16 vector atomic width",
+    span { loc = "location", message = "SPIR-V fp16 vector atomics only support half2 and half4." }
+)
+
+err(
+    "spirv-fp16-vector-atomic-unsupported-operation",
+    50014,
+    "invalid SPIR-V fp16 vector atomic operation",
+    span { loc = "location", message = "SPIR-V fp16 vector atomics only support add, sub, min, max, and exchange operations." }
+)
+
+err(
     "invalid-mesh-stage-output-topology",
     50060,
     "invalid mesh output topology",

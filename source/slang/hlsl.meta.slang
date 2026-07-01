@@ -6554,9 +6554,13 @@ $}
     /// @param byteAddress The address at which to perform the atomic add operation.
     /// @param fp16x2Value Two 16-bit floating point values are packed into a 32-bit unsigned integer.
     /// @return The 2 16-bit floating point values packed into a 32-bit unsigned integer.
+    /// @remarks For SPIR-V, this helper requires `SPV_NV_shader_atomic_fp16_vector`
+    /// and emits a `half2` `OpAtomicFAdd`; the packed fp16x2 representation matches
+    /// the NVAPI HLSL ABI, but the underlying operation is a vector atomic.
     [__requiresNVAPI]
     [ForceInline]
-    [require(cuda_hlsl_spirv)]
+    [require(cuda_hlsl, sm_5_0)]
+    [require(spirv, spvAtomicFloat16VectorNV)]
     uint _NvInterlockedAddFp16x2(uint byteAddress, uint fp16x2Value)
     {
         __target_switch
@@ -6574,14 +6578,18 @@ $}
     /// @param byteAddress The address at which to perform the atomic add operation.
     /// @param value The value to add to the value at `byteAddress`.
     /// @param originalValue The original value at `byteAddress` before the add operation.
-    /// @remarks For SPIR-V, this function maps to `OpAtomicFAdd` and requires `SPV_EXT_shader_atomic_float16_add` extension.
+    /// @remarks For SPIR-V, this function requires `spvAtomicFloat16AddEXT`, which
+    /// is also satisfied by `spvAtomicFloat16VectorNV`. It maps to a scalar
+    /// `OpAtomicFAdd` on `half` unless `spvAtomicFloat16VectorNV` selects the
+    /// half-vector atomic path from `SPV_NV_shader_atomic_fp16_vector`.
     ///
     /// For HLSL, this function translates to an NVAPI call
     /// due to lack of native HLSL intrinsic for floating point atomic add. For CUDA, this function
     /// maps to `atomicAdd`.
     [__requiresNVAPI]
     [ForceInline]
-    [require(cuda_hlsl_spirv, sm_5_0)]
+    [require(cuda_hlsl, sm_5_0)]
+    [require(spirv, spvAtomicFloat16AddEXT)]
     void InterlockedAddF16(uint byteAddress, half value, out half originalValue)
     {
         __target_switch
@@ -6599,6 +6607,20 @@ $}
                 originalValue = asfloat16((uint16_t)(_NvInterlockedAddFp16x2(byteAddress, packedInput) >> 16));
             }
             return;
+        case spvAtomicFloat16VectorNV:
+            {
+                let buf = __getEquivalentStructuredBuffer<half2>(this);
+                if ((byteAddress & 2) == 0)
+                {
+                    originalValue = __atomic_add(buf[byteAddress/4], half2(value, half(0.0))).x;
+                }
+                else
+                {
+                    originalValue = __atomic_add(buf[byteAddress/4], half2(half(0.0), value)).y;
+                }
+                return;
+            }
+        case spvAtomicFloat16AddEXT:
         default:
             {
                 let buf = __getEquivalentStructuredBuffer<half>(this);

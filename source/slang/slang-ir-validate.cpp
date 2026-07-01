@@ -535,7 +535,64 @@ static bool isValidAtomicDest(bool skipFuncParamValidation, IRInst* dst)
     return false;
 }
 
-void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst)
+static IRVectorType* getFp16VectorAtomicType(IRInst* inst)
+{
+    auto valueType = getAtomicOperationValueType(inst);
+    auto vectorType = as<IRVectorType>(valueType);
+    if (!vectorType || vectorType->getElementType()->getOp() != kIROp_HalfType)
+        return nullptr;
+    return vectorType;
+}
+
+static void validateSPIRVFp16VectorAtomicOperation(DiagnosticSink* sink, IRInst* inst)
+{
+    auto vectorType = getFp16VectorAtomicType(inst);
+    if (!vectorType)
+        return;
+
+    switch (inst->getOp())
+    {
+    case kIROp_AtomicCompareExchange:
+        sink->diagnose(
+            Diagnostics::SpirvFp16VectorAtomicUnsupportedOperation{.location = inst->sourceLoc});
+        return;
+
+    case kIROp_AtomicExchange:
+    case kIROp_AtomicAdd:
+    case kIROp_AtomicSub:
+    case kIROp_AtomicMin:
+    case kIROp_AtomicMax:
+        {
+            auto elementCountInst = as<IRIntLit>(vectorType->getElementCount());
+            if (!elementCountInst)
+            {
+                sink->diagnose(Diagnostics::SpirvFp16VectorAtomicUnsupportedWidth{
+                    .location = inst->sourceLoc});
+                return;
+            }
+
+            auto elementCount = elementCountInst->getValue();
+            if (elementCount != 2 && elementCount != 4)
+            {
+                sink->diagnose(Diagnostics::SpirvFp16VectorAtomicUnsupportedWidth{
+                    .location = inst->sourceLoc});
+                return;
+            }
+        }
+        return;
+
+    default:
+        sink->diagnose(
+            Diagnostics::SpirvFp16VectorAtomicUnsupportedOperation{.location = inst->sourceLoc});
+        return;
+    }
+}
+
+static void validateAtomicOperationsImpl(
+    bool skipFuncParamValidation,
+    bool validateSPIRVFp16VectorAtomics,
+    DiagnosticSink* sink,
+    IRInst* inst)
 {
     switch (inst->getOp())
     {
@@ -558,6 +615,8 @@ void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink
                 sink->diagnose(Diagnostics::InvalidAtomicDestinationPointer{
                     .location = inst->sourceLoc,
                 });
+            if (validateSPIRVFp16VectorAtomics)
+                validateSPIRVFp16VectorAtomicOperation(sink, inst);
         }
         break;
 
@@ -567,8 +626,25 @@ void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink
 
     for (auto child : inst->getModifiableChildren())
     {
-        validateAtomicOperations(skipFuncParamValidation, sink, child);
+        validateAtomicOperationsImpl(
+            skipFuncParamValidation,
+            validateSPIRVFp16VectorAtomics,
+            sink,
+            child);
     }
+}
+
+void validateAtomicOperations(
+    bool skipFuncParamValidation,
+    DiagnosticSink* sink,
+    IRInst* inst,
+    bool validateSPIRVFp16VectorAtomics)
+{
+    validateAtomicOperationsImpl(
+        skipFuncParamValidation,
+        validateSPIRVFp16VectorAtomics,
+        sink,
+        inst);
 }
 
 static void validateVectorOrMatrixElementType(
@@ -823,7 +899,7 @@ bool validateStructuredBufferResourceTypes(
 
 void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, DiagnosticSink* sink)
 {
-    validateAtomicOperations(skipFuncParamValidation, sink, module->getModuleInst());
+    validateAtomicOperations(skipFuncParamValidation, sink, module->getModuleInst(), false);
 }
 
 static void collectAssumeAddressInsts(IRInst* inst, List<IRInst*>& out)

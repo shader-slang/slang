@@ -714,6 +714,10 @@ Extensions
 `SPV_NV_ray_tracing_motion_blur`
 > Represents the SPIR-V extension for ray tracing motion blur.
 
+`SPV_NV_shader_atomic_fp16_vector`
+> Represents the SPIR-V extension for vector atomic float 16 add/min/max/exchange operations.
+> Vector atomic sub is emitted as a negated vector atomic add.
+
 `SPV_NV_shader_image_footprint`
 > Represents the SPIR-V extension for shader image footprint.
 
@@ -738,6 +742,11 @@ Extensions
 
 `spvAtomicFloat16MinMaxEXT`
 > Represents the SPIR-V capability for atomic float 16 min/max operations.
+
+`spvAtomicFloat16VectorNV`
+> Represents the SPIR-V capability for vector atomic float 16 add/min/max/exchange operations
+> from `SPV_NV_shader_atomic_fp16_vector`. Vector atomic sub is emitted as a negated
+> vector atomic add. Implies `spvAtomicFloat16AddEXT`.
 
 `spvAtomicFloat32AddEXT`
 > Represents the SPIR-V capability for atomic float 32 add operations.
