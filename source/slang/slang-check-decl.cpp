@@ -19968,12 +19968,19 @@ struct CapabilityDeclReferenceVisitor
         if (!derivativeFuncDecl->findModifier<RequireCapabilityAttribute>())
             return;
         this->ensureDecl(derivativeFuncDecl, DeclCheckState::CapabilityChecked);
-        // Point the provenance note at the derivative function, which is where the user
-        // declared both the `[require]` and the derivative linkage.
+        // Point the provenance note at the derivative function's name, which is where the
+        // user declared both the `[require]` and the derivative linkage. The `see-using-of`
+        // note pairs the decl name with this location, so use the identifier location
+        // (`getNameLoc()`) for a stable caret rather than `Decl::loc`, which is not
+        // guaranteed to sit on the identifier. Fall back to `loc` if the name has no
+        // location.
+        SourceLoc provenanceLoc = derivativeFuncDecl->getNameLoc();
+        if (!provenanceLoc.isValid())
+            provenanceLoc = derivativeFuncDecl->loc;
         handleProcessFunc(
             derivativeFuncDecl,
             derivativeFuncDecl->inferredCapabilityRequirements,
-            derivativeFuncDecl->loc);
+            provenanceLoc);
     }
     // Propagate the `[require]` capability requirements of `primalFuncDecl`'s user-defined
     // forward (`wantForward == true`) or backward (`wantForward == false`) derivative onto
