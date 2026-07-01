@@ -190,6 +190,7 @@ extern "C"
 }
 
 // Disassemble the given SPIRV-ASM instructions and return the result as a string.
+// The caller owns *outString and must release it with glslang_freeDisassembly().
 extern "C"
 #ifdef _MSC_VER
     _declspec(dllexport)
@@ -236,6 +237,18 @@ extern "C"
     }
 }
 
+// Free a disassembly buffer returned by glslang_disassembleSPIRVWithResult.
+extern "C"
+#ifdef _MSC_VER
+    _declspec(dllexport)
+#else
+    __attribute__((__visibility__("default")))
+#endif
+        void glslang_freeDisassembly(char* disassembly)
+{
+    delete[] disassembly;
+}
+
 
 // Disassemble the given SPIRV-ASM instructions.
 extern "C"
@@ -250,7 +263,7 @@ extern "C"
     auto succ = glslang_disassembleSPIRVWithResult(contents, contentsSize, &result);
     if (result)
         fprintf(stdout, "%s\n", result);
-    delete[] result;
+    glslang_freeDisassembly(result);
     return succ;
 }
 
