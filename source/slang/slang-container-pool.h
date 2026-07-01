@@ -94,9 +94,8 @@ struct ContainerPool
         // followed by many tiny uses: every return clears the same large table even though the live
         // count stays small. Track that pattern per slot and only release the buckets after it
         // repeats, so an occasional small use after a large pass does not cause allocation churn.
-        bool isUnderused =
-            bucketCount >= kContainerPoolHashSetMinRetireBucketCount &&
-            liveCount <= bucketCount / kContainerPoolHashSetRetireUnderuseDivisor;
+        bool isUnderused = bucketCount >= kContainerPoolHashSetMinRetireBucketCount &&
+                           liveCount <= bucketCount / kContainerPoolHashSetRetireUnderuseDivisor;
         if (!isUnderused)
         {
             m_hashSetUnderuseStreaks[objectIndex] = 0;
