@@ -8714,9 +8714,6 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
         suffixBaseType = BaseType::Double;
         break;
 
-    default:
-        SLANG_RELEASE_ASSERT(!"Unhandled floating point literal type");
-        // fall-through
     case FloatingPointLiteralType::BadSignificand:
         parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralNumber{
             .number = String(errorContent),
@@ -8729,6 +8726,10 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
             .suffix = String(errorContent),
             .location = token.loc});
         diagnosed = true;
+        break;
+
+    default:
+        SLANG_UNEXPECTED("Unhandled floating point literal type");
         break;
     }
 
