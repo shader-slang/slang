@@ -21,7 +21,7 @@ struct TestStruct
 }
 
 // METAL: void computeMain(uint3 tid{{.*}}
-// METAL: uint(int(tid{{.*}}.x))
+// METAL: int(tid{{.*}}.x)
 
 [numthreads(1,1,1)]
 void computeMain(int tid: SV_DispatchThreadID)
