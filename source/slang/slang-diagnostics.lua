@@ -3248,6 +3248,13 @@ err(
     span { loc = "stmt:Stmt", message = "duplicate cases not allowed within a 'switch' statement" }
 )
 
+err(
+    "switch-without-cases",
+    30606,
+    "'switch' statement body has no 'case' or 'default' labels",
+    span { loc = "stmt:Stmt", message = "statements in a 'switch' with no 'case' or 'default' labels are never executed and will be discarded" }
+)
+
 -- 310xx: link time specialization
 -- (definitions moved to slang-diagnostics-semantic-checking-7.lua)
 

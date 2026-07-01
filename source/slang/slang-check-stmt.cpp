@@ -363,16 +363,27 @@ void SemanticsStmtVisitor::validateCaseStmts(SwitchStmt* stmt, DiagnosticSink* s
     if (!blockStmt)
         return;
 
-    auto seqStmt = as<SeqStmt>(blockStmt->body);
-    if (!seqStmt)
-        return;
+    // A block stores more than one statement in a `SeqStmt`, but stores a single
+    // statement directly (with no `SeqStmt` wrapper) and an empty block as an
+    // `EmptyStmt`. Flatten all of these shapes into one list so the checks below
+    // inspect every body statement; otherwise a body that is a single statement
+    // (for example one `if`/`else` chain) would be skipped entirely.
+    List<Stmt*> bodyStmts;
+    if (auto seqStmt = as<SeqStmt>(blockStmt->body))
+        bodyStmts.addRange(seqStmt->stmts);
+    else if (blockStmt->body)
+        bodyStmts.add(blockStmt->body);
 
     bool hasDefaultStmt = false;
+    bool hasCaseOrDefaultLabel = false;
+    bool hasExecutableStmt = false;
     HashSet<Val*> caseStmtVals;
-    for (auto& sStmt : seqStmt->stmts)
+    for (auto sStmt : bodyStmts)
     {
         if (auto caseStmt = as<CaseStmt>(sStmt))
         {
+            hasCaseOrDefaultLabel = true;
+
             // check that all case tags are unique
             if (caseStmt->exprVal)
             {
@@ -387,6 +398,8 @@ void SemanticsStmtVisitor::validateCaseStmts(SwitchStmt* stmt, DiagnosticSink* s
         }
         else if (as<DefaultStmt>(sStmt))
         {
+            hasCaseOrDefaultLabel = true;
+
             // check that there is at most one `default` clause
             if (hasDefaultStmt)
             {
@@ -395,6 +408,21 @@ void SemanticsStmtVisitor::validateCaseStmts(SwitchStmt* stmt, DiagnosticSink* s
             }
             hasDefaultStmt = true;
         }
+        else if (!as<EmptyStmt>(sStmt))
+        {
+            // An ordinary statement that is neither a label nor an empty `;`.
+            hasExecutableStmt = true;
+        }
+    }
+
+    // A `switch` body that holds executable statements but no `case`/`default`
+    // label silently discards every one of those statements during lowering,
+    // because nothing in the body is reachable without a label to jump to. That
+    // is a miscompile, so diagnose it. An empty `switch` body or a body with only
+    // labels has nothing to discard and stays legal.
+    if (hasExecutableStmt && !hasCaseOrDefaultLabel)
+    {
+        sink->diagnose(Diagnostics::SwitchWithoutCases{.stmt = stmt});
     }
 }
 
