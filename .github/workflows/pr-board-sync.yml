@@ -71,13 +71,26 @@ name: PR Board Sync (reusable)
 #
 # Triggers and fork secrets (PUBLIC repo): callers drive this via privileged
 # events that DO receive the secret for fork PRs -- `pull_request_target` (PR
-# lifecycle/commits), `check_suite` (CI), `workflow_run` (the fork-review relay),
-# and `schedule` (the sweep). `pull_request_review` only receives the secret for
-# ORIGIN PRs; a fork review runs the fork head with no secret, so the caller
-# routes fork reviews through an unprivileged bridge whose completion fires a
-# privileged `workflow_run` here (see the dispatch's `workflow_run` branch). When
-# no token is delivered, every privileged step is gated off (HAS_TOKEN) and the
-# run skips cleanly; the sweep is the backstop.
+# lifecycle/commits), `workflow_run` (CI completion + the fork-review relay),
+# `status` (external commit statuses), and `schedule` (the sweep).
+# `pull_request_review` only receives the secret for ORIGIN PRs; a fork review
+# runs the fork head with no secret, so the caller routes fork reviews through an
+# unprivileged bridge whose completion fires a privileged `workflow_run` here
+# (see the dispatch's `workflow_run` branch). When no token is delivered, every
+# privileged step is gated off (HAS_TOKEN) and the run skips cleanly; the sweep
+# is the backstop.
+#
+# Why CI/check results come via `workflow_run` and `status`, NOT `check_suite`:
+# GitHub deliberately does not deliver `check_suite`/`check_run` events for suites
+# created by GitHub Actions (recursion prevention), so a `check_suite` trigger
+# never fires for this repo's Actions-based CI. `workflow_run` IS delivered for
+# Actions runs, so it carries "an Actions workflow finished" -- a CI failure (or
+# recovery) that lands after a PR's last push reaches the board in real time
+# instead of waiting for the nightly sweep. External, non-Actions checks instead
+# post a commit `status` (e.g. "SlangPy Tests", "license/cla", "CodeRabbit"),
+# which `computeTarget` folds into the CI rollup; the `status` event is the only
+# signal that carries those. A caller may still subscribe to `check_suite` for
+# any non-Actions, GitHub-App-created suites; the dispatch handles it.
 
 on:
   workflow_call:
@@ -160,12 +173,15 @@ jobs:
     runs-on: ubuntu-latest
     # Serialize events for the same PR so two near-simultaneous events (e.g.
     # opened + a fast synchronize) cannot double-write; cancel-in-progress: false
-    # lets the in-flight run finish and queues the next. A check_suite keys on its
-    # head SHA rather than a PR number, so it can still overlap a PR-keyed event --
-    # benign, since the assignment pick is deterministic and the Status writes are
-    # idempotent recomputes.
+    # lets the in-flight run finish and queues the next. The commit-scoped events
+    # (check_suite / workflow_run / status) key on their head SHA rather than a PR
+    # number, so they serialize against each other for the same commit -- which
+    # matters now that pr-ci-complete fans out to several gating workflows whose
+    # completions for one commit would otherwise run concurrently. They can still
+    # overlap a PR-number-keyed event, but that is benign: the assignment pick is
+    # deterministic and the Status writes are idempotent recomputes.
     concurrency:
-      group: pr-board-sync-${{ github.event.pull_request.number || github.event.check_suite.head_sha || github.run_id }}
+      group: pr-board-sync-${{ github.event.pull_request.number || github.event.check_suite.head_sha || github.event.workflow_run.head_sha || github.event.sha || github.run_id }}
       cancel-in-progress: false
     # HAS_TOKEN is false when SLANG_PR_BOT_TOKEN is not delivered to the run. On a
     # PUBLIC repo, GitHub withholds secrets from fork-PR head-context events
@@ -1049,11 +1065,25 @@ jobs:
               }
               if (!assignee) return;                    // no owner and no maintainer
 
+              // For a Community PR, also co-assign the original author. ProjectsV2
+              // has no people-typed custom field, so the built-in Assignees column
+              // is the only place an external contributor renders as a real,
+              // linked identity on the board -- co-assigning them is how we surface
+              // "who wrote it" alongside the owner. The owner stays first so it
+              // remains the "who owns this" pick. Best-effort: GitHub silently
+              // drops a non-assignable user (a PR's own author is assignable, so in
+              // practice this sticks). Bot/Internal PRs are unaffected -- a bot
+              // author is noise, and an Internal author is already the assignee.
+              const toAssign = [assignee];
+              if (source === SOURCE_COMMUNITY && info.authorLogin &&
+                  info.authorLogin.toLowerCase() !== assignee.toLowerCase()) {
+                toAssign.push(info.authorLogin);
+              }
               await github.rest.issues.addAssignees({
                 owner: context.repo.owner, repo: context.repo.repo,
-                issue_number: number, assignees: [assignee],
+                issue_number: number, assignees: toAssign,
               });
-              console.log(`assigned ${assignee} (source ${source})`);
+              console.log(`assigned ${toAssign.join(", ")} (source ${source})`);
 
               // Unrequest auto-assigned non-approvers (e.g. bmillsNV), coupled to
               // assignment exactly as the sweep does.
@@ -1250,13 +1280,30 @@ jobs:
               const suite = context.payload.check_suite || {};
               await reconcileByCommit(suite.head_sha, suite.pull_requests);
             } else if (ev === "workflow_run") {
-              // Stage 2 of the fork-review relay (see header): a fork PR's review
-              // can't get secrets, so an unprivileged caller bridge fires on the
-              // review and completes; this privileged run resolves the PR from the
-              // upstream run's head SHA and reconciles. Metadata only -- NEVER add a
-              // checkout here (the upstream ran fork-controlled context).
+              // Two privileged uses, both resolved the same way (by the upstream
+              // run's head SHA, since its pull_requests array is empty for fork
+              // PRs):
+              //   1. Gating-check completion: GitHub does not deliver check_suite
+              //      for Actions-created suites (recursion prevention), so a caller
+              //      relays a gating Actions workflow's completion (CI and the
+              //      lighter PR checks) here to recompute the target -- a failed
+              //      check goes to Snagged, a green run recovers it.
+              //   2. Stage 2 of the fork-review relay (see header): a fork PR's
+              //      review can't get secrets, so an unprivileged caller bridge
+              //      fires on the review and completes; this privileged run picks
+              //      that up.
+              // Metadata only -- NEVER add a checkout here (the upstream may have
+              // run in a fork-controlled context).
               const wr = context.payload.workflow_run || {};
               await reconcileByCommit(wr.head_sha, wr.pull_requests);
+            } else if (ev === "status") {
+              // A commit status posted by an external, non-Actions integration --
+              // e.g. "SlangPy Tests", "license/cla", or "CodeRabbit". computeTarget
+              // folds StatusContext results into the CI rollup (a failure -> the PR
+              // is Snagged), but these are NOT Actions check suites, so neither
+              // check_suite nor workflow_run ever carries them; the status event is
+              // the only signal. It is commit-scoped, so resolve the PR(s) by SHA.
+              await reconcileByCommit(context.payload.sha, null);
             }
 
       # --- Unrequest auto-assigned non-approver reviewers --------------------

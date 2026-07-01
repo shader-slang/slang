@@ -1,0 +1,59 @@
+name: PR Checks Complete Sync
+
+# Reconciles a PR's board Status when one of its gating GitHub Actions workflows
+# finishes, by relaying that workflow's completion into the reusable board-sync.
+#
+# Why this exists (and why pr-maintenance.yml's check_suite trigger is not
+# enough): GitHub deliberately does NOT deliver check_suite/check_run events for
+# suites created by GitHub Actions, to prevent recursive workflow runs. This
+# repo's checks are GitHub Actions, so the check_suite trigger never fires for
+# them -- a PR whose checks fail (or recover) after its last push would otherwise
+# sit in the wrong column (e.g. stuck in "In Review" instead of "Snagged") until
+# the nightly sweep. workflow_run IS delivered for Actions-created runs, so it is
+# the event that actually carries "a gating workflow finished" for this repo.
+#
+# Which workflows: the independent, PR-gating Actions workflows that produce a
+# pass/fail check. "CI" (ci.yml) is the heavyweight build/test umbrella and is
+# usually the last to finish, so when it completes the commit's full check rollup
+# has settled; the lighter checks are listed too so a PR is snagged in real time
+# even when only one of them fails (or when one finishes after CI). The reusable
+# workflow recomputes the target from the WHOLE rollup, so listing a workflow
+# only affects WHEN the recompute runs, never which checks it reads.
+#
+# Deliberately NOT listed:
+#  - The board-sync's own workflows ("PR Maintenance", "PR Review Fork Bridge",
+#    "PR Review Fork Apply", "PR Commit Status Sync", "PR Board Sweep (nightly)",
+#    and this one) -- a workflow_run keyed on them would trigger this caller in a
+#    loop.
+#  - "CI SlangPy Trigger Test" -- it only dispatches the SlangPy run; the actual
+#    result arrives later as the external "SlangPy Tests" commit status, handled
+#    by pr-commit-status.yml (the `status` event).
+#  - "Claude PR Review" -- an advisory review assist, not a merge gate.
+#
+# A workflow_run workflow runs in the base repo's PRIVILEGED context with secrets
+# even when the upstream check ran for a fork PR, which is exactly what the board
+# write needs. The reusable workflow's workflow_run dispatch branch resolves the
+# PR from the upstream run's head SHA (its pull_requests array is empty for fork
+# PRs) and recomputes the target Status. It does NO checkout (metadata only), so
+# running it in this privileged context is not a pwn-request vector.
+#
+# No conclusion guard: we react to every completion (failure -> Snagged, success
+# -> recovery to In Review/Approved); the recompute is idempotent. (workflow_run
+# only fires for workflow files on the default branch, so this activates once
+# merged to the default branch.)
+
+on:
+  workflow_run:
+    workflows:
+      - "CI"
+      - "Check Formatting (comment /format to auto-fix)"
+      - "Check Table of Contents (comment /regenerate-toc to auto-fix)"
+      - "Check GitHub Actions Workflows"
+      - "Verify PR Labels"
+    types: [completed]
+
+jobs:
+  board-sync:
+    uses: ./.github/workflows/pr-board-sync.yml
+    secrets:
+      SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}

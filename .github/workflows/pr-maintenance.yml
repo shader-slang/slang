@@ -7,11 +7,17 @@ name: PR Maintenance
 #
 #   uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
 #
-# pull_request_target and check_suite are privileged events that receive the
-# secret even for fork PRs, so they run here directly. pull_request_review only
-# receives the secret for ORIGIN PRs, so the job below skips it for forks; fork
-# reviews are handled by the pr-review-fork-bridge.yml -> pr-review-fork-apply.yml
+# pull_request_target is a privileged event that receives the secret even for
+# fork PRs, so it runs here directly. pull_request_review only receives the
+# secret for ORIGIN PRs, so the job below skips it for forks; fork reviews are
+# handled by the pr-review-fork-bridge.yml -> pr-review-fork-apply.yml
 # (workflow_run) relay. See pr-board-sync.yml for the board IDs and the secret.
+#
+# CI completion is NOT handled here. GitHub does not deliver check_suite events
+# for suites created by GitHub Actions (recursion prevention), so a check_suite
+# trigger never fires for this repo's Actions-based CI; CI completion is relayed
+# via workflow_run by pr-ci-complete.yml instead. The check_suite trigger below
+# is kept only to catch any non-Actions, GitHub-App-created check suites.
 
 on:
   pull_request_target:
@@ -28,7 +34,9 @@ on:
         dequeued,
       ]
   pull_request_review:
-    types: [submitted]
+    # dismissed matters too: dismissing a CHANGES_REQUESTED review (with no new
+    # commit) should move the PR out of Revising, and only this event signals it.
+    types: [submitted, dismissed]
   check_suite:
     types: [completed]
 
