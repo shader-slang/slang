@@ -3612,6 +3612,14 @@ err(
     span { loc = "param:Decl" }
 )
 
+-- 30705 is reserved for "multiple-depth-output-semantics" (#11863, in review).
+err(
+    "duplicate-system-value-semantic",
+    30706,
+    "duplicate system-value semantic '~semantic'; each system value can be declared at most once per entry point",
+    span { loc = "location" }
+)
+
 --
 -- 308xx: inheritance
 --
