@@ -3599,6 +3599,26 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
     else
     {
         // No direction modifier, or just `in`:
+
+        if (paramDecl->hasModifier<HLSLGroupSharedModifier>() &&
+            !paramDecl->hasModifier<InModifier>())
+        {
+            // A *bare* `groupshared` parameter -- one with no direction modifier at all -- names
+            // thread-group-shared memory: a single storage location shared by every invocation
+            // in the group. The default `in` mode would copy it by value, giving each invocation
+            // its own per-thread copy -- defeating the sharing and emitting no thread-group-shared
+            // storage at all. So a bare `groupshared` parameter is passed by reference instead.
+            //
+            // We use the mutable `borrow inout` mode because such scratch buffers are typically
+            // written as well as read. The scope is deliberately narrow: an *explicit* direction
+            // modifier takes precedence and is left unchanged -- `__ref`/`__constref`/`inout`/`out`
+            // are decided by the checks above, and an explicit `in groupshared` is excluded here so
+            // it keeps its by-value copy semantics (the user asked for a private per-thread copy).
+            // This mirrors the by-reference treatment of `HLSLPayloadModifier` above (which is
+            // read-only and so uses `borrow in`).
+            return ParamPassingMode::BorrowInOut;
+        }
+
         return ParamPassingMode::In;
     }
 }

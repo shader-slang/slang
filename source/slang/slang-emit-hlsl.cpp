@@ -2310,6 +2310,41 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     if (emitMeshOutputParam())
         return;
 
+    // HLSL forbids pairing the `groupshared` address-space keyword with an
+    // `in`/`out`/`inout` direction qualifier on a parameter: DXC rejects e.g.
+    // `groupshared inout uint s[64]` with "'inout' and 'groupshared' cannot be
+    // used together for a parameter". A `groupshared` parameter already names
+    // thread-group-shared memory by reference, so the direction wrapper that
+    // lowering attaches to a by-reference parameter (e.g. `borrow inout` for a
+    // writable scratch buffer) must be stripped before emission. We unwrap the
+    // parameter type to its value type and emit it without a direction keyword;
+    // the `groupshared` already emitted by `emitRateQualifiersAndAddressSpace`
+    // above carries the by-reference shared semantics on its own.
+    //
+    // A mesh-shader input payload is *also* lowered to a group-shared rate (see
+    // `HLSLPayloadModifier` in lowering), but it must keep flowing through
+    // `Super::emitSimpleFuncParamImpl`, whose `emitMeshShaderModifiers` emits
+    // its required `in payload` syntax. It is read-only (`borrow in`) so it never
+    // hits the illegal `groupshared inout` pairing this branch exists to fix, so
+    // we exclude it here and let the base emitter handle it.
+    if (as<IRGroupSharedRate>(param->getRate()) &&
+        !param->findDecoration<IRHLSLMeshPayloadDecoration>())
+    {
+        auto paramType = param->getDataType();
+        auto valueType = paramType;
+        if (auto outType = as<IROutParamTypeBase>(valueType))
+            valueType = outType->getValueType();
+        else if (auto refType = as<IRRefParamType>(valueType))
+            valueType = refType->getValueType();
+        else if (auto constRefType = as<IRBorrowInParamType>(valueType))
+            valueType = constRefType->getValueType();
+
+        emitType(valueType, getName(param));
+        emitSemantics(param);
+        emitPostDeclarationAttributesForType(paramType);
+        return;
+    }
+
     Super::emitSimpleFuncParamImpl(param);
 }
 
