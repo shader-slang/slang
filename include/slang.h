@@ -851,6 +851,7 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_MESH = 13,
         SLANG_STAGE_AMPLIFICATION = 14,
         SLANG_STAGE_DISPATCH = 15,
+        SLANG_STAGE_NODE = 16,
         //
         SLANG_STAGE_COUNT,
 
@@ -950,7 +951,7 @@ typedef uint32_t SlangSizeT;
     //
     // IMPORTANT: ABI STABILITY POLICY FOR CompilerOptionName
     //
-    // Every enumerator has an explicit integer value. Rules:
+    // Every enumerator except the terminal CountOf sentinel has an explicit integer value. Rules:
     //   1. NEVER insert a new enumerator in the middle of the list.
     //   2. NEVER remove an enumerator; rename to REMOVED_<Name> and keep the value.
     //   3. NEVER reuse an integer value from a removed/deprecated entry.
@@ -1203,6 +1204,12 @@ typedef uint32_t SlangSizeT;
                  //   of `1`, eliminating atomic contention (much faster, and avoids the GPU
                  //   watchdog timeouts heavy coverage can trigger) at the cost of exact
                  //   counts. Off by default.
+        // CLI-only query option `-<compiler>-version`: prints the version of the downstream
+        // <compiler> Slang would actually load for that pass-through (via
+        // IGlobalSession::getDownstreamCompilerVersion). It takes no value and is never stored on
+        // an option set; it only drives the print-and-continue handler in the command-line parser.
+        CompilerVersion = 153,
+
         SPIRVUnifiedDescriptorHeapStride =
             154, // bool: when set, emit each SPIRV resource descriptor-heap runtime array's
                  //   ArrayStride as the maximum of image and buffer descriptor sizes, so a
@@ -1210,12 +1217,8 @@ typedef uint32_t SlangSizeT;
                  //   stride. Opt-in; mutually exclusive with a non-zero
                  //   `-spirv-resource-heap-stride` (combining the two is an error).
 
-        // CLI-only query option `-<compiler>-version`: prints the version of the downstream
-        // <compiler> Slang would actually load for that pass-through (via
-        // IGlobalSession::getDownstreamCompilerVersion). It takes no value and is never stored on
-        // an option set; it only drives the print-and-continue handler in the command-line parser.
-        CompilerVersion = 153,
-
+        // Do not assign an explicit value to CountOf. It must remain one past the last option,
+        // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
     };
 

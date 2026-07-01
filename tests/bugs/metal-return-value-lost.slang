@@ -60,8 +60,8 @@ void computeMain(uint tid : SV_GroupIndex)
 // METAL: thread Vec_0 [[RET:_S[0-9]+]];
 // METAL: for(;;)
 // METAL: (&[[RET]])->data_0 = (&output_0)->data_0;
-// METAL: if(((&[[RET]])->data_0[int(0)]) == 30.0)
-// METAL: passed_0 = ((&[[RET]])->data_0[int(1)]) == 70.0;
+// METAL: if(((&[[RET]])->data_0[int(0)]) == 30.0f)
+// METAL: passed_0 = ((&[[RET]])->data_0[int(1)]) == 70.0f;
 
 // HLSL: Vec_0 [[RET:_S[0-9]+]];
 // HLSL: for(;;)
