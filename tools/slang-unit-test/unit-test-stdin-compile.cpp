@@ -1110,20 +1110,22 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteArtifactSymlinkPar
 
 struct DebugSpvFileCollector : Path::Visitor
 {
+    String directory;
     List<String>* files = nullptr;
 
     void accept(Path::Type type, const UnownedStringSlice& filename) SLANG_OVERRIDE
     {
         if (type == Path::Type::File)
-            files->add(String(filename));
+            files->add(Path::combine(directory, String(filename)));
     }
 };
 
-static SlangResult _collectDebugSpvFiles(List<String>& outFiles)
+static SlangResult _collectDebugSpvFiles(const String& directory, List<String>& outFiles)
 {
     DebugSpvFileCollector collector;
+    collector.directory = directory;
     collector.files = &outFiles;
-    SlangResult result = Path::find(Path::getCurrentPath(), "*.dbg.spv", &collector);
+    SlangResult result = Path::find(directory, "*.dbg.spv", &collector);
     return result == SLANG_E_NOT_FOUND ? SLANG_OK : result;
 }
 
@@ -1154,8 +1156,9 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
     TempCoverageCliFiles files;
     SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
 
+    String debugArtifactDirectory = Path::getParentDirectory(files.outputPath);
     List<String> debugFilesBefore;
-    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFilesBefore));
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugArtifactDirectory, debugFilesBefore));
 
     List<String> args;
     _addCoverageCliCompileArgs(args, files.sourcePath, true);
@@ -1171,7 +1174,7 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
         return SLANG_FAIL;
 
     List<String> debugFilesAfter;
-    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFilesAfter));
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugArtifactDirectory, debugFilesAfter));
 
     List<String> debugArtifactCandidates;
     for (const auto& file : debugFilesAfter)
@@ -1185,6 +1188,8 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
     ScopedDebugArtifactFile debugArtifact;
     debugArtifact.path = debugArtifactCandidates[0];
     String debugArtifactPath = debugArtifact.path;
+    if (Path::getParentDirectory(debugArtifactPath) != debugArtifactDirectory)
+        return SLANG_FAIL;
 
     File::remove(files.outputPath);
     File::remove(files.autoManifestPath);
@@ -1211,6 +1216,91 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
     if (File::exists(files.outputPath) || File::exists(debugArtifactPath) ||
         File::exists(files.autoManifestPath))
         return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+static SlangResult _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(
+    UnitTestContext* context,
+    bool useExplicitStdout)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    String currentPath = Path::getCurrentPath();
+    List<String> debugFilesBefore;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(currentPath, debugFilesBefore));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    if (useExplicitStdout)
+    {
+        args.add("-o");
+        args.add("-");
+    }
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00109", "requires an output file path"))
+        return SLANG_FAIL;
+    if (result.standardOutput.getLength() != 0)
+        return SLANG_FAIL;
+
+    List<String> debugFilesAfter;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(currentPath, debugFilesAfter));
+    for (const auto& file : debugFilesAfter)
+    {
+        if (!_containsFileName(debugFilesBefore, file))
+            return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
+static SlangResult _testSeparateDebugInfoStdoutWholeProgramFailsWithoutWritingSidecar(
+    UnitTestContext* context,
+    bool useExplicitStdout)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    String currentPath = Path::getCurrentPath();
+    List<String> debugFilesBefore;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(currentPath, debugFilesBefore));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    args.add("-whole-program");
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    if (useExplicitStdout)
+    {
+        args.add("-o");
+        args.add("-");
+    }
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00109", "requires an output file path"))
+        return SLANG_FAIL;
+    if (result.standardOutput.getLength() != 0)
+        return SLANG_FAIL;
+
+    List<String> debugFilesAfter;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(currentPath, debugFilesAfter));
+    for (const auto& file : debugFilesAfter)
+    {
+        if (!_containsFileName(debugFilesBefore, file))
+            return SLANG_FAIL;
+    }
 
     return SLANG_OK;
 }
@@ -1605,6 +1695,19 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeDiagnostic(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinDiagnostic(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpMentionsStdin(unitTestContext)));
+}
+
+SLANG_UNIT_TEST(SlangcSeparateDebugInfoOutput)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(unitTestContext, false)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(unitTestContext, true)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testSeparateDebugInfoStdoutWholeProgramFailsWithoutWritingSidecar(
+        unitTestContext,
+        false)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoStdoutWholeProgramFailsWithoutWritingSidecar(unitTestContext, true)));
 }
 
 SLANG_UNIT_TEST(SlangcCoverageManifestOutput)
