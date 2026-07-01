@@ -4050,6 +4050,16 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
     if (!a || !b)
         return false;
 
+    // Same implicit object: `this` vs `this`. Inside a method body an
+    // unqualified member `x` is rewritten to `MemberExpr(base=ThisExpr,
+    // decl=x)`, so the MemberExpr recursion below bottoms out here comparing
+    // the two `this` bases. ThisExpr does not derive from DeclRefExpr, so it
+    // needs its own case; both operands referring to `this` are the same
+    // storage. This is what makes `twoInoutInt(x, x)` in a method (i.e.
+    // `this.x` aliasing itself) still be diagnosed.
+    if (as<ThisExpr>(a))
+        return as<ThisExpr>(b) != nullptr;
+
     // Same member of the same base: s.x vs s.x, but not s.x vs t.x.
     //
     // This must be checked before the bare-DeclRefExpr case below, because

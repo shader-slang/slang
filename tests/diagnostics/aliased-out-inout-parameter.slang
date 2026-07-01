@@ -42,6 +42,32 @@ void twoInoutUint(inout uint a, inout uint b)
 
 void readBoth(int a, int b) {}
 
+// Regression for #11878 review: inside a method an unqualified member `x` is
+// `MemberExpr(base=ThisExpr, decl=x)`. The aliasing check must still diagnose
+// `twoInoutInt(x, x)` (this.x aliasing itself) via the ThisExpr base case,
+// while not flagging `this.x` against a different object's field.
+struct WithMethods
+{
+    int x;
+
+    [mutating]
+    void selfAlias()
+    {
+        // Positive: implicit this.x passed to both inout params.
+        twoInoutInt(x, x);
+//CHECK:            ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
+//CHECK:            ^ passing the same value to both may produce unexpected results
+    }
+
+    [mutating]
+    void otherObject(inout WithMethods other)
+    {
+        // Negative: this.x vs other.x are different objects — no warning
+        // expected (exhaustive mode fails on any spurious diagnostic).
+        twoInoutInt(this.x, other.x);
+    }
+}
+
 struct BoundingBox { int4 minBounds; }
 
 RWStructuredBuffer<BoundingBox> boundingBoxes;
