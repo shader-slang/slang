@@ -371,6 +371,13 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         REQUIRED_BY slang-test
         FOLDER test/tools
     )
+    # The scoped-core-debug-callback unit test exercises the render-test device cache
+    # (DeviceCache::acquireDebugBridge) to pin the #11856 fix without a GPU, so compile that
+    # render-test source into this module too.
+    target_sources(
+        gfx-unit-test
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/render-test/slang-test-device-cache.cpp
+    )
 
     slang_add_target(
         render-test

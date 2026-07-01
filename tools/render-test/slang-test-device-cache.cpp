@@ -27,6 +27,34 @@ uint64_t& DeviceCache::getNextCreationOrder()
     return instance;
 }
 
+std::unordered_map<
+    DeviceCache::DeviceCacheKey,
+    Slang::RefPtr<renderer_test::CoreToRHIDebugBridge>,
+    DeviceCache::DeviceCacheKeyHash>&
+DeviceCache::getBridgeCache()
+{
+    static std::unordered_map<
+        DeviceCacheKey,
+        Slang::RefPtr<renderer_test::CoreToRHIDebugBridge>,
+        DeviceCacheKeyHash>
+        instance;
+    return instance;
+}
+
+DeviceCache::DeviceCacheKey DeviceCache::makeKey(const rhi::DeviceDesc& desc)
+{
+    DeviceCacheKey key;
+    key.deviceType = desc.deviceType;
+    key.enableValidation = desc.enableValidation;
+    key.enableRayTracingValidation = desc.enableRayTracingValidation;
+    key.profileName = desc.slang.targetProfile ? desc.slang.targetProfile : "Unknown";
+    key.targetFlags = desc.slang.targetFlags;
+    key.defaultMatrixLayoutMode = desc.slang.defaultMatrixLayoutMode;
+    key.nvapiExtUavSlot = desc.nvapiExtUavSlot;
+    key.dx12ExperimentalFeatures = (desc.next != nullptr);
+    return key;
+}
+
 bool DeviceCache::DeviceCacheKey::operator==(const DeviceCacheKey& other) const
 {
     return deviceType == other.deviceType && enableValidation == other.enableValidation &&
@@ -100,15 +128,7 @@ SlangResult DeviceCache::acquireDevice(const rhi::DeviceDesc& desc, rhi::IDevice
     auto& nextCreationOrder = getNextCreationOrder();
 
     // Create cache key
-    DeviceCacheKey key;
-    key.deviceType = desc.deviceType;
-    key.enableValidation = desc.enableValidation;
-    key.enableRayTracingValidation = desc.enableRayTracingValidation;
-    key.profileName = desc.slang.targetProfile ? desc.slang.targetProfile : "Unknown";
-    key.targetFlags = desc.slang.targetFlags;
-    key.defaultMatrixLayoutMode = desc.slang.defaultMatrixLayoutMode;
-    key.nvapiExtUavSlot = desc.nvapiExtUavSlot;
-    key.dx12ExperimentalFeatures = (desc.next != nullptr);
+    DeviceCacheKey key = makeKey(desc);
 
     // Evict oldest device if we've reached the limit
     evictOldestDeviceIfNeeded();
@@ -150,9 +170,40 @@ SlangResult DeviceCache::acquireDevice(const rhi::DeviceDesc& desc, rhi::IDevice
 }
 
 
+Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> DeviceCache::acquireDebugBridge(
+    const rhi::DeviceDesc& desc)
+{
+    // CUDA devices are not cached (see acquireDevice), so each invocation gets a fresh device and
+    // therefore a fresh bridge, matching the uncached lifetime.
+    if (desc.deviceType == rhi::DeviceType::CUDA)
+    {
+        return renderer_test::createRetainedCoreToRHIDebugBridge();
+    }
+
+    std::lock_guard<std::mutex> lock(getMutex());
+    auto& bridgeCache = getBridgeCache();
+
+    DeviceCacheKey key = makeKey(desc);
+
+    auto it = bridgeCache.find(key);
+    if (it != bridgeCache.end())
+    {
+        return it->second;
+    }
+
+    Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> bridge =
+        renderer_test::createRetainedCoreToRHIDebugBridge();
+    bridgeCache[key] = bridge;
+    return bridge;
+}
+
+
 void DeviceCache::cleanCache()
 {
     std::lock_guard<std::mutex> lock(getMutex());
-    auto& deviceCache = getDeviceCache();
-    deviceCache.clear();
+    getDeviceCache().clear();
+    // Bridges remain alive via createRetainedCoreToRHIDebugBridge()'s process-global list, so any
+    // late message from a now-released device still hits a live (cleared) bridge rather than freed
+    // storage.
+    getBridgeCache().clear();
 }

@@ -1,4 +1,5 @@
 #include "../render-test/slang-support.h"
+#include "../render-test/slang-test-device-cache.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <atomic>
@@ -140,6 +141,57 @@ SLANG_UNIT_TEST(coreDebugCallbackGetStringReturnsIndependentStorage)
     SLANG_CHECK(first == second);
     // ...but backed by independent storage, not the bridge's shared buffer.
     SLANG_CHECK(first.getStringRepresentation() != second.getStringRepresentation());
+}
+
+// Pins the #11856 fix: the device cache must hand the same debug bridge back for a repeated device
+// key, so a later invocation that reuses a cached device binds the bridge that device is actually
+// wired to. Models two render-test invocations sharing one cached device, with no GPU: acquire the
+// bridge for a key, run an invocation scope, end it, then acquire the bridge for the same key and
+// confirm it is the same object and that the cached device's messages reach the second callback.
+//
+// Before the fix the harness minted a fresh bridge per invocation while the cached device kept the
+// first (now cleared) bridge, so the second acquisition would differ (bridgeB != bridgeA) and the
+// device's validation messages would be silently dropped.
+SLANG_UNIT_TEST(deviceCacheReusesDebugBridgeAcrossInvocations)
+{
+    using namespace renderer_test;
+
+    // A descriptor whose cache key is unique to this test, so it cannot collide with any other
+    // cached bridge entry in the process. The key drives bridge identity; no device is created.
+    rhi::DeviceDesc desc = {};
+    desc.deviceType = rhi::DeviceType::CPU; // any non-CUDA type (CUDA is not cached)
+    desc.enableValidation = true;
+    desc.slang.targetProfile = "device-cache-bridge-regression-11856";
+
+    // Invocation A: bind the bridge the cached device is wired to, capture a message, then end the
+    // invocation (scope clears the bridge's inner callback).
+    Slang::RefPtr<CoreToRHIDebugBridge> bridgeA = DeviceCache::acquireDebugBridge(desc);
+    CoreDebugCallback callbackA;
+    {
+        ScopedCoreDebugCallback scopedA(*bridgeA, &callbackA);
+        emitError(*bridgeA, "invocation A");
+    }
+    SLANG_CHECK(callbackA.getString() == "invocation A\n");
+
+    // Between invocations the bridge has no active callback, so a late device message is dropped
+    // rather than written to dead storage (the #11785 contract).
+    emitError(*bridgeA, "between invocations");
+
+    // Invocation B: the same key is a cache hit, so the cached device is still wired to bridgeA.
+    // acquireDebugBridge must return that same bridge.
+    Slang::RefPtr<CoreToRHIDebugBridge> bridgeB = DeviceCache::acquireDebugBridge(desc);
+    SLANG_CHECK(bridgeB == bridgeA);
+
+    CoreDebugCallback callbackB;
+    {
+        ScopedCoreDebugCallback scopedB(*bridgeB, &callbackB);
+        // The cached device emits through the bridge it was created with (bridgeA).
+        emitError(*bridgeA, "invocation B validation");
+    }
+    SLANG_CHECK(callbackB.getString() == "invocation B validation\n");
+
+    // The dropped between-invocations message reached neither callback.
+    SLANG_CHECK(callbackA.getString() == "invocation A\n");
 }
 
 SLANG_UNIT_TEST(coreDebugBridgeHandlesConcurrentMessages)

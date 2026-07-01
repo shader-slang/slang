@@ -24,6 +24,7 @@
 #pragma comment(lib, "advapi32")
 #endif
 
+#include <optional>
 #include <slang-rhi.h>
 #include <slang-rhi/acceleration-structure-utils.h>
 #include <slang-rhi/shader-cursor.h>
@@ -1769,10 +1770,11 @@ static SlangResult _innerMain(
         }
     }
 
-    auto debugCallback = renderer_test::createRetainedCoreToRHIDebugBridge();
-    renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
-        *debugCallback,
-        stdWriters->getDebugCallback());
+    // The debug bridge is bound below, once the device key is known, so a cache hit rebinds the
+    // live (cached) device's bridge instead of an unrelated fresh one (see #11856). Declared here
+    // so the binding outlives the device-setup block and stays active through rendering;
+    // ScopedCoreDebugCallback is non-movable, so std::optional defers its construction.
+    std::optional<renderer_test::ScopedCoreDebugCallback> scopedDebugCallback;
 
     // Use the profile name set on options if set
     input.profile = options.profileName.getLength() ? options.profileName : input.profile;
@@ -1909,7 +1911,6 @@ static SlangResult _innerMain(
         desc.deviceType = options.deviceType;
 
         desc.enableValidation = options.enableDebugLayers;
-        desc.debugCallback = debugCallback.Ptr();
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)
@@ -1961,6 +1962,18 @@ static SlangResult _innerMain(
         desc.nvapiExtUavSlot = uint32_t(nvapiExtnSlot);
         desc.slang.slangGlobalSession = session;
         desc.slang.targetProfile = options.profileName.getBuffer();
+
+        // All cache-key fields of `desc` are now set, so acquire the debug bridge keyed the same
+        // way as the device and bind this invocation's callback to it before the device is created.
+        // On a cache hit acquireDebugBridge returns the bridge the cached device is already wired
+        // to; on a miss the device is created with this same bridge (set as desc.debugCallback).
+        Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> debugBridge;
+        if (options.cacheRhiDevice)
+            debugBridge = DeviceCache::acquireDebugBridge(desc);
+        else
+            debugBridge = renderer_test::createRetainedCoreToRHIDebugBridge();
+        desc.debugCallback = debugBridge.Ptr();
+        scopedDebugCallback.emplace(*debugBridge, stdWriters->getDebugCallback());
         {
             if (options.enableDebugLayers)
             {
