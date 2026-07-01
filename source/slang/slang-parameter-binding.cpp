@@ -925,8 +925,19 @@ static void addExplicitParameterBinding(
             // Record that the particular binding space was
             // used by an explicit binding, so that we don't
             // claim it for auto-generated bindings that
-            // need to grab a full space
-            markSpaceUsed(context, parameterInfo->varLayout, semanticInfo.space);
+            // need to grab a full space.
+            //
+            // `InputAttachmentIndex` does not occupy a descriptor set: it lowers to
+            // `OpDecorateInputAttachmentIndex` only, never `OpDecorateDescriptorSet`, and its
+            // `semanticInfo.space` reaching here is a hardcoded placeholder `0` (the producers
+            // have no descriptor set to supply). Marking that placeholder space "used" would
+            // falsely occupy descriptor set 0 -- e.g. making a requested `-bindless-space-index 0`
+            // report unavailable. So skip the space-occupancy marking for this kind, while still
+            // recording the input-attachment index range below for overlap detection.
+            if (semanticInfo.kind != LayoutResourceKind::InputAttachmentIndex)
+            {
+                markSpaceUsed(context, parameterInfo->varLayout, semanticInfo.space);
+            }
 
             overlappedVarLayout = usedRangeSet->usedResourceRanges[(int)semanticInfo.kind].Add(
                 parameterInfo->varLayout,
@@ -4079,6 +4090,12 @@ static bool doesEntryPointParameterResourceNeedDefaultSpace(LayoutResourceKind k
     case LayoutResourceKind::VaryingOutput:
     case LayoutResourceKind::HitAttributes:
     case LayoutResourceKind::RayPayload:
+    // `InputAttachmentIndex` positions a Vulkan input-attachment index, not a
+    // descriptor-set-bound resource, so an entry-point parameter that consumes it (a
+    // `SubpassInput`) must not force allocation of a default descriptor space. Otherwise
+    // descriptor set 0 is reserved for nothing -- e.g. making a requested
+    // `-bindless-space-index 0` report unavailable when a `SubpassInput` is present.
+    case LayoutResourceKind::InputAttachmentIndex:
         return false;
     }
 }
