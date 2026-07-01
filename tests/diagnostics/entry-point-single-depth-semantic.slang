@@ -8,6 +8,7 @@
 // produced.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=RETONLY):-target spirv -entry retOnly -stage fragment
 
 //CHECK-NOT: E30705
 
@@ -16,11 +17,30 @@ struct FSOut
     float color : SV_Target;
 };
 
+// Single depth output on an `out` parameter, alongside a non-depth return-struct field.
 [shader("fragment")]
 FSOut main(float x, out float depth : SV_DepthGreaterEqual)
 {
     depth = x + 1.0;
     FSOut o;
+    o.color = x;
+    return o;
+}
+
+struct DepthOnly
+{
+    float d : SV_Depth;
+    float color : SV_Target;
+};
+
+// Single depth output living solely in a return-struct field must also compile clean:
+// the collector recurses into the struct but finds exactly one depth output.
+[shader("fragment")]
+DepthOnly retOnly(float x)
+//RETONLY-NOT: E30705
+{
+    DepthOnly o;
+    o.d = x + 1.0;
     o.color = x;
     return o;
 }
