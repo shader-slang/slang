@@ -190,6 +190,112 @@ public:
         return false;
     }
 
+    // Returns true when `deriv` is recognized as side-effect free for the
+    // carry-set tightening. Mirrors `isReadNoneCallee`'s structure for
+    // recursion through `IRSpecialize` / `IRGeneric` / autodiff translate
+    // ops, but also accepts a `[PreferRecompute]` *built-in* derivative as a
+    // positive purity signal — the macros in `diff.meta.slang` annotate the
+    // built-in math derivatives with `[PreferRecompute]` instead of
+    // `[__readNone]`, and at this phase (before `propagateFuncProperties`)
+    // they are not yet readNone-marked.
+    //
+    // `[PreferRecompute]` is only honored for built-in derivatives, gated on
+    // `[__target_intrinsic]` as the best-available built-in proxy at this
+    // phase. A user-authored derivative can carry plain `[PreferRecompute]`
+    // yet still have side effects — that form only requests recomputation and
+    // warns; it is not a purity contract — so trusting it for ordinary user
+    // functions would re-open the exact missing-`no_diff` bug #11374 fixes.
+    // Such user derivatives must carry real `[__readNone]` (handled by
+    // `isReadNoneCallee` above) to be trusted, and
+    // `[PreferRecompute(SideEffectBehavior.Allow)]` is never honored (it opts
+    // out of the side-effect-free guarantee).
+    //
+    // PROVISIONAL: `[__target_intrinsic]` is user-spellable, so a derivative
+    // marked with BOTH `[PreferRecompute]` and `__target_intrinsic` and a
+    // side-effecting body would still be wrongly trusted. That combination is
+    // pathological (an asm-leaf intrinsic has no Slang body to recompute), and
+    // no robust phase-local signal separates built-in pure derivatives from
+    // user code here (`propagateFuncProperties` runs later). The fully sound
+    // fix is to mark the pure built-in derivatives `[__readNone]` in
+    // `diff.meta.slang` and drop this proxy — deferred pending maintainer
+    // direction (see shader-slang/slang#11374).
+    bool isDerivativeAssumedReadNone(IRInst* deriv)
+    {
+        if (!deriv)
+            return false;
+
+        if (isReadNoneCallee(deriv))
+            return true;
+
+        if (as<IRTranslateBase>(deriv))
+        {
+            switch (deriv->getOp())
+            {
+            case kIROp_BackwardDifferentiatePrimal:
+            case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+            case kIROp_ForwardDifferentiate:
+            case kIROp_TrivialForwardDifferentiate:
+            case kIROp_TrivialBackwardDifferentiatePrimal:
+            case kIROp_FunctionCopy:
+                return isDerivativeAssumedReadNone(deriv->getOperand(0));
+            case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
+                return isDerivativeAssumedReadNone(deriv->getOperand(1));
+            default:
+                break;
+            }
+        }
+
+        // Wrappers may nest (e.g. IRSpecialize<IRTranslateBase<IRSpecialize<IRGeneric>>>),
+        // so recurse rather than unwrap iteratively.
+        if (auto specialize = as<IRSpecialize>(deriv))
+            return isDerivativeAssumedReadNone(specialize->getOperand(0));
+        if (auto generic = as<IRGeneric>(deriv))
+            return isDerivativeAssumedReadNone(findGenericReturnVal(generic));
+
+        if (auto func = as<IRFunc>(deriv))
+        {
+            auto preferRecompute = func->findDecoration<IRPreferRecomputeDecoration>();
+            if (!preferRecompute)
+                return false;
+            // Only trust `[PreferRecompute]` for built-in derivatives.
+            if (!func->findDecoration<IRTargetIntrinsicDecoration>())
+                return false;
+            // Operand 0 is the `SideEffectBehavior` (Warn = 0, Allow = 1; see
+            // core.meta.slang). Only the default `Warn` form is treated as
+            // side-effect free — `Allow` opts out of that guarantee.
+            enum
+            {
+                SideEffectBehavior_Allow = 1
+            };
+            if (auto behavior = as<IRIntLit>(preferRecompute->getOperand(0)))
+                return behavior->getValue() != SideEffectBehavior_Allow;
+            return true;
+        }
+        return false;
+    }
+
+    bool allAssociatedDerivativesReadNone(
+        DifferentiableTypeConformanceContext& ctx,
+        IRInst* callee)
+    {
+        // BackwardDerivativeContextRemat is intentionally omitted — its
+        // translate-ops are unconditionally readNone in isReadNoneCallee.
+        static const AnnotationKind kDerivativeKinds[] = {
+            AnnotationKind::ForwardDerivative,
+            AnnotationKind::BackwardDerivativeApply,
+            AnnotationKind::BackwardDerivativePropagate,
+        };
+        for (auto kind : kDerivativeKinds)
+        {
+            auto deriv = ctx.tryGetAssociationOfKind(callee, kind);
+            if (!deriv)
+                continue;
+            if (!isDerivativeAssumedReadNone(deriv))
+                return false;
+        }
+        return true;
+    }
+
     bool isInstInFunc(IRInst* inst, IRInst* func)
     {
         while (inst)
@@ -483,7 +589,16 @@ public:
                     // differentiable input. For non-readNone callees, fall
                     // back to the original conservative behavior of treating
                     // every differentiable-function call as carrying.
-                    if (!isReadNoneCallee(callee))
+                    //
+                    // The primary's readNone-ness alone is not enough: a
+                    // [__readNone] primary may have a user-defined
+                    // [ForwardDerivative] / [BackwardDerivative] variant
+                    // that writes to memory, and that variant is what the
+                    // autodiff transform actually emits at the call site. So
+                    // also require every associated derivative variant to be
+                    // readNone before treating the call as elidable (#11374).
+                    if (!isReadNoneCallee(callee) ||
+                        !allAssociatedDerivativesReadNone(diffTypeContext, callee))
                         return true;
 
                     // For readNone callees, a call carries a derivative only
