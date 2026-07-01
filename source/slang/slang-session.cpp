@@ -1808,7 +1808,12 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
     String moduleSrcPath = "";
 
     auto dependencyChunks = moduleChunk->getFileDependencies();
-    if (auto firstDependencyChunk = dependencyChunks.getFirst())
+    // The first dependency is the module's own source file. We still check it like the rest of
+    // the dependencies, but if that primary source is unavailable we accept the standalone
+    // precompiled module instead of treating it as stale. Missing later dependencies still
+    // indicate a stale source-backed module cache.
+    auto firstDependencyChunk = dependencyChunks.getFirst();
+    if (firstDependencyChunk)
     {
         moduleSrcPath = firstDependencyChunk->getValue();
 
@@ -1824,6 +1829,7 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
         }
     }
 
+    Index dependencyIndex = 0;
     for (auto dependencyChunk : dependencyChunks)
     {
         auto file = dependencyChunk->getValue();
@@ -1836,8 +1842,21 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
                 sourceFile = loadSourceFile(moduleSrcPath, file);
         }
         if (!sourceFile)
-            return false;
+        {
+            if (dependencyIndex == 0)
+            {
+                // If the module's own source file is unavailable, we can't prove staleness, so
+                // fall back to accepting the standalone precompiled module. Missing later
+                // dependencies still indicate a stale source-backed module cache.
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
         digestBuilder.append(sourceFile->getDigest());
+        dependencyIndex++;
     }
     return digestBuilder.finalize() == existingDigest;
 }
