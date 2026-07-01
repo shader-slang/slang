@@ -4930,6 +4930,11 @@ struct SemanticsDeclConformancesVisitor : public SemanticsDeclVisitorBase,
         }
 
         checkExtensionConformance(extensionDecl);
+
+        // Conformance checking has now marked any extension members that satisfy an interface
+        // requirement, so it is safe to look for same-signature collisions with the extended type
+        // (those interface-satisfying members are exempt).
+        checkExtensionMemberConflicts(extensionDecl);
     }
 
     // Build witness tables for generic type constraints to establish canonical
@@ -11211,6 +11216,162 @@ void SemanticsVisitor::checkExtensionConformance(ExtensionDecl* decl)
             continue;
 
         checkConformance(targetType, inheritanceDecl, decl);
+    }
+}
+
+// The broad kind of a member declaration, used to decide whether two same-named members can
+// collide. Two members only conflict when they fall in the same category; a name shared across
+// categories (e.g. a function and a nested type) is not an ambiguity Slang needs to warn about.
+enum class ExtensionMemberKind
+{
+    Other,    //< Not compared for #9660: inheritance clauses, constructors, subscripts, properties
+              //< -- out of scope for this interim diagnostic.
+    Callable, //< An ordinary `FuncDecl`, compared by overlapping signature.
+    Type,     //< A nested type, type alias, or associated type, compared by name alone.
+    Value,    //< A field or static variable, compared by name alone.
+};
+
+// Classify `member` into the category used for extension-member conflict detection. Returns
+// `Other` for declarations that should never participate in a conflict (so the caller can skip
+// them cheaply). For example a `struct`, `typedef`, and `associatedtype` are all `Type`, while a
+// member function is `Callable`.
+static ExtensionMemberKind getExtensionMemberKind(Decl* member)
+{
+    if (as<FuncDecl>(member))
+        return ExtensionMemberKind::Callable;
+    if (as<AggTypeDecl>(member) || as<SimpleTypeDecl>(member))
+        return ExtensionMemberKind::Type;
+    if (as<VarDeclBase>(member))
+        return ExtensionMemberKind::Value;
+    return ExtensionMemberKind::Other;
+}
+
+void SemanticsVisitor::checkExtensionMemberConflicts(ExtensionDecl* extensionDecl)
+{
+    // The builtin core/standard modules intentionally declare overlapping-signature members across
+    // the primary type and its 'extension's (for example a shared `__Element` typealias on several
+    // extensions of a builtin type), so this user-facing diagnostic does not apply to them.
+    if (isFromCoreModule(extensionDecl))
+        return;
+
+    // Exemption (ii): a free-form generic extension of a bare type parameter, e.g.
+    // `extension<T : IFoo> T { int defaulted() {...} }`, legitimately supplies default members to
+    // every conforming type, so its members are not in conflict with anything.
+    if (isDeclRefTypeOf<GenericTypeParamDecl>(extensionDecl->targetType))
+        return;
+
+    // Resolve the primary aggregate type declaration being extended. If the extension does not
+    // target a nominal aggregate type (e.g. it extends a builtin or a non-aggregate), there is no
+    // primary member list to compare against and no sibling-extension ordering to reason about.
+    auto declRefType = as<DeclRefType>(extensionDecl->targetType);
+    if (!declRefType)
+        return;
+    auto targetAggDeclRef = declRefType->getDeclRef().as<AggTypeDecl>();
+    if (!targetAggDeclRef)
+        return;
+    auto targetAggDecl = targetAggDeclRef.getDecl();
+
+    // Build the set of "other" member sources to compare each extension member against:
+    //   (a) the primary aggregate declaration's direct members, and
+    //   (b) sibling extensions of the same type that appear *before* this extension in the
+    //       candidate list.
+    //
+    // Comparing only against strictly-earlier siblings means each cross-extension pair is reported
+    // exactly once (by the later extension). The primary declaration is never an extension, so the
+    // base-vs-extension case is always reported here by the extension side.
+    List<ContainerDecl*> otherMemberSources;
+    otherMemberSources.add(targetAggDecl);
+
+    auto const& candidateExtensions = getCandidateExtensions(targetAggDeclRef, this);
+    auto thisExtensionIndex = candidateExtensions.indexOf(extensionDecl);
+    // An extension whose target was rejected is never registered as a candidate of that target, so
+    // it is absent from `candidateExtensions` and `indexOf` returns -1. The reachable case is
+    // `extension <interface> {...}`: an `InterfaceDecl` is an `AggTypeDecl` (so it passes the
+    // `as<AggTypeDecl>()` guard above), but extending an interface is itself an error
+    // (`InvalidExtensionOnInterface`), so the extension is diagnosed and never registered. Such an
+    // extension is already invalid and has no siblings to compare against, so there is nothing for
+    // this diagnostic to add — return rather than piling a second diagnostic onto broken code.
+    if (thisExtensionIndex < 0)
+        return;
+    // Comparing only against strictly-earlier siblings reports each cross-extension pair exactly
+    // once (by the later extension).
+    for (Index ii = 0; ii < thisExtensionIndex; ++ii)
+        otherMemberSources.add(candidateExtensions[ii]);
+
+    // The interface-satisfaction exemption below reads `IsOverridingModifier`, which conformance
+    // checking attaches to a member only while the container that owns that member is being
+    // conformance-checked. Module checking advances in source order, so a comparison source
+    // declared textually before its interface-conforming type may not have been conformance-checked
+    // yet when we run. Force every declaration whose modifiers we are about to inspect to
+    // `ReadyForConformances` so the exemption sees a stable answer; otherwise an `extension`
+    // declared before its interface would produce a spurious diagnostic on valid code.
+    // (`otherMemberSources[0]` is `targetAggDecl`, so the loop already covers the extended type.)
+    for (auto source : otherMemberSources)
+        ensureDecl(source, DeclCheckState::ReadyForConformances);
+
+    for (auto rawMember : extensionDecl->getDirectMemberDecls())
+    {
+        auto member = maybeGetInner(rawMember);
+        auto memberName = member->getName();
+        if (!memberName)
+            continue;
+
+        auto memberKind = getExtensionMemberKind(member);
+        if (memberKind == ExtensionMemberKind::Other)
+            continue;
+
+        // Exemption (i): a member that satisfies an interface requirement is an intended
+        // interface-implementation, not an ambiguity.
+        if (member->hasModifier<IsOverridingModifier>())
+            continue;
+
+        bool reported = false;
+        for (auto source : otherMemberSources)
+        {
+            for (auto rawOther : source->getDirectMemberDecls())
+            {
+                auto other = maybeGetInner(rawOther);
+                // `otherMemberSources` is the extended type plus strictly-earlier sibling
+                // extensions — never this extension — so `member` and `other` always come from
+                // different containers; the self-comparison guard is defensive, not load-bearing.
+                if (other == member)
+                    continue;
+                if (other->getName() != memberName)
+                    continue;
+                if (getExtensionMemberKind(other) != memberKind)
+                    continue;
+
+                // The other side satisfying an interface requirement is likewise intended.
+                if (other->hasModifier<IsOverridingModifier>())
+                    continue;
+
+                // Exemption (iii): callables only conflict when their signatures match.
+                // `doFunctionSignaturesMatch` does not consider the return type, so two members
+                // that differ only in their parameters (a legitimate overload set) are not a
+                // conflict.
+                if (memberKind == ExtensionMemberKind::Callable)
+                {
+                    // Generic member functions are out of scope for this interim diagnostic:
+                    // aligning two distinct generic parameter lists is not yet handled, so we skip
+                    // rather than rely on a comparison that would silently never match (the bare,
+                    // unsubstituted `DeclRef`s carry distinct generic parameter decls).
+                    if (as<GenericDecl>(rawMember) || as<GenericDecl>(rawOther))
+                        continue;
+
+                    DeclRef<FuncDecl> memberFuncRef(as<FuncDecl>(member));
+                    DeclRef<FuncDecl> otherFuncRef(as<FuncDecl>(other));
+                    if (!doFunctionSignaturesMatch(memberFuncRef, otherFuncRef))
+                        continue;
+                }
+
+                getSink()->diagnose(
+                    Diagnostics::AmbiguousExtensionMember{.member = member, .conflicting = other});
+                reported = true;
+                break;
+            }
+            if (reported)
+                break;
+        }
     }
 }
 
