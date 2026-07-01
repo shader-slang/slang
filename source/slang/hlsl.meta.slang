@@ -4516,7 +4516,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 //@public:
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray+1> location)
     {
         __target_switch
@@ -4669,7 +4669,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -4760,7 +4760,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
         get
         {
             __target_switch
@@ -4813,7 +4813,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 //@public:
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
     {
         __target_switch
@@ -4881,7 +4881,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv_wgsl, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_spirv_wgsl, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions + isArray + 1> locationAndSampleIndex)
     {
         return Load(__vectorReshape<Shape.dimensions + isArray>(locationAndSampleIndex), locationAndSampleIndex[Shape.dimensions + isArray]);
@@ -4889,7 +4889,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -4974,7 +4974,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
         get
         {
             __target_switch
@@ -4997,7 +4997,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
         get
         {
             __target_switch
