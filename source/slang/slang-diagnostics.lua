@@ -3553,6 +3553,13 @@ err(
     span { loc = "param:Decl" }
 )
 
+err(
+    "multiple-depth-output-semantics",
+    30705,
+    "a fragment entry point can declare at most one depth output, but both '~firstSemantic' and '~secondSemantic' system value semantics are present",
+    span { loc = "location" }
+)
+
 --
 -- 308xx: inheritance
 --
