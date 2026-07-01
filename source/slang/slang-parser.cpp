@@ -1387,8 +1387,7 @@ static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
     else if (parser->LookAheadToken(TokenType::StringLiteral))
     {
         auto nameToken = parser->ReadToken(TokenType::StringLiteral);
-        decl->nameAndLoc.name =
-            parser->getNamePool()->getName(getFileNameTokenValue(nameToken));
+        decl->nameAndLoc.name = parser->getNamePool()->getName(getFileNameTokenValue(nameToken));
         decl->nameAndLoc.loc = nameToken.loc;
         if (moduleDecl)
             moduleDecl->nameAndLoc = decl->nameAndLoc;
