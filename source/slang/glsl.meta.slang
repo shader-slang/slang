@@ -6919,8 +6919,8 @@ __glsl_extension(GL_EXT_shader_invocation_reorder)
 __glsl_extension(GL_EXT_ray_tracing_position_fetch)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl, ser_raygen_closesthit_miss)]
-[require(spirv, ser_raygen_closesthit_miss)]
+[require(glsl, ser_position_raygen_closesthit_miss)]
+[require(spirv, ser_position_raygen_closesthit_miss)]
 public void hitObjectGetIntersectionTriangleVertexPositionsEXT(hitObjectEXT hitObject, out vec3 positions[3])
 {
     __target_switch

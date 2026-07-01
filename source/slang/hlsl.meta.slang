@@ -24597,7 +24597,7 @@ struct HitObject
         /// GLSL helper: fetches the triangle vertex positions into an out array.
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_ray_tracing_position_fetch)
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_position_raygen_closesthit_miss)]
     [__NoSideEffect]
     void __glslGetTriangleVertexPositions(out float3 arr[3])
     {
@@ -24615,18 +24615,23 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_ray_tracing_position_fetch)
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_position_raygen_closesthit_miss)]
     [__NoSideEffect]
     float3[3] GetTriangleVertexPositions()
     {
         typedef float3[3] float3Arr3;
         __target_switch
         {
-        case glsl:
+        case _GL_EXT_shader_invocation_reorder:
             float3 output[3];
             __glslGetTriangleVertexPositions(output);
             return output;
-        case spirv:
+        case spvShaderInvocationReorderNV:
+            static_assert(false,
+                "GetTriangleVertexPositions() has no SPIRV NV equivalent. "
+                "Use SPV_EXT_shader_invocation_reorder instead.");
+            return float3Arr3();
+        case spvShaderInvocationReorderEXT:
             return spirv_asm
             {
                 OpExtension "SPV_KHR_ray_tracing_position_fetch";
