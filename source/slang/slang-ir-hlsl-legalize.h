@@ -10,16 +10,7 @@ namespace Slang
 class DiagnosticSink;
 class Session;
 
-struct IRFunc;
 struct IRModule;
-
-bool isBarrierFlagGetterOp(IROp op);
-IRInst* getBarrierFlagValueInst(IRInst* inst);
-uint32_t getKnownBarrierMemoryTypeFlags();
-uint32_t getKnownBarrierSemanticFlags();
-bool isValidBarrierMemoryTypeFlags(uint32_t flagVal);
-bool isValidBarrierSemanticFlags(uint32_t flagVal);
-bool isBarrierFlagValueCast(IRInst* castInst, IRType* fromType, IRType* toType);
 
 void legalizeNonStructParameterToStructForHLSL(IRModule* module);
 

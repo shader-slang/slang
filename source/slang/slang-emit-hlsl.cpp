@@ -3,7 +3,7 @@
 
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
-#include "slang-ir-hlsl-legalize.h"
+#include "slang-ir-hlsl-util.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
