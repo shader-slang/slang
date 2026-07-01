@@ -252,19 +252,6 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     // For now we are continuing to conflate all the subtype-ish relationships but not
     // tangling convertibility into it.
 
-    // First, make sure both sub type and super type decl are ready for lookup.
-    if (!(int(isSubTypeOptions) & int(IsSubTypeOptions::NoCaching)))
-    {
-        if (auto subDeclRefType = as<DeclRefType>(subType))
-        {
-            ensureDecl(subDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
-        }
-    }
-    if (auto superDeclRefType = as<DeclRefType>(superType))
-    {
-        ensureDecl(superDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
-    }
-
     SubtypeWitness* failureWitness = nullptr;
 
     // In the common case, we can use the pre-computed inheritance information for `subType`
@@ -281,7 +268,8 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // the facets that represent supertypes, and those
         // will be the ones that store a type on the facet.
         //
-        auto facetType = facet->getType()->resolve();
+        auto rawFacetType = facet->getType();
+        auto facetType = as<Type>(rawFacetType->resolve());
         if (!facetType)
             continue;
 
@@ -317,14 +305,15 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // box-rooted witness instead of one anchored at a free-floating `ThisType`.
         if (auto boxWitness = as<DeclaredSubtypeWitness>(witness))
         {
-            if (boxWitness->getSub() != subType)
+            if (boxWitness->getSub() != subType || boxWitness->getSup() != superType)
                 return m_astBuilder->getDeclaredSubtypeWitness(
                     subType,
-                    boxWitness->getSup(),
+                    superType,
                     boxWitness->getDeclRef());
         }
         return witness;
     }
+
     //
     // TODO: We could expand upon the test using the facet list above
     // by taking the facet lists of both `subType` and `superType`

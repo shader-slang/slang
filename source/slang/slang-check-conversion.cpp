@@ -2067,6 +2067,46 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
+    // The reverse direction is not an implicit conversion, but explicit cast/constructor syntax
+    // (`EnumTag(x)` or `(EnumTag)x`) should first coerce `x` to the enum's tag type and then wrap
+    // that tag value in the nominal enum type.
+    if (site == CoercionSite::ExplicitCoercion)
+    {
+        if (auto toEnumDeclRef = isDeclRefTypeOf<EnumDecl>(toType))
+        {
+            auto tagType = getTagType(m_astBuilder, toEnumDeclRef);
+            if (!tagType)
+                return false;
+
+            Expr* tagExpr = nullptr;
+            ConversionCost tagCost = kConversionCost_None;
+            if (_coerce(
+                    site,
+                    tagType,
+                    outToExpr ? &tagExpr : nullptr,
+                    fromType,
+                    fromExpr,
+                    sink,
+                    &tagCost,
+                    nullptr))
+            {
+                if (outCost)
+                    *outCost = tagCost + kConversionCost_Explicit;
+                if (outToExpr)
+                {
+                    auto enumExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                    enumExpr->type = toType;
+                    if (fromExpr)
+                        enumExpr->loc = fromExpr->loc;
+                    enumExpr->base = tagExpr;
+                    *outToExpr = enumExpr;
+                }
+                setWitnessOfConversionToBuiltinConversion();
+                return true;
+            }
+        }
+    }
+
     // matrix types with different layouts are convertible
     if (auto fromMatrixType = as<MatrixExpressionType>(fromType))
     {

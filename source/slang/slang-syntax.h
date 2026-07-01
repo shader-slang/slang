@@ -44,6 +44,34 @@ inline SubstExpr<Expr> getPackCountConstraintPackExpr(
     return declRef.substitute(astBuilder, declRef.getDecl()->packExpr);
 }
 
+inline DeclRef<Decl> getPackCountConstraintPackDeclRef(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    // The declaration checker stores the checked pack target in `packDeclRef`;
+    // `packExpr` remains only as source syntax for diagnostics and printing.
+    if (!declRef)
+        return DeclRef<Decl>();
+
+    auto packDeclRef = declRef.getDecl()->packDeclRef;
+    if (!packDeclRef)
+        return DeclRef<Decl>();
+
+    return substituteDeclRef(SubstitutionSet(declRef), astBuilder, packDeclRef);
+}
+
+inline IntVal* getPackCountConstraintActualCount(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    if (!declRef)
+        return nullptr;
+    auto val = declRef.getDecl()->actualCountVal;
+    if (!val)
+        return nullptr;
+    return as<IntVal>(val->substitute(astBuilder, SubstitutionSet(declRef)));
+}
+
 inline IntVal* getPackCountConstraintExpectedCount(
     ASTBuilder* astBuilder,
     DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)

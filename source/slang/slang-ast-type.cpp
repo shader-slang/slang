@@ -192,10 +192,13 @@ Val* DeclRefType::_substituteImplOverride(
     //
     if (auto satisfyingVal = substDeclRef.declRefBase->resolve())
     {
-        if (satisfyingVal != getDeclRef())
+        if (satisfyingVal != substDeclRef.declRefBase)
         {
             *ioDiff += 1;
-            return DeclRefType::create(astBuilder, substDeclRef);
+            if (auto satisfyingType = as<Type>(satisfyingVal))
+                return satisfyingType;
+            if (auto satisfyingDeclRef = as<DeclRefBase>(satisfyingVal))
+                return DeclRefType::create(astBuilder, DeclRef<Decl>(satisfyingDeclRef));
         }
     }
 
