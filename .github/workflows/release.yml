@@ -22,27 +22,27 @@ jobs:
               os: linux,
               platform: x86_64,
               runs-on: ubuntu-22.04,
-              compiler: gcc
+              compiler: gcc,
             }
           - {
               os: linux,
               platform: aarch64,
               runs-on: ubuntu-22.04-arm,
-              compiler: gcc
+              compiler: gcc,
             }
           - {
               os: linux,
               platform: wasm,
               runs-on: ubuntu-22.04,
               compiler: gcc,
-              build-slang-llvm: false
+              build-slang-llvm: false,
             }
           - {
               os: windows,
               platform: x86_64,
               arch: amd64,
               runs-on: windows-latest,
-              compiler: cl
+              compiler: cl,
             }
           - {
               os: windows,
@@ -50,21 +50,21 @@ jobs:
               arch: amd64_arm64,
               runs-on: windows-latest,
               compiler: cl,
-              extra-cmake-flags: "-DSLANG_ENABLE_CUDA=0"
+              extra-cmake-flags: "-DSLANG_ENABLE_CUDA=0",
             }
           - {
               os: macos,
               platform: x86_64,
               arch: x86_64,
               runs-on: macos-latest,
-              compiler: clang
+              compiler: clang,
             }
           - {
               os: macos,
               platform: aarch64,
               arch: arm64,
               runs-on: macos-latest,
-              compiler: clang
+              compiler: clang,
             }
 
           - { build-slang-llvm: false }
