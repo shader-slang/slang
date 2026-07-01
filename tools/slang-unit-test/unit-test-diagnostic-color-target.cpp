@@ -7,8 +7,9 @@
 using namespace Slang;
 
 // Compile a shader whose only diagnostic is emitted at the target/back-end stage and return the
-// diagnostics blob produced by getTargetCode(), as a string, with the session's DiagnosticColor
-// option set to `colorMode`.
+// diagnostics blob produced by getTargetCode(), as a string. When `setColorOption` is true the
+// session's DiagnosticColor option is set to `colorMode`; when false the option is left unset (a
+// plain default compile), and `colorMode` is ignored.
 //
 // A global variable is implicitly a global shader parameter; the resulting E39019
 // "global-uniform-not-expected" warning is reported during parameter binding, i.e. at the target
@@ -17,6 +18,7 @@ using namespace Slang;
 // so asserting on it would give a false pass.
 static String getTargetStageDiagnostics(
     slang::IGlobalSession* globalSession,
+    bool setColorOption,
     SlangDiagnosticColor colorMode)
 {
     const char* userSource = R"(
@@ -39,8 +41,11 @@ static String getTargetStageDiagnostics(
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &targetDesc;
-    sessionDesc.compilerOptionEntries = &colorOption;
-    sessionDesc.compilerOptionEntryCount = 1;
+    if (setColorOption)
+    {
+        sessionDesc.compilerOptionEntries = &colorOption;
+        sessionDesc.compilerOptionEntryCount = 1;
+    }
 
     ComPtr<slang::ISession> session;
     SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
@@ -81,7 +86,7 @@ SLANG_UNIT_TEST(diagnosticColorTargetStage)
     // ALWAYS: the target-stage diagnostic must be colored.
     {
         String diagnostics =
-            getTargetStageDiagnostics(globalSession, SLANG_DIAGNOSTIC_COLOR_ALWAYS);
+            getTargetStageDiagnostics(globalSession, true, SLANG_DIAGNOSTIC_COLOR_ALWAYS);
         // The expected target-stage diagnostic (E39019) must actually be present, so an unrelated
         // diagnostic cannot vacuously satisfy the color assertion.
         SLANG_CHECK(diagnostics.indexOf(toSlice("E39019")) != -1);
@@ -90,7 +95,19 @@ SLANG_UNIT_TEST(diagnosticColorTargetStage)
 
     // NEVER: the same diagnostic must not be colored (guards against a naive always-color fix).
     {
-        String diagnostics = getTargetStageDiagnostics(globalSession, SLANG_DIAGNOSTIC_COLOR_NEVER);
+        String diagnostics =
+            getTargetStageDiagnostics(globalSession, true, SLANG_DIAGNOSTIC_COLOR_NEVER);
+        SLANG_CHECK(diagnostics.indexOf(toSlice("E39019")) != -1);
+        SLANG_CHECK(diagnostics.indexOf(ansiEscape) == -1);
+    }
+
+    // Default: with DiagnosticColor unset, a plain compile must not color target-stage diagnostics
+    // (the sink stays at its AUTO default and the blob sink has no console writer). This pins the
+    // default-compile invariant and is a tripwire against any future change that starts
+    // force-materializing DiagnosticColor into the target-stage option set.
+    {
+        String diagnostics =
+            getTargetStageDiagnostics(globalSession, false, SLANG_DIAGNOSTIC_COLOR_AUTO);
         SLANG_CHECK(diagnostics.indexOf(toSlice("E39019")) != -1);
         SLANG_CHECK(diagnostics.indexOf(ansiEscape) == -1);
     }
