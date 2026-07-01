@@ -1,49 +1,86 @@
 # Operator Expressions
 
-In Slang:
-- ...
+Expressions are sequences of operators and operands. This page lists all operators and their canonical
+semantics. Operators in an expression are evaluated in an order according to [operator
+precedence](expressions-operator-precedence.md). Slang applications can declare custom implementations for
+most operators (TODO: see declarations / operator overloading).
 
-### Prefix Operator Expressions
+Operands are inputs for an operator. Operands are either atomic [expressions](expressions.md) or
+subexpressions, possibly with parentheses to indicate subexpression grouping.
 
-The following prefix operators are supported:
+Slang operators come in the following forms:
 
-| Operator 	| Description |
-|-----------|-------------|
-| `+`		| identity |
-| `-`		| arithmetic negation |
-| `~` 		| bit-wise Boolean negation |
-| `!`		| Boolean negation |
-| `++`		| increment in place |
-| `--`		| decrement in place |
+- **Postfix operators** — operators that apply to a single operand. The position of the operator is after the
+  operand. The associativity is left to right.
+- **Prefix operators** — operators that apply to a single operand. The position of the operator is before the
+  operand. The associativity is right to left.
+- **Binary operators** — operators that apply to two operands. The position of the operator is between the
+  operands (infix operators). The associativity is:
+  - left to right for binary operators other than assignment.
+  - right to left for assignment operators, including compound assignment.
+- **Ternary conditional operator** — special three-operand operator (see below). The associativity is from
+  right to left.
+- **Other operators** — Function call, generic application, subscript, member access, scope
 
-A prefix operator expression like `+val` is equivalent to a call expression to a function of the matching name `operator+(val)`, except that lookup for the function only considers functions marked with the `__prefix` keyword.
+## Semantics
 
-The built-in prefix `++` and `--` operators require that their operand is an l-value, and work as follows:
+### Prefix Operators
 
-* Evaluate the operand to produce an l-value
-* Read from the l-value to yield an _old value_
-* Increment or decrement the value to yield a _new value_
-* Write the new value to the l-value
-* Yield the new value
+| Operator 	| Operator function                  | Description                                  |
+|-----------|------------------------------------|----------------------------------------------|
+| `+`		| `__prefix R operator + (T)`        | identity (unary plus)                        |
+| `-`		| `__prefix R operator - (T)`        | arithmetic negation (unary minus)            |
+| `~` 		| `__prefix R operator ~ (T)`        | bitwise NOT (flip bits)                      |
+| `!`		| `__prefix R operator ! (T)`        | Boolean negation                             |
+| `++`		| `__prefix R operator ++ (inout T)` | increment in place, return incremented value |
+| `--`		| `__prefix R operator -- (inout T)` | decrement in place, return decremented value |
+| `*`		| `__prefix R operator * (T)`        | pointer dereference (experimental)           |
+| `&`		| `__prefix R operator & (__ref T)`  | address of (experimental)                    |
 
-### Postfix Operator Expressions
+Canonical semantics:
 
-The following postfix operators are supported:
+- The **identity (unary plus)** operator returns the value of the operand as is.
+- The **arithmetic negation (unary minus)** operator returns the negated value of the operand.
+- The **bitwise NOT** operator returns the operand with each bit negated individually.
+- The **Boolean negation** operator interprets the operand as a Boolean value (or vector or matrix of
+  Booleans) and negates the logical value (or values).
+- The **prefix increment** operator increments the operand in place and returns the incremented value.
+- The **prefix decrement** operator decrements the operand in place and returns the decremented value.
+- The **pointer dereference** operator returns the pointed value (L-value). The operand type is a pointer.
+- The **address of** operator returns a pointer to the operand. The operand must be
+  [addressable](expressions-value-categories.md).
 
-| Operator 	| Description |
-|-----------|-------------|
-| `++`		| increment in place |
-| `--`		| decrement in place |
+### Postfix Operators
 
-A postfix operator expression like `val++` is equivalent to a call expression to a function of the matching name `operator++(val)`, except that lookup for the function only considers functions marked with the `__postfix` keyword.
+| Operator 	| Operator function                   | Description                                  |
+|-----------|-------------------------------------|----------------------------------------------|
+| `++`		| `__postfix R operator ++ (inout T)` | increment in place, return incremented value |
+| `--`		| `__postfix R operator -- (inout T)` | decrement in place, return decremented value |
 
-The built-in prefix `++` and `--` operators require that their operand is an l-value, and work as follows:
+Canonical semantics:
 
-* Evaluate the operand to produce an l-value
-* Read from the l-value to yield an _old value_
-* Increment or decrement the value to yield a _new value_
-* Write the new value to the l-value
-* Yield the old value
+- The **postfix increment** operator increments the operand in place and returns the value before increment.
+- The **postfix decrement** operator decrements the operand in place and returns the value before decrement.
+
+## Binary Operators
+
+| Operator  | Operator function                   | Description                                  |
+|-----------|-------------------------------------|----------------------------------------------|
+| `*`       | `R operator * (T1, T2)`             | multiplication                               |
+| `/`       | `R operator / (T1, T2)`             | division                                     |
+| `%`       | `R operator % (T1, T2)`             | remainder                                    |
+| `+`       | `R operator + (T1, T2)`             | addition                                     |
+| `-`       | `R operator - (T1, T2)`             | subtraction                                  |
+| `<<`      | `R operator << (T1, T2)`            | bitwise left shift                           |
+| `>>`      | `R operator >> (T1, T2)`            | bitwise right shift                          |
+| `<`       | `R operator < (T1, T2)`             | less-than comparison                         |
+| `<=`      | `R operator <= (T1, T2)`            | less-than-or-equal-to comparison             |
+| `>`       | `R operator > (T1, T2)`             | greater-than comparison                      |
+| `>=`      | `R operator >= (T1, T2)`            | greater-than-or-equal-to comparison          |
+| `==`      | `R operator == (T1, T2)`            | equal-to comparison                          |
+| `!=`      | `R operator != (T1, T2)`            | not-equal-to comparison                      |
+
+TODO
 
 ### Infix Operator Expressions
 
