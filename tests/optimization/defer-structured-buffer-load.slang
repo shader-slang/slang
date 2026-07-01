@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry compute_main -stage compute
-//TEST:SIMPLE(filecheck=SPV): -target spirv
+//TEST:SIMPLE(filecheck=SPV): -target spirv -O0
 
 // Test that we can defer loading big structured buffer elements.
 
@@ -21,11 +21,14 @@ RWStructuredBuffer<float> outputBuffer;
 // Check that we don't load the entire `Root` struct and then do ElementExtract to get to `bigArray[0]`.
 // Instead we use access chain all the way to point to the required array element, and load just a single float.
 
+// `bottomGetValue` is not inlined, so the deferred load's result is
+// returned from its own function rather than stored directly at the
+// `compute_main` call site.
 // SPV: OpEntryPoint
 // SPV: %[[SBPTRARRAY:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer__arr_float_int_1024
 // SPV: %[[SBPTR:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_float %[[SBPTRARRAY]]
 // SPV: %[[VALUE:[A-Za-z0-9_]+]] = OpLoad %float %[[SBPTR]]
-// SPV: OpStore %{{.*}} %[[VALUE]]
+// SPV: OpReturnValue %[[VALUE]]
 
 // CUDA: __device__ float Bottom_bottomGetValue{{.*}}(uint [[PARAM0:[A-Za-z0-9_]+]], int [[PARAM1:[A-Za-z0-9_]+]])
 // CUDA:  __ldg(&(&(&(globalParams_0->sb_0){{\[}}[[PARAM0]]{{\]}})->bottom_0)->bigArray_0{{\[}}[[PARAM1]]{{\]}});

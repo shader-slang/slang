@@ -1,6 +1,11 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -O0
 
-// CHECK: OpImageFetch %v4float {{.*}} Lod %int_1
+// The mip level reaches `OpImageFetch` through `__TextureMip__init`'s return
+// value (a composite-extract of the boxed mip field), not as the literal
+// constant directly, so the constant is pinned at the call that carries it.
+// CHECK: %[[MIP:[A-Za-z0-9_]+]] = OpFunctionCall %__TextureMip %__TextureMip__init %int_1
+// CHECK: %[[LEVEL:[A-Za-z0-9_]+]] = OpCompositeExtract %int %[[MIP]] 0
+// CHECK: OpImageFetch %v4float {{.*}} Lod %[[LEVEL]]
 
 RWStructuredBuffer<float4> result;
 

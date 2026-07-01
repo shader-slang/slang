@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage raygeneration -emit-spirv-via-glsl
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage raygeneration
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage raygeneration -emit-spirv-via-glsl -O0
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage raygeneration -O0
 //   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage raygeneration -profile sm_6_5 -DNOMOTION
 
@@ -18,10 +18,10 @@
 // SPIRV-DAG: OpDecorate %{{.*}} Binding 1
 // SPIRV-DAG: OpDecorate %{{.*}} DescriptorSet 0
 
-// SPIRV: OpTraceRayKHR
-// SPIRV: OpTraceRayMotionNV
+// SPIRV-DAG: OpTraceRayKHR
+// SPIRV-DAG: OpTraceRayMotionNV
 
-// SPIRV: OpExecuteCallableKHR
+// SPIRV-DAG: OpExecuteCallableKHR
 
 // DXIL: main
 

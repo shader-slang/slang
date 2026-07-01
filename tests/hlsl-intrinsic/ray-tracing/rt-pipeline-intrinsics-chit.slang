@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage closesthit -emit-spirv-via-glsl
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage closesthit
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-assembly -entry main -stage closesthit -emit-spirv-via-glsl -O0
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage closesthit -O0
 //   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage closesthit -profile sm_6_5 -DNOMOTION
 
@@ -36,9 +36,9 @@
 // SPIRV-DAG: OpTypePointer HitAttribute{{NV|KHR}}
 // SPIRV-DAG: OpTypePointer CallableData{{NV|KHR}}
 
-// SPIRV: OpTraceRayKHR
-// SPIRV: OpTraceRayMotionNV
-// SPIRV: OpExecuteCallableKHR
+// SPIRV-DAG: OpTraceRayKHR
+// SPIRV-DAG: OpTraceRayMotionNV
+// SPIRV-DAG: OpExecuteCallableKHR
 
 // DXIL: main
 
