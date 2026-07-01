@@ -80,10 +80,10 @@ static ShaderModelInfo kKnownShaderModels[] = {
 #define _SM_HEX_DIGIT(x) _SM_HEX_DIGIT_INDIRECT(x)
 #define _SM_CONCAT_PASTE(a, b, c) a##b##c
 #define _SM_CONCAT(a, b, c) _SM_CONCAT_PASTE(a, b, c)
-#define SHADER_MODEL_INFO_DXIL(major, minor)                                          \
-    {                                                                                 \
-        (D3D_SHADER_MODEL)_SM_CONCAT(0x, major, _SM_HEX_DIGIT(minor)),                \
-            SLANG_DXIL, "sm_" #major "_" #minor                                       \
+#define SHADER_MODEL_INFO_DXIL(major, minor)                                        \
+    {                                                                               \
+        (D3D_SHADER_MODEL) _SM_CONCAT(0x, major, _SM_HEX_DIGIT(minor)), SLANG_DXIL, \
+            "sm_" #major "_" #minor                                                 \
     }
     SHADER_MODEL_INFO_DXIL(6, 0),
     SHADER_MODEL_INFO_DXIL(6, 1),
