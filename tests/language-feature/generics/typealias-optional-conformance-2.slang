@@ -29,13 +29,18 @@ struct Dual<T> where optional T : IA where optional T : IB
 
 typealias DualAlias<T> = Dual<T>;
 
-// Non-generic typealias of a constrained generic type (Bar<int>).
-// The alias has no type parameter, so the optional constraint cannot be satisfied.
+// Non-generic typealias of a constrained generic type.
+// BarInt: int does not implement IFoo, so the optional constraint is unsatisfied.
+// BarMyFoo: MyFoo : IFoo, so the optional constraint is satisfied.
+// Both aliases have no type parameter, so propagateOptionalConstraintsThroughTypealias
+// returns early (no parentGenericDecl) — the constraint is resolved at the typealias
+// body check site, not propagated.
 struct Bar<T> where optional T : IFoo
 {
     int test() { if (T is IFoo) return 1; return 0; }
 }
 typealias BarInt = Bar<int>;
+typealias BarMyFoo = Bar<MyFoo>;
 
 // --- Case 1: equality constraint ---
 // isEqualityConstraint must be copied to the synthesized constraint decl
@@ -93,6 +98,8 @@ void main()
     int c = DualAlias<int>().test();
     // Original: non-generic alias, constraint not satisfied for int.
     int d = BarInt().test();
+    // Non-generic alias, constraint satisfied for MyFoo.
+    int m = BarMyFoo().test();
 
     // Case 1: equality constraint alias — verify isEqualityConstraint propagation
     // by calling useEq, which requires T == int through the alias.
@@ -115,7 +122,7 @@ void main()
     // Case 5: functype alias is callable.
     int k = callFn((int x) => x + 1, 5);  // 6
 
-    printf("%d %d %d %d %d %d %d %d %d %d %d %d\n", a, b, c, d, e, f, g, h, i, j, k, l);
+    printf("%d %d %d %d %d %d %d %d %d %d %d %d %d\n", a, b, c, d, m, e, f, g, h, i, j, k, l);
 }
 
-// CHECK: 3 1 0 0 5 0 1 0 0 0 6 99
+// CHECK: 3 1 0 0 1 5 0 1 0 0 0 6 99
