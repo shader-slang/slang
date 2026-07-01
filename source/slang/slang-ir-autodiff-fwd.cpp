@@ -675,9 +675,9 @@ struct ForwardDiffTranslationContext
                     if (diffInst->getOp() != kIROp_VoidLit)
                         allVoid = false;
                 }
-                else if (auto operandDiffType = differentiateType(builder, operand->getDataType()))
+                else if (auto operandDiffType = differentiateType(builder, operand->getDataType());
+                         operandDiffType)
                 {
-                    SLANG_UNUSED(operandDiffType);
                     // Missing differentials for differentiable operands are constants with zero
                     // tangent, matching the generic construct fallback behavior.
                     auto operandDataType =
