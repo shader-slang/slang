@@ -786,8 +786,6 @@ static bool isVkBindingCompatibleEntryPointParameterType(Type* type)
         return true;
     if (as<SamplerStateType>(type))
         return true;
-    if (as<PtrType>(type))
-        return true;
     if (as<DynamicResourceType>(type))
         return true;
     if (auto arrayType = as<ArrayExpressionType>(type))
