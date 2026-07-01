@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:27:54Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 33e2de2e8f7d94757701c9d2589b0e90ad221fa2f6afba49347b2d79a916ab4c
+generated_at: 2026-06-29T20:13:25Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 68a85e13aad997a240500c6924c43cbfb5c7a2705b13eee149bc97d9ad794aeb
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -11,7 +11,11 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 
 This page documents the ordered IR-pass and downstream-binary sequence
 executed when Slang compiles for the SPIR-V target via the
-direct-emit path. The direct-emit entry point
+direct-emit path. It is written for a compiler developer who needs to
+locate where in the SPIR-V direct-emit pipeline a particular pass runs,
+what condition selects it, and which iterative passes loop until fixed
+point — for example, when debugging or modifying that pipeline. The
+direct-emit entry point
 `emitSPIRVForEntryPointsDirectly` is invoked only from the
 `CodeGenTarget::SPIRV` case of `CodeGenContext::_emitEntryPoints`
 ([slang-code-gen.cpp lines 1154-1158](../../../../source/slang/slang-code-gen.cpp)),
@@ -41,19 +45,19 @@ tables below; that filter is documented per-phase.
 ## Source
 
 - [slang-emit.cpp](../../../../source/slang/slang-emit.cpp)
-  — `linkAndOptimizeIR` (line ~895) is the orchestrator;
-  `emitSPIRVForEntryPointsDirectly` (line ~3237) is the SPIR-V
-  entry point; `createArtifactFromIR` (line ~3072) wraps the
+  — `linkAndOptimizeIR` (line ~896) is the orchestrator;
+  `emitSPIRVForEntryPointsDirectly` (line ~3251) is the SPIR-V
+  entry point; `createArtifactFromIR` (line ~3086) wraps the
   post-emit downstream chain (spirv-link, spirv-val,
   `optimizeSPIRV` currently disabled by `#if 0`).
 - [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)
-  — `emitSPIRVFromIR` (line ~11598) calls `legalizeIRForSPIRV`,
+  — `emitSPIRVFromIR` (line ~11803) calls `legalizeIRForSPIRV`,
   iterates the forward-declared-pointer fixup loop, and emits the
   SPIR-V words.
 - [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp)
-  — `legalizeIRForSPIRV` (line 3104) is the top-level legalizer;
-  `legalizeSPIRV` (line 2865) drives `SPIRVLegalizationContext::processModule`;
-  `simplifyIRForSpirvLegalization` (line 2878) is the iterative
+  — `legalizeIRForSPIRV` (line 3265) is the top-level legalizer;
+  `legalizeSPIRV` (line 3026) drives `SPIRVLegalizationContext::processModule`;
+  `simplifyIRForSpirvLegalization` (line 3039) is the iterative
   simplification loop (it declares outer / inner bound constants 8 /
   16 but never increments their counters, so it iterates to a fixed
   point — see the Loops section);
@@ -447,8 +451,9 @@ fix-ups, the entry-point parameter rewriting shared with GLSL,
 SPIR-V-only fix-ups (global-var initialization motion,
 `transformParamsToConstRef`, `removeRawDefaultConstructors`), and
 finally `eliminatePhis` with SPIR-V-specific configuration. The
-phase ends with `simplifyNonSSAIR`, `collectMetadata`, and
-`checkUnsupportedInst`.
+phase ends with `simplifyNonSSAIR`, an optional
+`getOrCreateLayout` (when the target capabilities imply
+`descriptor_handle`), `collectMetadata`, and `checkUnsupportedInst`.
 
 ```mermaid
 flowchart TD
@@ -511,7 +516,9 @@ flowchart TD
   cCM[collectCooperativeMetadata]
   ediGate{getBoolOption EmbedDownstreamIR}
   uNEI[unexportNonEmbeddableIR]
-  cM[collectMetadata]
+  descHandleGate{"target implies descriptor_handle and not PyTorch"}
+  gOCL["targetProgram->getOrCreateLayout (returns SLANG_FAIL on null)"]
+  cM["collectMetadata(targetProgram, metadata)"]
   minOpt5{not shouldPerformMinimumOptimizations}
   cUI[checkUnsupportedInst]
 
@@ -557,8 +564,10 @@ flowchart TD
   rLIRO --> sNSIR --> coopGate
   coopGate -->|true| cCM --> ediGate
   coopGate -->|false| ediGate
-  ediGate -->|true| uNEI --> cM
-  ediGate -->|false| cM
+  ediGate -->|true| uNEI --> descHandleGate
+  ediGate -->|false| descHandleGate
+  descHandleGate -->|true| gOCL --> cM
+  descHandleGate -->|false| cM
   cM --> minOpt5
   minOpt5 -->|true| cUI
 ```
@@ -607,8 +616,9 @@ flowchart TD
 | 40 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | After phi elimination. |
 | 41 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | Captures cooperative types that survive lowering. |
 | 42 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `getBoolOption(EmbedDownstreamIR)` | Static helper at line ~633. |
-| 43 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | Final pass that fills binding / exported-function fields on `metadata`. |
-| 44 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | Last `SLANG_PASS` in `linkAndOptimizeIR`. |
+| 43 | `targetProgram->getOrCreateLayout` | [slang-target-program.h](../../../../source/slang/slang-target-program.h) | `target != PyTorchCppBinding && targetCaps imply descriptor_handle` | Direct call ([slang-emit.cpp lines 2520-2529](../../../../source/slang/slang-emit.cpp)); returns `SLANG_FAIL` on null. Ensures the `ProgramLayout` exists so `collectMetadata` can read `bindlessSpaceIndex` and detect bindless-resource-heap use. The Vulkan / SPIR-V `descriptor_handle` capability set selects this on the SPIR-V path. |
+| 44 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | Now takes `targetProgram` (line 276) and reads `targetProgram->getExistingLayout()` to set `usesBindlessResourceHeap`; fills binding / exported-function fields on `metadata`. `getExistingLayout` no longer asserts the layout exists — it returns `nullptr` when no layout was built, so the bindless scan is simply skipped. |
+| 45 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | Last `SLANG_PASS` in `linkAndOptimizeIR`. |
 
 Filtered out for SPIR-V in this phase: the CUDA `__ldg` immutable-
 load lowering; `synthesizeActiveMask` (CUDA / PTX);
@@ -633,16 +643,16 @@ inside `legalizeIRForSPIRV`); the `CPPSource` /
 ## Phase D: IR-to-SPIR-V emit, simplification loop, downstream tools
 
 Starts immediately after `linkAndOptimizeIR` returns to
-`emitSPIRVForEntryPointsDirectly` (line ~3237 of
+`emitSPIRVForEntryPointsDirectly` (line ~3251 of
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp)). The
-SPIR-V backend in `emitSPIRVFromIR` (line ~11598 of
+SPIR-V backend in `emitSPIRVFromIR` (line ~11803 of
 [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp))
-calls the top-level `legalizeIRForSPIRV` (line 3104 of
+calls the top-level `legalizeIRForSPIRV` (line 3265 of
 [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp))
 which runs the SPIR-V-specific IR passes and the iterative
 `simplifyIRForSpirvLegalization` loop. After SPIR-V word emission
 the artifact passes through the optional downstream chain in
-`createArtifactFromIR` (line ~3072): `spirv-link` for embedded-
+`createArtifactFromIR` (line ~3086): `spirv-link` for embedded-
 module merging and `spirv-val` for validation.
 
 ```mermaid
@@ -674,17 +684,20 @@ flowchart TD
   emitEPs["emit irEntryPoints"]
   fwdHead{forward-declared pointers?}
   fwdFix[fix up forward-declared pointers]
+  diagStride[diagnoseConflictingDescriptorHeapStrideOptions]
   emitExtCap[emitSPIRVAnyExtension / emitSPIRVAnyCapabilities]
   emitFront[emitFrontMatter]
   emitPhys[emitPhysicalLayout]
   spvOutDone[SPIR-V bytes done]
+  optDisabled["(downstream) optimizeSPIRV [disabled]"]
+  compilerGate{compiler loaded?}
   skipLinkGate{"!isPrecompilation and !shouldSkipDownstreamLinking"}
   collectFiles["collect SPIR-V files from IREmbeddedDownstreamIR"]
   multiFile{spirvFiles.getCount > 1}
   spirvLink["(downstream) compiler->link spirv-link"]
   valGate{shouldRunSPIRVValidation}
   spirvVal["(downstream) compiler->validate spirv-val"]
-  optDisabled["(downstream) optimizeSPIRV [disabled]"]
+  spirvOpt["(downstream) compiler->compile spirv-opt"]
   artifactDone[final SPIR-V artifact]
 
   ent --> cAFIR --> eFR --> lIRSPV --> lSPV --> simpHead
@@ -696,14 +709,17 @@ flowchart TD
   discardGate -->|false| dceL
   dceL --> bEPRG --> iFSI --> rADMD --> emitDebug --> emitParams --> emitWholeProgram --> emitOpSource --> emitEPs --> fwdHead
   fwdHead -->|yes| fwdFix --> fwdHead
-  fwdHead -->|no| emitExtCap --> emitFront --> emitPhys --> spvOutDone --> skipLinkGate
+  fwdHead -->|no| diagStride --> emitExtCap --> emitFront --> emitPhys --> spvOutDone --> optDisabled
+  optDisabled --> compilerGate
+  compilerGate -->|false| artifactDone
+  compilerGate -->|true| skipLinkGate
   skipLinkGate -->|true| collectFiles --> multiFile
   skipLinkGate -->|false| valGate
   multiFile -->|yes| spirvLink --> valGate
   multiFile -->|no| valGate
-  valGate -->|true| spirvVal --> optDisabled
-  valGate -->|false| optDisabled
-  optDisabled --> artifactDone
+  valGate -->|true| spirvVal --> spirvOpt
+  valGate -->|false| spirvOpt
+  spirvOpt --> artifactDone
 ```
 
 | # | Pass / step | File | Gate | Notes |
@@ -711,7 +727,7 @@ flowchart TD
 | 1 | `emitSPIRVForEntryPointsDirectly` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (entry point) | Wraps `linkAndOptimizeIR` + `createArtifactFromIR`. |
 | 2 | `emitSPIRVFromIR` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | The SPIR-V backend. |
 | 3 | `legalizeIRForSPIRV` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) | (always) | Calls the inner three steps below. |
-| 4 | `legalizeSPIRV` → `SPIRVLegalizationContext::processModule` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) | (always) | The main SPIR-V legalization driver. |
+| 4 | `legalizeSPIRV` → `SPIRVLegalizationContext::processModule` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) | (always) | The main SPIR-V legalization driver. Per-inst dispatch now includes `processAbort` for `kIROp_Abort`: it packs the format string into a `uint` array, builds an explicitly-laid-out `AbortMessage` struct (cached per payload signature in `m_abortMessageTypes`), rewrites the inst to `Abort(message)`, and ends the block with `unreachable` (the abort is a block terminator). See Notable passes. |
 | 5 | `simplifyIRForSpirvLegalization` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) | (always) | Outer / inner loops carry `kMaxIterations = 8` / `kMaxFuncIterations = 16` guards, but the counters are never incremented, so termination is fixed-point-only; see the Loops section. |
 | 5a | `applySparseConditionalConstantPropagationForGlobalScope` | [slang-ir-sccp.cpp](../../../../source/slang/slang-ir-sccp.cpp) | (each outer iteration) | Global-scope SCCP. |
 | 5b | `peepholeOptimizeGlobalScope` | [slang-ir-peephole.cpp](../../../../source/slang/slang-ir-peephole.cpp) | (each outer iteration) | |
@@ -725,16 +741,17 @@ flowchart TD
 | 8 | `buildEntryPointReferenceGraph` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) | (always) | Populates `m_referencingEntryPoints`. |
 | 9 | `insertFragmentShaderInterlock` | [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) | (always; only acts on raster-ordered resources in fragment entry points) | |
 | 10 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-strip.cpp](../../../../source/slang/slang-ir-strip.cpp) | (always) | Direct call inside `emitSPIRVFromIR`. |
-| 11 | SPIR-V word emission | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | Sources: `IRDebugSource` / `IRDebugBuildIdentifier` / `IRDebugCompilationUnit` first; then optional `IRGlobalParam`s under `PreserveParameters`; then optional `IRFunc`s with `IRDownstreamModuleExportDecoration` under `GenerateWholeProgram`; then the `OpSource` instruction; then every entry point. |
+| 11 | SPIR-V word emission | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | Sources: `IRDebugSource` / `IRDebugBuildIdentifier` / `IRDebugCompilationUnit` first; then optional `IRGlobalParam`s under `PreserveParameters`; then optional `IRFunc`s with `IRDownstreamModuleExportDecoration` under `GenerateWholeProgram`; then the `OpSource` instruction; then every entry point. `kIROp_Abort` now emits via `emitAbort` (line ~4796): it declares `SPV_KHR_abort` / `SpvCapabilityAbortKHR` and emits `OpAbortKHR` with the packed message struct as its single operand, and is treated as a block terminator (no further insts in the block are emitted). |
 | 12 | Forward-declared pointer fixup loop | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always; loop body when `m_forwardDeclaredPointers != 0`) | See the Loops section. |
-| 13 | `emitSPIRVAnyExtension` / `emitSPIRVAnyCapabilities` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | Emit deferred-choice extensions and capabilities. |
-| 14 | `emitFrontMatter` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | |
-| 15 | `emitPhysicalLayout` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | Produces the final word stream. |
-| 16 | `optimizeSPIRV` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `#if 0` (currently disabled) | Inline spirv-opt invocation inside `createArtifactFromIR` (lines 3092-3099); left in for documentation, never executes. |
-| 17 | `compiler->link` (spirv-link) | (downstream tool) | `!isPrecompilation && !shouldSkipDownstreamLinking && spirvFiles.getCount() > 1` | Merges the freshly emitted SPIR-V with every `IREmbeddedDownstreamIR` of `CodeGenTarget::SPIRV` found in the program's IR modules. |
-| 18 | `compiler->validate` (spirv-val) | (downstream tool) | `shouldRunSPIRVValidation(codeGenContext)` | True only when neither `SkipSPIRVValidation` nor `IncompleteLibrary` is set and the `SLANG_RUN_SPIRV_VALIDATION` env var equals exactly `"1"` ([slang-emit.cpp lines 3045-3067](../../../../source/slang/slang-emit.cpp)). |
-| 19 | downstream `compile` (spirv-opt) | (downstream tool) | `compiler != nullptr` (the `PassThroughMode::SpirvOpt` downstream compiler loaded) plus the optimization-level options | Guarded by `if (compiler)` at [slang-emit.cpp line 3106](../../../../source/slang/slang-emit.cpp); `compiler->compile` at line 3210 uses `downstreamOptions.targetType = SLANG_SPIRV`. |
-| 20 | `addAssociated(metadata)` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | The `ArtifactPostEmitMetadata` produced in Phase A flows into the final artifact. |
+| 13 | `diagnoseConflictingDescriptorHeapStrideOptions` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always; only diagnoses on conflict) | Direct call after the forward-pointer loop ([slang-emit-spirv.cpp line ~11982](../../../../source/slang/slang-emit-spirv.cpp)). Re-checks the compile-API path for the `SPIRVUnifiedDescriptorHeapStride` + non-zero `SPIRVResourceHeapStride` conflict the CLI rejects at option-parse time; emits `SpirvConflictingDescriptorHeapStrideOptions`. See Notable passes. |
+| 14 | `emitSPIRVAnyExtension` / `emitSPIRVAnyCapabilities` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | Emit deferred-choice extensions and capabilities. |
+| 15 | `emitFrontMatter` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | |
+| 16 | `emitPhysicalLayout` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | Produces the final word stream. |
+| 17 | `optimizeSPIRV` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `#if 0` (currently disabled) | Inline spirv-opt invocation inside `createArtifactFromIR` (lines 3106-3113), positioned before the downstream link/validate chain; left in for documentation, never executes. |
+| 18 | `compiler->link` (spirv-link) | (downstream tool) | `!isPrecompilation && !shouldSkipDownstreamLinking && spirvFiles.getCount() > 1` | Merges the freshly emitted SPIR-V with every `IREmbeddedDownstreamIR` of `CodeGenTarget::SPIRV` found in the program's IR modules. |
+| 19 | `compiler->validate` (spirv-val) | (downstream tool) | `shouldRunSPIRVValidation(codeGenContext)` | True only when neither `SkipSPIRVValidation` nor `IncompleteLibrary` is set and the `SLANG_RUN_SPIRV_VALIDATION` env var equals exactly `"1"` ([slang-emit.cpp lines 3059-3082](../../../../source/slang/slang-emit.cpp)). |
+| 20 | downstream `compile` (spirv-opt) | (downstream tool) | `compiler != nullptr` (the `PassThroughMode::SpirvOpt` downstream compiler loaded) plus the optimization-level options | Guarded by `if (compiler)` at [slang-emit.cpp line 3120](../../../../source/slang/slang-emit.cpp); `compiler->compile` at line 3224 uses `downstreamOptions.targetType = SLANG_SPIRV`. |
+| 21 | `addAssociated(metadata)` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | The `ArtifactPostEmitMetadata` produced in Phase A flows into the final artifact. |
 
 Filtered out for SPIR-V in this phase: every non-Khronos backend
 in `emitEntryPointsSourceFromIR`; the LLVM / VM / Slang / WGSL
@@ -833,7 +850,7 @@ Two iterative passes execute in the SPIR-V pipeline. No other
 
 ### `simplifyIRForSpirvLegalization` (Phase D, step 5)
 
-Defined at line 2878 of
+Defined at line 3039 of
 [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp).
 
 - Outer loop: `while (changed && iterationCounter < kMaxIterations)`
@@ -854,7 +871,7 @@ Defined at line 2878 of
   it modified the IR; `changed` / `funcChanged` are the disjunction
   of those returns. At this source commit **neither `iterationCounter`
   nor `funcIterationCount` is incremented in the loop body**
-  ([slang-ir-spirv-legalize.cpp lines 2885-2914](../../../../source/slang/slang-ir-spirv-legalize.cpp)),
+  ([slang-ir-spirv-legalize.cpp lines 3046-3075](../../../../source/slang/slang-ir-spirv-legalize.cpp)),
   so the `< kMaxIterations` / `< kMaxFuncIterations` guards never
   actually bound the loops — each loop terminates solely when its
   pass set reports no change (and the outer loop additionally on a
@@ -868,7 +885,7 @@ rely entirely on reaching a fixed point.
 
 ### Forward-declared pointer fixup (Phase D, step 12)
 
-Defined around line 11775 of
+Defined around line 11964 of
 [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp).
 
 - Form: `do { ... } while (context.m_forwardDeclaredPointers.getCount() != 0)`.
@@ -885,7 +902,7 @@ Defined around line 11775 of
 ### `legalizeIRForSPIRV`
 
 The single SPIR-V-only entry point inside `emitSPIRVFromIR`,
-defined at line 3104 of
+defined at line 3265 of
 [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp).
 It is *not* a single pass: it sequences `legalizeSPIRV`
 (`SPIRVLegalizationContext::processModule`) followed by the
@@ -960,9 +977,64 @@ only when the target is CPU, CUDA, or Metal. For SPIR-V it
 ensures that struct-typed parameters are passed by const reference,
 which avoids unnecessary copies in the emitted code.
 
+### `Abort` lowering (`processAbort` + `emitAbort`)
+
+`kIROp_Abort` reaches the SPIR-V path with a string-literal format
+operand followed by variadic arguments. The lowering is split across
+two stages so the message type goes through the normal deduplicated
+type-emission path. In Phase D step 4, `SPIRVLegalizationContext::processAbort`
+([slang-ir-spirv-legalize.cpp lines 2070-2204](../../../../source/slang/slang-ir-spirv-legalize.cpp))
+packs the format string (with its null terminator) into a `uint` array
+with an explicit stride, widens `bool` argument values to `uint`
+(`OpTypeBool` has no physical size), and builds an explicitly-laid-out
+`AbortMessage` struct — cached per payload signature in
+`m_abortMessageTypes` so identical signatures share one nominal struct
+type. It rewrites the inst to `Abort(message)`, strips the trailing
+unreachable code, and terminates the block with `unreachable` because
+`OpAbortKHR` is itself a block terminator (mirroring the `discard` /
+`OpKill` treatment). At emit time (step 11), `emitAbort`
+([slang-emit-spirv.cpp line ~4796](../../../../source/slang/slang-emit-spirv.cpp))
+declares `SPV_KHR_abort` and `SpvCapabilityAbortKHR` and emits
+`OpAbortKHR` with the prepared message struct as its single operand.
+
+### Descriptor-heap array stride and the unified-stride option
+
+`getDescriptorRuntimeArrayType`
+([slang-emit-spirv.cpp line ~7263](../../../../source/slang/slang-emit-spirv.cpp))
+now keys its cache on (element type, stride) rather than element type
+alone, and takes a caller-chosen stride. `getDescriptorHeapArrayStride`
+selects `SPIRVSamplerHeapStride` for sampler heaps and
+`SPIRVResourceHeapStride` for texture / buffer resource heaps;
+acceleration-structure heap entries are lowered to `uint64` elements
+with a fixed minimum-8-byte stride (`getAccelerationStructureDescriptorHeapStride`).
+When `-spirv-unified-descriptor-heap-stride` is set, every resource
+descriptor-heap runtime array shares a single fixed
+`max(sizeof(image descriptor), sizeof(buffer descriptor))` stride
+(`getUnifiedResourceHeapStride`, emitted as an `OpSpecConstantOp` chain).
+The `diagnoseConflictingDescriptorHeapStrideOptions` call (Phase D step
+13) re-checks the compile-API path for the conflict between that option
+and a non-zero `SPIRVResourceHeapStride` that the CLI parser already
+rejects.
+
+### `legalizeEntryPointsForGLSL`: FragDepth and geometry-primitive refinements
+
+Beyond running for SPIR-V despite its name, this pass (Phase C step 6)
+now records the `SV_DepthGreaterEqual` / `SV_DepthLessEqual` semantics as
+`FragDepthGreater` / `FragDepthLess` system-value kinds (gated on
+`LayoutResourceKind::VaryingOutput`) and attaches
+`kIROp_GLSLFragDepthGreaterDecoration` /
+`kIROp_GLSLFragDepthLessDecoration` to the *entry point* rather than the
+`gl_FragDepth` var (a conservative-depth execution mode). For SPIR-V
+direct emit the decoration is inert — the SPIR-V emitter derives the
+mode independently — but the pass is shared with the via-GLSL path. The
+geometry-shader default-input-primitive (`triangle`) fallback also moved
+from `legalizeEntryPointParameterForGLSL` to the end of
+`legalizeEntryPointForGLSL` so it runs only after all parameters are
+processed and cannot clash with a real primitive qualifier.
+
 ### Downstream spirv-link / spirv-val / spirv-opt chain
 
-`createArtifactFromIR` (line ~3072 of `slang-emit.cpp`) wires up
+`createArtifactFromIR` (line ~3086 of `slang-emit.cpp`) wires up
 three downstream tools:
 
 - **spirv-link** runs only when there is more than one input
@@ -977,20 +1049,20 @@ three downstream tools:
   `SkipSPIRVValidation` (the `-skip-spirv-validation` flag) and the
   `IncompleteLibrary` options off; there is no `-validate-spirv`
   command-line flag. Even when `spirv-link` has replaced
-  `artifact` with the linked module (line ~3170), `spirv-val`
+  `artifact` with the linked module (line ~3184), `spirv-val`
   validates the freshly emitted `spirv` buffer (`spirv.getBuffer()`
-  at line ~3177), not the linked artifact. On validation failure the
+  at line ~3191), not the linked artifact. On validation failure the
   SPIR-V is disassembled and a `SpirvValidationFailed` diagnostic is
   emitted, but the artifact is still returned.
 - **spirv-opt** is invoked via the generic downstream-compile
   path (`downstreamOptions.targetType = SLANG_SPIRV`,
   `downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV`).
-  The earlier in-source `optimizeSPIRV` call at line ~3094
-  is currently inside a `#if 0` block (opening at line 3092) and
+  The earlier in-source `optimizeSPIRV` call at line ~3108
+  is currently inside a `#if 0` block (opening at line 3106) and
   never executes — it is shown in Phase D's diagram for
   documentation only.
 
-The in-source `optimizeSPIRV` block at line ~3094 is currently inside
+The in-source `optimizeSPIRV` block at line ~3108 is currently inside
 a `#if 0` guard and never executes; inline spirv-opt is therefore not
 part of the active pipeline.
 

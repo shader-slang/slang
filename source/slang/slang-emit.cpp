@@ -1685,6 +1685,21 @@ Result linkAndOptimizeIR(
         if (isD3DTarget(targetRequest))
         {
             SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+
+            // HLSL SM 6.7+ requires every member of a `[raypayload]` struct to declare
+            // both a `read(...)` and a `write(...)` qualifier. The call-site fill above
+            // only covers payload structs reached through a `TraceRay`-style call, so a
+            // user-authored struct with one-sided PAQ that only reaches a hit shader
+            // (e.g. a per-stage-compiled shader library) would slip through. Fill any
+            // missing per-side PAQs structurally on every `[raypayload]` struct.
+            auto profile = getEffectiveTargetProfile(
+                targetProgram->getTargetReq(),
+                targetProgram->getOptionSet());
+            if (profile.getFamily() == ProfileFamily::DX &&
+                profile.getVersion() >= ProfileVersion::DX_6_7)
+            {
+                SLANG_PASS(legalizeRayPayloadAccessQualifiersForHLSL);
+            }
         }
 
         if (requiredLoweringPassSet.existentialTypeLayout)

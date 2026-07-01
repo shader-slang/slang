@@ -32,8 +32,6 @@ class WorkloadSpec:
     extra_flags: list = field(default_factory=list)
     # phase timers that best localize this bucket's cost
     primary_timers: list = field(default_factory=lambda: ["compileInner"])
-    # intentionally non-zero exit (compile errors expected)
-    expect_fail: bool = False
     # emit reflection JSON (bench.py supplies a writable per-run path). Exercises
     # the reflection serializer in addition to the layout engine.
     reflection_json: bool = False
@@ -132,16 +130,6 @@ WORKLOADS = [
         # signal of the bare-local dynamic_dispatch workload.
         primary_timers=["compileInner", "specializeModule",
                         "legalizeExistentialTypeLayout", "simplifyIR"],
-    ),
-    WorkloadSpec(
-        name="diagnostics_errors",
-        bucket="diagnostics",
-        gen=workloads.gen_diagnostics_errors,
-        default_size=400,
-        mode="target",
-        extra_flags=SPIRV,
-        primary_timers=["frontEndExecute", "SemanticChecking", "compileInner"],
-        expect_fail=True,
     ),
     WorkloadSpec(
         name="diagnostics_clean",

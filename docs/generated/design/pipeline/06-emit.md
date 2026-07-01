@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:19:21Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 77f4f05b3dc0ad28bce5954a34b857ef3d07af59deedcfa5c6b2acfb674fa265
+generated_at: 2026-06-29T17:00:05Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: ea24fee55e05b1bf9f8539d729e088b731324bd838dcfea53da87cfcb44cd959
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -19,7 +19,7 @@ modifying a target backend.
 
 - **Input**: a fully linked, specialized, and legalized `IRModule`
   produced by `linkAndOptimizeIR`
-  ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 895)
+  ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 896)
   for one `TargetRequest`.
 - **Output**: a target artefact wrapped in an `IArtifact`
   (declared in
@@ -31,7 +31,7 @@ modifying a target backend.
 ## Emit dispatcher
 
 The dispatch happens in `CodeGenContext::emitEntryPointsSourceFromIR`
-([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2526 at
+([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2540 at
 `source_commit`) plus the variants invoked when targeting non-textual
 formats. The dispatcher:
 
@@ -47,9 +47,12 @@ formats. The dispatcher:
    to insert minimal parentheses.
 5. Wraps the result in an `IArtifact` and hands it back.
 
-The set of `#include`s at the top of
-[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) is the
-authoritative list of which backends are linked into the dispatcher.
+The `#include`s at the top of
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) pull in the
+header-backed emit helpers used by this file (C-like subclasses, LLVM,
+VM, Torch). Direct SPIR-V is not header-included here; it is wired via
+the `emitSPIRVFromIR` forward declaration and implemented in
+[slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp).
 
 ## Backends
 
@@ -228,9 +231,16 @@ dependencies.
    [source/slang/](../../../../source/slang). For a textual target,
    subclass `CLikeSourceEmitter`.
 2. Register the new backend in
-   [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) — both the
-   `#include` at the top and the dispatch logic in
-   `emitEntryPointsSourceFromIR`.
+   [slang-emit.cpp](../../../../source/slang/slang-emit.cpp). For a
+   textual target, add the dispatch arm in
+   `emitEntryPointsSourceFromIR` (the `switch (target)` /
+   `switch (sourceLanguage)` block that constructs the
+   `CLikeSourceEmitter` subclass) plus the `#include` for the header.
+   A direct/non-textual backend instead follows the pattern of SPIR-V,
+   LLVM, and VM bytecode: a separate emit function
+   (`emitSPIRVForEntryPointsDirectly`, `emitLLVMForEntryPoints`,
+   `emitVMByteCodeForEntryPoints`) invoked from the target dispatch
+   rather than `emitEntryPointsSourceFromIR`.
 3. Add a prelude under [prelude/](../../../../prelude) if the emitted
    code needs runtime support, and emit a `#include` for it from the
    backend.

@@ -148,11 +148,11 @@ jobs:
       runs-on: '["Linux", "self-hosted", "build", "GCP"]'
       container-user: "1003:1003"
 
-  # WASM build runs directly on the host (no container) via ci-slang-build.yml.
-  # Stays on GitHub-hosted ubuntu-22.04 for now: the GCP build image lacks the
-  # gcc host toolchain it needs (the native generators stage fails with
-  # CMAKE_CXX_COMPILER not set — no g++). Moving it requires either adding g++
-  # to the image or running the build in a container; tracked as a follow-up.
+  # WASM build runs directly on the host (no container) on the GCP build pool.
+  # The linux-cpu-runner image carries the gcc host toolchain (g++) the native
+  # generators build needs; emsdk is downloaded by the build itself. id-token is
+  # requested for the reusable workflow's GCP Workload Identity auth step (never
+  # part of the default GITHUB_TOKEN).
   build-linux-release-gcc-wasm:
     needs: [filter, wait-for-human-priority]
     if: >-
@@ -160,12 +160,16 @@ jobs:
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
     with:
       os: linux
       compiler: gcc
       platform: wasm
       config: release
-      runs-on: '["ubuntu-22.04"]'
+      runs-on: '["Linux", "self-hosted", "build", "GCP"]'
 
   # Sanitizer build+test (blocking via check-ci, runs on every PR). Runs in the
   # clang CI container (`--user root`, so no container-user concern) on the GCP

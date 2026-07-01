@@ -48,6 +48,11 @@ jobs:
           submodules: "recursive"
           fetch-depth: "0"
 
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.x"
+
       - name: Common setup
         uses: ./.github/actions/common-setup
         with:
@@ -121,9 +126,9 @@ jobs:
           args=(--slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" --samples "$SAMPLES" --warmup 1)
           [ -n "$ONLY" ] && args+=(--only "$ONLY")
           # Daily ToT sweep -> perf-results/daily/<label>/results.json
-          python bench.py "${args[@]}"
+          python3 bench.py "${args[@]}"
           # Stamp meta + rebuild perf-results/tracking/tracking.json
-          python track.py register --results "$RESULTS" --index "$RESULTS/index.json" \
+          python3 track.py register --results "$RESULTS" --index "$RESULTS/index.json" \
             --label "$LABEL" --commit "$COMMIT" --corpus-sha "$CORPUS_SHA"
 
       - name: Push results
@@ -164,7 +169,7 @@ jobs:
             exit 0
           fi
           cd "$SUITE"
-          python report.py --results "$RESULTS" --index "$RESULTS/index.json"
+          python3 report.py --results "$RESULTS" --index "$RESULTS/index.json"
 
       - name: Checkout gh-pages branch
         continue-on-error: true
@@ -233,4 +238,4 @@ jobs:
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE/tools/compile-perf"
-          python trend.py --results "$GITHUB_WORKSPACE/perf-results"
+          python3 trend.py --results "$GITHUB_WORKSPACE/perf-results"
