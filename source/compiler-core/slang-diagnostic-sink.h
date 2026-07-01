@@ -330,6 +330,11 @@ public:
         return bit < 32 && (m_enabledWarningLevels & (uint32_t(1) << bit)) != 0;
     }
 
+    /// Get/set the raw enabled-warning-group bitmask. Used to copy this settings-shaped state
+    /// between sinks (e.g. from a parent sink), mirroring getFlags/setFlags.
+    uint32_t getEnabledWarningLevels() const { return m_enabledWarningLevels; }
+    void setEnabledWarningLevels(uint32_t levels) { m_enabledWarningLevels = levels; }
+
     /// Get the (optional) diagnostic sink lexer. This is used to
     /// improve quality of highlighting a locations token. If not set, will just have a single
     /// character caret at location
@@ -415,6 +420,7 @@ public:
             setFlags(parentSink->getFlags());
             setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
             setEnableUnicode(parentSink->getEnableUnicode());
+            setEnabledWarningLevels(parentSink->getEnabledWarningLevels());
         }
     }
     /// Default Ctor
