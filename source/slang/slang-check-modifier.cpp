@@ -1635,6 +1635,12 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::NodeArraySizeAttribute:
         return modifierType;
 
+        // An entry point may specify at most one [numthreads]; giving it its own
+        // conflict group makes a second, redundant or conflicting attribute a
+        // reported duplicate rather than being silently ignored.
+    case ASTNodeType::NumThreadsAttribute:
+        return modifierType;
+
     case ASTNodeType::NodeDispatchGridAttribute:
     case ASTNodeType::NodeMaxDispatchGridAttribute:
         return ASTNodeType::NodeDispatchGridAttribute;
