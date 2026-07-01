@@ -1145,10 +1145,14 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_NodeOutputRecordGetElementPtr:
         {
             auto base = inst->getOperand(0);
-            emitOperand(base, inOuterPrec);
+            auto outerPrec = inOuterPrec;
+            auto prec = getInfo(EmitOp::Postfix);
+            bool needClose = maybeEmitParens(outerPrec, prec);
+            emitOperand(base, leftSide(outerPrec, prec));
             m_writer->emit(".Get(");
-            emitOperand(inst->getOperand(1), EmitOpInfo());
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
             m_writer->emit(")");
+            maybeCloseParens(needClose);
             return true;
         }
 
