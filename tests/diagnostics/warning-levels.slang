@@ -15,7 +15,12 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=ON): -Wall -target hlsl -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=ON): -Wextra -target hlsl -entry computeMain -stage compute
 
-// 4. An explicit per-id disable suppresses it regardless of the group being enabled.
+// 4. All three flags on one command line: each exact spelling wins over the -W<id> prefix, and
+// the WarningLevel option is additive (allowDuplicate), so passing several does not error or
+// collapse. The pedantic warning is still emitted.
+//DIAGNOSTIC_TEST:SIMPLE(diag=ON): -Wall -Wextra -Wpedantic -target hlsl -entry computeMain -stage compute
+
+// 5. An explicit per-id disable suppresses it regardless of the group being enabled.
 //DIAGNOSTIC_TEST:SIMPLE(diag=OFF): -Wno-keyword-used-as-name -target hlsl -entry computeMain -stage compute
 
 RWStructuredBuffer<int> outputBuffer;
