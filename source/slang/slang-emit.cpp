@@ -983,7 +983,7 @@ Result linkAndOptimizeIR(
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
         SLANG_PASS(lowerGLSLShaderStorageBufferObjectsToStructuredBuffers, sink);
 
-    SLANG_PASS(translateEntryPointInParamToBorrow, sink);
+    SLANG_PASS(translateEntryPointInParamToBorrow, sink, isCUDATarget(targetRequest));
 
     // Replace any global constants with their values.
     //
