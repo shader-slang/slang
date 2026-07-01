@@ -74,24 +74,60 @@ static Type* unwrapConditionalType(Type* type)
     return type;
 }
 
+// Extract the scalar element type and element count from a type.
+// For a scalar BasicExpressionType, returns the type itself with count 1.
+// For a VectorExpressionType, returns the element type and count.
+// Returns nullptr if the type is neither scalar nor vector.
+static BasicExpressionType* getScalarElementType(Type* type, IntegerLiteralValue& outCount)
+{
+    if (auto basicType = as<BasicExpressionType>(type))
+    {
+        outCount = 1;
+        return basicType;
+    }
+    if (auto vecType = as<VectorExpressionType>(type))
+    {
+        if (auto countVal = as<ConstantIntVal>(vecType->getElementCount()))
+        {
+            outCount = countVal->getValue();
+            return as<BasicExpressionType>(vecType->getElementType());
+        }
+    }
+    return nullptr;
+}
+
 // Check if two types are compatible for system value semantics.
-// This is stricter than canCoerce alone, as it requires that both types have
-// the same "shape" (both scalars or both vectors) to prevent scalar-to-vector
-// promotions like uint -> float4.
-static bool isSemanticTypeCompatible(SemanticsVisitor* visitor, Type* expectedType, Type* type)
+// Two types are compatible when they have the same shape (both scalar, or both
+// vectors of the same element count) and their scalar element types belong to
+// the same type category (integer, floating-point, or bool). This allows sign
+// coercions like int3 for a uint3 semantic while rejecting cross-category
+// coercions like float for a uint semantic.
+static bool isSemanticTypeCompatible(Type* expectedType, Type* type)
 {
     // Unwrap Conditional<T, hasValue> to T
     type = unwrapConditionalType(type);
 
-    // Must be coercible
-    if (!visitor->canCoerce(expectedType, type, nullptr))
+    IntegerLiteralValue expectedCount = 0, typeCount = 0;
+    auto expectedElem = getScalarElementType(expectedType, expectedCount);
+    auto typeElem = getScalarElementType(type, typeCount);
+
+    // Both types must be scalar or vector (no matrices, arrays, structs, etc.)
+    if (!expectedElem || !typeElem)
         return false;
 
-    // Both must have the same shape (both scalar or both vector)
-    bool expectedIsVector = as<VectorExpressionType>(expectedType) != nullptr;
-    bool typeIsVector = as<VectorExpressionType>(type) != nullptr;
+    // Shapes must match: same element count (1 for scalar, N for vectorN)
+    if (expectedCount != typeCount)
+        return false;
 
-    return expectedIsVector == typeIsVector;
+    // Scalar element types must be in the same category.
+    // BaseTypeInfo tracks FloatingPoint and Integer flags; bool has neither.
+    // Comparing the masked flags ensures int/uint match each other, float/half/double
+    // match each other, and bool only matches bool.
+    using Flag = BaseTypeInfo::Flag;
+    constexpr BaseTypeInfo::Flags categoryMask = Flag::FloatingPoint | Flag::Integer;
+    const auto& expectedInfo = BaseTypeInfo::getInfo(expectedElem->getBaseType());
+    const auto& typeInfo = BaseTypeInfo::getInfo(typeElem->getBaseType());
+    return (expectedInfo.flags & categoryMask) == (typeInfo.flags & categoryMask);
 }
 
 // Look up a SemanticDecl by name in the given scope.
@@ -224,7 +260,7 @@ static void validateSystemValueSemanticForType(
             continue;
         }
 
-        if (isSemanticTypeCompatible(visitor, accessorType, type))
+        if (isSemanticTypeCompatible(accessorType, type))
         {
             foundMatchingAccessor = true;
             break;
@@ -239,7 +275,6 @@ static void validateSystemValueSemanticForType(
                 if (accessorArrayType->isUnsized())
                 {
                     if (isSemanticTypeCompatible(
-                            visitor,
                             accessorArrayType->getElementType(),
                             typeArrayType->getElementType()))
                     {
