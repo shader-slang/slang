@@ -406,13 +406,18 @@ struct MatrixTypeLoweringContext
         auto matrixTypeA = as<IRMatrixType>(typeA);
         auto matrixTypeB = as<IRMatrixType>(typeB);
 
-        bool shouldLowerA = matrixTypeA && shouldLowerMatrixType(matrixTypeA);
-        bool shouldLowerB = matrixTypeB && shouldLowerMatrixType(matrixTypeB);
-
-        // Only matrix-matrix comparisons are supported
-        SLANG_ASSERT(
-            shouldLowerA && shouldLowerB &&
-            "Comparison operations only supported between matrices that need lowering");
+        // A matrix comparison such as `float4x4 == float4x4` produces a `bool`
+        // matrix result. `getReplacement` dispatches here whenever the result OR
+        // an operand needs lowering, and since `shouldLowerMatrixType` lowers only
+        // bool/int/uint matrices, the bool-matrix *result* forces dispatch even
+        // when the float operands themselves do not need lowering. That is why
+        // this function -- unlike `legalizeBinaryOperation`, which treats the
+        // all-non-lowered case as `SLANG_UNREACHABLE` -- accepts matrix operands
+        // of any element type. We require only that both operands are matrices,
+        // and use `SLANG_RELEASE_ASSERT` so a non-matrix operand fails loudly in
+        // release builds rather than corrupting the row extraction below.
+        SLANG_RELEASE_ASSERT(
+            matrixTypeA && matrixTypeB && "Only matrix-matrix comparisons are supported");
 
         // Create IRBuilder at the top level
         IRBuilder builder(inst);
@@ -422,8 +427,15 @@ struct MatrixTypeLoweringContext
         IRInst* legalizedA = getReplacement(opdA);
         IRInst* legalizedB = getReplacement(opdB);
 
-        auto rowCount = as<IRIntLit>(matrixTypeA->getRowCount());
-        auto columnCount = as<IRIntLit>(matrixTypeA->getColumnCount());
+        // Derive the loop dimensions from the result type, mirroring
+        // `legalizeBinaryOperation`/`legalizeUnaryOperation`. With the weakened
+        // precondition above, `matrixTypeA` is only known to be "some matrix", so
+        // the bool-matrix result -- not operand A -- is the source of truth for
+        // the row/column counts.
+        auto resultMatrixType = as<IRMatrixType>(inst->getDataType());
+        SLANG_ASSERT(resultMatrixType && "Comparison should have matrix result type");
+        auto rowCount = as<IRIntLit>(resultMatrixType->getRowCount());
+        auto columnCount = as<IRIntLit>(resultMatrixType->getColumnCount());
 
         SLANG_ASSERT(
             rowCount && columnCount &&

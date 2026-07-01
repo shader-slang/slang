@@ -157,3 +157,15 @@ docs/generated/tests/design/ir-reference/decorations/struct-with-many-field-deco
 # removal, not a single observed pass"). Re-adding here so the next
 # flip back to FAILED doesn't turn the nightly red again.
 docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buffer-load-negative-index-literal.slang
+
+# Surfaced on nightly run 28004033987 (Linux agentic suite):
+# https://github.com/shader-slang/slang/actions/runs/28004033987
+# (no tracking issue filed yet; pending user triage). Test-server flake,
+# NOT a content bug: passes locally both standalone and under
+# `-use-test-server`. The CI "JSON RPC failure: waitForResult() /
+# hasMessage()" is the test server dying mid-batch (same class as the
+# sibling `rwstructured-buffer-load-negative-index-literal` and
+# `struct-with-many-field-decorations` entries above). Regeneration would
+# not help; kept here so the next flip to FAILED doesn't turn the nightly
+# red.
+docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buffer-getelementptr-negative-index-literal.slang

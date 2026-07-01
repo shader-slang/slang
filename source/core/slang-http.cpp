@@ -102,7 +102,10 @@ void HTTPHeader::reset()
         if (key == g_contentLength)
         {
             Index length;
-            SLANG_RETURN_ON_FAIL(StringUtil::parseInt(value, length) || length < 0);
+            if (SLANG_FAILED(StringUtil::parseInt(value, length)) || length < 0)
+            {
+                return SLANG_FAIL;
+            }
 
             out.m_contentLength = length;
         }

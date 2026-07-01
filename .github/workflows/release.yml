@@ -23,12 +23,14 @@ jobs:
               platform: x86_64,
               runs-on: ubuntu-22.04,
               compiler: gcc,
+              image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1,
             }
           - {
               os: linux,
               platform: aarch64,
               runs-on: ubuntu-22.04-arm,
               compiler: gcc,
+              image: "",
             }
           - {
               os: linux,
@@ -36,6 +38,7 @@ jobs:
               runs-on: ubuntu-22.04,
               compiler: gcc,
               build-slang-llvm: false,
+              image: "",
             }
           - {
               os: windows,
@@ -43,6 +46,7 @@ jobs:
               arch: amd64,
               runs-on: windows-latest,
               compiler: cl,
+              image: "",
             }
           - {
               os: windows,
@@ -51,6 +55,7 @@ jobs:
               runs-on: windows-latest,
               compiler: cl,
               extra-cmake-flags: "-DSLANG_ENABLE_CUDA=0",
+              image: "",
             }
           - {
               os: macos,
@@ -58,6 +63,7 @@ jobs:
               arch: x86_64,
               runs-on: macos-latest,
               compiler: clang,
+              image: "",
             }
           - {
               os: macos,
@@ -65,6 +71,7 @@ jobs:
               arch: arm64,
               runs-on: macos-latest,
               compiler: clang,
+              image: "",
             }
 
           - { build-slang-llvm: false }

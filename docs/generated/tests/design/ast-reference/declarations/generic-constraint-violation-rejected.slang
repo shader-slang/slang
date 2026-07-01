@@ -1,7 +1,7 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-4-8
+//META: generated_at=2026-06-24T09:20:31Z
+//META: source_commit=b25e06aeb8862d207541c3d812c57cb9e381b802
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#nodes
 //META: doc_section_digest=27f253003cd15aae74f1aea7cff6d2c4178b22d296301b6ed8e2aa0baf6c9884
 //META: purpose=A GenericTypeConstraintDecl is enforced at the call site; specializing with a type that does not satisfy the constraint is diagnosed.
@@ -13,7 +13,7 @@
 // constrained generic cannot be specialized at a type that does not
 // satisfy the constraint, and the checker diagnoses the call site.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 interface IShape { int area(); }
 
@@ -28,5 +28,5 @@ void main()
 {
     NotAShape n; n.v = 1;
     int x = polyArea(n);
-//CHECK:            ^ could not specialize generic for arguments of type (NotAShape)
+//CHECK:            ^ type argument 'NotAShape' does not conform to the required interface 'IShape'
 }
