@@ -21,17 +21,19 @@ jobs:
         with:
           fetch-depth: "2"
       - id: filter
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           # This step prevents subsequent steps from running if only documentation was changed
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            git fetch origin ${{ github.base_ref }}
-            BASE=origin/${{ github.base_ref }}
+            git fetch origin "$BASE_REF"
+            BASE="origin/${BASE_REF}"
           else
             BASE=HEAD^1
           fi
 
           shouldRun=true
-          if files="$(git diff --name-only $BASE...HEAD)"; then
+          if files="$(git diff --name-only "${BASE}...HEAD")"; then
             # Git diff succeeded, check if non-documentation files were changed
             if echo "$files" | grep -Eqx 'docs/(command-line-slangc-reference.md|user-guide/a3-02-reference-capability-atoms.md)'; then
               echo "Generated reference document changed, running checks"
@@ -46,7 +48,7 @@ jobs:
             echo "Git diff failed, conservatively running tests"
             shouldRun=true
           fi
-          echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
+          echo "should-run=$shouldRun" >> "$GITHUB_OUTPUT"
 
   # Low-priority gate. This job runs for every PR/dispatch that needs CI, but
   # only nv-slang-bot[bot] workflow_dispatch runs can ever yield. Those are the
