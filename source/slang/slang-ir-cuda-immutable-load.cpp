@@ -300,7 +300,14 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
         case kIROp_Load:
             {
                 auto load = as<IRLoad>(inst);
-                if (isPointerToImmutableLocation(getRootAddr(load->getPtr())))
+                auto root = getRootAddr(load->getPtr());
+                // The OptiX SBT (read via `optixGetSbtDataPointer()`) is mutated
+                // in place by the host between dispatches, so loads from it must
+                // not go through CUDA's non-coherent read-only cache (`__ldg`).
+                // This guard relies on `getRootAddr` walking exactly the SBT
+                // access-chain ops (`FieldAddress`, `GetElementPtr`); if either
+                // side changes, keep them in lockstep. See shader-slang/slang#10188.
+                if (root->getOp() != kIROp_GetOptiXSbtDataPtr && isPointerToImmutableLocation(root))
                 {
                     IRBuilder builder(load);
                     builder.setInsertBefore(load);

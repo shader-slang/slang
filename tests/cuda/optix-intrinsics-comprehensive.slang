@@ -38,6 +38,11 @@ uniform RaytracingAccelerationStructure scene;
 // Traditional SBT data access
 //CHECK-DAG: optixGetSbtDataPointer
 
+// SBT data is mutated in place by the host between dispatches, so loads from
+// the SBT pointer must not go through CUDA's non-coherent read-only cache.
+// See shader-slang/slang#10188.
+//CHECK-NOT: __ldg
+
 // PTX intrinsics validation - using actual PTX names (order independent)
 //CHECK_PTX-DAG: _optix_get_hit_kind
 //CHECK_PTX-DAG: _optix_read_instance_idx
