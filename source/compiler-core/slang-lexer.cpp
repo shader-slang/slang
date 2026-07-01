@@ -133,6 +133,24 @@ enum
     kEOF = -1
 };
 
+static const int kMaxLexErrorCount = 100;
+
+template<typename P, typename... Args>
+static void diagnose(
+    DiagnosticSink* sink,
+    const P& loc,
+    const DiagnosticInfo& info,
+    const Args&... args)
+{
+    if (!sink)
+        return;
+
+    // Cap max errors to avoid flooding the sink memory.
+    if (sink->getErrorCount() > kMaxLexErrorCount)
+        return;
+    sink->diagnose(loc, info, args...);
+}
+
 // Get the next input byte, without any handling of
 // escaped newlines, non-ASCII code points, source locations, etc.
 static int _peekRaw(Lexer* lexer)
@@ -155,6 +173,35 @@ static int _advanceRaw(Lexer* lexer)
         return kEOF;
 
     return *lexer->m_cursor++;
+}
+
+static SourceLoc _getSourceLoc(const Lexer& lexer, const char* it)
+{
+    return lexer.m_startLoc + (it - lexer.m_begin);
+}
+
+static SourceLoc _getSourceLoc(const Lexer* lexer)
+{
+    return _getSourceLoc(*lexer, lexer->m_cursor);
+}
+
+static String _inputToByteSeq(const char* b, const char* e)
+{
+    StringBuilder byteSeqBuilder;
+    for (const char* i = b; i != e; ++i)
+    {
+        if (i == b)
+            StringUtil::appendFormat(
+                byteSeqBuilder,
+                "0x%02X",
+                unsigned{static_cast<unsigned char>(*i)});
+        else
+            StringUtil::appendFormat(
+                byteSeqBuilder,
+                " 0x%02X",
+                unsigned{static_cast<unsigned char>(*i)});
+    }
+    return byteSeqBuilder.toString();
 }
 
 // When the cursor is already at the first byte of an end-of-line sequence,
@@ -227,13 +274,32 @@ static int _peek(Lexer* lexer, int offset = 0)
         {
             // Consume all unicode characters.
             pos--;
+            bool first{true};
+            bool invalid{};
             c = getUnicodePointFromUTF8(
-                [&]()
+                [&]() -> unsigned char
                 {
                     if (lexer->m_cursor + pos >= lexer->m_end)
-                        return (char)0;
-                    return lexer->m_cursor[pos++];
-                });
+                        return 0U;
+
+                    if (first || isUtf8ContinuationByte(lexer->m_cursor[pos]))
+                    {
+                        first = false;
+                        return static_cast<unsigned char>(lexer->m_cursor[pos++]);
+                    }
+
+                    // Current byte is not a continuation byte, so we don't
+                    // consume it. Instead, we'll just return a poison byte to
+                    // ensure that the current sequence is interpreted as
+                    // invalid.
+                    return 0xFFU; // always invalid UTF-8
+                },
+                &invalid);
+
+            // If the UTF-8 sequence is invalid, we'll return space,
+            // instead. This will be diagnosed in _advance().
+            if (invalid)
+                c = ' ';
         }
         // Default case is to just hand along the byte we read as an ASCII code point.
     } while (offset--);
@@ -290,16 +356,39 @@ static int _advance(Lexer* lexer)
         if (isUtf8LeadingByte((Byte)c))
         {
             lexer->m_cursor--;
+            const char* seqStart = lexer->m_cursor;
+            bool invalid{};
             c = getUnicodePointFromUTF8(
-                [&]()
+                [&]() -> unsigned char
                 {
                     if (lexer->m_cursor >= lexer->m_end)
                     {
                         isInvalidStream = true;
-                        return (char)0;
+                        return 0U;
                     }
-                    return *lexer->m_cursor++;
-                });
+
+                    if ((lexer->m_cursor == seqStart) || isUtf8ContinuationByte(*lexer->m_cursor))
+                        return static_cast<unsigned char>(*lexer->m_cursor++);
+
+                    // Current byte is not a continuation byte, so we don't
+                    // consume it. Instead, we'll just return a poison byte to
+                    // ensure that the current sequence is interpreted as
+                    // invalid.
+                    return 0xFFU; // always invalid UTF-8
+                },
+                &invalid);
+
+            // If the UTF-8 sequence is invalid, we'll interpret it as a space
+            // and diagnose.
+            if (invalid)
+            {
+                diagnose(
+                    lexer->m_sink,
+                    _getSourceLoc(*lexer, seqStart),
+                    LexerDiagnostics::invalidUtf8ByteSequence,
+                    _inputToByteSeq(seqStart, lexer->m_cursor).getBuffer());
+                c = ' ';
+            }
         }
 
         // If we encounter a \0, return kEOF, and move stream cursor to the end.
@@ -311,24 +400,6 @@ static int _advance(Lexer* lexer)
         // Default case is to return the raw byte we saw.
         return c;
     }
-}
-
-static const int kMaxLexErrorCount = 100;
-
-template<typename P, typename... Args>
-static void diagnose(
-    DiagnosticSink* sink,
-    const P& loc,
-    const DiagnosticInfo& info,
-    const Args&... args)
-{
-    if (!sink)
-        return;
-
-    // Cap max errors to avoid flooding the sink memory.
-    if (sink->getErrorCount() > kMaxLexErrorCount)
-        return;
-    sink->diagnose(loc, info, args...);
 }
 
 static void _handleNewLine(Lexer* lexer)
@@ -424,16 +495,6 @@ static void _lexIdentifier(Lexer* lexer)
         }
         return;
     }
-}
-
-static SourceLoc _getSourceLoc(const Lexer& lexer, const char* it)
-{
-    return lexer.m_startLoc + (it - lexer.m_begin);
-}
-
-static SourceLoc _getSourceLoc(const Lexer* lexer)
-{
-    return _getSourceLoc(*lexer, lexer->m_cursor);
 }
 
 static void _lexDigits(Lexer* lexer, int base)
@@ -1259,25 +1320,6 @@ static IntegerLiteralValue _decodeStringEscape(
 
     outUnicode = unicode;
     return value;
-}
-
-static String _inputToByteSeq(const char* b, const char* e)
-{
-    StringBuilder byteSeqBuilder;
-    for (const char* i = b; i != e; ++i)
-    {
-        if (i == b)
-            StringUtil::appendFormat(
-                byteSeqBuilder,
-                "0x%02X",
-                unsigned{static_cast<unsigned char>(*i)});
-        else
-            StringUtil::appendFormat(
-                byteSeqBuilder,
-                " 0x%02X",
-                unsigned{static_cast<unsigned char>(*i)});
-    }
-    return byteSeqBuilder.toString();
 }
 
 IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink)
