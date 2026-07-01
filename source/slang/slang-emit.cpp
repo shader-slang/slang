@@ -57,6 +57,7 @@
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-glsl-liveness.h"
 #include "slang-ir-hlsl-legalize.h"
+#include "slang-ir-hoist-cuda-resource-array-params.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-late-require-capability.h"
@@ -1329,6 +1330,20 @@ Result linkAndOptimizeIR(
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
     SLANG_PASS(finalizeSpecialization);
+
+    // On CUDA, hoist compute entry-point uniform params that contain a fixed-size resource array
+    // into a `ConstantBuffer<GlobalParams>` so they emit as the `__constant__` descriptor object
+    // instead of a serial dynamic-address `ld.param` chain. Must run after generic specialization
+    // so the param types are concrete structs. Gate on the whole CUDA family
+    // (CUDASource/CUDAHeader/PTX) since all three share the CUDA source emitter where the `.param`
+    // slowdown manifests.
+    if (isCUDATarget(targetRequest))
+    {
+        SLANG_PASS(hoistCUDAResourceArrayParamsToParameterGroup);
+        // The hoist performs invasive IR restructuring (new global param, rewritten uniform uses,
+        // rewritten entry-point function type), so validate the module at the pass boundary.
+        validateIRModuleIfEnabled(codeGenContext, irModule);
+    }
 
     // Lower DiffTypeInfo instructions to MakeTuple.
     // This must happen after specialization since DiffTypeInfo is hoistable.
