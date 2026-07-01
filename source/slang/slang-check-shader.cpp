@@ -27,6 +27,13 @@ enum class SemanticDirection
     Output,
 };
 
+// Maximum nesting depth when recursively walking a declaration's type for system-value
+// semantics. Shared by validateSystemValueSemantic and collectDepthOutputSemantics so the two
+// walks provably use the same bound: collectDepthOutputSemantics can return silently at the
+// limit precisely because validateSystemValueSemantic runs first with this same bound and has
+// already reported MaximumTypeNestingLevelExceeded for anything deeper.
+static constexpr UInt kMaxSystemValueSemanticRecursionDepth = 128;
+
 static bool isValidThreadDispatchIDType(Type* type)
 {
     // Can accept a single int/unit
@@ -361,7 +368,6 @@ static void validateSystemValueSemantic(
     Scope* scope,
     UInt recursionDepth = 0)
 {
-    static constexpr UInt kMaxSystemValueSemanticRecursionDepth = 128;
     if (!decl)
         return;
 
@@ -467,6 +473,78 @@ static void validateSystemValueSemantic(
         stage,
         direction,
         scope);
+}
+
+// Return true if `semanticName` is one of the fragment depth-output system values
+// (SV_Depth / SV_DepthGreaterEqual / SV_DepthLessEqual). A trailing numeric index is
+// stripped first, matching validateSystemValueSemanticForType above, because Slang treats
+// an indexed spelling like "SV_Depth0" as the same depth output (it lowers to gl_FragDepth /
+// DepthReplacing just as "SV_Depth" does), so it must be classified identically here.
+static bool isDepthOutputSemantic(UnownedStringSlice semanticName)
+{
+    UnownedStringSlice baseName;
+    UnownedStringSlice indexSlice;
+    splitNameAndIndex(semanticName, baseName, indexSlice);
+    return baseName.caseInsensitiveEquals(toSlice("sv_depth")) ||
+           baseName.caseInsensitiveEquals(toSlice("sv_depthgreaterequal")) ||
+           baseName.caseInsensitiveEquals(toSlice("sv_depthlessequal"));
+}
+
+// Append to `ioDepthSemantics` every depth-output system-value semantic that `decl` contributes
+// as a fragment output. `decl` is an `out`/`inout` parameter or the entry-point function itself
+// (whose return type is examined). A fragment output can only be a scalar, a struct, or an array
+// of those — never a mesh/stream output wrapper, which belong to non-fragment stages — so
+// unwrapping Conditional and array wrappers and recursing into struct fields reaches every place
+// a depth semantic can appear. Each depth semantic is recorded independently (a decl may
+// contribute both its own semantic and those of its fields), so a collected count greater than
+// one means the fragment entry point genuinely declares more than one depth output.
+static void collectDepthOutputSemantics(
+    ASTBuilder* astBuilder,
+    Decl* decl,
+    List<HLSLSimpleSemantic*>& ioDepthSemantics,
+    UInt recursionDepth = 0)
+{
+    if (!decl || recursionDepth >= kMaxSystemValueSemanticRecursionDepth)
+        return;
+
+    // Get the type from the declaration (parameter type or function return type).
+    Type* type = nullptr;
+    if (auto varDecl = as<VarDeclBase>(decl))
+        type = varDecl->getType();
+    else if (auto funcDecl = as<FuncDecl>(decl))
+        type = funcDecl->returnType.type;
+
+    if (type)
+    {
+        // Unwrap Conditional<T> and any array wrappers, matching the sibling aggregate walk
+        // validateNoPerPrimitiveSemanticsInType, so a depth semantic on a field of an
+        // array-of-struct output (e.g. `out DepthOut a[1]`) is still reached.
+        type = unwrapConditionalType(type);
+        while (auto arrayType = as<ArrayExpressionType>(type))
+            type = unwrapConditionalType(arrayType->getElementType());
+        if (auto declRefType = as<DeclRefType>(type))
+        {
+            if (auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
+            {
+                for (auto fieldDeclRef :
+                     getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+                {
+                    collectDepthOutputSemantics(
+                        astBuilder,
+                        fieldDeclRef.getDecl(),
+                        ioDepthSemantics,
+                        recursionDepth + 1);
+                }
+            }
+        }
+    }
+
+    // Record a depth semantic declared directly on this decl.
+    if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
+    {
+        if (isDepthOutputSemantic(semantic->name.getContent()))
+            ioDepthSemantics.add(semantic);
+    }
 }
 
 /// Recursively walk `paramDeclRef` and add any existential/interface specialization parameters to
@@ -1802,6 +1880,42 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 stage,
                 SemanticDirection::Output,
                 scope);
+        }
+    }
+
+    // HLSL allows a fragment shader to write at most one depth output. Slang previously
+    // accepted multiple depth output semantics (e.g. both SV_Depth and SV_DepthGreaterEqual)
+    // and silently produced a semantically wrong shader: the GLSL emitter assumes a single
+    // directional depth qualifier on gl_FragDepth, and the SPIR-V emitter collapses the
+    // conflicting per-variable depth execution modes to DepthReplacing (dropping the
+    // directional hint). The per-parameter validation above checks each semantic in isolation
+    // and never aggregates, so detect the conflict here across all of the entry point's
+    // outputs and reject it uniformly on every target.
+    if (stage == Stage::Fragment)
+    {
+        auto astBuilder = getCurrentASTBuilder();
+        List<HLSLSimpleSemantic*> depthOutputSemantics;
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            // Depth semantics are output-only (setter-only in the core module; any input use
+            // is already rejected), so only `out`/`inout` parameters can carry one.
+            // InOutModifier derives from OutModifier, so this catches both.
+            if (param->hasModifier<OutModifier>())
+                collectDepthOutputSemantics(astBuilder, param, depthOutputSemantics);
+        }
+        // The return value is also an output of the entry point.
+        collectDepthOutputSemantics(astBuilder, entryPointFuncDecl, depthOutputSemantics);
+
+        if (depthOutputSemantics.getCount() > 1)
+        {
+            // Report at the second collected depth output — the one that makes the count
+            // exceed one — and name it as conflicting with the first. Collection order is
+            // parameters (in declaration order) then the return value, so the "second" is the
+            // later contributor, not necessarily the lexically-later one.
+            sink->diagnose(Diagnostics::MultipleDepthOutputSemantics{
+                .conflictingSemantic = String(depthOutputSemantics[1]->name.getContent()),
+                .earlierSemantic = String(depthOutputSemantics[0]->name.getContent()),
+                .location = depthOutputSemantics[1]->loc});
         }
     }
 

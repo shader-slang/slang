@@ -59,6 +59,10 @@ namespace SlangRecord
 // The temporary lives until the end of the enclosing scope, so this macro
 // must be used at function-body scope (not inside an inner block) to ensure
 // the temporary outlives all subsequent uses of `arg`.
+// The temporary is named `_temp_<arg>` and is zero-initialized. Besides the null-redirect above,
+// call sites may redirect `arg` to `&_temp_<arg>` on a failure path so a subsequent RECORD_OUTPUT
+// serializes a defined 0 rather than dereferencing caller memory the wrapped API left unwritten on
+// failure (see GlobalSessionProxy::getDownstreamCompilerVersion, issue #11865).
 // Usage: PREPARE_POINTER_OUTPUT(outBlob) where outBlob is ISlangBlob**
 //        or PREPARE_POINTER_OUTPUT(pathTypeOut) where pathTypeOut is SlangPathType*
 #define PREPARE_POINTER_OUTPUT(arg)             \
