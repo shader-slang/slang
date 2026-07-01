@@ -174,6 +174,12 @@ public:
     bool searchInWorkspace = true;
     WorkspaceFlavor workspaceFlavor = WorkspaceFlavor::Standard;
 
+    // Language version assumed for files with no `#language` directive, from the
+    // `slang.predefinedLanguageVersion` setting. UNKNOWN means "unset": nothing is injected and the
+    // compiler default stands. A `#language` directive still wins, since the preprocessor applies
+    // it unconditionally.
+    SlangLanguageVersion predefinedLanguageVersion = SLANG_LANGUAGE_VERSION_UNKNOWN;
+
     slang::IGlobalSession* slangGlobalSession;
     Dictionary<String, RefPtr<DocumentVersion>> openedDocuments;
     DocumentVersion* openDoc(String path, String text);
@@ -187,6 +193,7 @@ public:
     bool updatePredefinedMacros(List<String> predefinedMacros);
     bool updateSearchPaths(List<String> searchPaths);
     bool updateSearchInWorkspace(bool value);
+    bool updatePredefinedLanguageVersion(SlangLanguageVersion version);
 
     void init(List<URI> rootDirURI, slang::IGlobalSession* globalSession);
     void invalidate();

@@ -57,6 +57,7 @@ add_executable(
     vk_compute_demo.h
     vk_compute_demo.cpp
 )
+set_default_compile_options(shader-coverage-bvh-traversal USE_FEWER_WARNINGS)
 add_dependencies(shader-coverage-bvh-traversal ${_copy_target})
 
 target_include_directories(

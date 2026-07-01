@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T09:24:37Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: f22ca582d91fc2387de917c9eb2e492cd1590365f14fadabe1615dec6bfac4b6
+generated_at: 2026-06-29T13:22:37Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 835ca8ae0e597a608474aaa8d581c75de3d392cc320259f50ca47f254b43433d
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -37,16 +37,18 @@ macro in
 expands to a `TOKEN(id, "'<text>'")` so every punctuation kind is
 both a `TokenType` enumerator and a string used in diagnostics. The
 "Lexer source range" column points at the lexer code that emits the
-kind; in `slang-lexer.cpp` the bulk of the dispatch lives in
-`Lexer::lexToken` / `Lexer::lexTokenImpl`.
+kind. In `slang-lexer.cpp` the per-character dispatch lives in the
+free function `_lexTokenImpl` (around line 1736), wrapped by the
+`Lexer::lexToken` member (around line 2243), which loops to fold out
+line continuations and attach flags.
 
 ### End markers and special
 
 | TokenKind | Lexer source range | Notes |
 | --- | --- | --- |
 | `Unknown` | default-constructed `Token` | Should not appear in valid input |
-| `EndOfFile` | end-of-buffer branch of `lexTokenImpl` | Returned when the lexer reaches end of input |
-| `Invalid` | error branch of `lexTokenImpl` (`slang-lexer.cpp` around line 1739) | Lexer hit a character it cannot classify; emits a diagnostic unless `kLexerFlag_SuppressDiagnostics` is set, but the `Invalid` token is still produced |
+| `EndOfFile` | end-of-buffer branch of `_lexTokenImpl` (`slang-lexer.cpp` around line 1745) | Returned when the lexer reaches end of input |
+| `Invalid` | error branch of `_lexTokenImpl` (`slang-lexer.cpp` around line 2239) | Lexer hit a character it cannot classify; emits a diagnostic unless `kLexerFlag_SuppressDiagnostics` is set (see `Lexer::getDiagnosticSink` in [slang-lexer.h](../../../../source/compiler-core/slang-lexer.h)), but the `Invalid` token is still produced |
 
 ### Content tokens
 
@@ -55,8 +57,8 @@ kind; in `slang-lexer.cpp` the bulk of the dispatch lives in
 | `Identifier` | identifier rule in `slang-lexer.cpp` | Includes every keyword; classification deferred to the parser via syntax-decl lookup |
 | `IntegerLiteral` | integer-literal rule in `slang-lexer.cpp` | Suffixes (`u`, `l`, `ul`, ...) are part of the token's raw text |
 | `FloatingPointLiteral` | float-literal rule in `slang-lexer.cpp` | Suffixes (`f`, `lf`, ...) are part of the token's raw text |
-| `StringLiteral` | string-literal rule in `slang-lexer.cpp` (regular, raw-string, and include-header forms) | Includes the opening / closing quotes; escape sequences are not yet decoded |
-| `CharLiteral` | char-literal rule in `slang-lexer.cpp` | Single-quoted character literal |
+| `StringLiteral` | `_lexStringLiteralBody` / `_lexRawStringLiteralBody` in `slang-lexer.cpp` (regular, raw-string, and include-header forms) | Raw token text includes the opening / closing quotes; escape sequences are decoded later by `getStringLiteralTokenValue` |
+| `CharLiteral` | `_lexStringLiteralBody` in `slang-lexer.cpp`, invoked with `singleChar = true` | Single-quoted character literal; the lexer diagnoses empty (`''`) and multi-character bodies, and `getCharLiteralValue` decodes the code point |
 
 ### Trivia (whitespace and comments)
 
@@ -77,7 +79,7 @@ them out of the token stream they iterate.
 | --- | --- | --- |
 | `Pound` | `#` punctuation in `slang-lexer.cpp` | Preprocessor directive prefix |
 | `PoundPound` | `##` punctuation in `slang-lexer.cpp` | Preprocessor token paste |
-| `CompletionRequest` | synthesized by the language-server pipeline | `#?`; emitted at the cursor position to request completion (`slang-completion-token.cpp`) |
+| `CompletionRequest` | `#?` arm of the `#` branch in `_lexTokenImpl` (`slang-lexer.cpp` around line 2137) | `#?`; emitted at the cursor position to request completion |
 
 ### Punctuation and structural symbols
 
@@ -205,9 +207,16 @@ implements several context-sensitive rules:
   closed only by `)delimiter"` for an arbitrary `delimiter`. Inside,
   newlines and backslashes are taken literally — no escape processing
   is performed. Implementation lives in `_lexRawStringLiteralBody`
-  (`slang-lexer.cpp` lines 1025-1072, with the closing-delimiter
-  termination check at lines 1050-1053), invoked from the
-  string-literal dispatch at line 1471.
+  (`slang-lexer.cpp` lines 1545-1592, with the closing-delimiter
+  termination check around lines 1564-1576), invoked from the `R"`
+  arm of the string-literal dispatch at line 1936. A bare `"` as the
+  delimiter is rejected with `LexerDiagnostics::quoteCannotBeDelimiter`.
+- **Character literals.** A `'`-quoted body is lexed by the same
+  `_lexStringLiteralBody` helper as strings, passing `singleChar = true`
+  (`slang-lexer.cpp` around line 1351). The lexer enforces the
+  one-character rule eagerly: an empty body or a body that reaches a
+  second character emits `LexerDiagnostics::illegalCharacterLiteral`,
+  and the resulting token is still returned as a `CharLiteral`.
 - **Numeric literal suffixes.** Suffix characters (`u`, `l`, `f`,
   `h`, ...) are kept as part of the literal token's raw text. The
   parser / checker decodes them when interpreting the value.

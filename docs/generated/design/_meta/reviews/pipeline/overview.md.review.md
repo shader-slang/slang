@@ -1,48 +1,47 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-12T12:04:49+00:00
+reviewed_at: 2026-06-30T13:32:54+00:00
 target_doc: pipeline/overview.md
-target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_watched_paths_digest: b52333a3c46debaf875894fc96056347221bef98dce0a1495d4cac0af510369e
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: 2854d32691b21394b5c128e6ff961825c7bcc6f4a9a204e7f97ca918b148ec26
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
   factual_accuracy: pass
   cross_references: pass
   completeness: pass
-  style_consistency: partial
+  style_consistency: pass
   source_alignment: pass
   front_matter_validity: pass
-finding_count: 1
+finding_count: 0
 severity_breakdown:
   critical: 0
   major: 0
   minor: 0
-  nit: 1
+  nit: 0
 ---
 
 # Review report for pipeline/overview.md
 
 ## Summary
 
-The overview is factually aligned with the sampled pipeline sources and its links lint cleanly. The only finding is a small common-contract style issue: the first body paragraph identifies the page purpose but leaves the intended reader to the second paragraph.
+The overview is factually aligned with the watched source files and satisfies the `pipeline-overview.md` prompt contract. I found no reportable issues; the line-numbered driver claims and the stage-to-file map checked out against the current source.
 
 ## Items checked
 
-- Ran `regenerate.py show pipeline/overview.md` and read the target page, `_common.md`, `pipeline-overview.md`, and dependency `architecture/overview.md`.
-- Verified front matter keys, recorded source commit, and 64-character hex watched-path digest.
-- Spot-checked 15 overview claims against `source/compiler-core/slang-lexer.cpp`, `source/slang/slang-preprocessor.cpp`, `source/slang/slang-parser.cpp`, `source/slang/slang-check.cpp`, `source/slang/slang-compile-request.cpp`, `source/slang/slang-compile-request.h`, `source/slang/slang-lower-to-ir.cpp`, and `source/slang/slang-emit.cpp`.
-- Checked stage ordering, driver entry points, `FrontEndCompileRequest::checkAllTranslationUnits`, `generateIRForTranslationUnit`, `TargetProgram::getOrCreateIRModuleForLayout`, `linkAndOptimizeIR`, and `emitEntryPointsSourceFromIR` claims.
-- Resolved relative links with `regenerate.py lint` for this assigned doc group; lint reported no issues.
+- Verified the required front matter keys and copied `source_commit` / `watched_paths_digest` from the target document.
+- Checked the required structure from `pipeline-overview.md`: title, end-to-end `flowchart LR`, stage subsections, driver entry points, and cross-cutting concerns.
+- Spot-checked 14 concrete claims against watched sources: lexer tokenization in `source/compiler-core/slang-lexer.cpp`; preprocessing, include setup, and `parsePreprocessedSegments` in `source/slang/slang-compile-request.cpp`; parser class and deferred body-token handling in `source/slang/slang-parser.cpp`; `SemanticsVisitor` dispatch and semantic-check loop in `source/slang/slang-check.cpp` / `source/slang/slang-compile-request.cpp`; IR generation through `IRBuilder`, `IRModule::create`, and `lowerFrontEndEntryPointToIR` in `source/slang/slang-lower-to-ir.cpp`; `linkAndOptimizeIR` and `emitEntryPointsSourceFromIR` in `source/slang/slang-emit.cpp`.
+- Verified the line-numbered claims for `linkAndOptimizeIR` at line 896, `emitEntryPointsSourceFromIR` at line 2540, and `checkTranslationUnit` in `FrontEndCompileRequest::checkAllTranslationUnits` at line 513.
+- Resolved the relative links to peer pipeline docs, cross-cutting docs, the architecture dependency doc, and the linked source paths named by the page.
+- Checked source-alignment claims for the approximate `slang-ir-*.cpp` count, `slang-check-*.cpp` family, `slang-emit-<target>.cpp` family, AST header family, and named driver/request/module headers.
 
 ## Findings
 
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | nit | Intro, lines 12-18 | The first body paragraph says what the page covers, but the intended-reader sentence is a separate paragraph. `_common.md` requires the first paragraph itself to state both the coverage and the intended reader. | `docs/generated/design/_meta/prompts/_common.md:65-66` says the first paragraph must state what the document covers and who its intended reader is; `docs/generated/design/pipeline/overview.md:12-18` splits those into two paragraphs. | Merge the intended-reader sentence into the first paragraph, or otherwise revise the first paragraph so it contains both the page purpose and audience. |
+(no findings)
 
 ## No-issues notes
 
-- The mermaid diagram uses camelCase node IDs and no explicit colors.
-- Every stage subsection includes links to watched source files and a detail page.
-- The source-backed entry-point line references for `linkAndOptimizeIR` and `emitEntryPointsSourceFromIR` match the recorded commit.
+- The page stays at roadmap depth and does not duplicate the per-stage documents.
+- The mermaid diagram uses simple camelCase node IDs and no styling.
+- The document includes at least one watched source link in every stage subsection.

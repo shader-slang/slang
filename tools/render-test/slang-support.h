@@ -123,10 +123,22 @@ public:
         m_buf.clear();
     }
 
+    /// Returns a snapshot of the captured messages that does not alias the
+    /// builder's storage, so a concurrent reader can safely inspect it after the
+    /// lock is released.
+    ///
+    /// `Slang::String`'s copy constructor shares the underlying reference-counted
+    /// `StringRepresentation`, so `m_buf.toString()` would hand back a `String`
+    /// pointing into the same char buffer that `handleMessage` keeps appending to.
+    /// Once this method returns and the lock is dropped, a later in-place append
+    /// (`String::appendInPlace`, taken whenever the buffer is uniquely referenced
+    /// again) would then race the reader's access to that buffer. Constructing a
+    /// fresh `String` from the builder's slice forces an independent allocation
+    /// while still under the lock, breaking the alias.
     Slang::String getString()
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        return m_buf.toString();
+        return Slang::String(m_buf.getUnownedSlice());
     }
 
 private:
