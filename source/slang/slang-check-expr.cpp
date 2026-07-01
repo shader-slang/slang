@@ -4602,6 +4602,31 @@ Type* SemanticsExprVisitor::coerceOperandsOfBuiltinBinaryExpr(
     return commonType;
 }
 
+bool SemanticsExprVisitor::hasUserDefinedNonCoreOperatorInScope(Name* operatorName, Scope* scope)
+{
+    // Scoped name lookup like the one `visitVarExpr` performs for an operator's `functionExpr`:
+    // `a * b` (etc.) resolves by looking up the operator token name (`*`) in scope, which finds
+    // both the core-module builtin `operator*` overloads and any user-defined ones (a user
+    // `operator*` is stored under the operator token name too; see `ParseDeclName`). This is only
+    // an existence pre-check -- no overload resolution -- so it stays much cheaper than the
+    // resolution the fast path exists to skip. It is deliberately a conservative superset of what
+    // resolution ultimately considers: unlike `visitVarExpr` we do not pass the decl-exclusion /
+    // transparent-member options or apply the visibility filter, because deferring on any
+    // candidate is always safe -- normal resolution then applies the real visibility rules and, if
+    // nothing user-defined applies, selects the builtin.
+    LookupResult lookupResult =
+        lookUp(m_astBuilder, this, operatorName, scope, LookupMask::Default);
+    for (const auto& item : lookupResult)
+    {
+        // A candidate outside the core module is a user-defined overload; defer to normal
+        // resolution so it is considered. (`isFromCoreModule` treats a null decl as non-core, but
+        // every lookup item carries a decl, so this only ever fires for a real user declaration.)
+        if (!isFromCoreModule(item.declRef.getDecl()))
+            return true;
+    }
+    return false;
+}
+
 Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
 {
     // Recognize a builtin arithmetic (`+ - * / %`), comparison (`< > <= >=`), equality
@@ -4634,6 +4659,11 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         // In GLSL operator scope the `glsl` module owns matrix operator semantics, so leave
         // matrix operands to normal resolution (see the binary case for the full rationale).
         if (isGLSLOperatorScope() && as<MatrixExpressionType>(uOperandType))
+            return nullptr;
+        // If a user-defined `operator-`/`!`/`~` is in scope, defer to normal overload resolution
+        // so it is honored rather than shadowed by the builtin fast path (issue #11877). Mirrors
+        // the GLSL-scope deferral above; see `hasUserDefinedNonCoreOperatorInScope`.
+        if (hasUserDefinedNonCoreOperatorInScope(uVarExpr->name, uVarExpr->scope))
             return nullptr;
         Type* uElementType = uOperandType;
         if (auto v = as<VectorExpressionType>(uOperandType))
@@ -4731,6 +4761,15 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         if (isEquality && anyVec)
             return nullptr;
     }
+
+    // If a user-defined `operator OP` for this operator is in scope, defer to normal overload
+    // resolution so it is honored rather than silently shadowed by the builtin fast path (issue
+    // #11877 -- e.g. a user `operator*(float4x4, float4x4)`). This mirrors the GLSL-scope deferral
+    // above and runs before operand coercion below (which would otherwise mutate `expr`'s
+    // arguments). See `hasUserDefinedNonCoreOperatorInScope` for why the lookup is cheap and why
+    // deferring on a bare name match is always safe.
+    if (hasUserDefinedNonCoreOperatorInScope(varExpr->name, varExpr->scope))
+        return nullptr;
 
     // A bitwise/shift operator with a builtin floating-point operand has no integer interpretation.
     // Reject it here -- before the mixed-shift early return and common-type coercion below -- so
