@@ -3911,6 +3911,27 @@ static Type* _findReplacementThisParamType(IRGenContext* context, DeclRef<Decl> 
     return nullptr;
 }
 
+// Structural test: returns the `LookupDeclRef` if `declRefBase` is a
+// `LookupDeclRef` whose lookup source resolves to a `CallableDecl`-typed
+// `DeclRefType`, else null. The predicate itself is structural — it does
+// not check AD-ness — but today's only producer of this shape in the
+// front end is `convertHigherOrderExprToLookup`, which rewrites
+// `__fwd_diff(member.method)` / `__bwd_diff(member.method)` into a
+// member access on the function-as-type of the underlying member method
+// (the AD 2.0 rewrite). The lowering call sites that consult this
+// helper therefore use it as a stand-in for "this DeclRef came out of
+// the AD 2.0 rewrite". If a future change introduces a fresh
+// `LookupDeclRef`-on-`CallableDecl` shape from a non-AD producer, every
+// call site below must be re-validated — keep this comment in sync.
+// See shader-slang/slang#11004.
+static LookupDeclRef* asLookupOnCallable(DeclRefBase* declRefBase)
+{
+    auto lookup = as<LookupDeclRef>(declRefBase);
+    if (lookup && isDeclRefTypeOf<CallableDecl>(lookup->getLookupSource()))
+        return lookup;
+    return nullptr;
+}
+
 /// Get the type of the `this` parameter introduced by `parentDeclRef`, or null.
 ///
 /// E.g., if `parentDeclRef` is a `struct` declaration, then this will
@@ -4497,15 +4518,11 @@ void _lowerInfoFromFuncType(
             getActualParamPassingModeForImplicitThisParam(declRef.getDecl(), thisType);
 
         // Hack for how this-types work for looked up function for AD 2.0..
-        if (auto lookup = as<LookupDeclRef>((declRef.declRefBase)))
+        if (auto lookup = asLookupOnCallable(declRef.declRefBase))
         {
-            auto lookupSource = lookup->getLookupSource();
-            if (isDeclRefTypeOf<CallableDecl>(lookupSource))
-            {
-                innerThisParamDirection = getActualParamPassingModeForImplicitThisParam(
-                    as<DeclRefType>(lookupSource)->getDeclRef().getDecl(),
-                    thisType);
-            }
+            innerThisParamDirection = getActualParamPassingModeForImplicitThisParam(
+                as<DeclRefType>(lookup->getLookupSource())->getDeclRef().getDecl(),
+                thisType);
         }
 
         if (thisType)
@@ -4963,6 +4980,39 @@ struct ExprLoweringContext
         else if (auto staticMemberFuncExpr = as<StaticMemberExpr>(funcExpr))
         {
             outInfo->funcDeclRef = resolveAliases(staticMemberFuncExpr->declRef);
+            // For the AD 2.0 lookup-on-callable shape only, surface the
+            // receiver preserved in `SharedTypeExpr::base.exp` so the
+            // implicit-`this` path in `visitInvokeExprImpl` finds it.
+            // Plain `obj.someStaticMember()` reaches this branch with
+            // the same `SharedTypeExpr` wrapper but must not synthesize
+            // a `this` arg.
+            if (asLookupOnCallable(outInfo->funcDeclRef.declRefBase))
+            {
+                // The AD 2.0 rewrite produced by
+                // `convertHigherOrderExprToLookup` (slang-check-expr.cpp)
+                // routes through `ConstructLookupResultExpr`'s
+                // `isEffectivelyStatic` path, which wraps the original
+                // receiver in a `SharedTypeExpr`
+                // (`SharedTypeExpr::base.exp = <receiver>`) and forwards
+                // it to `ConstructDeclRefExpr`. `ConstructLookupResultExpr`
+                // also has a sibling `TypeType` branch that emits a
+                // `StaticMemberExpr` *without* a `SharedTypeExpr`
+                // wrapping — today no AD 2.0 lookup reaches this code
+                // through that path, but a future synthesis or overload
+                // collapse could land here with a different
+                // `baseExpression` shape. Guard rather than assert so a
+                // shape we don't recognise leaves `outInfo->baseExpr`
+                // null and the call falls back to the pre-PR behaviour
+                // (the worst case is the original #11004 ICE
+                // re-surfacing on that exact path) instead of aborting
+                // a release build.
+                if (auto sharedTypeBase =
+                        as<SharedTypeExpr>(staticMemberFuncExpr->baseExpression))
+                {
+                    if (sharedTypeBase->base.exp)
+                        outInfo->baseExpr = sharedTypeBase->base.exp;
+                }
+            }
             return true;
         }
         else if (auto varExpr = as<VarExpr>(funcExpr))
@@ -5548,27 +5598,64 @@ struct ExprLoweringContext
                 // Calculate args by func-type
                 auto resolvedFuncType = as<FuncType>(expr->functionExpr->type);
                 funcTypeInfo.type = lowerType(context, resolvedFuncType);
-                // Insert a this type to the front of the param types
 
+                // For the AD 2.0 lookup-on-callable shape, the resolved
+                // `FuncType` already encodes the implicit `this` as its
+                // first parameter (`FwdDiffFuncType`/`BwdDiffFuncType`
+                // substitute it during type resolution). Skip the
+                // prepend below and iterate user args past the implicit
+                // slot. The narrow `asLookupOnCallable` gate avoids
+                // mis-routing per-arg passing modes for unrelated
+                // shapes that happen to satisfy `paramCount ==
+                // argCount + 1`.
+                Count argCount = expr->arguments.getCount();
+                bool funcTypeAlreadyHasImplicitThis = false;
                 if (baseExpr)
                 {
                     if (auto thisType = getThisParamTypeForCallable(context, funcDeclRef))
                     {
-                        auto irThisType = lowerType(context, thisType);
+                        if (asLookupOnCallable(funcDeclRef.declRefBase) &&
+                            resolvedFuncType->getParamCount() == argCount + 1)
+                        {
+                            funcTypeAlreadyHasImplicitThis = true;
+                        }
 
-                        List<IRType*> paramTypes;
-                        paramTypes.add(irThisType);
-                        for (auto paramType : cast<IRFuncType>(funcTypeInfo.type)->getParamTypes())
-                            paramTypes.add(paramType);
+                        if (!funcTypeAlreadyHasImplicitThis)
+                        {
+                            auto irThisType = lowerType(context, thisType);
 
-                        funcTypeInfo.type = context->irBuilder->getFuncType(
-                            paramTypes.getCount(),
-                            paramTypes.getBuffer(),
-                            cast<IRFuncType>(funcTypeInfo.type)->getResultType());
+                            List<IRType*> paramTypes;
+                            paramTypes.add(irThisType);
+                            for (auto paramType :
+                                 cast<IRFuncType>(funcTypeInfo.type)->getParamTypes())
+                                paramTypes.add(paramType);
+
+                            funcTypeInfo.type = context->irBuilder->getFuncType(
+                                paramTypes.getCount(),
+                                paramTypes.getBuffer(),
+                                cast<IRFuncType>(funcTypeInfo.type)->getResultType());
+                        }
                     }
                 }
 
-                addDirectCallArgs(expr, resolvedFuncType, &irArgs, &argFixups);
+                if (funcTypeAlreadyHasImplicitThis)
+                {
+                    for (Index i = 0; i < argCount; ++i)
+                    {
+                        auto paramInfo = resolvedFuncType->getParamInfo(i + 1);
+                        addDirectCallArgs(
+                            expr,
+                            i,
+                            paramInfo.mode,
+                            DeclRef<ParamDecl>(),
+                            &irArgs,
+                            &argFixups);
+                    }
+                }
+                else
+                {
+                    addDirectCallArgs(expr, resolvedFuncType, &irArgs, &argFixups);
+                }
             }
             else
             {
