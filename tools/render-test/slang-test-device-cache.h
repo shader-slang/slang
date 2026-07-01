@@ -38,6 +38,13 @@ public:
     struct CachedDevice
     {
         Slang::ComPtr<rhi::IDevice> device;
+
+        // The debug bridge this device was created with (as desc.debugCallback). A cached device is
+        // wired to this exact bridge for its whole life and cannot be re-pointed, so acquireDevice
+        // hands it back to every caller — including a cache hit — to bind their per-invocation
+        // callback to (see #11856).
+        Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> bridge;
+
         uint64_t creationOrder;
 
         CachedDevice();
@@ -51,31 +58,19 @@ private:
     static std::unordered_map<DeviceCacheKey, CachedDevice, DeviceCacheKeyHash>& getDeviceCache();
     static uint64_t& getNextCreationOrder();
 
-    // Maps a device key to the debug bridge wired into that key's cached device. Unlike the device
-    // cache it is never evicted: bridges are tiny and, like the ones from
-    // createRetainedCoreToRHIDebugBridge(), must outlive any retained device state that could emit
-    // late messages, so a device re-created for a key after eviction re-wires the same bridge.
-    static std::unordered_map<
-        DeviceCacheKey,
-        Slang::RefPtr<renderer_test::CoreToRHIDebugBridge>,
-        DeviceCacheKeyHash>&
-    getBridgeCache();
-
-    // Builds the cache key from a device descriptor. Shared by acquireDevice and acquireDebugBridge
-    // so a device and its debug bridge are always keyed identically.
-    static DeviceCacheKey makeKey(const rhi::DeviceDesc& desc);
-
     static void evictOldestDeviceIfNeeded();
 
 public:
-    static SlangResult acquireDevice(const rhi::DeviceDesc& desc, rhi::IDevice** outDevice);
-
-    // Returns the debug bridge that the cached device for `desc` is (or will be) wired to, creating
-    // and retaining one on first use. Callers set `desc.debugCallback` to it before acquireDevice
-    // and bind their per-invocation ScopedCoreDebugCallback to it, so a cache hit rebinds the live
-    // device's bridge instead of an unrelated fresh one (see #11856).
-    static Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> acquireDebugBridge(
-        const rhi::DeviceDesc& desc);
+    // Acquires a device for `desc`, reusing a cached one when possible, and returns via `outBridge`
+    // the debug bridge that device is wired to. On a miss the device is created with a fresh
+    // retained bridge (set as desc.debugCallback) and both are cached together; on a hit the cached
+    // device and its original bridge are returned. Callers bind a ScopedCoreDebugCallback to
+    // `outBridge` so a reused device routes its validation messages to the current invocation's
+    // callback instead of a stale one (see #11856).
+    static SlangResult acquireDevice(
+        const rhi::DeviceDesc& desc,
+        rhi::IDevice** outDevice,
+        Slang::RefPtr<renderer_test::CoreToRHIDebugBridge>* outBridge);
 
     static void cleanCache();
 };

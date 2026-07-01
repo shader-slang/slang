@@ -53,11 +53,11 @@ private:
 ///
 /// Device descriptors store debug callbacks as raw pointers, and retained RHI
 /// state may emit messages after the harness invocation that created a device.
-/// Each freshly created (non-cached) device gets a distinct bridge so old
-/// emitters can only reach their own cleared bridge, not the next invocation's
-/// callback. Cached devices instead reuse one bridge per device key, retained by
-/// DeviceCache::acquireDebugBridge so the bridge matches the (possibly reused)
-/// device an invocation binds to (see #11856).
+/// Each device is created with one such bridge as its debug callback and stays
+/// wired to it for life. A cached device stores its bridge alongside it in the
+/// device cache, and DeviceCache::acquireDevice hands that same bridge back on a
+/// reuse, so an invocation binding to it reaches the device it is actually using
+/// rather than an unrelated fresh bridge (see #11856).
 inline Slang::RefPtr<CoreToRHIDebugBridge> createRetainedCoreToRHIDebugBridge()
 {
     static std::mutex* mutex = new std::mutex;

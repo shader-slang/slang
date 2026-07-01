@@ -372,7 +372,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         FOLDER test/tools
     )
     # The scoped-core-debug-callback unit test exercises the render-test device cache
-    # (DeviceCache::acquireDebugBridge) to pin the #11856 fix without a GPU, so compile that
+    # (DeviceCache::acquireDevice) to pin the #11856 fix without a GPU, so compile that
     # render-test source into this module too.
     target_sources(
         gfx-unit-test

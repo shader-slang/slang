@@ -27,34 +27,6 @@ uint64_t& DeviceCache::getNextCreationOrder()
     return instance;
 }
 
-std::unordered_map<
-    DeviceCache::DeviceCacheKey,
-    Slang::RefPtr<renderer_test::CoreToRHIDebugBridge>,
-    DeviceCache::DeviceCacheKeyHash>&
-DeviceCache::getBridgeCache()
-{
-    static std::unordered_map<
-        DeviceCacheKey,
-        Slang::RefPtr<renderer_test::CoreToRHIDebugBridge>,
-        DeviceCacheKeyHash>
-        instance;
-    return instance;
-}
-
-DeviceCache::DeviceCacheKey DeviceCache::makeKey(const rhi::DeviceDesc& desc)
-{
-    DeviceCacheKey key;
-    key.deviceType = desc.deviceType;
-    key.enableValidation = desc.enableValidation;
-    key.enableRayTracingValidation = desc.enableRayTracingValidation;
-    key.profileName = desc.slang.targetProfile ? desc.slang.targetProfile : "Unknown";
-    key.targetFlags = desc.slang.targetFlags;
-    key.defaultMatrixLayoutMode = desc.slang.defaultMatrixLayoutMode;
-    key.nvapiExtUavSlot = desc.nvapiExtUavSlot;
-    key.dx12ExperimentalFeatures = (desc.next != nullptr);
-    return key;
-}
-
 bool DeviceCache::DeviceCacheKey::operator==(const DeviceCacheKey& other) const
 {
     return deviceType == other.deviceType && enableValidation == other.enableValidation &&
@@ -110,17 +82,29 @@ void DeviceCache::evictOldestDeviceIfNeeded()
     }
 }
 
-SlangResult DeviceCache::acquireDevice(const rhi::DeviceDesc& desc, rhi::IDevice** outDevice)
+SlangResult DeviceCache::acquireDevice(
+    const rhi::DeviceDesc& desc,
+    rhi::IDevice** outDevice,
+    Slang::RefPtr<renderer_test::CoreToRHIDebugBridge>* outBridge)
 {
-    if (!outDevice)
+    if (!outDevice || !outBridge)
         return SLANG_E_INVALID_ARG;
 
     *outDevice = nullptr;
+    *outBridge = nullptr;
 
-    // Skip caching for CUDA devices due to crashes
+    // Skip caching for CUDA devices due to crashes. Each call gets a fresh device wired to a fresh
+    // retained bridge (as desc.debugCallback).
     if (desc.deviceType == rhi::DeviceType::CUDA)
     {
-        return rhi::getRHI()->createDevice(desc, outDevice);
+        Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> bridge =
+            renderer_test::createRetainedCoreToRHIDebugBridge();
+        rhi::DeviceDesc localDesc = desc;
+        localDesc.debugCallback = bridge.Ptr();
+        SlangResult result = rhi::getRHI()->createDevice(localDesc, outDevice);
+        if (SLANG_SUCCEEDED(result))
+            *outBridge = bridge;
+        return result;
     }
 
     std::lock_guard<std::mutex> lock(getMutex());
@@ -128,35 +112,51 @@ SlangResult DeviceCache::acquireDevice(const rhi::DeviceDesc& desc, rhi::IDevice
     auto& nextCreationOrder = getNextCreationOrder();
 
     // Create cache key
-    DeviceCacheKey key = makeKey(desc);
+    DeviceCacheKey key;
+    key.deviceType = desc.deviceType;
+    key.enableValidation = desc.enableValidation;
+    key.enableRayTracingValidation = desc.enableRayTracingValidation;
+    key.profileName = desc.slang.targetProfile ? desc.slang.targetProfile : "Unknown";
+    key.targetFlags = desc.slang.targetFlags;
+    key.defaultMatrixLayoutMode = desc.slang.defaultMatrixLayoutMode;
+    key.nvapiExtUavSlot = desc.nvapiExtUavSlot;
+    key.dx12ExperimentalFeatures = (desc.next != nullptr);
 
     // Evict oldest device if we've reached the limit
     evictOldestDeviceIfNeeded();
 
     // Check if we have a cached device
     auto it = deviceCache.find(key);
-    if (it != deviceCache.end())
+    if (it != deviceCache.end() && it->second.device)
     {
-        // Return the cached device - COM reference counting handles the references
+        // Return the cached device and the bridge it is actually wired to - COM reference counting
+        // handles the device references.
         *outDevice = it->second.device.get();
-        if (*outDevice)
-        {
-            (*outDevice)->addRef();
-            return SLANG_OK;
-        }
+        (*outDevice)->addRef();
+        *outBridge = it->second.bridge;
+        return SLANG_OK;
     }
 
-    // Create new device
+    // Miss: create the device wired to a fresh retained bridge (as desc.debugCallback). The bridge
+    // must outlive the device (retained device state can emit messages after any single
+    // invocation), which createRetainedCoreToRHIDebugBridge() guarantees via a process-global list;
+    // it is cached alongside the device so a later hit hands back the same bridge.
+    Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> bridge =
+        renderer_test::createRetainedCoreToRHIDebugBridge();
+    rhi::DeviceDesc localDesc = desc;
+    localDesc.debugCallback = bridge.Ptr();
+
     Slang::ComPtr<rhi::IDevice> device;
-    auto result = rhi::getRHI()->createDevice(desc, device.writeRef());
+    SlangResult result = rhi::getRHI()->createDevice(localDesc, device.writeRef());
     if (SLANG_FAILED(result))
     {
         return result;
     }
 
-    // Cache the device
+    // Cache the device together with the bridge it was created with.
     CachedDevice& cached = deviceCache[key];
     cached.device = device;
+    cached.bridge = bridge;
     cached.creationOrder = nextCreationOrder++;
 
     // Return the device with proper reference counting
@@ -165,45 +165,18 @@ SlangResult DeviceCache::acquireDevice(const rhi::DeviceDesc& desc, rhi::IDevice
     {
         (*outDevice)->addRef();
     }
+    *outBridge = bridge;
 
     return SLANG_OK;
-}
-
-
-Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> DeviceCache::acquireDebugBridge(
-    const rhi::DeviceDesc& desc)
-{
-    // CUDA devices are not cached (see acquireDevice), so each invocation gets a fresh device and
-    // therefore a fresh bridge, matching the uncached lifetime.
-    if (desc.deviceType == rhi::DeviceType::CUDA)
-    {
-        return renderer_test::createRetainedCoreToRHIDebugBridge();
-    }
-
-    std::lock_guard<std::mutex> lock(getMutex());
-    auto& bridgeCache = getBridgeCache();
-
-    DeviceCacheKey key = makeKey(desc);
-
-    auto it = bridgeCache.find(key);
-    if (it != bridgeCache.end())
-    {
-        return it->second;
-    }
-
-    Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> bridge =
-        renderer_test::createRetainedCoreToRHIDebugBridge();
-    bridgeCache[key] = bridge;
-    return bridge;
 }
 
 
 void DeviceCache::cleanCache()
 {
     std::lock_guard<std::mutex> lock(getMutex());
-    getDeviceCache().clear();
-    // Bridges remain alive via createRetainedCoreToRHIDebugBridge()'s process-global list, so any
+    // Dropping the cache releases each device and our reference to its bridge. The bridge objects
+    // themselves stay alive via createRetainedCoreToRHIDebugBridge()'s process-global list, so any
     // late message from a now-released device still hits a live (cleared) bridge rather than freed
     // storage.
-    getBridgeCache().clear();
+    getDeviceCache().clear();
 }
