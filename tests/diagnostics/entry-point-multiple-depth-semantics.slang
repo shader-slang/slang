@@ -13,14 +13,27 @@
 // entry point, so exactly the single E30705 diagnostic is produced per case.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=TWOPARAMS):-target spirv -entry twoParams -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=TWOSAME):-target spirv -entry twoSame -stage fragment
 //DIAGNOSTIC_TEST:SIMPLE(diag=RETSTRUCT):-target spirv -entry retStruct -stage fragment
 //DIAGNOSTIC_TEST:SIMPLE(diag=MIXED):-target spirv -entry mixed -stage fragment
 //DIAGNOSTIC_TEST:SIMPLE(diag=INDEXED):-target spirv -entry indexed -stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=ARRAYFIELD):-target spirv -entry arrayField -stage fragment
 
 // Two depth outputs across two `out` parameters.
 [shader("fragment")]
 void twoParams(float x, out float a : SV_DepthGreaterEqual, out float b : SV_Depth)
 //TWOPARAMS: E30705
+{
+    a = x + 1.0;
+    b = x - 1.0;
+}
+
+// The canonical duplicate: the same depth semantic declared twice (a likely copy-paste error).
+// The message names both offenders, which with identical spellings reads sensibly as
+// "'SV_Depth' conflicts with the earlier 'SV_Depth'".
+[shader("fragment")]
+void twoSame(float x, out float a : SV_Depth, out float b : SV_Depth)
+//TWOSAME:                                                  ^^^^^^^^ E30705
 {
     a = x + 1.0;
     b = x - 1.0;
@@ -66,5 +79,16 @@ void indexed(float x, out float a : SV_Depth0, out float b : SV_DepthLessEqual)
 //INDEXED: E30705
 {
     a = x + 1.0;
+    b = x - 1.0;
+}
+
+// A depth semantic reached only through an array-typed aggregate output: the array element is
+// the struct `DepthOut` (SV_DepthGreaterEqual), which conflicts with the `out` SV_Depth. The
+// collector must unwrap the array to see the struct field.
+[shader("fragment")]
+void arrayField(float x, out DepthOut a[2], out float b : SV_Depth)
+//ARRAYFIELD: E30705
+{
+    a[0].d = x + 1.0;
     b = x - 1.0;
 }

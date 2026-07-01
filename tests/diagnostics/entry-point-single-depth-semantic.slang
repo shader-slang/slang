@@ -1,16 +1,14 @@
-// Positive control for the "multiple depth output" diagnostic (E30705): a
-// fragment entry point that declares exactly one depth output must still
-// compile without error. This guards against the multiplicity check (added in
-// validateEntryPoint) firing on the legal single-depth case.
+// Positive control for the "multiple depth output" diagnostic (E30705): a fragment entry point
+// that declares exactly one depth output must still compile without error. This guards against
+// the multiplicity check (added in validateEntryPoint) firing on the legal single-depth case.
 //
-// A single depth output across an `out` parameter and a separate non-depth
-// return-struct field is fine, so neither E30705 nor any other error should be
-// produced.
+// Uses the FileCheck runner rather than DIAGNOSTIC_TEST so the negation has real force: under
+// DIAGNOSTIC_TEST a `//CHECK-NOT:` line is parsed as an ordinary comment (the annotation parser
+// only recognizes exactly `//<prefix>:`), so it would assert nothing. Here `CHECK: OpEntryPoint`
+// additionally proves real SPIR-V was produced — impossible if E30705 had aborted compilation.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage fragment
-//DIAGNOSTIC_TEST:SIMPLE(diag=RETONLY):-target spirv -entry retOnly -stage fragment
-
-//CHECK-NOT: E30705
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment
+//TEST:SIMPLE(filecheck=RETONLY):-target spirv-asm -entry retOnly -stage fragment
 
 struct FSOut
 {
@@ -26,6 +24,8 @@ FSOut main(float x, out float depth : SV_DepthGreaterEqual)
     o.color = x;
     return o;
 }
+//CHECK-NOT: E30705
+//CHECK: OpEntryPoint
 
 struct DepthOnly
 {
@@ -33,14 +33,15 @@ struct DepthOnly
     float color : SV_Target;
 };
 
-// Single depth output living solely in a return-struct field must also compile clean:
-// the collector recurses into the struct but finds exactly one depth output.
+// Single depth output living solely in a return-struct field must also compile clean: the
+// collector recurses into the struct but finds exactly one depth output.
 [shader("fragment")]
 DepthOnly retOnly(float x)
-//RETONLY-NOT: E30705
 {
     DepthOnly o;
     o.d = x + 1.0;
     o.color = x;
     return o;
 }
+//RETONLY-NOT: E30705
+//RETONLY: OpEntryPoint

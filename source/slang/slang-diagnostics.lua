@@ -3556,7 +3556,7 @@ err(
 err(
     "multiple-depth-output-semantics",
     30705,
-    "a fragment entry point can declare at most one depth output, but both '~firstSemantic' and '~secondSemantic' system value semantics are present",
+    "a fragment entry point can declare at most one depth output, but '~conflictingSemantic' conflicts with the earlier '~earlierSemantic'",
     span { loc = "location" }
 )
 
