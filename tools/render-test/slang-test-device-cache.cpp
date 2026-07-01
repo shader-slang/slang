@@ -130,7 +130,9 @@ SlangResult DeviceCache::acquireDevice(
     if (it != deviceCache.end() && it->second.device)
     {
         // Return the cached device and the bridge it is actually wired to - COM reference counting
-        // handles the device references.
+        // handles the device references. A cached device and its bridge are always stored together
+        // on a miss, so the bridge is never null here.
+        SLANG_ASSERT(it->second.bridge);
         *outDevice = it->second.device.get();
         (*outDevice)->addRef();
         *outBridge = it->second.bridge;

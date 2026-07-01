@@ -144,16 +144,19 @@ SLANG_UNIT_TEST(coreDebugCallbackGetStringReturnsIndependentStorage)
     SLANG_CHECK(first.getStringRepresentation() != second.getStringRepresentation());
 }
 
-// Pins the #11856 fix end-to-end through DeviceCache::acquireDevice, GPU-free: it reuses the
-// always-available CPU backend to create a real device, then confirms that a cache hit returns the
-// same device wired to the same debug bridge, so a later invocation binds the bridge the reused
-// device is actually wired to. Before the fix the harness minted a fresh bridge per invocation
-// while the cached device kept the first (now cleared) bridge, so the reused device's validation
-// messages were silently dropped (false-green CI).
+// Pins the #11856 fix through DeviceCache::acquireDevice without a GPU: it uses the CPU backend
+// (when enabled) to create a real device, then confirms that a same-key cache hit returns the SAME
+// device and the SAME debug bridge object it was created with, that a distinct key gets a distinct
+// bridge, and that after cleanCache() the key gets a fresh bridge. That bridge identity is
+// the crux of the fix: before it, the harness minted a fresh bridge per invocation while the cached
+// device stayed wired to the first (now cleared) bridge, so a reused device's validation messages
+// were silently dropped (false-green CI).
 //
-// Deleting `localDesc.debugCallback = bridge.Ptr()` (or the bridge storage on the cached device) in
-// slang-test-device-cache.cpp makes the bridge-reuse assertions here fail, so this guards the real
-// integration point, not just bridge object identity.
+// What this GPU-free test does NOT observe is the device actually forwarding a message through its
+// debugCallback (that needs a GPU plus a crafted validation failure). The emitError(*bridge, ...)
+// calls below stand in for that forwarded message and confirm the scoped callback routes it to the
+// current invocation's callback; the device<->debugCallback wiring itself is covered by inspection
+// at the harness layer.
 SLANG_UNIT_TEST(deviceCacheReusesDebugBridgeAcrossInvocations)
 {
     using namespace renderer_test;

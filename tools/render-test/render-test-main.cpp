@@ -2031,8 +2031,11 @@ static SlangResult _innerMain(
     // Route this invocation's debug messages to the device's bridge for as long as we use the
     // device (adapter query and rendering below), then clear it on scope exit so a later message
     // from a retained/cached device is dropped rather than written to a stale callback (#11785).
-    // Binding here (after the device exists) rather than at function top is fine: the compile-only
-    // and onlyStartup paths above return before creating a device, so they emit no RHI messages.
+    // Binding after the device is acquired (not at function top) is deliberate: the correct bridge
+    // is only known once the device exists. Every return before this point either creates no RHI
+    // device (compile-only, the onlyStartup pre-checks) or is an error bail-out, so none loses an
+    // observable RHI message. Reaching here means a device exists, so its bridge is set.
+    SLANG_ASSERT(deviceBridge);
     renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
         *deviceBridge,
         stdWriters->getDebugCallback());
