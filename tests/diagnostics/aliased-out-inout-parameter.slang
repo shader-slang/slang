@@ -42,6 +42,22 @@ void twoInoutUint(inout uint a, inout uint b)
 
 void readBoth(int a, int b) {}
 
+struct BoundingBox { int4 minBounds; }
+
+RWStructuredBuffer<BoundingBox> boundingBoxes;
+
+// Regression for #11878: the same field of two *different* objects must not
+// be reported as aliasing. Before the fix, MemberExpr (which derives from
+// DeclRefExpr) was caught by the bare-DeclRefExpr case, which compared only
+// the field declaration and ignored the base object, so `dest.minBounds[0]`
+// and `bbox.minBounds[0]` were wrongly flagged.
+void expandBoundingBox(uint index, BoundingBox bbox)
+{
+    int unused;
+    InterlockedMin(boundingBoxes[index].minBounds[0], bbox.minBounds[0], unused);
+//CHECK-NOT: potentially aliased
+}
+
 [numthreads(1,1,1)]
 void computeMain()
 {
@@ -95,6 +111,12 @@ void computeMain()
 
     // Negative: distinct struct fields — no warning expected.
     twoInoutInt(s.x, s.y);
+//CHECK-NOT: potentially aliased
+
+    // Negative: same field of two *different* struct objects — no warning
+    // expected (regression for #11878).
+    S s2;
+    twoInoutInt(s.x, s2.x);
 //CHECK-NOT: potentially aliased
 
     // Negative: distinct array elements — no warning expected.
