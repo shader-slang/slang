@@ -22,31 +22,27 @@ jobs:
               os: linux,
               platform: x86_64,
               runs-on: ubuntu-22.04,
-              compiler: gcc,
-              image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1,
+              compiler: gcc
             }
           - {
               os: linux,
               platform: aarch64,
               runs-on: ubuntu-22.04-arm,
-              compiler: gcc,
-              image: "",
+              compiler: gcc
             }
           - {
               os: linux,
               platform: wasm,
               runs-on: ubuntu-22.04,
               compiler: gcc,
-              build-slang-llvm: false,
-              image: "",
+              build-slang-llvm: false
             }
           - {
               os: windows,
               platform: x86_64,
               arch: amd64,
               runs-on: windows-latest,
-              compiler: cl,
-              image: "",
+              compiler: cl
             }
           - {
               os: windows,
@@ -54,24 +50,21 @@ jobs:
               arch: amd64_arm64,
               runs-on: windows-latest,
               compiler: cl,
-              extra-cmake-flags: "-DSLANG_ENABLE_CUDA=0",
-              image: "",
+              extra-cmake-flags: "-DSLANG_ENABLE_CUDA=0"
             }
           - {
               os: macos,
               platform: x86_64,
               arch: x86_64,
               runs-on: macos-latest,
-              compiler: clang,
-              image: "",
+              compiler: clang
             }
           - {
               os: macos,
               platform: aarch64,
               arch: arm64,
               runs-on: macos-latest,
-              compiler: clang,
-              image: "",
+              compiler: clang
             }
 
           - { build-slang-llvm: false }
@@ -90,7 +83,6 @@ jobs:
             }
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
-    container: ${{ matrix.image || '' }}
 
     defaults:
       run:
