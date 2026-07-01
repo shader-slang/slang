@@ -56,7 +56,8 @@ static String getTargetStageDiagnostics(
     SLANG_CHECK_ABORT(module != nullptr);
 
     ComPtr<slang::IComponentType> linkedProgram;
-    module->link(linkedProgram.writeRef(), loadDiagnostics.writeRef());
+    ComPtr<slang::IBlob> linkDiagnostics;
+    module->link(linkedProgram.writeRef(), linkDiagnostics.writeRef());
     SLANG_CHECK_ABORT(linkedProgram != nullptr);
 
     ComPtr<slang::IBlob> code;

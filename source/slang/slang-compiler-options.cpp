@@ -442,8 +442,8 @@ void applySettingsToDiagnosticSink(
     // Handle diagnostic color setting.
     // A sink may have settings applied from several option sets in sequence (e.g. a linkage option
     // set followed by a component-type option set). Only apply the color mode when this set
-    // actually carries the option, so a set that does not specify it does not clobber a mode
-    // already applied by a prior set with the AUTO default.
+    // actually carries the option, so a set that does not specify it does not overwrite a mode a
+    // prior set already applied (which would reset it to the AUTO default).
     // The sink will handle AUTO by checking writer->isConsole().
     if (options.hasOption(CompilerOptionName::DiagnosticColor))
     {
