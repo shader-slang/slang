@@ -4516,6 +4516,13 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 //@public:
     [__readNone]
     [ForceInline]
+    // Static requirement is plain `texture_sm_4_1`, not the `_samplerless` alias: this block
+    // is generic over `isCombined`, and a *combined* sampler's GLSL `texelFetch` needs no
+    // `GL_EXT_samplerless_texture_functions`. The samplerless atom here would spuriously fire
+    // `warning[E41012]` under an explicit `-profile` (#11874); the extension is added at emit
+    // time for the bare case only, via the `isCombined`-gated `__requireTargetExtension` below.
+    // (The two `hlsl_spirv`-only sparse-fetch `Load` overloads below keep the alias -- they
+    // have no GLSL path, so the samplerless atom is inert there.)
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray+1> location)
     {
