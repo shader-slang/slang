@@ -20209,6 +20209,9 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
             {
                 if (auto decoration = as<RequireCapabilityAttribute>(mod))
                     localDeclaredCaps.unionWith(decoration->capabilitySet);
+                else if (as<Shader64BitIndexingAttribute>(mod))
+                    localDeclaredCaps.unionWith(
+                        CapabilitySet(CapabilityName::spvShader64BitIndexingEXT));
                 else if (auto entrypoint = as<EntryPointAttribute>(mod))
                     stageToJoin = entrypoint->capabilitySet
                                       ? entrypoint->capabilitySet->getTargetStage()

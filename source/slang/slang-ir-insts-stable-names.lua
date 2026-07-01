@@ -839,5 +839,6 @@ return {
 	["ImageTexelPointer"] = 862,
 	["Type.MetalPackedVec"] = 863,
 	["Decoration.glslFragDepthGreater"] = 865,
-	["Decoration.glslFragDepthLess"] = 866
+	["Decoration.glslFragDepthLess"] = 866,
+	["Decoration.shader64BitIndexing"] = 867
 }

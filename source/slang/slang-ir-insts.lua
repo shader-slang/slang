@@ -1834,6 +1834,7 @@ local insts = {
 			-- SPIR-V execution mode.
 			{ glslFragDepthGreater = { struct_name = "GLSLFragDepthGreaterDecoration" } },
 			{ glslFragDepthLess = { struct_name = "GLSLFragDepthLessDecoration" } },
+			{ shader64BitIndexing = { struct_name = "Shader64BitIndexingDecoration" } },
 			{ precise = { struct_name = "PreciseDecoration" } },
 			{ public = { struct_name = "PublicDecoration" } },
 			{ hlslExport = { struct_name = "HLSLExportDecoration" } },
