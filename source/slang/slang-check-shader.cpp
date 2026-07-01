@@ -770,6 +770,16 @@ bool isUniformParameterType(Type* type)
 // warning is suppressed only for parameters we can honor, and still fires for
 // parameter kinds (e.g. plain varying scalars) where the annotation has no effect.
 // Arrays and modified types defer to their element/base type.
+//
+// This list must stay in sync with the binder's contract: an explicit
+// `[[vk::binding(...)]]` can only position a parameter that consumes a
+// `DescriptorTableSlot` or `SubElementRegisterSpace` (see
+// `isVkBindingEntryPointParameterResourceKind` in slang-parameter-binding.cpp).
+// Unlike the near-identical `isUniformParameterType` above, do NOT list `PtrType`
+// here: a raw pointer is a buffer-device-address value in push-constant/uniform
+// storage with no descriptor slot to position, so the binder never honors a
+// binding on it. Listing it would silently suppress the E38010 diagnostic
+// (regression #11857).
 static bool isVkBindingCompatibleEntryPointParameterType(Type* type)
 {
     if (as<ResourceType>(type))
