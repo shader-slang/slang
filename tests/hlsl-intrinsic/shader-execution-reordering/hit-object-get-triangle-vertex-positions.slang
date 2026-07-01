@@ -1,4 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderEXT
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderEXT -capability spvRayTracingPositionFetchKHR
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=NV_ERR): -target spirv-asm -entry rayGenerationMain -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV -capability spvRayTracingPositionFetchKHR
 
 // HitObject.GetTriangleVertexPositions is Vulkan-EXT only and lowers to the
 // result-producing OpHitObjectGetIntersectionTriangleVertexPositionsEXT (opcode 5307),
@@ -9,6 +10,8 @@
 // CHECK-DAG: OpExtension "SPV_EXT_shader_invocation_reorder"
 // CHECK-DAG: OpCapability ShaderInvocationReorderEXT
 // CHECK: OpHitObjectGetIntersectionTriangleVertexPositionsEXT
+// NV_ERR: static assertion failed
+// NV_ERR: GetTriangleVertexPositions() has no SPIRV NV equivalent
 
 //TEST_INPUT: set scene = AccelerationStructure
 uniform RaytracingAccelerationStructure scene;

@@ -7,7 +7,7 @@
 // It was previously emitted incorrectly as a void instruction writing through a
 // pointer operand, which produces invalid SPIR-V. This locks in the correct form.
 
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage raygeneration -entry main -target spirv-asm -capability spvShaderInvocationReorderEXT
+//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage raygeneration -entry main -target spirv-asm -capability spvShaderInvocationReorderEXT -capability spvRayTracingPositionFetchKHR
 
 import glsl;
 

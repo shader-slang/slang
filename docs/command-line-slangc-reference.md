@@ -1872,6 +1872,7 @@ A capability describes an optional feature that a target may or may not support.
 * `rayquery_position` 
 * `ser_raygen` 
 * `ser_raygen_closesthit_miss` 
+* `ser_position_raygen_closesthit_miss` 
 * `ser_nv_raygen` 
 * `ser_nv_raygen_closesthit_miss` 
 * `ser_nv_motion_raygen_closesthit_miss` 
