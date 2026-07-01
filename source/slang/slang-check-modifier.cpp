@@ -488,6 +488,152 @@ Modifier* SemanticsVisitor::validateAttribute(
 
         waveSizeAttr->numLanes = value;
     }
+    else if (auto nodeLaunchAttr = as<NodeLaunchAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        String mode;
+        if (!checkLiteralStringVal(attr->args[0], &mode))
+            return nullptr;
+        auto modeSlice = mode.getUnownedSlice();
+        if (modeSlice.caseInsensitiveEquals(toSlice("broadcasting")))
+        {
+            nodeLaunchAttr->mode = "broadcasting";
+        }
+        else if (modeSlice.caseInsensitiveEquals(toSlice("thread")))
+        {
+            nodeLaunchAttr->mode = "thread";
+        }
+        else if (modeSlice.caseInsensitiveEquals(toSlice("coalescing")))
+        {
+            nodeLaunchAttr->mode = "coalescing";
+        }
+        else
+        {
+            getSink()->diagnose(Diagnostics::InvalidNodeLaunchMode{.mode = mode, .attr = attr});
+            return nullptr;
+        }
+    }
+    else if (auto gridAttr = as<NodeMaxDispatchGridAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 3)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "3",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        gridAttr->x = checkConstantIntVal(attr->args[0]);
+        gridAttr->y = checkConstantIntVal(attr->args[1]);
+        gridAttr->z = checkConstantIntVal(attr->args[2]);
+        if (!gridAttr->x || !gridAttr->y || !gridAttr->z)
+            return nullptr;
+    }
+    else if (auto fixedGridAttr = as<NodeDispatchGridAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 3)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "3",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        fixedGridAttr->x = checkConstantIntVal(attr->args[0]);
+        fixedGridAttr->y = checkConstantIntVal(attr->args[1]);
+        fixedGridAttr->z = checkConstantIntVal(attr->args[2]);
+        if (!fixedGridAttr->x || !fixedGridAttr->y || !fixedGridAttr->z)
+            return nullptr;
+    }
+    else if (auto maxRecAttr = as<MaxRecordsAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        auto value = checkConstantIntVal(attr->args[0]);
+        if (!value)
+            return nullptr;
+        maxRecAttr->value = value;
+    }
+    else if (auto nodeIDAttr = as<NodeIDAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount < 1 || argCount > 2)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1...2",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+
+        String name;
+        if (!checkLiteralStringVal(attr->args[0], &name))
+            return nullptr;
+        nodeIDAttr->name = name;
+        if (argCount == 2)
+        {
+            auto arrayIndex = checkConstantIntVal(attr->args[1]);
+            if (!arrayIndex)
+                return nullptr;
+            nodeIDAttr->arrayIndex = arrayIndex;
+        }
+        else
+        {
+            nodeIDAttr->arrayIndex = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 0);
+        }
+    }
+    else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        auto count = checkConstantIntVal(attr->args[0]);
+        if (!count)
+            return nullptr;
+        nodeArraySizeAttr->count = count;
+    }
+    else if (as<NodeIsProgramEntryAttribute>(attr) || as<AllowSparseNodesAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 0)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "0",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+    }
     else if (auto anyValueSizeAttr = as<AnyValueSizeAttribute>(attr))
     {
         // This case handles GLSL-oriented layout attributes
@@ -1234,7 +1380,8 @@ Modifier* SemanticsVisitor::validateAttribute(
         requirePreludeAttr->capabilitySet = CapabilitySet(capName).freeze(getASTBuilder());
         if (auto stringLitExpr = as<StringLiteralExpr>(attr->args[1]))
         {
-            requirePreludeAttr->prelude = getStringLiteralTokenValue(stringLitExpr->token);
+            requirePreludeAttr->prelude =
+                getStringLiteralTokenValue(stringLitExpr->token, getSink());
         }
         else
         {
@@ -1479,6 +1626,18 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::GLSLPrecisionModifier:
     case ASTNodeType::HLSLGroupSharedModifier:
         return modifierType;
+
+    case ASTNodeType::NodeLaunchAttribute:
+    case ASTNodeType::MaxRecordsAttribute:
+    case ASTNodeType::NodeIDAttribute:
+    case ASTNodeType::NodeIsProgramEntryAttribute:
+    case ASTNodeType::AllowSparseNodesAttribute:
+    case ASTNodeType::NodeArraySizeAttribute:
+        return modifierType;
+
+    case ASTNodeType::NodeDispatchGridAttribute:
+    case ASTNodeType::NodeMaxDispatchGridAttribute:
+        return ASTNodeType::NodeDispatchGridAttribute;
 
     case ASTNodeType::HLSLStaticModifier:
     case ASTNodeType::ActualGlobalModifier:

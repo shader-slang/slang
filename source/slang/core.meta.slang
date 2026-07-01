@@ -3787,6 +3787,31 @@ __prefix T operator !(T v0)
     return v0.not();
 }
 
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator &=(in out T v0, T v1)
+{
+    v0 = v0 & v1;
+    return v0;
+}
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator |=(in out T v0, T v1)
+{
+    v0 = v0 | v1;
+    return v0;
+}
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator ^=(in out T v0, T v1)
+{
+    v0 = v0 ^ v1;
+    return v0;
+}
+
 // The operator overloads defined above already allows Enum types to be used
 // in logical operators, but we still provide overloads for __EnumTypes and map
 // them directly to intrinsic op to allow constant propagation at AST level to
@@ -3801,6 +3826,11 @@ __generic<T : __EnumType>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitOr))
 T operator |(T v0, T v1);
+
+__generic<T : __EnumType>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitXor))
+T operator ^(T v0, T v1);
 
 __generic<T : __EnumType>
 [__unsafeForceInlineEarly]
@@ -4903,9 +4933,6 @@ attribute_syntax [QuadDerivatives] : QuadDerivativesAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
 
-__generic<T>
-typealias NodePayloadPtr = Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::NodePayloadAMDX)>;
-
 __attributeTarget(StructDecl)
 attribute_syntax [raypayload] : RayPayloadAttribute;
 
@@ -5045,16 +5072,19 @@ semantic sv_dispatchthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -5066,16 +5096,19 @@ semantic sv_groupid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -5084,6 +5117,7 @@ semantic sv_groupindex
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 }
 
@@ -5095,16 +5129,19 @@ semantic sv_groupthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 

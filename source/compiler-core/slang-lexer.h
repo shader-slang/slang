@@ -171,7 +171,7 @@ struct Lexer
 
 
 // Helper routines for extracting values from tokens
-String getStringLiteralTokenValue(Token const& token);
+String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink);
 String getFileNameTokenValue(Token const& token);
 
 // Note about integer literal values. This is the underlying storage type, but
@@ -228,7 +228,12 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     bool& outPrecisionLost,
     UnownedStringSlice& outErrorContent);
 
-IntegerLiteralValue getCharLiteralValue(Token const& token);
+// Returns a positive 32-bit code point in range [0, 0xffffffff] on success or
+// -1 on failure. A failure is also diagnosed.
+//
+// See docs/language-reference/expressions-literal.md for the literal format.
+IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink);
+
 } // namespace Slang
 
 #endif
