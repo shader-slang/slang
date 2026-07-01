@@ -1,38 +1,47 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-30T13:32:54+00:00
 target_doc: pipeline/overview.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: c42e276adc6581c33bb4effaa5201418aa07fde812042c885eb713bf657774c6
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: 2854d32691b21394b5c128e6ff961825c7bcc6f4a9a204e7f97ca918b148ec26
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 3
+finding_count: 0
 severity_breakdown:
   critical: 0
-  major: 1
-  minor: 2
+  major: 0
+  minor: 0
   nit: 0
 ---
 
 # Review report for pipeline/overview.md
 
 ## Summary
-The page is structurally lint-clean, but review found 3 findings; the most significant severity is major. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+
+The overview is factually aligned with the watched source files and satisfies the `pipeline-overview.md` prompt contract. I found no reportable issues; the line-numbered driver claims and the stage-to-file map checked out against the current source.
 
 ## Items checked
-- Verified front matter, stage links, driver/source path claims, `linkAndOptimizeIR`, `emitEntryPointsSourceFromIR`, and representative compile-request orchestration claims.
+
+- Verified the required front matter keys and copied `source_commit` / `watched_paths_digest` from the target document.
+- Checked the required structure from `pipeline-overview.md`: title, end-to-end `flowchart LR`, stage subsections, driver entry points, and cross-cutting concerns.
+- Spot-checked 14 concrete claims against watched sources: lexer tokenization in `source/compiler-core/slang-lexer.cpp`; preprocessing, include setup, and `parsePreprocessedSegments` in `source/slang/slang-compile-request.cpp`; parser class and deferred body-token handling in `source/slang/slang-parser.cpp`; `SemanticsVisitor` dispatch and semantic-check loop in `source/slang/slang-check.cpp` / `source/slang/slang-compile-request.cpp`; IR generation through `IRBuilder`, `IRModule::create`, and `lowerFrontEndEntryPointToIR` in `source/slang/slang-lower-to-ir.cpp`; `linkAndOptimizeIR` and `emitEntryPointsSourceFromIR` in `source/slang/slang-emit.cpp`.
+- Verified the line-numbered claims for `linkAndOptimizeIR` at line 896, `emitEntryPointsSourceFromIR` at line 2540, and `checkTranslationUnit` in `FrontEndCompileRequest::checkAllTranslationUnits` at line 513.
+- Resolved the relative links to peer pipeline docs, cross-cutting docs, the architecture dependency doc, and the linked source paths named by the page.
+- Checked source-alignment claims for the approximate `slang-ir-*.cpp` count, `slang-check-*.cpp` family, `slang-emit-<target>.cpp` family, AST header family, and named driver/request/module headers.
 
 ## Findings
 
-| ID | Severity | Location | Description | Evidence | Recommendation |
-| --- | --- | --- | --- | --- | --- |
-| F-001 | minor | lines 109-115 | The page claims `source/slang/` contains roughly 300 `slang-ir-*.cpp` files, but the watched glob resolves to about 161 implementation files. | `source/slang/slang-ir-*.cpp` at review HEAD resolves to 161 files. | Change the count to roughly 160, or avoid a precise count. |
-| F-002 | minor | lines 145-149 | The page says `slang-end-to-end-request.cpp` declares `EndToEndCompileRequest`; the class is declared in the header. | `source/slang/slang-end-to-end-request.h:61` declares `class EndToEndCompileRequest`. | Change the reference to `slang-end-to-end-request.h` for the declaration. |
-| F-003 | major | `## Driver entry points` | The prompt requires `slang-compile-request.cpp` orchestration coverage, but this section links only `slang-compile-request.h`. | `source/slang/slang-compile-request.cpp:513` contains orchestration through `checkAllTranslationUnits` / `checkTranslationUnit`. | Add a `slang-compile-request.cpp` link and describe its orchestration role. |
+(no findings)
+
+## No-issues notes
+
+- The page stays at roadmap depth and does not duplicate the per-stage documents.
+- The mermaid diagram uses simple camelCase node IDs and no styling.
+- The document includes at least one watched source link in every stage subsection.

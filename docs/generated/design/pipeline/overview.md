@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:42:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: c42e276adc6581c33bb4effaa5201418aa07fde812042c885eb713bf657774c6
+model: claude-opus-4.8
+generated_at: 2026-06-29T13:35:55Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 2854d32691b21394b5c128e6ff961825c7bcc6f4a9a204e7f97ca918b148ec26
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -12,22 +12,21 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 This document is the index to the per-stage pipeline documents under
 [pipeline/](.). It traces the flow of data from a source buffer to an
 emitted target artefact and points at the file(s) that drive each
-stage. Readers who want depth should follow the per-stage links.
-
-The intended reader knows what a compiler is in general but has not yet
-mapped Slang's pipeline onto its source layout.
+stage. It is written for a reader who knows what a compiler is in
+general but has not yet mapped Slang's pipeline onto its source layout;
+readers who want depth should follow the per-stage links.
 
 ## End-to-end flow
 
 ```mermaid
 flowchart LR
-    Source[Source files] --> Lex[Lex / Preprocess]
-    Lex --> Parse[Parse to AST]
-    Parse --> Check[Semantic check]
-    Check --> Lower[AST to IR]
-    Lower --> Passes[IR passes]
-    Passes --> Emit[Emit]
-    Emit --> Artefact[Target artefact]
+    source[Source files] --> lexPreprocess[Lex / Preprocess]
+    lexPreprocess --> parse[Parse to AST]
+    parse --> semanticCheck[Semantic check]
+    semanticCheck --> lower[AST to IR]
+    lower --> irPasses[IR passes]
+    irPasses --> emit[Emit]
+    emit --> targetArtifact[Target artefact]
 ```
 
 The diagram is conceptual — actual control flow weaves checking and
@@ -107,7 +106,7 @@ Detail: [04-ast-to-ir.md](04-ast-to-ir.md).
 ### IR passes
 
 The `linkAndOptimizeIR` function in
-[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (line 893 at
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (line 896 at
 `source_commit`) drives a long, target-sensitive sequence of IR
 transformations between lowering and emit. The
 [source/slang/](../../../../source/slang) directory contains roughly
@@ -124,7 +123,7 @@ Detail: [05-ir-passes.md](05-ir-passes.md).
 ### Emit
 
 `emitEntryPointsSourceFromIR`
-([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2418 at
+([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2540 at
 `source_commit`) selects the right backend for each `TargetRequest`
 and produces a target artefact: HLSL, GLSL, SPIR-V, Metal, WGSL, C++,
 CUDA, Torch glue, LLVM IR / native via `slang-llvm`, or VM bytecode.

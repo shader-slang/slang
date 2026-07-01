@@ -18,10 +18,6 @@ on:
       runs-on:
         required: true
         type: string
-      test-category:
-        required: false
-        type: string
-        default: smoke
       full-gpu-tests:
         required: false
         type: boolean
@@ -64,7 +60,7 @@ jobs:
         shell: bash
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
@@ -102,26 +98,35 @@ jobs:
           fi
           # Build common slang-test arguments
           slang_test_args=(
-            "-category" "${{ inputs.test-category }}"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
             "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
           )
 
-          # Restrict to CPU / LLVM backends; tests requiring any GPU API get
-          # ignored by the test filter rather than run-and-failed.
+          # slang-test accepts only a single -api option (a later one silently
+          # overrides an earlier one), so select exactly one expression.
+          # "-api all" is equivalent to the default (all APIs enabled).
           if [[ "${{ inputs.cpu-only }}" == "true" ]]; then
-            slang_test_args+=("-api" "cpu+llvm")
+            # Restrict to CPU / LLVM backends; tests requiring any GPU API get
+            # ignored by the test filter rather than run-and-failed.
+            api_expr="cpu+llvm"
+          elif [[ "${{ inputs.os }}" == "macos" ]]; then
+            # Metal is the only GPU API on macOS; restrict to it. (cpu)/(llvm)
+            # tests are skipped here and covered by the CPU-only tier, while
+            # no-API tests still run because their requiredFlags==0.
+            api_expr="mtl"
+          elif [[ "${{ inputs.gpu-api-only }}" == "true" ]]; then
+            # Restrict to GPU APIs so (cpu) / (llvm) tests are skipped.
+            # Intentionally NOT using -api-only: no-API tests still need to run
+            # because COMPILE directives in multi-step compile→dispatch tests
+            # have requiredFlags==0 and would be skipped, breaking the dispatch.
+            api_expr="vk+cuda+dx11+dx12+mtl+wgpu"
+          else
+            api_expr="all"
           fi
 
-          # Restrict to GPU APIs so (cpu) / (llvm) tests are skipped. Intentionally
-          # NOT using -api-only: no-API tests still need to run because
-          # COMPILE directives in multi-step compile→dispatch tests have
-          # requiredFlags==0 and would be skipped, breaking the dispatch.
-          if [[ "${{ inputs.gpu-api-only }}" == "true" ]]; then
-            slang_test_args+=("-api" "vk+cuda+dx11+dx12+mtl+wgpu")
-          fi
+          slang_test_args+=("-api" "$api_expr")
 
           # Add test server arguments only if server count > 1
           if [ "${{ inputs.server-count }}" -gt 1 ]; then
@@ -139,6 +144,7 @@ jobs:
             slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux.txt")
           fi
 
+
           # T4 runners cannot execute SM 8.0+ cooperative matrix / neural tests
           if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
             slang_test_args+=("-skip-list" "tests/skip-list-gpu-t4.txt")
@@ -150,7 +156,13 @@ jobs:
             slang_test_args+=("-skip-list" "tests/skip-list-debug.txt")
           fi
 
-          # Execute slang-test with all arguments
+          # Execute slang-test with all arguments. Print the fully-resolved
+          # command first so the CI log shows exactly which arguments were used
+          # (the conditional logic above only shows the source, not the result).
+          printf '+ %q' "$bin_dir/slang-test"
+          printf ' %q' "${slang_test_args[@]}"
+          printf '\n'
+
           "$bin_dir/slang-test" "${slang_test_args[@]}"
       - name: Run Slang examples
         # Run examples on release for pull requests, and not on merge_group, to reduce CI load.
@@ -174,7 +186,6 @@ jobs:
           via_glsl_args=(
             -use-test-server
             -server-count ${{ inputs.server-count }}
-            -category ${{ inputs.test-category }}
             -emit-spirv-via-glsl
             -api vk
             -expected-failure-list tests/expected-failure-via-glsl.txt
@@ -183,47 +194,8 @@ jobs:
           if [[ "${{ inputs.gpu-tier }}" == "t4" ]]; then
             via_glsl_args+=("-skip-list" "tests/skip-list-gpu-t4.txt")
           fi
+          printf '+ %q' "$bin_dir/slang-test"
+          printf ' %q' "${via_glsl_args[@]}"
+          printf '\n'
+
           "$bin_dir/slang-test" "${via_glsl_args[@]}"
-
-  # Run slang-rhi tests when:
-  # 1. full-gpu-tests is enabled AND
-  # 2. Either it's a pull request OR config is release
-  # This is to reduce the CI load but do some check on pull requests.
-  # expensive slang-rhi tests are excluded with -tce option, because they are not relevant for Slang.
-  test-slang-rhi:
-    runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 50
-    if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
-          fetch-depth: "1"
-
-      - name: Common Test Setup
-        uses: ./.github/actions/common-test-setup
-        with:
-          os: ${{ inputs.os }}
-          compiler: ${{ inputs.compiler }}
-          platform: ${{ inputs.platform }}
-          config: ${{ inputs.config }}
-          artifact-suffix: ${{ inputs.artifact-suffix }}
-
-      - name: Run slang-rhi tests
-        run: |
-          export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
-          "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
-
-      - name: Run slang-rhi tests (OptiX 8.0)
-        if: inputs.os == 'windows' || inputs.os == 'linux'
-        run: |
-          "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80000 -tc="ray-tracing-*.cuda"
-
-      - name: Run slang-rhi tests (OptiX 8.1)
-        if: inputs.os == 'windows' || inputs.os == 'linux'
-        run: |
-          "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"

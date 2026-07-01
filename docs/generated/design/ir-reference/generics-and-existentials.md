@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:32:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
+model: claude-opus-4.8
+generated_at: 2026-06-29T18:20:38Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -25,20 +25,30 @@ The opcodes documented here are scattered through
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) rather
 than living in a single contiguous group:
 
-- `key` / `StructKey`, `global_generic_param`, `witness_table`,
-  `indexedFieldKey`, `thisTypeWitness`, `TypeEqualityWitness`,
-  `interface_req_entry`, and `witness_table_entry` appear around
-  lines 816-1048 (interleaved with the structural opcodes also
-  documented in [structure.md](structure.md)).
+- `key` / `StructKey`, `builtinRequirementKey` / `BuiltinRequirementKey`,
+  `global_generic_param`, `witness_table`, `indexedFieldKey`,
+  `thisTypeWitness`, `TypeEqualityWitness`, `interface_req_entry`, and
+  `witness_table_entry` appear around lines 814-1070 (interleaved with
+  the structural opcodes also documented in
+  [structure.md](structure.md)).
 - `specialize`, `lookupWitness`, `GetSequentialID`,
   `bind_global_generic_param`, `globalValueRef`, `rtti_object`,
-  `packAnyValue`, `unpackAnyValue` appear around lines 932-1041.
+  `packAnyValue`, `unpackAnyValue` appear around lines 950-1060.
 - `makeExistential`, `makeExistentialWithRTTI`,
   `createExistentialObject`, `wrapExistential`,
   `getValueFromBoundInterface`, `extractExistentialValue`,
   `extractExistentialType`, `extractExistentialWitnessTable`,
   `isNullExistential`, `extractTaggedUnionTag`,
-  `extractTaggedUnionPayload` appear around lines 2460-2485.
+  `extractTaggedUnionPayload` appear around lines ~2510-2535.
+- The type-flow specialization opcodes (`TypeSet` / `FuncSet` /
+  `WitnessTableSet` / `GenericSet` and their elements,
+  `GetDispatcher`, the tagged-union and tag operations, and the
+  specialization keys) appear around lines ~2940-3190.
+
+The `BuiltinRequirementKey` C++ struct and its `getBuiltinRequirementKey`
+builder helper, plus the `BuiltinRequirementDecoration` and its
+`addBuiltinRequirementDecoration` helper, are declared in
+[slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h).
 
 C++ wrappers are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). The
@@ -72,6 +82,7 @@ flowchart TD
   WitnessTables --> witness_table
   WitnessTables --> witness_table_entry
   WitnessTables --> interface_req_entry
+  WitnessTables --> builtinReqKeyNode["builtinRequirementKey / BuiltinRequirementKey"]
   RTTI --> rtti_objectNode["rtti_object / GetSequentialID"]
 ```
 
@@ -81,7 +92,7 @@ flowchart TD
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `specialize` | — | `base, arg, ...` | H | `GenericAppExpr` in `slang-lower-to-ir.cpp` | Applies generic arguments to a generic value (function, type, or witness); hoistable so identical specializations dedupe. |
+| `specialize` | — | `base, arg, ...` | H | `GenericAppDeclRef` substitution lowering in `emitDeclRef`, `slang-lower-to-ir.cpp` | Applies generic arguments to a generic value (function, type, or witness); hoistable so identical specializations dedupe. |
 | `bind_global_generic_param` | — | `param: IRGlobalGenericParam, val: IRInst` | | (synthesized) | Binds a global generic parameter to a concrete value at link time. |
 | `globalValueRef` | — | `value` | | (synthesized) | Wraps a reference to another global IR value so it can be carried across an IR-pass boundary that would otherwise rewrite the use. |
 | `global_generic_param` | — | — | G | `GenericTypeParamDecl` (at module scope) | Declares a generic parameter at module level. |
@@ -125,26 +136,27 @@ processing.
 
 ### Witness tables and witness facts
 
-The structural opcodes that back interface dispatch are documented
-in [structure.md](structure.md); only the ones the dispatch path
-consumes directly are summarized here.
+These opcodes back interface dispatch. Their structural (container)
+role is documented in [structure.md](structure.md); the rows below
+give the shapes the dispatch path (`lookupWitness`, specialization)
+consumes.
 
-- `witness_table`, `witness_table_entry`, and `interface_req_entry`
-  store the requirement-to-implementation mapping that
-  `lookupWitness` walks. See
-  [structure.md — witness tables and witness facts](structure.md).
-- `thisTypeWitness` and `TypeEqualityWitness` are placeholder
-  witnesses used by the type system to certify self-conformance and
-  type equality.
-- `key` (`StructKey`) and `indexedFieldKey` identify the
-  requirement slots that witness tables key on; documented in
-  [structure.md — struct internals](structure.md).
+| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
+| --- | --- | --- | --- | --- | --- |
+| `witness_table` | — | `concreteType` (plus children: `witness_table_entry`) | H | `InheritanceDecl` lowering in `slang-lower-to-ir.cpp` | Operand 0 is the conforming concrete type (the conformed interface is carried by the result `WitnessTableType`); entries are child `witness_table_entry` insts that `lookupWitness` walks. |
+| `witness_table_entry` | — | `requirementKey, satisfyingVal` | | (synthesized) | One row of a `witness_table`. |
+| `interface_req_entry` | `InterfaceRequirementEntry` | `requirementKey, requirementVal` | G | (synthesized in `InterfaceDecl` lowering) | One requirement slot on the interface side; `requirementKey` is a `StructKey` or a hoistable `BuiltinRequirementKey`. |
+| `thisTypeWitness` | — | `type` | | (synthesized inside `InterfaceDecl` lowering) | Placeholder witness that `ThisType` conforms to the enclosing interface. |
+| `TypeEqualityWitness` | — | `subType, superType` | H | (synthesized) | Placeholder witness certifying two types are equal. |
+| `key` | `StructKey` | — | G | Member-name lowering in `slang-lower-to-ir.cpp` | Identity for a requirement slot that witness tables key on; a distinct global symbol per requirement decl, unified across modules by its `key_<mangled>` linkage name. |
+| `builtinRequirementKey` | `BuiltinRequirementKey` | `kindOperand: IRIntLit` | H | `getInterfaceRequirementKey` for a `BuiltinRequirementModifier`-tagged requirement, in `slang-lower-to-ir.cpp` | Key for a recognized built-in interface requirement (e.g. an `IDifferentiable` member); deduplicated by construction from its `BuiltinRequirementKind` operand instead of carrying a linkage name. |
+| `indexedFieldKey` | — | `baseType, index` | H | (synthesized) | Synthetic key for an unnamed (tuple-like) requirement slot. |
 
 ### Runtime type information
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `rtti_object` | `RTTIObject` | (variadic) | | (synthesized) | Materialized RTTI record for a type; produced by the RTTI-object pass. |
+| `rtti_object` | `RTTIObject` | `type` | | (synthesized) | Materialized RTTI record for the type given by its single operand; produced by the RTTI-object pass. |
 | `GetSequentialID` | — | `RTTIOperand` | H | (synthesized) | Returns a stable integer ID for an RTTI operand; used by dynamic-dispatch tables. |
 | `GetDynamicResourceHeap` | — | — | H | (synthesized) | Returns the current dynamic-resource-heap value used for descriptor-handle decoding. |
 
@@ -195,12 +207,12 @@ across passes.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `GetDispatcher` | — | `witnessTableSet, lookupKey` | H | (synthesized) | Returns a dispatcher function for one requirement key over a witness-table set. |
+| `GetDispatcher` | — | `witnessTableSet, lookupKey` | H | (synthesized) | Returns a dispatcher function for one requirement key over a witness-table set. `lookupKey` is typed `IRInst` (not `IRStructKey`), since a built-in requirement reached through dynamic dispatch uses a `BuiltinRequirementKey`. |
 | `GetSpecializedDispatcher` | — | `witnessTableSet, lookupKey, specializationArgs...` | H | (synthesized) | Returns a specialized dispatcher when the key points at a generic. |
 | `SpecializeExistentialsInFunc` | — | `func, bindings...` | H | (synthesized) | Reference to a function with specific existential-parameter bindings; each binding is `VoidLit` for "any" or a type-flow info value. |
 | `SpecializeExistentialsInType` | — | (variadic) | H | (synthesized) | Cache key for specialized `BindExistentialsType` results. |
-| `WeakUse` | — | — | H | (synthesized) | Marker for a weak use that should not pin its operand; used by the type-flow pass. |
-| `FuncTypeOf` | — | — | H | (synthesized) | Compile-time helper that returns the function type of its operand. |
+| `WeakUse` | — | `inst` | H | (synthesized) | Marker for a weak use that should not pin its operand; used by the type-flow pass. (The Lua schema omits the operand name; `IRBuilder::getWeakUse` passes the weakly referenced inst.) |
+| `FuncTypeOf` | — | `func` | H | (synthesized) | Compile-time helper that returns the function type of its operand. (The Lua schema omits the operand name; lowering emits it from the lowered function-as-type operand.) |
 
 ### AnyValue marshalling
 
@@ -259,6 +271,30 @@ expects `T` can be invoked. The pass that lowers
 `BindExistentialsType` (see [types.md](types.md)) inserts
 `wrapExistential` calls at the corresponding crossings.
 
+### `extractExistentialValue` / `extractExistentialType` / `extractExistentialWitnessTable`
+
+These are the three projections that reverse `makeExistential`.
+Given an existential value built from a concrete value `C`, a type,
+and a witness, `extractExistentialValue(existential)` recovers the
+packed concrete-typed value, `extractExistentialType(existential)`
+recovers the packed concrete type, and
+`extractExistentialWitnessTable(existential)` recovers the witness
+table proving conformance. The type and witness-table projections are
+hoistable (their result is determined purely by the existential
+operand), whereas the value projection is not. The
+existential-elimination pass uses the trio to peel an existential
+apart once its concrete contents are statically known.
+
+### `TypeEqualityWitness`
+
+`TypeEqualityWitness(subType, superType)` is a placeholder witness
+certifying that two types are equal. It is the witness form used when
+a conformance constraint is satisfied not by an interface
+implementation but by a type-equality fact (for example, when generic
+argument substitution makes an associated type identical to a
+concrete type). The opcode is hoistable, so a given `subType` /
+`superType` pair resolves to a single witness inst.
+
 ### `witness_table` and `witness_table_entry`
 
 `witness_table` is a hoistable parent opcode whose children are
@@ -277,6 +313,36 @@ losing the per-requirement information.
 opcode and declares the requirement. The `requirementKey` (a
 `StructKey`) is what joins the two sides — every witness table for
 the interface must have an entry keyed by the same `StructKey`.
+
+### `builtinRequirementKey` / `BuiltinRequirementKey`
+
+`BuiltinRequirementKey` is the requirement-key variant used for a
+requirement that the front end recognizes as a built-in interface
+member (for example, the `Differential` associated type, `dzero`, or
+`dadd` of `IDifferentiable`). Where an ordinary `key` / `StructKey` is
+a distinct `global` symbol per requirement decl — unified across
+modules only through its `key_<mangled>` linkage name —
+`BuiltinRequirementKey` is hoistable and its identity is its
+`kindOperand` (a `BuiltinRequirementKind` integer). Two references to
+the same built-in role therefore resolve to a single key inst by
+construction, even when one comes from the canonical interface
+constraint and another from a constraint synthesized while building a
+type's `Differential`, and across the precompiled-core-module boundary.
+
+`getInterfaceRequirementKey` in
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+chooses the key: a requirement carrying a `BuiltinRequirementModifier`
+uses its own `kind`; the conformance requirement of a built-in
+associated type (e.g. the relocated `Differential : IDifferentiable`)
+derives its witness role from the associated type's kind
+(`DifferentialType` -> `DifferentialWitness`). The function's return
+type is `IRInst*` rather than `IRStructKey*` so it can return either key
+form. Because the key is shared, a `BuiltinRequirementDecoration`
+(carrying the same `BuiltinRequirementKind`) is attached once, letting
+role-scanning consumers (autodiff's
+`getInterfaceEntryByBuiltinRequirement`) find the entry by role rather
+than by its position in the interface's requirement list — the access
+is by key role, not by entry order.
 
 ### `rtti_object` and `GetSequentialID`
 

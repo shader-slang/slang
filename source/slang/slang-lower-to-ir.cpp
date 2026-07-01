@@ -487,7 +487,11 @@ struct SharedIRGenContext
     // requirement to the IR-level "key" that
     // is used to fetch that requirement from a
     // witness table.
-    Dictionary<Decl*, IRStructKey*> interfaceRequirementKeys;
+    // Cached requirement keys per requirement decl. The value is an `IRInst*`
+    // rather than `IRStructKey*` because a built-in requirement uses a hoistable
+    // `IRBuiltinRequirementKey` (not a `StructKey`); ordinary requirements still
+    // use an `IRStructKey`.
+    Dictionary<Decl*, IRInst*> interfaceRequirementKeys;
 
     // Arrays we keep around strictly for memory-management purposes:
 
@@ -508,6 +512,12 @@ struct SharedIRGenContext
     Dictionary<IRInst*, DebugSourceLineColumnCache> mapDebugSourceToLineColumnCache;
 
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
+
+    // Concrete pack-count witnesses prove facts that have already been checked
+    // by the front end and carry no IR operands. `visitConcreteVariadicPackCountWitness`
+    // reuses this module-level proof-only table instead of emitting one table
+    // for every specialized call site.
+    IRInst* concreteVariadicPackCountWitnessTable = nullptr;
 
     uint32_t nextCoverageBranchSiteID = 1;
 
@@ -1558,6 +1568,32 @@ static String getNameForNameHint(IRGenContext* context, Decl* decl)
     if (auto moduleParentDecl = as<ModuleDecl>(parentDecl))
         parentDecl = moduleParentDecl->parentDecl;
 
+    // An `extension` declaration is anonymous, so its recursive name hint would
+    // be empty; without special handling a method in `extension Example { ... }`
+    // would get the bare hint `extensionMethod` rather than the qualified
+    // `Example.extensionMethod` that struct-body methods receive. Base the
+    // qualifier on the extended type instead — the same target-type basis that
+    // symbol mangling uses for an `ExtensionDecl` (`emitQualifiedName`,
+    // slang-mangle.cpp).
+    //
+    // Extensions can only target nominal types: the checker rejects anything
+    // else (e.g. `extension<T> T` → error 30850, "type 'T' cannot be extended"),
+    // so every `ExtensionDecl` reaching here has a `targetType` that is a
+    // `DeclRefType` of a `ContainerDecl` — named structs/interfaces/enums,
+    // builtins (`float`), vectors (`vector`), typedefs (resolved to the
+    // underlying type's decl), and generic instances (qualified by the
+    // un-specialized name, `Box`). All of those qualify. The `as<ContainerDecl>`
+    // cast is required because `parentDecl` is `ContainerDecl*` while `getDecl()`
+    // returns `Decl*`; its null result, caught by the existing `if (!parentDecl)`
+    // guard below, is a defensive soft-fallback rather than an assert — a name
+    // hint is cosmetic, so an unforeseen target shape degrading to the
+    // unqualified leaf is harmless, whereas crashing here would not be.
+    if (auto extensionParentDecl = as<ExtensionDecl>(parentDecl))
+    {
+        if (auto targetDeclRefType = as<DeclRefType>(extensionParentDecl->targetType))
+            parentDecl = as<ContainerDecl>(targetDeclRefType->getDeclRef().getDecl());
+    }
+
     if (!parentDecl)
     {
         return leafName->text;
@@ -1642,7 +1678,7 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     return true;
 }
 
-IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl)
+IRInst* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl)
 {
     // Only specific types of decls are treated as requirements, e.g. methods and asssociated types.
     // Other types of decls are allowed but not regarded as a requirement.
@@ -1656,7 +1692,7 @@ IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirement
     if (auto genericDecl = as<GenericDecl>(requirementDecl))
         return getInterfaceRequirementKey(context, genericDecl->inner);
 
-    IRStructKey* requirementKey = nullptr;
+    IRInst* requirementKey = nullptr;
     if (context->shared->interfaceRequirementKeys.tryGetValue(requirementDecl, requirementKey))
     {
         return requirementKey;
@@ -1666,6 +1702,79 @@ IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirement
     auto builder = &builderStorage;
 
     builder->setInsertInto(builder->getModule());
+
+    // Determine whether this requirement is a recognized built-in requirement,
+    // and if so, its `BuiltinRequirementKind` role.
+    //
+    //  - A requirement tagged with `__builtin_requirement(kind)` carries the role
+    //    directly (e.g. `IDifferentiable.Differential`, `.dzero`, `.dadd`).
+    //  - The conformance-witness requirement of a built-in associated type (the
+    //    `Differential : IDifferentiable` inheritance clause) does not carry its
+    //    own marker, so we derive its role from the constrained associated type's
+    //    kind (`DifferentialType` -> `DifferentialWitness`). This lets autodiff
+    //    find the witness by role without having to split the associated type's
+    //    declaration (which would change front-end resolution of `Differential`).
+    bool hasBuiltinRole = false;
+    BuiltinRequirementKind builtinRole = BuiltinRequirementKind::DifferentialType;
+    if (auto builtinReq = requirementDecl->findModifier<BuiltinRequirementModifier>())
+    {
+        hasBuiltinRole = true;
+        builtinRole = builtinReq->kind;
+    }
+    else if (auto constraint = as<GenericTypeConstraintDecl>(requirementDecl);
+             constraint && !constraint->isEqualityConstraint)
+    {
+        // This is the conformance requirement of a built-in associated type
+        // (e.g. the relocated `Differential : IDifferentiable`). The built-in
+        // *role* tag lives on the constrained associated type itself --
+        // `IDifferentiable.Differential` carries `BuiltinRequirementModifier`
+        // with kind `DifferentialType` -- so we read that tag off `sub` (which
+        // must be the associated type) and map it to the corresponding *witness*
+        // role. A non-associated-type `sub` carries no such tag and is not a
+        // built-in requirement.
+        if (auto assoc = isDeclRefTypeOf<AssocTypeDecl>(constraint->sub.type))
+        {
+            if (auto assocReq = assoc.getDecl()->findModifier<BuiltinRequirementModifier>())
+            {
+                switch (assocReq->kind)
+                {
+                case BuiltinRequirementKind::DifferentialType:
+                    builtinRole = BuiltinRequirementKind::DifferentialWitness;
+                    hasBuiltinRole = true;
+                    break;
+                case BuiltinRequirementKind::DifferentialPtrType:
+                    builtinRole = BuiltinRequirementKind::DifferentialPtrWitness;
+                    hasBuiltinRole = true;
+                    break;
+                case BuiltinRequirementKind::BwdCallableContextType:
+                    builtinRole = BuiltinRequirementKind::BwdCallableContextWitness;
+                    hasBuiltinRole = true;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+
+    if (hasBuiltinRole)
+    {
+        // Use the hoistable, deduplicated-by-construction key for this built-in
+        // role. Its identity is the `kind` operand, so the same logical
+        // requirement always resolves to a single key inst -- whether referenced
+        // from the canonical interface constraint or from a constraint
+        // synthesized while building a type's `Differential`, and across the
+        // precompiled-core-module boundary. No `key_<mangled>` linkage decoration
+        // is needed (or wanted): identity comes from the operand, not a name.
+        requirementKey = builder->getBuiltinRequirementKey((IRIntegerValue)builtinRole);
+        context->shared->interfaceRequirementKeys.add(requirementDecl, requirementKey);
+        // Also tag the role as a decoration so role-scanning consumers (autodiff's
+        // `getInterfaceEntryByBuiltinRequirement`) work unchanged. The key is
+        // shared, so add the decoration only once.
+        if (!requirementKey->findDecoration<IRBuiltinRequirementDecoration>())
+            builder->addBuiltinRequirementDecoration(requirementKey, (IRIntegerValue)builtinRole);
+        return requirementKey;
+    }
 
     // Construct a key to serve as the representation of
     // this requirement in the IR, and to allow lookup
@@ -1757,9 +1866,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             lowerType(context, getType(context->astBuilder, val->getDeclRef())));
     }
 
-    LoweredValInfo visitFuncCallIntVal(FuncCallIntVal* val)
+    LoweredValInfo visitBuiltinOperationIntVal(BuiltinOperationIntVal* val)
     {
-        TryClauseEnvironment tryEnv;
         List<IRInst*> args;
         IRType* specConstRateType = nullptr;
         for (auto arg : val->getArgs())
@@ -1769,75 +1877,61 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             if (!specConstRateType && isSpecConstRateType(loweredArg.val->getFullType()))
                 specConstRateType = loweredArg.val->getFullType();
         }
-        auto funcType = lowerType(context, val->getFuncType());
-        auto funcResType = maybeAddRateType(
-            getBuilder(),
-            specConstRateType,
-            as<IRFuncType>(funcType)->getResultType());
-
-        // Check for operators and emit constexpr ops instead of calls.
-        // This ensures that compile-time integer expressions get hoistable,
-        // deduplicatable IR instructions.
-        auto funcName = val->getFuncDeclRef().getName();
-        if (funcName)
+        auto builder = getBuilder();
+        auto resType =
+            maybeAddRateType(builder, specConstRateType, lowerType(context, val->getType()));
+        // Emit the corresponding hoistable constexpr IR op, keyed on the operator enum.
+        switch (val->getOp())
         {
-            auto nameSlice = funcName->text.getUnownedSlice();
-            auto builder = getBuilder();
-
-            // Binary operators (2 args)
-#define CONSTEXPR_BINARY_OP(opStr, emitMethod)                                             \
-    if (nameSlice == toSlice(opStr) && args.getCount() == 2)                               \
-    {                                                                                      \
-        return LoweredValInfo::simple(builder->emitMethod(funcResType, args[0], args[1])); \
-    }                                                                                      \
-    else
-
-            // Arithmetic (+,*,- are handled by PolynomialIntVal)
-            CONSTEXPR_BINARY_OP("/", emitConstexprDiv)
-            CONSTEXPR_BINARY_OP("%", emitConstexprIRem)
-            // Shifts
-            CONSTEXPR_BINARY_OP("<<", emitConstexprShl)
-            CONSTEXPR_BINARY_OP(">>", emitConstexprShr)
-            // Bitwise
-            CONSTEXPR_BINARY_OP("&", emitConstexprBitAnd)
-            CONSTEXPR_BINARY_OP("|", emitConstexprBitOr)
-            CONSTEXPR_BINARY_OP("^", emitConstexprBitXor)
-            // Comparisons
-            CONSTEXPR_BINARY_OP("==", emitConstexprEql)
-            CONSTEXPR_BINARY_OP("!=", emitConstexprNeq)
-            CONSTEXPR_BINARY_OP(">", emitConstexprGreater)
-            CONSTEXPR_BINARY_OP("<", emitConstexprLess)
-            CONSTEXPR_BINARY_OP(">=", emitConstexprGeq)
-            CONSTEXPR_BINARY_OP("<=", emitConstexprLeq)
-            // Logical
-            CONSTEXPR_BINARY_OP("&&", emitConstexprAnd)
-            CONSTEXPR_BINARY_OP("||", emitConstexprOr)
-
-#undef CONSTEXPR_BINARY_OP
-
-            // Unary operators (1 arg)
-            if (nameSlice == toSlice("!") && args.getCount() == 1)
-            {
-                return LoweredValInfo::simple(builder->emitConstexprNot(funcResType, args[0]));
-            }
-            else if (nameSlice == toSlice("~") && args.getCount() == 1)
-            {
-                return LoweredValInfo::simple(builder->emitConstexprBitNot(funcResType, args[0]));
-            }
-            // Ternary select (?:) operator (3 args)
-            else if (nameSlice == toSlice("?:") && args.getCount() == 3)
-            {
-                return LoweredValInfo::simple(
-                    builder->emitConstexprSelect(funcResType, args[0], args[1], args[2]));
-            }
+        case BuiltinOperationKind::Add:
+            return LoweredValInfo::simple(builder->emitConstexprAdd(resType, args[0], args[1]));
+        case BuiltinOperationKind::Sub:
+            return LoweredValInfo::simple(builder->emitConstexprSub(resType, args[0], args[1]));
+        case BuiltinOperationKind::Mul:
+            return LoweredValInfo::simple(builder->emitConstexprMul(resType, args[0], args[1]));
+        case BuiltinOperationKind::Div:
+            return LoweredValInfo::simple(builder->emitConstexprDiv(resType, args[0], args[1]));
+        case BuiltinOperationKind::Mod:
+            return LoweredValInfo::simple(builder->emitConstexprIRem(resType, args[0], args[1]));
+        case BuiltinOperationKind::Neg:
+            return LoweredValInfo::simple(builder->emitConstexprNeg(resType, args[0]));
+        case BuiltinOperationKind::Eql:
+            return LoweredValInfo::simple(builder->emitConstexprEql(resType, args[0], args[1]));
+        case BuiltinOperationKind::Neq:
+            return LoweredValInfo::simple(builder->emitConstexprNeq(resType, args[0], args[1]));
+        case BuiltinOperationKind::Less:
+            return LoweredValInfo::simple(builder->emitConstexprLess(resType, args[0], args[1]));
+        case BuiltinOperationKind::Greater:
+            return LoweredValInfo::simple(builder->emitConstexprGreater(resType, args[0], args[1]));
+        case BuiltinOperationKind::Leq:
+            return LoweredValInfo::simple(builder->emitConstexprLeq(resType, args[0], args[1]));
+        case BuiltinOperationKind::Geq:
+            return LoweredValInfo::simple(builder->emitConstexprGeq(resType, args[0], args[1]));
+        case BuiltinOperationKind::BitAnd:
+            return LoweredValInfo::simple(builder->emitConstexprBitAnd(resType, args[0], args[1]));
+        case BuiltinOperationKind::BitOr:
+            return LoweredValInfo::simple(builder->emitConstexprBitOr(resType, args[0], args[1]));
+        case BuiltinOperationKind::BitXor:
+            return LoweredValInfo::simple(builder->emitConstexprBitXor(resType, args[0], args[1]));
+        case BuiltinOperationKind::BitNot:
+            return LoweredValInfo::simple(builder->emitConstexprBitNot(resType, args[0]));
+        case BuiltinOperationKind::Lsh:
+            return LoweredValInfo::simple(builder->emitConstexprShl(resType, args[0], args[1]));
+        case BuiltinOperationKind::Rsh:
+            return LoweredValInfo::simple(builder->emitConstexprShr(resType, args[0], args[1]));
+        case BuiltinOperationKind::Not:
+            return LoweredValInfo::simple(builder->emitConstexprNot(resType, args[0]));
+        case BuiltinOperationKind::And:
+            return LoweredValInfo::simple(builder->emitConstexprAnd(resType, args[0], args[1]));
+        case BuiltinOperationKind::Or:
+            return LoweredValInfo::simple(builder->emitConstexprOr(resType, args[0], args[1]));
+        case BuiltinOperationKind::Conditional:
+            return LoweredValInfo::simple(
+                builder->emitConstexprSelect(resType, args[0], args[1], args[2]));
+        case BuiltinOperationKind::Unknown:
+            break;
         }
-
-        // TODO: Eventually, we might want to have a hoistable "Call" instruction to emit const-expr
-        // calls.
-        //
-        auto resVal =
-            emitCallToDeclRef(context, funcResType, val->getFuncDeclRef(), funcType, args, tryEnv);
-        return resVal;
+        SLANG_UNIMPLEMENTED_X("BuiltinOperationIntVal lowering");
     }
 
     LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
@@ -2501,6 +2595,40 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(emitNonEmptyPackWitness(loweredPack));
     }
 
+    LoweredValInfo visitDeclaredVariadicPackCountWitness(DeclaredVariadicPackCountWitness* witness)
+    {
+        auto builder = getBuilder();
+        auto witnessType = builder->getWitnessTableType(builder->getVoidType());
+        return emitDeclRef(context, witness->getDeclRef(), witnessType);
+    }
+
+    IRInst* emitConcreteVariadicPackCountWitness()
+    {
+        if (auto witnessTable = context->shared->concreteVariadicPackCountWitnessTable)
+            return witnessTable;
+
+        auto builder = getBuilder();
+        auto voidType = builder->getVoidType();
+
+        // Pack-count witnesses carry no runtime data. Use the same proof-only
+        // witness-table shape as other hidden generic witnesses so calls and
+        // generic params have a concrete IR value without introducing a runtime
+        // `countof` operation.
+        auto oldLoc = builder->getInsertLoc();
+        builder->setInsertInto(builder->getModule());
+        auto witnessTable = builder->createWitnessTable(voidType, voidType);
+        builder->setInsertLoc(oldLoc);
+        context->shared->concreteVariadicPackCountWitnessTable = witnessTable;
+
+        return witnessTable;
+    }
+
+    LoweredValInfo visitConcreteVariadicPackCountWitness(ConcreteVariadicPackCountWitness* witness)
+    {
+        SLANG_UNUSED(witness); // Proof-only witness, operands are not needed at runtime.
+        return LoweredValInfo::simple(emitConcreteVariadicPackCountWitness());
+    }
+
     LoweredValInfo visitHasDiffTypeInfoWitness(HasDiffTypeInfoWitness* witness)
     {
         SLANG_UNUSED(witness);
@@ -2527,7 +2655,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             //
             // Use a sub-builder so that the insert point isn't affected.
             IRBuilder subBuilder(context->irBuilder->getModule());
-            auto poisonWitness = getUnitPoisonVal(&subBuilder, context->irBuilder->getModule());
+            auto poisonWitness = getUnitPoisonVal(&subBuilder);
             return getBuilder()->getDifferentialPairType(primalType, poisonWitness);
         }
         if (as<IRAssociatedType>(primalType) || as<IRThisType>(primalType))
@@ -2542,7 +2670,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                         operands.add(argVal);
                     });
 
-            auto undefined = getBuilder()->emitPoison(operands[1]->getFullType());
+            auto undefined = getBuilder()->getPoison(operands[1]->getFullType());
             return getBuilder()->getDifferentialPairType(primalType, undefined);
         }
 
@@ -3480,6 +3608,13 @@ ParamPassingMode adjustParamPassingModeBasedOnParamType(
     ParamPassingMode originalMode,
     Type* paramType)
 {
+    // A mesh-shader output's direction is intrinsic to its `MeshOutputType` (carried by
+    // IRMeshOutputDecoration), so the `out` on the `out vertices T[N]` spelling must not
+    // also wrap it in `IROutParamType`: that would diverge from the generic
+    // `OutputVertices<T,N>` spelling and make the HLSL emitter print a doubled `out`.
+    if (as<MeshOutputType>(paramType))
+        originalMode = ParamPassingMode::In;
+
     // If the type is copyable, then the original mode is appropriate to use.
     //
     if (isCopyableType(paramType))
@@ -5090,6 +5225,16 @@ struct ExprLoweringContext
                         argCounter++);
                 }
                 else if (
+                    auto packCountConstraintDecl =
+                        as<GenericVariadicPackCountConstraintDecl>(memberDecl))
+                {
+                    _lowerSubstitutionArg(
+                        subContext,
+                        genSubst,
+                        packCountConstraintDecl,
+                        argCounter++);
+                }
+                else if (
                     auto hasDiffTypeInfoConstraintDecl =
                         as<HasDiffTypeInfoConstraintDecl>(memberDecl))
                 {
@@ -5128,6 +5273,110 @@ struct ExprLoweringContext
     /// Lower an invoke expr, and attempt to fuse a store of the expr's result into destination.
     /// If the store is fused, returns LoweredValInfo::None. Otherwise, returns the IR val
     /// representing the RValue.
+    // Emit a `BuiltinOperatorExpr` (produced by the fast path; see
+    // `convertToBuiltinArithmeticOp`) directly as the corresponding IR instruction, bypassing
+    // callable resolution/lowering. Covers arithmetic (`+ - * / %`), comparison (`< > <= >=`),
+    // equality (`== !=`), bitwise and shift (`& | ^ << >>`), and the unary `- ! ~`, on builtin
+    // integer / floating-point / bool scalar, vector, or matrix operands (possibly of mixed
+    // type/shape). The operator kind, operands, and result type are already resolved during
+    // checking; differentiability is handled by autodiff's rules for the emitted IR ops.
+    LoweredValInfo lowerBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
+    {
+        auto irType = lowerType(context, expr->type);
+        const Index argCount = expr->arguments.getCount();
+        SLANG_ASSERT(argCount == 1 || argCount == 2);
+        IRInst* args[2];
+        for (Index i = 0; i < argCount; ++i)
+            args[i] = getSimpleVal(context, lowerRValueExpr(context, expr->arguments[i]));
+
+        // Determine whether the operand element type is floating-point (selects FRem vs
+        // IRem for `%`).
+        bool isFloatingPoint = false;
+        {
+            Type* elementType = expr->arguments[0]->type.type;
+            if (auto vecType = as<VectorExpressionType>(elementType))
+                elementType = vecType->getElementType();
+            else if (auto matType = as<MatrixExpressionType>(elementType))
+                elementType = matType->getElementType();
+            if (auto basicType = as<BasicExpressionType>(elementType))
+                isFloatingPoint = (BaseTypeInfo::getInfo(basicType->getBaseType()).flags &
+                                   BaseTypeInfo::Flag::FloatingPoint) != 0;
+        }
+
+        IROp op = kIROp_Add;
+        switch (expr->op)
+        {
+        case BuiltinOperationKind::Add:
+            op = kIROp_Add;
+            break;
+        case BuiltinOperationKind::Sub:
+            op = kIROp_Sub;
+            break;
+        case BuiltinOperationKind::Mul:
+            op = kIROp_Mul;
+            break;
+        case BuiltinOperationKind::Div:
+            op = kIROp_Div;
+            break;
+        case BuiltinOperationKind::Mod:
+            op = isFloatingPoint ? kIROp_FRem : kIROp_IRem;
+            break;
+        case BuiltinOperationKind::Neg:
+            op = kIROp_Neg;
+            break;
+        case BuiltinOperationKind::Not:
+            op = kIROp_Not;
+            break;
+        case BuiltinOperationKind::BitNot:
+            op = kIROp_BitNot;
+            break;
+        case BuiltinOperationKind::Eql:
+            op = kIROp_Eql;
+            break;
+        case BuiltinOperationKind::Neq:
+            op = kIROp_Neq;
+            break;
+        case BuiltinOperationKind::Less:
+            op = kIROp_Less;
+            break;
+        case BuiltinOperationKind::Greater:
+            op = kIROp_Greater;
+            break;
+        case BuiltinOperationKind::Leq:
+            op = kIROp_Leq;
+            break;
+        case BuiltinOperationKind::Geq:
+            op = kIROp_Geq;
+            break;
+        case BuiltinOperationKind::BitAnd:
+            op = kIROp_BitAnd;
+            break;
+        case BuiltinOperationKind::BitOr:
+            op = kIROp_BitOr;
+            break;
+        case BuiltinOperationKind::BitXor:
+            op = kIROp_BitXor;
+            break;
+        case BuiltinOperationKind::Lsh:
+            op = kIROp_Lsh;
+            break;
+        case BuiltinOperationKind::Rsh:
+            op = kIROp_Rsh;
+            break;
+        case BuiltinOperationKind::Conditional:
+        case BuiltinOperationKind::And:
+        case BuiltinOperationKind::Or:
+        case BuiltinOperationKind::Unknown:
+            // `convertToBuiltinArithmeticOp` never produces a `BuiltinOperatorExpr` for `?:`,
+            // `&&`, `||` (short-circuit/ternary, not fast-pathed) or for an unrecognized
+            // operator, so a node with these kinds should not exist.
+            SLANG_UNEXPECTED("BuiltinOperatorExpr with non-fast-path operation kind");
+            break;
+        }
+        return LoweredValInfo::simple(
+            getBuilder()->emitIntrinsicInst(irType, op, (UInt)argCount, args));
+    }
+
     LoweredValInfo visitInvokeExprImpl(
         InvokeExpr* expr,
         LoweredValInfo destination,
@@ -5146,7 +5395,7 @@ struct ExprLoweringContext
                 context->getSink()->diagnose(loweringDiag);
             }
             auto irType = lowerType(context, expr->type);
-            return LoweredValInfo::simple(getBuilder()->emitPoison(irType));
+            return LoweredValInfo::simple(getBuilder()->getPoison(irType));
         }
         context->invokeLoweringRecursionDepth++;
         SLANG_DEFER(context->invokeLoweringRecursionDepth--);
@@ -5793,7 +6042,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     }
                     else if (operand.token.type == TokenType::StringLiteral)
                     {
-                        const auto v = getStringLiteralTokenValue(operand.token);
+                        const auto v =
+                            getStringLiteralTokenValue(operand.token, context->getSink());
                         return builder->emitSPIRVAsmOperandLiteral(
                             builder->getStringValue(v.getUnownedSlice()));
                     }
@@ -6322,7 +6572,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             // In practice, we should never get here. If the value remains unassigned after all of
             // the subsequent IR steps and is used, it should be detected by
             // detectUninitializedResources.
-            return LoweredValInfo::simple(getBuilder()->emitPoison(irType));
+            return LoweredValInfo::simple(getBuilder()->getPoison(irType));
         }
         else if (auto declRefType = as<DeclRefType>(type))
         {
@@ -6758,6 +7008,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             expr,
             LoweredValInfo(),
             TryClauseEnvironment());
+    }
+
+    LoweredValInfo visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
+    {
+        return sharedLoweringContext.lowerBuiltinOperatorExpr(expr);
     }
 
     LoweredValInfo visitBuiltinCastExpr(BuiltinCastExpr* expr)
@@ -9409,6 +9664,38 @@ static HumaneSourceLoc _getDebugHumaneLoc(
     return humaneLoc;
 }
 
+// Returns true if `funcDecl` is a constructor that Slang synthesized (a default
+// or member-wise initializer) rather than one the user wrote. Such a function has
+// no user-authored body; its source locations are inherited from the struct and
+// member declarations (see `createCtor` and `synthesizeCtorBodyForMemberVar` in
+// slang-check-decl.cpp). Emitting source-level debug info for it would let a
+// debugger step into the compiler-generated initializer and walk the struct/member
+// declaration lines, so callers suppress debug info for these functions (#11550).
+//
+// Discriminating by flavor (not by the `$init` name) is required: a user-written
+// `__init` is also mangled to `<Type>.$init`, but carries `UserDefined` flavor and
+// must keep its debug info. The IR `IRConstructorDecoration` is attached only after
+// the function's `IRDebugLocationDecoration`, so the AST flavor is what is available in time.
+//
+// The two `maybe*` call sites below (`maybeAddDebugLocationDecoration` on the IRFunc
+// and `maybeEmitDebugLine` on the body) self-gate on this predicate and are BOTH
+// load-bearing and non-redundant: a function's `IRDebugLocationDecoration` and its
+// body's `DebugLine`s are produced independently, so neither gate subsumes the other.
+// They key on `context->funcDecl`, which is the function currently being lowered (the
+// ctor's own IRFunc for the decoration, and the ctor again for the statements lowered
+// under its sub-context); module-level lowering runs with `funcDecl == nullptr`, so the
+// gate is a no-op there. A third caller, at the constructor-lowering site, gates the
+// `this` debug-variable emission (#11565); it is independently load-bearing because the
+// `addNameHint` there, unlike these two helpers, has no internal synthesized-ctor gate.
+static bool isSynthesizedConstructorDecl(FunctionDeclBase* funcDecl)
+{
+    auto ctorDecl = as<ConstructorDecl>(funcDecl);
+    if (!ctorDecl)
+        return false;
+    return ctorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault) ||
+           ctorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
+}
+
 void maybeEmitDebugLine(
     IRGenContext* context,
     StmtLoweringVisitor* visitor,
@@ -9418,6 +9705,11 @@ void maybeEmitDebugLine(
 {
     // Only emit debug line info if debug level is at least Minimal
     if (context->debugInfoLevel == DebugInfoLevel::None)
+        return;
+
+    // A synthesized initializer has no user-authored source, so it must not emit
+    // steppable debug lines (see isSynthesizedConstructorDecl).
+    if (isSynthesizedConstructorDecl(context->funcDecl))
         return;
 
     if (!allowNullStmt)
@@ -9448,6 +9740,13 @@ void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
 {
     // Only emit debug location info if debug level is at least Minimal
     if (context->debugInfoLevel == DebugInfoLevel::None)
+        return;
+
+    // A synthesized initializer must not receive a source-level debug location:
+    // giving its IRFunc one would produce a DebugFunction/DebugScope (and, via
+    // insertDebugValueStore, param DebugVar/DebugValue) and let a debugger step
+    // into compiler-generated code (see isSynthesizedConstructorDecl).
+    if (isSynthesizedConstructorDecl(context->funcDecl))
         return;
 
     IRInst* debugSourceInst = getOrEmitDebugSource(context, inst->sourceLoc);
@@ -10081,7 +10380,21 @@ top:
         break;
 
     default:
-        SLANG_UNIMPLEMENTED_X("assignment");
+        {
+            SourceLoc loc;
+            for (auto locInfo = context->irBuilder->getSourceLocInfo(); locInfo;
+                 locInfo = locInfo->next)
+            {
+                if (locInfo->sourceLoc.getRaw() != 0)
+                {
+                    loc = locInfo->sourceLoc;
+                    break;
+                }
+            }
+            context->getSink()->diagnose(Diagnostics::UnsupportedAssignmentTarget{
+                .location = loc,
+            });
+        }
         break;
     }
 }
@@ -10319,6 +10632,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
     {
+        // An interface-level constraint (declared via `__constraint` in an
+        // interface body) is a direct member of the interface. It lowers as the
+        // key for that interface requirement, just like a constraint attached to
+        // an associated type or interface method.
+        if (as<InterfaceDecl>(decl->parentDecl))
+        {
+            return LoweredValInfo::simple(getInterfaceRequirementKey(decl));
+        }
+
         // This might be a type constraint on an associated type,
         // in which case it should lower as the key for that
         // interface requirement.
@@ -10404,6 +10726,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         SLANG_UNEXPECTED("non-empty pack constraint during lowering");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitGenericVariadicPackCountConstraintDecl(
+        GenericVariadicPackCountConstraintDecl* decl)
+    {
+        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl);
+            globalGenericParamDecl)
+        {
+            auto witnessType = getBuilder()->getWitnessTableType(getBuilder()->getVoidType());
+            auto inst = getBuilder()->emitGlobalGenericParam(witnessType);
+            addLinkageDecoration(context, inst, decl);
+            return LoweredValInfo::simple(inst);
+        }
+
+        SLANG_UNEXPECTED("pack-count constraint during lowering");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
@@ -11462,7 +11800,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return varVal;
     }
 
-    IRStructKey* getInterfaceRequirementKey(Decl* requirementDecl)
+    IRInst* getInterfaceRequirementKey(Decl* requirementDecl)
     {
         return Slang::getInterfaceRequirementKey(context, requirementDecl);
     }
@@ -11613,15 +11951,35 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         UInt entryIndex = 0;
-        auto addEntry = [&](IRStructKey* requirementKey, DeclRef<Decl> requirementDeclRef)
+        auto addEntry = [&](IRInst* requirementKey, DeclRef<Decl> requirementDeclRef)
         {
             auto entry = subBuilder->createInterfaceRequirementEntry(requirementKey, nullptr);
+            auto relocatedSubtypeConstraint = requirementDeclRef.as<GenericTypeConstraintDecl>();
             if (auto inheritance = requirementDeclRef.as<InheritanceDecl>())
             {
                 auto irBaseType =
                     lowerType(subContext, getSup(subContext->astBuilder, inheritance));
                 auto irWitnessTableType = subBuilder->getWitnessTableType(irBaseType);
                 entry->setRequirementVal(irWitnessTableType);
+            }
+            else if (
+                relocatedSubtypeConstraint &&
+                !relocatedSubtypeConstraint.getDecl()->isEqualityConstraint)
+            {
+                // A subtype constraint on an associated type (`associatedtype A : IBar`,
+                // `associatedtype A where A : IBar`) is recorded in the unified
+                // representation as an interface-level requirement (a sibling of `A`). It is
+                // a *conformance* requirement: its witness is a witness table for the bound.
+                // We must lower it the same way the conformance was lowered when the bound was
+                // nested in the associated type (see the associated-type constraint loop
+                // below), i.e. with a `WitnessTableType` requirement value -- otherwise
+                // consumers (e.g. autodiff) that read the requirement get a malformed entry.
+                // (Equality constraints, e.g. `__constraint A == B`, are handled by the
+                // generic path below.)
+                auto irBaseType = lowerType(
+                    subContext,
+                    getSup(subContext->astBuilder, relocatedSubtypeConstraint));
+                entry->setRequirementVal(subBuilder->getWitnessTableType(irBaseType));
             }
             else
             {
@@ -12418,6 +12776,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     void emitGenericConstraintDecl(
         IRGenContext* subContext,
+        GenericVariadicPackCountConstraintDecl* constraintDecl)
+    {
+        auto subBuilder = subContext->irBuilder;
+        // Generic lowering turns each source generic constraint into a hidden
+        // parameter. The checker has already validated `countof(Pack) == Count`,
+        // so lowering only needs a proof value with the same witness-table
+        // representation consumed by `visitDeclaredVariadicPackCountWitness`.
+        auto witnessType = subBuilder->getWitnessTableType(subBuilder->getVoidType());
+        auto param = subBuilder->emitParam(witnessType);
+        addNameHint(context, param, constraintDecl);
+        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
+    }
+
+    void emitGenericConstraintDecl(
+        IRGenContext* subContext,
         HasDiffTypeInfoConstraintDecl* constraintDecl)
     {
         auto subBuilder = subContext->irBuilder;
@@ -12489,6 +12862,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
             {
                 emitGenericConstraintDecl(subContext, nonEmptyConstraintDecl);
+            }
+            else if (
+                auto packCountConstraintDecl =
+                    as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
+            {
+                emitGenericConstraintDecl(subContext, packCountConstraintDecl);
             }
             else if (
                 auto hasDiffTypeInfoConstraintDecl =
@@ -13705,18 +14084,67 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto constructorDecl = as<ConstructorDecl>(decl);
             if (constructorDecl)
             {
+                // The IR value that stands for `this` inside the initializer body: either a
+                // caller-provided return-destination out-parameter (for a non-copyable result
+                // type, see `maybeAddReturnDestinationParam`) or, in the common by-value case, a
+                // fresh local holding the value the initializer constructs and returns.
+                IRInst* thisStorage = nullptr;
                 if (subContext->returnDestination.flavor != LoweredValInfo::Flavor::None)
+                {
                     subContext->thisVal = subContext->returnDestination;
+                    // The return destination is always an l-value pointer:
+                    // maybeAddReturnDestinationParam lowers it as an `Out` parameter, which
+                    // becomes `LoweredValInfo::ptr(...)`. Assert that invariant and read `.val`
+                    // (the `LoweredValInfo` union holds an `IRInst*` in `val` only for
+                    // Ptr/Simple) — that pointer is the object under construction.
+                    SLANG_ASSERT(
+                        subContext->returnDestination.flavor == LoweredValInfo::Flavor::Ptr);
+                    thisStorage = subContext->returnDestination.val;
+                }
                 else
                 {
                     auto thisVar = subContext->irBuilder->emitVar(irResultType);
                     subContext->thisVal = LoweredValInfo::ptr(thisVar);
+                    thisStorage = thisVar;
 
                     // For class-typed objects, we need to allocate it from heap.
                     if (isClassType(irResultType))
                     {
                         auto allocatedObj = subContext->irBuilder->emitAllocObj(irResultType);
                         subContext->irBuilder->emitStore(thisVar, allocatedObj);
+                    }
+                }
+
+                // For a user-written initializer compiled with debug info, expose the object
+                // under construction as a `this` debug variable, so a debugger stopped inside
+                // `__init` can inspect the members being initialized just as it can inside a
+                // `[mutating]` method. `thisStorage` is exactly that object (the value the
+                // initializer constructs and returns). Naming it lets the debug-var pass in
+                // slang-ir-insert-debug-value-store.cpp surface it: a return-destination
+                // parameter is emitted by that pass's parameter loop, whereas a fresh local is
+                // emitted by its local-var loop only if it also carries an
+                // IRDebugLocationDecoration, which we add below. Synthesized initializers are
+                // excluded via the shared isSynthesizedConstructorDecl() predicate: they have no
+                // user-authored body, so a steppable `this` would only expose compiler-generated
+                // code (the same rationale that suppresses their debug lines for #11550). Unlike
+                // maybeAddDebugLocationDecoration/maybeEmitDebugLine, addNameHint has no internal
+                // synthesized-ctor gate, so this outer check is the only thing keeping a
+                // synthesized initializer's object from being named `this`.
+                if (thisStorage && !isSynthesizedConstructorDecl(constructorDecl) &&
+                    subContext->debugInfoLevel != DebugInfoLevel::None)
+                {
+                    addNameHint(subContext, thisStorage, "this");
+
+                    // The fresh by-value local is surfaced by the pass's local-var loop only if
+                    // it carries an IRDebugLocationDecoration, so add one.
+                    // maybeAddDebugLocationDecoration reads the var's sourceLoc, which emitVar
+                    // stamps from the IR builder's current source location — established by the
+                    // enclosing function lowering, not in this block. A return-destination
+                    // parameter is surfaced by the parameter loop instead and needs no such
+                    // decoration.
+                    if (auto thisVar = as<IRVar>(thisStorage))
+                    {
+                        maybeAddDebugLocationDecoration(subContext, thisVar);
                     }
                 }
 

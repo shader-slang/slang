@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:50:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 562a0873aae2e59ee7743d5a1b0d436fb33c759dbcab165ff574e19fbf111219
+model: claude-opus-4.8
+generated_at: 2026-06-12T10:34:32Z
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+watched_paths_digest: 88909e4def1133ca5cd3ccb36f17d01f8bcc633abff88b21acd9208e1a05d1f2
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -13,7 +13,7 @@ This page is a navigation hub for the per-target pipeline pages
 in `target-pipelines/`. Each peer page documents one target's
 ordered IR-pass and downstream-tool sequence as a four-phase
 control-flow-graph view of the shared orchestrator
-`linkAndOptimizeIR` (line ~893 of
+`linkAndOptimizeIR` (line ~895 of
 [../../../../source/slang/slang-emit.cpp](../../../../source/slang/slang-emit.cpp)).
 For an unordered, topical catalog of every IR pass — grouped by
 category rather than by execution order — see
@@ -70,19 +70,15 @@ is which switch arm each target lands in.
 | Target | CodeGenTarget enum values | Phase C entry | Phase D emitter | Downstream tools | Loops |
 | --- | --- | --- | --- | --- | --- |
 | SPIR-V | `SPIRV`, `SPIRVAssembly` | `legalizeIRForSPIRV` ([slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp)) | `emitSPIRVForEntryPointsDirectly` ([slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)) | spirv-link, spirv-val, spirv-opt | **Yes** — `simplifyIRForSpirvLegalization` (outer 8 × inner 16); forward-declared-pointer fixup loop in `emitSPIRVFromIR`. |
-| HLSL | `HLSL` (plus downstream `DXIL`, `DXBytecode`, and their `*Assembly` variants) | (no single driver — per-pass HLSL arms: `wrapStructuredBuffersOfMatrices`, `legalizeNonStructParameterToStructForHLSL`, `legalizeNonVectorCompositeSelect`, `legalizeEmptyRayPayloadsForHLSL`, `legalizeUniformBufferLoad`, `applyVariableScopeCorrection`) | `HLSLSourceEmitter` ([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)) | DXC (for `DXIL*`), fxc (for `DXBytecode*`) | **No** loops in `linkAndOptimizeIR`. |
+| HLSL | `HLSL` (plus downstream `DXIL`, `DXBytecode`, and their `*Assembly` variants) | (no single entry; per-pass HLSL arms) | `HLSLSourceEmitter` ([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)) | DXC (for `DXIL*`), fxc (for `DXBytecode*`) | **No** loops in `linkAndOptimizeIR`. |
 | Metal | `Metal`, `MetalLib`, `MetalLibAssembly` | `legalizeIRForMetal` ([slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp)) | `MetalSourceEmitter` ([slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp)) | Apple `metal` compiler (for `MetalLib*`) | **No** loops in `linkAndOptimizeIR`; `legalizeIRForMetal` is single-pass. |
 | WGSL | `WGSL`, `WGSLSPIRV`, `WGSLSPIRVAssembly` | `legalizeIRForWGSL` ([slang-ir-wgsl-legalize.cpp](../../../../source/slang/slang-ir-wgsl-legalize.cpp)) | `WGSLSourceEmitter` ([slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp)) | Tint (for `WGSLSPIRV*`) | **No** loops in `linkAndOptimizeIR`; `legalizeIRForWGSL` is single-pass. |
-| CUDA | `CUDASource`, `CUDAHeader`, `PTX` | (no single driver — per-pass CUDA arms: `synthesizeActiveMask`, `legalizeEntryPointVaryingParamsForCUDA`, `lowerImmutableBufferLoadForCUDA`, plus shared `undoParameterCopy` / `transformParamsToConstRef` with CPU and Metal) | `CUDASourceEmitter` ([slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp), inheriting from `CPPSourceEmitter`) | nvrtc / runtime CUDA compiler (for `PTX`) | **No** loops in `linkAndOptimizeIR`. |
+| CUDA | `CUDASource`, `CUDAHeader`, `PTX` | (no single entry; per-pass CUDA arms) | `CUDASourceEmitter` ([slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp), inheriting from `CPPSourceEmitter`) | nvrtc / runtime CUDA compiler (for `PTX`) | **No** loops in `linkAndOptimizeIR`. |
 
-Several conditional gates apply across multiple targets — most
-notably `eliminatePhis` runs with **register-allocation enabled**
-only for SPIR-V (when `isKhronosTarget && emitSpirvDirectly`), and
-with **default options** for HLSL, Metal, WGSL, and CUDA. SPIR-V
-is also the only target that defers address-space propagation
-into its legalizer; Metal and WGSL run
-`specializeAddressSpaceForMetal` / `specializeAddressSpaceForWGSL`
-inside `linkAndOptimizeIR`.
+Targets differ in which conditional gates and target-specific
+legalization arms they land on; each per-target page documents
+those choices, its phi-elimination configuration, and its
+downstream tool chain in detail.
 
 ## Filtering rules
 
@@ -94,7 +90,7 @@ the CPU / Host / LLVM variants, etc.). A glance at one page does
 **not** show the global ordering of `linkAndOptimizeIR`; it shows
 only the passes reachable for that target. Where two targets
 share an arm (for example, CUDA, Metal, and CPU all hit the
-`undoParameterCopy` arm at line ~2095), each page that lists the
+`undoParameterCopy` arm at line ~2142), each page that lists the
 pass also documents the shared arm in its prose.
 
 For a single, unfiltered view of every pass — independent of

@@ -1,7 +1,7 @@
 //META: generated=true
-//META: model=claude-sonnet-4-6
-//META: generated_at=2026-06-02T07:02:43+00:00
-//META: source_commit=9c1a6a00ef413932805da5b813465a7a9d517fb9
+//META: model=claude-opus-4-8
+//META: generated_at=2026-06-24T09:20:31Z
+//META: source_commit=b25e06aeb8862d207541c3d812c57cb9e381b802
 //META: doc_ref=docs/language-reference/generics.md#type-checking
 //META: doc_section_digest=7b3e1c2f4d8a0e9f5b2c6d1e3f7a4b8c0d2e6f9a1b5c3e7f0d4a8b2c6e0f4a
 //META: purpose=A type whose associated type does not satisfy a `where T.AssocType == int` equality constraint is rejected at the call site.
@@ -39,5 +39,5 @@ void computeMain(uint3 id : SV_DispatchThreadID)
     FloatProperty fp1;
     FloatProperty fp2;
     int r = addTwoInts(fp1, fp2);
-//CHECK: E39999
+//CHECK: E30440
 }

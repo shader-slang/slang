@@ -1,0 +1,46 @@
+name: Check GitHub Actions Workflows
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Install actionlint
+        env:
+          ACTIONLINT_VERSION: v1.7.12
+        run: |
+          set -euo pipefail
+          version="${ACTIONLINT_VERSION#v}"
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          install_dir="$RUNNER_TEMP/actionlint"
+
+          mkdir -p "$install_dir"
+          cd "$install_dir"
+
+          curl -fsSLO "https://github.com/rhysd/actionlint/releases/download/${ACTIONLINT_VERSION}/${archive}"
+          curl -fsSLO "https://github.com/rhysd/actionlint/releases/download/${ACTIONLINT_VERSION}/actionlint_${version}_checksums.txt"
+          grep "  ${archive}$" "actionlint_${version}_checksums.txt" | sha256sum -c -
+          tar -xzf "$archive"
+          ./actionlint -version
+
+      - name: Run actionlint
+        run: |
+          "$RUNNER_TEMP/actionlint/actionlint" -config-file .github/actionlint.yaml -shellcheck= -no-color

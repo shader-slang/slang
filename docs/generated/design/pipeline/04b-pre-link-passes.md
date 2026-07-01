@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:40:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 7f4e296a80f6a59ce95b5faccef2ae071beeb30e11f234e93ea2f89f30aa8f17
+model: claude-opus-4.8
+generated_at: 2026-06-29T20:13:48Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 0a827687878ad7390b1acdda49546f652c2eaf5da2d820809834f1faa2ed69cb
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -29,7 +29,7 @@ use the `SLANG_PASS(...)` macro that wraps the post-link passes in
 ## Source
 
 - [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-  — `generateIRForTranslationUnit` (line ~14386) is the orchestrator.
+  — `generateIRForTranslationUnit` (line ~15062) is the orchestrator.
   The function is invoked once per `TranslationUnitRequest` from
   `Module::compile` and friends; its result is cached on
   `Module::m_irModule`.
@@ -75,7 +75,7 @@ the program is composed for a specific target.
 
 ## Phase A: AST walk and IR emission
 
-Spans roughly lines 14408-14514 of
+Spans roughly lines 15084-15193 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
 This phase creates a fresh `IRModule`, optionally attaches
 `kIROp_ExperimentalModuleDecoration` and per-source `DebugSource`
@@ -118,7 +118,7 @@ flowchart TD
   nvGate -- no --> vMod
 ```
 
-| # | Call | File | Gate | Notes |
+| # | Pass | File | Gate | Notes |
 |---|---|---|---|---|
 | A1 | `IRModule::create(session)` | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) | always | Creates the empty module that the rest of the pipeline mutates. |
 | A2 | `module->setName(moduleDecl->getName())` | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) | always | Records the module's source-level name. |
@@ -131,13 +131,13 @@ flowchart TD
 | A9 | `addNVAPISlotDecoration(moduleInst, registerName, spaceName)` | [slang-ir.h](../../../../source/slang/slang-ir.h) | `moduleDecl->findModifier<NVAPISlotModifier>()` | Module-level NVAPI register/space binding. |
 | A10 | `validateIRModuleIfEnabled(compileRequest, module)` | [slang-ir-validate.h](../../../../source/slang/slang-ir-validate.h) | always (no-op unless validation is enabled at the compiler-option level) | Closes Phase A with a structural sanity check on the freshly emitted IR. |
 
-The `#if 0` block at line 14501 (a `dumpIR(module, ..., "GENERATED", ...)`
+The `#if 0` block at line 15180 (a `dumpIR(module, ..., "GENERATED", ...)`
 call) is intentionally disabled in production builds; flip it for
 debugging the pre-mandatory IR shape.
 
 ## Phase B: Mandatory pre-optimization transformations
 
-Spans roughly lines 14536-14563. The block comment at line 14516
+Spans roughly lines 15215-15242. The block comment at line 15195
 states the dual purpose: simplify the IR ahead of backend
 compilation, **and** establish dataflow invariants the
 non-essential validators in Phase D rely on.
@@ -156,7 +156,7 @@ flowchart TD
   diGate -- yes --> idvs
 ```
 
-| # | Call | File | Gate | Notes |
+| # | Pass | File | Gate | Notes |
 |---|---|---|---|---|
 | B1 | `prelinkIR(translationUnit->module, module, externalSymbolsToPrelink)` | [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp) | always | Imports `[unsafeForceInlineEarly]` bodies and the `externalSymbolsToPrelink` set so they are available to later passes. Distinct from the post-link `linkIR` driven by `linkAndOptimizeIR`. |
 | B2 | `lowerErrorHandling(module, sink)` | [slang-ir-lower-error-handling.cpp](../../../../source/slang/slang-ir-lower-error-handling.cpp) | always | Rewrites throwing functions to return `Result<T,E>`; translates `tryCall` into `call` + `ifElse`. |
@@ -167,7 +167,7 @@ flowchart TD
 
 ## Phase C: Mandatory optimization passes
 
-Spans roughly lines 14569-14650. This phase establishes SSA,
+Spans roughly lines 15248-15329. This phase establishes SSA,
 constant-propagates with `applySparseConditionalConstantPropagation`,
 performs an optional CFG simplification + peephole pair (gated on
 `!minimumOptimizations`), runs a per-function DCE sweep, optionally
@@ -194,15 +194,15 @@ flowchart TD
   liGate -- no --> inlineLoop
 ```
 
-| # | Call | File | Gate | Notes |
+| # | Pass | File | Gate | Notes |
 |---|---|---|---|---|
 | C1 | `constructSSA(module)` | [slang-ir-ssa.cpp](../../../../source/slang/slang-ir-ssa.cpp) | always | Promotes addressable locals to SSA temporaries module-wide. |
 | C2 | `applySparseConditionalConstantPropagation(module, nullptr, sink)` | [slang-ir-sccp.cpp](../../../../source/slang/slang-ir-sccp.cpp) | always | SCCP over the freshly constructed SSA. |
 | C3 | `simplifyCFG(module, CFGSimplificationOptions::getDefault())` | [slang-ir-simplify-cfg.cpp](../../../../source/slang/slang-ir-simplify-cfg.cpp) | `!minimumOptimizations` | Removes empty/unreachable blocks. |
 | C4 | `peepholeOptimize(nullptr, module, getPrelinking())` | [slang-ir-peephole.cpp](../../../../source/slang/slang-ir-peephole.cpp) | `!minimumOptimizations` | The pre-linking peephole subset; full peephole runs post-link. |
-| C5 | per-function `eliminateDeadCode(func, dceOptions)` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | always | One pass over every `IRGlobalValueWithCode` with `keepExportsAlive`, `keepLayoutsAlive`, `useFastAnalysis` all set. |
+| C5 | per-function `eliminateDeadCode(func, dceOptions)` (line ~15264) | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | always | One pass over every `IRGlobalValueWithCode` with `keepExportsAlive`, `keepLayoutsAlive`, `useFastAnalysis` all set. |
 | C6 | `invertLoops(module)` | [slang-ir-loop-inversion.cpp](../../../../source/slang/slang-ir-loop-inversion.cpp) | `CompilerOptionName::LoopInversion` | Moves loop condition checks to the end of the loop and wraps the loop in an outer `if`, so SCCP can recognize loops that always execute at least once. |
-| C7 | `performMandatoryEarlyInlining` fixed-point loop | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | always (loop body) | Documented under [Loops in the pipeline](#loops-in-the-pipeline). Honors `[unsafeForceInlineEarly]` as a hard requirement, not a hint. |
+| C7 | `performMandatoryEarlyInlining` fixed-point loop (line ~15303) | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | always (loop body) | Called as `performMandatoryEarlyInlining(module, &modifiedFuncs.getHashSet())`. Documented under [Loops in the pipeline](#loops-in-the-pipeline). Honors `[unsafeForceInlineEarly]` as a hard requirement, not a hint. |
 
 C5 iterates over functions but not over passes; treat it as one
 step in the pipeline whose effect happens to be per-function. The
@@ -213,7 +213,7 @@ inlining loop.
 
 ## Phase D: Non-essential validation, stripping, and finalization
 
-Spans roughly lines 14652-14771. Phase D first runs a block of
+Spans roughly lines 15331-15448. Phase D first runs a block of
 optional dataflow validators (gated on
 `shouldRunNonEssentialValidation`), then strips front-end-only
 decorations (with an obfuscation sub-gate that also requests a
@@ -255,7 +255,7 @@ flowchart TD
   vMod --> bmn
 ```
 
-| # | Call | File | Gate | Notes |
+| # | Pass | File | Gate | Notes |
 |---|---|---|---|---|
 | D1 | `checkForRecursiveTypes(module, sink)` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation` | Disallows recursive type definitions. |
 | D2 | early return on error | [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) | `sink->getErrorCount() != 0` | If D1 (or any earlier diagnostic) raised an error, Phase D exits before propagation and the later passes. |
@@ -274,7 +274,7 @@ flowchart TD
 | D15 | `module->buildMangledNameToGlobalInstMap()` | [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) | always | Builds the lookup index `linkIR` later needs. |
 
 Note that the `if (compileRequest->optionSet.shouldDumpIR())` block
-between D14 and D15 (lines 14757-14767) is an optional dump, not a
+between D14 and D15 (lines 15436-15446) is an optional dump, not a
 pipeline step; it does not mutate the module.
 
 ## Conditional gates
@@ -289,6 +289,8 @@ pipeline step; it does not mutate the module.
 | Source map | `linkage->m_optionSet.shouldHaveSourceMap()` | D13 (only when `shouldStripNameHints` is also true). |
 | Loop inversion | `linkage->m_optionSet.getBoolOption(CompilerOptionName::LoopInversion)` | C6. |
 | Trace coverage | `linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceCoverage)` | Sets `context->traceCoverage`; does **not** directly gate a pass in this pipeline, but propagates into per-decl lowering inside A6/A7. |
+| Trace function coverage | `linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceFunctionCoverage)` | Sets `context->traceFunctionCoverage`; like `TraceCoverage`, it influences per-decl lowering (function-entry counters) rather than gating a pass here. |
+| Trace branch coverage | `linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage)` | Sets `context->traceBranchCoverage`; influences per-decl lowering (per-branch-arm counters) rather than gating a pass here. |
 | Debug info | `linkage->m_optionSet.getDebugInfoLevel()` | A4 (any level above `None`), A5 (`Standard` or higher), B6 (`Standard` or higher). |
 
 ### Context predicates
@@ -309,7 +311,7 @@ pipeline step; it does not mutate the module.
 
 The pre-link pipeline contains **exactly one** pass-level loop:
 the `performMandatoryEarlyInlining` fixed point at lines
-14624-14650.
+15303-15329.
 
 ```mermaid
 flowchart TD
@@ -336,17 +338,20 @@ flowchart TD
   endGate -- no --> done
 ```
 
-The outer `for(;;)` terminates when `performMandatoryEarlyInlining`
-reports `changed == false` and no inner-cluster pass mutates the
-module. The inner per-modified-function cluster
-(`constructSSA` → `applySparseConditionalConstantPropagation` →
-`peepholeOptimize` → `simplifyCFG` with `getFast()` →
-`eliminateDeadCode`) only runs when `!minimumOptimizations`; in
-that mode each pass's return value feeds back into `changed`, so
-the outer loop continues iterating as long as **any** of those
-five inner passes reports progress on **any** modified function.
+The outer `for(;;)` reuses a single `changed` flag.
+`performMandatoryEarlyInlining` sets it first; if inlining reports
+`false`, the `if (changed)` block is skipped and the loop breaks
+immediately. If inlining reports `true`, `changed` is then
+**overwritten** by the `peepholeOptimizeGlobalScope` result — the
+inlining `true` is not carried directly into the termination
+test — and, when `!minimumOptimizations`, the per-modified-function
+cluster (`constructSSA` → `applySparseConditionalConstantPropagation`
+→ `peepholeOptimize` → `simplifyCFG` with `getFast()`) OR-assigns
+its results into `changed` (the trailing `eliminateDeadCode` call
+does not). The loop breaks once this final `changed` value is
+`false`.
 
-The per-function DCE sweep at C5 (line 14585-14589) iterates over
+The per-function DCE sweep at C5 (line 15264-15268) iterates over
 functions but not over passes — it is one pipeline step whose
 effect happens to be per-function, not a loop in the pipeline
 sense. The same applies to A6 (`lowerFrontEndEntryPointToIR` per
@@ -374,6 +379,20 @@ imported modules:
 (see [../target-pipelines/](../target-pipelines)) once the
 program has been composed for a target, and pulls in every
 referenced symbol from every imported module.
+
+Before cloning, `prelinkIR` calls `_ensureLinkingInfo()` on every
+stable input module (the current module's dependencies plus the
+core modules), but **not** on `irModule` itself — prelink mutates
+`irModule` by replacing declarations with cloned definitions, and
+the per-module linking-info cache assumes the module is frozen once
+built. The linking-info cache (a module-owned acceleration
+structure built once per module in
+[slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp))
+lets both `prelinkIR` and `linkIR` look up exported symbols, global
+params, known builtins, and per-target annotations without rescanning
+the global instruction list or walking high-fanout use lists. It is
+a performance cache only; it does not change which symbols are
+imported.
 
 ### `lowerErrorHandling`
 
@@ -432,7 +451,7 @@ Removes decorations and instructions that are only meaningful to
 the front end — `IRHighLevelDeclDecoration`, optionally
 `IRNameHintDecoration` (when obfuscation is on), and a handful of
 internal book-keeping insts. The intent is documented by the
-comment at line 14688: AST-level information must not flow into
+comment at line 15367: AST-level information must not flow into
 the backend.
 
 ### `obfuscateModuleLocs`
@@ -442,9 +461,12 @@ Lives in
 Runs only when both `shouldObfuscateCode()` and
 `shouldHaveSourceMap()` are true — that is, the user wants
 obfuscated source locations **and** the ability to map them back
-to actual source via a side-channel source map. Without the source
-map, locs are simply stripped; without obfuscation, locs are
-preserved.
+to actual source via a side-channel source map. This pre-link
+stripping block sets `stripOptions.stripSourceLocs = false`
+unconditionally, so locs are never stripped here; if obfuscation is
+enabled without a source map, name hints are stripped but
+`obfuscateModuleLocs` does not run and the original locs are left in
+place.
 
 ### `module->buildMangledNameToGlobalInstMap`
 
@@ -468,9 +490,10 @@ overall flow.
 
 ### `SpecializedComponentTypeIRGenContext::process`
 
-Lives at line ~14783 of
-[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
-This routine builds a small IR module for a
+Lives at line ~15454 of
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+(its `process` method begins at line ~15462). This routine builds a
+small IR module for a
 `SpecializedComponentType` that records how specialization
 arguments bind to specialization parameters. It does **not** run
 the mandatory-optimization passes documented on this page —
@@ -481,7 +504,7 @@ runs.
 
 ### `TargetProgram::createIRModuleForLayout`
 
-Lives at line ~15327 of
+Lives at line ~16011 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
 It produces a separate, per-target IR module whose only contents
 are `IRLayoutDecoration`s on stub globals and entry points; it

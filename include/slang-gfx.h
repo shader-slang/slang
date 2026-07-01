@@ -55,7 +55,7 @@ typedef int GfxCount;
 typedef size_t Size;
 typedef size_t Offset;
 
-const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
+constexpr uint64_t kTimeoutInfinite{0xFFFFFFFFFFFFFFFFU};
 
 enum class StructType
 {

@@ -295,6 +295,7 @@ return {
 	["RequireComputeDerivative"] = 297,
 	["StaticAssert"] = 298,
 	["Printf"] = 299,
+	["Abort"] = 864,
 	["RequireMaximallyReconverges"] = 300,
 	["RequireQuadDerivatives"] = 301,
 	["add"] = 302,
@@ -832,5 +833,11 @@ return {
 	["SubpassLoad"] = 856,
 	["TranslateBase.IdentityRemat"] = 857,
 	["IncrementFunctionCoverageCounter"] = 858,
-	["IncrementBranchCoverageCounter"] = 859
+	["IncrementBranchCoverageCounter"] = 859,
+	["Decoration.BuiltinRequirementDecoration"] = 860,
+	["builtinRequirementKey"] = 861,
+	["ImageTexelPointer"] = 862,
+	["Type.MetalPackedVec"] = 863,
+	["Decoration.glslFragDepthGreater"] = 865,
+	["Decoration.glslFragDepthLess"] = 866
 }

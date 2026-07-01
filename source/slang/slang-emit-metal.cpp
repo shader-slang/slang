@@ -1153,6 +1153,31 @@ void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             default:
                 break;
             }
+
+            // Suffix finite half/float literals so MSL doesn't type a bare decimal
+            // as `double` (which breaks `as_type<ushort>(h)`, #11837). NaN/Inf and
+            // Double stay bare; non-finite half/float is a known remaining gap.
+            if (auto basicType = as<IRBasicType>(inst->getDataType()))
+            {
+                const char* suffix = nullptr;
+                switch (basicType->getBaseType())
+                {
+                case BaseType::Half:
+                    suffix = "h";
+                    break;
+                case BaseType::Float:
+                    suffix = "f";
+                    break;
+                default:
+                    break;
+                }
+                if (suffix)
+                {
+                    m_writer->emit(constantInst->value.floatVal);
+                    m_writer->emit(suffix);
+                    return;
+                }
+            }
             break;
         }
 
@@ -1248,6 +1273,15 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             emitVectorTypeNameImpl(
                 vecType->getElementType(),
                 getIntVal(vecType->getElementCount()));
+            return;
+        }
+    case kIROp_MetalPackedVectorType:
+        {
+            auto packedVecType = (IRMetalPackedVectorType*)type;
+            m_writer->emit("packed_");
+            emitVectorTypeNameImpl(
+                packedVecType->getElementType(),
+                getIntVal(packedVecType->getElementCount()));
             return;
         }
     case kIROp_MatrixType:

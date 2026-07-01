@@ -1,14 +1,14 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T18:30:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-30T14:00:16Z
 target_doc: cross-cutting/serialization.md
 review_report: ../../reviews/cross-cutting/serialization.md.review.md
-target_doc_source_commit_before: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 actions:
-  fixed: 2
-  rejected_bogus: 0
+  fixed: 0
+  rejected_bogus: 3
   rejected_out_of_scope: 0
   deferred: 0
   escalated: 0
@@ -17,15 +17,11 @@ actions:
 # Remediation report for cross-cutting/serialization.md
 
 ## Summary
-
-F-001 addressed by expanding the manifest's `watched_paths` to
-include the IR-type and source-loc serialize files cited in the
-body. F-002 addressed by removing the unsupported alternative-
-workflow claim from `## Round-trip and repro files`.
+All three findings were rejected as bogus: the current target document already matches the watched source on every cited point, so no edits were made this cycle. F-001 claims the doc names the mode type `SerializerMode`, but the doc already uses the correct `SerializationMode`. F-002 claims the source-location section says file content and an expansion stack are serialized, but the doc explicitly states the file content is not serialized and lists only path/range/line tables. F-003 claims the embedded-core-module rationale is unsupported, but it is paraphrased from the fossil header comment. The review reads as written against an earlier draft than the document present at this commit.
 
 ## Actions
-
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | The runbook ("Manifest gaps") prescribes extending `watched_paths`. The body legitimately discusses what those serialize-helper files do, so bringing them in scope is the cleanest fix. | Added `source/slang/slang-serialize-ir-types.{h,cpp}` and `source/slang/slang-serialize-source-loc.{h,cpp}` to the page's `watched_paths` in `_meta/manifest.yaml`. After `mark-fresh`, the doc's `watched_paths_digest` changes, so this doc will surface as `review-stale` next cycle. |
-| F-002 | fixed | The prompt limits this section to historical (deprecated) repro handling; the "`-target slang` plus the test-server framework is the supported path" claim was beyond that scope and was not anchored in any watched file. | Reworded the second sentence of `## Round-trip and repro files` to say "any newer alternative workflow is out of scope for this page" instead of naming a specific (unsubstantiated) workflow. |
+| F-001 | rejected-bogus | Doc line 68 reads "distinguished by a `SerializationMode`"; grep finds no `SerializerMode` anywhere in `docs/generated/design/cross-cutting/serialization.md`. Matches `source/slang/slang-serialize.h:62` (`enum class SerializationMode`) and `:122` (`getMode()`). The claimed mismatch does not exist. | — |
+| F-002 | rejected-bogus | Doc lines 201-214 state the serializer captures per-file "path, its source-location range, and its line-start tables (both unadjusted and `#line`-adjusted)" and that "the file's content is not serialized," reconstructing via `createSourceFileWithSize`. Matches `source/slang/slang-serialize-source-loc.h:74-84` and `slang-serialize-source-loc.cpp:270-277`. The doc never claims content or an expansion stack is serialized. | — |
+| F-003 | rejected-bogus | The fossil header comment `source/slang/slang-serialize-fossil.h:29-35` says the toggle exists because "one of the key cases for serialization in Slang is loading the core module from the `slang.dll` binary itself ... we provide a define ... to measure how much performance is being lost to validation checks." Doc lines 126-133 paraphrase this; it is not invented. The finding cited only lines 36-44 and overlooked the comment. | — |

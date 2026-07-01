@@ -10,6 +10,7 @@ performance-oriented GPU programming for real-time graphics.
 
 * [Language Goals (TODO)](introduction-goals.md)
 * [Typographical Conventions](introduction-typographical-conventions.md)
+* [Language Evolution](introduction-language-evolution.md)
 
 
 ## Purpose of this document

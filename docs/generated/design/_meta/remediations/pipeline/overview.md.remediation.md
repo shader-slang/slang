@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T19:30:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-30T14:05:31Z
 target_doc: pipeline/overview.md
 review_report: ../../reviews/pipeline/overview.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 actions:
-  fixed: 3
+  fixed: 0
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,16 +18,9 @@ actions:
 
 ## Summary
 
-All three findings addressed: the inflated pass-file count is
-corrected, the `EndToEndCompileRequest` declaration reference is
-fixed, and `slang-compile-request.cpp` orchestration is now covered
-with a description of `checkAllTranslationUnits` /
-`checkTranslationUnit`.
+The review report records `finding_count: 0` and an empty `## Findings` table; all six checklist items (factual accuracy, cross-references, completeness, style consistency, source alignment, front-matter validity) passed. There is nothing to act on, so no edits were made to the target document and `target_doc_source_commit_after` equals `target_doc_source_commit_before`. The action breakdown is zero fixed, zero rejected-bogus, zero rejected-out-of-scope, zero deferred, zero escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | The watched glob resolves to ~161 files, not ~300; the inflated count would be a misleading guide to reviewers. | Updated the "IR passes" paragraph to read "roughly 160 `slang-ir-*.cpp` files". |
-| F-002 | fixed | The class is declared in `slang-end-to-end-request.h`; the `.cpp` only contains the implementation. | Split the "Driver entry points" bullet so it cites the header for the declaration and the `.cpp` for the implementation. |
-| F-003 | fixed | The prompt requires orchestration coverage from `slang-compile-request.cpp`; the section linked only the header. | Expanded the first "Driver entry points" bullet to cite `slang-compile-request.cpp`, naming the `checkAllTranslationUnits` / `checkTranslationUnit` orchestration loop and pointing at line 513. |

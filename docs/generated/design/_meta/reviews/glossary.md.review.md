@@ -1,37 +1,42 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-12T13:18:05+00:00
 target_doc: glossary.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 7176a22219b18c44d0407a900615049a6a078771700ca274d01d15aeb88bc3ad
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 8033723409ecbf2551b9a4eb228a4e39356c3fa79164d7d057fb8526b4b0145a
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
   completeness: partial
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 2
+finding_count: 1
 severity_breakdown:
   critical: 0
-  major: 0
-  minor: 2
+  major: 1
+  minor: 0
   nit: 0
 ---
 
 # Review report for glossary.md
 
 ## Summary
-The page is structurally lint-clean, but review found 2 findings; the most significant severity is minor. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The glossary is mostly aligned with its prompt: entries are tagged, term definitions are source-supported, and the sampled links resolve. One completeness issue remains: the `## Cross-reference index` table omits two peer pipeline documents included by the manifest's watched-path glob.
 
 ## Items checked
-- Checked required floor terms, `[Slang]` / `[General]` tags, mandatory `See:` links, external links, cross-reference index coverage, and selected source anchors.
+- Ran `python3 docs/generated/design/_meta/regenerate.py show glossary.md` and reviewed the per-doc prompt, `_common.md`, resolved watched files, and dependencies `architecture/overview.md`, `pipeline/overview.md`, `cross-cutting/ir-instructions.md`, `syntax-reference/keywords-and-builtins.md`, `name-resolution/index.md`, and `ir-reference/index.md`.
+- Checked front matter for required keys, source commit, watched-path digest, and warning string.
+- Verified the required structure: `## Conventions`, `## Terms`, and `## Cross-reference index`.
+- Checked that the required Slang-specific and general-theory floor terms are present and tagged with exactly one of `[Slang]` or `[General]`.
+- Spot-checked more than 10 source-alignment claims for terms including `ASTBuilder`, `capability atom`, `DiagnosticSink`, `FIDDLE`, `IRInst`, `IROp`, `layout IR module`, `lookup result`, `mandatory optimization pass`, `target`, and `witness table`.
+- Checked relative links and peer links used by the page; no unresolved target was found.
+- Checked that the body has no source line-number citations requiring line-by-line verification.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## Terms` | The glossary is not strictly alphabetically ordered: `differential pair` appears before `DiagnosticSink`, but `DiagnosticSink` should sort first. | `docs/generated/design/_meta/prompts/glossary.md` requires an alphabetically ordered glossary. | Move `DiagnosticSink` before `differential pair` and re-scan for similar ordering issues. |
-| F-002 | minor | `**session**` | The glossary correctly says session is exposed as `slang::IGlobalSession`, but this conflicts with `architecture/overview.md`, which says `Session` maps to `ISession`. | `source/slang/slang-global-session.h` supports `IGlobalSession`; the peer conflict is in `architecture/overview.md`. | Keep this glossary entry and fix `architecture/overview.md` to align with it. |
+| F-001 | major | `## Cross-reference index`, lines 757-792 | The prompt requires the cross-reference index to cover every peer doc listed in the manifest entry for `glossary.md`, but the table omits `pipeline/04b-pre-link-passes.md` and `pipeline/04c-layout-ir.md`. Both docs are included by the manifest's `docs/generated/design/pipeline/*.md` watched-path glob and were present in the resolved file list from `regenerate.py show glossary.md`. | `docs/generated/design/_meta/prompts/glossary.md:135` requires the index table to cover every peer doc listed in the manifest entry. `docs/generated/design/_meta/manifest.yaml:754` through `docs/generated/design/_meta/manifest.yaml:757` include the pipeline glob for `glossary.md`; the generated table lists `pipeline/04-ast-to-ir.md`, then jumps to `pipeline/05-ir-passes.md` and `pipeline/06-emit.md`. | Add rows for `pipeline/04b-pre-link-passes.md` and `pipeline/04c-layout-ir.md`, using the existing terms `mandatory optimization pass` and `layout IR module` respectively. |

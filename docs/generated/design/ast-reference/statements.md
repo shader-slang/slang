@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-12T09:33:28+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 12add2d77eb534b6741b9633b4251590baf28be0de7f2554aacada789942f5ec
+model: claude-opus-4.8
+generated_at: 2026-06-29T15:17:07Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: ef75dc1de48b06f0b01fd7da196735cab6033928aab034bca2cebfd41fe221d7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -19,7 +19,7 @@ that handles statements.
 
 Statement classes are declared in
 [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h). The
-parser entry point is `parseStatement` in
+parser entry point is `Parser::ParseStatement` in
 [slang-parser.cpp](../../../../source/slang/slang-parser.cpp); the
 function-body parsing happens lazily under the two-stage parsing
 strategy explained in
@@ -75,8 +75,10 @@ flowchart TD
 `BreakableStmt`s carry a `UniqueStmtIDNode* uniqueID` that
 `ChildStmt`s reference via `targetOuterStmtID`. `UniqueStmtIDNode` is
 declared in this header as a `Decl` subclass for serialization
-convenience, even though it is not a real declaration; it is excluded
-from the `## Nodes` table because it is not parsed as a statement.
+convenience, even though it is not a real declaration; it is listed in
+the `## Nodes` table as a helper because the header declares it with
+`FIDDLE()`, even though it is not in the `Stmt` hierarchy and is not
+parsed as a statement.
 
 ## Nodes
 
@@ -107,10 +109,10 @@ from the `## Nodes` table because it is not parsed as a statement.
 | `ContinueStmt` | `JumpStmt` | (inherits) | [continue](../syntax-reference/grammar.md#statements) | `continue`. |
 | `ReturnStmt` | `Stmt` | `expression: Expr*` | [return](../syntax-reference/grammar.md#statements) | `return` (optionally with an expression). |
 | `DeferStmt` | `Stmt` | `statement: Stmt*` | [defer](../syntax-reference/grammar.md#statements) | `defer S;`; lowered to scope-exit handlers in the IR. |
-| `ThrowStmt` | `Stmt` | `expression: Expr*` | [throw](../syntax-reference/grammar.md#statements) | `throw e;` for errorable functions. |
-| `CatchStmt` | `Stmt` | `errorVar: ParamDecl*`, `tryBody: Stmt*`, `handleBody: Stmt*` | [try-catch](../syntax-reference/grammar.md#statements) | `try { ... } catch (e) { ... }` block; `errorVar == null` means a catch-all. |
+| `ThrowStmt` | `Stmt` | `expression: Expr*` | [throw](../syntax-reference/grammar.md#statements) | `throw e` for errorable functions (`ParseThrowStatement` does not itself consume a trailing `;`). |
+| `CatchStmt` | `Stmt` | `errorVar: ParamDecl*`, `tryBody: Stmt*`, `handleBody: Stmt*` | [do-catch](../syntax-reference/grammar.md#statements) | `do { ... } catch (e) { ... }`; `tryBody` is the protected body, `handleBody` the handler; `errorVar == null` means a catch-all. |
 | `ExpressionStmt` | `Stmt` | `expression: Expr*` | [expression stmt](../syntax-reference/grammar.md#statements) | An expression used for its side effects (`f();`, `a = b;`). |
-| `RequireCapabilityStmt` | `Stmt` | `requiredCaps: List<Token>` | [require_capability](../syntax-reference/grammar.md#statements) | Statement-level capability requirement scoped to the enclosing function. |
+| `RequireCapabilityStmt` | `Stmt` | `requiredCaps: List<Token>` | (none) | `__requireCapability(...)`; statement-level capability requirement scoped to the enclosing function. |
 | `UniqueStmtIDNode` | `Decl` | (no parsed state) | (none) | Synthesized identity helper that gives a statement a stable unique id; used by serialization and control-flow tracking rather than parsed as a statement. |
 
 ## Notable nodes
@@ -152,14 +154,21 @@ expression) so that a `DeclStmt` can introduce loop variables.
 `UnscopedForStmt` is the legacy HLSL form that does not scope the
 loop variable to the body.
 
+### ReturnStmt
+
+`return` is both a control-flow terminator and the carrier of the
+function's result: `ReturnStmt::expression` is the returned `Expr*`,
+or null for a bare `return` in a `void` function. The checker matches
+the expression against the enclosing function's declared return type.
+
 ### CompileTimeForStmt
 
 A range-based for whose bounds must be compile-time constants
 (`rangeBeginVal` and `rangeEndVal` are `IntVal*` filled in by
 checking). The IR lowering unrolls the loop and emits no runtime
-loop instructions; the body is duplicated once per iteration. This
-is the statement that backs Slang's `[ForceInline]`-style range
-loops over generic value parameters.
+loop instructions; the body is duplicated once per iteration. The
+parser produces it from the `$for (name in Range(...))` syntax
+(`parseCompileTimeForStmt`).
 
 ### TargetSwitchStmt, StageSwitchStmt, TargetCaseStmt
 
@@ -186,26 +195,34 @@ holds both the protected body (`tryBody`) and the handler
 catch handler has a fully-typed local variable. A null `errorVar`
 denotes a catch-all that does not bind the error value.
 
-### DeclStmt and ExpressionStmt
+### DeclStmt, ExpressionStmt, and EmptyStmt
 
-These two boilerplate wrappers exist so that the statement grammar
+These boilerplate wrappers exist so that the statement grammar
 remains uniform. `DeclStmt` lets any `DeclBase` appear in a statement
 position (the canonical use is a local-variable declaration);
 `ExpressionStmt` lets an arbitrary `Expr` be used for its side
-effects. The checker validates each kind separately.
+effects. The checker validates each kind separately. `EmptyStmt` is
+the node the parser emits for a bare `;`, so an empty statement slot
+(for example, a loop body that is just `;`) still has a concrete
+`Stmt`.
 
-### LabelStmt and BreakStmt::targetLabel
+### LabelStmt, BreakStmt, ContinueStmt, and DiscardStmt
 
 Slang supports labeled statements and labeled breaks. `LabelStmt`
 attaches a label token to an inner statement; `BreakStmt::targetLabel`
 optionally names the enclosing labeled loop or switch to break out
 of. Resolution of `targetLabel` to a `BreakableStmt::uniqueID` is
-done by the checker.
+done by the checker. `ContinueStmt` is the sibling `JumpStmt` that
+restarts the nearest enclosing loop. `DiscardStmt` is a
+fragment-shader-only control-flow statement (`discard`) that kills the
+current pixel and carries no operands.
 
 ### RequireCapabilityStmt
 
 Asserts that the surrounding function requires the listed capability
-atoms. The parser stores them as raw tokens; the checker resolves
+atoms. The parser recognizes the `__requireCapability` keyword
+(`Parser::ParseRequireCapabilityStatement`) and stores the atoms as
+raw tokens; the checker resolves
 each token to a capability via the capability system documented in
 [../cross-cutting/targets.md](../cross-cutting/targets.md).
 

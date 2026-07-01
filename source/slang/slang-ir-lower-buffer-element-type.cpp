@@ -1632,6 +1632,51 @@ struct LoweredElementTypeContext
         auto clonedFunc = as<IRFunc>(cloneInst(&cloneEnv, &builder, call->getCallee()));
         List<IRUse*> uses;
 
+        // If our cloned function has uses already, that means it may be calling
+        // itself (is recursive). There are also other potential causes, such as
+        // decorations, but this condition is basically only here to skip
+        // unnecessary extra work on the vast majority of non-recursive cases.
+        // Running the code inside is harmless but useless when the function is
+        // not calling itself.
+        //
+        // In this context, it is actually more correct for the recursive calls
+        // in a cloned function to call the original function instead of the new
+        // clone. First, the cloned function has a different type signature, but
+        // the `cloneInst` retains the old arguments for recursive calls, which
+        // already can cause type mismatches in the IR.
+        //
+        // Second, the CastStorageToLogical insts in the arguments of the
+        // cloned call get recorded in outNewCasts, causing the function call to
+        // the clone to get handled as if it had not been specialized in
+        // `deferStorageToLogicalCasts`. As the cloned function won't be
+        // recorded in `specializedFuncs` yet, it leads to
+        // `createSpecializedFuncThatUseStorageType` being called again for the
+        // clone. This sets up an infinite loop of cloning and specializing.
+        //
+        // By swapping the callees from the cloned function to the original
+        // function, we can fix both issues: we won't get type signature issues
+        // and the function is found in `specializedFuncs` during the next
+        // iteration in `deferStorageToLogicalCasts`.
+        if (clonedFunc->hasUses())
+        {
+            // Replace all self-calls with the original function.
+            cloneEnv.mapOldValToNew.remove(clonedFunc);
+            cloneEnv.mapOldValToNew.add(clonedFunc, call->getCallee());
+            traverseUsers<IRCall>(
+                clonedFunc,
+                [&](IRCall* user)
+                {
+                    // Ensure that the use is specifically as the callee.
+                    if (user->getCallee() == clonedFunc)
+                    {
+                        builder.setInsertBefore(user);
+                        auto newCall = cloneInst(&cloneEnv, &builder, user);
+                        user->replaceUsesWith(newCall);
+                        user->removeAndDeallocate();
+                    }
+                });
+        }
+
         // If a parameter is being translated to storage type,
         // insert a cast to convert it to logical type.
         List<IRParam*> params;
@@ -2213,6 +2258,12 @@ struct LoweredElementTypeContext
             return;
         auto matrixType = as<IRMatrixType>(matrixTypeInfo->originalType);
         auto colCount = getIntVal(matrixType->getColumnCount());
+        // On Metal, matrices in device buffers are stored as arrays of *packed*
+        // vectors rather than ordinary vectors, so whole-row loads/stores need
+        // a conversion between the row vector and its packed-vector storage.
+        IRMetalPackedVectorType* minorPackedType = nullptr;
+        if (auto innerArrayType = as<IRArrayTypeBase>(matrixTypeInfo->loweredInnerArrayType))
+            minorPackedType = as<IRMetalPackedVectorType>(innerArrayType->getElementType());
         traverseUses(
             majorAddr,
             [&](IRUse* use)
@@ -2252,6 +2303,14 @@ struct LoweredElementTypeContext
                             auto element =
                                 builder.emitElementAddress(dataPtr, majorGEP->getIndex());
                             resultInst = builder.emitLoad(element);
+                            if (minorPackedType)
+                            {
+                                // Convert the loaded packed row to the logical
+                                // row vector (MSL `float3(packed_float3)`).
+                                auto vectorType = as<IRVectorType>(user->getDataType());
+                                SLANG_ASSERT(vectorType);
+                                resultInst = builder.emitMakeVector(vectorType, 1, &resultInst);
+                            }
                         }
                         user->replaceUsesWith(resultInst);
                         user->removeAndDeallocate();
@@ -2279,12 +2338,20 @@ struct LoweredElementTypeContext
                                     elementAddr,
                                     builder.emitElementExtract(storeInst->getVal(), i));
                             }
+                            user->removeAndDeallocate();
                         }
                         else
                         {
                             auto rowAddr =
                                 builder.emitElementAddress(dataPtr, majorGEP->getIndex());
-                            builder.emitStore(rowAddr, storeInst->getVal());
+                            IRInst* value = storeInst->getVal();
+                            if (minorPackedType)
+                            {
+                                // Convert the logical row vector to its packed
+                                // storage form (MSL `packed_float3(float3)`).
+                                value = builder.emitMakeVector(minorPackedType, 1, &value);
+                            }
+                            builder.emitStore(rowAddr, value);
                             user->removeAndDeallocate();
                         }
                         break;
@@ -2514,7 +2581,6 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
             break;
         }
     }
-
     auto rules = getTypeLayoutRuleNameForBuffer(target, bufferType);
     return TypeLoweringConfig{addrSpace, rules};
 }
@@ -2880,6 +2946,284 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
     }
 };
 
+// Metal device buffers use natural (scalar-aligned, tightly packed) layout —
+// the layout `getTypeLayoutRuleNameForBuffer` already declares for them. MSL
+// vector types are aligned to a power-of-two multiple of their element size
+// (e.g. `float3` has size and alignment 16) and so cannot express natural
+// layout, so this policy lowers vectors in such buffers to packed vectors
+// (MSL `packed_T<N>`, e.g. `packed_float3`: 12 bytes, 4-byte alignment) and
+// matrices to structs of packed-vector arrays. Constant buffers and argument
+// buffers (Uniform address space) keep the native Metal layout, which is what
+// reflection reports for them.
+struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
+{
+    MetalBufferElementTypeLoweringPolicy(
+        TargetProgram* inTarget,
+        BufferElementTypeLoweringOptions inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
+    {
+    }
+
+    // Discover top-level vector buffer elements for lowering; the base class's
+    // set (struct/matrix/array/bool) does not include bare vectors. The actual
+    // decision is `needsPackedVectorStorage`, shared with vector fields found
+    // inside lowered composites.
+    bool needsElementLowering(IRType* elementType) override
+    {
+        if (auto vectorType = as<IRVectorType>(elementType))
+        {
+            return needsPackedVectorStorage(vectorType);
+        }
+        return DefaultBufferElementTypeLoweringPolicy::needsElementLowering(elementType);
+    }
+
+    // Decide whether a buffer with this config uses packed vector storage.
+    // Only device-memory buffers laid out with natural rules do: constant
+    // and argument buffers (Uniform address space) keep the native MSL
+    // layout reflection reports, and an explicit non-natural data layout
+    // (e.g. `Std140DataLayout`) opts out via the rule-name check.
+    bool usesPackedVectorStorage(TypeLoweringConfig config)
+    {
+        if (config.layoutRuleName != IRTypeLayoutRuleName::Natural)
+            return false;
+        switch (config.addressSpace)
+        {
+        case AddressSpace::StorageBuffer:
+        case AddressSpace::UserPointer:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    // The single classification deciding whether a vector uses packed storage,
+    // for both top-level elements and leaves inside composites. Every
+    // multi-element vector does, because natural layout guarantees only the
+    // element's alignment (so a `float4` may sit at offset 4 or be bound at a
+    // 4-byte-aligned base), which no native MSL vector type can express. This
+    // includes `bool` vectors: MSL `bool` is a 1-byte storage type, so a
+    // `bool3` is padded to 4 bytes natively but `packed_bool3` is exactly 3.
+    static bool needsPackedVectorStorage(IRVectorType* vectorType)
+    {
+        auto countInst = as<IRIntLit>(vectorType->getElementCount());
+        if (!countInst)
+            return false;
+        return getIntVal(countInst) > 1;
+    }
+
+    // Return a [ForceInline] function that converts a packed-vector storage
+    // value (by address) back to the logical vector. MSL constructs a vector
+    // directly from a packed vector, so this is a single conversion:
+    // `float3 unpackVector(ref packed_float3 p) { return float3(p); }`
+    IRFunc* createVectorUnpackFunc(
+        IRVectorType* vectorType,
+        IRMetalPackedVectorType* packedVectorType)
+    {
+        IRBuilder builder(packedVectorType);
+        builder.setInsertAfter(packedVectorType);
+        auto func = builder.createFunc();
+        auto refPackedType = builder.getRefParamType(packedVectorType, AddressSpace::Generic);
+        auto funcType = builder.getFuncType(1, (IRType**)&refPackedType, vectorType);
+        func->setFullType(funcType);
+        builder.addNameHintDecoration(func, UnownedStringSlice("__unpackVector"));
+        builder.addForceInlineDecoration(func);
+        builder.setInsertInto(func);
+        builder.emitBlock();
+
+        auto packedParamRef = builder.emitParam(refPackedType);
+        auto packedParam = builder.emitLoad(packedParamRef);
+        auto result = builder.emitMakeVector(vectorType, 1, &packedParam);
+        builder.emitReturn(result);
+        return func;
+    }
+
+    // Return a [ForceInline] function that converts a logical vector to its
+    // packed-vector storage form (written through the out parameter). MSL
+    // constructs a packed vector directly from a vector, so this is a single
+    // conversion:
+    // `void packVector(out packed_float3 p, float3 v) { p = packed_float3(v); }`
+    IRFunc* createVectorPackFunc(
+        IRVectorType* vectorType,
+        IRMetalPackedVectorType* packedVectorType)
+    {
+        IRBuilder builder(packedVectorType);
+        builder.setInsertAfter(packedVectorType);
+        auto func = builder.createFunc();
+        auto outPackedType = builder.getRefParamType(packedVectorType, AddressSpace::Generic);
+        IRType* paramTypes[] = {outPackedType, vectorType};
+        auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
+        func->setFullType(funcType);
+        builder.addNameHintDecoration(func, UnownedStringSlice("__packVector"));
+        builder.addForceInlineDecoration(func);
+        builder.setInsertInto(func);
+        builder.emitBlock();
+
+        auto outParam = builder.emitParam(outPackedType);
+        IRInst* originalParam = builder.emitParam(vectorType);
+        auto packedVal = builder.emitMakeVector(packedVectorType, 1, &originalParam);
+        builder.emitStore(outParam, packedVal);
+        builder.emitReturn();
+        return func;
+    }
+
+    IRFunc* createMatrixPackFuncForPackedRows(
+        IRMatrixType* matrixType,
+        IRStructType* structType,
+        IRMetalPackedVectorType* minorPackedType,
+        IRArrayType* majorArrayType)
+    {
+        IRBuilder builder(structType);
+        builder.setInsertAfter(structType);
+        auto func = builder.createFunc();
+        auto outStructType = builder.getRefParamType(structType, AddressSpace::Generic);
+        IRType* paramTypes[] = {outStructType, matrixType};
+        auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
+        func->setFullType(funcType);
+        builder.addNameHintDecoration(func, UnownedStringSlice("__packMatrix"));
+        builder.addForceInlineDecoration(func);
+        builder.setInsertInto(func);
+        builder.emitBlock();
+        auto rowCount = getIntVal(matrixType->getRowCount());
+        auto colCount = getIntVal(matrixType->getColumnCount());
+        auto outParam = builder.emitParam(outStructType);
+        auto originalParam = builder.emitParam(matrixType);
+        List<IRInst*> elements;
+        elements.setCount((Index)(rowCount * colCount));
+        for (IRIntegerValue r = 0; r < rowCount; r++)
+        {
+            auto vector = builder.emitElementExtract(originalParam, r);
+            for (IRIntegerValue c = 0; c < colCount; c++)
+                elements[(Index)(r * colCount + c)] = builder.emitElementExtract(vector, c);
+        }
+        bool isColMajor = getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+        auto majorCount = isColMajor ? colCount : rowCount;
+        auto minorCount = isColMajor ? rowCount : colCount;
+        List<IRInst*> minorVectors;
+        for (IRIntegerValue i = 0; i < majorCount; i++)
+        {
+            List<IRInst*> minorArgs;
+            for (IRIntegerValue j = 0; j < minorCount; j++)
+            {
+                auto element = isColMajor ? elements[(Index)(j * colCount + i)]
+                                          : elements[(Index)(i * colCount + j)];
+                minorArgs.add(element);
+            }
+            minorVectors.add(builder.emitMakeVector(
+                minorPackedType,
+                (UInt)minorArgs.getCount(),
+                minorArgs.getBuffer()));
+        }
+        auto majorArray = builder.emitMakeArray(
+            majorArrayType,
+            (UInt)minorVectors.getCount(),
+            minorVectors.getBuffer());
+        auto result = builder.emitMakeStruct(structType, 1, &majorArray);
+        builder.emitStore(outParam, result);
+        builder.emitReturn();
+        return func;
+    }
+
+    LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
+    {
+        if (usesPackedVectorStorage(config))
+        {
+            bool needExplicitLayout = config.lowerToPhysicalType;
+            if (auto vectorType = as<IRVectorType>(type))
+            {
+                if (needsPackedVectorStorage(vectorType))
+                {
+                    IRBuilder builder(type);
+                    builder.setInsertAfter(type);
+                    LoweredElementTypeInfo info = {};
+                    info.originalType = type;
+
+                    // A packed vector (MSL `packed_float3` etc.) has exactly
+                    // the natural layout: element alignment, no padding. No
+                    // explicit stride is needed — the type implies its layout.
+                    auto packedType = builder.getMetalPackedVectorType(
+                        vectorType->getElementType(),
+                        vectorType->getElementCount());
+                    maybeAddPhysicalTypeDecoration(builder, packedType, config);
+
+                    info.loweredType = packedType;
+                    info.convertLoweredToOriginal = createVectorUnpackFunc(vectorType, packedType);
+                    info.convertOriginalToLowered = createVectorPackFunc(vectorType, packedType);
+                    return info;
+                }
+            }
+            else if (auto matrixType = as<IRMatrixType>(type))
+            {
+                bool isColMajor =
+                    getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+                auto minorCount = isColMajor ? getIntVal(matrixType->getRowCount())
+                                             : getIntVal(matrixType->getColumnCount());
+                auto majorCount = isColMajor ? getIntVal(matrixType->getColumnCount())
+                                             : getIntVal(matrixType->getRowCount());
+                if (minorCount > 1)
+                {
+                    IRBuilder builder(type);
+                    builder.setInsertAfter(type);
+                    LoweredElementTypeInfo info = {};
+                    info.originalType = type;
+
+                    auto loweredType = builder.createStructType();
+                    maybeAddPhysicalTypeDecoration(builder, loweredType, config);
+
+                    StringBuilder nameSB;
+                    nameSB << "_MatrixStorage_";
+                    getTypeNameHint(nameSB, matrixType->getElementType());
+                    nameSB << getIntVal(matrixType->getRowCount()) << "x"
+                           << getIntVal(matrixType->getColumnCount());
+                    if (isColMajor)
+                        nameSB << "_ColMajor";
+                    if (!needExplicitLayout)
+                        nameSB << "_logical";
+                    nameSB << getLayoutName(config.layoutRuleName);
+                    builder.addNameHintDecoration(
+                        loweredType,
+                        nameSB.produceString().getUnownedSlice());
+                    auto structKey = builder.createStructKey();
+                    builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
+
+                    // Rows (or columns, for column-major layout) are stored as
+                    // packed vectors, whose stride is the natural one.
+                    auto minorPackedType = builder.getMetalPackedVectorType(
+                        matrixType->getElementType(),
+                        builder.getIntValue(builder.getIntType(), minorCount));
+                    IRSizeAndAlignment minorSizeAlignment;
+                    getSizeAndAlignment(
+                        target->getTargetReq(),
+                        config.getLayoutRule(),
+                        minorPackedType,
+                        &minorSizeAlignment);
+                    auto majorArrayType = builder.getArrayType(
+                        minorPackedType,
+                        builder.getIntValue(builder.getIntType(), majorCount),
+                        needExplicitLayout ? builder.getIntValue(
+                                                 builder.getIntType(),
+                                                 minorSizeAlignment.getStride())
+                                           : nullptr);
+                    builder.createStructField(loweredType, structKey, majorArrayType);
+
+                    info.loweredType = loweredType;
+                    info.loweredInnerArrayType = majorArrayType;
+                    info.loweredInnerStructKey = structKey;
+                    info.convertLoweredToOriginal =
+                        createMatrixUnpackFunc(matrixType, loweredType, structKey);
+                    info.convertOriginalToLowered = createMatrixPackFuncForPackedRows(
+                        matrixType,
+                        loweredType,
+                        minorPackedType,
+                        majorArrayType);
+                    return info;
+                }
+            }
+        }
+
+        return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
+    }
+};
+
 struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
 {
     MetalParameterBlockElementTypeLoweringPolicy(
@@ -3095,6 +3439,8 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
         return new DefaultBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::KhronosTarget:
         return new KhronosTargetBufferElementTypeLoweringPolicy(target, options);
+    case BufferElementTypeLoweringPolicyKind::Metal:
+        return new MetalBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::MetalParameterBlock:
         return new MetalParameterBlockElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::MetalPointerLowering:
