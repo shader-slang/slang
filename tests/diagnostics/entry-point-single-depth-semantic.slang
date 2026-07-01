@@ -3,9 +3,12 @@
 // the multiplicity check (added in validateEntryPoint) firing on the legal single-depth case.
 //
 // Uses the FileCheck runner rather than DIAGNOSTIC_TEST so the negation has real force: under
-// DIAGNOSTIC_TEST a `//CHECK-NOT:` line is parsed as an ordinary comment (the annotation parser
-// only recognizes exactly `//<prefix>:`), so it would assert nothing. Here `CHECK: OpEntryPoint`
-// additionally proves real SPIR-V was produced — impossible if E30705 had aborted compilation.
+// DIAGNOSTIC_TEST a `//<prefix>-NOT:` line is parsed as an ordinary comment (the annotation parser
+// only recognizes exactly `//<prefix>:`), so it would assert nothing. The positive OpEntryPoint
+// match below additionally proves real SPIR-V was produced — impossible if E30705 had aborted
+// compilation. (Do not spell the FileCheck prefix + colon literally anywhere in this prose:
+// FileCheck scans the whole file, so a stray one becomes a live directive and fails the run —
+// which is exactly what this comment previously did.)
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment
 //TEST:SIMPLE(filecheck=RETONLY):-target spirv-asm -entry retOnly -stage fragment
