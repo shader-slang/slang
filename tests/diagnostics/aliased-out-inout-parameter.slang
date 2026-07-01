@@ -54,8 +54,9 @@ RWStructuredBuffer<BoundingBox> boundingBoxes;
 void expandBoundingBox(uint index, BoundingBox bbox)
 {
     int unused;
+    // NOTE: no aliasing warning expected here. This test runs in exhaustive
+    // mode, so any unannotated diagnostic (e.g. a spurious E30051) fails it.
     InterlockedMin(boundingBoxes[index].minBounds[0], bbox.minBounds[0], unused);
-//CHECK-NOT: potentially aliased
 }
 
 [numthreads(1,1,1)]
@@ -114,10 +115,10 @@ void computeMain()
 //CHECK-NOT: potentially aliased
 
     // Negative: same field of two *different* struct objects — no warning
-    // expected (regression for #11878).
+    // expected (regression for #11878). Exhaustive mode fails the test if a
+    // spurious warning is emitted here.
     S s2;
     twoInoutInt(s.x, s2.x);
-//CHECK-NOT: potentially aliased
 
     // Negative: distinct array elements — no warning expected.
     twoInoutInt(arr[0], arr[1]);
