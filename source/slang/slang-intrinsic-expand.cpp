@@ -365,7 +365,13 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
     case '9':
         {
             --cursor;
-            Index argIndex = parseNat() + m_argIndexOffset;
+            Index argIndex = parseNat();
+            // For a texture-only query on a combined texture-sampler that was lowered into a
+            // `{texture, sampler}` pair, skip over the injected sampler operand at index 1 so the
+            // positional output args line up. `$0` (the texture) is intentionally left unshifted.
+            if (m_skipCombinedSamplerOperand && argIndex >= 1)
+                argIndex += 1;
+            argIndex += m_argIndexOffset;
             // Simple case: emit one of the direct arguments to the call
             SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < m_argCount));
             m_writer->emit("(");
@@ -459,6 +465,29 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             m_emitter->emitSimpleType(underlyingType);
         }
         break;
+
+    case 'X':
+        {
+            // Marker that emits nothing; used by texture-only queries such as `GetDimensions`.
+            //
+            // When a combined `Sampler2D`-style value is lowered into a `{texture, sampler}` pair
+            // (HLSL/Metal/WGSL/CPU/CUDA), the lowered call gains an injected sampler operand at
+            // index 1 that a texture-only query never consumes. Without compensation the positional
+            // `$N` accessors in the query's intrinsic string would address the sampler and shift
+            // every output argument by one (see shader-slang/slang#11669). Setting this flag makes
+            // `$N` for N >= 1 skip the injected sampler so the operands line up again; `$0` (the
+            // texture) is left unshifted.
+            //
+            // The sampler operand is only present when the receiver was a combined texture-sampler,
+            // so we detect it by type rather than assume it: on a plain texture the operand at
+            // index 1 is the first output and the flag stays false.
+            if (m_argCount >= 2 && as<IRSamplerStateTypeBase>(m_args[1].get()->getDataType()))
+            {
+                m_skipCombinedSamplerOperand = true;
+            }
+        }
+        break;
+
     case 'p':
         {
             // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
