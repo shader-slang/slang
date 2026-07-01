@@ -97,6 +97,26 @@ static ShaderModelInfo kKnownShaderModels[] = {
     SHADER_MODEL_INFO_DXIL(6, 9),
     SHADER_MODEL_INFO_DXIL(6, 10)
 #undef SHADER_MODEL_INFO_DXIL
+#undef _SM_CONCAT
+#undef _SM_CONCAT_PASTE
+#undef _SM_HEX_DIGIT
+#undef _SM_HEX_DIGIT_INDIRECT
+#undef _SM_HEX_DIGIT_15
+#undef _SM_HEX_DIGIT_14
+#undef _SM_HEX_DIGIT_13
+#undef _SM_HEX_DIGIT_12
+#undef _SM_HEX_DIGIT_11
+#undef _SM_HEX_DIGIT_10
+#undef _SM_HEX_DIGIT_9
+#undef _SM_HEX_DIGIT_8
+#undef _SM_HEX_DIGIT_7
+#undef _SM_HEX_DIGIT_6
+#undef _SM_HEX_DIGIT_5
+#undef _SM_HEX_DIGIT_4
+#undef _SM_HEX_DIGIT_3
+#undef _SM_HEX_DIGIT_2
+#undef _SM_HEX_DIGIT_1
+#undef _SM_HEX_DIGIT_0
 };
 
 Result DeviceImpl::createBuffer(
