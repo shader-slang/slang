@@ -21,7 +21,7 @@
 // the caller's poison the segments differ; with the fix both record a defined 0 and the segments
 // are byte-identical.
 
-#include "../../source/slang-record-replay/proxy/proxy-session.h"
+#include "slang-record-replay/proxy/proxy-session.h"
 #include "unit-test-replay-common.h"
 
 // Assert that the two back-to-back recorded call segments [off0,off1) and [off1,off2) are
