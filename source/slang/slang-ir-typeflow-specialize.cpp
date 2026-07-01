@@ -1159,33 +1159,30 @@ struct TypeFlowSpecializationContext
     //
     IRInst* flatUnionPropagationInfo(IRInst* info1, IRInst* info2)
     {
-        if (as<IRTaggedUnionType>(info1) && as<IRTaggedUnionType>(info2))
-        {
-            return makeTaggedUnionType(unionSet<IRWitnessTableSet>(
-                as<IRTaggedUnionType>(info1)->getWitnessTableSet(),
-                as<IRTaggedUnionType>(info2)->getWitnessTableSet()));
-        }
+        // `as<>` transparently unwraps an `IRAttributedType` (e.g. a `no_diff` existential), so a
+        // branch can match while `info` is the attributed wrapper. Read the set/table from the
+        // unwrapped type the `as<>` returns -- `info->getOperand(0)` would be the wrapped type, not
+        // the set, and `cast<IRTypeSet>` of it asserts.
+        if (auto taggedUnion1 = as<IRTaggedUnionType>(info1))
+            if (auto taggedUnion2 = as<IRTaggedUnionType>(info2))
+                return makeTaggedUnionType(unionSet<IRWitnessTableSet>(
+                    taggedUnion1->getWitnessTableSet(),
+                    taggedUnion2->getWitnessTableSet()));
 
-        if (as<IRSetTagType>(info1) && as<IRSetTagType>(info2))
-        {
-            return makeTagType(unionSet<IRSetBase>(
-                cast<IRSetBase>(info1->getOperand(0)),
-                cast<IRSetBase>(info2->getOperand(0))));
-        }
+        if (auto setTag1 = as<IRSetTagType>(info1))
+            if (auto setTag2 = as<IRSetTagType>(info2))
+                return makeTagType(unionSet<IRSetBase>(setTag1->getSet(), setTag2->getSet()));
 
-        if (as<IRElementOfSetType>(info1) && as<IRElementOfSetType>(info2))
-        {
-            return makeElementOfSetType(unionSet<IRSetBase>(
-                cast<IRSetBase>(info1->getOperand(0)),
-                cast<IRSetBase>(info2->getOperand(0))));
-        }
+        if (auto elementOf1 = as<IRElementOfSetType>(info1))
+            if (auto elementOf2 = as<IRElementOfSetType>(info2))
+                return makeElementOfSetType(
+                    unionSet<IRSetBase>(elementOf1->getSet(), elementOf2->getSet()));
 
-        if (as<IRUntaggedUnionType>(info1) && as<IRUntaggedUnionType>(info2))
-        {
-            return makeUntaggedUnionType(unionSet<IRTypeSet>(
-                cast<IRTypeSet>(info1->getOperand(0)),
-                cast<IRTypeSet>(info2->getOperand(0))));
-        }
+        if (auto untaggedUnion1 = as<IRUntaggedUnionType>(info1))
+            if (auto untaggedUnion2 = as<IRUntaggedUnionType>(info2))
+                return makeUntaggedUnionType(unionSet<IRTypeSet>(
+                    cast<IRTypeSet>(untaggedUnion1->getSet()),
+                    cast<IRTypeSet>(untaggedUnion2->getSet())));
 
         if (as<IROptionalType>(info1) && as<IROptionalNoneType>(info2))
             return info1;
@@ -1212,12 +1209,14 @@ struct TypeFlowSpecializationContext
     //
     IRInst* unionPropagationInfo(IRInst* typeUnionMask, IRInst* info1, IRInst* info2)
     {
-        // Basic cases: if either info is null, it is considered "empty";
-        // if they're equal, union must be the same inst.
+        // If either info is null ("no refinement; keep the declared type") return the other -- but
+        // a lone `OptionalNoneType` (a bare `none`) must not dominate: it would retype a declared
+        // `Optional<T>` merge point to the payload-less `OptionalNoneType`, dropping the non-none
+        // path's payload. Return null in that case so the declared `Optional<T>` is kept.
         if (!info1)
-            return info2;
+            return as<IROptionalNoneType>(info2) ? nullptr : info2;
         if (!info2)
-            return info1;
+            return as<IROptionalNoneType>(info1) ? nullptr : info1;
         if (areInfosEqual(info1, info2))
             return info1;
 
@@ -5732,6 +5731,10 @@ struct TypeFlowSpecializationContext
             return specializeGetElementFromTag(context, as<IRGetElementFromTag>(inst));
         case kIROp_Load:
             return specializeLoad(context, inst);
+        case kIROp_FieldExtract:
+            return specializeFieldExtract(context, as<IRFieldExtract>(inst));
+        case kIROp_Var:
+            return specializeVar(context, inst);
         case kIROp_Store:
             return specializeStore(context, as<IRStore>(inst));
         case kIROp_SwizzledStore:
@@ -7667,6 +7670,100 @@ struct TypeFlowSpecializationContext
         return false;
     }
 
+    // True if `specializeFieldExtract` already bridged this extract on a prior fixpoint iteration:
+    // its value is stored into a temporary that a `CastInterfaceToTaggedUnionPtr` reads back.
+    // Checked so the run-to-fixpoint driver does not bridge the same extract repeatedly.
+    static bool isBridgedInterfaceFieldExtract(IRInst* fieldExtract)
+    {
+        for (auto use = fieldExtract->firstUse; use; use = use->nextUse)
+        {
+            auto store = as<IRStore>(use->getUser());
+            if (!store || store->getVal() != fieldExtract)
+                continue;
+            for (auto ptrUse = store->getPtr()->firstUse; ptrUse; ptrUse = ptrUse->nextUse)
+                if (as<IRCastInterfaceToTaggedUnionPtr>(ptrUse->getUser()))
+                    return true;
+        }
+        return false;
+    }
+
+    bool specializeFieldExtract(IRInst* context, IRFieldExtract* inst)
+    {
+        // `analyzeFieldExtract` refines a read of an interface-typed struct field to a
+        // `TaggedUnionType`, but the field is physically still an existential box. Retyping the
+        // extract to the tagged union (the generic `replaceType` path) is wrong: a singleton
+        // tagged union lowers to its bare element, so the downstream `GetValueFromTaggedUnion`
+        // would read the whole box as the payload (e.g. `ExtraImpl x = square.extra;`). Instead,
+        // mirror `specializeLoad`: keep the extract reading the interface field, store it into a
+        // temporary, and re-read it through a `CastInterfaceToTaggedUnionPtr` so the dynamic-
+        // dispatch lowering builds a proper tag+payload tuple.
+        auto valInfo = tryGetInfo(context, inst);
+        if (!valInfo)
+            return false;
+
+        auto fieldType = (IRType*)inst->getDataType();
+        auto specializedType = (IRType*)getLoweredType(valInfo);
+        if (fieldType == specializedType)
+            return false;
+
+        // Bridge only an interface field that is still a physical existential box -- i.e. the
+        // tagged-union info came from `analyzeFieldExtract`'s witness-table fallback (struct loaded
+        // raw, no propagated `fieldInfo`). With `fieldInfo` present the field was specialized to a
+        // tagged union (built via `MakeStruct`), so the plain type rewrite is correct. Everything
+        // else (including non-interface fields) takes the generic `replaceType` path.
+        auto taggedUnionType = as<IRTaggedUnionType>(specializedType);
+        auto structType = as<IRStructType>(inst->getBase()->getDataType());
+        auto structField =
+            structType ? findStructField(structType, as<IRStructKey>(inst->getField())) : nullptr;
+        bool needsBridge = taggedUnionType && as<IRInterfaceType>(fieldType) &&
+                           !isComInterfaceType(fieldType) && !isBuiltin(fieldType) && structField &&
+                           !this->fieldInfo.containsKey(structField);
+        if (!needsBridge)
+            return replaceType(context, inst);
+
+        if (isBridgedInterfaceFieldExtract(inst))
+            return false; // already bridged on a prior iteration
+
+        IRBuilder builder(inst);
+        builder.setInsertAfter(inst);
+
+        auto tempVar = builder.emitVar(fieldType);
+        auto store = cast<IRStore>(builder.emitStore(tempVar, inst));
+
+        IRInst* castArgs[] = {
+            tempVar,
+            taggedUnionType->getWitnessTableSet(),
+            taggedUnionType->getTypeSet()};
+        auto castPtr = builder.emitIntrinsicInst(
+            builder.getPtrType(specializedType),
+            kIROp_CastInterfaceToTaggedUnionPtr,
+            3,
+            castArgs);
+        auto newVal = builder.emitLoad(specializedType, castPtr);
+
+        inst->replaceUsesWith(newVal);
+        // `replaceUsesWith` also rewired the store we just created; point it back at the original
+        // interface value rather than the tagged-union result.
+        builder.replaceOperand(store->getValUse(), inst);
+        return true;
+    }
+
+    bool specializeVar(IRInst* context, IRInst* inst)
+    {
+        // Vars without info keep the prior default behavior (no rewrite).
+        if (!tryGetInfo(context, inst))
+            return false;
+
+        // The temporary `specializeFieldExtract` introduces must keep its declared interface
+        // pointer type, since `lowerCastInterfaceToTaggedUnionPtr` requires the cast pointer's
+        // element to be the interface type. Skip the rewrite for it; otherwise the tagged-union
+        // info `analyzeStore` propagated onto it would retype it to `Ptr(TaggedUnion)`.
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+            if (as<IRCastInterfaceToTaggedUnionPtr>(use->getUser()))
+                return false;
+        return replaceType(context, inst);
+    }
+
     bool handleDefaultStore(IRInst* context, IRStore* inst)
     {
         // This handles a rare case in the compiler, where we
@@ -8129,14 +8226,18 @@ struct TypeFlowSpecializationContext
             }
         }
 
-        // If the target witness table type was found, gather all witness tables using it
+        // Gather the witness tables of this type, but only module-scope (global) ones: the result
+        // feeds `IRBuilder::getSet`, whose elements must be global. Autodiff can synthesize
+        // block-local witness tables (a generic differentiable interface under `bwd_diff`); those
+        // are derivative artifacts, not primal conformances, and would assert in `getSet`.
         if (targetTableType)
         {
             for (auto use = targetTableType->firstUse; use; use = use->nextUse)
             {
                 if (auto witnessTable = as<IRWitnessTable>(use->getUser()))
                 {
-                    if (witnessTable->getDataType() == targetTableType)
+                    if (witnessTable->getDataType() == targetTableType &&
+                        isGlobalInst(witnessTable))
                     {
                         outTables.add(witnessTable);
                     }
