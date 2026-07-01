@@ -61,7 +61,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // ROWMAJOR-NOT: array<float3,
 // ROWMAJOR: array<packed_float3, int(3)> data
 // ROWMAJOR-NOT: array<float3,
-// ROWMAJOR-DAG: = packed_float3(float3(5.0, 6.0, 7.0))
+// ROWMAJOR-DAG: = packed_float3(float3(5.0f, 6.0f, 7.0f))
 // ROWMAJOR-DAG: float3({{.*}}data
 
 // The metallib target compiles the generated MSL with the Metal toolchain;

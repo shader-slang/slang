@@ -261,4 +261,37 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
     }
 }
 
+void legalizeRayPayloadAccessQualifiersForHLSL(IRModule* module)
+{
+    // Walk every `[raypayload]` struct in the module and fill in any missing per-side
+    // PAQs. This is a structural pass keyed on `IRRayPayloadDecoration`, rather than a
+    // call-site fixup, because the call-site PAQ fill in
+    // `searchChildrenForForceVarIntoStructTemporarily` only fires when the frontend wraps
+    // a payload argument with `__forceVarIntoRayPayloadStructTemporarily`, which it does
+    // only around `TraceRay` / `HitObject::TraceRay` / `HitObject::Invoke` payload args.
+    // A hit-shader-only translation unit (typical for per-stage-compiled, runtime-linked
+    // shader libraries) has no such call, so a user-authored struct with one-sided PAQ
+    // would keep its one-sided PAQ and be rejected by DXC at SM 6.7+.
+    // Collect first: filling a struct's PAQs reaches `builder.getStringValue(...)` and
+    // adds decorations, which inserts new global instructions and would invalidate a
+    // live `getGlobalInsts()` walk (the same hazard documented in
+    // `legalizeEmptyRayPayloadsForHLSL`).
+    List<IRStructType*> rayPayloadStructs;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto structType = as<IRStructType>(globalInst);
+        if (!structType)
+            continue;
+        if (!structType->findDecoration<IRRayPayloadDecoration>())
+            continue;
+        rayPayloadStructs.add(structType);
+    }
+
+    IRBuilder builder(module);
+    for (auto structType : rayPayloadStructs)
+    {
+        addDefaultPayloadAccessQualifiersToStruct(builder, structType);
+    }
+}
+
 } // namespace Slang
