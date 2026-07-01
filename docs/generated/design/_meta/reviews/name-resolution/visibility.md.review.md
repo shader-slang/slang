@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-12T13:38:32+00:00
+reviewed_at: 2026-06-30T13:35:08+00:00
 target_doc: name-resolution/visibility.md
-target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_watched_paths_digest: 7000c50536855f3dc1b45bca7d5d1e8dd84cac67a0962f289a509743162726d3
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: 21fdad4e7e32c7256d8962453b7a50b0c472b695cd802a74745c15f4e19be6a0
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -13,34 +13,34 @@ checklist:
   style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 3
+finding_count: 2
 severity_breakdown:
   critical: 0
   major: 2
-  minor: 1
+  minor: 0
   nit: 0
 ---
 
 # Review report for name-resolution/visibility.md
 
 ## Summary
-The page is broadly aligned with the visibility implementation and resolves its peer links, but it has two substantive review findings. The most important issue is a factual error in the concepts section: it names `SessionDesc::minLanguageVersion`, which does not exist; the source field is `SlangGlobalSessionDesc::minLanguageVersion`. The page also omits a prompt-required re-export failure mode and gives the wrong diagnostic for duplicated visibility modifiers.
+The visibility page has the required structure, valid front matter, and working relative links, and many core visibility claims match the watched sources. I found two major source-alignment issues: the language-version section asserts rejection behavior that is not supported by the checked implementation, and the synthesized-member section describes default inheritance where the checker often writes explicit visibility modifiers.
 
 ## Items checked
-- Ran `regenerate.py show name-resolution/visibility.md` and checked the manifest entry, per-doc prompt, ten resolved watched files, and three depends-on docs.
-- Verified target front matter, required section order, source paragraph, concepts list, rules subsections, edge cases, and peer links against the common and per-page prompt contracts.
-- Resolved the document's relative links to source files, peer name-resolution pages, AST reference pages, and the glossary; the linked peers exist in the manifest.
-- Spot-checked 16 factual/source-alignment claims at `eb9403ef595a99c2ff6def1d538dbd7a792d9371`, including the visibility modifier classes, `DeclVisibility`, `ModuleDecl::defaultVisibility`, language-version constants, `getDeclVisibility`, lookup filtering, overload filtering, private extension access, `getTypeVisibility`, `checkVisibility`, `ExternModifier`, `ExportedModifier`, `IgnoreForLookupModifier`, and the listed diagnostics.
+- Ran `regenerate.py show name-resolution/visibility.md` and reviewed the target document, `_common.md`, the visibility prompt, and the resolved watched-file set.
+- Read the dependency documents `ast-reference/modifiers.md`, `ast-reference/declarations.md`, and `name-resolution/scopes.md`.
+- Checked front matter for all required keys, the target source commit, warning string, and 64-character hex watched-path digest.
+- Resolved the page's relative links to peer name-resolution docs, AST-reference docs, glossary, watched source files, and `include/slang.h`.
+- Spot-checked source-backed claims for `VisibilityModifier`, `PublicModifier`, `PrivateModifier`, `InternalModifier`, `DeclVisibility`, `ModuleDecl::defaultVisibility`, `getDeclVisibility`, `checkModule`, `isDeclVisibleFromScope`, `filterLookupResultByVisibilityAndDiagnose`, `TryCheckOverloadCandidateVisibility`, `checkVisibility`, `DeclPassesLookupMask`, `IgnoreForLookupModifier`, and the cited diagnostics.
+- Checked the language-version and synthesized-visibility sections against nearby implementation code because those claims affect user-visible access behavior.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Concepts`, `SlangLanguageVersion` bullet | The page says ``SessionDesc::minLanguageVersion`` defaults to `SLANG_LANGUAGE_VERSION_2025`, but `SessionDesc` has no such field. The field with that default is `SlangGlobalSessionDesc::minLanguageVersion`, so the cited API surface is wrong. | `include/slang.h:4244` declares `struct SessionDesc` and its fields through `skipSPIRVValidation` without `minLanguageVersion`; `include/slang.h:5565` declares `struct SlangGlobalSessionDesc`, and `include/slang.h:5574` sets `minLanguageVersion = SLANG_LANGUAGE_VERSION_2025`. | Change the concept bullet to name `SlangGlobalSessionDesc::minLanguageVersion`, or remove the session-default sentence if this page should only discuss per-module language defaults. |
-| F-002 | major | `## Edge cases and failure modes` | The per-page prompt requires an edge case for "a `using`-decl that re-exports an `internal` decl from another module: how it is rejected," but the generated edge-case list does not cover `using`, re-exporting, `FuncAliasDecl`, or the non-exported-import diagnostic path. | `docs/generated/design/_meta/prompts/name-resolution-visibility.md:93` requires this edge case. The closest source-backed rejection path checks public callable aliases: `source/slang/slang-check-decl.cpp:9012` starts `validatePublicCallableOperandVisibility`, `source/slang/slang-check-decl.cpp:9025` handles `FuncAliasDecl`, and `source/slang/slang-diagnostics.lua:2652` defines `public-custom-derivative-uses-non-exported-import`. | Add the required edge case, naming the actual source path and diagnostic if this is the intended re-export case. If the watched source no longer has a `using`-specific rejection path, state that the information was not located in the watched paths and identify the additional path or prompt correction needed. |
-| F-003 | minor | `## Edge cases and failure modes`, "Visibility modifier on a node that does not accept one" bullet | The page says `invalid-visibility-modifier-on-type-of-decl` fires when "the user writes `public public ...`", but duplicate visibility modifiers are handled by the duplicate-modifier conflict-group check, not by `InvalidVisibilityModifierOnTypeOfDecl`. | `source/slang/slang-check-modifier.cpp:1501` maps `PublicModifier`, `PrivateModifier`, and `InternalModifier` to the `VisibilityModifier` conflict group; `source/slang/slang-check-modifier.cpp:2295` checks mutually exclusive modifier conflicts and emits `Diagnostics::DuplicateModifier` at `source/slang/slang-check-modifier.cpp:2306`. The duplicate diagnostic is defined as `duplicate-modifier` in `source/slang/slang-diagnostics.lua:2709`. | Remove `public public ...` from this bullet or change it to cite `DuplicateModifier`; keep `invalid-visibility-modifier-on-type-of-decl` for the namespace/unsupported-node cases that actually emit that diagnostic. |
+| F-001 | major | `## Concepts`, `SlangLanguageVersion languageVersion` bullet, lines 64-76 | The page says `SlangGlobalSessionDesc::minLanguageVersion` means "New sessions therefore reject modules whose declared version is older than 2025 by default." That rejection behavior is not supported by the checked sources: `include/slang.h` only defines the field default, while `isValidSlangLanguageVersion` still accepts `SLANG_LANGUAGE_VERSION_LEGACY`, and the parser/preprocessor paths accept the `legacy` language version. | `include/slang.h` lines 5654-5655 only say `minLanguageVersion` is the "oldest Slang language version that any sessions will use"; `source/slang/slang-compiler.cpp` lines 7-14 returns true for `SLANG_LANGUAGE_VERSION_LEGACY`; `source/slang/slang-preprocessor.cpp` lines 4543-4569 accepts `legacy` when the version is valid. | Remove the rejection claim, or replace it with a source-backed statement limited to the enum/default values. If rejection/minimum-version enforcement is intended to be documented, add the actual enforcement path to the manifest and cite it. |
+| F-002 | major | `### Generic parameters, accessors, and synthesized members`, lines 260-267 | The page says synthesized members are "constructed without an explicit visibility modifier and inherit the parent's default," with only a few synthesis sites explicitly propagating visibility. The watched checker code contradicts that framing: several synthesized declarations explicitly call `addVisibilityModifier`, often using the parent visibility or the minimum of parent and requirement visibility. This also leaves the prompt-required `slang-check-decl.cpp` synthesis sites under-cited. | `source/slang/slang-check-decl.cpp` lines 7442-7448, 8523-8529, and 8902-8908 explicitly add visibility to synthesized requirement members using `Math::Min`; lines 3873-3875 and 3933-3934 explicitly propagate synthesized differential member visibility; `source/slang/slang-check-expr.cpp` lines 817-818 explicitly adds visibility to synthesized differential declarations. | Rewrite the paragraph to say synthesized declarations are assigned visibility at their synthesis sites, commonly from the parent or from `Math::Min(parent, requirement)`, and cite the relevant `slang-check-decl.cpp` sites. Do not imply default inheritance is the normal mechanism for the listed examples. |
 
 ## No-issues notes
-- The front matter has all required generated-doc keys and the watched-path digest is a well-formed SHA-256 hex string matching the manifest context shown for this review.
-- `getDeclVisibility`, `isDeclVisibleFromScope`, `filterLookupResultByVisibilityAndDiagnose`, and `TryCheckOverloadCandidateVisibility` are all cited at line ranges that match the current source layout.
-- The `IgnoreForLookupModifier` discussion matches the enum tag-type inheritance producer and the lookup-side skip.
+- The `DeclVisibility` enum values and their numeric order match `source/slang/slang-ast-support-types.h`.
+- The lookup-boundary and overload-resolution filtering descriptions match `filterLookupResultByVisibilityAndDiagnose` and `TryCheckOverloadCandidateVisibility`.
+- The `IgnoreForLookupModifier` discussion matches the enum tag-type producer and the lookup-side skip.
