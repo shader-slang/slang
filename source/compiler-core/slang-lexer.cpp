@@ -1057,6 +1057,7 @@ static uint32_t _parseHexNumber(
     const char*& cursor,
     const char* const e,
     size_t maxDigits,
+    size_t& outNumDigits,
     bool& outOverflow)
 {
     uint32_t value{};
@@ -1084,10 +1085,12 @@ static uint32_t _parseHexNumber(
     }
 
     outOverflow = overflow;
+    outNumDigits = numDigits;
     return value;
 }
 
-// Decodes string escape sequence, returns -1 on failure
+// Decodes string escape sequence, returns -1 on failure. Failures will be
+// diagnosed.
 //
 // Preconditions:
 // - cursor != e      -- there must be at least 1 character
@@ -1095,8 +1098,11 @@ static uint32_t _parseHexNumber(
 static IntegerLiteralValue _decodeStringEscape(
     const char*& cursor,
     const char* const e,
+    DiagnosticSink* sink,
+    const SourceLoc& loc,
     bool& outUnicode)
 {
+    const char* const b = cursor;
     bool unicode{};
     int64_t value{};
 
@@ -1108,7 +1114,10 @@ static IntegerLiteralValue _decodeStringEscape(
 
     // check that there is an escape sequence after '\'
     if (cursor == e)
+    {
+        diagnose(sink, loc, LexerDiagnostics::invalidStringEscape, String(b, cursor));
         value = -1;
+    }
     else
     {
         uint8_t byte = *cursor++;
@@ -1182,25 +1191,34 @@ static IntegerLiteralValue _decodeStringEscape(
         case 'x':
             {
                 bool overflow{};
+                size_t numDigits{};
 
                 if ((cursor != e) && (*cursor == '{'))
                 {
                     // \x{...}
 
                     ++cursor;
-                    value = _parseHexNumber(cursor, e, 255U, overflow);
+                    value = _parseHexNumber(cursor, e, 255U, numDigits, overflow);
 
                     if ((cursor != e) && (*cursor == '}'))
                         ++cursor;
+                    else
+                    {
+                        // no enclosing '}'
+                        value = -1;
+                    }
                 }
                 else
                 {
                     // \x...
-                    value = _parseHexNumber(cursor, e, 255U, overflow);
+                    value = _parseHexNumber(cursor, e, 255U, numDigits, overflow);
                 }
 
-                if (overflow)
+                if ((numDigits == 0U) || overflow)
                     value = -1;
+
+                if (value == -1)
+                    diagnose(sink, loc, LexerDiagnostics::invalidStringEscape, String(b, cursor));
 
                 break;
             }
@@ -1208,29 +1226,53 @@ static IntegerLiteralValue _decodeStringEscape(
         case 'u':
             {
                 bool overflow{};
+                size_t numDigits{};
 
                 if ((cursor != e) && (*cursor == '{'))
                 {
                     // \u{...}
 
                     ++cursor;
-                    value = _parseHexNumber(cursor, e, 255U, overflow);
+                    value = _parseHexNumber(cursor, e, 255U, numDigits, overflow);
 
                     if ((cursor != e) && (*cursor == '}'))
+                    {
                         ++cursor;
+
+                        if (numDigits == 0U)
+                            value = -1;
+                    }
+                    else
+                    {
+                        // no enclosing '}'
+                        value = -1;
+                    }
 
                     if (overflow)
                         value = -1;
+
+                    if (value == -1)
+                        diagnose(
+                            sink,
+                            loc,
+                            LexerDiagnostics::invalidStringEscape,
+                            String(b, cursor));
                 }
                 else
                 {
                     // \u...
-                    value = _parseHexNumber(cursor, e, 4U, overflow);
+                    value = _parseHexNumber(cursor, e, 4U, numDigits, overflow);
 
                     // note: value cannot overflow here (4 hex digits max), so we'll
                     // guard this with assert instead of check to avoid unreachable
                     // branches
                     SLANG_ASSERT(!overflow);
+
+                    if (numDigits != 4U)
+                    {
+                        diagnose(sink, loc, LexerDiagnostics::invalidUnicodeStringEscape, "u", 4U);
+                        value = -1;
+                    }
                 }
 
                 unicode = true;
@@ -1240,12 +1282,20 @@ static IntegerLiteralValue _decodeStringEscape(
         case 'U':
             {
                 bool overflow{};
-                value = _parseHexNumber(cursor, e, 8U, overflow);
+                size_t numDigits{};
+
+                value = _parseHexNumber(cursor, e, 8U, numDigits, overflow);
 
                 // note: value cannot overflow here (8 hex digits max), so we'll
                 // guard this with assert instead of check to avoid unreachable
                 // branches
                 SLANG_ASSERT(!overflow);
+
+                if (numDigits != 8U)
+                {
+                    diagnose(sink, loc, LexerDiagnostics::invalidUnicodeStringEscape, "U", 8U);
+                    value = -1;
+                }
 
                 unicode = true;
 
@@ -1253,7 +1303,11 @@ static IntegerLiteralValue _decodeStringEscape(
             }
 
         default:
-            value = -1;
+            {
+                diagnose(sink, loc, LexerDiagnostics::invalidStringEscape, String(b, cursor));
+                value = -1;
+                break;
+            }
         }
     }
 
@@ -1303,18 +1357,10 @@ IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink
     {
         // handle escape
         bool unicode{};
-        const char* literalStart = cursor;
-        ret = _decodeStringEscape(cursor, e, unicode);
+        ret = _decodeStringEscape(cursor, e, sink, token.getLoc(), unicode);
 
         // note: unicode matters only with string literals
         static_cast<void>(unicode);
-
-        if (ret == -1)
-        {
-            StringBuilder sb;
-            sb.append(literalStart, cursor - literalStart);
-            diagnose(sink, token.getLoc(), LexerDiagnostics::invalidStringEscape, sb.getBuffer());
-        }
     }
     else
     {
@@ -1345,6 +1391,12 @@ IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink
         }
     }
 
+    // did we consume everything? (and we haven't diagnosed yet)
+    if ((cursor != e) && (ret != -1))
+    {
+        diagnose(sink, token.getLoc(), LexerDiagnostics::illegalCharacterLiteral);
+    }
+
     return ret;
 }
 
@@ -1352,26 +1404,16 @@ IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink
 // the bare minimum (\"). Therefore, this function pushes almost all
 // escape-related checking and error handling to getStringLiteralTokenValue()
 // and getCharLiteralValue().
-static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
+static void _lexStringLiteralBody(Lexer* lexer, char quote)
 {
-    int len = 0;
     for (;;)
     {
         int c = _peek(lexer);
         if (c == quote)
         {
-            if (singleChar && len == 0)
-            { // Empty char literal - size must be exactly 1.
-                if (auto sink = lexer->getDiagnosticSink())
-                {
-                    diagnose(sink, _getSourceLoc(lexer), LexerDiagnostics::illegalCharacterLiteral);
-                }
-            }
             _advance(lexer);
             return;
         }
-
-        len++;
 
         switch (c)
         {
@@ -1403,7 +1445,6 @@ static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
             case '\\':
                 _advance(lexer);
                 break;
-
             }
             break;
 
@@ -1528,8 +1569,8 @@ String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
 
         // decode escape sequence
         bool unicode{};
-        const char* literalStart = cursor;
-        IntegerLiteralValue charValue = _decodeStringEscape(cursor, end, unicode);
+        IntegerLiteralValue charValue =
+            _decodeStringEscape(cursor, end, sink, token.getLoc(), unicode);
 
         if (charValue >= 0)
         {
@@ -1574,13 +1615,6 @@ String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink)
                         hexSB.getBuffer());
                 }
             }
-        }
-        else
-        {
-            StringBuilder sb;
-            sb.append(literalStart, cursor - literalStart);
-
-            diagnose(sink, token.getLoc(), LexerDiagnostics::invalidStringEscape, sb.getBuffer());
         }
     }
 
@@ -1811,12 +1845,12 @@ static TokenType _lexTokenImpl(Lexer* lexer)
 
     case '\"':
         _advance(lexer);
-        _lexStringLiteralBody(lexer, '\"', false);
+        _lexStringLiteralBody(lexer, '\"');
         return TokenType::StringLiteral;
 
     case '\'':
         _advance(lexer);
-        _lexStringLiteralBody(lexer, '\'', true);
+        _lexStringLiteralBody(lexer, '\'');
         return TokenType::CharLiteral;
 
 
