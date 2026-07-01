@@ -499,6 +499,75 @@ bool trimOptimizableTypes(IRModule* module)
     return changed;
 }
 
+void removeEmptyStructFields(IRModule* module)
+{
+    IRBuilder builder(module);
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto structType = as<IRStructType>(inst);
+        if (!structType)
+            continue;
+
+        List<IRStructField*> emptyFields;
+        for (auto field : structType->getFields())
+        {
+            if (isStructEmpty(field->getFieldType()))
+                emptyFields.add(field);
+        }
+
+        for (auto field : emptyFields)
+        {
+            auto fieldType = field->getFieldType();
+
+            // Rewrite each use of the field to a fresh empty value so that removing the
+            // field below leaves nothing referencing it. An empty value carries no data, so
+            // any fresh instance is equivalent: a `FieldExtract` becomes a fresh (empty)
+            // `MakeStruct`, and a `FieldAddress` becomes the address of a fresh local variable
+            // (which validly absorbs its loads, stores, and escapes).
+            //
+            // Only `FieldExtract` and `FieldAddress` users of the field key need rewriting:
+            // they materialize a value/pointer typed for the removed field, so they would
+            // dangle. The `IRStructKey` itself is a global inst that survives field removal, so
+            // any remaining key user (e.g. a decoration or debug inst that references the key)
+            // keeps referencing a live key and needs no rewrite. (`MakeStruct` does not use the
+            // key: it carries the field's value as a positional operand, trimmed via the struct
+            // type by `trimMakeStructOperands` below.)
+            List<IRInst*> accesses;
+            for (auto use = field->getKey()->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                if (as<IRFieldExtract>(user) || as<IRFieldAddress>(user))
+                    accesses.add(user);
+            }
+            // The `FieldAddress` replacement is a fresh local `Var`, which is intentionally in
+            // the default (function-local) address space rather than the original field
+            // address's: a local allocation cannot live in a buffer/uniform address space, so
+            // matching the field address's space would itself be invalid IR. Because an empty
+            // value has no bytes to read or write, the address space of its address is
+            // behaviorally immaterial, so the local is a sound replacement for any field-address
+            // use (load, store, or pass-by-reference).
+            for (auto access : accesses)
+            {
+                builder.setInsertBefore(access);
+                IRInst* replacement = as<IRFieldExtract>(access)
+                                          ? builder.emitMakeStruct(fieldType, 0, nullptr)
+                                          : (IRInst*)builder.emitVar(fieldType);
+                access->replaceUsesWith(replacement);
+                access->removeAndDeallocate();
+            }
+
+            // Drop the operand each `MakeStruct` of this struct supplied for the field, then
+            // unlink the now-unreferenced field. Removing one field at a time keeps the
+            // remaining fields' operand indices aligned with the trimmed `MakeStruct`s.
+            trimMakeStructOperands(field);
+            field->removeFromParent();
+        }
+
+        for (auto field : emptyFields)
+            field->removeAndDeallocate();
+    }
+}
+
 bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions options)
 {
     // The main source of confusion/complexity here is that
