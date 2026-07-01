@@ -277,22 +277,22 @@ static int _peek(Lexer* lexer, int offset = 0)
             bool first{true};
             bool invalid{};
             c = getUnicodePointFromUTF8(
-                [&]()
+                [&]() -> unsigned char
                 {
                     if (lexer->m_cursor + pos >= lexer->m_end)
-                        return (char)0;
+                        return 0U;
 
                     if (first || isUtf8ContinuationByte(lexer->m_cursor[pos]))
                     {
                         first = false;
-                        return lexer->m_cursor[pos++];
+                        return static_cast<unsigned char>(lexer->m_cursor[pos++]);
                     }
 
                     // Current byte is not a continuation byte, so we don't
                     // consume it. Instead, we'll just return a poison byte to
                     // ensure that the current sequence is interpreted as
                     // invalid.
-                    return (char)0xFF; // always invalid UTF-8
+                    return 0xFFU; // always invalid UTF-8
                 },
                 &invalid);
 
@@ -359,22 +359,22 @@ static int _advance(Lexer* lexer)
             const char* seqStart = lexer->m_cursor;
             bool invalid{};
             c = getUnicodePointFromUTF8(
-                [&]()
+                [&]() -> unsigned char
                 {
                     if (lexer->m_cursor >= lexer->m_end)
                     {
                         isInvalidStream = true;
-                        return (char)0;
+                        return 0U;
                     }
 
                     if ((lexer->m_cursor == seqStart) || isUtf8ContinuationByte(*lexer->m_cursor))
-                        return *lexer->m_cursor++;
+                        return static_cast<unsigned char>(*lexer->m_cursor++);
 
                     // Current byte is not a continuation byte, so we don't
                     // consume it. Instead, we'll just return a poison byte to
                     // ensure that the current sequence is interpreted as
                     // invalid.
-                    return (char)0xFF; // always invalid UTF-8
+                    return 0xFFU; // always invalid UTF-8
                 },
                 &invalid);
 
