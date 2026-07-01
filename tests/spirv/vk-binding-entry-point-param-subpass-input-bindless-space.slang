@@ -25,6 +25,11 @@ float4 main(
     return input.SubpassLoad() + texture.Load(int3(0, 0, 0));
 }
 
+// The bug's named symptom was the spurious `warning[E39012]: requested bindless space index
+// unavailable` (fired twice). Pin its absence directly -- the warning fires iff the requested
+// bindless space is unavailable, so this is the same condition as `bindlessSpaceIndex: 0` above.
+// CHECK-NOT: warning{{.*}}39012
+
 // The input attachment itself is still bound at set 3 / binding 7 with index 5.
 // CHECK-DAG: OpDecorate %entryPointParams_input Binding 7
 // CHECK-DAG: OpDecorate %entryPointParams_input DescriptorSet 3
