@@ -439,9 +439,16 @@ void applySettingsToDiagnosticSink(
         targetSink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
     }
 
-    // Handle diagnostic color setting
-    // The sink will handle AUTO by checking writer->isConsole()
-    targetSink->setDiagnosticColorMode(
-        (SlangDiagnosticColor)options.getIntOption(CompilerOptionName::DiagnosticColor));
+    // Handle diagnostic color setting.
+    // This function is called once per option set that layers onto the sink (e.g. the linkage
+    // option set followed by the component-type option set in ComponentType::getTargetArtifact).
+    // Only apply the color mode when this set actually carries the option, so a set that does not
+    // specify it does not clobber a mode already applied by a prior set with the AUTO default.
+    // The sink will handle AUTO by checking writer->isConsole().
+    if (options.hasOption(CompilerOptionName::DiagnosticColor))
+    {
+        targetSink->setDiagnosticColorMode(
+            (SlangDiagnosticColor)options.getIntOption(CompilerOptionName::DiagnosticColor));
+    }
 }
 } // namespace Slang
