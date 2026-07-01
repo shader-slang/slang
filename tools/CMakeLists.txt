@@ -374,7 +374,8 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     # The #11856 unit test drives DeviceCache::acquireDevice, so compile it into this module too.
     target_sources(
         gfx-unit-test
-        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/render-test/slang-test-device-cache.cpp
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/render-test/slang-test-device-cache.cpp
     )
 
     slang_add_target(
