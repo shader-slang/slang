@@ -5,7 +5,7 @@
 
 [shader("vertex")]
 float4 vertexShader(float id: SV_ViewID) : SV_Position
-//CHECK: E30701
+//CHECK:                  ^^ type 'float' is not valid for system value semantic 'SV_ViewID'; expected 'uint'
 {
     return float4(id, 0, 0, 1);
 }
