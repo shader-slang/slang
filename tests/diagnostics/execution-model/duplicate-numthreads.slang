@@ -13,7 +13,10 @@ void main()
 
 // Each duplicate [numthreads] is reported as error 31202 (duplicate-modifier):
 // three attributes yield two duplicate diagnostics, and each diagnostic emits
-// two machine-readable rows (title + span) carrying error code E31202.
+// two machine-readable rows (a title row and a span row) carrying error code
+// E31202. Both rows survive because the title text differs from the span
+// message, so they are not de-duplicated -- if those two messages are ever
+// unified, this exact four-line count would need to be revisited.
 //CHECK: E31202
 //CHECK: E31202
 //CHECK: E31202
