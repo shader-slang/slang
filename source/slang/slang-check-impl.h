@@ -3915,6 +3915,19 @@ private:
     // matrix operands and vector equality (`==`/`!=`), whose semantics the `glsl` module owns.
     Expr* convertToBuiltinArithmeticOp(InvokeExpr* expr);
 
+    // Return true when a user-defined (non-core-module) `operator OP` named `operatorName` is in
+    // scope from `scope`. Used by the builtin-operator fast path to *defer* to normal overload
+    // resolution when such an overload exists, so a user `operator*(float4x4, float4x4)` is not
+    // silently shadowed by the builtin component-wise multiply (issue #11877). It is a scoped name
+    // lookup like the one `visitVarExpr` uses for the operator's `functionExpr`, but only an
+    // existence pre-check -- it does not run overload resolution (candidate coercion/ranking), so
+    // the common case (no user overload) stays cheap. The builtin operators live in the core
+    // module, so a lookup whose candidates are all `isFromCoreModule` means no user overload is in
+    // scope. It is a conservative superset of resolution's candidate set (no visibility filtering),
+    // which is fine: deferring on any candidate is always safe -- if the user overload does not
+    // apply to these operand types, normal resolution simply selects the builtin.
+    bool hasUserDefinedNonCoreOperatorInScope(Name* operatorName, Scope* scope);
+
     // For a builtin binary operator `a OP b` whose operands have *different* builtin
     // scalar/vector/matrix types, compute the common operand type that overload resolution
     // would converge on (the "usual arithmetic conversions"): the result element type is the
