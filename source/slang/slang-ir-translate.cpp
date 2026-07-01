@@ -511,11 +511,27 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
             specializeWitnessLookup(cast<IRLookupWitnessMethod>(instWithCanonicalOperands)));
     }
 
+    // Only `set` insts are cached (the O(N) hot path; the other kinds reaching this fall-through
+    // are non-monotonic). See `resolvedStructuralFixedPoints` for the whitelist rationale.
+    if (as<IRSetBase>(instWithCanonicalOperands))
+        ctx->recordStructuralFixedPoint(instWithCanonicalOperands);
     return instWithCanonicalOperands;
 }
 
 IRInst* TranslationContext::resolveInst(IRInst* inst)
 {
+    // Fast path: a recorded structural fixed point resolves to itself with no side
+    // effects, so skip the (potentially O(operandCount)) operand re-walk. The entry is
+    // only valid while the inst remains attached to the module; use SLANG_RELEASE_ASSERT
+    // (not SLANG_ASSERT, which compiles to an assume in release) so a future caller that
+    // passes an inst removed/deallocated since it was recorded fails loudly in every
+    // build rather than reading a stale pointer.
+    if (inst && resolvedStructuralFixedPoints.contains(inst))
+    {
+        SLANG_RELEASE_ASSERT(inst->getParent() && as<IRModuleInst>(inst->getParent()));
+        return inst;
+    }
+
     IRBuilder builder(irModule);
     while (auto resolvedInst = _resolveInstRec(this, inst))
     {
