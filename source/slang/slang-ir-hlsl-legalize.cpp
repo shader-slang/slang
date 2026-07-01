@@ -1,7 +1,7 @@
 // slang-ir-hlsl-legalize.cpp
 #include "slang-ir-hlsl-legalize.h"
 
-#include "slang-ir-hlsl-util.h"
+#include "slang-ir-util-hlsl.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-specialize-function-call.h"

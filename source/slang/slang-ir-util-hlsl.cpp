@@ -1,5 +1,5 @@
-// slang-ir-hlsl-util.cpp
-#include "slang-ir-hlsl-util.h"
+// slang-ir-util-hlsl.cpp
+#include "slang-ir-util-hlsl.h"
 
 #include "slang-ir-insts.h"
 #include "slang-type-system-shared.h"

@@ -1,4 +1,4 @@
-// slang-ir-hlsl-util.h
+// slang-ir-util-hlsl.h
 #pragma once
 
 #include "slang-ir.h"
