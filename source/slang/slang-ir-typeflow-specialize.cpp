@@ -6878,15 +6878,7 @@ struct TypeFlowSpecializationContext
             auto selectedCallee = calleeSet->getElement(0);
 
             if (as<IRPoison>(selectedCallee))
-            {
-                IRBuilder builder(context);
-                builder.setInsertBefore(inst);
-                auto defaultVal = builder.emitDefaultConstruct(inst->getDataType());
-                inst->replaceUsesWith(defaultVal);
-                inst->removeAndDeallocate();
-                module->getContainerPool().free(&callArgs);
-                return true;
-            }
+                return replaceCallWithDefaultValue();
 
             if (isIntrinsic(callee))
                 effectiveFuncType = as<IRFuncType>(callee->getDataType());
