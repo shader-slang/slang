@@ -603,6 +603,16 @@ bool areKnownEqualShapeElements(IRInst* left, IRInst* right);
 
 IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> elements);
 
+/// Returns true if `type` is one of the work-graph record types (e.g.
+/// DispatchNodeInputRecord<T>, ThreadNodeInputRecord<T>, NodeOutput<T>, etc.).
+/// These types are opaque ABI objects that must survive type legalization unchanged.
+bool isWorkGraphRecordType(IRType* type);
+
+/// Returns the element type operand for generic work-graph record types, or null
+/// for non-generic record types. Empty record types such as `EmptyNodeOutput`
+/// intentionally return null because they carry no payload element type.
+IRType* getWorkGraphRecordElementType(IRType* type);
+
 } // namespace Slang
 
 #endif

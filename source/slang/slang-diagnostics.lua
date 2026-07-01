@@ -2560,6 +2560,65 @@ err(
     span { loc = "attr:Modifier", message = "expected a power of 2 between 4 and 128, inclusive, in 'WaveSize' attribute, got '~value:Int'" }
 )
 
+err(
+    "invalid-node-launch-mode",
+    31113,
+    "invalid 'NodeLaunch' mode",
+    span { loc = "attr:Modifier", message = "invalid NodeLaunch mode '~mode:String'; expected 'broadcasting', 'thread', or 'coalescing'" }
+)
+
+err(
+    "node-grid-attribute-requires-broadcasting",
+    31115,
+    "node grid attribute requires broadcasting launch mode",
+    span { loc = "decl:Decl", message = "'[NodeDispatchGrid]' and '[NodeMaxDispatchGrid]' are only valid on broadcasting-launch node shaders" }
+)
+
+err(
+    "invalid-barrier-semantic-flags-value",
+    31116,
+    "invalid 'BarrierSemanticFlags' value",
+    span { loc = "location", message = "unrecognized BarrierSemanticFlags value '~value:String'; expected REORDER (0x0) on its own, or any combination of GROUP_SYNC (0x1), GROUP_SCOPE (0x2), DEVICE_SCOPE (0x4)" }
+)
+
+err(
+    "invalid-barrier-memory-type-flags-value",
+    31117,
+    "invalid 'BarrierMemoryTypeFlags' value",
+    span { loc = "location", message = "unrecognized BarrierMemoryTypeFlags value '~value:String'; expected a combination of UAV_MEMORY (0x1), GROUP_SHARED_MEMORY (0x2), NODE_INPUT_MEMORY (0x4), NODE_OUTPUT_MEMORY (0x8), or ALL_MEMORY (0xf)" }
+)
+
+err(
+    "allow-sparse-nodes-requires-node-output-array",
+    31118,
+    "invalid 'AllowSparseNodes' target",
+    span { loc = "attr:Modifier", message = "'[AllowSparseNodes]' is only valid on NodeOutputArray parameters" }
+)
+
+err(
+    "num-threads-disallowed-on-thread-launch-node",
+    31119,
+    "invalid 'numthreads' on thread-launch node",
+    span { loc = "attr:Modifier", message = "thread-launch node shaders must not specify '[numthreads]'; they use an implicit '[numthreads(1, 1, 1)]'" }
+)
+
+err(
+    "node-launch-attribute-required",
+    31127,
+    "missing 'NodeLaunch' attribute",
+    span { loc = "decl:Decl", message = "node shader entry point '~decl:Decl' must specify a '[NodeLaunch]' attribute" }
+)
+
+err(
+    "node-num-threads-attribute-required",
+    31128,
+    "missing 'numthreads' attribute on node shader",
+    span {
+        loc = "decl:Decl",
+        message = "non-thread-launch node shader entry point '~decl:Decl' must specify a '[numthreads]' attribute"
+    }
+)
+
 warning(
     "explicit-uniform-location",
     31104,

@@ -2,6 +2,7 @@
 #pragma once
 #include "../core/slang-list.h"
 #include "slang-compiler.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -9,7 +10,6 @@ namespace Slang
 class DiagnosticSink;
 class Session;
 
-struct IRFunc;
 struct IRModule;
 
 void legalizeNonStructParameterToStructForHLSL(IRModule* module);
@@ -23,5 +23,7 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module);
 // only reaches a hit shader and is never `TraceRay`'d) would otherwise be emitted with
 // one-sided qualifiers and rejected by DXC.
 void legalizeRayPayloadAccessQualifiersForHLSL(IRModule* module);
+
+void validateBarrierFlagsForHLSL(IRModule* module, DiagnosticSink* sink);
 
 } // namespace Slang
