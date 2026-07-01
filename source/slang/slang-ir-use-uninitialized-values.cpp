@@ -175,6 +175,57 @@ static bool canIgnoreType(IRType* type, IRType* upper)
     return false;
 }
 
+// Return the loop-header block parameter (the phi) that the loop's argument at `argIndex`
+// feeds. A `loop`'s operands are (target, break, continue, arg0, arg1, ...), and the
+// arguments map positionally to the parameters of the loop-header (`target`) block, so
+// argument N is merged into target-block parameter N. Returns null if there is no such
+// parameter.
+static IRParam* getLoopHeaderParam(IRLoop* loop, UInt argIndex)
+{
+    IRBlock* header = loop->getTargetBlock();
+    if (!header)
+        return nullptr;
+
+    UInt i = 0;
+    for (auto param : header->getParams())
+    {
+        if (i == argIndex)
+            return param;
+        i++;
+    }
+    return nullptr;
+}
+
+// Collect the blocks that make up a loop's body into `body`: those reachable from the loop's
+// target (header) block without passing through its break (reconvergence) block. The break
+// block is deliberately excluded -- control only reaches it once the loop has finished, so it
+// is "after" the loop, not part of the body. This is the same notion of "loop body" that the
+// definite-assignment loop relaxation uses (see `cancelLoadsByDefiniteAssignment`).
+static void getLoopBodyBlocks(IRLoop* loop, HashSet<IRBlock*>& body)
+{
+    IRBlock* breakBlock = loop->getBreakBlock();
+
+    HashSet<IRBlock*> visited;
+    List<IRBlock*> work;
+    visited.add(breakBlock); // sentinel: never traverse past the break block
+    if (auto target = loop->getTargetBlock())
+    {
+        if (visited.add(target))
+            work.add(target);
+    }
+    while (work.getCount())
+    {
+        auto b = work.getLast();
+        work.removeLast();
+        body.add(b);
+        for (auto succ : b->getSuccessors())
+        {
+            if (visited.add(succ))
+                work.add(succ);
+        }
+    }
+}
+
 static List<IRInst*> getAliasableInstructions(IRInst* inst)
 {
     List<IRInst*> addresses;
@@ -261,7 +312,10 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
     {
     case kIROp_Loop:
     case kIROp_UnconditionalBranch:
-        // TODO: Ignore branches for now
+        // A branch neither loads nor stores the value itself; it just forwards it as a
+        // block (phi) argument. The value-merge continuation through a `loop`'s initial
+        // phi-argument is handled separately in `collectLoopCarriedFirstIterationReads`, so
+        // the first-iteration read of a loop-carried variable is collected as a load there.
         return None;
 
     // Debug info instructions should be ignored - they don't constitute
@@ -549,28 +603,15 @@ static void cancelLoadsByDefiniteAssignment(
         // we accept the rare missed in-loop conditional-store case rather than warn on
         // the pervasive element-wise pattern. Uses that occur *inside* the loop before
         // the store are still reported, since clean state still flows into the body.
-        HashSet<IRBlock*> bodyVisited;
-        List<IRBlock*> bodyWork;
-        bodyVisited.add(breakBlock); // sentinel: never traverse past the break block
-        if (auto target = loop->getTargetBlock())
-        {
-            if (bodyVisited.add(target))
-                bodyWork.add(target);
-        }
+        HashSet<IRBlock*> body;
+        getLoopBodyBlocks(loop, body);
         bool bodyHasStore = false;
-        while (bodyWork.getCount())
+        for (auto b : body)
         {
-            auto b = bodyWork.getLast();
-            bodyWork.removeLast();
             if (blocksWithStore.contains(b))
             {
                 bodyHasStore = true;
                 break;
-            }
-            for (auto succ : b->getSuccessors())
-            {
-                if (bodyVisited.add(succ))
-                    bodyWork.add(succ);
             }
         }
         if (bodyHasStore)
@@ -653,6 +694,75 @@ static void cancelLoadsByDefiniteAssignment(
     }
 }
 
+// Collect reads of `inst` (a potentially-uninitialized value) that happen on the first
+// iteration of a loop that carries it. Consider this example:
+//
+//     float total;
+//     for (int i = 0; i < n; ++i)
+//         total += a[i];   // first iteration reads `total` while still uninitialized
+//     return total;
+//
+// After SSA construction `total` becomes a loop-header phi. The uninitialized seed reaches
+// the loop only as the loop's initial (loop-entry) argument and is merged into the header
+// parameter; the back-edge supplies the accumulated value. On the first iteration the header
+// parameter still holds the uninitialized seed, so the in-loop read `total += a[i]` (which
+// reads the header parameter) is a genuine use of an uninitialized value.
+//
+// We therefore resolve the loop-entry argument to its header parameter and collect that
+// parameter's uses -- but only those that occur *inside the loop body* (blocks reachable from
+// the loop header without passing the break block). Uses outside the body (e.g. the post-loop
+// `return total`) are left to the normal definite-assignment / loop-relaxation analysis: by
+// the time control reaches them the loop has run on every reaching path, so flagging them as
+// never-initialized would reintroduce false positives on the common "conditionally assign in
+// a loop, use after" idiom (e.g. ray-query loops committing a hit attribute).
+//
+// Only `loop` initial arguments are followed (not `unconditionalBranch` arguments): following
+// an if-merge phi would reclassify a conditionally-initialized value (a must-init case) as a
+// never-initialized one, and the loop back-edge carries the accumulated value, not the seed.
+// `visitedPhis` guards against phi cycles (e.g. `for (;;) x = x;`) and handles nested loops.
+static void collectLoopCarriedFirstIterationReads(
+    IRInst* inst,
+    List<IRInst*>& stores,
+    List<IRInst*>& loads,
+    HashSet<IRInst*>& visitedPhis)
+{
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        auto loop = as<IRLoop>(use->getUser());
+        if (!loop)
+            continue;
+
+        UInt argCount = loop->getArgCount();
+        for (UInt i = 0; i < argCount; i++)
+        {
+            if (loop->getArg(i) != inst)
+                continue;
+
+            IRParam* phi = getLoopHeaderParam(loop, i);
+            if (!phi || !visitedPhis.add(phi))
+                continue;
+
+            HashSet<IRBlock*> body;
+            getLoopBodyBlocks(loop, body);
+
+            for (auto alias : getAliasableInstructions(phi))
+            {
+                for (auto u = alias->firstUse; u; u = u->nextUse)
+                {
+                    IRInst* user = u->getUser();
+                    auto userBlock = as<IRBlock>(user->getParent());
+                    if (userBlock && body.contains(userBlock))
+                        collectInstructionByUsage(stores, loads, user, alias);
+                }
+
+                // The phi (or one of its aliases) may itself be the initial argument of a
+                // nested loop, seeding that inner loop's first-iteration read; recurse.
+                collectLoopCarriedFirstIterationReads(alias, stores, loads, visitedPhis);
+            }
+        }
+    }
+}
+
 static void collectAliasableLoadStores(IRInst* inst, List<IRInst*>& stores, List<IRInst*>& loads)
 {
     auto addresses = getAliasableInstructions(inst);
@@ -663,6 +773,13 @@ static void collectAliasableLoadStores(IRInst* inst, List<IRInst*>& stores, List
         for (auto use = alias->firstUse; use; use = use->nextUse)
             collectInstructionByUsage(stores, loads, use->getUser(), alias);
     }
+
+    // Also collect in-loop first-iteration reads of a loop-carried uninitialized value, which
+    // are reached through the loop's phi (block parameter) rather than by using `inst`
+    // directly.
+    HashSet<IRInst*> visitedPhis;
+    for (auto alias : addresses)
+        collectLoopCarriedFirstIterationReads(alias, stores, loads, visitedPhis);
 }
 
 static List<IRInst*> getUnresolvedParamLoads(
