@@ -18,12 +18,11 @@
 // exactly once (at creation) and beginCall records its already-assigned handle rather than
 // allocating a new one -- and every field except the output slot(s) is identical between the two
 // calls, so the two segments are byte-identical iff the output slots match. If the proxy serialized
-// the caller's poison the segments differ; with the fix both record a defined 0 and the segments are
-// byte-identical.
-
-#include "unit-test-replay-common.h"
+// the caller's poison the segments differ; with the fix both record a defined 0 and the segments
+// are byte-identical.
 
 #include "../../source/slang-record-replay/proxy/proxy-session.h"
+#include "unit-test-replay-common.h"
 
 // Assert that the two back-to-back recorded call segments [off0,off1) and [off1,off2) are
 // byte-identical. Uses SLANG_CHECK_ABORT for the length preconditions so the memcmp only runs on a
@@ -40,17 +39,18 @@ static bool twoRecordedSegmentsIdentical(size_t off0, size_t off1, size_t off2)
     return memcmp(data + off0, data + off1, len1) == 0;
 }
 
-// GlobalSessionProxy::getDownstreamCompilerVersion serializes both int* output slots unconditionally.
-// Called with SLANG_PASS_THROUGH_NONE the real IGlobalSession returns SLANG_E_NOT_FOUND WITHOUT
-// writing *outMajor/*outMinor (Session::getDownstreamCompilerVersion, slang-global-session.cpp:285-
-// 286), so before the fix the proxy read (and serialized) whatever the caller left in that memory.
+// GlobalSessionProxy::getDownstreamCompilerVersion serializes both int* output slots
+// unconditionally. Called with SLANG_PASS_THROUGH_NONE the real IGlobalSession returns
+// SLANG_E_NOT_FOUND WITHOUT writing *outMajor/*outMinor (see Session::getDownstreamCompilerVersion
+// in slang-global-session.cpp), so before the fix the proxy read (and serialized) whatever the
+// caller left in that memory.
 SLANG_UNIT_TEST(replayGetDownstreamCompilerVersionFailureNoUninitializedRead)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    // Recording must be active BEFORE the session is created so the returned session is wrapped in a
-    // GlobalSessionProxy and registered for handle tracking. We set the mode directly via
+    // Recording must be active BEFORE the session is created so the returned session is wrapped in
+    // a GlobalSessionProxy and registered for handle tracking. We set the mode directly via
     // ctx().setMode(Mode::Record) rather than the public slang_enableRecordLayer(true) used by the
     // sibling wrapping test; both leave the context in Mode::Record, which is what makes
     // slang_createGlobalSession2 wrap the returned session in a proxy. (Do not reset() after
@@ -90,16 +90,17 @@ SLANG_UNIT_TEST(replayGetDownstreamCompilerVersionFailureNoUninitializedRead)
 
 // SessionProxy::getTypeConformanceWitnessSequentialID serializes its uint32_t* output slot
 // unconditionally. Called with null type arguments the real ISession returns SLANG_FAIL WITHOUT
-// writing *outId (Linkage::getTypeConformanceWitnessSequentialID, slang-session.cpp:758-759), so the
-// same uninitialized-read defect applies. The null-argument failure path is reached without a
-// compiled module or real TypeReflection objects, so this mirrors the test above for the sibling fix.
+// writing *outId (Linkage::getTypeConformanceWitnessSequentialID, slang-session.cpp:758-759), so
+// the same uninitialized-read defect applies. The null-argument failure path is reached without a
+// compiled module or real TypeReflection objects, so this mirrors the test above for the sibling
+// fix.
 SLANG_UNIT_TEST(replayGetTypeConformanceWitnessSequentialIDFailureNoUninitializedRead)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    // Same requirement as above: recording active before session creation so the proxies are wrapped
-    // and registered.
+    // Same requirement as above: recording active before session creation so the proxies are
+    // wrapped and registered.
     ctx().setMode(Mode::Record);
 
     Slang::ComPtr<slang::IGlobalSession> globalSession;
