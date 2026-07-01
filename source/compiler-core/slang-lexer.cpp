@@ -782,6 +782,114 @@ IntegerLiteralValue getIntegerLiteralValue(
     return value;
 }
 
+// Rounds a non-negative double to the precision and range of a narrower float
+// type, returning the result still held in a double.
+//
+// This function assumes that 'value' is non-negative.
+//
+// Parameters:
+//
+//   value           - Value to round. When a regular number, must be >= 0. May also be 0,
+//                     +infinity, NaN.
+//   minNormalExp    - Minimum normal exponent before subnormal
+//   maxExp          - Maximum exponent. Anything above that is +INFINITY
+//   precisionBits   - Precision in number of bits
+//   roundToNearest  - Rounding mode: true = round to nearest, ties to even. False = truncate
+//                     (round towards zero)
+//
+// Note:
+// - float:  -126, +127, 24
+// - half:   -14,  +15,  11
+static double _truncateDouble(
+    double value,
+    int minNormalExp,
+    int maxExp,
+    unsigned precisionBits,
+    bool roundToNearest)
+{
+    // NaNs and INFs are passed as is
+    if (!std::isfinite(value))
+        return value;
+
+    SLANG_ASSERT(value >= 0.0);
+
+    // first check for overflow
+    if (roundToNearest)
+    {
+        // anything at or above the tie point that rounds up to maxExp+1 overflows
+        const double limit =
+            std::ldexp(2.0, maxExp) - std::ldexp(1.0, maxExp - static_cast<int>(precisionBits));
+        if (value >= limit)
+            return std::numeric_limits<double>::infinity();
+    }
+    else
+    {
+        const double limit = std::ldexp(2.0, maxExp);
+        if (value >= limit)
+            return std::numeric_limits<double>::infinity();
+    }
+
+    // Note: there is a seeming off-by-one with exponents. This is because
+    // frexp() returns a fraction between [0.5, 1). That is, a number such as
+    // 3.5 is decomposed as 0.875 * 2^2, instead of 1.75 * 2^1.
+    int exp{};
+    double fraction = std::frexp(value, &exp);
+
+    // Additional precision reduction for subnormals - note the exponent
+    // off-by-one comment above.
+    int precisionLoss = std::max(minNormalExp - (exp - 1), 0);
+
+    int exponentShift = static_cast<int>(precisionBits) - precisionLoss;
+
+    // scale the fraction so that the retained bits become the integer part
+    fraction = std::ldexp(fraction, exponentShift);
+
+    if (roundToNearest)
+    {
+        // To make the rounding precise, we need to divide the number into integer and fractional
+        // parts
+        double integerPart{};
+
+        // yyyyyyy.xxxxxxxx
+        // integer.roundoff
+
+        double roundOffPart = std::modf(fraction, &integerPart);
+        if (roundOffPart != 0.5)
+        {
+            fraction = std::round(fraction);
+        }
+        else
+        {
+            // Tied. The tie breaker is the least significant retained
+            // bit. Round up or down to make it 0.
+
+            // integerPart / 2:
+            //
+            // intege.r00000
+            //        |
+            //        \- The least significant retained bit. Note: Round-off part
+            //           is 0.5 since we're in this branch.
+
+            [[maybe_unused]] double unused{};
+            double lsb = std::modf(integerPart / 2.0, &unused);
+            if (lsb >= 0.5)
+                fraction = std::round(fraction); // round up to make integerPart even
+            else
+                fraction = std::trunc(fraction); // round down to keep integerPart even
+        }
+    }
+    else
+    {
+        // simple truncation
+        fraction = std::trunc(fraction);
+    }
+
+    fraction = std::ldexp(fraction, -exponentShift);
+
+    // return rounded double
+    return std::ldexp(fraction, exp);
+}
+
 // Converts a literal in hexadecimal format to double. The return value is truncated
 // in case the significand in the literal cannot be fit.
 //
@@ -973,19 +1081,20 @@ static double _hexFloatLiteralToDouble(
 
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
-    UnownedStringSlice* outSuffix,
-    bool* outIsOutOfRange,
-    bool* outPrecisionLost)
+    FloatingPointLiteralType& outLiteralType,
+    bool& outIsOutOfRange,
+    bool& outPrecisionLost,
+    UnownedStringSlice& outErrorContent)
 {
-    FloatingPointLiteralValue value{};
-    bool isOutOfRange{}; // underflow/overflow detection
-    bool precisionLost{};
-
     const UnownedStringSlice content = token.getContent();
+    const char* cursor = content.begin();
+    const char* end = content.end();
 
-    char const* cursor = content.begin();
-    char const* end = content.end();
+    bool hexFloat{};
+    const char* numberStart{};
+    UnownedStringSlice errorContent{};
 
+    // start by consuming the hex prefix if any
     if (UnownedStringSlice(cursor, end).startsWith("0x") ||
         UnownedStringSlice(cursor, end).startsWith("0X"))
     {
@@ -995,17 +1104,205 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         // is reasonably straightforward.
 
         cursor += 2U;
-        value = _hexFloatLiteralToDouble(cursor, end, cursor, isOutOfRange, precisionLost);
+        hexFloat = true;
+    }
+
+    // the number starts here
+    numberStart = cursor;
+
+    // scan through the number
+    if (hexFloat)
+    {
+        // Hex float: find exponent marker (p/P)
+        while (cursor != end)
+        {
+            char c = *cursor;
+            if (c == '#')
+                break;
+            ++cursor;
+            if (c == 'p' || c == 'P')
+                break;
+        }
+
+        // then scan through the exponent number
+        while (cursor != end)
+        {
+            bool expChar{};
+            switch (*cursor)
+            {
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+            case '+':
+            case '-':
+                expChar = true;
+                break;
+
+            default:
+                expChar = false;
+                break;
+            }
+
+            if (!expChar)
+                break;
+
+            ++cursor;
+        }
+
+        // rest is suffix.
     }
     else
     {
-        // We'll use fast_float to handle decimal float formats. This should
-        // give us bit-exact input regardless of the toolchain used to compile
-        // slang.
+        // regular float: the number chars (incl. exponent) are distinct from
+        // suffix chars
+        while (cursor != end)
+        {
+            bool numberChar{};
+            switch (*cursor)
+            {
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+            case 'e':
+            case 'E':
+            case '+':
+            case '-':
+            case '.':
+                numberChar = true;
+                break;
 
+            default:
+                numberChar = false;
+                break;
+            }
+
+            if (!numberChar)
+                break;
+
+            ++cursor;
+        }
+
+        // rest is suffix.
+    }
+
+    UnownedStringSlice number{numberStart, cursor};
+    FloatingPointLiteralValue value{};
+    bool isInfinity{};
+
+    // Check for infinity marker
+    if (UnownedStringSlice(cursor, end).startsWith("#INF"))
+    {
+        isInfinity = true;
+        cursor += 4U;
+        value = std::numeric_limits<double>::infinity();
+    }
+
+    UnownedStringSlice suffix{cursor, end};
+
+    // start from the suffix, since we need the literal type for rounding
+    FloatingPointLiteralType literalType;
+    if ((suffix == "") || (suffix == "f") || (suffix == "F"))
+        literalType = FloatingPointLiteralType::Float;
+    else if (
+        (suffix == "h") || (suffix == "H") || (suffix == "hf") || (suffix == "HF") ||
+        (suffix == "fh") || (suffix == "FH"))
+        literalType = FloatingPointLiteralType::Half;
+    else if (
+        (suffix == "l") || (suffix == "L") || (suffix == "lf") || (suffix == "LF") ||
+        (suffix == "fl") || (suffix == "FL"))
+        literalType = FloatingPointLiteralType::Double;
+    else
+    {
+        literalType = FloatingPointLiteralType::BadSuffix;
+        errorContent = suffix;
+    }
+
+    // then the floating-point number
+    bool isOutOfRange{};
+    bool precisionLost{};
+
+    // Cursor is updated to be at the end of parsed number
+    if (isInfinity)
+    {
+        cursor = number.end();
+    }
+    else if (hexFloat)
+    {
+        value = _hexFloatLiteralToDouble(
+            number.begin(),
+            number.end(),
+            cursor,
+            isOutOfRange,
+            precisionLost);
+
+        double oldValue = value;
+
+        if (literalType == FloatingPointLiteralType::Half)
+            value = _truncateDouble(value, -14, +15, 11, false);
+        else if (literalType == FloatingPointLiteralType::Float)
+            value = _truncateDouble(value, -126, +127, 24, false);
+
+        // value became 0 in truncation?
+        if (oldValue != 0.0 && value == 0.0)
+            isOutOfRange = true;
+
+        // value changed in truncation?
+        if (value != oldValue)
+            precisionLost = true;
+    }
+    else
+    {
         value = 0.0; // default in case of errors. fast_float sets the value
                      // appropriately in case of result_out_of_range
-        auto result = fast_float::from_chars(cursor, end, value);
+
+        fast_float::from_chars_result_t<char> result{};
+
+        if (literalType == FloatingPointLiteralType::Float)
+        {
+            float f{};
+            result = fast_float::from_chars(number.begin(), number.end(), f);
+            value = f;
+        }
+        else if (literalType == FloatingPointLiteralType::Half)
+        {
+            // We do not currently have std::float16_t support in all our
+            // compiler toolchains, so parse to double and then round to
+            // half. This effectively performs double rounding (decimal ->
+            // double -> half), and therefore in rare cases, the result may
+            // differ from a single correctly-rounded decimal -> half.
+            result = fast_float::from_chars(number.begin(), number.end(), value);
+
+            if (result.ec == std::errc{})
+            {
+                double oldValue = value;
+                value = _truncateDouble(value, -14, +15, 11, true);
+
+                if (!std::isfinite(value))
+                    isOutOfRange = true;
+                else if (oldValue != 0.0 && value == 0.0)
+                    isOutOfRange = true;
+            }
+        }
+        else
+        {
+            // in all other cases, parse as double
+            result = fast_float::from_chars(number.begin(), number.end(), value);
+        }
+
         cursor = result.ptr;
 
         if (result.ec == std::errc::result_out_of_range)
@@ -1015,35 +1312,25 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
         }
         else if (result.ec != std::errc{})
         {
-            // We can still fail to parse literals here, since our accepted
-            // floating point format is narrower than the tokenizer general
-            // literal format. This should trigger an invalid suffix error later
-            // on.
+            // nonspecific error
+            literalType = FloatingPointLiteralType::BadSignificand;
+            errorContent = UnownedStringSlice(content.begin(), number.end());
             value = 0.0;
         }
     }
 
     // check for special exponent for infinity
-    if ((cursor != end) && (*cursor == '#'))
+    if (cursor != number.end())
     {
-        const auto inf = toSlice("#INF");
-
-        if (UnownedStringSlice(cursor, end).startsWith(inf))
-        {
-            value = INFINITY;
-            isOutOfRange = false;
-            cursor += inf.getLength();
-        }
+        literalType = FloatingPointLiteralType::BadSignificand;
+        errorContent = UnownedStringSlice(content.begin(), number.end());
     }
 
-    if (outSuffix)
-        *outSuffix = UnownedStringSlice(cursor, end);
-
-    if (outIsOutOfRange)
-        *outIsOutOfRange = isOutOfRange;
-
-    if (outPrecisionLost)
-        *outPrecisionLost = precisionLost;
+    // report results
+    outLiteralType = literalType;
+    outIsOutOfRange = isOutOfRange;
+    outPrecisionLost = precisionLost && !isOutOfRange;
+    outErrorContent = errorContent;
 
     return value;
 }

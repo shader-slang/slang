@@ -8180,213 +8180,6 @@ static NodeBase* parseTreatAsDifferentiableExpr(Parser* parser, void* /*userData
     return noDiffExpr;
 }
 
-enum class FloatFixKind
-{
-    None,            ///< No modification was made
-    Unrepresentable, ///< Unrepresentable
-    Zeroed,          ///< Too close to 0
-    Truncated,       ///< Truncated to a non zero value
-};
-
-// Truncates double to a narrower float type
-//
-// Parameters:
-//
-//   value           - Value to truncate. May be 0, infinity, NaN
-//   minNormalExp    - Minimum normal exponent before subnormal
-//   maxExp          - Maximum exponent. Anything above that is INFINITY or -INFINITY
-//   precisionBits   - Precision in number of bits
-//
-// Note:
-// - float:  -126, +127, 24
-// - half:   -14,  +15,  11
-static double _truncateDouble(double value, int minNormalExp, int maxExp, unsigned precisionBits)
-{
-    // NaNs and INFs are passed as is
-    if (!std::isfinite(value))
-        return value;
-
-    int exp{};
-    double fraction = std::frexp(value, &exp);
-
-    // Note: there is a seeming off-by-one with exponents. This is because frexp() returns
-    // fraction between [0.5, 1). That is, the 1.0 is decomposed as as 0.5 * 2^1.
-    if (exp > (maxExp + 1))
-    {
-        // overflow
-        if (value >= 0.0)
-            return INFINITY;
-        else
-            return -INFINITY;
-    }
-
-    // for subnormals - note the exponent off-by-one comment above.
-    int precisionLoss = std::max(minNormalExp - (exp - 1), 0);
-
-    int exponentShift = static_cast<int>(precisionBits) - precisionLoss;
-
-    // truncate fraction
-    fraction = ldexp(fraction, exponentShift);
-    fraction = trunc(fraction);
-    fraction = ldexp(fraction, -exponentShift);
-
-    // return truncated double
-    return ldexp(fraction, exp);
-}
-
-
-static FloatFixKind _fixFloatLiteralValue(
-    BaseType type,
-    bool truncateToFit, // hex literals are truncated if necessary
-    IRFloatingPointValue value,
-    IRFloatingPointValue& outValue)
-{
-    // Notes:
-    // - Infinite and NaN values don't need fixing. They're infinites and NaNs
-    //   regardless of the precision.
-    // - Double-to-double conversion never loses precision
-    if ((type != BaseType::Double) && std::isfinite(value))
-    {
-        // our logic depends on that IRFloatingPointValue is double
-        static_assert(
-            std::is_same_v<IRFloatingPointValue, double>,
-            "_fixFloatLiteralValue() logic assumption");
-
-        // representable range
-        double positiveMin; // minimum value
-        double nonzeroMin;  // minimum value that we'll still consider rounded to non-zero
-        double positiveMax; // maximum value
-        double finiteMax;   // maximum value that we'll still consider finite
-
-        // truncation control
-        int minNormalExp;
-        int maxExp;
-        unsigned precisionBits;
-
-        switch (type)
-        {
-        case BaseType::Float:
-            positiveMin = std::numeric_limits<float>::denorm_min();
-            nonzeroMin = double{std::numeric_limits<float>::denorm_min()} / 2.0;
-            static_assert(0x1.FFFFFE0p127 == double{std::numeric_limits<float>::max()});
-            positiveMax = 0x1.FFFFFE0p127;
-            finiteMax = 0x1.FFFFFFp127; // this still rounds down to positiveMax
-            minNormalExp = -126;
-            maxExp = 127;
-            precisionBits = 24;
-            break;
-
-        case BaseType::Half:
-            static_assert(0x0.004p-14 == SLANG_HALF_SUB_NORMAL_MIN);
-            positiveMin = 0x0.004p-14;
-            nonzeroMin = 0x0.002p-14;
-            static_assert(0x1.FFC0p15 == SLANG_HALF_MAX);
-            positiveMax = 0x1.FFC0p15;
-            finiteMax = 0x1.FFE0p15; // this still rounds up to positiveMax
-            minNormalExp = -14;
-            maxExp = 15;
-            precisionBits = 11;
-            break;
-
-        default:
-            outValue = value;
-            return FloatFixKind::None;
-        }
-
-        if (!std::signbit(value))
-        {
-            // positive number
-            if (value > finiteMax)
-            {
-                outValue = INFINITY;
-                return FloatFixKind::Unrepresentable;
-            }
-
-            if (value > positiveMax)
-            {
-                outValue = positiveMax;
-                return FloatFixKind::Truncated;
-            }
-
-            if (value >= positiveMin)
-            {
-                if (truncateToFit)
-                {
-                    outValue = _truncateDouble(value, minNormalExp, maxExp, precisionBits);
-                    return value == outValue ? FloatFixKind::None : FloatFixKind::Truncated;
-                }
-                else
-                {
-                    outValue = value;
-                    return FloatFixKind::None;
-                }
-            }
-
-            if (value >= nonzeroMin)
-            {
-                outValue = positiveMin;
-                return FloatFixKind::Truncated;
-            }
-
-            if (value > 0.0)
-            {
-                outValue = 0.0;
-                return FloatFixKind::Zeroed;
-            }
-
-            outValue = value;
-            return FloatFixKind::None;
-        }
-        else
-        {
-            // negative number
-            if (value < -finiteMax)
-            {
-                outValue = -INFINITY;
-                return FloatFixKind::Unrepresentable;
-            }
-
-            if (value < -positiveMax)
-            {
-                outValue = -positiveMax;
-                return FloatFixKind::Truncated;
-            }
-
-            if (value <= -positiveMin)
-            {
-                if (truncateToFit)
-                {
-                    outValue = _truncateDouble(value, minNormalExp, maxExp, precisionBits);
-                    return value == outValue ? FloatFixKind::None : FloatFixKind::Truncated;
-                }
-                else
-                {
-                    outValue = value;
-                    return FloatFixKind::None;
-                }
-            }
-
-            if (value <= -nonzeroMin)
-            {
-                outValue = -positiveMin;
-                return FloatFixKind::Truncated;
-            }
-
-            if (value < 0.0)
-            {
-                outValue = -0.0;
-                return FloatFixKind::Zeroed;
-            }
-
-            outValue = value;
-            return FloatFixKind::None;
-        }
-    }
-
-    outValue = value;
-    return FloatFixKind::None;
-}
-
 static IntegerLiteralValue _fixIntegerLiteral(
     BaseType baseType,
     IntegerLiteralValue value,
@@ -8896,31 +8689,51 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
     auto token = parser->tokenReader.advanceToken();
     constExpr->token = token;
 
-    UnownedStringSlice suffix{};
+    FloatingPointLiteralType literalType{};
     bool isOutOfRange{};
     bool precisionLost{};
-    bool isHexFloat = token.getContent().startsWith("0x") || token.getContent().startsWith("0X");
+    UnownedStringSlice errorContent{};
+
     FloatingPointLiteralValue value =
-        getFloatingPointLiteralValue(token, &suffix, &isOutOfRange, &precisionLost);
+        getFloatingPointLiteralValue(token, literalType, isOutOfRange, precisionLost, errorContent);
 
-    // Look at any suffix on the value, default is Float
     BaseType suffixBaseType = BaseType::Float;
-    if ((suffix == "") || (suffix == "f") || (suffix == "F"))
-        suffixBaseType = BaseType::Float;
-    else if (
-        (suffix == "h") || (suffix == "H") || (suffix == "hf") || (suffix == "HF") ||
-        (suffix == "fh") || (suffix == "FH"))
-        suffixBaseType = BaseType::Half;
-    else if (
-        (suffix == "l") || (suffix == "L") || (suffix == "lf") || (suffix == "LF") ||
-        (suffix == "fl") || (suffix == "FL"))
-        suffixBaseType = BaseType::Double;
-    else
-        parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
-            .suffix = String(suffix),
-            .location = token.loc});
+    bool diagnosed{};
 
-    if (isOutOfRange)
+    switch (literalType)
+    {
+    case FloatingPointLiteralType::Half:
+        suffixBaseType = BaseType::Half;
+        break;
+
+    case FloatingPointLiteralType::Float:
+        suffixBaseType = BaseType::Float;
+        break;
+
+    case FloatingPointLiteralType::Double:
+        suffixBaseType = BaseType::Double;
+        break;
+
+    case FloatingPointLiteralType::BadSignificand:
+        parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralNumber{
+            .number = String(errorContent),
+            .location = token.loc});
+        diagnosed = true;
+        break;
+
+    case FloatingPointLiteralType::BadSuffix:
+        parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
+            .suffix = String(errorContent),
+            .location = token.loc});
+        diagnosed = true;
+        break;
+
+    default:
+        SLANG_UNEXPECTED("Unhandled floating point literal type");
+        break;
+    }
+
+    if (isOutOfRange && !diagnosed)
     {
         if (std::isfinite(value))
         {
@@ -8938,53 +8751,19 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
                 .convertedValue = String(value),
                 .location = token.loc});
         }
+        diagnosed = true;
     }
 
-    // TODO(JS):
-    // It is worth noting here that because of the way that the lexer works, that
-    // literals are always handled as if they are positive (a preceding - is taken as a
-    // negate on a positive value). The code in _fixFloatLiteralValue() is designed to
-    // work with positive and negative values, as this behavior might change in the
-    // future, and is arguably more 'correct'.
-
-    FloatingPointLiteralValue fixedValue = value;
-    auto fixType = _fixFloatLiteralValue(suffixBaseType, isHexFloat, value, fixedValue);
-
-    switch (fixType)
-    {
-    case FloatFixKind::Truncated:
-        precisionLost = true;
-        break;
-
-    case FloatFixKind::None:
-        break;
-
-    case FloatFixKind::Zeroed:
-        parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
-            .literal = String(token.getContent()),
-            .type = String(BaseTypeInfo::asText(suffixBaseType)),
-            .convertedValue = String(fixedValue),
-            .location = token.loc});
-        break;
-
-    case FloatFixKind::Unrepresentable:
-        parser->sink->diagnose(Diagnostics::FloatLiteralUnrepresentable{
-            .type = String(BaseTypeInfo::asText(suffixBaseType)),
-            .literal = String(token.getContent()),
-            .convertedValue = String(fixedValue),
-            .location = token.loc});
-        break;
-    }
-
-    if (precisionLost && isHexFloat)
+    if (precisionLost && !diagnosed)
     {
         parser->sink->diagnose(Diagnostics::FloatHexLiteralPrecisionLost{
             .literal = String(token.getContent()),
-            .truncatedValue = StringUtil::makeMinimalHexFloat(fixedValue),
+            .truncatedValue = StringUtil::makeMinimalHexFloat(value),
             .location = token.loc});
+        diagnosed = true;
     }
 
-    constExpr->value = fixedValue;
+    constExpr->value = value;
     constExpr->suffixType = suffixBaseType;
 
     return constExpr;
