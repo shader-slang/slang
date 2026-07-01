@@ -82,15 +82,16 @@ SLANG_UNIT_TEST(diagnosticColorTargetStage)
     {
         String diagnostics =
             getTargetStageDiagnostics(globalSession, SLANG_DIAGNOSTIC_COLOR_ALWAYS);
-        // The target-stage diagnostic must actually be present, else the color check is vacuous.
-        SLANG_CHECK(diagnostics.getLength() != 0);
+        // The expected target-stage diagnostic (E39019) must actually be present, so an unrelated
+        // diagnostic cannot vacuously satisfy the color assertion.
+        SLANG_CHECK(diagnostics.indexOf(toSlice("E39019")) != -1);
         SLANG_CHECK(diagnostics.indexOf(ansiEscape) != -1);
     }
 
     // NEVER: the same diagnostic must not be colored (guards against a naive always-color fix).
     {
         String diagnostics = getTargetStageDiagnostics(globalSession, SLANG_DIAGNOSTIC_COLOR_NEVER);
-        SLANG_CHECK(diagnostics.getLength() != 0);
+        SLANG_CHECK(diagnostics.indexOf(toSlice("E39019")) != -1);
         SLANG_CHECK(diagnostics.indexOf(ansiEscape) == -1);
     }
 }

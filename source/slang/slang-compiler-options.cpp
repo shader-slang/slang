@@ -440,10 +440,10 @@ void applySettingsToDiagnosticSink(
     }
 
     // Handle diagnostic color setting.
-    // This function is called once per option set that layers onto the sink (e.g. the linkage
-    // option set followed by the component-type option set in ComponentType::getTargetArtifact).
-    // Only apply the color mode when this set actually carries the option, so a set that does not
-    // specify it does not clobber a mode already applied by a prior set with the AUTO default.
+    // A sink may have settings applied from several option sets in sequence (e.g. a linkage option
+    // set followed by a component-type option set). Only apply the color mode when this set
+    // actually carries the option, so a set that does not specify it does not clobber a mode
+    // already applied by a prior set with the AUTO default.
     // The sink will handle AUTO by checking writer->isConsole().
     if (options.hasOption(CompilerOptionName::DiagnosticColor))
     {
