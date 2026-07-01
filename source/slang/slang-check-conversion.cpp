@@ -2185,15 +2185,6 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
-    // Disallow converting to a ParameterGroupType.
-    //
-    // TODO(tfoley): Under what circumstances would this check ever be needed?
-    //
-    if (as<ParameterGroupType>(toType))
-    {
-        return _failedCoercion(toType, outToExpr, fromExpr, sink);
-    }
-
     // If the type that we are converting from is a parameter group type
     // (something like `ConstantBuffer<X>` or `ParameterBlock<X>`) and we
     // are converting to some type `Y`, then we want to allow for a multi-step
