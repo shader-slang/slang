@@ -480,10 +480,15 @@ public:
                     // effects or memory reads (e.g. a texture/buffer load with
                     // a user-supplied `[BackwardDerivative]`) can legitimately
                     // produce a derivative from captured state without any
-                    // differentiable input. For non-readNone callees, fall
-                    // back to the original conservative behavior of treating
-                    // every differentiable-function call as carrying.
-                    if (!isReadNoneCallee(callee))
+                    // differentiable input. The check must also consider any
+                    // user-supplied derivative variants of the callee: a
+                    // `[__readNone]` primary whose `[ForwardDerivative]` writes
+                    // a buffer still produces observable derivative state
+                    // through differentiation (#11374). For callees that fail
+                    // the stronger gate, fall back to the original
+                    // conservative behavior of treating every
+                    // differentiable-function call as carrying.
+                    if (!isReadNoneCalleeAndAllDerivatives(callee))
                         return true;
 
                     // For readNone callees, a call carries a derivative only
