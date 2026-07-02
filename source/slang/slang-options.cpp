@@ -585,6 +585,12 @@ void initCommandOptions(CommandOptions& options)
          "-warnings-disable",
          "-warnings-disable <id>[,<id>...]",
          "Disable specific warning ids."},
+        {OptionKind::WarningLevel,
+         "-Wall,-Wextra,-Wpedantic",
+         "-Wall | -Wextra | -Wpedantic",
+         "Enable the corresponding group of opt-in warnings (additive). Staging: the pedantic "
+         "group is currently enabled by default, so passing the pedantic flag is a no-op today; a "
+         "future release will make it opt-in."},
         {OptionKind::EnableWarning, "-W...", "-W<id>", "Enable a warning with the specified id."},
         {OptionKind::DisableWarning, "-Wno-...", "-Wno-<id>", "Disable warning with <id>"},
         {OptionKind::DumpWarningDiagnostics,
@@ -3048,6 +3054,28 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // Enable the warning
                 // SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning,
                 // Severity::Warning));
+                break;
+            }
+        case OptionKind::WarningLevel:
+            {
+                // The flag spelling (-Wall/-Wextra/-Wpedantic) selects which warning group to
+                // enable. Exact-match options take priority over the -W<id> prefix, so these are
+                // never confused with `-W<name>`.
+                auto flag = argValue.getUnownedSlice();
+                SlangWarningLevel level;
+                if (flag == "-Wall")
+                    level = SLANG_WARNING_LEVEL_ALL;
+                else if (flag == "-Wextra")
+                    level = SLANG_WARNING_LEVEL_EXTRA;
+                else if (flag == "-Wpedantic")
+                    level = SLANG_WARNING_LEVEL_PEDANTIC;
+                else
+                {
+                    // Only the three exact flags above are registered for WarningLevel, so any
+                    // other spelling reaching here is a wiring bug, not user input.
+                    SLANG_UNEXPECTED("unhandled -W warning-level flag");
+                }
+                linkage->m_optionSet.add(OptionKind::WarningLevel, (int)level);
                 break;
             }
         case OptionKind::VerifyDebugSerialIr:
