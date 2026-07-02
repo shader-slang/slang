@@ -13,6 +13,12 @@
 [submodule "external/spirv-tools"]
 	path = external/spirv-tools
 	url = https://github.com/KhronosGroup/SPIRV-Tools.git
+	# We routinely pin to a SPIRV-Tools fix that has been upstreamed as a PR but
+	# not yet merged to KhronosGroup main, to avoid a chicken-and-egg wait. Such
+	# a commit deliberately isn't on the tracked branch yet, so skip the branch
+	# check. The SHA is still verified to be fetchable from the official Khronos
+	# URL above, which catches pins that point at a developer fork. See PR #11063.
+	slang-skip-pin-check = true
 [submodule "external/spirv-headers"]
 	path = external/spirv-headers
 	url = https://github.com/KhronosGroup/SPIRV-Headers.git
@@ -41,6 +47,12 @@
 [submodule "external/lua"]
 	path = external/lua
 	url = https://github.com/lua/lua.git
+	# We track lua's v5.4 maintenance line. The pinned commit (3fe7be9,
+	# v5.4.7-7-g3fe7be9) is reachable from the 'v5.4' branch but NOT from lua's
+	# default branch 'master', so this override is required: without it the pin
+	# check would resolve the remote default ('master') and fail. It is not a
+	# skip — branch reachability is still enforced, just against v5.4.
+	branch = v5.4
 [submodule "external/optix-dev"]
 	path = external/optix-dev
 	url = https://github.com/NVIDIA/optix-dev.git
