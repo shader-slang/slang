@@ -1978,6 +1978,14 @@ SimpleSemanticInfo decomposeSimpleSemantic(HLSLSimpleSemantic* semantic)
     return info;
 }
 
+// Return true if a lowercased semantic name denotes a system-value semantic,
+// operating under the assumption that *any* semantic with an `SV_` or `NV_`
+// prefix is a system value.
+static bool isSystemValueSemanticName(String const& loweredSemanticName)
+{
+    return loweredSemanticName.startsWith("sv_") || loweredSemanticName.startsWith("nv_");
+}
+
 static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     ParameterBindingContext* context,
     Type* type,
@@ -1996,11 +2004,9 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
 
     RefPtr<TypeLayout> typeLayout;
 
-    // First we check for a system-value semantic, operating
-    // under the assumption that *any* semantic with an `SV_`
-    // or `NV_` prefix is a system value.
+    // First we check for a system-value semantic.
     //
-    if (sn.startsWith("sv_") || sn.startsWith("nv_"))
+    if (isSystemValueSemanticName(sn))
     {
         // Fragment shader color/render target outputs need to be handled
         // specially, because they are declared with an `SV`-prefixed
@@ -2316,6 +2322,35 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     return typeLayout;
 }
 
+// Return true if an entry-point parameter in a ray-tracing stage plays one of
+// the ray-tracing-specific varying roles (ray payload, callable payload, or hit
+// attributes) rather than being an ordinary system-value input.
+//
+// Ray-tracing parameters are identified by direction and position rather than
+// by semantic, so a parameter with no semantic (or a user-defined semantic)
+// takes a ray-tracing role. The `SV_RayPayload` and `SV_IntersectionAttributes`
+// semantics explicitly mark those same roles, so they do too. Any other
+// system-value semantic instead marks a builtin input that is valid in the
+// stage, as in:
+//
+//      [shader("intersection")]
+//      void main(uint primitiveId : SV_PrimitiveID) { ... }
+//
+// where `primitiveId` must be laid out by the regular system-value logic
+// (consuming no varying resources) rather than being mistaken for a payload or
+// hit-attributes parameter.
+static bool isRayTracingPayloadOrAttributesParameter(EntryPointParameterState const& state)
+{
+    if (!state.optSemanticName)
+        return true;
+
+    String sn = state.optSemanticName->toLower();
+    if (!isSystemValueSemanticName(sn))
+        return true;
+
+    return sn == "sv_raypayload" || sn == "sv_intersectionattributes";
+}
+
 // Returns nullptr when `type` is not valid in a varying parameter position
 // (e.g. interface types, textures, samplers, constant buffers).
 static RefPtr<TypeLayout> processEntryPointVaryingParameter(
@@ -2377,73 +2412,82 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     // "varying" input/output parameters, since they don't have the same
     // idea of previous/next stage as the rasterization shader types.
     //
-    if (state.directionMask & kEntryPointParameterDirection_Output)
+    // That interpretation only applies to parameters that play a
+    // ray-tracing-specific role (ray payload, callable payload, or hit
+    // attributes). A parameter that carries an ordinary system-value semantic
+    // (e.g. `SV_PrimitiveID` in an intersection shader) is a builtin input,
+    // and is laid out by the regular system-value logic below.
+    //
+    if (isRayTracingPayloadOrAttributesParameter(state))
     {
-        // Note: we are silently treating `out` parameters as if they
-        // were `in out` for this test, under the assumption that
-        // an `out` parameter represents a write-only payload.
-
-        switch (state.stage)
+        if (state.directionMask & kEntryPointParameterDirection_Output)
         {
-        default:
-            // Not a raytracing shader.
-            break;
+            // Note: we are silently treating `out` parameters as if they
+            // were `in out` for this test, under the assumption that
+            // an `out` parameter represents a write-only payload.
 
-        case Stage::Intersection:
-        case Stage::RayGeneration:
-            // Don't expect this case to have any `in out` parameters.
-            getSink(context)->diagnose(Diagnostics::DontExpectOutParametersForStage{
-                .stage = getStageName(state.stage),
-                .location = state.loc});
-            break;
+            switch (state.stage)
+            {
+            default:
+                // Not a raytracing shader.
+                break;
 
-        case Stage::AnyHit:
-        case Stage::ClosestHit:
-        case Stage::Miss:
-            // `in out` or `out` parameter is payload
-            return createTypeLayoutWith(
-                context->layoutContext,
-                context->getRulesFamily()->getRayPayloadParameterRules(),
-                type);
+            case Stage::Intersection:
+            case Stage::RayGeneration:
+                // Don't expect this case to have any `in out` parameters.
+                getSink(context)->diagnose(Diagnostics::DontExpectOutParametersForStage{
+                    .stage = getStageName(state.stage),
+                    .location = state.loc});
+                break;
 
-        case Stage::Callable:
-            // `in out` or `out` parameter is payload
-            return createTypeLayoutWith(
-                context->layoutContext,
-                context->getRulesFamily()->getCallablePayloadParameterRules(),
-                type);
+            case Stage::AnyHit:
+            case Stage::ClosestHit:
+            case Stage::Miss:
+                // `in out` or `out` parameter is payload
+                return createTypeLayoutWith(
+                    context->layoutContext,
+                    context->getRulesFamily()->getRayPayloadParameterRules(),
+                    type);
+
+            case Stage::Callable:
+                // `in out` or `out` parameter is payload
+                return createTypeLayoutWith(
+                    context->layoutContext,
+                    context->getRulesFamily()->getCallablePayloadParameterRules(),
+                    type);
+            }
         }
-    }
-    else
-    {
-        switch (state.stage)
+        else
         {
-        default:
-            // Not a raytracing shader.
-            break;
+            switch (state.stage)
+            {
+            default:
+                // Not a raytracing shader.
+                break;
 
-        case Stage::Intersection:
-        case Stage::RayGeneration:
-        case Stage::Miss:
-        case Stage::Callable:
-            // Don't expect this case to have any `in` parameters.
-            //
-            // TODO: For a miss or callable shader we could interpret
-            // an `in` parameter as indicating a payload that the
-            // programmer doesn't intend to write to.
-            //
-            getSink(context)->diagnose(Diagnostics::DontExpectInParametersForStage{
-                .stage = getStageName(state.stage),
-                .location = state.loc});
-            break;
+            case Stage::Intersection:
+            case Stage::RayGeneration:
+            case Stage::Miss:
+            case Stage::Callable:
+                // Don't expect this case to have any `in` parameters.
+                //
+                // TODO: For a miss or callable shader we could interpret
+                // an `in` parameter as indicating a payload that the
+                // programmer doesn't intend to write to.
+                //
+                getSink(context)->diagnose(Diagnostics::DontExpectInParametersForStage{
+                    .stage = getStageName(state.stage),
+                    .location = state.loc});
+                break;
 
-        case Stage::AnyHit:
-        case Stage::ClosestHit:
-            // `in` parameter is hit attributes
-            return createTypeLayoutWith(
-                context->layoutContext,
-                context->getRulesFamily()->getHitAttributesParameterRules(),
-                type);
+            case Stage::AnyHit:
+            case Stage::ClosestHit:
+                // `in` parameter is hit attributes
+                return createTypeLayoutWith(
+                    context->layoutContext,
+                    context->getRulesFamily()->getHitAttributesParameterRules(),
+                    type);
+            }
         }
     }
 
