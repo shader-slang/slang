@@ -4,6 +4,16 @@ on:
   pull_request:
     branches: [master]
     types: [opened, synchronize, reopened, ready_for_review]
+    # The TOC check only regenerates docs/user-guide/toc.html (see
+    # docs/build_toc.sh), so it is only relevant when the user guide changes.
+    # Path-filtering it keeps it off the ~majority of PRs that touch no docs,
+    # freeing a GitHub-hosted runner slot against the org's 20-concurrent cap.
+    # The workflow file and the generator script are included so changes to the
+    # check's own machinery still trigger it.
+    paths:
+      - "docs/user-guide/**"
+      - "docs/build_toc.sh"
+      - ".github/workflows/check-toc.yml"
 jobs:
   check-formatting:
     if: github.event.pull_request.draft != true

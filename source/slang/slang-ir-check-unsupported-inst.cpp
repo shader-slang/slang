@@ -81,6 +81,72 @@ static IRType* findUnstorableOpaqueHandleType(IRType* type)
     return findUnstorableOpaqueHandleType(type, visited);
 }
 
+// True if `target` is a C++/CUDA *kernel* output target. The `String` type is
+// implemented in terms of the Slang core runtime (`Slang::String`), which is
+// available for host C++ output and for the LLVM-backed CPU path, but not in the
+// C++/CUDA kernel preludes. Emitting a `String` value for one of these targets
+// would reference an undefined `String` type/method (issue #11297), so it must be
+// diagnosed instead. Host C++ and the LLVM CPU path are deliberately excluded
+// because they do provide a `String` runtime. (CUDA/PTX `String` usage is usually
+// also rejected earlier by capability checks, since `String`'s members are
+// `[require(cpp)]`; this is the backend-agnostic safety net.)
+static bool isKernelCPPOrCUDASourceTarget(TargetRequest* target)
+{
+    switch (target->getTarget())
+    {
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
+    case CodeGenTarget::PyTorchCppBinding:
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
+    case CodeGenTarget::PTX:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// True if `funcType` has any parameter or result of type `String`.
+static bool funcTypeReferencesStringType(IRFuncType* funcType)
+{
+    if (as<IRStringType>(funcType->getResultType()))
+        return true;
+    for (UInt i = 0; i < funcType->getParamCount(); i++)
+    {
+        if (as<IRStringType>(funcType->getParamType(i)))
+            return true;
+    }
+    return false;
+}
+
+// True if `inst` produces or consumes a `String` value that requires the (host-
+// only) `String` runtime. This is either an inst whose result type is `String`
+// (e.g. `MakeString`, or reading a `String` local), or a call to a function
+// whose signature takes/returns `String` (e.g. `String.getLength`).
+//
+// We must key a call on the *callee's parameter type*, not on its argument
+// values: a string literal `"..."` has type `String` even when it is implicitly
+// converted to a `NativeString` argument, so `NativeString.getLength("...")`
+// (which is supported) would be misflagged if we looked at argument types.
+// `NativeString.getLength` takes a `NativeString` parameter, so checking the
+// callee's signature correctly distinguishes it from `String.getLength`.
+static bool instReferencesStringType(IRInst* inst)
+{
+    if (as<IRStringType>(inst->getDataType()))
+        return true;
+
+    if (auto call = as<IRCall>(inst))
+    {
+        if (auto callee = call->getCalleeUse()->get())
+        {
+            if (auto funcType = as<IRFuncType>(callee->getFullType()))
+                return funcTypeReferencesStringType(funcType);
+        }
+    }
+
+    return false;
+}
+
 void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
 {
     // Khronos targets (SPIR-V and GLSL) and WGSL cannot place an
@@ -92,6 +158,12 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     // (issue #10526, typically from selecting or returning a resource through
     // control flow); reject it with a diagnostic rather than emitting invalid code.
     const bool rejectOpaqueLocals = isKhronosTarget(target) || isWGPUTarget(target);
+
+    // The `String` type has no runtime representation in kernel C++/CUDA output;
+    // a use there (e.g. `let s : String = "1"; s.getLength();`) would otherwise
+    // emit uncompilable code referencing an undefined `String`/method instead of
+    // any diagnostic.
+    const bool rejectString = isKernelCPPOrCUDASourceTarget(target);
 
     for (auto block : func->getBlocks())
     {
@@ -120,6 +192,16 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
                     }
                 }
                 break;
+            }
+
+            // A `String` value has no valid lowering for a kernel C++/CUDA
+            // target. Diagnose a `String`-typed result or a call into a
+            // `String`-signature function (e.g. `String.getLength`) rather than
+            // emitting uncompilable code referencing an undefined `String`.
+            if (rejectString && instReferencesStringType(inst))
+            {
+                auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+                sink->diagnose(Diagnostics::StringTypeNotSupportedOnKernelTarget{.location = loc});
             }
         }
     }

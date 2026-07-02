@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:11:26Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 27462c385136ef073434b5258573aa3428e1b1ede07eb649ae3e32b68e3a86c3
+generated_at: 2026-06-29T13:21:39Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: afbd89494a4fc2b1e32feff2a72cd537b19b3ce0b699732634ab56f8de8603f1
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -231,7 +231,13 @@ Anything under [source/](../../../../source) is implementation. The
 public-header rules in [CLAUDE.md](../../../../CLAUDE.md) (no enum
 re-ordering, no virtual-method changes mid-vtable, no removal) reflect
 the fact that this surface must keep ABI compatibility with older
-callers.
+callers. New API is therefore added by *appending*: methods are
+appended to the end of an interface (e.g.
+`IGlobalSession::getDownstreamCompilerVersion`), new capabilities arrive
+as fresh UUID'd interfaces obtained via `castAs` /
+`queryInterface` (e.g. `IBindlessResourceMetadata`), and new option
+enumerators are appended before the `CountOf` sentinel — all visible in
+[include/slang.h](../../../../include/slang.h).
 
 ## Reading guide
 
