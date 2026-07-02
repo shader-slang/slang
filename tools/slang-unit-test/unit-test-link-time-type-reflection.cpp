@@ -710,3 +710,72 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionWithLoadedButNotLinkedModule)
 
     SLANG_CHECK(spirvStr.indexOf(toSlice("OpDecorate %tex Binding 0")) != -1);
 }
+
+// Test for issue #10749 (global-generic-param path): computing a layout for a type
+// that references a module-scope `type_param` (a `GlobalGenericParamDecl`) via the
+// program-less `ISession::getTypeLayout` reaches the other two null-guards added in
+// this PR -- `findGlobalGenericSpecializationArg` (no program => no specialization
+// argument) and `_createTypeLayoutForGlobalGenericTypeParam` (no program => no global
+// param index, `paramIndex = -1`). The extern-member tests above do not reach these,
+// so this pins them: a regression that turned either guard back into an unconditional
+// `programLayout->...` dereference would crash here.
+SLANG_UNIT_TEST(linkTimeTypeReflectionGlobalTypeParamSessionGetTypeLayout)
+{
+    const char* userSourceBody = R"(
+        interface IBase {}
+        type_param TParam : IBase;
+
+        struct Wrap {
+            TParam field;
+        }
+    )";
+
+    String moduleName = "linkTimeGlobalTypeParam_SessionLayout";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        moduleName.getBuffer(),
+        (moduleName + ".slang").getBuffer(),
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    // Module-level reflection: no link step, so there is no resolved program.
+    auto moduleReflection = module->getLayout();
+    SLANG_CHECK_ABORT(moduleReflection != nullptr);
+
+    auto wrapType = moduleReflection->findTypeByName("Wrap");
+    SLANG_CHECK_ABORT(wrapType != nullptr);
+
+    // Go through ISession::getTypeLayout (Linkage::getTypeLayout), which passes
+    // programLayout=nullptr. Laying out `Wrap` reaches the field of type `TParam`
+    // (a GlobalGenericParamDecl), exercising the two global-generic-param null guards.
+    ComPtr<slang::IBlob> layoutDiagnostics;
+    auto wrapLayout = session->getTypeLayout(
+        wrapType,
+        0,
+        slang::LayoutRules::Default,
+        layoutDiagnostics.writeRef());
+
+    // Must not crash and must return a layout with the single `TParam` field. The
+    // field's global-generic param index is unavailable on the program-less path
+    // (paramIndex = -1), but reflecting that index is not part of this test's
+    // contract; the point is that laying out the `type_param`-typed field does not
+    // dereference a null program layout.
+    SLANG_CHECK(wrapLayout != nullptr);
+    if (wrapLayout)
+    {
+        SLANG_CHECK(wrapLayout->getFieldCount() == 1);
+    }
+}

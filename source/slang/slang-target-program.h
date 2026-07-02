@@ -54,6 +54,21 @@ public:
     ///
     ProgramLayout* getExistingLayout() { return m_layout; }
 
+    /// The cache of type layouts computed on the fly by the reflection API for
+    /// this program on this target (e.g. `spReflection_GetTypeLayout`).
+    ///
+    /// This lives on the `TargetProgram` rather than the session-long
+    /// `TargetRequest` so that a cached `TypeLayout` — whose contents (resolved
+    /// `extern` members, global-generic param indices) are computed against
+    /// this specific program — has exactly the program's lifetime. Keying such
+    /// entries by a raw `ProgramLayout*` on the `TargetRequest` would risk a
+    /// freed program's address being reused by a later program and aliasing a
+    /// stale entry.
+    Dictionary<TargetRequest::TypeLayoutKey, RefPtr<TypeLayout>>& getTypeLayouts()
+    {
+        return m_typeLayouts;
+    }
+
     /// Get the compiled code for an entry point on the target.
     ///
     /// If this is the first time that code generation has
@@ -126,6 +141,10 @@ private:
 
     // The computed layout, if it has been generated yet
     RefPtr<ProgramLayout> m_layout;
+
+    // Type layouts computed on the fly by the reflection API for this program
+    // on this target. See `getTypeLayouts`.
+    Dictionary<TargetRequest::TypeLayoutKey, RefPtr<TypeLayout>> m_typeLayouts;
 
     CompilerOptionSet m_optionSet;
     // Parallel backend emission shares these lazy result caches across threads.

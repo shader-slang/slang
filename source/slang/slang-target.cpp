@@ -4,6 +4,7 @@
 #include "../core/slang-type-text-util.h"
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "slang-compiler.h"
+#include "slang-target-program.h"
 #include "slang-type-layout.h"
 
 namespace Slang
@@ -262,12 +263,26 @@ TypeLayout* TargetRequest::getTypeLayout(
     // type that does not reference them.
     auto layoutContext = getInitialLayoutContextForTarget(this, programLayout, rules);
 
+    // Choose where to cache. When a `ProgramLayout` is supplied, the resulting
+    // `TypeLayout` is computed against that specific program (resolved `extern`
+    // members, global-generic indices), so it must be cached with the program's
+    // lifetime — on the owning `TargetProgram`, not on this session-long
+    // `TargetRequest`. Caching a program-scoped result under a raw
+    // `ProgramLayout*` key here would let a freed program's address be reused
+    // by a later program and alias a stale entry.
+    //
+    // The program-less path has no such hazard: `Type*` lives in the
+    // linkage-owned `ASTBuilder` arena that outlives every program, so its
+    // entries stay on this `TargetRequest`.
+    auto& typeLayoutCache =
+        programLayout ? programLayout->getTargetProgram()->getTypeLayouts() : getTypeLayouts();
+
     RefPtr<TypeLayout> result;
-    auto key = TypeLayoutKey{type, rules, programLayout};
-    if (getTypeLayouts().tryGetValue(key, result))
+    auto key = TypeLayoutKey{type, rules};
+    if (typeLayoutCache.tryGetValue(key, result))
         return result.Ptr();
     result = createTypeLayout(layoutContext, type);
-    getTypeLayouts()[key] = result;
+    typeLayoutCache[key] = result;
     return result.Ptr();
 }
 
