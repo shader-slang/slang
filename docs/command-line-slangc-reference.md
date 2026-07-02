@@ -258,6 +258,14 @@ all - Treat all warnings as errors.
 Disable specific warning ids. 
 
 
+<a id="wall"></a>
+### -Wall, -Wextra, -Wpedantic
+
+**-Wall | -Wextra | -Wpedantic**
+
+Enable the corresponding group of opt-in warnings (additive). 
+
+
 <a id="w"></a>
 ### -W
 
