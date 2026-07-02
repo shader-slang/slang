@@ -523,6 +523,10 @@ void calcRequiredLoweringPassSet(
     case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
         break;
+    case kIROp_HLSLAppendStructuredBufferType:
+    case kIROp_HLSLConsumeStructuredBufferType:
+        result.appendConsumeStructuredBuffer = true;
+        break;
     case kIROp_DynamicResourceType:
         result.dynamicResource = true;
         break;
@@ -1595,7 +1599,13 @@ Result linkAndOptimizeIR(
     // On non-HLSL targets, there isn't an implementation of `AppendStructuredBuffer`
     // and `ConsumeStructuredBuffer` types, so we lower them into normal struct types
     // of `RWStructuredBuffer` typed fields now.
-    if (target != CodeGenTarget::HLSL)
+    //
+    // Gated on `appendConsumeStructuredBuffer` to skip this whole-module walk when
+    // neither type is present. The flag is safe against false-negatives: these types are
+    // only produced by the front-end and no later IR pass synthesizes them, so the
+    // post-specialization `calcRequiredLoweringPassSet` scan that precedes this point can
+    // never miss one that is still present here.
+    if (target != CodeGenTarget::HLSL && requiredLoweringPassSet.appendConsumeStructuredBuffer)
     {
         SLANG_PASS(lowerAppendConsumeStructuredBuffers, targetProgram, sink);
     }
