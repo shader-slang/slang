@@ -184,10 +184,11 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
         paramIndex++;
     }
 
-    SubtypeWitness* returnWitness = doesTypeHaveNoDiffModifier(funcType->getResultType()) ||
-                                            callableDeclRef.getDecl()->findModifier<NoDiffModifier>()
-                                        ? nullptr
-                                        : getDiffWitness(funcType->getResultType());
+    SubtypeWitness* returnWitness =
+        doesTypeHaveNoDiffModifier(funcType->getResultType()) ||
+                callableDeclRef.getDecl()->findModifier<NoDiffModifier>()
+            ? nullptr
+            : getDiffWitness(funcType->getResultType());
 
     auto thisValueType = getTypeForThisExpr(this, callableDeclRef);
     Type* thisParamType = nullptr;

@@ -10267,7 +10267,8 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                 return true;
             }
 
-            if (auto funcConstraintDecl = as<FuncConstraintDecl>(requiredConstraintDeclRef.getDecl()))
+            if (auto funcConstraintDecl =
+                    as<FuncConstraintDecl>(requiredConstraintDeclRef.getDecl()))
             {
                 Type* requiredBaseFuncType = nullptr;
                 auto kind = getDifferentiabilityConformanceKind(

@@ -921,10 +921,8 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                     }
                     else
                     {
-                        newParamTypes.add(
-                            astBuilder->getConstRefParamType(_getNoDiffType(
-                                astBuilder,
-                                paramInfo.type)));
+                        newParamTypes.add(astBuilder->getConstRefParamType(
+                            _getNoDiffType(astBuilder, paramInfo.type)));
                     }
                     break;
                 }
