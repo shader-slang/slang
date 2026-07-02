@@ -26,11 +26,20 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      # Pinned MaterialX commit that includes generateshader.py with the
+      # slang target. Also part of the shader-corpus cache key below, so
+      # bumping the pin automatically regenerates the cached corpus.
+      # TODO: Switch to a stable release tag; v1.39.5 is the first release
+      # containing the slang target.
+      MATERIALX_COMMIT: 3bd5fa90225169d90e1cd83ca12c732a461025f8
 
     steps:
+      # This job never builds Slang from source (it downloads a prebuilt
+      # artifact), so the checkout only needs the workflow's local actions
+      # and scripts — not the large submodule tree.
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
-          submodules: "recursive"
           fetch-depth: "1"
 
       - name: Check disk space
@@ -72,12 +81,28 @@ jobs:
           echo "Found slangc at: $SLANGC"
           "$SLANGC" --version || echo "Could not get slangc version"
 
+      # The generated shader corpus is a pure function of the pinned
+      # MaterialX commit and the generation logic in this workflow file
+      # (both hashed into the key) — it never depends on the PR's Slang
+      # changes, because generateshader.py runs MaterialX's own code
+      # generator without involving slangc. On a cache hit the clone,
+      # build, and generate steps below are skipped and the job goes
+      # straight to compiling the corpus with the PR's slangc.
+      - name: Restore generated shader corpus
+        id: corpus-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ runner.temp }}/materialx-test/generated-shaders
+          key: materialx-corpus-${{ inputs.os }}-${{ env.MATERIALX_COMMIT }}-${{ hashFiles('.github/workflows/ci-materialx-regression-test.yml') }}
+
       - name: Setup Python
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.10"
 
       - name: Clone MaterialX
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: |
           echo "===================================================================="
           echo "MaterialX → Slang Integration Test"
@@ -91,12 +116,11 @@ jobs:
           echo "Cloning MaterialX repository..."
           git clone https://github.com/AcademySoftwareFoundation/MaterialX.git
           cd MaterialX
-          # Pin to specific commit that includes generateshader.py
-          # TODO: Switch to stable release tag when available
-          git checkout 3bd5fa90225169d90e1cd83ca12c732a461025f8
-          echo "SUCCESS: MaterialX cloned at commit 3bd5fa9"
+          git checkout "$MATERIALX_COMMIT"
+          echo "SUCCESS: MaterialX cloned at commit $MATERIALX_COMMIT"
 
       - name: Build MaterialX
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: |
           WORK_DIR="${RUNNER_TEMP}/materialx-test"
           cd "$WORK_DIR/MaterialX"
@@ -123,6 +147,7 @@ jobs:
           echo "SUCCESS: MaterialX built and installed successfully"
 
       - name: Generate Slang Shaders from MaterialX
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: |
           WORK_DIR="${RUNNER_TEMP}/materialx-test"
           cd "$WORK_DIR"
@@ -219,40 +244,60 @@ jobs:
           TOTAL_SHADERS=${#SHADER_FILES[@]}
           echo "Found $TOTAL_SHADERS generated shaders"
 
+          if [ "$TOTAL_SHADERS" -eq 0 ]; then
+            echo "ERROR: no generated shaders found; the restored corpus cache or the generation step produced nothing"
+            exit 1
+          fi
+
+          # Compile the shaders in parallel. Each worker writes its verdict
+          # (and, for failures, the compiler log) to a per-shader file under
+          # RESULTS_DIR so that concurrent workers never interleave partial
+          # output; the aggregation pass below reads those files back.
+          RESULTS_DIR=$(mktemp -d)
+          export RESULTS_DIR SLANGC
+
+          compile_one() {
+            local shader_path="$1"
+            local relative_path="${shader_path#generated-shaders/}"
+            local result_file="$RESULTS_DIR/${relative_path//\//__}"
+            local out log
+            out=$(mktemp)
+            log=$(mktemp)
+            if "$SLANGC" -target spirv -stage fragment -entry fragmentMain "$shader_path" -o "$out" > /dev/null 2>"$log"; then
+              echo "PASS $relative_path" > "$result_file"
+              echo "OK      $relative_path"
+            else
+              {
+                echo "FAIL $relative_path"
+                head -20 "$log"
+              } > "$result_file"
+              echo "FAILED  $relative_path"
+            fi
+            rm -f "$out" "$log"
+          }
+          export -f compile_one
+
+          JOBS=$(nproc 2>/dev/null || echo 4)
+          echo "Compiling with $JOBS parallel jobs"
+          printf '%s\0' "${SHADER_FILES[@]}" | xargs -0 -n 1 -P "$JOBS" bash -c 'compile_one "$1"' _
+
           PASS_COUNT=0
           FAIL_COUNT=0
-          SKIP_COUNT=0
-          FAILED_SHADERS=()
-          SKIPPED_SHADERS=()
-          CURRENT=0
-
-          for SHADER_PATH in "${SHADER_FILES[@]}"; do
-            CURRENT=$((CURRENT + 1))
-            RELATIVE_PATH="${SHADER_PATH#generated-shaders/}"
-            TEMP_OUT=$(mktemp)
-
-            echo "[$CURRENT/$TOTAL_SHADERS] Compiling $RELATIVE_PATH"
-
-            ERROR_LOG=$(mktemp)
-            if "$SLANGC" -target spirv -stage fragment -entry fragmentMain "$SHADER_PATH" -o "$TEMP_OUT" > /dev/null 2>"$ERROR_LOG"; then
-              PASS_COUNT=$((PASS_COUNT + 1))
-              echo "  -> OK"
-            else
-              FAIL_COUNT=$((FAIL_COUNT + 1))
-              FAILED_SHADERS+=("$RELATIVE_PATH")
-              echo "  -> FAILED"
-              # Show error for first failure only
-              if [ $FAIL_COUNT -eq 1 ]; then
-                echo "  First failure error:"
-                cat "$ERROR_LOG" | head -20
-              fi
-            fi
-
-            rm -f "$TEMP_OUT" "$ERROR_LOG"
+          FAILED_RESULTS=()
+          for result in "$RESULTS_DIR"/*; do
+            case "$(head -1 "$result")" in
+              PASS\ *) PASS_COUNT=$((PASS_COUNT + 1)) ;;
+              FAIL\ *) FAIL_COUNT=$((FAIL_COUNT + 1)); FAILED_RESULTS+=("$result") ;;
+            esac
           done
 
-          TOTAL_TESTED=$((PASS_COUNT + FAIL_COUNT))
-          TOTAL_SHADERS=$((PASS_COUNT + FAIL_COUNT + SKIP_COUNT))
+          # Every shader must produce exactly one verdict; a mismatch means
+          # a worker died without reporting (or two shaders collided on one
+          # result file), so fail loudly instead of undercounting.
+          if [ $((PASS_COUNT + FAIL_COUNT)) -ne "$TOTAL_SHADERS" ]; then
+            echo "ERROR: $TOTAL_SHADERS shaders submitted but only $((PASS_COUNT + FAIL_COUNT)) results recorded"
+            exit 1
+          fi
 
           echo ""
           echo "===================================================================="
@@ -260,33 +305,30 @@ jobs:
           echo "===================================================================="
           echo "  Total shaders: $TOTAL_SHADERS"
           echo "  Compiled:      $PASS_COUNT"
-          echo "  Skipped:       $SKIP_COUNT"
           echo "  Failed:        $FAIL_COUNT"
-
-          if [ $SKIP_COUNT -gt 0 ]; then
-            echo ""
-            echo "Skipped shaders (known issues):"
-            for shader in "${SKIPPED_SHADERS[@]}"; do
-              echo "  - $shader"
-            done
-          fi
 
           if [ $FAIL_COUNT -gt 0 ]; then
             echo ""
             echo "Failed shaders:"
-            for shader in "${FAILED_SHADERS[@]}"; do
-              echo "  - $shader"
+            for result in "${FAILED_RESULTS[@]}"; do
+              echo "  - $(head -1 "$result" | sed 's/^FAIL //')"
+            done
+            echo ""
+            echo "Compiler output for failed shaders (first 10):"
+            SHOWN=0
+            for result in "${FAILED_RESULTS[@]}"; do
+              echo "--- $(head -1 "$result" | sed 's/^FAIL //') ---"
+              tail -n +2 "$result"
+              SHOWN=$((SHOWN + 1))
+              if [ $SHOWN -ge 10 ]; then break; fi
             done
             echo ""
             echo "FAILED: $FAIL_COUNT shaders failed compilation"
             exit 1
           fi
 
-          if [ $TOTAL_TESTED -gt 0 ]; then
-            PASS_RATE=$((PASS_COUNT * 100 / TOTAL_TESTED))
-            echo ""
-            echo "SUCCESS: All $PASS_COUNT tested shaders compiled ($PASS_RATE%)"
-          fi
+          echo ""
+          echo "SUCCESS: All $PASS_COUNT tested shaders compiled (100%)"
 
           echo "===================================================================="
           echo "MaterialX → Slang Integration Test: PASSED"
