@@ -11,6 +11,7 @@
 // matching empty output when emission breaks.
 
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute
 
 RWStructuredBuffer<int> inBuf;
 RWStructuredBuffer<int> outBuf;
@@ -24,3 +25,9 @@ void computeMain(uint i : SV_GroupIndex)
 // CHECK-NOT: AppendStructuredBuffer_Append
 // CHECK-NOT: ConsumeStructuredBuffer_Consume
 // CHECK: void main(
+
+// Same baseline on SPIR-V: a plain-buffer module has none of the counter atomics that
+// Append/Consume lowering emits. (Positive anchor first so the NOT covers the function body.)
+// SPV: OpEntryPoint
+// SPV-NOT: OpAtomicIIncrement
+// SPV-NOT: OpAtomicIDecrement
