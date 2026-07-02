@@ -263,7 +263,7 @@ Disable specific warning ids.
 
 **-Wall | -Wextra | -Wpedantic**
 
-Enable the corresponding group of opt-in warnings (additive). Staging: the pedantic group is currently enabled by default, so [-Wpedantic](#wall-1) is a no-op today; a future release will make it opt-in. 
+Enable the corresponding group of opt-in warnings (additive). Staging: the pedantic group is currently enabled by default, so passing the pedantic flag is a no-op today; a future release will make it opt-in. 
 
 
 <a id="w"></a>
