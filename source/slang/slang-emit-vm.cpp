@@ -3,6 +3,7 @@
 #include "slang-ir-call-graph.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 using namespace slang;
 
@@ -28,6 +29,10 @@ public:
     };
     Dictionary<ConstKey, VMOperand> mapConstantIntToOperand;
     Dictionary<IRFunc*, int> mapFuncToId;
+
+    // Global parameters already reported via diagnoseGlobalParam, so the same
+    // unsupported parameter is diagnosed once rather than once per reference.
+    HashSet<IRGlobalParam*> diagnosedGlobalParams;
 
     VMByteCodeBuilder& byteCodeBuilder;
     CodeGenContext* codeGenContext;
@@ -238,7 +243,11 @@ public:
 
     VMOperand ensureInst(IRInst* inst)
     {
-        VMOperand operand;
+        // Zero-initialize: the global-parameter branch below diagnoses and returns
+        // without computing a real operand, so it must start from a well-defined
+        // value rather than indeterminate stack bytes (which writeInst would copy
+        // byte-for-byte into the code buffer).
+        VMOperand operand = {};
         if (mapInstToOperand.tryGetValue(inst, operand))
             return operand;
 
@@ -258,11 +267,106 @@ public:
             operand.size *= (uint32_t)constantVector->getOperandCount();
             mapInstToOperand[inst] = operand;
         }
+        else if (auto globalParam = findReferencedGlobalParam(inst))
+        {
+            // A global parameter (possibly reached through a global-scope instruction
+            // such as a load of the parameter) has arrived at value emission. The
+            // interpreter cannot represent it, so report the limitation and return the
+            // (unused) default operand; emission fails once an error has been reported.
+            diagnoseGlobalParam(globalParam);
+            mapInstToOperand[inst] = operand;
+        }
         else
         {
             SLANG_UNEXPECTED("unsupported global inst for vm bytecode emit");
         }
         return operand;
+    }
+
+    // Return the global shader parameter that `inst` is, or that it references
+    // through its operands (transitively), or null if there is none. Used to detect
+    // values the interpreter cannot represent: a `uniform float` used in a function
+    // body, for example, lowers to a global-scope `load` of the parameter, so the
+    // unsupported value reaching the emitter is the load rather than the parameter
+    // itself.
+    IRGlobalParam* findReferencedGlobalParam(IRInst* inst)
+    {
+        HashSet<IRInst*> visited;
+        return findReferencedGlobalParam(inst, visited);
+    }
+
+    // Worker for findReferencedGlobalParam. `visited` guards against re-walking
+    // shared operands in the global-scope graph, which a global initializer can
+    // reference from several places.
+    IRGlobalParam* findReferencedGlobalParam(IRInst* inst, HashSet<IRInst*>& visited)
+    {
+        if (auto globalParam = as<IRGlobalParam>(inst))
+            return globalParam;
+        // Only global-scope instructions are followed here; an operand at function
+        // scope is an ordinary value that ensureInst handles through its normal paths.
+        if (!as<IRModuleInst>(inst->getParent()))
+            return nullptr;
+        if (!visited.add(inst))
+            return nullptr;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            if (auto found = findReferencedGlobalParam(inst->getOperand(i), visited))
+                return found;
+        }
+        return nullptr;
+    }
+
+    // Report that a global shader parameter is not supported by the interpreter. The
+    // interpreter runs on the CPU and has no concept of global parameters or GPU
+    // resource types (e.g. RWStructuredBuffer), so a program referencing one cannot
+    // be interpreted. This is the single source of truth for the diagnostic; the two
+    // detection points below feed into it.
+    void diagnoseGlobalParam(IRGlobalParam* globalParam)
+    {
+        if (!diagnosedGlobalParams.add(globalParam))
+            return;
+        codeGenContext->getSink()->diagnose(
+            Diagnostics::GlobalParamNotSupportedByInterpreter{.name = getName(globalParam)});
+    }
+
+    // Report a clean diagnostic if any instruction of a function body has a global
+    // parameter as a direct operand, and return true in that case.
+    //
+    // This complements the check in ensureInst: every emitted *value* flows through
+    // ensureInst and is caught there, but a few instruction handlers (and the
+    // unimplemented-instruction fallback in emitInst) abort before calling ensureInst
+    // on their global-parameter operand. Checking operands up front, before emitting
+    // any instruction of the function, catches those cases and lets the failure
+    // propagate out of emitVMByteCodeForEntryPoints as a clean error instead of an
+    // internal abort.
+    bool diagnoseGlobalParamReferences(IRFunc* func)
+    {
+        bool diagnosed = false;
+        for (auto block : func->getBlocks())
+        {
+            // Mirror emitFunction, which skips unreachable blocks; an operand reference
+            // in a block that is never emitted cannot cause an abort.
+            if (isUnreachableBlock(block))
+                continue;
+
+            for (auto inst : block->getChildren())
+            {
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                {
+                    // Use findReferencedGlobalParam (not a direct as<IRGlobalParam>) so
+                    // this mirrors the detection in ensureInst: an operand can be a
+                    // global-scope load of the parameter rather than the parameter
+                    // itself, and the consuming instruction's handler may abort before
+                    // ensureInst is reached.
+                    if (auto globalParam = findReferencedGlobalParam(inst->getOperand(i)))
+                    {
+                        diagnoseGlobalParam(globalParam);
+                        diagnosed = true;
+                    }
+                }
+            }
+        }
+        return diagnosed;
     }
 
     void writeInst(
@@ -1078,6 +1182,12 @@ public:
 
     void emitFunction(IRFunc* func)
     {
+        // Bail out with a clean diagnostic before emitting any instruction if this
+        // function references a global shader parameter, which the interpreter does
+        // not support.
+        if (diagnoseGlobalParamReferences(func))
+            return;
+
         VMByteCodeFunctionBuilder funcBuilder;
         funcBuilder.name = addStringLiteral(getName(func).getUnownedSlice());
 
@@ -1193,8 +1303,18 @@ SlangResult emitVMByteCodeForEntryPoints(
     LinkedIR& linkedIR,
     VMByteCodeBuilder& byteCode)
 {
+    auto sink = codeGenContext->getSink();
+    int errorCountBefore = sink->getErrorCount();
+
     ByteCodeEmitter emitter(byteCode, codeGenContext);
     emitter.emitEntryPoints(linkedIR);
+
+    // If emission reported a diagnostic (e.g. an unsupported global parameter),
+    // fail cleanly so the emitted bytecode is not used, rather than returning
+    // success with malformed output.
+    if (sink->getErrorCount() != errorCountBefore)
+        return SLANG_FAIL;
+
     return SLANG_OK;
 }
 
