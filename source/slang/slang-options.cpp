@@ -588,7 +588,9 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::WarningLevel,
          "-Wall,-Wextra,-Wpedantic",
          "-Wall | -Wextra | -Wpedantic",
-         "Enable the corresponding group of opt-in warnings (additive)."},
+         "Enable the corresponding group of opt-in warnings (additive). Staging: the pedantic "
+         "group is currently enabled by default, so -Wpedantic is a no-op today; a future release "
+         "will make it opt-in."},
         {OptionKind::EnableWarning, "-W...", "-W<id>", "Enable a warning with the specified id."},
         {OptionKind::DisableWarning, "-Wno-...", "-Wno-<id>", "Disable warning with <id>"},
         {OptionKind::DumpWarningDiagnostics,

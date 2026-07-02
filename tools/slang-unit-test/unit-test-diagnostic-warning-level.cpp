@@ -102,6 +102,24 @@ SLANG_UNIT_TEST(warningLevelWarningsAsErrorsInteraction)
     SLANG_CHECK(sink.getErrorCount() == 2);
 }
 
+// A child sink built from a parent inherits the parent's enabled warning groups. Sinks are
+// spun up per-translation-unit / per-module from a parent sink via the parent-copying ctor,
+// so an opt-in group enabled on the parent must carry over to nested/downstream compilations.
+SLANG_UNIT_TEST(warningLevelInheritedFromParentSink)
+{
+    DiagnosticSink parent;
+    parent.enableWarningLevel(WarningLevel::All);
+
+    // The parent-copying ctor forwards the enabled-group bitmask alongside flags/color/unicode.
+    DiagnosticSink child(nullptr, nullptr, &parent);
+
+    SLANG_CHECK(child.isWarningLevelEnabled(WarningLevel::All) == true);
+    SLANG_CHECK(emitted(child, makeWarning(3, WarningLevel::All)) == true);
+    // A group the parent did not enable is not inherited either.
+    SLANG_CHECK(child.isWarningLevelEnabled(WarningLevel::Extra) == false);
+    SLANG_CHECK(emitted(child, makeWarning(4, WarningLevel::Extra)) == false);
+}
+
 // Out-of-range group values (only reachable via a bogus int cast through the public
 // WarningLevel option) must not trigger an out-of-range shift / undefined behavior.
 SLANG_UNIT_TEST(warningLevelOutOfRangeIsSafe)
