@@ -170,9 +170,9 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 3);
-        SLANG_CHECK(cmdLine.m_args[0] == "-vk");
-        SLANG_CHECK(cmdLine.m_args[1] == "-Xslang");
-        SLANG_CHECK(cmdLine.m_args[2] == SlangTest::kTestOptimizationOption);
+        SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[1] == SlangTest::kTestOptimizationOption);
+        SLANG_CHECK(cmdLine.m_args[2] == "-vk");
     }
 
     {
@@ -238,9 +238,9 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 3);
-        SLANG_CHECK(cmdLine.m_args[0] == "-mtl");
-        SLANG_CHECK(cmdLine.m_args[1] == "-Xslang");
-        SLANG_CHECK(cmdLine.m_args[2] == SlangTest::kMetalRenderTestOptimizationOption);
+        SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[1] == SlangTest::kMetalRenderTestOptimizationOption);
+        SLANG_CHECK(cmdLine.m_args[2] == "-mtl");
     }
 
     {
@@ -250,9 +250,9 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 3);
-        SLANG_CHECK(cmdLine.m_args[0] == "-metal");
-        SLANG_CHECK(cmdLine.m_args[1] == "-Xslang");
-        SLANG_CHECK(cmdLine.m_args[2] == SlangTest::kMetalRenderTestOptimizationOption);
+        SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[1] == SlangTest::kMetalRenderTestOptimizationOption);
+        SLANG_CHECK(cmdLine.m_args[2] == "-metal");
     }
 
     // A Metal render test that already forwards a level keeps it.
@@ -270,10 +270,9 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         SLANG_CHECK(cmdLine.m_args[2] == "-O3");
     }
 
-    // Render-test commands append the default even after a trailing forwarding flag with no
-    // value. Unlike compiler-backed diagnostic tests, render-test directives never leave a
-    // forwarding flag dangling on purpose (such a command line is invalid for render-test), so
-    // appending is the pinned contract for this helper.
+    // The render-test default is inserted at the front, so a directive that accidentally
+    // leaves a forwarding flag without its value cannot consume the inserted default; the
+    // mistake stays visible as a dangling trailing flag.
     {
         CommandLine cmdLine;
         cmdLine.addArg("-vk");
@@ -282,9 +281,9 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 4);
-        SLANG_CHECK(cmdLine.m_args[0] == "-vk");
-        SLANG_CHECK(cmdLine.m_args[1] == "-xslang");
-        SLANG_CHECK(cmdLine.m_args[2] == "-Xslang");
-        SLANG_CHECK(cmdLine.m_args[3] == SlangTest::kTestOptimizationOption);
+        SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[1] == SlangTest::kTestOptimizationOption);
+        SLANG_CHECK(cmdLine.m_args[2] == "-vk");
+        SLANG_CHECK(cmdLine.m_args[3] == "-xslang");
     }
 }

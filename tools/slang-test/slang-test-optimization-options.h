@@ -119,6 +119,10 @@ inline bool hasRenderTestRenderApiArg(const List<String>& args, RenderApiType ap
 /// The option is forwarded with `-Xslang` because render-test options are not slangc options.
 /// Metal render tests receive `-O1` instead of `-O0`; see
 /// `kMetalRenderTestOptimizationOption` for why.
+///
+/// Like `addDefaultSlangOptimization`, the default is inserted at the front of the argument
+/// list rather than appended, so a directive that accidentally leaves an option without its
+/// required parameter cannot consume the inserted default and change the command's meaning.
 inline void addDefaultRenderTestSlangOptimization(CommandLine& ioCmdLine)
 {
     if (hasRenderTestSlangOptimizationArg(ioCmdLine.m_args))
@@ -126,8 +130,10 @@ inline void addDefaultRenderTestSlangOptimization(CommandLine& ioCmdLine)
 
     const bool isMetal = hasRenderTestRenderApiArg(ioCmdLine.m_args, RenderApiType::Metal);
 
-    ioCmdLine.addArg("-Xslang");
-    ioCmdLine.addArg(isMetal ? kMetalRenderTestOptimizationOption : kTestOptimizationOption);
+    ioCmdLine.m_args.insert(0, "-Xslang");
+    ioCmdLine.m_args.insert(
+        1,
+        isMetal ? kMetalRenderTestOptimizationOption : kTestOptimizationOption);
 }
 
 } // namespace SlangTest
