@@ -1601,10 +1601,13 @@ Result linkAndOptimizeIR(
     // of `RWStructuredBuffer` typed fields now.
     //
     // Gated on `appendConsumeStructuredBuffer` to skip this whole-module walk when
-    // neither type is present. The flag is safe against false-negatives: these types are
-    // only produced by the front-end and no later IR pass synthesizes them, so the
-    // post-specialization `calcRequiredLoweringPassSet` scan that precedes this point can
-    // never miss one that is still present here.
+    // neither type is present. `calcRequiredLoweringPassSet` flags accumulate across the
+    // post-link and post-specialization scans (they are not reset between them). These
+    // types are produced only by the front-end and no IR pass synthesizes them, so any
+    // instance present here was already present at the post-link scan and set the flag:
+    // the gate can never be a false-negative (skip a needed lowering). The flag can only
+    // be stale-true (e.g. an unused buffer dead-code-eliminated after a scan), which
+    // costs a harmless no-op walk, so gating is behavior-preserving.
     if (target != CodeGenTarget::HLSL && requiredLoweringPassSet.appendConsumeStructuredBuffer)
     {
         SLANG_PASS(lowerAppendConsumeStructuredBuffers, targetProgram, sink);
