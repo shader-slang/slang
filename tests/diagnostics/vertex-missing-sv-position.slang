@@ -30,7 +30,7 @@ struct VSOutput
 VSOutput vertexMain(uint vid : SV_VertexID)
 /*ON:
          ^^^^^^^^^^ vertex shader 'vertexMain' has no output with the 'SV_Position' system value semantic
-         ^^^^^^^^^^ vertex shader 'vertexMain' has no output with the 'SV_Position' system value semantic; if it feeds the rasterizer directly the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output)
+         ^^^^^^^^^^ vertex shader 'vertexMain' has no output with the 'SV_Position' system value semantic; if it feeds the rasterizer directly, the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output)
 */
 {
     VSOutput output;
@@ -43,7 +43,7 @@ VSOutput vertexMain(uint vid : SV_VertexID)
 void outParamMissing(uint vid : SV_VertexID, out float4 color : COLOR)
 /*ON:
      ^^^^^^^^^^^^^^^ vertex shader 'outParamMissing' has no output with the 'SV_Position' system value semantic
-     ^^^^^^^^^^^^^^^ vertex shader 'outParamMissing' has no output with the 'SV_Position' system value semantic; if it feeds the rasterizer directly the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output)
+     ^^^^^^^^^^^^^^^ vertex shader 'outParamMissing' has no output with the 'SV_Position' system value semantic; if it feeds the rasterizer directly, the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output)
 */
 {
     color = float4(1);

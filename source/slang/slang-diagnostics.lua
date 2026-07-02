@@ -4447,7 +4447,7 @@ warning(
     "vertex-shader-missing-sv-position",
     38052,
     "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic",
-    span { loc = "location", message = "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic; if it feeds the rasterizer directly the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output)" },
+    span { loc = "location", message = "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic; if it feeds the rasterizer directly, the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output)" },
     -- Pedantic (off by default): a vertex shader may legitimately omit SV_Position when its output
     -- feeds a geometry/tessellation/mesh stage that supplies the position itself (see #11884), and
     -- at VS-compile time we cannot tell that case apart from a real missing-position bug. The check
