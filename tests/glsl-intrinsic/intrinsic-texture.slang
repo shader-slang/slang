@@ -8,11 +8,11 @@
 //TEST:SIMPLE(filecheck=GLSL_GRADS):    -allow-glsl -stage fragment -entry fragMain -target glsl -DGLSL
 
 // Sampling gradients available. Implicit LOD sampling translates to OpImageSampleImplicitLod and similar
-//TEST:SIMPLE(filecheck=SPIR_GRADS):  -allow-glsl -stage fragment -entry fragMain -target spirv -DSPIRV
-//TEST:SIMPLE(filecheck=SPIR_GRADS):  -allow-glsl -stage compute -entry computeMain -target spirv -DSPIRV -capability SPV_KHR_compute_shader_derivatives
+//TEST:SIMPLE(filecheck=SPIR_GRADS):  -allow-glsl -stage fragment -entry fragMain -target spirv -DSPIRV -O3
+//TEST:SIMPLE(filecheck=SPIR_GRADS):  -allow-glsl -stage compute -entry computeMain -target spirv -DSPIRV -capability SPV_KHR_compute_shader_derivatives -O3
 
 // sampling gradients not available. Implicit LOD sampling translates to OpImageSampleExplicitLod with Lod=0 and similar
-//TEST:SIMPLE(filecheck=SPIR_NOGRADS):  -allow-glsl -stage vertex -entry vertexMain -target spirv -DSPIRV -DVERTEX_STAGE -DNO_GRADS
+//TEST:SIMPLE(filecheck=SPIR_NOGRADS):  -allow-glsl -stage vertex -entry vertexMain -target spirv -DSPIRV -DVERTEX_STAGE -DNO_GRADS -O3
 
 //TEST:SIMPLE(filecheck=CUDA): -allow-glsl -stage compute  -entry computeMain -target cuda -DCUDA
 //TEST:SIMPLE(filecheck=CUDA): -allow-glsl -stage fragment -entry fragMain -target cuda -DCUDA
