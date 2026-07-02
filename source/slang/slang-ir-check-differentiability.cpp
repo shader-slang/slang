@@ -91,16 +91,23 @@ public:
     // backward-derivative function. `bwd_diff(f)` lowers to a `BackwardDifferentiate` (or the
     // `LegacyBackwardDifferentiate` form used by the pre-2.0 auto-diff path); calling that value
     // is how a `bwd_diff(f)(...)` invocation appears in the IR at this checking stage.
+    //
+    // For a generic callee such as `bwd_diff(g<float>)` the operand is wrapped as
+    // `Specialize(BackwardDifferentiate(g), float)`, so unwrap the `Specialize`/generic layers
+    // first (but not the differentiation op itself) before inspecting the opcode.
     static bool isBackwardDerivativeValue(IRInst* inst)
     {
         if (!inst)
             return false;
+        inst = getResolvedInstForDecorations(inst, /*resolveThroughDifferentiation:*/ false);
         switch (inst->getOp())
         {
         case kIROp_BackwardDifferentiate:
         case kIROp_LegacyBackwardDifferentiate:
         case kIROp_BackwardDifferentiatePrimal:
         case kIROp_BackwardDifferentiatePropagate:
+        case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+        case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
             return true;
         default:
             return false;
