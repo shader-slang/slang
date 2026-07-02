@@ -124,6 +124,76 @@ public:
 
 struct ShaderBindingRange;
 
+struct UniformParamUsage
+{
+    // Parent CB or parameter block binding identity. Two spaces are
+    // recorded because the byte query and the reflection emitter key off
+    // different ones, and they diverge for a CB bound to a non zero
+    // descriptor set (see ByteGranularityParameterUsageInfo for the full
+    // rationale):
+    //   parentSpace        - the space the Uniform category reports
+    //                        (RegisterSpace offset only); what
+    //                        isParameterLocationUsed(Uniform, space) is
+    //                        queried with. Each usedRanges entry carries
+    //                        this as its spaceIndex.
+    //   parentBindingSpace - the parent binding's own space (includes the
+    //                        descriptor set); what the emitter matches via
+    //                        getBindingSpace. Together with
+    //                        parentBindingIndex it disambiguates multiple
+    //                        CBs in a shared register space.
+    // Each entry in usedRanges has category=Uniform,
+    // spaceIndex=parentSpace, registerIndex=byte offset within the
+    // parent, and registerCount=byte size.
+    UInt parentSpace;
+    UInt parentBindingSpace;
+    UInt parentBindingIndex;
+    List<ShaderBindingRange> usedRanges;
+    // True when the IR pass deliberately did not analyze this param
+    // (unbounded uniform element type, etc.). usedRanges is empty in
+    // that case and any byte query against this parent should yield
+    // SLANG_E_NOT_AVAILABLE.
+    bool isUntracked;
+};
+
+// Result of resolving a uniform bearing param's parent binding identity.
+// found is false when the param carries neither a constant buffer nor a
+// descriptor slot binding, in which case there is no parent to scope its
+// byte ranges against.
+struct UniformParentBinding
+{
+    UInt space;
+    UInt bindingIndex;
+    bool found;
+};
+
+// Choose the (space, bindingIndex) that identifies a uniform bearing
+// param's parent constant buffer or parameter block. A constant buffer
+// can expose a ConstantBuffer binding (D3D b register), a
+// DescriptorTableSlot binding (Vulkan/SPIR-V descriptor), or both.
+//
+// The IR pass that records byte ranges and the reflection emitter that
+// reports them must agree on this key, or the ranges silently fail to
+// match. Both route through this one rule: prefer the ConstantBuffer
+// binding when present, otherwise the DescriptorTableSlot binding,
+// otherwise report not found. Presence is decided by the caller (the
+// layout actually carries an offset for that category), never by
+// treating a zero offset as absent: a zero offset is a real binding
+// (register b0, descriptor binding 0).
+inline UniformParentBinding selectUniformParentBinding(
+    bool hasConstantBuffer,
+    UInt constantBufferSpace,
+    UInt constantBufferIndex,
+    bool hasDescriptorTableSlot,
+    UInt descriptorTableSlotSpace,
+    UInt descriptorTableSlotIndex)
+{
+    if (hasConstantBuffer)
+        return {constantBufferSpace, constantBufferIndex, true};
+    if (hasDescriptorTableSlot)
+        return {descriptorTableSlotSpace, descriptorTableSlotIndex, true};
+    return {0, 0, false};
+}
+
 class IArtifactPostEmitMetadata : public slang::IMetadata
 {
 public:
@@ -141,6 +211,11 @@ public:
 
     /// Get the debug build identifier for a base and debug spirv pair
     SLANG_NO_THROW virtual const char* SLANG_MCALL getDebugBuildIdentifier() = 0;
+
+    /// Per uniform bearing parameter, a scoped list of byte ranges that
+    /// reachable code touched. See UniformParamUsage for the scoping
+    /// contract.
+    SLANG_NO_THROW virtual Slice<UniformParamUsage> SLANG_MCALL getUniformParamUsage() = 0;
 };
 
 } // namespace Slang

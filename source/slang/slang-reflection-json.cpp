@@ -1,6 +1,7 @@
 
 #include "slang-reflection-json.h"
 
+#include "../compiler-core/slang-artifact-associated-impl.h"
 #include "../core/slang-blob.h"
 #include "slang-ast-support-types.h"
 #include "slang.h"
@@ -1092,6 +1093,101 @@ static void emitEntryPointParamJSON(
     }
 
     emitReflectionVarBindingInfoJSON(writer, param, request, entryPointIndex);
+
+    if (auto typeLayout = param->getTypeLayout())
+    {
+        auto kind = typeLayout->getKind();
+        if (kind == slang::TypeReflection::Kind::ConstantBuffer ||
+            kind == slang::TypeReflection::Kind::ParameterBlock ||
+            kind == slang::TypeReflection::Kind::Struct)
+        {
+            // Look up the param's primary CB or parameter block binding.
+            // For a CB the binding lives in the ConstantBuffer category;
+            // for a parameter block on Vulkan style targets it lives in
+            // DescriptorTableSlot. We must pick the same one the IR pass
+            // picked (selectUniformParentBinding), and that choice is by
+            // category presence, not offset value: a zero offset is a
+            // real binding (register b0), so getOffset returning 0 cannot
+            // stand in for "category absent". We test presence by walking
+            // the categories the layout actually carries.
+            bool hasConstantBuffer = false;
+            bool hasDescriptorTableSlot = false;
+            for (unsigned int i = 0, n = param->getCategoryCount(); i < n; ++i)
+            {
+                switch (param->getCategoryByIndex(i))
+                {
+                case slang::ParameterCategory::ConstantBuffer:
+                    hasConstantBuffer = true;
+                    break;
+                case slang::ParameterCategory::DescriptorTableSlot:
+                    hasDescriptorTableSlot = true;
+                    break;
+                default:
+                    break;
+                }
+            }
+            UniformParentBinding parent = selectUniformParentBinding(
+                hasConstantBuffer,
+                param->getBindingSpace(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER),
+                param->getOffset(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER),
+                hasDescriptorTableSlot,
+                param->getBindingSpace(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT),
+                param->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT));
+            SlangUInt spaceIndex =
+                parent.found ? parent.space
+                             : param->getBindingSpace(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER);
+            SlangUInt parentBindingIndex = parent.bindingIndex;
+
+            // If the metadata is unavailable for any reason (codegen
+            // skipped, request without backing artifact, etc.) we just
+            // omit the usedByteRanges key. That matches how the rest of
+            // this emitter handles missing data.
+            ComPtr<slang::IComponentType> program;
+            ComPtr<slang::IMetadata> metadata;
+            IArtifactPostEmitMetadata* postEmit = nullptr;
+            if (request &&
+                SLANG_SUCCEEDED(request->getProgramWithEntryPoints(program.writeRef())) &&
+                SLANG_SUCCEEDED(
+                    program->getEntryPointMetadata(entryPointIndex, 0, metadata.writeRef())))
+            {
+                postEmit = static_cast<IArtifactPostEmitMetadata*>(
+                    metadata->castAs(IArtifactPostEmitMetadata::getTypeGuid()));
+            }
+            if (postEmit)
+            {
+                for (const auto& entry : postEmit->getUniformParamUsage())
+                {
+                    // Match the parent binding's own space (which includes
+                    // the descriptor set), since spaceIndex here came from
+                    // getBindingSpace on the parent CB or parameter block.
+                    if (entry.parentBindingSpace != spaceIndex ||
+                        entry.parentBindingIndex != parentBindingIndex)
+                        continue;
+                    if (entry.isUntracked)
+                    {
+                        writer << ",\n\"usedByteRangesUnavailable\": true";
+                    }
+                    else
+                    {
+                        writer << ",\n\"usedByteRanges\": [";
+                        writer.indent();
+                        bool first = true;
+                        for (const auto& r : entry.usedRanges)
+                        {
+                            if (!first)
+                                writer << ",";
+                            first = false;
+                            writer << "\n{\"offset\": " << (uint64_t)r.registerIndex
+                                   << ", \"size\": " << (uint64_t)r.registerCount << "}";
+                        }
+                        writer.dedent();
+                        writer << "\n]";
+                    }
+                    break;
+                }
+            }
+        }
+    }
 
     writer.dedent();
     writer << "\n}";
