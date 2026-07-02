@@ -269,4 +269,22 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         SLANG_CHECK(cmdLine.m_args[1] == "-Xslang");
         SLANG_CHECK(cmdLine.m_args[2] == "-O3");
     }
+
+    // Render-test commands append the default even after a trailing forwarding flag with no
+    // value. Unlike compiler-backed diagnostic tests, render-test directives never leave a
+    // forwarding flag dangling on purpose (such a command line is invalid for render-test), so
+    // appending is the pinned contract for this helper.
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-vk");
+        cmdLine.addArg("-xslang");
+
+        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 4);
+        SLANG_CHECK(cmdLine.m_args[0] == "-vk");
+        SLANG_CHECK(cmdLine.m_args[1] == "-xslang");
+        SLANG_CHECK(cmdLine.m_args[2] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[3] == SlangTest::kTestOptimizationOption);
+    }
 }
