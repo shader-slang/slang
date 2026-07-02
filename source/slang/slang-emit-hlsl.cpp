@@ -12,6 +12,37 @@
 namespace Slang
 {
 
+// The Shader-Execution-Reordering (SER) ABI a `HitObject` value uses on an HLSL target.
+// NVAPI SER (`NvHitObject` / `NvReorderThread`) and DXR-1.3 native SER (`dx::HitObject`) are
+// distinct, non-interchangeable ABIs: the emitted HitObject *type* and every HitObject
+// *operation* applied to it must resolve to the same one, or the generated HLSL is invalid.
+enum class HitObjectSERAbi
+{
+    None,      // target implies neither SER ABI
+    NVAPI,     // NVAPI extension SER (requires `hlsl_nvapi`)
+    DxrNative, // DXR 1.3 native SER (requires SM 6.9)
+};
+
+// Return the SER ABI implied by `targetCaps`. This is the single source of truth for the HLSL
+// emitter's HitObject-ABI decision. It resolves NVAPI-vs-native using the SAME primitive that
+// `specializeTargetSwitch` uses to pick a HitObject op's `__target_switch` case
+// (`atLeastOneSetImpliedInOther(hlsl_nvapi)`), so the emitted HitObject type and the emitted
+// HitObject operations can never disagree about which ABI is in effect — even on a
+// partial-stage capability set, where the older whole-set `implies` predicate could diverge.
+static HitObjectSERAbi getHitObjectSERAbi(const CapabilitySet& targetCaps)
+{
+    auto isImplied = [&](CapabilityName atom)
+    {
+        return ((int)targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(atom)) &
+                (int)CapabilitySet::ImpliesReturnFlags::Implied) != 0;
+    };
+    if (isImplied(CapabilityName::hlsl_nvapi))
+        return HitObjectSERAbi::NVAPI;
+    if (isImplied(CapabilityName::_sm_6_9))
+        return HitObjectSERAbi::DxrNative;
+    return HitObjectSERAbi::None;
+}
+
 bool HLSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
     // Barrier flag conversion ops do not have a standalone HLSL temporary form. The
@@ -1963,28 +1994,26 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_HitObjectType:
         {
-            // Emit appropriate HitObject type based on capability
-            // User must explicitly specify which SER path to use
-            auto targetCaps = getTargetReq()->getTargetCaps();
-            auto nvapiCapabilitySet = CapabilitySet(CapabilityName::hlsl_nvapi);
-            auto sm69CapabilitySet = CapabilitySet(CapabilityName::_sm_6_9);
-
-            if (targetCaps.implies(nvapiCapabilitySet))
+            // Emit the HitObject type for the SER ABI the target implies. `getHitObjectSERAbi`
+            // is the single authority for this decision, so the type emitted here agrees with
+            // how HitObject operations resolve their `__target_switch`. The user selects a SER
+            // path via capabilities (e.g. `ser_nvapi` vs a native SM 6.9 DXR profile).
+            switch (getHitObjectSERAbi(getTargetReq()->getTargetCaps()))
             {
-                // NVAPI extension: use NvHitObject (matches `case hlsl_nvapi:` calls)
+            case HitObjectSERAbi::NVAPI:
+                // NVAPI extension: use NvHitObject (matches `case hlsl_nvapi:` op calls).
                 m_writer->emit("NvHitObject");
-                // Ensure NVAPI header is included when using NvHitObject type
+                // Ensure NVAPI header is included when using NvHitObject type.
                 m_extensionTracker->m_requiresNVAPI = true;
-            }
-            else if (targetCaps.implies(sm69CapabilitySet))
-            {
-                // DXR 1.3 native: use dx::HitObject namespace
+                break;
+            case HitObjectSERAbi::DxrNative:
+                // DXR 1.3 native: use the dx::HitObject namespace type.
                 m_writer->emit("dx::HitObject");
-            }
-            else
-            {
+                break;
+            case HitObjectSERAbi::None:
                 SLANG_UNEXPECTED("HitObjectType requires either SM 6.9+ (DXR 1.3 native) or "
                                  "hlsl_nvapi capability");
+                break;
             }
             return;
         }
