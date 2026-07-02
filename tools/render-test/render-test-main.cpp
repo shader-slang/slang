@@ -212,6 +212,49 @@ static rhi::Feature _getFeatureFromName(const UnownedStringSlice& featureName)
     return rhi::Feature::_Count;
 }
 
+/// Returns whether the test requested the `shader-abort` render feature.
+///
+/// In shader-abort mode the dispatch is expected to fire an `abort()` (OpAbortKHR), which on
+/// Vulkan causes device loss; slang-rhi recovers the abort message via the device-fault path
+/// and forwards it through the debug callback. Render-test enters a device-loss-tolerant capture
+/// mode (see the dispatch site) only when this feature is requested, so that every other test
+/// keeps its existing behavior.
+static bool _isShaderAbortRequested(const Options& options)
+{
+    for (const auto& name : options.renderFeatures)
+    {
+        if (_getFeatureFromName(name.getUnownedSlice()) == rhi::Feature::ShaderAbort)
+            return true;
+    }
+    return false;
+}
+
+/// Prints any captured "Shader abort: ..." messages from `callback` to `out`, one per line.
+///
+/// slang-rhi prefixes a shader abort's host-delivered message with "Shader abort: "; the debug
+/// callback may also collect unrelated validation/driver errors during a device-loss, so this
+/// filters to just the abort lines. Emitting them on render-test's stdout lets a `filecheck=`
+/// line in the test assert the abort text (the harness FileCheck runs against captured stdout).
+static bool _printCapturedShaderAbortMessages(CoreDebugCallback& callback, WriterHelper out)
+{
+    const String captured = callback.getString();
+    List<UnownedStringSlice> lines;
+    StringUtil::calcLines(captured.getUnownedSlice(), lines);
+    const UnownedStringSlice prefix = UnownedStringSlice::fromLiteral("Shader abort: ");
+    bool foundMessage = false;
+    for (const auto& line : lines)
+    {
+        Index prefixIndex = line.indexOf(prefix);
+        if (prefixIndex != -1)
+        {
+            UnownedStringSlice message = line.tail(prefixIndex);
+            out.print("%.*s\n", (int)message.getLength(), message.begin());
+            foundMessage = true;
+        }
+    }
+    return foundMessage;
+}
+
 class ProgramVars;
 
 struct ShaderOutputPlan
@@ -1501,8 +1544,8 @@ Result RenderTestApp::update()
         passEncoder->end();
     }
     m_startTicks = Process::getClockTick();
-    m_queue->submit(encoder->finish());
-    m_queue->waitOnHost();
+    SLANG_RETURN_ON_FAIL(m_queue->submit(encoder->finish()));
+    SLANG_RETURN_ON_FAIL(m_queue->waitOnHost());
 
     // If we are in a mode where output is requested, we need to snapshot the back buffer here
     if (m_options.outputPath.getLength() || m_options.performanceProfile)
@@ -1664,6 +1707,12 @@ static SlangResult _innerMain(
     if (options.deviceType == DeviceType::Default)
     {
         return SLANG_OK;
+    }
+    // Shader abort tests intentionally lose the device, so a cached device would poison later
+    // render-test invocations in the same slang-test process.
+    if (_isShaderAbortRequested(options))
+    {
+        options.cacheRhiDevice = false;
     }
 
     ShaderCompilerUtil::Input input;
@@ -2042,13 +2091,50 @@ static SlangResult _innerMain(
         return SLANG_OK;
     }
 
+    // In shader-abort mode the dispatch is expected to fire an abort() that loses the device, so
+    // capture the abort message slang-rhi forwards through the debug callback and print it to
+    // stdout for a `filecheck=` assertion. This whole block is gated on the shader-abort feature
+    // being requested, so non-abort tests keep their existing behavior unchanged.
+    const bool shaderAbortMode = _isShaderAbortRequested(options);
+
     {
         RenderTestApp app;
         renderDocBeginFrame();
         SLANG_RETURN_ON_FAIL(app.initialize(session, deviceWrapper.get(), options, input));
-        app.update();
-        renderDocEndFrame();
-        app.finalize();
+
+        if (shaderAbortMode)
+        {
+            // Re-route the device's debug bridge to a local capture buffer for the dispatch, so
+            // render-test owns the abort text regardless of how the harness wired its callback.
+            renderer_test::CoreDebugCallback abortCapture;
+            {
+                renderer_test::ScopedCoreDebugCallback scopedAbortCapture(
+                    *debugCallback,
+                    &abortCapture);
+
+                // A shader abort loses the device, so update() may fail here. Keep that result
+                // until after cleanup and message printing so a successful capture can still be
+                // checked by stdout FileCheck, while a missing message remains a real failure.
+                SlangResult updateResult = app.update();
+
+                // Keep the abort capture active through cleanup as well. Some drivers surface
+                // the device-fault message when the lost device is finalized, not during the
+                // queue wait itself.
+                renderDocEndFrame();
+                app.finalize();
+                bool capturedShaderAbortMessage =
+                    _printCapturedShaderAbortMessages(abortCapture, stdWriters->getOut());
+                if (SLANG_FAILED(updateResult) && !capturedShaderAbortMessage)
+                    return updateResult;
+            }
+        }
+        else
+        {
+            SLANG_RETURN_ON_FAIL(app.update());
+
+            renderDocEndFrame();
+            app.finalize();
+        }
     }
 
     return SLANG_OK;
