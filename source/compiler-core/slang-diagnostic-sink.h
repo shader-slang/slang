@@ -88,10 +88,12 @@ struct DiagnosticInfo
     char const* messageFormat;
 
     /// The warning group this diagnostic belongs to. Only meaningful for warnings; the default of
-    /// `WarningLevel::Default` means "always emitted". Tagging a warning with another group makes
-    /// it opt-in via the corresponding -Wall/-Wextra/-Wpedantic flag (or the WarningLevel API
-    /// option). Has a default so the many aggregate initializers that predate this field (and the
-    /// `DIAGNOSTIC(...)` macro catalogs) keep compiling unchanged.
+    /// `WarningLevel::Default` means "always emitted". Tagging a warning with another group gates
+    /// it on whether that group is currently enabled (see the enabled-groups bitmask below):
+    /// `Extra` is on by default, `All`/`Pedantic` are off by default, and each is toggled by the
+    /// corresponding -Wall/-Wextra/-Wpedantic flag (or the WarningLevel API option). Has a default
+    /// so the many aggregate initializers that predate this field (and the `DIAGNOSTIC(...)` macro
+    /// catalogs) keep compiling unchanged.
     WarningLevel level = WarningLevel::Default;
 };
 
