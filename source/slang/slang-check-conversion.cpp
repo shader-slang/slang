@@ -14,7 +14,6 @@
 
 namespace Slang
 {
-
 namespace
 {
 
@@ -2399,8 +2398,7 @@ bool SemanticsVisitor::_coerce(
     // legitimately broadcasts into them via their element constructor, and any
     // aggregate/struct `toType` is excluded because it may expose a generic
     // initializer that accepts `T`. Both of those must still take the search below.
-    if (as<BasicExpressionType>(toType) &&
-        isDeclRefTypeOf<GenericTypeParamDeclBase>(fromType.type))
+    if (as<BasicExpressionType>(toType) && isDeclRefTypeOf<GenericTypeParamDeclBase>(fromType.type))
     {
         return _failedCoercion(toType, outToExpr, fromExpr, sink);
     }
