@@ -4050,14 +4050,26 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
     if (!a || !b)
         return false;
 
-    // Same declaration reference.
-    if (auto aDeclRef = as<DeclRefExpr>(a))
-    {
-        auto bDeclRef = as<DeclRefExpr>(b);
-        return bDeclRef && aDeclRef->declRef.getDecl() == bDeclRef->declRef.getDecl();
-    }
+    // Same implicit object: `this` vs `this`. Inside a method body an
+    // unqualified member `x` is rewritten to `MemberExpr(base=ThisExpr,
+    // decl=x)`, so the MemberExpr recursion below bottoms out here comparing
+    // the two `this` bases. ThisExpr does not derive from DeclRefExpr, so it
+    // needs its own case; both operands referring to `this` are the same
+    // storage. This is what makes `twoInoutInt(x, x)` in a method (i.e.
+    // `this.x` aliasing itself) still be diagnosed.
+    if (as<ThisExpr>(a))
+        return as<ThisExpr>(b) != nullptr;
 
-    // Same member of the same base: s.x vs s.x.
+    // Same member of the same base: s.x vs s.x, but not s.x vs t.x.
+    //
+    // This must be checked before the bare-DeclRefExpr case below, because
+    // MemberExpr derives from DeclRefExpr. If we let the DeclRefExpr branch
+    // catch a MemberExpr it would compare only the member declaration and
+    // ignore the base object, so `a.minBounds` and `b.minBounds` (same field
+    // of two different objects) would be wrongly reported as aliasing. We
+    // must recurse into the base expressions to confirm they are the same
+    // storage. (DerefMemberExpr for buffer-element member access derives from
+    // MemberExpr, so it is handled here too.)
     if (auto aMember = as<MemberExpr>(a))
     {
         auto bMember = as<MemberExpr>(b);
@@ -4066,6 +4078,15 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
         if (aMember->declRef.getDecl() != bMember->declRef.getDecl())
             return false;
         return _exprsDefinitelyAlias(aMember->baseExpression, bMember->baseExpression);
+    }
+
+    // Same bare declaration reference: a bare variable (VarExpr) or static
+    // member (StaticMemberExpr), which have no base object to compare.
+    if (auto aDeclRef = as<DeclRefExpr>(a))
+    {
+        auto bDeclRef = as<DeclRefExpr>(b);
+        return bDeclRef && !as<MemberExpr>(b) &&
+               aDeclRef->declRef.getDecl() == bDeclRef->declRef.getDecl();
     }
 
     // Same element of the same base: arr[0] vs arr[0].
