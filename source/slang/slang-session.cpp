@@ -247,11 +247,10 @@ slang::IModule* Linkage::loadModuleFromBlob(
     try
     {
         SHA1::Digest sourceDigest = computeSourceBlobDigest(source);
-        auto digestToString = [](SHA1::Digest const& d) { return d.toString(); };
 
         String moduleNameStr = moduleName;
         if (!moduleName)
-            moduleNameStr = digestToString(sourceDigest);
+            moduleNameStr = sourceDigest.toString();
 
         auto name = getNamePool()->getName(moduleNameStr);
         RefPtr<LoadedModule> loadedModule;
@@ -284,7 +283,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
         if (pathStr.getLength() == 0)
         {
             // If path is empty, use a digest from source as path.
-            pathStr = digestToString(sourceDigest);
+            pathStr = sourceDigest.toString();
         }
         auto pathInfo = PathInfo::makeFromString(pathStr);
         if (File::exists(pathStr))
