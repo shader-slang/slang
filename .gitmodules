@@ -10,9 +10,6 @@
 [submodule "external/imgui"]
 	path = external/imgui
 	url = https://github.com/ocornut/imgui.git
-	# Vendored fork of imgui v1.68; the pinned commit carries a slang-local
-	# patch and is not on upstream master. See issue #9336 / PR #10858.
-	slang-skip-pin-check = true
 [submodule "external/spirv-tools"]
 	path = external/spirv-tools
 	url = https://github.com/KhronosGroup/SPIRV-Tools.git
