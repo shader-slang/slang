@@ -3,6 +3,7 @@
 #define SLANG_TEST_OPTIMIZATION_OPTIONS_H
 
 #include "core/slang-command-line.h"
+#include "core/slang-render-api-util.h"
 #include "core/slang-type-text-util.h"
 
 namespace Slang
@@ -11,6 +12,15 @@ namespace SlangTest
 {
 
 static constexpr const char* kTestOptimizationOption = "-O0";
+
+/// The default optimization level for Metal render tests.
+///
+/// Metal render tests compile through the downstream `metal` toolchain to produce a metallib,
+/// and macOS CI showed mass flaky failures when that toolchain runs at `-O0` (the generated MSL
+/// itself is identical at every level). `-O1` maps to the toolchain's previous default flags, so
+/// Metal render tests keep the behavior that passed CI while still receiving an explicit
+/// slang-test-controlled level like every other target.
+static constexpr const char* kMetalRenderTestOptimizationOption = "-O1";
 
 /// Returns true when an argument is a slangc optimization-level option.
 ///
@@ -83,16 +93,36 @@ inline bool hasRenderTestSlangOptimizationArg(const List<String>& args)
     return false;
 }
 
+/// Returns true when a render-test command explicitly selects the given API.
+inline bool hasRenderTestRenderApiArg(const List<String>& args, RenderApiType apiType)
+{
+    for (const auto& arg : args)
+    {
+        if (arg.getLength() <= 1 || arg[0] != '-')
+            continue;
+
+        UnownedStringSlice name(arg.getUnownedSlice().begin() + 1, arg.getUnownedSlice().end());
+        if (RenderApiUtil::findApiTypeByName(name) == apiType)
+            return true;
+    }
+
+    return false;
+}
+
 /// Adds the slang-test default optimization level to render-test commands.
 ///
 /// The option is forwarded with `-Xslang` because render-test options are not slangc options.
+/// Metal render tests receive `-O1` instead of `-O0`; see
+/// `kMetalRenderTestOptimizationOption` for why.
 inline void addDefaultRenderTestSlangOptimization(CommandLine& ioCmdLine)
 {
     if (hasRenderTestSlangOptimizationArg(ioCmdLine.m_args))
         return;
 
+    const bool isMetal = hasRenderTestRenderApiArg(ioCmdLine.m_args, RenderApiType::Metal);
+
     ioCmdLine.addArg("-Xslang");
-    ioCmdLine.addArg(kTestOptimizationOption);
+    ioCmdLine.addArg(isMetal ? kMetalRenderTestOptimizationOption : kTestOptimizationOption);
 }
 
 } // namespace SlangTest

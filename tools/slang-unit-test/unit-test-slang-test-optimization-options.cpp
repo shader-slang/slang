@@ -213,6 +213,8 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         SLANG_CHECK(cmdLine.m_args[4] == "-X.");
     }
 
+    // Metal render tests receive the Metal-specific default level; see
+    // kMetalRenderTestOptimizationOption for why.
     {
         CommandLine cmdLine;
         cmdLine.addArg("-mtl");
@@ -222,7 +224,7 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         SLANG_CHECK(cmdLine.m_args.getCount() == 3);
         SLANG_CHECK(cmdLine.m_args[0] == "-mtl");
         SLANG_CHECK(cmdLine.m_args[1] == "-Xslang");
-        SLANG_CHECK(cmdLine.m_args[2] == SlangTest::kTestOptimizationOption);
+        SLANG_CHECK(cmdLine.m_args[2] == SlangTest::kMetalRenderTestOptimizationOption);
     }
 
     {
@@ -234,6 +236,21 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         SLANG_CHECK(cmdLine.m_args.getCount() == 3);
         SLANG_CHECK(cmdLine.m_args[0] == "-metal");
         SLANG_CHECK(cmdLine.m_args[1] == "-Xslang");
-        SLANG_CHECK(cmdLine.m_args[2] == SlangTest::kTestOptimizationOption);
+        SLANG_CHECK(cmdLine.m_args[2] == SlangTest::kMetalRenderTestOptimizationOption);
+    }
+
+    // A Metal render test that already forwards a level keeps it.
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-mtl");
+        cmdLine.addArg("-Xslang");
+        cmdLine.addArg("-O3");
+
+        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 3);
+        SLANG_CHECK(cmdLine.m_args[0] == "-mtl");
+        SLANG_CHECK(cmdLine.m_args[1] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[2] == "-O3");
     }
 }

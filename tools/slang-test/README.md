@@ -126,6 +126,15 @@ optimization option to slangc:
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -Xslang -O3
 ```
 
+Besides `-Xslang <option>`, the forwarding forms `-compile-arg <option>`,
+`-xslang <option>`, and a `-Xslang... <options...> -X.` block are also
+recognized. Prefer the `-Xslang <option>` form shown above for new tests.
+
+Metal render tests are the one exception to the `-O0` default: they receive
+`-Xslang -O1` instead, because the downstream `metal` toolchain that produces
+the metallib is unstable at `-O0` on macOS CI. The generated MSL source is
+identical at every level, so this only affects the downstream compilation.
+
 The recognized optimization spellings are `-O`, `-O0`, `-Onone`, `-O1`,
 `-Odefault`, `-O2`, `-Ohigh`, `-O3`, and `-Omaximal`. Prefer the lowest level
 that preserves the test's expected output.
