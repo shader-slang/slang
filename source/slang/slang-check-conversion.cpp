@@ -2374,6 +2374,60 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    // Before entering the initializer-based conversion search that makes up the
+    // rest of this function, fast-reject the one shape that is both provably
+    // doomed and hot: at an implicit coercion site, an opaque generic type
+    // parameter can never convert to a concrete *scalar* builtin type. This
+    // matters because ranking an operator call on a constrained generic `T`
+    // against the many concrete builtin scalar overloads
+    // (`operator*(float,float)`, ...) drives one full recursive conversion
+    // search per rejected candidate — the dominant semantic-checking cost in
+    // generic-heavy code (issue #11897).
+    //
+    // Soundness: `_coerce` accepts a generic type parameter through three
+    // earlier paths — exact match (`toType == fromType`), the subtype-witness
+    // path (a declared constraint supertype), and the type-equality-witness
+    // path (`where T == X` constraints). Once those have failed, the only
+    // remaining route is the initializer search below, and at an implicit site
+    // nested conversions are disallowed (`disallowNestedConversions` below), so
+    // an initializer candidate could only apply if its parameter type exactly
+    // matched the opaque `T` itself. No scalar builtin declares such an
+    // initializer. Note that this is a contingent property of the core module,
+    // not a theorem: a user extension like
+    // `extension float { __init<U : IFoo>(U x); }` would break it, and if that
+    // ever needs supporting this rejection must instead be gated on a cached
+    // per-`toType` "has a generic initializer" check. It is also specifically a
+    // property of `BasicExpressionType`: `FloatE4M3`/`FloatE5M2`/`BFloat16`
+    // *do* declare generic initializers, and stay on the search path only
+    // because they are `DeclRefType`s, not `BasicExpressionType`s.
+    //
+    // Explicit coercion sites must not take this shortcut: there nested
+    // conversions are allowed, so the search below can legitimately succeed —
+    // e.g. `float(t)` under `where T == int` applies `float.__init(int)`
+    // through the cost-0 equality-witness conversion `T -> int`.
+    //
+    // The target-type test is deliberately narrow: only a *scalar* `toType` is
+    // rejected. `vector<T,N>` / `matrix<T,N,M>` must still take the search
+    // because a scalar generic `T` legitimately broadcasts into them via their
+    // element constructor, and an aggregate/struct `toType` may expose a
+    // generic initializer that accepts `T`. The source-type test uses
+    // `GenericTypeParamDeclBase`, so it also covers generic type-pack
+    // parameters: a bare decl-ref to a pack parameter is just as opaque as an
+    // ordinary one, and no scalar-builtin initializer can accept a pack.
+    //
+    // (The `ImplicitCastMethodKey` failure cache below cannot absorb this cost
+    // instead: its key includes the `Type*`, and every generic declaration has
+    // a distinct `T` type object, so each declaration pays the doomed search
+    // once per scalar target before its failure is cached.)
+    const bool toTypeIsScalarBuiltin = as<BasicExpressionType>(toType) != nullptr;
+    const auto fromTypeGenericParamDeclRef =
+        isDeclRefTypeOf<GenericTypeParamDeclBase>(fromType.type);
+    if (site != CoercionSite::ExplicitCoercion && toTypeIsScalarBuiltin &&
+        fromTypeGenericParamDeclRef)
+    {
+        return _failedCoercion(toType, outToExpr, fromExpr, sink);
+    }
+
     // The main general-purpose approach for conversion is
     // using suitable marked initializer ("constructor")
     // declarations on the target type.
@@ -2381,27 +2435,6 @@ bool SemanticsVisitor::_coerce(
     // This is treated as a form of overload resolution,
     // since we are effectively forming an overloaded
     // call to one of the initializers in the target type.
-
-    // Fast rejection: an opaque generic type parameter cannot be converted to a
-    // concrete *scalar* builtin type through an initializer. A generic parameter's
-    // only valid coercions are to its declared constraint supertypes (handled by the
-    // subtype-witness path above) and to itself (exact-match path above); there is no
-    // initializer on a scalar builtin that accepts an opaque parameter, so the
-    // initializer-based conversion search below would do a full (recursive) overload
-    // resolution only to fail. This is the dominant `_coerce` cost when ranking an
-    // operator on a constrained generic `T` against the many concrete builtin scalar
-    // operator overloads (each rejected `operator OP(float,float)`-style candidate
-    // drives one such doomed search).
-    //
-    // The check is intentionally narrow: only a *scalar* `toType` is rejected.
-    // `vector<T,N>` / `matrix<T,N,M>` are excluded because a scalar generic `T`
-    // legitimately broadcasts into them via their element constructor, and any
-    // aggregate/struct `toType` is excluded because it may expose a generic
-    // initializer that accepts `T`. Both of those must still take the search below.
-    if (as<BasicExpressionType>(toType) && isDeclRefTypeOf<GenericTypeParamDeclBase>(fromType.type))
-    {
-        return _failedCoercion(toType, outToExpr, fromExpr, sink);
-    }
 
     OverloadResolveContext overloadContext;
     overloadContext.disallowNestedConversions = (site != CoercionSite::ExplicitCoercion);
