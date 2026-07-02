@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#extensiondecl
-//META: doc_section_digest=0cda32200a5996680b579cdf7db2b997f7ed67ad17396bc603809449a7bab1db
+//META: doc_section_digest=05e6c25d2d157e10628b6b3d7185f1f92df372676d332ad265d71884285f0c78
 //META: purpose=An ExtensionDecl attaches new members to an existing type; the added member is callable on values of that type.
 //META: intent=functional
 //META: pipeline_stage=check
