@@ -3612,6 +3612,13 @@ err(
     span { loc = "param:Decl" }
 )
 
+err(
+    "multiple-depth-output-semantics",
+    30705,
+    "a fragment entry point can declare at most one depth output, but '~conflictingSemantic' conflicts with the earlier '~earlierSemantic'",
+    span { loc = "location" }
+)
+
 --
 -- 308xx: inheritance
 --
@@ -5338,6 +5345,12 @@ err(
     52012,
     "ref accessor incompatible with dynamic dispatch",
     span { loc = "location", message = "'ref' accessor returning type '~valueType:Type' is incompatible with dynamic dispatch because interface types require AnyValue marshalling." }
+)
+
+err(
+    "global-param-not-supported-by-interpreter",
+    52013,
+    "global shader parameter '~name' is not supported by the Slang interpreter (slangi), which runs on the CPU and does not support global parameters or GPU resource types; compile this program with slangc to a GPU target instead."
 )
 
 warning(
