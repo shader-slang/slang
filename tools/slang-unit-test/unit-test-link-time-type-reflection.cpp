@@ -779,3 +779,131 @@ SLANG_UNIT_TEST(linkTimeTypeReflectionGlobalTypeParamSessionGetTypeLayout)
         SLANG_CHECK(wrapLayout->getFieldCount() == 1);
     }
 }
+
+// Test for issue #10749 (per-program cache correctness): the same base module with an
+// `extern` struct member is linked against two different config modules that resolve
+// the extern to concrete types of different shape, and each linked program is reflected
+// via `programLayout->getTypeLayout`. Because the reflection type-layout cache is scoped
+// to the owning `TargetProgram` (not the session-long `TargetRequest`), each program
+// must report its own resolved shape.
+//
+// This pins the lifetime/scoping invariant the cache fix relies on: a refactor that
+// folded the two caches back onto `TargetRequest` keyed only by `{type, rules}` would
+// return program A's layout for program B's identical `Scene`/`Type*` query, and this
+// test would catch it.
+SLANG_UNIT_TEST(linkTimeTypeReflectionStructMemberPerProgramCache)
+{
+    const char* baseSourceBody = R"(
+        interface IAccelerationStructure { int getType(); }
+        extern struct AccelerationStructure : IAccelerationStructure;
+
+        struct Scene {
+            AccelerationStructure accelStruct;
+        }
+
+        ParameterBlock<Scene> gScene;
+
+        [numthreads(1,1,1)]
+        [shader("compute")]
+        void computeMain() {
+            int x = gScene.accelStruct.getType();
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV_ASM;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    // A single session: the base module and its `Scene`/`AccelerationStructure` decls
+    // (and thus the `Type*` that `findTypeByName("Scene")` yields) are shared across
+    // both linked programs, and both programs' `TargetProgram`s hang off the same
+    // session-long `TargetRequest`. This is exactly the setup where a `TargetRequest`
+    // cache keyed only by `{type, rules}` would alias between programs.
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto baseModule = session->loadModuleFromSourceString(
+        "perProgramCacheBase",
+        "perProgramCacheBase.slang",
+        baseSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(baseModule != nullptr);
+
+    // Link the shared base module against the given config module and return the
+    // resolved field count of `Scene.accelStruct` as seen through
+    // `programLayout->getTypeLayout`.
+    auto resolvedAccelStructFieldCount = [&](const char* configName, const char* configBody) -> int
+    {
+        String configSource = "import perProgramCacheBase;\n" + String(configBody);
+        auto configModule = session->loadModuleFromSourceString(
+            configName,
+            (String(configName) + ".slang").getBuffer(),
+            configSource.getBuffer(),
+            diagnosticBlob.writeRef());
+        SLANG_CHECK_ABORT(configModule != nullptr);
+
+        slang::IComponentType* components[] = {baseModule, configModule};
+        ComPtr<slang::IComponentType> compositeProgram;
+        session->createCompositeComponentType(
+            components,
+            2,
+            compositeProgram.writeRef(),
+            diagnosticBlob.writeRef());
+        SLANG_CHECK_ABORT(compositeProgram != nullptr);
+
+        ComPtr<slang::IComponentType> linkedProgram;
+        compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
+        SLANG_CHECK_ABORT(linkedProgram != nullptr);
+
+        auto programLayout = linkedProgram->getLayout();
+        SLANG_CHECK_ABORT(programLayout != nullptr);
+
+        auto sceneType = programLayout->findTypeByName("Scene");
+        SLANG_CHECK_ABORT(sceneType != nullptr);
+
+        auto sceneLayout = programLayout->getTypeLayout(sceneType);
+        SLANG_CHECK_ABORT(sceneLayout != nullptr);
+
+        // Two back-to-back calls on the same program must be memoized to the same pointer.
+        SLANG_CHECK(programLayout->getTypeLayout(sceneType) == sceneLayout);
+
+        SLANG_CHECK_ABORT(sceneLayout->getFieldCount() == 1);
+        auto accelStructTypeLayout = sceneLayout->getFieldByIndex(0)->getTypeLayout();
+        SLANG_CHECK_ABORT(accelStructTypeLayout != nullptr);
+        return (int)accelStructTypeLayout->getFieldCount();
+    };
+
+    // Config A resolves AccelerationStructure to a type with one field.
+    const char* configA = R"(
+        struct HWAccelerationStructureA : IAccelerationStructure {
+            uint handle;
+            int getType() { return 1; }
+        }
+        export struct AccelerationStructure : IAccelerationStructure = HWAccelerationStructureA;
+    )";
+
+    // Config B resolves the same extern to a type with two fields.
+    const char* configB = R"(
+        struct HWAccelerationStructureB : IAccelerationStructure {
+            float x;
+            float y;
+            int getType() { return 2; }
+        }
+        export struct AccelerationStructure : IAccelerationStructure = HWAccelerationStructureB;
+    )";
+
+    int fieldsA = resolvedAccelStructFieldCount("perProgramCacheConfigA", configA);
+    int fieldsB = resolvedAccelStructFieldCount("perProgramCacheConfigB", configB);
+
+    // Each program reports its own resolved shape. If the cache were shared across
+    // programs keyed only by {type, rules}, the second query would alias the first
+    // and both would report the same field count.
+    SLANG_CHECK(fieldsA == 1);
+    SLANG_CHECK(fieldsB == 2);
+}
