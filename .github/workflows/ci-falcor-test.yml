@@ -11,6 +11,11 @@ jobs:
     name: Test (Falcor)
     timeout-minutes: 100
     runs-on: [Linux, self-hosted, X64, falcor-bridge]
+    # Vet-and-approve gate: this job runs PR-controlled code on the internal
+    # bridge VM, so it is gated behind the `falcor-ci` environment (required
+    # reviewers = the `ci-approvers` team). A PR by a team member runs
+    # automatically; anyone else's run waits for a one-click approval.
+    environment: falcor-ci
     defaults:
       run:
         shell: bash
