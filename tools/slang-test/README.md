@@ -139,10 +139,10 @@ The recognized optimization spellings are `-O`, `-O0`, `-Onone`, `-O1`,
 `-Odefault`, `-O2`, `-Ohigh`, `-O3`, and `-Omaximal`. Prefer the lowest level
 that preserves the test's expected output.
 
-For diagnostic tests that intentionally leave an option without its required
-argument, put the explicit optimization option before that dangling option.
-`slang-test` appends its default after the directive arguments, so relying on
-the default in that case can change which option receives the diagnostic.
+For compiler-backed commands, `slang-test` inserts its default at the front of
+the argument list, so directive arguments keep their meaning — in particular, a
+diagnostic test that intentionally leaves a trailing option without its
+required argument still triggers the missing-argument diagnostic.
 
 ## Unit Tests
 In addition to the above test tools, there are also `slang-unit-test-tool` and `gfx-unit-test-tool`, which are invoked as in the following examples; but note that the unit tests do get run as part of `slang-test` as well.

@@ -58,11 +58,16 @@ inline bool hasSlangOptimizationArg(const List<String>& args)
 ///
 /// Most compiler-based tests do not need optimized output, and keeping them at `-O0` avoids
 /// optimizer time and SPIR-V optimizer output churn.
+///
+/// The default is inserted at the front of the argument list rather than appended, so it can
+/// never change the meaning of the test-provided arguments. For example, a diagnostic test may
+/// intentionally end with a dangling `-target` to provoke a missing-argument diagnostic; an
+/// appended `-O0` would be consumed as that option's argument and change the diagnostic.
 inline void addDefaultSlangOptimization(CommandLine& ioCmdLine)
 {
     if (!hasSlangOptimizationArg(ioCmdLine.m_args))
     {
-        ioCmdLine.addArg(kTestOptimizationOption);
+        ioCmdLine.m_args.insert(0, kTestOptimizationOption);
     }
 }
 

@@ -147,6 +147,22 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         SLANG_CHECK(cmdLine.m_args[0] == "-O3");
     }
 
+    // The default is inserted at the front so it cannot be consumed as the argument of a
+    // trailing option that a diagnostic test intentionally leaves dangling.
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("test.slang");
+        cmdLine.addArg("-profile");
+        cmdLine.addArg("ps_4_0");
+        cmdLine.addArg("-target");
+
+        SlangTest::addDefaultSlangOptimization(cmdLine);
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 5);
+        SLANG_CHECK(cmdLine.m_args[0] == SlangTest::kTestOptimizationOption);
+        SLANG_CHECK(cmdLine.m_args[4] == "-target");
+    }
+
     {
         CommandLine cmdLine;
         cmdLine.addArg("-vk");
