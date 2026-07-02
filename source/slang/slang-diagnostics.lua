@@ -4369,6 +4369,13 @@ err(
     span { loc = "location", message = "encountered non-differentiable function '~func' during higher-order differentiation" }
 )
 
+err(
+    "cannot-differentiate-result-of-backward-differentiation",
+    38037,
+    "cannot differentiate the result of a backward-derivative call",
+    span { loc = "location", message = "the code produced by 'bwd_diff' is not itself differentiable, so a function that calls 'bwd_diff' cannot be differentiated; use forward-mode differentiation ('fwd_diff') for higher-order derivatives." }
+)
+
 --
 -- 380xx: entry point parameters
 --
