@@ -31,6 +31,53 @@
 namespace Slang
 {
 
+// Returns true when `inst` is a compile-time-constant value of the flat shape a gather offset takes
+// AND which the SPIR-V backend therefore materializes as a constant object
+// (`OpConstant`/`OpConstantComposite`) — making it legal as a `ConstOffset` image operand
+// (issue #9382). A gather offset is always a scalar or a flat integer vector, so the only accepted
+// shapes are: a leaf `IRConstant`, or a single-level `MakeVector`/`MakeVectorFromScalar` whose
+// element operands are all `IRConstant`s (e.g. `int2(2, 1)`, or the scalar splat `int2(1)`).
+//
+// The shape is intentionally narrow — NOT "any constant-foldable IR". The load-bearing property is
+// "emits as an `OpConstantComposite`", which the backend guarantees only for such a single-level
+// composite of module-scope constants: `emitGlobalInst` routes it to the `ConstantsAndTypes`
+// section, whereas a body-local composite would emit as `OpCompositeConstruct` — invalid as a
+// `ConstOffset`. Broader shapes (`MakeArray`/`MakeStruct`/`MakeMatrix`, nested composites) can
+// never be a gather offset and are not guaranteed to be globally hoisted, so they are excluded; the
+// narrow set makes the "constant object" claim true by construction.
+//
+// Constant-FOLDABLE expressions are NOT treated as constants here: e.g. `-int2(2, 1)` is
+// `Neg(MakeVector(...))` at this stage — not yet a constant object — so classifying it constant and
+// emitting `ConstOffset` could produce invalid SPIR-V. It is kept as `Offset` + capability. KNOWN
+// LIMITATION: a *later* pass may constant-fold such an offset (to `int2(-2, -1)`) and rewrite the
+// operand to `ConstOffset`, while the capability this pass added for the then-runtime form remains
+// — so a foldable-constant offset can still over-declare `ImageGatherExtended`. This pass removes
+// the over-declaration only for offsets that are already constant objects at SPIR-V legalization
+// time (literals and `int2(...)`/splat of literals); the fold-after-legalization case is a
+// separate, pre-existing limitation (the original #9382 mechanism, where spirv-opt rewrites the
+// operand but does not strip the capability).
+static bool isConstantGatherOffset(IRInst* inst)
+{
+    if (!inst)
+        return false;
+
+    if (as<IRConstant>(inst))
+        return true;
+
+    // A gather offset is a flat integer vector: `int2(2, 1)` (`MakeVector`) or the splat `int2(1)`
+    // (`MakeVectorFromScalar`). Its elements are scalar constants, so check them as leaf constants;
+    // no recursion, because a gather offset never has nested-composite elements.
+    if (inst->getOp() == kIROp_MakeVector || inst->getOp() == kIROp_MakeVectorFromScalar)
+    {
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+            if (!as<IRConstant>(inst->getOperand(i)))
+                return false;
+        return true;
+    }
+
+    return false;
+}
+
 //
 // Legalization of IR for direct SPIRV emit.
 //
@@ -1822,6 +1869,138 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         inst->removeAndDeallocate();
     }
 
+    // Returns the SPIR-V opcode of an asm instruction, or `SpvOpMax` when there is no concrete
+    // opcode value to read — either the `__truncate` pseudo-instruction, or an opcode operand whose
+    // value is not an `IRIntLit`. `processSPIRVAsm` treats `SpvOpMax` as "not a gather" via its
+    // `default` case. This helper exists to avoid `getOpcodeOperandWord()`, which asserts on the
+    // `__truncate` case.
+    static SpvOp getSpvOpCodeFromAsmInst(IRSPIRVAsmInst* spvInst)
+    {
+        auto opcodeOperand = spvInst->getOpcodeOperand();
+        if (opcodeOperand->getOp() == kIROp_SPIRVAsmOperandTruncate)
+            return SpvOpMax;
+        auto opcodeLit = as<IRIntLit>(opcodeOperand->getValue());
+        if (!opcodeLit)
+            return SpvOpMax;
+        return (SpvOp)opcodeLit->getValue();
+    }
+
+    // Lowers an image gather (`OpImageGather`/`OpImageDrefGather`) so that a compile-time-constant
+    // offset uses the capability-free `ConstOffset` image operand instead of `Offset`, which would
+    // otherwise force the `ImageGatherExtended` capability (issue #9382). A runtime offset must
+    // keep `Offset`, so the pass synthesizes the required capability for that case.
+    //
+    // Why the branch is required (not cosmetic): per the SPIR-V spec `ConstOffset` is legal only
+    // for a constant object, while `Offset` is the only legal form for a runtime offset. A gather
+    // offset is genuinely reachable at runtime (e.g. `tex.Gather(s, uv, int2(uv))`, and GLSL
+    // `textureGatherOffset` routed through the same intrinsic), so forcing `ConstOffset` would be
+    // invalid SPIR-V — the #5339 CTS failure that PR #5426 fixed by switching these sites to
+    // `Offset`. The core module (hlsl.meta.slang `__texture_gather_offset`) always emits the
+    // `Offset` form and does not declare the capability; this pass makes both correct per call
+    // site.
+    void processImageGatherOffset(IRSPIRVAsm* asmBlock, IRSPIRVAsmInst* spvInst)
+    {
+        // Find the image-operands mask: the sole literal/enum operand that requests `Offset`
+        // (0x10) without `ConstOffset` (0x08). For a gather the sampled image, coordinate,
+        // component, (dref,) and offset value are all inst operands (never literal/enum), so
+        // exactly one literal/enum operand — the mask — can match, and the first match is it.
+        // Indices in this function are in `getSPIRVOperands()` space: operand 0 is the first SPIRV
+        // operand, AFTER the opcode.
+        Index maskSpvOperandIndex = -1;
+        IRSPIRVAsmOperand* maskOperand = nullptr;
+        uint32_t mask = 0;
+        Index index = 0;
+        for (auto operand : spvInst->getSPIRVOperands())
+        {
+            if (operand->getOp() == kIROp_SPIRVAsmOperandLiteral ||
+                operand->getOp() == kIROp_SPIRVAsmOperandEnum)
+            {
+                if (auto maskLit = as<IRIntLit>(operand->getValue()))
+                {
+                    uint32_t value = (uint32_t)maskLit->getValue();
+                    if ((value & SpvImageOperandsOffsetMask) &&
+                        !(value & SpvImageOperandsConstOffsetMask))
+                    {
+                        maskOperand = operand;
+                        mask = value;
+                        maskSpvOperandIndex = index;
+                        break;
+                    }
+                }
+            }
+            index++;
+        }
+        if (!maskOperand)
+            return;
+
+        // The offset value is the operand right after the mask, plus one slot per lower
+        // image-operand whose bit precedes `Offset`. SPIR-V lists image-operand values in ascending
+        // bit order, and the only bits below `Offset` (0x10) are Bias (0x1), Lod (0x2), Grad (0x4 —
+        // two operands dx/dy), and ConstOffset (0x8, excluded above) — so only Bias/Lod/Grad can
+        // contribute operands here. (Bias/Lod on a gather are reachable via
+        // `ImageGatherBiasLodAMD`.)
+        Index offsetSpvOperandIndex = maskSpvOperandIndex + 1;
+        if (mask & SpvImageOperandsBiasMask)
+            offsetSpvOperandIndex++;
+        if (mask & SpvImageOperandsLodMask)
+            offsetSpvOperandIndex++;
+        if (mask & SpvImageOperandsGradMask)
+            offsetSpvOperandIndex += 2;
+
+        IRInst* offsetValue = nullptr;
+        index = 0;
+        for (auto operand : spvInst->getSPIRVOperands())
+        {
+            if (index == offsetSpvOperandIndex)
+            {
+                if (operand->getOp() == kIROp_SPIRVAsmOperandInst)
+                    offsetValue = operand->getValue();
+                break;
+            }
+            index++;
+        }
+        // An `Offset` image operand always carries an offset value; reaching here without one means
+        // the operand layout did not match the mask. (In release we fall through to the runtime
+        // branch below, which is always valid SPIR-V.)
+        SLANG_ASSERT(offsetValue);
+
+        IRBuilder builder(asmBlock->getModule());
+        if (isConstantGatherOffset(offsetValue))
+        {
+            // Constant offset: switch the mask to `ConstOffset`, which requires no capability.
+            // The mask operand is a hoistable inst (SPIRVAsmOperandEnum), so it must not be mutated
+            // in place — that would corrupt IR value-numbering and trip the hoistable-use assert in
+            // IRUse::set. Build a fresh `ConstOffset` mask operand and point the (non-hoistable)
+            // gather instruction at it; the now-unused `Offset` operand is left for dead-code
+            // elimination. The mask sits at `maskSpvOperandIndex + 1` in the gather's raw operands
+            // because operand 0 is the opcode and `getSPIRVOperands()` starts after it.
+            uint32_t newMask =
+                (mask & ~SpvImageOperandsOffsetMask) | SpvImageOperandsConstOffsetMask;
+            builder.setInsertBefore(spvInst);
+            auto newMaskOperand =
+                builder.emitSPIRVAsmOperandEnum(builder.getIntValue(builder.getIntType(), newMask));
+            spvInst->setOperand(maskSpvOperandIndex + 1, newMaskOperand);
+        }
+        else
+        {
+            // Runtime offset: keep `Offset` and declare `OpCapability ImageGatherExtended` in the
+            // block — re-establishing the capability that `__texture_gather_offset` in
+            // hlsl.meta.slang previously declared unconditionally (this PR moved it here so it is
+            // emitted only when actually needed). The emitter hoists in-block capabilities to
+            // module scope and deduplicates them, so adding one per runtime gather is harmless.
+            builder.setInsertInto(asmBlock);
+            if (auto firstChild = asmBlock->getFirstChild())
+                builder.setInsertBefore(firstChild);
+            auto opcode = builder.emitSPIRVAsmOperandEnum(
+                builder.getIntValue(builder.getIntType(), SpvOpCapability));
+            auto capability = builder.emitSPIRVAsmOperandEnum(
+                builder.getIntValue(builder.getIntType(), SpvCapabilityImageGatherExtended));
+            List<IRInst*> operands;
+            operands.add(capability);
+            builder.emitSPIRVAsmInst(opcode, operands);
+        }
+    }
+
     void processSPIRVAsm(IRSPIRVAsm* inst)
     {
         // Move anything that is not an spirv instruction to the outer parent.
@@ -1831,6 +2010,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 child->insertBefore(inst);
             else if (child->getOp() == kIROp_SPIRVAsmOperandConvertTexel)
                 processConvertTexel(inst, child);
+            else if (auto spvInst = as<IRSPIRVAsmInst>(child))
+            {
+                switch (getSpvOpCodeFromAsmInst(spvInst))
+                {
+                case SpvOpImageGather:
+                case SpvOpImageDrefGather:
+                    processImageGatherOffset(inst, spvInst);
+                    break;
+                default:
+                    break;
+                }
+            }
         }
     }
 
