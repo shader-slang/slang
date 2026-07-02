@@ -2164,8 +2164,9 @@ void SemanticsVisitor::maybeCheckMissingNoDiffThis(Expr* expr)
         auto thisExpr = as<ThisExpr>(memberExpr->baseExpression);
         if (thisExpr && isTypeDifferentiable(memberExpr->type.type))
         {
+            auto noDiffThisAttr = this->m_parentFunc->findModifier<NoDiffThisAttribute>();
             if (isTypeDifferentiable(calcThisType(thisExpr->type.type)) ||
-                this->m_parentFunc->findModifier<NoDiffThisAttribute>())
+                (noDiffThisAttr && !noDiffThisAttr->isSynthesized))
             {
                 return;
             }

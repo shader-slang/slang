@@ -7169,6 +7169,7 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         if (requiredMemberDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>())
         {
             auto noDiffThisAttr = m_astBuilder->create<NoDiffThisAttribute>();
+            noDiffThisAttr->isSynthesized = true;
             addModifier(synthesized, noDiffThisAttr);
         }
     }
@@ -14799,6 +14800,7 @@ static void _maybeAddImplicitNoDiffThisForNonDifferentiableThis(
     if (!visitor->isTypeDifferentiable(thisType))
     {
         auto noDiffThisModifier = visitor->getASTBuilder()->create<NoDiffThisAttribute>();
+        noDiffThisModifier->isSynthesized = true;
         addModifier(decl, noDiffThisModifier);
     }
 }
