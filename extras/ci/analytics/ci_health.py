@@ -25,7 +25,6 @@ from datetime import datetime, timezone, timedelta
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ci_visualization import page_template, chart_section, DOWNLOAD_JS
 from ci_hosted_runner_usage import (
-    DEFAULT_HOSTED_RUNNER_CAP,
     HOSTED_LABEL_PREFIXES,
     sample_hosted_runner_usage,
 )
@@ -641,7 +640,10 @@ def _build_hosted_runner_chart(snapshots):
     # Collect every label observed across the window so the stacked
     # series stay consistent.
     labels_seen = set()
-    cap = DEFAULT_HOSTED_RUNNER_CAP
+    # Track the most recent known cap for the reference line. Stays None
+    # if no snapshot carried a detectable cap, in which case the chart
+    # omits the cap line rather than drawing a guessed one.
+    cap = None
     for s in snapshots:
         usage = s.get("hosted_runner_usage") or {}
         if usage.get("cap"):
@@ -1002,7 +1004,14 @@ function buildCharts(hours) {{
     }});
   }}
 
-  // Hosted-runner usage stacked by label, with the cap as a dashed line.
+  // Hosted-runner usage stacked by label. The cap is shown as faint
+  // background threshold zones (amber >=80%, red >=100%) rather than a
+  // full-height dashed line: a line at the cap forces the y-axis to
+  // auto-scale up to the cap, crushing the real usage band (typically
+  // well below cap) into an unreadable sliver at the bottom. The zone
+  // plugin draws relative to the current y-scale, so it never influences
+  // auto-scaling — the axis fits the data and the zones simply clip to
+  // whatever range is on screen.
   const hostedCanvas = document.getElementById('hostedRunnerHistory_canvas');
   if (hostedCanvas && hostedRunnerChart) {{
     const hostedDatasets = [];
@@ -1028,24 +1037,63 @@ function buildCharts(hours) {{
       tension: 0.3,
       stack: 'queued',
     }});
-    hostedDatasets.push({{
-      label: 'Cap (' + hostedRunnerChart.cap + ')',
-      data: Array(labels.length).fill(hostedRunnerChart.cap),
-      borderColor: '#dc3545',
-      borderDash: [6, 3],
-      borderWidth: 2,
-      pointRadius: 0,
-      fill: false,
-    }});
+
+    // Paint amber/red threshold bands behind the data. Only active when
+    // the cap is known; a null cap (org plan not queryable) draws no
+    // bands, matching the "cap unknown" handling elsewhere.
+    const capZonesPlugin = {{
+      id: 'hostedCapZones',
+      beforeDraw(chart) {{
+        const cap = hostedRunnerChart.cap;
+        if (!cap) return;
+        const {{ ctx, chartArea, scales }} = chart;
+        const y = scales.y;
+        if (!y) return;
+        const warnStart = 0.8 * cap;   // amber threshold (80% of cap)
+        // Nothing to shade if usage never enters the warn band — this is
+        // the common case (usage well below 80%), and skipping it keeps
+        // the plot clean rather than washing it in colour.
+        if (y.max <= warnStart) return;
+        const left = chartArea.left;
+        const width = chartArea.right - left;
+        // Paint each band only across the [threshold, cap] slice that is
+        // actually on screen. Bands are drawn relative to the y-scale, so
+        // they clip to the data-driven range and never stretch the axis.
+        const px = (v) => y.getPixelForValue(Math.min(v, y.max));
+        ctx.save();
+        // Amber: 80%..100% of cap.
+        const amberTop = px(cap);
+        const amberBottom = px(warnStart);
+        ctx.fillStyle = 'rgba(253,126,20,0.10)';
+        ctx.fillRect(left, amberTop, width, amberBottom - amberTop);
+        // Red: at/above cap (only visible once usage reaches the cap).
+        if (y.max > cap) {{
+          const redTop = px(y.max);
+          const redBottom = px(cap);
+          ctx.fillStyle = 'rgba(220,53,69,0.12)';
+          ctx.fillRect(left, redTop, width, redBottom - redTop);
+        }}
+        ctx.restore();
+      }}
+    }};
+
     charts.hostedRunner = new Chart(hostedCanvas.getContext('2d'), {{
       type: 'line',
       data: {{ labels: displayLabels, datasets: hostedDatasets }},
+      plugins: [capZonesPlugin],
       options: {{
         responsive: true,
         scales: {{
           y: {{ min: 0, stacked: true, title: {{ display: true, text: 'Hosted Runners' }} }}
         }},
         plugins: {{
+          subtitle: {{
+            display: !!hostedRunnerChart.cap,
+            text: hostedRunnerChart.cap
+              ? 'Cap ' + hostedRunnerChart.cap + ' — amber ≥ 80%, red ≥ 100%'
+              : '',
+            color: '#6c757d',
+          }},
           tooltip: {{
             callbacks: {{
               afterBody: function(items) {{
@@ -1054,7 +1102,9 @@ function buildCharts(hours) {{
                   hostedRunnerChart.total_series || [], n
                 )[idx];
                 if (total == null) return '';
-                return 'Total in use: ' + total + ' / ' + hostedRunnerChart.cap;
+                return hostedRunnerChart.cap
+                  ? 'Total in use: ' + total + ' / ' + hostedRunnerChart.cap
+                  : 'Total in use: ' + total;
               }}
             }}
           }}
@@ -1099,12 +1149,14 @@ def render_hosted_runner_usage(hosted_runner_usage):
     if not hosted_runner_usage:
         return "<p>Hosted-runner usage unavailable.</p>"
 
-    cap = hosted_runner_usage.get("cap", DEFAULT_HOSTED_RUNNER_CAP)
+    # `cap` is None when the org plan wasn't queryable. Treat that as
+    # "unknown" — never fall back to a guessed denominator, because a
+    # wrong cap silently mis-scales the banner and percentage.
+    cap = hosted_runner_usage.get("cap")
     in_progress = hosted_runner_usage.get("in_progress", {})
     queued = hosted_runner_usage.get("queued", {})
     in_use = in_progress.get("total", 0)
     queued_total = queued.get("total", 0)
-    pct = (in_use / cap * 100) if cap else 0
     partial = hosted_runner_usage.get("partial", False)
 
     # Severity thresholds match shader-slang/slang#11142:
@@ -1112,10 +1164,15 @@ def render_hosted_runner_usage(hosted_runner_usage):
     #   alarm at  100% of cap with queued > 0
     # A partial sample is a known undercount; show PARTIAL instead of
     # OK/HIGH/AT CAP so the dashboard doesn't reassure operators with a
-    # false-healthy banner during an Actions API failure.
+    # false-healthy banner during an Actions API failure. An unknown cap
+    # can't be scored at all, so it gets its own UNKNOWN CAP banner with
+    # no denominator or percentage.
     if partial:
         banner_fg, banner_bg = "#6c757d", "#e2e3e5"
         banner_label = "PARTIAL"
+    elif not cap:
+        banner_fg, banner_bg = "#6c757d", "#e2e3e5"
+        banner_label = "UNKNOWN CAP"
     elif in_use >= cap and queued_total > 0:
         banner_fg, banner_bg = "#dc3545", "#f8d7da"
         banner_label = "AT CAP"
@@ -1126,10 +1183,15 @@ def render_hosted_runner_usage(hosted_runner_usage):
         banner_fg, banner_bg = "#198754", "#d1e7dd"
         banner_label = "OK"
 
+    if cap:
+        usage_text = f"{in_use} / {cap} hosted runners in use ({in_use / cap * 100:.0f}%)"
+    else:
+        usage_text = f"{in_use} hosted runners in use"
+
     html = f"""
 <div style="border-left:4px solid {banner_fg};background:{banner_bg};padding:12px 18px;margin-bottom:14px;border-radius:4px">
   <span style="background:{banner_fg};color:white;padding:2px 8px;border-radius:3px;font-size:0.8em">{banner_label}</span>
-  <strong style="margin-left:8px">{in_use} / {cap} hosted runners in use ({pct:.0f}%)</strong>
+  <strong style="margin-left:8px">{usage_text}</strong>
   &nbsp;&nbsp;<span style="color:#6c757d">queued jobs: {queued_total}</span>
 </div>
 """
@@ -1138,6 +1200,13 @@ def render_hosted_runner_usage(hosted_runner_usage):
             '<p style="color:#6c757d;margin-top:-8px">'
             "Sample is partial and may undercount usage "
             "(GitHub Actions API failure during collection)."
+            "</p>\n"
+        )
+    elif not cap:
+        html += (
+            '<p style="color:#6c757d;margin-top:-8px">'
+            "Concurrency cap could not be detected from the org plan; "
+            "showing raw usage without a cap or percentage."
             "</p>\n"
         )
 
@@ -1444,10 +1513,14 @@ def main():
         cap = hosted_runner_usage["cap"]
         in_use = hosted_runner_usage["in_progress"]["total"]
         queued = hosted_runner_usage["queued"]["total"]
-        cap_note = (
-            "" if cap != DEFAULT_HOSTED_RUNNER_CAP else " (plan not queryable, using fallback)"
-        )
-        print(f"  Hosted runners in use: {in_use}/{cap}{cap_note}, queued: {queued}")
+        if cap:
+            print(f"  Hosted runners in use: {in_use}/{cap}, queued: {queued}")
+        else:
+            print(
+                f"  Hosted runners in use: {in_use} (cap unknown — org plan "
+                f"not queryable), queued: {queued}",
+                file=sys.stderr,
+            )
         if hosted_runner_usage.get("partial"):
             fetch_errs = hosted_runner_usage.get("fetch_errors", 0)
             list_errs = hosted_runner_usage.get("list_errors", [])

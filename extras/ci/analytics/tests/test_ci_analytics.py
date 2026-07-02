@@ -1762,13 +1762,15 @@ class TestHostedRunnerCapResolution(unittest.TestCase):
         ):
             self.assertIsNone(ci_hosted_runner_usage.fetch_org_plan_cap("shader-slang"))
 
-    def test_resolve_hosted_runner_cap_falls_back_on_failure(self):
+    def test_resolve_hosted_runner_cap_none_when_plan_unqueryable(self):
+        """No plan -> None (not a guessed fallback), so consumers can
+        report "cap unknown" instead of a wrong denominator.
+        """
         with mock.patch.object(
             ci_hosted_runner_usage, "fetch_org_plan_cap", side_effect=lambda org: None
         ):
-            self.assertEqual(
-                ci_hosted_runner_usage.resolve_hosted_runner_cap("shader-slang/slang"),
-                ci_hosted_runner_usage.DEFAULT_HOSTED_RUNNER_CAP,
+            self.assertIsNone(
+                ci_hosted_runner_usage.resolve_hosted_runner_cap("shader-slang/slang")
             )
 
     def test_resolve_hosted_runner_cap_prefers_live_plan(self):
@@ -1799,9 +1801,50 @@ class TestHostedRunnerCapResolution(unittest.TestCase):
 
         self.assertEqual(snap["cap"], 60)
 
-    def test_default_cap_is_team_tier(self):
-        """The static fallback tracks the Slang org's actual plan (Team)."""
-        self.assertEqual(ci_hosted_runner_usage.DEFAULT_HOSTED_RUNNER_CAP, 60)
+    def test_sample_cap_is_none_when_undetectable(self):
+        """When the plan can't be queried and no --cap is given, the
+        snapshot carries cap=None so consumers know it's unknown.
+        """
+
+        def fake_in_progress(repo):
+            return [], None
+
+        def fake_queued(repo):
+            return [], None
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "resolve_hosted_runner_cap", side_effect=lambda repo: None
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage("shader-slang/slang")
+
+        self.assertIsNone(snap["cap"])
+
+    def test_plan_tier_map_values(self):
+        """The tier->cap map is the single source of truth for caps."""
+        self.assertEqual(
+            ci_hosted_runner_usage.PLAN_TIER_HOSTED_RUNNER_CAP,
+            {"free": 20, "team": 60, "enterprise": 180},
+        )
+
+    def test_format_summary_omits_cap_line_when_unknown(self):
+        """With cap=None the CLI summary drops the denominator/percentage
+        and warns, instead of printing a bogus `N / None`.
+        """
+        snapshot = {
+            "cap": None,
+            "in_progress": {"total": 7, "by_workflow": [], "by_label": []},
+            "queued": {"total": 0, "by_workflow": [], "by_label": []},
+        }
+        out = ci_hosted_runner_usage.format_summary(snapshot)
+        self.assertIn("Hosted runners in use: 7", out)
+        self.assertNotIn("/ None", out)
+        self.assertNotIn("%", out)
+        self.assertIn("WARNING", out)
+        self.assertIn("cap could not be detected", out)
 
 
 class TestHostedLabelPalette(unittest.TestCase):
@@ -1914,6 +1957,40 @@ class TestHostedRunnerRender(unittest.TestCase):
         self.assertIn("PARTIAL", html)
         self.assertNotIn("OK", html)
         self.assertIn("partial", html.lower())
+
+    def test_render_banner_unknown_cap_omits_denominator(self):
+        """A None cap (org plan not queryable) renders UNKNOWN CAP with
+        raw usage and no `/ cap` or percentage — a wrong denominator is
+        worse than none.
+        """
+        html = ci_health.render_hosted_runner_usage(self._snapshot(in_use=12, cap=None))
+        self.assertIn("UNKNOWN CAP", html)
+        self.assertIn("12 hosted runners in use", html)
+        self.assertNotIn("/ None", html)
+        self.assertNotIn("%)", html)
+        self.assertNotIn("AT CAP", html)
+        self.assertIn("could not be detected", html)
+
+    def test_build_hosted_runner_chart_none_cap_when_undetectable(self):
+        """If no snapshot carries a cap, the chart's cap is None so the
+        JS omits the reference line rather than drawing a guessed one.
+        """
+        snapshots = [
+            {
+                "timestamp": "2026-07-02T10:00:00Z",
+                "hosted_runner_usage": {
+                    "cap": None,
+                    "in_progress": {
+                        "total": 2,
+                        "by_label": [{"label": "ubuntu-latest", "count": 2}],
+                    },
+                    "queued": {"total": 0},
+                },
+            }
+        ]
+        chart = ci_health._build_hosted_runner_chart(snapshots)
+        self.assertIsNotNone(chart)
+        self.assertIsNone(chart["cap"])
 
     def test_build_hosted_runner_chart_none_when_no_data(self):
         snapshots = [{"timestamp": "2026-05-13T10:00:00Z"}]

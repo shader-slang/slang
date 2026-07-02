@@ -14,8 +14,10 @@ See shader-slang/slang#11142 for background.
 The cap is queried dynamically from the org's plan (see
 `fetch_org_plan_cap`) so that a plan upgrade — e.g. Free (20) -> Team
 (60) — is picked up automatically instead of silently reporting against
-a stale hard-coded number. `DEFAULT_HOSTED_RUNNER_CAP` is only the
-fallback used when that query fails.
+a stale hard-coded number. When the plan can't be queried the cap is
+reported as unknown (None) rather than guessed: consumers then omit the
+denominator and percentage and warn, because a wrong cap silently
+mis-scales every usage reading.
 
 CLI usage:
     python3 ci_hosted_runner_usage.py
@@ -44,11 +46,6 @@ PLAN_TIER_HOSTED_RUNNER_CAP = {
     "team": 60,
     "enterprise": 180,
 }
-
-# Fallback cap used only when the org plan cannot be queried. Set to the
-# Team-tier value because the Slang org is on GitHub Team (60 concurrent
-# hosted runners); see the plan map above.
-DEFAULT_HOSTED_RUNNER_CAP = PLAN_TIER_HOSTED_RUNNER_CAP["team"]
 
 HOSTED_LABEL_PREFIXES = ("ubuntu-", "macos-", "windows-")
 
@@ -228,7 +225,7 @@ def fetch_org_plan_cap(org):
     `PLAN_TIER_HOSTED_RUNNER_CAP`. Querying the plan requires the token to
     have org visibility (an org owner/member token); an external token
     sees no `plan` field, in which case this returns None and the caller
-    falls back to `DEFAULT_HOSTED_RUNNER_CAP`.
+    reports the cap as unknown.
 
     Returns None (never raises) on any API error, missing plan, or
     unrecognized tier, so it is safe to call from the sampler's happy
@@ -262,15 +259,19 @@ def fetch_org_plan_cap(org):
 
 
 def resolve_hosted_runner_cap(repo):
-    """Return the hosted-runner cap to report against for `repo`.
+    """Return the hosted-runner cap to report against for `repo`, or None
+    if it can't be determined.
 
-    Prefers the cap derived from the org's live plan tier
-    (`fetch_org_plan_cap`) and falls back to `DEFAULT_HOSTED_RUNNER_CAP`
-    when the plan can't be queried. Kept separate from
+    The cap is derived from the org's live plan tier
+    (`fetch_org_plan_cap`). When the plan can't be queried this returns
+    None rather than a guessed fallback: a wrong denominator (e.g.
+    reporting `40 / 60` when the real cap might be 20) is worse than no
+    denominator, so callers surface "cap unknown" instead of substituting
+    a plausible-but-unverified number. Kept separate from
     `sample_hosted_runner_usage` so the CLI and health run can resolve the
-    cap once and log which value they landed on.
+    cap once.
     """
-    return fetch_org_plan_cap(org_from_repo(repo)) or DEFAULT_HOSTED_RUNNER_CAP
+    return fetch_org_plan_cap(org_from_repo(repo))
 
 
 def sample_hosted_runner_usage(repo, cap=None):
@@ -281,9 +282,14 @@ def sample_hosted_runner_usage(repo, cap=None):
     `resolve_hosted_runner_cap`; pass an explicit integer to override
     (e.g. from the `--cap` CLI flag or a test).
 
+    The returned snapshot's `cap` is an int when the cap is known and
+    None when it couldn't be detected (the plan wasn't queryable and no
+    `--cap` was given). Consumers must treat a None `cap` as "unknown" —
+    omit the denominator/percentage and warn — rather than as zero.
+
     Returns a dict suitable for embedding in the health snapshot:
         {
-            "cap": 60,
+            "cap": 60,   # or None if undetectable
             "in_progress": { total, by_workflow, by_label },
             "queued":      { total, by_workflow, by_label },
         }
@@ -355,8 +361,8 @@ def parse_args():
         help=(
             "Hosted-runner concurrency cap to report against. Default: "
             "auto-detected from the org's GitHub plan tier (Free=20, "
-            f"Team=60, Enterprise=180; fallback {DEFAULT_HOSTED_RUNNER_CAP} "
-            "if the plan can't be queried)."
+            "Team=60, Enterprise=180). If the plan can't be queried the "
+            "cap is reported as unknown; pass this flag to force a value."
         ),
     )
     parser.add_argument(
@@ -372,13 +378,23 @@ def format_summary(snapshot):
     cap = snapshot["cap"]
     in_use = snapshot["in_progress"]["total"]
     queued = snapshot["queued"]["total"]
-    pct = (in_use / cap * 100) if cap else 0
 
     lines = []
-    lines.append(
-        f"Hosted runners in use: {in_use} / {cap} ({pct:.0f}%)   "
-        f"queued: {queued}"
-    )
+    if cap:
+        pct = in_use / cap * 100
+        lines.append(
+            f"Hosted runners in use: {in_use} / {cap} ({pct:.0f}%)   "
+            f"queued: {queued}"
+        )
+    else:
+        # Cap unknown (plan not queryable and no --cap): report the raw
+        # in-use count without a denominator or percentage, since the
+        # cap we'd divide by is a guess.
+        lines.append(f"Hosted runners in use: {in_use}   queued: {queued}")
+        lines.append(
+            "WARNING: hosted-runner cap could not be detected from the org "
+            "plan; showing raw usage without a cap. Pass --cap to set one."
+        )
     if snapshot.get("partial"):
         lines.append(
             "WARNING: sample is partial and may undercount hosted-runner usage."
