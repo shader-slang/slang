@@ -27,12 +27,14 @@ jobs:
       run:
         shell: bash
     env:
-      # Pinned MaterialX commit that includes generateshader.py with the
-      # slang target. Also part of the shader-corpus cache key below, so
-      # bumping the pin automatically regenerates the cached corpus.
-      # TODO: Switch to a stable release tag; v1.39.5 is the first release
-      # containing the slang target.
-      MATERIALX_COMMIT: 3bd5fa90225169d90e1cd83ca12c732a461025f8
+      # Pinned MaterialX release. The commit SHA is the source of truth
+      # (tags are mutable references; the clone step verifies the tag
+      # still resolves to this SHA) and is part of the shader-corpus
+      # cache key below, so bumping the pin automatically regenerates
+      # the cached corpus. v1.39.5 is the first release containing the
+      # slang target in generateshader.py.
+      MATERIALX_TAG: v1.39.5
+      MATERIALX_COMMIT: 7b64921ef1d42f2d57871e9d2c43dc11f041f26b
 
     steps:
       # This job never builds Slang from source (it downloads a prebuilt
@@ -113,11 +115,18 @@ jobs:
           mkdir -p "$WORK_DIR"
           cd "$WORK_DIR"
 
-          echo "Cloning MaterialX repository..."
-          git clone https://github.com/AcademySoftwareFoundation/MaterialX.git
+          echo "Cloning MaterialX $MATERIALX_TAG..."
+          git clone --depth 1 --branch "$MATERIALX_TAG" https://github.com/AcademySoftwareFoundation/MaterialX.git
           cd MaterialX
-          git checkout "$MATERIALX_COMMIT"
-          echo "SUCCESS: MaterialX cloned at commit $MATERIALX_COMMIT"
+
+          # Tags are mutable references; the pinned SHA is the source of
+          # truth. Refuse to proceed if the tag no longer resolves to it.
+          ACTUAL_COMMIT=$(git rev-parse HEAD)
+          if [ "$ACTUAL_COMMIT" != "$MATERIALX_COMMIT" ]; then
+            echo "ERROR: tag $MATERIALX_TAG resolves to $ACTUAL_COMMIT, expected $MATERIALX_COMMIT"
+            exit 1
+          fi
+          echo "SUCCESS: MaterialX $MATERIALX_TAG cloned at commit $MATERIALX_COMMIT"
 
       - name: Build MaterialX
         if: steps.corpus-cache.outputs.cache-hit != 'true'
