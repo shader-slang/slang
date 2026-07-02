@@ -11,8 +11,7 @@
 //META: catalog_name=vertex-shader-missing-sv-position
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// A vertex shader with no SV_Position output triggers W38052. This warning is in the `pedantic`
-// group (off by default), so it is opt-in via -Wpedantic.
+// A vertex shader with no SV_Position output triggers W38052.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-Wpedantic -target hlsl -entry main -stage vertex -profile sm_5_0
 
