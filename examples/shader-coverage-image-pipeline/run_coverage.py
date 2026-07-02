@@ -20,7 +20,6 @@ All flags are forwarded verbatim to the demo binary.  Extra flags:
 import argparse
 import os
 import platform
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -49,7 +48,7 @@ def _find_slang_root(hint: Path | None) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Demo binary discovery + auto-build
+# Demo binary discovery
 # ---------------------------------------------------------------------------
 
 _TARGET = "shader-coverage-image-pipeline"
@@ -86,37 +85,27 @@ def _is_stale(binary: Path, slang_root: Path) -> bool:
     return False
 
 
-def _ensure_demo_binary(slang_root: Path) -> Path:
-    """Return the demo binary path, building it first if necessary."""
-    # Fast path: already built and up to date.
+def _find_demo_binary(slang_root: Path) -> Path:
+    """Return the path to the already-built demo binary.
+
+    This intentionally does not build anything: building the demo target also pulls in
+    and rebuilds any stale Slang libraries, which is surprising for a script whose job
+    is to run coverage. If the binary is missing we print how to build it and exit; if
+    it exists but a source file is newer we warn but still use it.
+    """
     for c in _candidate_paths(slang_root):
         if c.exists():
             if _is_stale(c, slang_root):
-                print(f"[build] binary is stale (source newer than binary) — rebuilding")
-                break
-            return c
-
-    # Slow path: build only the demo target. Assumes Slang itself is already
-    # built (cmake --build --preset release was run by the user).
-    print(f"[build] building target '{_TARGET}' …")
-    result = subprocess.run(
-        [shutil.which("cmake.exe") or "cmake",
-         "--build", "--preset", "release", "--target", _TARGET],
-        cwd=slang_root,
-    )
-    if result.returncode != 0:
-        sys.exit(
-            f"error: cmake build failed for target '{_TARGET}'.\n"
-            "Build Slang first:  cmake --build --preset release"
-        )
-
-    for c in _candidate_paths(slang_root):
-        if c.exists():
+                print(
+                    f"[warn] '{_TARGET}' binary looks stale (a source file is newer). "
+                    f"Rebuild if needed:  cmake --build --preset release --target {_TARGET}"
+                )
             return c
 
     sys.exit(
-        f"error: build succeeded but '{_TARGET}' binary not found in expected paths.\n"
-        f"Searched under: {slang_root / 'build'}"
+        f"error: '{_TARGET}' binary not found under {slang_root / 'build'}.\n"
+        f"Build it first (Slang must already be configured):\n"
+        f"    cmake --build --preset release --target {_TARGET}"
     )
 
 
@@ -179,7 +168,7 @@ def main(argv=None):
 
     script_dir = Path(__file__).resolve().parent
     slang_root = _find_slang_root(Path(known.slang_root) if known.slang_root else None)
-    binary = _ensure_demo_binary(slang_root)
+    binary = _find_demo_binary(slang_root)
 
     mode = known.mode
     output_dir = Path(known.output_dir).resolve() if known.output_dir else script_dir
