@@ -69,8 +69,13 @@ jobs:
           fetch-depth: "250"
           fetch-tags: true
 
-      # Restore sccache local cache from master
+      # Restore sccache local cache from master. sccache is a build
+      # accelerator, not a correctness input: a cache miss or a transient
+      # cache-service error must degrade to a slower (cold) build, never fail
+      # the job. Without continue-on-error a 5xx/timeout from the cache backend
+      # fails the build step, which in the merge queue evicts the whole batch.
       - name: Restore sccache cache
+        continue-on-error: true
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ${{ inputs.os == 'windows' && 'C:/sccache' || '/tmp/.cache/sccache' }}
