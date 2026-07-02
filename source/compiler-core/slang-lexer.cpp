@@ -190,16 +190,10 @@ static String _inputToByteSeq(const char* b, const char* e)
     StringBuilder byteSeqBuilder;
     for (const char* i = b; i != e; ++i)
     {
-        if (i == b)
-            StringUtil::appendFormat(
-                byteSeqBuilder,
-                "0x%02X",
-                unsigned{static_cast<unsigned char>(*i)});
-        else
-            StringUtil::appendFormat(
-                byteSeqBuilder,
-                " 0x%02X",
-                unsigned{static_cast<unsigned char>(*i)});
+        StringUtil::appendFormat(
+            byteSeqBuilder,
+            (i == b) ? "0x%02X" : " 0x%02X",
+            unsigned{static_cast<unsigned char>(*i)});
     }
     return byteSeqBuilder.toString();
 }
