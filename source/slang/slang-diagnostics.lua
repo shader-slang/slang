@@ -125,8 +125,9 @@ local fatal = helpers.fatal
 -- Warning-level (group) sentinel: pass one positionally to warning() to make that warning
 -- opt-in behind a -W group flag, e.g.
 --   warning("my-warning", 123, "message", span{...}, pedantic)
--- Only `pedantic` is used today; `helpers.all` and `helpers.extra` exist for the other groups
--- and can be bound here when a diagnostic needs them.
+-- `extra` is on by default and `pedantic` is off by default (see DiagnosticSink); `helpers.all`
+-- exists for the third group and can be bound here when a diagnostic needs it.
+local extra = helpers.extra
 local pedantic = helpers.pedantic
 
 --
@@ -946,9 +947,11 @@ warning(
     20103,
     "keyword used as a name",
     span { loc = "location", message = "'~name:Name' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts" },
-    -- Pedantic: using a type keyword as a name is legal and usually works; this is a
-    -- style/portability hint rather than a likely bug, so it belongs in the pedantic group.
-    pedantic
+    -- Extra: using a type keyword as a name is legal and usually works, so this is a
+    -- style/portability hint rather than a likely bug. It lives in the `extra` group (on by
+    -- default) rather than `pedantic` because the diagnostic still points at a real, if benign,
+    -- footgun in the user's own code.
+    extra
 )
 
 err(
@@ -4444,7 +4447,12 @@ warning(
     "vertex-shader-missing-sv-position",
     38052,
     "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic",
-    span { loc = "location", message = "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic; the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output, or suppress with -warnings-disable 38052)" }
+    span { loc = "location", message = "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic; if it feeds the rasterizer directly the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output)" },
+    -- Pedantic (off by default): a vertex shader may legitimately omit SV_Position when its output
+    -- feeds a geometry/tessellation/mesh stage that supplies the position itself (see #11884), and
+    -- at VS-compile time we cannot tell that case apart from a real missing-position bug. The check
+    -- is a false positive too often to run by default, so it is opt-in via -Wpedantic.
+    pedantic
 )
 
 --
