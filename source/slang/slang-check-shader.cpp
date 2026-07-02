@@ -2290,9 +2290,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // Note that this only checks when they're used on entry point parameters.
     bool supportsVkBindingOnEntryPointParameters =
         _allTargetsSupportVkBindingOnEntryPointParameters(linkage);
-    auto astBuilder = linkage->getASTBuilder();
     for (const auto& param : entryPointFuncDecl->getParameters())
     {
+        auto astBuilder = linkage->getASTBuilder();
         bool supportsVkBindingOnParameter =
             supportsVkBindingOnEntryPointParameters &&
             isVkBindingCompatibleEntryPointParameterType(astBuilder, param->getType());
