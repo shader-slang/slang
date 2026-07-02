@@ -4,7 +4,7 @@
 // the run that suppresses it uses the `OFF` buffer, which has no annotations and therefore asserts
 // that NOTHING is emitted (exhaustive matching would fail on any unannotated diagnostic).
 //
-// The independent `pedantic` group (off by default) is covered in warning-levels-pedantic.slang.
+// The independent `pedantic` group (off by default) is covered in vertex-missing-sv-position.slang.
 
 // 1. Default: the extra group is on, so the warning is emitted.
 //DIAGNOSTIC_TEST:SIMPLE(diag=WARN): -target hlsl -entry computeMain -stage compute
