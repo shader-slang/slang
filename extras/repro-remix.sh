@@ -2,7 +2,7 @@
 #
 # repro-remix.sh - Reproduce RTX Remix shader compilation workflow
 #
-# This script replicates the steps from .github/workflows/compile-rtx-remix-shaders-nightly.yml
+# This script replicates the steps from .github/workflows/nightly-remix-test.yml
 # to help debug issues when the nightly workflow fails.
 #
 # Prerequisites: Slang must already be built in Debug configuration at build/Debug/bin/

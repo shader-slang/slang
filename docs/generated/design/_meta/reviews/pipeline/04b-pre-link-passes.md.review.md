@@ -1,21 +1,21 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-12T12:04:49+00:00
+reviewed_at: 2026-06-30T13:34:14+00:00
 target_doc: pipeline/04b-pre-link-passes.md
-target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_watched_paths_digest: 5d8f0673fff709ba944e2d5a817256dd08a0b0e59062363746d7886db6baead6
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: 0a827687878ad7390b1acdda49546f652c2eaf5da2d820809834f1faa2ed69cb
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
-  factual_accuracy: pass
+  factual_accuracy: partial
   cross_references: pass
   completeness: pass
   style_consistency: pass
-  source_alignment: pass
+  source_alignment: partial
   front_matter_validity: pass
-finding_count: 0
+finding_count: 1
 severity_breakdown:
-  critical: 0
+  critical: 1
   major: 0
   minor: 0
   nit: 0
@@ -25,23 +25,25 @@ severity_breakdown:
 
 ## Summary
 
-The pre-link mandatory-pass page is aligned with `generateIRForTranslationUnit` at the recorded source commit. I found no ordered-pass, gate, loop, or link issues.
+The document gives a well-structured, source-aligned view of the pre-link pipeline and satisfies the required four-phase contract. The only issue found is in the `obfuscateModuleLocs` notable-pass text: it says source locations are stripped when no source map is requested, but the pre-link code explicitly sets `stripSourceLocs = false` and only obfuscates locations when both name stripping and source maps are enabled.
 
 ## Items checked
 
-- Ran `regenerate.py show pipeline/04b-pre-link-passes.md` and read the target page, `_common.md`, `pipeline-04b-pre-link-passes.md`, and dependencies `pipeline/03-semantic-check.md`, `pipeline/04-ast-to-ir.md`, `pipeline/05-ir-passes.md`, and `ir-reference/index.md`.
-- Verified front matter keys, recorded source commit, and 64-character hex watched-path digest.
-- Checked every line-number citation in the body against `source/slang/slang-lower-to-ir.cpp` and sampled linked pass implementation headers/files.
-- Verified the ordered Phase A-D tables against `generateIRForTranslationUnit`, including `prelinkIR`, `lowerErrorHandling`, `lowerDefer`, `synthesizeBitFieldAccessors`, `lowerExpandType`, debug-value insertion, SSA/SCCP/CFG/peephole/DCE, loop inversion, early inlining, non-essential validation, stripping, obfuscation, validation, and mangled-name-map construction.
-- Confirmed the pass-level loop description matches the `for (;;)` body and that the page does not mislabel pre-link calls as `SLANG_PASS` calls.
-- Resolved relative links with `regenerate.py lint` for this assigned doc group; lint reported no issues.
+- Read the target document, `_common.md`, the per-doc prompt, and dependency docs `pipeline/03-semantic-check.md`, `pipeline/04-ast-to-ir.md`, `pipeline/05-ir-passes.md`, and `ir-reference/index.md`.
+- Resolved the manifest data with `regenerate.py show pipeline/04b-pre-link-passes.md` and sampled claims against the watched files `slang-lower-to-ir.cpp`, `slang-lower-to-ir.h`, `slang-ir-link.cpp`, `slang-ir-link.h`, and `slang-compiler-options.h`.
+- Verified 18 concrete source claims, including the Phase A setup and debug-source gates, Phase B pass order, Phase C optimization order, DCE options, loop-inversion gate, mandatory-early-inlining loop, Phase D validation/stripping/finalization order, option accessors, `prelinkIR` input modules and linking-info behavior, `[unsafeForceInlineEarly]` cloning, and both adjacent IR-module constructors.
+- Checked that the required sections from the pre-link mandatory-pass contract are present, including phase diagrams/tables, conditional gates, the single pass-level loop, notable passes, adjacent constructs, and see-also links.
+- Checked representative relative links to source files, peer generated docs, target-pipeline index, and IR-reference index.
 
 ## Findings
 
-(no findings)
+| ID | Severity | Location | Description | Evidence | Recommendation |
+| --- | --- | --- | --- | --- | --- |
+| F-001 | critical | `### obfuscateModuleLocs`, lines 461-466 | The document says that when obfuscation is enabled but no source map is requested, "locs are simply stripped." In the pre-link stripping block, source locations are explicitly not stripped: `stripOptions.stripSourceLocs = false`; `obfuscateModuleLocs` then runs only when `shouldStripNameHints && shouldHaveSourceMap()` is true. | `source/slang/slang-lower-to-ir.cpp:15391-15418` sets `shouldStripNameHints`, sets `stripSourceLocs = false`, calls `stripFrontEndOnlyInstructions`, and gates `obfuscateModuleLocs` on `stripOptions.shouldStripNameHints && linkage->m_optionSet.shouldHaveSourceMap()`. | Replace the final sentence of this callout with a source-aligned statement such as: "If obfuscation is enabled without a source map, this pre-link block strips name hints but does not run `obfuscateModuleLocs`; it also leaves `stripSourceLocs` false here." |
 
 ## No-issues notes
 
-- The source line numbers reflect the current shifted locations around `generateIRForTranslationUnit`.
-- The mandatory-early-inlining loop description correctly notes the overwritten `changed` value after `peepholeOptimizeGlobalScope`.
-- The adjacent constructs section stays within the required three constructs.
+- The phase tables match the order of calls in `generateIRForTranslationUnit`, including the disabled dump blocks being documented as non-pipeline steps.
+- The mandatory-early-inlining loop description correctly captures the subtle overwrite of `changed` by `peepholeOptimizeGlobalScope`.
+- The `prelinkIR` callout matches the source: full function bodies are cloned only for `IRUnsafeForceInlineEarlyDecoration`, and linking info is built for stable input modules but not the mutating output module.
+- The adjacent constructs correctly point out that specialized-component and layout IR modules are built separately and do not run the mandatory pre-link pass sequence.

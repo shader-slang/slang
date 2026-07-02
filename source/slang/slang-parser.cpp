@@ -1320,7 +1320,7 @@ static void parseFileReferenceDeclBase(Parser* parser, FileReferenceDeclBase* de
     if (peekTokenType(parser) == TokenType::StringLiteral)
     {
         auto nameToken = parser->ReadToken(TokenType::StringLiteral);
-        auto nameString = getStringLiteralTokenValue(nameToken);
+        auto nameString = getFileNameTokenValue(nameToken);
         auto moduleName = getName(parser, nameString);
 
         decl->moduleNameAndLoc = NameLoc(moduleName, nameToken.loc);
@@ -1387,8 +1387,7 @@ static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
     else if (parser->LookAheadToken(TokenType::StringLiteral))
     {
         auto nameToken = parser->ReadToken(TokenType::StringLiteral);
-        decl->nameAndLoc.name =
-            parser->getNamePool()->getName(getStringLiteralTokenValue(nameToken));
+        decl->nameAndLoc.name = parser->getNamePool()->getName(getFileNameTokenValue(nameToken));
         decl->nameAndLoc.loc = nameToken.loc;
         if (moduleDecl)
             moduleDecl->nameAndLoc = decl->nameAndLoc;
@@ -1405,12 +1404,21 @@ static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
     return decl;
 }
 
-static NameLoc ParseDeclName(Parser* parser)
+// Parse a declaration name, which may be an ordinary identifier or an
+// `operator <op>` name. When `outIsValidOperatorName` is non-null, it is set to
+// true only if an `operator` keyword was followed by a *valid* operator token
+// (so a malformed `operator <garbage>`, which already reports `InvalidOperator`,
+// is not additionally flagged downstream).
+static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = nullptr)
 {
+    if (outIsValidOperatorName)
+        *outIsValidOperatorName = false;
+
     Token nameToken;
     if (AdvanceIf(parser, "operator"))
     {
         nameToken = parser->ReadToken();
+        bool isValidOperator = true;
         switch (nameToken.type)
         {
         case TokenType::OpAdd:
@@ -1466,8 +1474,12 @@ static NameLoc ParseDeclName(Parser* parser)
             parser->sink->diagnose(Diagnostics::InvalidOperator{
                 .op = nameToken.getContent(),
                 .location = nameToken.loc});
+            isValidOperator = false;
             break;
         }
+
+        if (outIsValidOperatorName)
+            *outIsValidOperatorName = isValidOperator;
 
         if (nameToken.type == TokenType::LParent)
             return NameLoc(getName(parser, "()"), nameToken.loc);
@@ -1497,6 +1509,11 @@ struct Declarator : RefObject
 struct NameDeclarator : Declarator
 {
     NameLoc nameAndLoc;
+
+    // True if the name came from `operator <op>` syntax. Such a name is only
+    // valid for a function declaration; using it for a variable is diagnosed in
+    // `CompleteVarDecl`.
+    bool isOperatorName = false;
 };
 
 // A declarator that declares a pointer type
@@ -1527,6 +1544,10 @@ struct DeclaratorInfo
     NameLoc nameAndLoc;
     Modifiers semantics;
     Expr* initializer = nullptr;
+
+    // True if `nameAndLoc` came from `operator <op>` syntax (see
+    // `NameDeclarator::isOperatorName`).
+    bool isOperatorName = false;
 };
 
 // Add a member declaration to its container, and ensure that its
@@ -2436,6 +2457,20 @@ static void CompleteVarDecl(Parser* parser, VarDeclBase* decl, DeclaratorInfo co
 {
     parser->FillPosition(decl);
 
+    // An `operator <op>` name only makes sense for a function declaration. If we
+    // reach here the declarator was completed as a variable (e.g.
+    // `int operator+ = 10;`), which is not valid; without this the malformed
+    // declaration is accepted silently and only surfaces as a confusing error at
+    // a later use site. `CompleteVarDecl` is shared with traditional parameter
+    // parsing, so exclude `ParamDecl` (whose "operator name used as a variable
+    // name" message would be inaccurate); a parameter named with an operator is a
+    // separate, rarer case left to its own handling.
+    if (declaratorInfo.isOperatorName && !as<ParamDecl>(decl))
+    {
+        parser->sink->diagnose(
+            Diagnostics::OperatorNameUsedAsVariableName{.location = declaratorInfo.nameAndLoc.loc});
+    }
+
     if (!declaratorInfo.nameAndLoc.name)
     {
         // HACK(tfoley): we always give a name, even if the declarator didn't include one... :(
@@ -2515,9 +2550,15 @@ static RefPtr<Declarator> parseDirectAbstractDeclarator(
     case TokenType::Identifier:
     case TokenType::CompletionRequest:
         {
+            // A valid `operator <op>` name is only legal when this declarator
+            // turns out to be a function. Remember whether `ParseDeclName`
+            // actually parsed a valid operator name so a later variable
+            // completion can reject it (see `CompleteVarDecl`). A malformed
+            // `operator <garbage>` already reports `InvalidOperator`, so it is
+            // not flagged again.
             auto nameDeclarator = new NameDeclarator();
             nameDeclarator->flavor = Declarator::Flavor::name;
-            nameDeclarator->nameAndLoc = ParseDeclName(parser);
+            nameDeclarator->nameAndLoc = ParseDeclName(parser, &nameDeclarator->isOperatorName);
             maybeDiagnoseKeywordUsedAsName(parser, nameDeclarator->nameAndLoc);
             declarator = nameDeclarator;
         }
@@ -2708,6 +2749,7 @@ static void UnwrapDeclarator(
             {
                 auto nameDeclarator = (NameDeclarator*)declarator.Ptr();
                 ioInfo->nameAndLoc = nameDeclarator->nameAndLoc;
+                ioInfo->isOperatorName = nameDeclarator->isOperatorName;
                 return;
             }
             break;
@@ -6659,7 +6701,8 @@ static Stmt* parseIntrinsicAsmStmt(Parser* parser)
     parser->FillPosition(stmt);
     parser->ReadToken();
 
-    stmt->asmText = getStringLiteralTokenValue(parser->ReadToken(TokenType::StringLiteral));
+    stmt->asmText =
+        getStringLiteralTokenValue(parser->ReadToken(TokenType::StringLiteral), parser->sink);
 
     while (AdvanceIf(parser, TokenType::Comma))
     {
@@ -9153,16 +9196,16 @@ static Expr* parseAtomicExpr(Parser* parser)
             if (!parser->LookAheadToken(TokenType::StringLiteral))
             {
                 // Easy/common case: a single string
-                constExpr->value = getStringLiteralTokenValue(token);
+                constExpr->value = getStringLiteralTokenValue(token, parser->sink);
             }
             else
             {
                 StringBuilder sb;
-                sb << getStringLiteralTokenValue(token);
+                sb << getStringLiteralTokenValue(token, parser->sink);
                 while (parser->LookAheadToken(TokenType::StringLiteral))
                 {
                     token = parser->tokenReader.advanceToken();
-                    sb << getStringLiteralTokenValue(token);
+                    sb << getStringLiteralTokenValue(token, parser->sink);
                 }
                 constExpr->value = sb.produceString();
             }
@@ -9178,7 +9221,7 @@ static Expr* parseAtomicExpr(Parser* parser)
             auto token = parser->tokenReader.advanceToken();
             constExpr->token = token;
 
-            IntegerLiteralValue value = getCharLiteralValue(token);
+            IntegerLiteralValue value = getCharLiteralValue(token, parser->sink);
             constExpr->value = value;
             constExpr->suffixType = BaseType::UInt;
             return constExpr;
@@ -10293,7 +10336,7 @@ static NodeBase* parseTargetIntrinsicModifier(Parser* parser, void* /*userData*/
                 {
                     const auto t = parser->ReadToken();
                     first ? void(first = false) : modifier->definitionString.append(" ");
-                    modifier->definitionString.append(getStringLiteralTokenValue(t));
+                    modifier->definitionString.append(getStringLiteralTokenValue(t, parser->sink));
                     modifier->isString = true;
                 } while (parser->LookAheadToken(TokenType::StringLiteral));
             }
