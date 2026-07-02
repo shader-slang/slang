@@ -8,6 +8,10 @@
 // Off by default (no -Wpedantic): the warning must NOT appear.
 //DIAGNOSTIC_TEST:SIMPLE(diag=OFF): -target spirv
 
+// The groups are independent, so enabling the other groups must NOT turn this pedantic warning on.
+//DIAGNOSTIC_TEST:SIMPLE(diag=OFF): -Wall -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=OFF): -Wextra -target spirv
+
 // With -Wpedantic: the warning appears.
 //DIAGNOSTIC_TEST:SIMPLE(diag=ON): -Wpedantic -target spirv
 
