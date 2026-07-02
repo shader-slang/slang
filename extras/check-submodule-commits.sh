@@ -294,11 +294,20 @@ if [[ ${#FAILURES[@]} -gt 0 ]]; then
     echo "    ref:      $branch"
     echo "    pinned:   $sha"
     echo "    reason:   $reason"
-    echo "    fix:      the pinned commit is not reachable from the tracked ref '$branch'."
-    echo "              The 'branch =' value in .gitmodules may name either a branch or"
-    echo "              a tag. Either land the commit on '$branch', re-point the submodule"
-    echo "              to a commit reachable from it, or correct the 'branch =' value to"
-    echo "              the branch or tag that actually contains the pinned commit."
+    if [[ "$branch" == "<opted out>" ]]; then
+      # Opt-out submodules skip the branch/tag reachability check, so the only
+      # way they reach the failure list is a SHA that isn't fetchable from the
+      # URL at all. Branch/tag remediation would be misleading here.
+      echo "    fix:      the pinned commit is not fetchable from the configured URL."
+      echo "              Check the URL, the pinned SHA, and whether upstream history"
+      echo "              was rewritten so the commit no longer exists."
+    else
+      echo "    fix:      the pinned commit is not reachable from the tracked ref '$branch'."
+      echo "              The 'branch =' value in .gitmodules may name either a branch or"
+      echo "              a tag. Either land the commit on '$branch', re-point the submodule"
+      echo "              to a commit reachable from it, or correct the 'branch =' value to"
+      echo "              the branch or tag that actually contains the pinned commit."
+    fi
     echo
   done
   exit 1
