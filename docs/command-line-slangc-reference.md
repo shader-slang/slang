@@ -258,6 +258,14 @@ all - Treat all warnings as errors.
 Disable specific warning ids. 
 
 
+<a id="wall"></a>
+### -Wall, -Wextra, -Wpedantic
+
+**-Wall | -Wextra | -Wpedantic**
+
+Enable the corresponding group of opt-in warnings (additive). Staging: the pedantic group is currently enabled by default, so passing the pedantic flag is a no-op today; a future release will make it opt-in. 
+
+
 <a id="w"></a>
 ### -W
 
@@ -1307,6 +1315,7 @@ Stage
 * `mesh` 
 * `amplification`, `task` 
 * `dispatch` 
+* `node` 
 
 <a id="vulkan-shift"></a>
 ## vulkan-shift
@@ -1637,6 +1646,7 @@ A capability describes an optional feature that a target may or may not support.
 * `mesh` 
 * `task` 
 * `amplification` 
+* `node` 
 * `any_stage` 
 * `amplification_mesh` 
 * `raytracing_stages` 

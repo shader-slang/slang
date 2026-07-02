@@ -4933,9 +4933,6 @@ attribute_syntax [QuadDerivatives] : QuadDerivativesAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
 
-__generic<T>
-typealias NodePayloadPtr = Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::NodePayloadAMDX)>;
-
 __attributeTarget(StructDecl)
 attribute_syntax [raypayload] : RayPayloadAttribute;
 
@@ -5075,16 +5072,19 @@ semantic sv_dispatchthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -5096,16 +5096,19 @@ semantic sv_groupid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -5114,6 +5117,7 @@ semantic sv_groupindex
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 }
 
@@ -5125,16 +5129,19 @@ semantic sv_groupthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 

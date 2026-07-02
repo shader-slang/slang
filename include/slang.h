@@ -585,6 +585,20 @@ typedef uint32_t SlangSizeT;
                 */
     };
 
+    /* A warning "level" (group), modeled on the clang/gcc -Wall/-Wextra/-Wpedantic
+    groups. Each group is enabled independently: a warning tagged with a group is
+    emitted only when that group has been enabled, while warnings in the implicit
+    Default group are always emitted. */
+    typedef int SlangWarningLevelIntegral;
+    enum SlangWarningLevel : SlangWarningLevelIntegral
+    {
+        SLANG_WARNING_LEVEL_DEFAULT = 0,  /**< Always emitted; this is the baseline group and is not
+                                             something a caller enables explicitly. */
+        SLANG_WARNING_LEVEL_ALL = 1,      /**< Warnings enabled by -Wall. */
+        SLANG_WARNING_LEVEL_EXTRA = 2,    /**< Warnings enabled by -Wextra. */
+        SLANG_WARNING_LEVEL_PEDANTIC = 3, /**< Warnings enabled by -Wpedantic. */
+    };
+
     typedef int SlangDiagnosticFlags;
     enum
     {
@@ -851,6 +865,7 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_MESH = 13,
         SLANG_STAGE_AMPLIFICATION = 14,
         SLANG_STAGE_DISPATCH = 15,
+        SLANG_STAGE_NODE = 16,
         //
         SLANG_STAGE_COUNT,
 
@@ -1215,6 +1230,11 @@ typedef uint32_t SlangSizeT;
                  //   single heap shared by buffers and images is indexed at the device's unified
                  //   stride. Opt-in; mutually exclusive with a non-zero
                  //   `-spirv-resource-heap-stride` (combining the two is an error).
+
+        // intValue0: a SlangWarningLevel group to enable (e.g. SLANG_WARNING_LEVEL_PEDANTIC).
+        // Repeatable: enabling multiple groups is additive, matching how -Wall/-Wextra/-Wpedantic
+        // combine on the command line. CLI spellings: -Wall, -Wextra, -Wpedantic.
+        WarningLevel = 155,
 
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.

@@ -285,7 +285,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
-    add_dependencies(slang-test slang-neural-module)
+    add_dependencies(slang-test slang-neural-module slang-workgraph-module)
 
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}
@@ -376,6 +376,12 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         OUTPUT_NAME gfx-unit-test-tool
         REQUIRED_BY slang-test
         FOLDER test/tools
+    )
+    # The #11856 unit test drives DeviceCache::acquireDevice, so compile it into this module too.
+    target_sources(
+        gfx-unit-test
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/render-test/slang-test-device-cache.cpp
     )
 
     slang_add_target(

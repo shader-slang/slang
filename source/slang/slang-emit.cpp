@@ -550,6 +550,10 @@ void calcRequiredLoweringPassSet(
     case kIROp_IncrementBranchCoverageCounter:
         result.coverageTracing = true;
         break;
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+    case kIROp_GetEnumBarrierSemanticFlags:
+        result.barrierFlagValidation = true;
+        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -1579,6 +1583,14 @@ Result linkAndOptimizeIR(
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    if ((target == CodeGenTarget::HLSL || isD3DTarget(targetRequest)) &&
+        requiredLoweringPassSet.barrierFlagValidation)
+    {
+        SLANG_PASS(validateBarrierFlagsForHLSL, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
 
     // On non-HLSL targets, there isn't an implementation of `AppendStructuredBuffer`
     // and `ConsumeStructuredBuffer` types, so we lower them into normal struct types

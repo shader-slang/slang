@@ -652,6 +652,22 @@ if (coopMeta)
 }
 ```
 
+### Experimental Standard Modules
+
+Some standard-library APIs are packaged as experimental modules. A shader must enable
+experimental features before importing one of these modules, for example with
+`slangc -experimental-feature`.
+
+The work graph APIs are available from:
+
+```slang
+import experimental.workgraph;
+```
+
+`experimental.workgraph` provides work graph node attributes, record types, and barrier
+helpers for HLSL Shader Model 6.8 work graph shaders. The module is experimental and the API
+surface may change before it is stabilized.
+
 ## Using the Compilation API
 
 The C++ API provided by Slang is meant to provide more complete control over compilation for applications that need it.
@@ -1056,6 +1072,7 @@ meanings of their `CompilerOptionValue` encodings.
 | DisableWarnings    | Specifies a list of warnings to disable. `stringValue0` encodes comma separated list of warning codes or names. |
 | EnableWarning      | Specifies a list of warnings to enable. `stringValue0` encodes comma separated list of warning codes or names. |
 | DisableWarning     | Specify a warning to disable. `stringValue0` encodes the warning code or name. |
+| WarningLevel       | Enable a group of opt-in warnings, modeled on clang/gcc. `intValue0` encodes a `SlangWarningLevel` group (`SLANG_WARNING_LEVEL_ALL`/`_EXTRA`/`_PEDANTIC`). Repeatable and additive, matching the `-Wall`/`-Wextra`/`-Wpedantic` command-line flags. Warnings in the always-on default group are unaffected. (Staging note: the `pedantic` group is currently enabled by default, so `-Wpedantic` is a no-op today; a future change will make it opt-in.) |
 | ReportDownstreamTime | Turn on/off downstream compilation time report. `intValue0` encodes a bool value for the setting. |
 | ReportPerfBenchmark | Turn on/off reporting of time spent in different parts of the compiler. `intValue0` encodes a bool value for the setting. |
 | SkipSPIRVValidation | Specifies whether or not to skip the validation step after emitting SPIR-V. `intValue0` encodes a bool value for the setting. |
