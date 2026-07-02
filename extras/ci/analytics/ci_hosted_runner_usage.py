@@ -5,14 +5,22 @@ Hosted-runner quota sampler.
 Samples in-progress and queued GitHub-hosted runner jobs for a repo and
 returns a structured snapshot suitable for the health dashboard.
 
-The Slang org runs on the public-repo 20-concurrent-runner cap, shared
-across every hosted-runner label (ubuntu-*, macos-*, windows-*, etc.).
-When usage approaches the cap, gating jobs starve and the merge queue
-stalls. See shader-slang/slang#11142 for background.
+The Slang org's GitHub-hosted-runner concurrency cap is shared across
+every hosted-runner label (ubuntu-*, macos-*, windows-*, etc.) and is
+set by the org's GitHub plan tier, not by anything we configure. When
+usage approaches the cap, gating jobs starve and the merge queue stalls.
+See shader-slang/slang#11142 for background.
+
+The cap is queried dynamically from the org's plan (see
+`fetch_org_plan_cap`) so that a plan upgrade — e.g. Free (20) -> Team
+(60) — is picked up automatically instead of silently reporting against
+a stale hard-coded number. `DEFAULT_HOSTED_RUNNER_CAP` is only the
+fallback used when that query fails.
 
 CLI usage:
     python3 ci_hosted_runner_usage.py
-    python3 ci_hosted_runner_usage.py --repo shader-slang/slang --cap 20
+    python3 ci_hosted_runner_usage.py --repo shader-slang/slang        # cap auto-detected
+    python3 ci_hosted_runner_usage.py --repo shader-slang/slang --cap 60
 """
 
 import argparse
@@ -22,14 +30,25 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from gh_api import gh_api_list
+from gh_api import gh_api, gh_api_list
 
 DEFAULT_REPO = "shader-slang/slang"
 
-# The Slang org runs on the standard public-repo concurrent-runner cap
-# of 20 hosted runners shared across all labels. The cap is per-org,
-# not per-label.
-DEFAULT_HOSTED_RUNNER_CAP = 20
+# GitHub's standard concurrent-runner cap for GitHub-hosted runners, by
+# plan tier. This is the total number of hosted runners an account can
+# run at once across all labels; it is a per-account limit, not
+# per-label and not per-repo. Values are GitHub's published standard
+# limits (https://docs.github.com/actions/reference/usage-limits).
+PLAN_TIER_HOSTED_RUNNER_CAP = {
+    "free": 20,
+    "team": 60,
+    "enterprise": 180,
+}
+
+# Fallback cap used only when the org plan cannot be queried. Set to the
+# Team-tier value because the Slang org is on GitHub Team (60 concurrent
+# hosted runners); see the plan map above.
+DEFAULT_HOSTED_RUNNER_CAP = PLAN_TIER_HOSTED_RUNNER_CAP["team"]
 
 HOSTED_LABEL_PREFIXES = ("ubuntu-", "macos-", "windows-")
 
@@ -190,16 +209,87 @@ def summarize(jobs):
     }
 
 
-def sample_hosted_runner_usage(repo, cap=DEFAULT_HOSTED_RUNNER_CAP):
+def org_from_repo(repo):
+    """Return the org/owner portion of an `owner/name` repo string.
+
+    e.g. `"shader-slang/slang"` -> `"shader-slang"`. Returns the input
+    unchanged if it carries no `/`, so a bare org name also works.
+    """
+    return repo.split("/", 1)[0] if repo else repo
+
+
+def fetch_org_plan_cap(org):
+    """Look up the GitHub-hosted-runner concurrency cap for `org` from its
+    plan tier, or None if it can't be determined.
+
+    The concurrency cap isn't exposed directly by any API, but it is a
+    fixed function of the org's GitHub plan (Free -> 20, Team -> 60,
+    Enterprise -> 180). We read `orgs/<org>.plan.name` and map it through
+    `PLAN_TIER_HOSTED_RUNNER_CAP`. Querying the plan requires the token to
+    have org visibility (an org owner/member token); an external token
+    sees no `plan` field, in which case this returns None and the caller
+    falls back to `DEFAULT_HOSTED_RUNNER_CAP`.
+
+    Returns None (never raises) on any API error, missing plan, or
+    unrecognized tier, so it is safe to call from the sampler's happy
+    path.
+    """
+    if not org:
+        return None
+    data, err = gh_api(f"orgs/{org}")
+    if err or not isinstance(data, dict):
+        print(
+            f"Warning: could not query plan for org {org}: "
+            f"{err or 'unexpected response'}; using fallback cap.",
+            file=sys.stderr,
+        )
+        return None
+    plan = data.get("plan")
+    tier = plan.get("name") if isinstance(plan, dict) else None
+    if not tier:
+        # No `plan` field means the token lacks org visibility. Don't warn
+        # loudly — this is expected for external/fork tokens.
+        return None
+    cap = PLAN_TIER_HOSTED_RUNNER_CAP.get(tier.lower())
+    if cap is None:
+        print(
+            f"Warning: unrecognized GitHub plan tier {tier!r} for org "
+            f"{org}; using fallback cap.",
+            file=sys.stderr,
+        )
+        return None
+    return cap
+
+
+def resolve_hosted_runner_cap(repo):
+    """Return the hosted-runner cap to report against for `repo`.
+
+    Prefers the cap derived from the org's live plan tier
+    (`fetch_org_plan_cap`) and falls back to `DEFAULT_HOSTED_RUNNER_CAP`
+    when the plan can't be queried. Kept separate from
+    `sample_hosted_runner_usage` so the CLI and health run can resolve the
+    cap once and log which value they landed on.
+    """
+    return fetch_org_plan_cap(org_from_repo(repo)) or DEFAULT_HOSTED_RUNNER_CAP
+
+
+def sample_hosted_runner_usage(repo, cap=None):
     """Sample current hosted-runner usage for `repo`.
+
+    `cap` is the concurrency cap to report against. When None (the
+    default), it is auto-detected from the org's plan tier via
+    `resolve_hosted_runner_cap`; pass an explicit integer to override
+    (e.g. from the `--cap` CLI flag or a test).
 
     Returns a dict suitable for embedding in the health snapshot:
         {
-            "cap": 20,
+            "cap": 60,
             "in_progress": { total, by_workflow, by_label },
             "queued":      { total, by_workflow, by_label },
         }
     """
+    if cap is None:
+        cap = resolve_hosted_runner_cap(repo)
     in_progress_runs, ip_list_err = fetch_in_progress_runs(repo)
     queued_runs, q_list_err = fetch_queued_runs(repo)
 
@@ -249,7 +339,8 @@ def parse_args():
         description=(
             "Sample GitHub-hosted runner usage for a repo, broken down "
             "by workflow and label. Aimed at detecting impending "
-            "20-runner-cap exhaustion before it stalls the merge queue."
+            "runner-cap exhaustion before it stalls the merge queue. The "
+            "cap is auto-detected from the org's GitHub plan tier."
         )
     )
     parser.add_argument(
@@ -260,10 +351,12 @@ def parse_args():
     parser.add_argument(
         "--cap",
         type=int,
-        default=DEFAULT_HOSTED_RUNNER_CAP,
+        default=None,
         help=(
-            f"Hosted-runner concurrency cap to report against "
-            f"(default: {DEFAULT_HOSTED_RUNNER_CAP}, the standard public-repo limit)"
+            "Hosted-runner concurrency cap to report against. Default: "
+            "auto-detected from the org's GitHub plan tier (Free=20, "
+            f"Team=60, Enterprise=180; fallback {DEFAULT_HOSTED_RUNNER_CAP} "
+            "if the plan can't be queried)."
         ),
     )
     parser.add_argument(

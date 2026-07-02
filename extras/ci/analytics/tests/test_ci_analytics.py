@@ -1698,6 +1698,112 @@ class TestHostedRunnerUsage(unittest.TestCase):
         self.assertEqual(snap["queued"]["by_workflow"], [{"name": "CMake Options", "count": 2}])
 
 
+class TestHostedRunnerCapResolution(unittest.TestCase):
+    """The hosted-runner cap is derived from the org's live GitHub plan
+    tier so a plan change (e.g. Free -> Team, 20 -> 60) is picked up
+    without a code edit. These tests cover the plan lookup, the tier
+    mapping, and the fallback path when the plan can't be queried.
+    """
+
+    def test_org_from_repo(self):
+        self.assertEqual(
+            ci_hosted_runner_usage.org_from_repo("shader-slang/slang"), "shader-slang"
+        )
+        # A bare org (no slash) is returned unchanged.
+        self.assertEqual(
+            ci_hosted_runner_usage.org_from_repo("shader-slang"), "shader-slang"
+        )
+
+    def test_fetch_org_plan_cap_maps_team_tier(self):
+        def fake_gh_api(endpoint):
+            self.assertEqual(endpoint, "orgs/shader-slang")
+            return {"login": "shader-slang", "plan": {"name": "team", "seats": 40}}, None
+
+        with mock.patch.object(ci_hosted_runner_usage, "gh_api", side_effect=fake_gh_api):
+            self.assertEqual(
+                ci_hosted_runner_usage.fetch_org_plan_cap("shader-slang"), 60
+            )
+
+    def test_fetch_org_plan_cap_maps_free_and_enterprise(self):
+        for tier, expected in (("free", 20), ("enterprise", 180), ("TEAM", 60)):
+            with mock.patch.object(
+                ci_hosted_runner_usage,
+                "gh_api",
+                side_effect=lambda ep, t=tier: ({"plan": {"name": t}}, None),
+            ):
+                self.assertEqual(
+                    ci_hosted_runner_usage.fetch_org_plan_cap("org"), expected
+                )
+
+    def test_fetch_org_plan_cap_returns_none_without_plan_field(self):
+        """An external/fork token sees no `plan` field. That must yield
+        None (caller falls back), not a crash.
+        """
+        with mock.patch.object(
+            ci_hosted_runner_usage,
+            "gh_api",
+            side_effect=lambda ep: ({"login": "shader-slang"}, None),
+        ):
+            self.assertIsNone(ci_hosted_runner_usage.fetch_org_plan_cap("shader-slang"))
+
+    def test_fetch_org_plan_cap_returns_none_on_api_error(self):
+        with mock.patch.object(
+            ci_hosted_runner_usage,
+            "gh_api",
+            side_effect=lambda ep: (None, "HTTP 403"),
+        ):
+            self.assertIsNone(ci_hosted_runner_usage.fetch_org_plan_cap("shader-slang"))
+
+    def test_fetch_org_plan_cap_returns_none_on_unknown_tier(self):
+        with mock.patch.object(
+            ci_hosted_runner_usage,
+            "gh_api",
+            side_effect=lambda ep: ({"plan": {"name": "galaxy-brain"}}, None),
+        ):
+            self.assertIsNone(ci_hosted_runner_usage.fetch_org_plan_cap("shader-slang"))
+
+    def test_resolve_hosted_runner_cap_falls_back_on_failure(self):
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_org_plan_cap", side_effect=lambda org: None
+        ):
+            self.assertEqual(
+                ci_hosted_runner_usage.resolve_hosted_runner_cap("shader-slang/slang"),
+                ci_hosted_runner_usage.DEFAULT_HOSTED_RUNNER_CAP,
+            )
+
+    def test_resolve_hosted_runner_cap_prefers_live_plan(self):
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_org_plan_cap", side_effect=lambda org: 60
+        ):
+            self.assertEqual(
+                ci_hosted_runner_usage.resolve_hosted_runner_cap("shader-slang/slang"), 60
+            )
+
+    def test_sample_auto_detects_cap_when_none(self):
+        """With cap=None the sampler resolves the cap from the org plan."""
+
+        def fake_in_progress(repo):
+            return [], None
+
+        def fake_queued(repo):
+            return [], None
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "resolve_hosted_runner_cap", side_effect=lambda repo: 60
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage("shader-slang/slang")
+
+        self.assertEqual(snap["cap"], 60)
+
+    def test_default_cap_is_team_tier(self):
+        """The static fallback tracks the Slang org's actual plan (Team)."""
+        self.assertEqual(ci_hosted_runner_usage.DEFAULT_HOSTED_RUNNER_CAP, 60)
+
+
 class TestHostedLabelPalette(unittest.TestCase):
     """Regression: variants must yield valid 6-digit `#RRGGBB` colors.
 

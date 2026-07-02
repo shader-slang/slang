@@ -1444,7 +1444,10 @@ def main():
         cap = hosted_runner_usage["cap"]
         in_use = hosted_runner_usage["in_progress"]["total"]
         queued = hosted_runner_usage["queued"]["total"]
-        print(f"  Hosted runners in use: {in_use}/{cap}, queued: {queued}")
+        cap_note = (
+            "" if cap != DEFAULT_HOSTED_RUNNER_CAP else " (plan not queryable, using fallback)"
+        )
+        print(f"  Hosted runners in use: {in_use}/{cap}{cap_note}, queued: {queued}")
         if hosted_runner_usage.get("partial"):
             fetch_errs = hosted_runner_usage.get("fetch_errors", 0)
             list_errs = hosted_runner_usage.get("list_errors", [])
