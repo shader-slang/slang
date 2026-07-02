@@ -9,6 +9,7 @@
 // match.
 
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute
 
 RWStructuredBuffer<int> inBuf;
 AppendStructuredBuffer<int> appendBuf;
@@ -27,3 +28,10 @@ void computeMain(uint i : SV_GroupIndex)
 // The Append/Consume types are lowered into synthesized accessor functions:
 // CHECK-DAG: AppendStructuredBuffer_Append
 // CHECK-DAG: ConsumeStructuredBuffer_Consume
+
+// SPIR-V has no AppendStructuredBuffer type either, so the same lowering runs there:
+// the buffer splits into element/counter storage buffers and the counter update becomes
+// an atomic (Append increments, Consume decrements). If the gate wrongly skipped the
+// pass, the un-lowered type would reach the SPIR-V emitter and compilation would fail.
+// SPV-DAG: OpAtomicIIncrement
+// SPV-DAG: OpAtomicIDecrement
