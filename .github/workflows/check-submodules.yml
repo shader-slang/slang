@@ -4,12 +4,20 @@ on:
   pull_request:
     branches: [master]
     types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "external/**"
+      - ".gitmodules"
+      - ".github/workflows/check-submodules.yml"
+      - "extras/check-submodule-commits.sh"
   merge_group:
     types: [checks_requested]
 
-# No top-level paths: filter — GitHub treats path-skipped jobs as "not run",
-# which breaks required-check gating. The script's --diff-base flag handles
-# the short-circuit when no submodule pointer changed.
+# This check is not a required status check, so a path-skipped job on an
+# unrelated PR is harmless — it simply never reports, and nothing waits on it.
+# The pull_request paths: filter above therefore restricts the work to PRs that
+# actually touch a submodule pointer, the workflow, or the script. merge_group
+# has no paths: filter (GitHub ignores paths: on merge_group), so the check
+# re-runs over every submodule in the queue as a final gate.
 jobs:
   check-submodules:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
@@ -26,6 +34,4 @@ jobs:
         with:
           fetch-depth: 0
       - name: Verify submodule pins
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-        run: ./extras/check-submodule-commits.sh --diff-base "$BASE_SHA"
+        run: ./extras/check-submodule-commits.sh
