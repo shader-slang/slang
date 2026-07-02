@@ -10,7 +10,6 @@ Conventions:
 - Every compilable workload exposes a ``[shader("compute")]`` entry named
   ``computeMain`` so ``slangc`` auto-discovers it; results are written to a
   ``RWStructuredBuffer`` so nothing is dead-code-eliminated.
-- The ``diagnostics_errors`` workload is intentionally non-compiling.
 """
 
 import os
@@ -171,24 +170,8 @@ def gen_dynamic_dispatch(n):
     return {"dynamic_dispatch.slang": "".join(s)}
 
 
-def gen_diagnostics_errors(n):
-    """n functions each referencing an undefined identifier -> n diagnostics.
-    Stresses the diagnostic-emission path during semantic checking. Intentionally
-    fails to compile (expect_fail)."""
-    s = [_HEADER, _buf()]
-    for i in range(n):
-        s.append(
-            f"float bad_{i}(float x) {{ return x + undefined_symbol_{i} * missing_const_{i}; }}\n"
-        )
-    s.append('\n[shader("compute")]\n[numthreads(1,1,1)]\n')
-    s.append("void computeMain() { outBuf[0] = bad_0(1.0); }\n")
-    return {"diagnostics_errors.slang": "".join(s)}
-
-
 def gen_diagnostics_clean(n):
-    """Size-matched control for diagnostics_errors: same shape, compiles cleanly.
-    Subtract its SemanticChecking time from the error variant to isolate the
-    diagnostic-path cost."""
+    """N functions with distinct compile-time constants, no errors."""
     s = [_HEADER, _buf()]
     for i in range(n):
         s.append(f"static const float k_{i} = {i % 7}.0;\n")

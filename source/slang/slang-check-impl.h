@@ -215,6 +215,11 @@ struct GenericArgumentInferenceFailure
         GenericParamUnificationConflict,
     };
 
+    // Empty payload type for `Kind::None`.
+    struct NonePayload
+    {
+    };
+
     struct VariadicPackCountMismatch
     {
         SourceLoc location = SourceLoc();
@@ -287,6 +292,9 @@ struct GenericArgumentInferenceFailure
     Kind kind = Kind::None;
     union
     {
+        // Keep `Kind::None` as a real active union member; without this, GCC
+        // reports maybe-uninitialized errors when overload candidates are copied.
+        NonePayload nonePayload;
         VariadicPackCountMismatch variadicPackCountMismatch;
         GenericArityMismatch genericArityMismatch;
         OrdinaryGenericParamNotInferred ordinaryGenericParamNotInferred;
@@ -299,7 +307,8 @@ struct GenericArgumentInferenceFailure
     // placement-new in `set*()` / `copyActiveMemberFrom` (which never destroys
     // the previously active member first) well-defined.
     static_assert(
-        std::is_trivially_destructible_v<VariadicPackCountMismatch> &&
+        std::is_trivially_destructible_v<NonePayload> &&
+            std::is_trivially_destructible_v<VariadicPackCountMismatch> &&
             std::is_trivially_destructible_v<GenericArityMismatch> &&
             std::is_trivially_destructible_v<OrdinaryGenericParamNotInferred> &&
             std::is_trivially_destructible_v<InterfaceConformanceNotSatisfied> &&
@@ -308,7 +317,7 @@ struct GenericArgumentInferenceFailure
         "GenericArgumentInferenceFailure payloads must be trivially destructible");
 
     GenericArgumentInferenceFailure()
-        : variadicPackCountMismatch()
+        : nonePayload()
     {
     }
 
@@ -320,6 +329,9 @@ struct GenericArgumentInferenceFailure
 
     GenericArgumentInferenceFailure& operator=(GenericArgumentInferenceFailure const& other)
     {
+        if (this == &other)
+            return *this;
+
         kind = other.kind;
         copyActiveMemberFrom(other);
         return *this;
@@ -399,6 +411,7 @@ private:
                 GenericParamUnificationConflict(other.genericParamUnificationConflict);
             break;
         case Kind::None:
+            new (&nonePayload) NonePayload(other.nonePayload);
             break;
         }
     }

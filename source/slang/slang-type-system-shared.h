@@ -5,6 +5,62 @@
 
 namespace Slang
 {
+
+// Memory type flags for the work-graph Barrier() intrinsic (SM 6.8, first argument).
+// Keep these values in sync with experimental/workgraph.slang; the HLSL emitter also
+// compares against these values when emitting named Barrier constants.
+struct BarrierMemoryTypeFlags
+{
+    enum Enum : uint32_t
+    {
+        UavMemory = 0x01u,
+        GroupSharedMemory = 0x02u,
+        NodeInputMemory = 0x04u,
+        NodeOutputMemory = 0x08u,
+        AllMemory = 0x0fu,
+    };
+};
+static_assert(
+    BarrierMemoryTypeFlags::UavMemory == 0x01u,
+    "UavMemory must match experimental/workgraph.slang");
+static_assert(
+    BarrierMemoryTypeFlags::GroupSharedMemory == 0x02u,
+    "GroupSharedMemory must match experimental/workgraph.slang");
+static_assert(
+    BarrierMemoryTypeFlags::NodeInputMemory == 0x04u,
+    "NodeInputMemory must match experimental/workgraph.slang");
+static_assert(
+    BarrierMemoryTypeFlags::NodeOutputMemory == 0x08u,
+    "NodeOutputMemory must match experimental/workgraph.slang");
+static_assert(
+    BarrierMemoryTypeFlags::AllMemory == 0x0fu,
+    "AllMemory must match experimental/workgraph.slang");
+
+// Semantic flags for the work-graph Barrier() intrinsic (SM 6.8, second argument).
+// Keep these values in sync with experimental/workgraph.slang; the HLSL emitter also
+// compares against these values when emitting named Barrier constants.
+struct BarrierSemanticFlags
+{
+    enum Enum : uint32_t
+    {
+        Reorder = 0x00u,
+        GroupSync = 0x01u,
+        GroupScope = 0x02u,
+        DeviceScope = 0x04u,
+    };
+};
+static_assert(
+    BarrierSemanticFlags::Reorder == 0x00u,
+    "Reorder must match experimental/workgraph.slang");
+static_assert(
+    BarrierSemanticFlags::GroupSync == 0x01u,
+    "GroupSync must match experimental/workgraph.slang");
+static_assert(
+    BarrierSemanticFlags::GroupScope == 0x02u,
+    "GroupScope must match experimental/workgraph.slang");
+static_assert(
+    BarrierSemanticFlags::DeviceScope == 0x04u,
+    "DeviceScope must match experimental/workgraph.slang");
 #define FOREACH_BASE_TYPE(X) \
     X(Void)                  \
     X(Bool)                  \

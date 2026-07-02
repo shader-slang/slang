@@ -183,6 +183,9 @@ static void emitReflectionVarBindingInfoJSON(
         case SLANG_STAGE_AMPLIFICATION:
             stageName = "amplification";
             break;
+        case SLANG_STAGE_NODE:
+            stageName = "node";
+            break;
 
         default:
             break;
@@ -1163,6 +1166,9 @@ static void emitReflectionEntryPointJSON(
         break;
     case SLANG_STAGE_AMPLIFICATION:
         writer << ",\n\"stage\": \"amplification\"";
+        break;
+    case SLANG_STAGE_NODE:
+        writer << ",\n\"stage\": \"node\"";
         break;
     default:
         break;

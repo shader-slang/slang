@@ -33,7 +33,10 @@ jobs:
           shouldRun=true
           if files="$(git diff --name-only $BASE...HEAD)"; then
             # Git diff succeeded, check if non-documentation files were changed
-            if echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|CONTRIBUTING\.md$|README\.md$)'; then
+            if echo "$files" | grep -Eqx 'docs/(command-line-slangc-reference.md|user-guide/a3-02-reference-capability-atoms.md)'; then
+              echo "Generated reference document changed, running checks"
+              shouldRun=true
+            elif echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|\.claude/|[^/]+\.md$|\.coderabbit\.yaml$)'; then
               shouldRun=true
             else
               echo "Only documentation files changed, skipping remaining steps"
@@ -45,12 +48,95 @@ jobs:
           fi
           echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
 
-  # Linux x86_64 builds run in the CI container on the GCP self-hosted build
-  # pool. container-user is the GCP build runner image's UID:GID (1003), which
-  # owns _work; the reusable workflow defaults to 1001 for GitHub-hosted runners.
-  build-linux-debug-gcc-x86_64:
+  # Low-priority gate. This job runs for every PR/dispatch that needs CI, but
+  # only nv-slang-bot[bot] workflow_dispatch runs can ever yield. Those are the
+  # bot's draft-testing runs: a draft PR has no pull_request CI, so the bot
+  # dispatches CI manually while iterating. Every other run — human PRs, the
+  # bot's own ready-for-review PRs, and merge_group — is full priority, so the
+  # gate succeeds immediately and the build jobs (which require this job to
+  # succeed) proceed normally. When a throttled bot dispatch must yield to
+  # human, merge-queue, or older bot CI, a marker step fails this job so it
+  # consumes no expensive build/test runners; ci-retry-yielded-bot then reruns
+  # it once CI is quiet.
+  #
+  # The job deliberately resolves to success or failure, never 'skipped':
+  # a skipped dependency would collide with the implicit success() that gates
+  # the build jobs and silently skip all of CI. See the build-job `if` below.
+  wait-for-human-priority:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
+    # This gate fires for every PR revision and does light work (checkout +
+    # Python + `gh api`, no GPU) — the same shape as ci-health/ci-analytics.
+    #
+    # RUNNER SELECTION — switchable via the `ANALYTICS_RUNS_ON` repository
+    # variable, WITHOUT a code change (Settings → Secrets and variables →
+    # Actions → Variables):
+    #   - variable UNSET (default): run on GitHub-hosted `ubuntu-latest`.
+    #   - variable SET to a runs-on JSON string, e.g.
+    #     `["Linux", "self-hosted", "analytics", "GCP"]`: run on the GCP
+    #     analytics pool.
+    # It was offloaded to the GCP analytics pool in June 2026 to keep it off the
+    # 20-runner org cap. NOTE: ci-health.yml runs on the same variable; keeping
+    # it on GCP avoids the self-starvation blind spot where the cap monitor is
+    # itself starved by the cap it measures — prefer the GCP pool for this group
+    # unless the Teams-tier cap has ample headroom.
+    runs-on: ${{ vars.ANALYTICS_RUNS_ON && fromJSON(vars.ANALYTICS_RUNS_ON) || fromJSON('["ubuntu-latest"]') }}
+    timeout-minutes: 10
+    # Only reads Actions API state and runs a script; no write access needed.
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - id: priority
+        name: Check priority gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Only the bot's own workflow_dispatch runs (its draft-testing runs)
+          # are throttled. The bot's ready-for-review PRs are treated as human.
+          IS_THROTTLED_BOT: ${{ github.event_name == 'workflow_dispatch' && github.triggering_actor == 'nv-slang-bot[bot]' }}
+        run: |
+          if [[ "$IS_THROTTLED_BOT" != "true" ]]; then
+            echo "Not a throttled bot run; proceeding without yielding."
+            echo "yielded=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python3 extras/ci/wait-for-priority.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow ci.yml \
+            --max-yield-hours 12
+
+      - name: Stop yielded bot CI
+        if: steps.priority.outputs.yielded == 'true'
+        run: |
+          echo "::error::priority-gate-yielded: higher-priority CI is active; ci-retry-yielded-bot will rerun this bot CI when quiet"
+          exit 1
+
+  # Linux x86_64 builds run in the CI container.
+  #
+  # RUNNER SELECTION — switchable between GitHub-hosted and the GCP self-hosted
+  # build pool via the `LINUX_BUILD_RUNS_ON` repository variable, WITHOUT a code
+  # change (Settings → Secrets and variables → Actions → Variables):
+  #   - variable UNSET (default): run on GitHub-hosted `ubuntu-22.04`.
+  #   - variable SET to a runs-on JSON string, e.g.
+  #     `["Linux", "self-hosted", "build", "GCP"]`: run on the GCP build pool.
+  # These builds were offloaded to GCP in June 2026 (PR #11738) to relieve the
+  # GitHub-hosted 20-runner org cap; with the Teams-tier 60-runner cap they can
+  # ride the GitHub-hosted pool again by default, while the variable keeps a
+  # zero-code-change escape hatch back to GCP if the cap tightens.
+  #
+  # container-user must track the runner: the GCP build image's runner owns
+  # _work as UID:GID 1003, while GitHub-hosted runners use 1001 (the reusable
+  # workflow's default). It is keyed off the SAME variable so the two never
+  # diverge — set the variable → get the GCP UID; unset → get the hosted UID.
+  build-linux-debug-gcc-x86_64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build-container.yml
     # id-token is never part of the default GITHUB_TOKEN even when the repo
     # default is "write"; it must be requested explicitly for the reusable
@@ -62,12 +148,17 @@ jobs:
       packages: read
     with:
       config: debug
-      runs-on: '["Linux", "self-hosted", "build", "GCP"]'
-      container-user: "1003:1003"
+      runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
+      container-user: ${{ vars.LINUX_BUILD_RUNS_ON && '1003:1003' || '1001:1001' }}
 
+  # Runner selection and container-user tracking: see build-linux-debug-gcc-x86_64
+  # above (both keyed off the `LINUX_BUILD_RUNS_ON` repository variable).
   build-linux-release-gcc-x86_64:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build-container.yml
     # id-token is never part of the default GITHUB_TOKEN even when the repo
     # default is "write"; it must be requested explicitly for the reusable
@@ -79,39 +170,69 @@ jobs:
       packages: read
     with:
       config: release
-      runs-on: '["Linux", "self-hosted", "build", "GCP"]'
-      container-user: "1003:1003"
+      runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
+      container-user: ${{ vars.LINUX_BUILD_RUNS_ON && '1003:1003' || '1001:1001' }}
 
-  # NOTE: wasm stays on GitHub-hosted for now. It builds directly on the host
-  # (no container) via ci-slang-build.yml, and the GCP build runner image lacks
-  # the host build toolchain (cmake), so it fails there with "cmake: command not
-  # found". Moving it onto the build pool requires running it in the CI
-  # container like the other Linux builds — tracked as a follow-up.
+  # WASM build runs directly on the host (no container). It needs the gcc host
+  # toolchain (g++) for the native generators build; emsdk is downloaded by the
+  # build itself. Both GitHub-hosted `ubuntu-22.04` and the GCP linux-cpu-runner
+  # image provide g++, so this job runs on either.
+  #
+  # RUNNER SELECTION — switchable via the `LINUX_BUILD_RUNS_ON` repository
+  # variable, same as the x86_64 builds above: unset → GitHub-hosted
+  # `ubuntu-22.04`; set to a runs-on JSON string → the GCP build pool. id-token
+  # is requested for the reusable workflow's GCP Workload Identity auth step
+  # (never part of the default GITHUB_TOKEN); it is harmless on GitHub-hosted.
   build-linux-release-gcc-wasm:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
     with:
       os: linux
       compiler: gcc
       platform: wasm
       config: release
-      runs-on: '["ubuntu-22.04"]'
+      runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
 
   # Sanitizer build+test (blocking via check-ci, runs on every PR). Runs in the
-  # clang CI container; kept on GitHub-hosted until validated on the GCP build
-  # pool (tracked with the wasm container follow-up).
+  # clang CI container as `--user root`, so there is no container-user concern
+  # and no runner-UID coupling — only the runner label switches.
+  #
+  # RUNNER SELECTION — switchable via the `LINUX_BUILD_RUNS_ON` repository
+  # variable, same as the x86_64 builds above: unset → GitHub-hosted
+  # `ubuntu-22.04`; set to a runs-on JSON string → the GCP build pool. id-token
+  # is requested explicitly for GCP Workload Identity auth (never part of the
+  # default GITHUB_TOKEN); it is harmless on GitHub-hosted.
   sanitizer-linux-clang-x86_64:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-sanitizer.yml
+    permissions:
+      # Required by ci-slang-sanitizer.yml's GCP Workload Identity auth step;
+      # id-token is never part of the default GITHUB_TOKEN.
+      id-token: write
+      contents: read
+      packages: read
     with:
-      runs-on: '["ubuntu-22.04"]'
+      runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
 
   # macOS builds
   build-macos-debug-clang-aarch64:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: macos
@@ -121,8 +242,11 @@ jobs:
       runs-on: '["macos-latest"]'
 
   build-macos-release-clang-aarch64:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: macos
@@ -133,8 +257,11 @@ jobs:
 
   # Linux ARM64 builds (GitHub-hosted)
   build-linux-debug-gcc-aarch64:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -145,8 +272,11 @@ jobs:
       warnings-as-errors: false
 
   build-linux-release-gcc-aarch64:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -158,8 +288,11 @@ jobs:
 
   # Windows builds (self-hosted)
   build-windows-debug-cl-x86_64-gpu:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -169,8 +302,11 @@ jobs:
       runs-on: '["Windows", "self-hosted", "build"]'
 
   build-windows-release-cl-x86_64-gpu:
-    needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -367,11 +503,11 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
-  # MaterialX Integration Tests (Windows only for initial validation)
+  # MaterialX integration test (Windows only for initial validation).
   test-materialx-windows-release:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/materialx-test.yml
+    uses: ./.github/workflows/ci-materialx-regression-test.yml
     with:
       os: windows
       compiler: cl
@@ -423,6 +559,55 @@ jobs:
             exit 1
           fi
 
+  # Verify docs/user-guide/a3-02-reference-capability-atoms.md matches
+  # source/slang/slang-capabilities.capdef.
+  # Reuses the release artifact built by build-linux-release-gcc-x86_64 instead
+  # of building slang-capability-generator again from scratch.
+  check-capability-atoms-ref:
+    needs: [filter, build-linux-release-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Download Slang release artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: slang-tests-linux-x86_64-gcc-release
+          path: artifacts
+
+      - name: Generate capability atoms reference
+        run: |
+          # slang-capability-generator may depend on libraries under Release/lib,
+          # separate from the Release/bin binaries.
+          chmod +x artifacts/Release/bin/* 2>/dev/null || true
+          export LD_LIBRARY_PATH="$PWD/artifacts/Release/lib:$LD_LIBRARY_PATH"
+          if [[ ! -x artifacts/Release/bin/slang-capability-generator ]]; then
+            echo "slang-capability-generator is missing from the Slang release artifact."
+            exit 1
+          fi
+          mkdir -p temp/capability temp/docs/user-guide
+          cp docs/user-guide/a3-02-reference-capability-atoms.md temp/docs/user-guide/a3-02-reference-capability-atoms.md
+          capdefs=(source/slang/*.capdef)
+          artifacts/Release/bin/slang-capability-generator \
+            "${capdefs[@]}" \
+            --target-directory temp/capability \
+            --doc temp/docs/user-guide/a3-02-reference-capability-atoms.md
+
+      - name: Compare with existing reference
+        run: |
+          if ! diff -q temp/docs/user-guide/a3-02-reference-capability-atoms.md docs/user-guide/a3-02-reference-capability-atoms.md > /dev/null; then
+            echo "Capability atoms reference is out of date. Diff:"
+            diff -u docs/user-guide/a3-02-reference-capability-atoms.md temp/docs/user-guide/a3-02-reference-capability-atoms.md
+            echo "Please regenerate docs/user-guide/a3-02-reference-capability-atoms.md with slang-capability-generator."
+            exit 1
+          fi
+
   test-falcor:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
@@ -437,7 +622,7 @@ jobs:
     permissions:
       contents: read
       actions: read
-    uses: ./.github/workflows/ci-compile-test.yml
+    uses: ./.github/workflows/ci-slang-regression-test.yml
 
   test-benchmark:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
@@ -445,7 +630,7 @@ jobs:
     permissions:
       contents: read
       actions: read
-    uses: ./.github/workflows/ci-benchmark-test.yml
+    uses: ./.github/workflows/ci-mdl-benchmark-test.yml
 
   # Aggregate gate required by branch protection / the merge queue.
   #
@@ -486,9 +671,11 @@ jobs:
         test-materialx-windows-release,
         sanitizer-linux-clang-x86_64,
         check-cmdline-ref,
+        check-capability-atoms-ref,
         test-falcor,
         test-compile-regression,
         test-benchmark,
+        wait-for-human-priority,
       ]
     runs-on: ubuntu-latest
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
