@@ -116,9 +116,10 @@ SLANG_UNIT_TEST(warningLevelInheritedFromParentSink)
 
     SLANG_CHECK(child.isWarningLevelEnabled(WarningLevel::All) == true);
     SLANG_CHECK(emitted(child, makeWarning(3, WarningLevel::All)) == true);
-    // A group the parent did not enable is not inherited either.
-    SLANG_CHECK(child.isWarningLevelEnabled(WarningLevel::Extra) == false);
-    SLANG_CHECK(emitted(child, makeWarning(4, WarningLevel::Extra)) == false);
+    // An off-by-default group the parent did not enable stays off in the child (Pedantic is off
+    // by default; Extra would be a poor probe here since it is on by default).
+    SLANG_CHECK(child.isWarningLevelEnabled(WarningLevel::Pedantic) == false);
+    SLANG_CHECK(emitted(child, makeWarning(4, WarningLevel::Pedantic)) == false);
 }
 
 // Out-of-range group values (only reachable via a bogus int cast through the public
