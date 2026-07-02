@@ -5189,10 +5189,17 @@ semantic sv_pointcoord
 
 semantic sv_primitiveid
 {
+    // GLSL_EXT_ray_tracing allows `gl_PrimitiveID` as an input in the
+    // intersection, any-hit, and closest-hit stages, so we accept
+    // `SV_PrimitiveID` there in addition to the rasterization stages.
+    // It maps to the same value as the `PrimitiveIndex()` intrinsic.
     [require(fragment)]
     [require(geometry)]
     [require(hull)]
     [require(domain)]
+    [require(intersection)]
+    [require(anyhit)]
+    [require(closesthit)]
     get : uint;
 
     [require(geometry)]
