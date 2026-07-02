@@ -122,6 +122,12 @@ local err = helpers.err
 local warning = helpers.warning
 local internal = helpers.internal
 local fatal = helpers.fatal
+-- Warning-level (group) sentinel: pass one positionally to warning() to make that warning
+-- opt-in behind a -W group flag, e.g.
+--   warning("my-warning", 123, "message", span{...}, pedantic)
+-- Only `pedantic` is used today; `helpers.all` and `helpers.extra` exist for the other groups
+-- and can be bound here when a diagnostic needs them.
+local pedantic = helpers.pedantic
 
 --
 -- 0xxxx - Command line and interaction with host platform APIs.
@@ -939,7 +945,10 @@ warning(
     "keyword-used-as-name",
     20103,
     "keyword used as a name",
-    span { loc = "location", message = "'~name:Name' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts" }
+    span { loc = "location", message = "'~name:Name' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts" },
+    -- Pedantic: using a type keyword as a name is legal and usually works; this is a
+    -- style/portability hint rather than a likely bug, so it belongs in the pedantic group.
+    pedantic
 )
 
 err(
