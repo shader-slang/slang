@@ -53,7 +53,7 @@ struct WithMethods
     [mutating]
     void selfAlias()
     {
-        // Positive: implicit this.x passed to both inout params.
+        // Implicit this.x passed to both inout params: expect the aliasing warning.
         twoInoutInt(x, x);
 //CHECK:            ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
 //CHECK:            ^ passing the same value to both may produce unexpected results
@@ -62,8 +62,8 @@ struct WithMethods
     [mutating]
     void otherObject(inout WithMethods other)
     {
-        // Negative: this.x vs other.x are different objects — no warning
-        // expected (exhaustive mode fails on any spurious diagnostic).
+        // this.x vs other.x are different objects, so no warning is expected;
+        // exhaustive mode fails the test if a spurious diagnostic is emitted.
         twoInoutInt(this.x, other.x);
     }
 }
