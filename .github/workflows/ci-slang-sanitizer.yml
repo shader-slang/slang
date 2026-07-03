@@ -264,19 +264,29 @@ jobs:
           fi
 
       - name: Package ASan-instrumented binaries
+        # Deliberately gated on build success only, not on test or summary
+        # outcome: sanitizer findings must not block publishing, because the
+        # instrumented binaries are how downstream users reproduce those
+        # findings. Nightly artifacts are a debugging aid, not a release
+        # channel.
         if: inputs.upload-binaries && steps.build.outcome == 'success'
         run: |
           # Bundle the instrumented build for downstream ASan users. Binaries
           # are built with -shared-libsan, so ship the matching dynamic ASan
           # runtime alongside them; consumers must put both lib/ and
           # asan-runtime/ on LD_LIBRARY_PATH.
+          #
+          # Copies are strict on purpose: a missing binary or ASan runtime
+          # must fail this step loudly rather than upload an artifact that is
+          # silently unusable (MANIFEST.txt alone would defeat the upload
+          # step's if-no-files-found check).
           staging=/tmp/sanitizer-binaries
           mkdir -p "$staging/bin" "$staging/asan-runtime"
           cp -a "$lib_dir" "$staging/lib"
-          cp -a "$bin_dir/slangc" "$bin_dir/slangd" "$staging/bin/" 2>/dev/null || true
+          cp -a "$bin_dir/slangc" "$bin_dir/slangd" "$staging/bin/"
           cp -a include "$staging/include"
           CLANG_RUNTIME_DIR=$(clang-18 -print-runtime-dir)
-          cp -a "$CLANG_RUNTIME_DIR"/libclang_rt.asan*.so* "$staging/asan-runtime/" || true
+          cp -a "$CLANG_RUNTIME_DIR"/libclang_rt.asan*.so* "$staging/asan-runtime/"
           {
             echo "commit: $GITHUB_SHA"
             echo "clang: $(clang-18 --version | head -1)"
