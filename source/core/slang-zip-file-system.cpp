@@ -169,8 +169,12 @@ static mz_file_read_func _calcReadFunc()
     void* buf;
     size_t size;
     mz_zip_writer_finalize_heap_archive(&archive, &buf, &size);
+    // `buf` is owned by miniz's allocator. Copy it into Slang-owned storage and release the
+    // original with miniz's own `mz_free`, so allocation/deallocation stay paired rather than
+    // relying on `ScopedAllocation` (which always frees via `::free`).
     ScopedAllocation alloc;
-    alloc.attach(buf, size);
+    alloc.set(buf, size);
+    mz_free(buf);
     mz_zip_writer_end(&archive);
 
     // Read
@@ -397,7 +401,11 @@ SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
                     void* buf;
                     size_t size;
                     mz_zip_writer_finalize_heap_archive(&m_archive, &buf, &size);
-                    m_data.attach(buf, size);
+                    // `buf` is owned by miniz's allocator. Copy it into the member allocation and
+                    // release the original with miniz's own `mz_free`, so allocation/deallocation
+                    // stay paired rather than relying on `ScopedAllocation`'s `::free`.
+                    m_data.set(buf, size);
+                    mz_free(buf);
 
                     mz_zip_writer_end(&m_archive);
 
