@@ -31,23 +31,32 @@
 #   cmake/sanitizer-ignorelist.txt     -- suppresses UBSan checks at compile level
 #   This file                          -- accepts real findings as known issues
 
-# Record-replay proxy leaks during the replay unit tests: the replay
-# path invokes proxied methods with default-initialized out-parameters
-# and discards the results, so replayed object-creating calls (sessions
-# via tryWrap, digest blobs via getSessionDescDigest, wrapped
-# filesystems) are never released. Root allocation sites:
-#   SlangRecord::tryWrap<...>          (proxy-base.cpp)
-#   Slang::RawBlob::tryCreate          (via GlobalSessionProxy digest replay)
+# #11936: Record-replay replay path leaks objects created by replayed
+# calls: the replay path invokes proxied methods with default-initialized
+# out-parameters and discards the results, so replayed object-creating
+# calls (sessions and filesystems via tryWrap, digest blobs via
+# getSessionDescDigest) are never released. tryWrap matches the proxy
+# wrapper allocations (proxy-base.cpp); callWithDefaults matches the
+# discarded-out-parameter allocations made inside replayed calls
+# (proxy-macros.h). Deliberately NOT matching generic allocation helpers
+# like RawBlob::tryCreate -- that would silently accept unrelated future
+# blob leaks.
 LEAK: SlangRecord::tryWrap
-LEAK: SlangRecord::wrapObject
-LEAK: Slang::RawBlob::tryCreate
+LEAK: SlangRecord::callWithDefaults
+# Also #11936: the replay-playback unit tests leak their TestCalculatorProxy
+# objects (a reference taken during record/replay of proxied calls is never
+# released; the handle registry itself stores raw pointers, so the imbalance
+# is in the call path). The allocation site is the test function, so match
+# the test-function name prefix.
+LEAK: _replayContext
 
-# Historical entries, removed when their findings stopped occurring
-# (nightly run 28644605608 flagged them as never-matched):
-#   #10828 LEAK: _maybeBeginMacroInvocation -- fixed (wrong-arg-count
-#     macro invocation error paths now free the MacroInvocation).
+# Historical entries:
+#   #10828 LEAK: _maybeBeginMacroInvocation -- fixed by this PR: the
+#     wrong-arg-count macro invocation error paths now free the
+#     MacroInvocation.
 #   #10893 TypeLayoutReflection use-after-free SUMMARY patterns
 #     (List<ResourceInfo>::begin / slang-reflection-api.cpp /
-#     slang-type-layout.h) -- the UBSan finding no longer occurs even
-#     though render-test CPU compute tests still run; re-add (with
-#     current line numbers) if #10893 resurfaces.
+#     slang-type-layout.h) -- stale: never matched in recent nightly
+#     runs (e.g. 28644605608 and the scheduled master runs), so the
+#     UBSan finding no longer reproduces there. Re-add (with current
+#     line numbers) if #10893 resurfaces.
