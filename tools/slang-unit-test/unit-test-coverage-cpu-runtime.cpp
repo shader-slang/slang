@@ -221,8 +221,21 @@ static void runCoverageCpuRuntimeTest(slang::IGlobalSession* globalSession, int 
     SLANG_CHECK(resourceInfo.uniformOffset >= 0);
     // The CPU representation of the coverage buffer is a
     // (data pointer, element count) pair; the reported stride is the size of
-    // that representation in the global-params payload.
-    SLANG_CHECK(resourceInfo.uniformStride == int32_t(sizeof(CpuStructuredBufferView)));
+    // that representation in the global-params payload. Abort on mismatch:
+    // the payload below is sized from these fields, so continuing with an
+    // out-of-contract stride (e.g. the `0` "unavailable" sentinel) would
+    // turn a metadata regression into an out-of-bounds write instead of a
+    // clean test failure.
+    SLANG_CHECK_ABORT(resourceInfo.uniformStride == int32_t(sizeof(CpuStructuredBufferView)));
+
+    // A real host discovers the counter element width from the metadata
+    // rather than trusting what it asked for, so exercise that path: read
+    // `CoverageBufferInfo::elementByteWidth`, check it matches the requested
+    // width, and size the counter storage from the reported value.
+    slang::CoverageBufferInfo bufferInfo;
+    SLANG_CHECK_ABORT(coverage->getBufferInfo(&bufferInfo) == SLANG_OK);
+    SLANG_CHECK_ABORT(bufferInfo.elementByteWidth == uint32_t(counterByteWidth));
+    const int reportedCounterByteWidth = int(bufferInfo.elementByteWidth);
 
     // The kernel executes in-process, so host and kernel agree on pointer
     // width and the buffer view can be patched in directly.
@@ -232,7 +245,7 @@ static void runCoverageCpuRuntimeTest(slang::IGlobalSession* globalSession, int 
     outputView.count = kThreadCount;
 
     List<uint8_t> counterBytes;
-    counterBytes.setCount(Index(counterCount) * counterByteWidth);
+    counterBytes.setCount(Index(counterCount) * reportedCounterByteWidth);
     memset(counterBytes.getBuffer(), 0, counterBytes.getCount());
     CpuStructuredBufferView coverageView;
     coverageView.data = counterBytes.getBuffer();
@@ -298,7 +311,7 @@ static void runCoverageCpuRuntimeTest(slang::IGlobalSession* globalSession, int 
             SLANG_CHECK_ABORT(entry.counterIndex < counterCount);
             ++entriesOnLine;
             totalCount +=
-                readCounter(counterBytes.getBuffer(), counterByteWidth, entry.counterIndex);
+                readCounter(counterBytes.getBuffer(), reportedCounterByteWidth, entry.counterIndex);
         }
         SLANG_CHECK(entriesOnLine == 1);
         SLANG_CHECK(totalCount == expected.expectedCount);
