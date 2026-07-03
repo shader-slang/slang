@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T15:00:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/base.md#modifiablesyntaxnode-syntaxnode
+//META: doc_section_digest=5400392de5f3914b937152b3a687cf2f86b73c6fdd2711ed9c393a4bd6334fdb
 //META: purpose=A ModifiableSyntaxNode owns a Modifiers list; the modifiers attached to a Decl actually take effect during checking (a [mutating] member function is permitted to assign through `this`).
-//META: doc_section_digest=c83724cc2e67a0c1757c7e0f6348a823e9a1e94cacf2fe8aab557ba773326bc0
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.

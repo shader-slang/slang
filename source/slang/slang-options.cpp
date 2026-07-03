@@ -22,6 +22,7 @@
 #include "../core/slang-string-slice-pool.h"
 #include "../core/slang-string-util.h"
 #include "../core/slang-type-text-util.h"
+#include "core/slang-stream.h"
 #include "slang-compiler-options.h"
 #include "slang-compiler.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
@@ -547,7 +548,7 @@ void initCommandOptions(CommandOptions& options)
          "Specify the shader profile for code generation.\n"
          "Accepted profiles are:\n"
          "* sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6,6_7,6_8,6_9,6_10}\n"
-         "* glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}\n"
+         "* glsl_{150,330,400,410,420,430,440,450,460}\n"
          "Additional profiles that include -stage information:\n"
          "* {vs,hs,ds,gs,ps}_<version>\n"
          "See -capability for information on <capability>\n"
@@ -584,6 +585,12 @@ void initCommandOptions(CommandOptions& options)
          "-warnings-disable",
          "-warnings-disable <id>[,<id>...]",
          "Disable specific warning ids."},
+        {OptionKind::WarningLevel,
+         "-Wall,-Wextra,-Wpedantic",
+         "-Wall | -Wextra | -Wpedantic",
+         "Enable the corresponding group of opt-in warnings (additive). Staging: the pedantic "
+         "group is currently enabled by default, so passing the pedantic flag is a no-op today; a "
+         "future release will make it opt-in."},
         {OptionKind::EnableWarning, "-W...", "-W<id>", "Enable a warning with the specified id."},
         {OptionKind::DisableWarning, "-Wno-...", "-Wno-<id>", "Disable warning with <id>"},
         {OptionKind::DumpWarningDiagnostics,
@@ -925,6 +932,15 @@ void initCommandOptions(CommandOptions& options)
          "-spirv-sampler-heap-stride <stride>",
          "Specify the byte stride for the sampler descriptor heap when generating SPIRV with "
          "spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(OpTypeSampler)."},
+        {OptionKind::SPIRVUnifiedDescriptorHeapStride,
+         "-spirv-unified-descriptor-heap-stride",
+         nullptr,
+         "When generating SPIRV with spvDescriptorHeapEXT, emit each resource descriptor-heap "
+         "runtime array's ArrayStride as the maximum of image and buffer descriptor sizes, so "
+         "a single heap shared by buffers and images is indexed at the device's unified stride. "
+         "Only affects the default OpConstantSizeOfEXT path (used when -spirv-resource-heap-stride "
+         "is 0); mutually exclusive with a non-zero -spirv-resource-heap-stride (combining the two "
+         "is an error). Does not affect the sampler heap or acceleration-structure entries."},
         {OptionKind::EmitSeparateDebug,
          "-separate-debug-info",
          nullptr,
@@ -978,6 +994,28 @@ void initCommandOptions(CommandOptions& options)
             "executable or library.\n",
             UserValue(OptionKind::CompilerPath),
             "-<compiler>-path");
+    }
+
+    {
+        auto namesList = NameValueUtil::getNames(
+            NameValueUtil::NameKind::First,
+            TypeTextUtil::getCompilerInfos());
+        StringBuilder names;
+        for (auto name : namesList)
+        {
+            names << "-" << name << "-version,";
+        }
+        // remove last ,
+        names.reduceLength(names.getLength() - 1);
+
+        options.add(
+            names.getBuffer(),
+            "-<compiler>-version",
+            "Print the version of the downstream <compiler> that Slang would load for that "
+            "pass-through, then continue. Reports \"not found\" if the compiler cannot be "
+            "located. Takes no value.\n",
+            UserValue(OptionKind::CompilerVersion),
+            "-<compiler>-version");
     }
 
     const Option downstreamOpts[] = {
@@ -1369,6 +1407,14 @@ struct OptionsParser
         bool redundantProfileSet = false;
     };
 
+    struct PendingBuiltinModuleSave
+    {
+        slang::BuiltinModuleName moduleName = slang::BuiltinModuleName::Core;
+        SlangArchiveType archiveType = SLANG_ARCHIVE_TYPE_RIFF_LZ4;
+        String fileName;
+        bool writeAsSourceBytes = false;
+    };
+
     int addTranslationUnit(SlangSourceLanguage language, Stage impliedStage);
 
     void addInputSlangPath(String const& path);
@@ -1389,6 +1435,15 @@ struct OptionsParser
     void addOutputPath(String const& path, CodeGenTarget impliedFormat);
 
     void addOutputPath(char const* inPath);
+
+    // Adds a built-in module save request to be written after optional core-module compilation.
+    SlangResult addPendingBuiltinModuleSave(
+        slang::BuiltinModuleName moduleName,
+        bool writeAsSourceBytes);
+
+    // Writes deferred built-in module saves, compiling each requested module if needed.
+    // For example, GLSL serialization after loading core reuses that archive.
+    SlangResult writePendingBuiltinModuleSaves();
     RawEntryPoint* getCurrentEntryPoint();
 
     void setStage(RawEntryPoint* rawEntryPoint, Stage stage);
@@ -1513,7 +1568,8 @@ struct OptionsParser
     bool m_stdinConsumed = false;
     bool m_hasLoadedRepro = false;
     bool m_compileCoreModule = false;
-    slang::CompileCoreModuleFlags m_compileCoreModuleFlags;
+    slang::CompileCoreModuleFlags m_compileCoreModuleFlags = 0;
+    List<PendingBuiltinModuleSave> m_pendingBuiltinModuleSaves;
 
     SlangArchiveType m_archiveType = SLANG_ARCHIVE_TYPE_RIFF_LZ4;
 
@@ -1824,6 +1880,63 @@ void OptionsParser::addOutputPath(char const* inPath)
     }
 }
 
+SlangResult OptionsParser::addPendingBuiltinModuleSave(
+    slang::BuiltinModuleName moduleName,
+    bool writeAsSourceBytes)
+{
+    CommandLineArg fileName;
+    SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
+
+    PendingBuiltinModuleSave save;
+    save.moduleName = moduleName;
+    save.archiveType = m_archiveType;
+    save.fileName = fileName.value;
+    save.writeAsSourceBytes = writeAsSourceBytes;
+    m_pendingBuiltinModuleSaves.add(save);
+    return SLANG_OK;
+}
+
+SlangResult OptionsParser::writePendingBuiltinModuleSaves()
+{
+    for (const auto& save : m_pendingBuiltinModuleSaves)
+    {
+        ComPtr<ISlangBlob> blob;
+        SlangResult saveResult =
+            m_session->saveBuiltinModule(save.moduleName, save.archiveType, blob.writeRef());
+        if (SLANG_FAILED(saveResult))
+        {
+            SLANG_RETURN_ON_FAIL(m_session->compileBuiltinModule(
+                save.moduleName,
+                save.moduleName == slang::BuiltinModuleName::Core ? m_compileCoreModuleFlags : 0));
+            SLANG_RETURN_ON_FAIL(
+                m_session->saveBuiltinModule(save.moduleName, save.archiveType, blob.writeRef()));
+        }
+
+        if (!save.writeAsSourceBytes)
+        {
+            SLANG_RETURN_ON_FAIL(File::writeAllBytes(
+                save.fileName,
+                blob->getBufferPointer(),
+                blob->getBufferSize()));
+            continue;
+        }
+
+        StringBuilder builder;
+        StringWriter writer(&builder, 0);
+
+        SLANG_RETURN_ON_FAIL(HexDumpUtil::dumpSourceBytes(
+            (const uint8_t*)blob->getBufferPointer(),
+            blob->getBufferSize(),
+            16,
+            &writer));
+
+        SLANG_RETURN_ON_FAIL(
+            File::writeNativeText(save.fileName, builder.getBuffer(), builder.getLength()));
+    }
+
+    return SLANG_OK;
+}
+
 OptionsParser::RawEntryPoint* OptionsParser::getCurrentEntryPoint()
 {
     auto rawEntryPointCount = m_rawEntryPoints.getCount();
@@ -1911,17 +2024,42 @@ void OptionsParser::setFloatingPointMode(RawTarget* rawTarget, FloatingPointMode
     }
 }
 
+static SlangResult _loadReproBlobFromFile(
+    const String& path,
+    DiagnosticSink* sink,
+    ISlangBlob** outBlob)
+{
+    RefPtr<FileStream> stream = new FileStream;
+    SLANG_RETURN_ON_FAIL(
+        stream->init(path, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
+
+    List<Byte> streamData;
+    auto readResult = StreamUtil::readAll(stream, streamData);
+    if (SLANG_FAILED(readResult))
+    {
+        sink->diagnose(Diagnostics::UnableToReadRiff{});
+        return readResult;
+    }
+
+    return ReproUtil::loadState(
+        reinterpret_cast<const uint8_t*>(streamData.getBuffer()),
+        streamData.getCount(),
+        sink,
+        outBlob);
+}
+
 static SlangResult _loadRepro(
     const String& path,
     DiagnosticSink* sink,
     EndToEndCompileRequest* request)
 {
-    List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(path, sink, buffer));
+    ComPtr<ISlangBlob> reproBlob;
+    SLANG_RETURN_ON_FAIL(_loadReproBlobFromFile(path, sink, reproBlob.writeRef()));
 
-    auto requestState = ReproUtil::getRequest(buffer);
+    auto requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
     // If we can find a directory, that exists, we will set up a file system to load from that
     // directory
@@ -2313,9 +2451,9 @@ SlangResult OptionsParser::_parseReproFileSystem(const CommandLineArg& arg)
     CommandLineArg reproName;
     SLANG_RETURN_ON_FAIL(m_reader.expectArg(reproName));
 
-    List<uint8_t> buffer;
+    ComPtr<ISlangBlob> reproBlob;
     {
-        const Result res = ReproUtil::loadState(reproName.value, m_sink, buffer);
+        const Result res = _loadReproBlobFromFile(reproName.value, m_sink, reproBlob.writeRef());
         if (SLANG_FAILED(res))
         {
             m_sink->diagnose(
@@ -2324,9 +2462,10 @@ SlangResult OptionsParser::_parseReproFileSystem(const CommandLineArg& arg)
         }
     }
 
-    auto requestState = ReproUtil::getRequest(buffer);
+    auto requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
     // If we can find a directory, that exists, we will set up a file system to load from that
     // directory
@@ -2622,6 +2761,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::TraceFunctionCoverage:
         case OptionKind::TraceBranchCoverage:
         case OptionKind::TraceCoverageBoolean:
+        case OptionKind::SPIRVUnifiedDescriptorHeapStride:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:
@@ -2740,48 +2880,16 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 break;
             }
         case OptionKind::SaveCoreModule:
-            {
-                CommandLineArg fileName;
-                SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
-
-                ComPtr<ISlangBlob> blob;
-
-                SLANG_RETURN_ON_FAIL(m_session->saveCoreModule(m_archiveType, blob.writeRef()));
-                SLANG_RETURN_ON_FAIL(File::writeAllBytes(
-                    fileName.value,
-                    blob->getBufferPointer(),
-                    blob->getBufferSize()));
-                break;
-            }
+            SLANG_RETURN_ON_FAIL(
+                addPendingBuiltinModuleSave(slang::BuiltinModuleName::Core, false));
+            break;
         case OptionKind::SaveCoreModuleBinSource:
         case OptionKind::SaveGLSLModuleBinSource:
             {
-                CommandLineArg fileName;
-                SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
-
-                ComPtr<ISlangBlob> blob;
-
-                if (optionKind == OptionKind::SaveCoreModuleBinSource)
-                {
-                    SLANG_RETURN_ON_FAIL(m_session->saveCoreModule(m_archiveType, blob.writeRef()));
-                }
-                else
-                {
-                    SLANG_RETURN_ON_FAIL(m_session->saveBuiltinModule(
-                        slang::BuiltinModuleName::GLSL,
-                        m_archiveType,
-                        blob.writeRef()));
-                }
-                StringBuilder builder;
-                StringWriter writer(&builder, 0);
-
-                SLANG_RETURN_ON_FAIL(HexDumpUtil::dumpSourceBytes(
-                    (const uint8_t*)blob->getBufferPointer(),
-                    blob->getBufferSize(),
-                    16,
-                    &writer));
-
-                File::writeNativeText(fileName.value, builder.getBuffer(), builder.getLength());
+                const auto moduleName = optionKind == OptionKind::SaveCoreModuleBinSource
+                                            ? slang::BuiltinModuleName::Core
+                                            : slang::BuiltinModuleName::GLSL;
+                SLANG_RETURN_ON_FAIL(addPendingBuiltinModuleSave(moduleName, true));
                 break;
             }
         case OptionKind::DumpIrIds:
@@ -2946,6 +3054,28 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // Enable the warning
                 // SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning,
                 // Severity::Warning));
+                break;
+            }
+        case OptionKind::WarningLevel:
+            {
+                // The flag spelling (-Wall/-Wextra/-Wpedantic) selects which warning group to
+                // enable. Exact-match options take priority over the -W<id> prefix, so these are
+                // never confused with `-W<name>`.
+                auto flag = argValue.getUnownedSlice();
+                SlangWarningLevel level;
+                if (flag == "-Wall")
+                    level = SLANG_WARNING_LEVEL_ALL;
+                else if (flag == "-Wextra")
+                    level = SLANG_WARNING_LEVEL_EXTRA;
+                else if (flag == "-Wpedantic")
+                    level = SLANG_WARNING_LEVEL_PEDANTIC;
+                else
+                {
+                    // Only the three exact flags above are registered for WarningLevel, so any
+                    // other spelling reaching here is a wiring bug, not user input.
+                    SLANG_UNEXPECTED("unhandled -W warning-level flag");
+                }
+                linkage->m_optionSet.add(OptionKind::WarningLevel, (int)level);
                 break;
             }
         case OptionKind::VerifyDebugSerialIr:
@@ -3612,6 +3742,54 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
                 break;
             }
+        case OptionKind::CompilerVersion:
+            {
+                // `-<compiler>-version` is a print-and-continue query option. It has the same
+                // "-<compiler>-..." shape as -<compiler>-path, but instead of consuming a value it
+                // prints the version of the downstream compiler Slang would actually load for that
+                // pass-through, then lets parsing continue (like -version). Recover <compiler> as
+                // the text between the leading '-' and the trailing "-version", exactly as the
+                // CompilerPath case recovers the name before "-path".
+                const Index index = argValue.lastIndexOf('-');
+                if (index >= 0)
+                {
+                    UnownedStringSlice passThroughSlice =
+                        argValue.getUnownedSlice().head(index).tail(1);
+
+                    SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
+                    if (SLANG_FAILED(TypeTextUtil::findPassThrough(passThroughSlice, passThrough)))
+                    {
+                        m_sink->diagnose(Diagnostics::UnknownDownstreamCompiler{
+                            .compiler = passThroughSlice,
+                            .location = arg.loc});
+                        return SLANG_FAIL;
+                    }
+
+                    // getDownstreamCompilerVersion shares the same lazy-discovery funnel used
+                    // during compilation, so the reported version is the library that would
+                    // actually be used for this pass-through (it honors -<compiler>-path and the
+                    // standard search order). It returns SLANG_OK once the compiler is located and
+                    // loaded -- major/minor are then valid, and a loaded-but-versionless compiler
+                    // such as glslang reports 0.0 -- and SLANG_E_NOT_FOUND when it cannot be
+                    // loaded (e.g. the toolchain is not installed).
+                    int major = 0;
+                    int minor = 0;
+                    StringBuilder versionStr;
+                    versionStr << passThroughSlice << " version: ";
+                    if (SLANG_SUCCEEDED(
+                            m_session->getDownstreamCompilerVersion(passThrough, &major, &minor)))
+                    {
+                        versionStr << major << "." << minor;
+                    }
+                    else
+                    {
+                        versionStr << "not found";
+                    }
+                    versionStr << "\n";
+                    m_sink->diagnoseRaw(Severity::Note, versionStr.getUnownedSlice());
+                }
+                break;
+            }
         case OptionKind::InputFilesRemain:
             {
                 // The `--` option causes us to stop trying to parse options,
@@ -3880,6 +4058,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
     {
         SLANG_RETURN_ON_FAIL(m_session->compileCoreModule(m_compileCoreModuleFlags));
     }
+    SLANG_RETURN_ON_FAIL(writePendingBuiltinModuleSaves());
 
     // TODO(JS): This is a restriction because of how setting of state works for load repro
     // If a repro has been loaded, then many of the following options will overwrite
@@ -4265,6 +4444,18 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     .target =
                         TypeTextUtil::getCompileTargetName(SlangCompileTarget(rawTarget.format))});
             }
+        }
+
+        // `-spirv-unified-descriptor-heap-stride` and an explicit non-zero
+        // `-spirv-resource-heap-stride` express contradictory strides for the same resource heap,
+        // so reject the combination here, as soon as the options are parsed, rather than waiting
+        // until SPIR-V emission. An explicit stride of 0 selects the default `OpConstantSizeOfEXT`
+        // path that the unified option modifies and is therefore not a conflict.
+        if (linkage->m_optionSet.getBoolOption(
+                CompilerOptionName::SPIRVUnifiedDescriptorHeapStride) &&
+            linkage->m_optionSet.getIntOption(CompilerOptionName::SPIRVResourceHeapStride) != 0)
+        {
+            m_sink->diagnose(Diagnostics::SpirvConflictingDescriptorHeapStrideOptions{});
         }
 
         // TODO: do we need to require that a target must have a profile specified,

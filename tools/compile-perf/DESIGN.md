@@ -36,7 +36,7 @@ timing trustworthy. They store results in a separate repo,
 `shader-slang/slang-compile-perf`, authenticated with the `SLANG_COMPILE_PERF_PAT`
 secret (the `PERF_RESULTS_REPO` env overrides the target).
 
-- **`compile-perf-nightly.yml`** — builds tip-of-tree, sweeps into
+- **`nightly-mdl-perf-test.yml`** — builds tip-of-tree, sweeps into
   `daily/<date>-<sha>/`, runs `track.py register` (stamp + rebuild the tracking
   series), pushes the results repo, then runs `trend.py`. **Manual
   `workflow_dispatch` only right now — the daily `schedule` is commented out;**
