@@ -86,27 +86,52 @@ void computeMain(
 This will be turned into a CUDA entry point with
 
 ```
-struct UniformEntryPointParams
-{
-    Thing thing;
-    Thing thing2;
-};
-
-struct UniformState
+struct GlobalParams
 {
     CUtexObject tex;                // This is the combination of a texture and a sampler(!)
     SamplerState sampler;           // This variable exists within the layout, but it's value is not used.
     RWStructuredBuffer<int32_t> outputBuffer;    // This is implemented as a template in the CUDA prelude. It's just a pointer, and a size
     Thing* thing3;                  // Constant buffers map to pointers
 };
+extern "C" __constant__ GlobalParams SLANG_globalParams;
 
 // [numthreads(4, 1, 1)]
-extern "C" __global__  void computeMain(UniformEntryPointParams* params, UniformState* uniformState)
+extern "C" __global__ void computeMain(Thing thing, Thing thing2)
 ```
+
+Global-scope shader parameters are collected into a single struct stored in the
+module's `__constant__ SLANG_globalParams` symbol; the host writes it once per
+module (or per dispatch, as it sees fit). Entry-point `uniform` parameters are
+passed *by value* as CUDA kernel arguments (the buffer handed to
+`cuLaunchKernel`), acting as root constants.
+
+There is one exception to the by-value rule. CUDA kernel-argument (`.param`)
+space cannot be dynamically indexed efficiently: a runtime index into a by-value
+parameter lowers to a serial per-element load chain. A compute entry-point
+`uniform` parameter of struct type that carries a *descriptor table* — a
+fixed-size array whose elements are (or contain) resources or pointers — is
+therefore passed *by reference*: it is laid out and reflected as an implicit
+`ParameterBlock`, and the kernel receives one 8-byte device pointer whose
+payload lives in device global memory.
+
+```
+struct TensorList { RWStructuredBuffer<float> tensors[32]; };
+
+void computeMain(uniform TensorList list, ...)
+// becomes
+extern "C" __global__ void computeMain(TensorList* list, ...)
+```
+
+Reflection reports such a parameter as a `ParameterBlock` sub-object occupying 8
+bytes of the kernel-argument buffer, so reflection-driven hosts (e.g. slang-rhi)
+bind it like any other parameter block: allocate a device buffer for the
+element, write the descriptors into it, and place the buffer's address at the
+parameter's kernel-argument offset. The `-cuda-entry-point-params-by-value`
+compiler option restores the legacy all-by-value ABI.
 
 With CUDA - the caller specifies how threading is broken up, so `[numthreads]` is available through reflection, and in a comment in output source code but does not produce varying code.
 
-The UniformState and UniformEntryPointParams struct typically vary by shader. UniformState holds 'normal' bindings, whereas UniformEntryPointParams hold the uniform entry point parameters. Where specific bindings or parameters are located can be determined by reflection. The structures for the example above would be something like the following...
+Where specific bindings or parameters are located can be determined by reflection. The types in the structures above map to CUDA types as follows...
 
 `StructuredBuffer<T>`,`RWStructuredBuffer<T>` become
 

@@ -1203,6 +1203,14 @@ typedef uint32_t SlangSizeT;
                  //   of `1`, eliminating atomic contention (much faster, and avoids the GPU
                  //   watchdog timeouts heavy coverage can trigger) at the cost of exact
                  //   counts. Off by default.
+        CudaEntryPointParamsByValue =
+            153, // bool: restore the legacy CUDA ABI where an entry-point `uniform`
+                 //   parameter containing a fixed-size array of descriptors (resources
+                 //   or pointer-backed structs) is passed by value in kernel-argument
+                 //   space. By default such parameters are passed by reference — laid
+                 //   out and reflected as an implicit `ParameterBlock` whose payload
+                 //   lives in device global memory — because kernel-argument space
+                 //   cannot be dynamically indexed efficiently.
 
         CountOf,
     };

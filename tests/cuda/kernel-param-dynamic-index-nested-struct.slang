@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute -line-directive-mode none
+//TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute -line-directive-mode none -cuda-entry-point-params-by-value
 
 // Same as kernel-param-dynamic-index-local-copy.slang, but with the array nested
 // one struct level down and its elements being pointer-backed structs — the shape
@@ -6,6 +6,11 @@
 // legalization must root the access chain through the parameter's local copy
 // while leaving statically-addressed accesses to the same parameter (the
 // `indices` field here) on the parameter itself.
+//
+// By default this parameter shape is passed by reference instead (see
+// entry-point-uniform-descriptor-array-byref.slang); the local-copy floor tested
+// here is what covers it under the `-cuda-entry-point-params-by-value` legacy ABI
+// (and kernels excluded from the by-reference gate, e.g. [CudaKernel] functions).
 
 struct MyTensor
 {

@@ -2,6 +2,7 @@
 #include "slang-parameter-binding.h"
 
 #include "../compiler-core/slang-artifact-desc-util.h"
+#include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"
@@ -2634,6 +2635,166 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     return processParamOfType(_Move(processParamOfType), type);
 }
 
+/// Returns true if `type` is, or transitively contains (through struct fields and
+/// array elements), a descriptor-carrying leaf: an opaque resource/handle type
+/// (texture, sampler, buffer, parameter group — see `isOpaqueHandleType`) or a
+/// pointer. E.g. `RWStructuredBuffer<float>` and `struct MyTensor { float* data; }`
+/// match; `uint`, `float3`, and `float4x4` do not.
+static bool typeContainsDescriptorLeaf(ASTBuilder* astBuilder, Type* type, HashSet<Decl*>& seen)
+{
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+
+    if (isOpaqueHandleType(type))
+        return true;
+    if (as<PtrTypeBase>(type))
+        return true;
+
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return typeContainsDescriptorLeaf(astBuilder, arrayType->getElementType(), seen);
+
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
+        {
+            if (!seen.add(structDecl))
+                return false;
+            for (auto field : structDecl->getFields())
+            {
+                auto fieldDeclRef = astBuilder->getMemberDeclRef(declRefType->getDeclRef(), field)
+                                        .as<VarDeclBase>();
+                auto fieldType =
+                    fieldDeclRef ? getType(astBuilder, fieldDeclRef) : field->type.type;
+                if (fieldType && typeContainsDescriptorLeaf(astBuilder, fieldType, seen))
+                    return true;
+            }
+            seen.remove(structDecl);
+        }
+    }
+    return false;
+}
+
+/// Returns true if `type` transitively contains (through struct fields and array
+/// elements) a fixed-size array whose element type transitively contains a
+/// descriptor-carrying leaf — i.e. the type carries a *descriptor table*, an indexed
+/// collection of resources or pointer-backed structs. E.g.
+/// `struct TensorList { RWTensor<float,2> tensors[8]; }` matches (the element holds a
+/// pointer); `struct Args { uint counts[8]; }` and a single non-arrayed tensor struct
+/// do not.
+static bool typeContainsDescriptorBearingFixedArray(
+    ASTBuilder* astBuilder,
+    Type* type,
+    HashSet<Decl*>& seen)
+{
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+
+    if (auto arrayType = as<ArrayExpressionType>(type))
+    {
+        auto elementType = arrayType->getElementType();
+        if (!arrayType->isUnsized())
+        {
+            HashSet<Decl*> leafSeen;
+            if (typeContainsDescriptorLeaf(astBuilder, elementType, leafSeen))
+                return true;
+        }
+        return typeContainsDescriptorBearingFixedArray(astBuilder, elementType, seen);
+    }
+
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
+        {
+            if (!seen.add(structDecl))
+                return false;
+            for (auto field : structDecl->getFields())
+            {
+                auto fieldDeclRef = astBuilder->getMemberDeclRef(declRefType->getDeclRef(), field)
+                                        .as<VarDeclBase>();
+                auto fieldType =
+                    fieldDeclRef ? getType(astBuilder, fieldDeclRef) : field->type.type;
+                if (fieldType &&
+                    typeContainsDescriptorBearingFixedArray(astBuilder, fieldType, seen))
+                    return true;
+            }
+            seen.remove(structDecl);
+        }
+    }
+    return false;
+}
+
+/// Decide whether a CUDA compute entry-point `uniform` parameter should be passed by
+/// reference — laid out as an implicit `ParameterBlock<paramType>` whose payload lives
+/// in device global memory — instead of by value in kernel-argument (`.param`) space.
+///
+/// CUDA kernel-argument space cannot be dynamically indexed: a runtime index into a
+/// by-value parameter is lowered by ptxas to a serial per-element load chain, making a
+/// runtime-indexed descriptor array 10-30x slower than the same data placed behind a
+/// pointer in global memory (issue #11774). A parameter that carries a descriptor
+/// table (see `typeContainsDescriptorBearingFixedArray`) is therefore passed as one
+/// 8-byte device pointer. Plain-data parameters — including plain-data arrays — keep
+/// the by-value fast path (their dynamic-index long tail is handled ABI-invisibly by
+/// `legalizeCUDAKernelParamDynamicIndex`).
+///
+/// This is the single site where the by-reference decision is made; the layout it
+/// produces is recorded in reflection, and the IR is reconciled to it by
+/// `reconcileCUDAByRefEntryPointParams` (slang-ir-cuda-byref-entry-point-params.cpp),
+/// which consumes the recorded layout rather than re-deriving a predicate — so the
+/// emitted kernel signature and the reflected layout cannot disagree.
+///
+/// The decision is currently restricted to struct-typed parameters: a struct wrapped
+/// in a `ParameterBlock` reflects as a parameter-group sub-object that existing hosts
+/// (slang-rhi) already bind correctly, whereas `ParameterBlock<T[N]>` is a group
+/// shape hosts do not yet represent. Bare descriptor-array parameters keep the
+/// by-value layout and rely on the dynamic-index legalization above.
+static bool shouldPassCUDAEntryPointUniformParamByRef(
+    ParameterBindingContext* context,
+    EntryPointParameterState const& state,
+    Type* paramType)
+{
+    if (!isCUDATarget(context->getTargetRequest()))
+        return false;
+    if (context->getTargetRequest()->getOptionSet().getBoolOption(
+            CompilerOptionName::CudaEntryPointParamsByValue))
+        return false;
+
+    // Ray-tracing stages pass entry-point uniforms through the shader binding table
+    // (see collectOptiXEntryPointUniformParams); only ordinary compute kernels use
+    // CUDA kernel-argument space.
+    if (state.stage != Stage::Compute)
+        return false;
+
+    // Torch/AutoPyBind/CudaKernel entry points have generated host-side launch code
+    // that passes arguments by value; their ABI is owned by that generated code.
+    if (auto entryPointLayout = context->entryPointLayout)
+    {
+        if (auto entryPointFuncDecl = entryPointLayout->entryPoint.getDecl())
+        {
+            if (entryPointFuncDecl->hasModifier<TorchEntryPointAttribute>() ||
+                entryPointFuncDecl->hasModifier<CudaKernelAttribute>() ||
+                entryPointFuncDecl->hasModifier<AutoPyBindCudaAttribute>())
+                return false;
+        }
+    }
+
+    // A parameter that is already an explicit parameter group is passed by reference
+    // through the existing path; do not double-wrap.
+    if (as<UniformParameterGroupType>(paramType))
+        return false;
+
+    // See the doc comment: only struct-typed parameters are converted. Note that a
+    // bare array must be rejected explicitly: `T[N]` is itself a `DeclRefType` of the
+    // core-module `Array` struct, so a plain "is a struct decl-ref" test would match.
+    if (as<ArrayExpressionType>(paramType))
+        return false;
+    auto declRefType = as<DeclRefType>(paramType);
+    if (!declRefType || !as<StructDecl>(declRefType->getDeclRef().getDecl()))
+        return false;
+
+    HashSet<Decl*> seen;
+    return typeContainsDescriptorBearingFixedArray(context->getASTBuilder(), paramType, seen);
+}
+
 /// Compute the type layout for a parameter declared directly on an entry point.
 static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
     ParameterBindingContext* context,
@@ -2650,6 +2811,18 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
         // a uniform shader parameter passed via the implicitly-defined
         // constant buffer (e.g., the `$Params` constant buffer seen in fxc/dxc output).
         //
+        // On CUDA, a parameter that carries a descriptor table is passed by
+        // reference instead: wrapping it in an implicit `ParameterBlock` here makes
+        // the standard layout machinery below produce the parameter-group layout
+        // (an 8-byte device pointer in kernel-argument space) that both reflection
+        // and the emitted kernel signature then agree on. See
+        // `shouldPassCUDAEntryPointUniformParamByRef` for the full rationale.
+        //
+        if (shouldPassCUDAEntryPointUniformParamByRef(context, state, paramType))
+        {
+            paramType = context->getASTBuilder()->getParameterBlockType(paramType);
+        }
+
         LayoutRulesImpl* layoutRules = nullptr;
         if (isKhronosTarget(context->getTargetRequest()))
         {

@@ -36,6 +36,7 @@
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-com-interface.h"
 #include "slang-ir-coverage-instrument.h"
+#include "slang-ir-cuda-byref-entry-point-params.h"
 #include "slang-ir-cuda-immutable-load.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
@@ -1165,6 +1166,12 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::CUDASource:
         case CodeGenTarget::CUDAHeader:
             SLANG_PASS(collectOptiXEntryPointUniformParams);
+            // Reconcile compute entry-point uniform parameters to the by-reference
+            // (implicit ParameterBlock) layout that parameter binding decided for
+            // descriptor-table-bearing parameters; the pass consumes the recorded
+            // layout, it does not re-derive the decision (see
+            // slang-ir-cuda-byref-entry-point-params.h).
+            SLANG_PASS(reconcileCUDAByRefEntryPointParams, codeGenContext->getSink());
             validateIRModuleIfEnabled(codeGenContext, irModule);
             break;
 
