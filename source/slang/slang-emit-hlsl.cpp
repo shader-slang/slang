@@ -1969,17 +1969,17 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             auto nvapiCapabilitySet = CapabilitySet(CapabilityName::hlsl_nvapi);
             auto sm69CapabilitySet = CapabilitySet(CapabilityName::_sm_6_9);
 
-            if (targetCaps.implies(sm69CapabilitySet))
+            if (targetCaps.implies(nvapiCapabilitySet))
             {
-                // DXR 1.3 native: use dx::HitObject namespace
-                m_writer->emit("dx::HitObject");
-            }
-            else if (targetCaps.implies(nvapiCapabilitySet))
-            {
-                // NVAPI extension: use NvHitObject
+                // NVAPI extension: use NvHitObject (matches `case hlsl_nvapi:` calls)
                 m_writer->emit("NvHitObject");
                 // Ensure NVAPI header is included when using NvHitObject type
                 m_extensionTracker->m_requiresNVAPI = true;
+            }
+            else if (targetCaps.implies(sm69CapabilitySet))
+            {
+                // DXR 1.3 native: use dx::HitObject namespace
+                m_writer->emit("dx::HitObject");
             }
             else
             {

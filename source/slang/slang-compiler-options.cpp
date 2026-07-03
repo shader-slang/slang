@@ -216,6 +216,7 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::DisableWarning:
     case CompilerOptionName::DisableWarnings:
     case CompilerOptionName::EnableWarning:
+    case CompilerOptionName::WarningLevel:
     case CompilerOptionName::Capability:
     case CompilerOptionName::DownstreamArgs:
     case CompilerOptionName::VulkanBindShift:
@@ -429,6 +430,24 @@ void applySettingsToDiagnosticSink(
                 element.stringValue.getUnownedSlice(),
                 Severity::Warning,
                 Severity::Error);
+    }
+    // Enable each requested warning group (-Wall/-Wextra/-Wpedantic). These are additive, so a
+    // diagnostic tagged with any enabled group becomes visible. `intValue` is embedder-controlled
+    // through the public WarningLevel option, so validate it here at the API boundary and ignore
+    // anything outside the known groups (Default is the always-on baseline and needs no enabling).
+    auto warningLevelArray = options.getArray(CompilerOptionName::WarningLevel);
+    for (auto& element : warningLevelArray)
+    {
+        switch (element.intValue)
+        {
+        case SLANG_WARNING_LEVEL_ALL:
+        case SLANG_WARNING_LEVEL_EXTRA:
+        case SLANG_WARNING_LEVEL_PEDANTIC:
+            targetSink->enableWarningLevel((WarningLevel)element.intValue);
+            break;
+        default:
+            break;
+        }
     }
     if (options.shouldEmitRichDiagnostics())
     {

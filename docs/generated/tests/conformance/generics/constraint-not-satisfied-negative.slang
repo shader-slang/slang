@@ -1,30 +1,40 @@
 //META: generated=true
 //META: model=claude-opus-4-8
-//META: generated_at=2026-06-24T09:20:31Z
-//META: source_commit=b25e06aeb8862d207541c3d812c57cb9e381b802
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/language-reference/generics.md#type-checking
-//META: doc_section_digest=7b3e1c2f4d8a0e9f5b2c6d1e3f7a4b8c0d2e6f9a1b5c3e7f0d4a8b2c6e0f4a
-//META: purpose=Passing a type that does not satisfy the declared constraint is a compile-time error.
+//META: doc_section_digest=4f712396b718dc4245b0d7a122fe7c024d74b3b4a70dd75948a651b3aa074c9c
+//META: purpose=A call whose argument type does not satisfy the generic's conformance constraint (`where T : IArithmetic`) is rejected at the call site.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that passing a type that does not conform to the declared constraint is rejected.
-// `usesFoo<T : IFoo>` requires IFoo; passing `NotFoo` (no conformance) should trigger E39999,
-// confirming that constraint checking fires before specialization.
+// Verifies that a conformance constraint is enforced at specialization: a plain
+// struct `NotArith` does not conform to IArithmetic, so calling `addTwo<T>`
+// (which requires `T : IArithmetic`) with two NotArith values cannot specialize.
+// CHECK asserts E39999 "could not specialize generic" fires on the call
+// (non-exhaustive skips the trailing "see declaration" note).
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl
 
-interface IFoo { int val(); }
-
-int usesFoo<T : IFoo>(T x) { return x.val(); }
-
-struct NotFoo { int x; }
-
-void test()
+struct NotArith
 {
-    NotFoo nf;
-    nf.x = 1;
-    int r = usesFoo(nf);
-//CHECK: E38029
+    int x;
+}
+
+func addTwo<T>(T a, T b) -> T where T : IArithmetic
+{
+    return a + b;
+}
+
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    NotArith p = { 1 };
+    NotArith q = { 2 };
+    addTwo(p, q);
+    //CHECK: E39999
+    outputBuffer[0] = 0;
 }

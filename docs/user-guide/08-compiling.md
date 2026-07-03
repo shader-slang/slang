@@ -1072,6 +1072,7 @@ meanings of their `CompilerOptionValue` encodings.
 | DisableWarnings    | Specifies a list of warnings to disable. `stringValue0` encodes comma separated list of warning codes or names. |
 | EnableWarning      | Specifies a list of warnings to enable. `stringValue0` encodes comma separated list of warning codes or names. |
 | DisableWarning     | Specify a warning to disable. `stringValue0` encodes the warning code or name. |
+| WarningLevel       | Enable a group of opt-in warnings, modeled on clang/gcc. `intValue0` encodes a `SlangWarningLevel` group (`SLANG_WARNING_LEVEL_ALL`/`_EXTRA`/`_PEDANTIC`). Repeatable and additive, matching the `-Wall`/`-Wextra`/`-Wpedantic` command-line flags. Warnings in the always-on default group are unaffected. (Staging note: the `pedantic` group is currently enabled by default, so `-Wpedantic` is a no-op today; a future change will make it opt-in.) |
 | ReportDownstreamTime | Turn on/off downstream compilation time report. `intValue0` encodes a bool value for the setting. |
 | ReportPerfBenchmark | Turn on/off reporting of time spent in different parts of the compiler. `intValue0` encodes a bool value for the setting. |
 | SkipSPIRVValidation | Specifies whether or not to skip the validation step after emitting SPIR-V. `intValue0` encodes a bool value for the setting. |
@@ -1103,7 +1104,7 @@ meanings of their `CompilerOptionValue` encodings.
 | DebugInformationFormat | Specifies the format of debug info. `intValue0` a value defined in the `SlangDebugInfoFormat` enum. |
 | VulkanBindShiftAll | Specifies the `-fvk-bind-shift` option for all spaces. `intValue0`: kind, `intValue1`: shift. |
 | GenerateWholeProgram | When set will emit target code for the entire program instead of for a specific entry point. `intValue0` specifies a bool value for the setting. |
-| UseUpToDateBinaryModule | When set will only load precompiled modules if it is up-to-date with its source. `intValue0` specifies a bool value for the setting. |
+| UseUpToDateBinaryModule | When set, the compiler verifies that a precompiled `.slang-module` is up-to-date with its source before loading it; out-of-date binaries are recompiled from source. Standalone binaries whose primary source is not on the search path are still loaded (compiler-version and option-set validation are skipped in that path). `intValue0` specifies a bool value for the setting. |
 | ValidateUniformity | When set will perform [uniformity analysis](a1-05-uniformity.md).|
 | SPIRVResourceHeapStride | Specifies the byte stride for the resource descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to emit `OpConstantSizeOfEXT(ResourceType)` as the default stride. For `RaytracingAccelerationStructure` entries, the 0 default emits a literal 8-byte `ArrayStride` for the `uint64` device address elements; explicit stride values still override these defaults, but must be at least 8 bytes for acceleration-structure entries. |
 | SPIRVSamplerHeapStride | Specifies the byte stride for the sampler descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
