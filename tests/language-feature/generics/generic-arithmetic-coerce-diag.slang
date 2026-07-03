@@ -31,6 +31,27 @@ int implicitPlain<T : IArithmetic>(T t)
     return x;
 }
 
+// `float` and `half` targets take the same rejection as `int`; pinned so a
+// narrowing of the target predicate can't slip through unnoticed. (`bool` is
+// deliberately absent: it is excluded from the rejection because of its
+// __implicit_conversion __init<T : __EnumType>(T) — see the enumToBool case
+// in generic-arithmetic-coerce.slang.)
+float implicitPlainFloat<T : IArithmetic>(T t)
+{
+    float x = t;
+//CHECK:      ^ error E30019
+//CHECK:      ^ expected an expression of type 'float', got 'T'
+    return x;
+}
+
+half implicitPlainHalf<T : IArithmetic>(T t)
+{
+    half x = t;
+//CHECK:     ^ error E30019
+//CHECK:     ^ expected an expression of type 'half', got 'T'
+    return x;
+}
+
 extension int
 {
     // `__implicit_conversion` is what would have made this initializer viable

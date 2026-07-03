@@ -2392,8 +2392,13 @@ bool SemanticsVisitor::_coerce(
     // nested conversions are disallowed (`disallowNestedConversions` below), so
     // an initializer candidate could only apply if its parameter type exactly
     // matched the opaque `T` itself. No scalar builtin declares such an
-    // initializer. Note that this is a contingent property of the core module,
-    // not a theorem: a user extension like
+    // initializer — with one exception: `bool` declares
+    // `__init<T : __EnumType>(T)` marked `__implicit_conversion`
+    // (`extension bool : IRangedValue` in core.meta.slang), through which an
+    // enum-constrained generic parameter legitimately converts to `bool`, so
+    // `bool` targets are excluded from the rejection below. Note that the
+    // remaining scalar set is a contingent property of the core module, not a
+    // theorem: a user extension like
     // `extension float { __init<U : IFoo>(U x); }` would break it, and if that
     // ever needs supporting this rejection must instead be gated on a cached
     // per-`toType` "has a generic initializer" check. It is also specifically a
@@ -2427,7 +2432,9 @@ bool SemanticsVisitor::_coerce(
     // instead: its key includes the `Type*`, and every generic declaration has
     // a distinct `T` type object, so each declaration pays the doomed search
     // once per scalar target before its failure is cached.)
-    const bool toTypeIsScalarBuiltin = as<BasicExpressionType>(toType) != nullptr;
+    const auto toTypeBasic = as<BasicExpressionType>(toType);
+    const bool toTypeIsScalarBuiltin =
+        toTypeBasic && toTypeBasic->getBaseType() != BaseType::Bool;
     const auto fromTypeGenericParamDeclRef =
         isDeclRefTypeOf<GenericTypeParamDeclBase>(fromType.type);
     if (site != CoercionSite::ExplicitCoercion && toTypeIsScalarBuiltin &&

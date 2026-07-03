@@ -34,6 +34,11 @@
 //   soundness argument relies on: implicit `T -> int` at a scalar target under
 //   `where T == int` must succeed through the type-equality-witness path,
 //   which runs *before* the fast rejection ever gets a chance to fire.
+// - `enumToBool` pins the `bool` exclusion: the core module's
+//   `extension bool` declares an `__implicit_conversion`-marked
+//   `__init<T : __EnumType>(T)`, so an enum-constrained opaque `T` must still
+//   convert to `bool` through the initializer search (a rejection keyed on
+//   "any BasicExpressionType target" would break it).
 // - `polyPack` pins the variadic-generics neighborhood: pack elements flow
 //   through the same constrained-generic arithmetic (`poly`) whose checking
 //   hits the fast rejection, at mixed scalar instantiations. (A *bare* pack
@@ -103,6 +108,20 @@ int implicitEqScalar<T>(T t) where T == int
     return x;
 }
 
+enum Flag
+{
+    Off,
+    On,
+}
+
+bool enumToBool<T : __EnumType>(T e)
+{
+    // Implicit T -> bool through bool's __implicit_conversion generic
+    // initializer; bool is excluded from the rejection's target set.
+    bool b = e;
+    return b;
+}
+
 void accept<each T>(expand each T v) {}
 
 int writePoly<T : __BuiltinArithmeticType>(inout int offset, T value)
@@ -118,7 +137,7 @@ void polyPack<each T : __BuiltinArithmeticType>(inout int offset, expand each T 
     accept(expand writePoly(offset, each args));
 }
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -165,4 +184,7 @@ void computeMain()
 
     outputBuffer[12] = implicitEqScalar<int>(17);
     // CHECK: 17
+
+    outputBuffer[13] = enumToBool(Flag.On) ? 19 : -1;
+    // CHECK: 19
 }
