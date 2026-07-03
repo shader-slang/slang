@@ -24608,10 +24608,8 @@ struct HitObject
 
         /// Returns the world-space vertex positions of the triangle that was hit.
         /// Valid if the hit object represents a triangle hit.
-        ///
-        /// **Vulkan EXT only.** Requires the ray tracing position fetch extension
-        /// (`SPV_KHR_ray_tracing_position_fetch` / `GL_EXT_ray_tracing_position_fetch`).
-        /// @return Array of three vertex positions in world space.
+        /// @return Array of three vertex positions in world space
+        /// @remarks Requires ray tracing position fetch extension
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_ray_tracing_position_fetch)
     [ForceInline]
@@ -24626,10 +24624,18 @@ struct HitObject
             float3 output[3];
             __glslGetTriangleVertexPositions(output);
             return output;
+        // A HitObject built under the NV capability is emitted as OpTypeHitObjectNV,
+        // but OpHitObjectGetIntersectionTriangleVertexPositionsEXT (the only opcode for
+        // this query) requires an OpTypeHitObjectEXT operand. There is no NV opcode, and
+        // mixing an NV-typed HitObject with the EXT op produces invalid SPIR-V, so this
+        // combination is rejected at compile time rather than emitted. Note that
+        // spvShaderInvocationReorderNV inherits from spvShaderInvocationReorderEXT for
+        // capability purposes, but the emitted HitObject type still follows the NV/EXT
+        // split, so we cannot simply fall through to the EXT case below.
         case spvShaderInvocationReorderNV:
             static_assert(false,
                 "GetTriangleVertexPositions() has no SPIRV NV equivalent. "
-                "Use SPV_EXT_shader_invocation_reorder instead.");
+                "Use the spvShaderInvocationReorderEXT capability instead.");
             return float3Arr3();
         case spvShaderInvocationReorderEXT:
             return spirv_asm
