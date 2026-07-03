@@ -2433,8 +2433,7 @@ bool SemanticsVisitor::_coerce(
     // a distinct `T` type object, so each declaration pays the doomed search
     // once per scalar target before its failure is cached.)
     const auto toTypeBasic = as<BasicExpressionType>(toType);
-    const bool toTypeIsScalarBuiltin =
-        toTypeBasic && toTypeBasic->getBaseType() != BaseType::Bool;
+    const bool toTypeIsScalarBuiltin = toTypeBasic && toTypeBasic->getBaseType() != BaseType::Bool;
     const auto fromTypeGenericParamDeclRef =
         isDeclRefTypeOf<GenericTypeParamDeclBase>(fromType.type);
     if (site != CoercionSite::ExplicitCoercion && toTypeIsScalarBuiltin &&
