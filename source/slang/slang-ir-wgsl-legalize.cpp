@@ -212,6 +212,84 @@ struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
     }
 };
 
+static bool isAtomicOp(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_AtomicLoad:
+    case kIROp_AtomicStore:
+    case kIROp_AtomicExchange:
+    case kIROp_AtomicCompareExchange:
+    case kIROp_AtomicAdd:
+    case kIROp_AtomicSub:
+    case kIROp_AtomicAnd:
+    case kIROp_AtomicOr:
+    case kIROp_AtomicXor:
+    case kIROp_AtomicMin:
+    case kIROp_AtomicMax:
+    case kIROp_AtomicInc:
+    case kIROp_AtomicDec:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// WGSL atomic built-ins take a `ptr<AS, atomic<T>>`, so a buffer accessed
+// atomically must have an atomic element type. Collect buffers that don't.
+static void collectAtomicStructuredBuffers(IRInst* inst, List<IRInst*>& buffers)
+{
+    if (isAtomicOp(inst->getOp()))
+    {
+        if (auto gep = as<IRRWStructuredBufferGetElementPtr>(inst->getOperand(0)))
+        {
+            auto buffer = gep->getOperand(0);
+            if (auto bufferType = as<IRHLSLStructuredBufferTypeBase>(buffer->getDataType()))
+            {
+                if (!as<IRAtomicType>(bufferType->getElementType()) && !buffers.contains(buffer))
+                    buffers.add(buffer);
+            }
+        }
+    }
+    for (auto child : inst->getChildren())
+        collectAtomicStructuredBuffers(child, buffers);
+}
+
+static void promoteAtomicStructuredBuffer(IRInst* buffer)
+{
+    IRBuilder builder(buffer);
+    auto bufferType = as<IRHLSLStructuredBufferTypeBase>(buffer->getDataType());
+    auto atomicElementType = builder.getType(kIROp_AtomicType, bufferType->getElementType());
+
+    // Rebuild the buffer type, preserving the remaining operands (e.g. layout).
+    List<IRInst*> operands;
+    operands.add(atomicElementType);
+    for (UInt i = 1; i < bufferType->getOperandCount(); i++)
+        operands.add(bufferType->getOperand(i));
+    buffer->setFullType(
+        builder.getType(bufferType->getOp(), (UInt)operands.getCount(), operands.getBuffer()));
+
+    // Retype every element pointer derived from this buffer.
+    for (auto use = buffer->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (user->getOp() != kIROp_RWStructuredBufferGetElementPtr)
+            continue;
+        if (user->getOperand(0) != buffer)
+            continue;
+        if (auto oldPtrType = as<IRPtrTypeBase>(user->getDataType()))
+            user->setFullType(builder.getPtrType(atomicElementType, oldPtrType));
+    }
+}
+
+static void legalizeAtomicCounterBuffersForWGSL(IRModule* module)
+{
+    List<IRInst*> buffers;
+    collectAtomicStructuredBuffers(module->getModuleInst(), buffers);
+    for (auto buffer : buffers)
+        promoteAtomicStructuredBuffer(buffer);
+}
+
 void legalizeIRForWGSL(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     List<EntryPointInfo> entryPoints;
@@ -234,6 +312,9 @@ void legalizeIRForWGSL(IRModule* module, TargetProgram* targetProgram, Diagnosti
 
     // Go through every instruction in the module and legalize them as needed.
     processInst(module->getModuleInst(), targetProgram, sink);
+
+    // Buffers accessed by atomics must use an atomic element type in WGSL.
+    legalizeAtomicCounterBuffersForWGSL(module);
 
     // Some global insts are illegal, e.g. function calls.
     // We need to inline and remove those.

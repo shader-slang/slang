@@ -3538,11 +3538,15 @@ static LegalVal declareVars(
                 {
                     auto simpleElementVar = tupleVal->elements[0].val.getSimple();
                     auto simpleCounterVar = tupleVal->elements[1].val.getSimple();
-                    IRBuilder builder(simpleElementVar);
-                    builder.addDecoration(
-                        simpleElementVar,
-                        kIROp_CounterBufferDecoration,
-                        simpleCounterVar);
+                    // Only SPIR-V consumes this; elsewhere it pins a dead counter global.
+                    if (isSPIRV(context->targetProgram->getTargetReq()->getTarget()))
+                    {
+                        IRBuilder builder(simpleElementVar);
+                        builder.addDecoration(
+                            simpleElementVar,
+                            kIROp_CounterBufferDecoration,
+                            simpleCounterVar);
+                    }
                     // Clone decorations from leafVar to both element and counter var.
                     cloneDecorationToVar(leafVar, simpleElementVar);
                     cloneDecorationToVar(leafVar, simpleCounterVar);
