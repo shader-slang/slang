@@ -404,10 +404,17 @@ SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
                     // `buf` is owned by miniz's allocator. Copy it into the member allocation and
                     // release the original with miniz's own `mz_free`, so allocation/deallocation
                     // stay paired rather than relying on `ScopedAllocation`'s `::free`.
-                    m_data.set(buf, size);
+                    const void* copied = m_data.set(buf, size);
                     mz_free(buf);
 
                     mz_zip_writer_end(&m_archive);
+
+                    // The copy above can fail under memory pressure; surface it as OOM (matching
+                    // `loadArchive`) rather than a generic reader-init failure below.
+                    if (!copied)
+                    {
+                        return SLANG_E_OUT_OF_MEMORY;
+                    }
 
                     // Read
                     mz_zip_zero_struct(&m_archive);
