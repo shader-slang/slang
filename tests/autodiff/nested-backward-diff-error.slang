@@ -1,4 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+// The second run passes `-disable-non-essential-validations`, which skips the front-end
+// `checkAutoDiffUsages` check; this exercises the backstop copy of the check inside the auto-diff
+// translation pass, which must also diagnose (rather than crash) on this input.
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -disable-non-essential-validations
 
 // Nested `bwd_diff` (backward-differentiating a function that itself calls `bwd_diff`) used to
 // crash the auto-diff passes with an internal error, because the result of `bwd_diff` is not
