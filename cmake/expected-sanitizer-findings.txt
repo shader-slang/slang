@@ -50,6 +50,12 @@ LEAK: SlangRecord::callWithDefaults
 # the test-function name prefix.
 LEAK: _replayContext
 
+# #11938: Repro load leaks CacheFileSystem::PathInfo entries that have no
+# unique identity: the post-load hand-off to the CacheFileSystem's owning
+# unique-identity map skips them (see the TODO in slang-repro.cpp), so
+# nobody owns them. Surfaced by the repro-validator unit tests.
+LEAK: getPathInfoFromFile
+
 # Historical entries:
 #   #10828 LEAK: _maybeBeginMacroInvocation -- fixed by this PR: the
 #     wrong-arg-count macro invocation error paths now free the
