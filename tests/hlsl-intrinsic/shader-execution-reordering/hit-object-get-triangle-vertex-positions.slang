@@ -4,6 +4,10 @@
 // HitObject.GetTriangleVertexPositions is Vulkan-EXT only and lowers to the
 // result-producing OpHitObjectGetIntersectionTriangleVertexPositionsEXT (opcode 5307),
 // which requires the ray tracing position fetch extension.
+//
+// Under the NV capability a HitObject is emitted as OpTypeHitObjectNV, which the EXT
+// opcode (requiring OpTypeHitObjectEXT) rejects. There is no NV opcode for this query,
+// so the NV path is rejected at compile time rather than emitting invalid SPIR-V.
 
 // CHECK-DAG: OpExtension "SPV_KHR_ray_tracing_position_fetch"
 // CHECK-DAG: OpCapability RayTracingPositionFetchKHR
