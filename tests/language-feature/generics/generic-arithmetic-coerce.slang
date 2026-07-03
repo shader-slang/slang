@@ -18,15 +18,22 @@
 //   generic `T` still broadcasts into `vector<T,3>` / `matrix<T,2,2>` via the
 //   element constructor (toType is not a scalar, so the rejection must not
 //   fire).
-// - `wrapGeneric` pins the aggregate boundary: a struct exposing a generic
-//   `__init<U : IArithmetic>(U)` must still accept an opaque `T` (a wider
-//   rejection keyed on "any DeclRefType source" or "any target" would break
-//   it).
+// - `wrapGeneric` / `wrapGenericInit` pin the aggregate boundary: a struct
+//   exposing a generic `__init<U : IArithmetic>(U)` must still accept an
+//   opaque `T` (a wider rejection keyed on "any DeclRefType source" or "any
+//   target" would break it). The two spellings reach `_coerce` differently:
+//   `Wrapped(t)` is call syntax (an explicit coercion site), while
+//   `Wrapped w = t;` is an initializer site — the implicit-site + struct-target
+//   combination that actually stresses the target guard.
 // - `explicitCast` pins the coercion-site boundary: at an *explicit* cast
 //   site, nested conversions are allowed, so `float(t)` under `where T == int`
 //   legitimately succeeds through `float.__init(int)` plus the cost-0
 //   equality-witness conversion `T -> int`; the rejection must not fire for
 //   explicit sites.
+// - `implicitEqScalar` pins the acceptance-path ordering the rejection's
+//   soundness argument relies on: implicit `T -> int` at a scalar target under
+//   `where T == int` must succeed through the type-equality-witness path,
+//   which runs *before* the fast rejection ever gets a chance to fire.
 // - `polyPack` pins the variadic-generics neighborhood: pack elements flow
 //   through the same constrained-generic arithmetic (`poly`) whose checking
 //   hits the fast rejection, at mixed scalar instantiations. (A *bare* pack
@@ -54,13 +61,29 @@ matrix<T, 2, 2> matBroadcast<T : IArithmetic>(T x)
 struct Wrapped
 {
     int tag;
+    // `__implicit_conversion` makes the initializer viable at *implicit*
+    // coercion sites (a plain `__init` only supports explicit conversion),
+    // which is what lets `wrapGenericInit` stress the rejection's target
+    // guard below.
+    __implicit_conversion(100)
     __init<U : IArithmetic>(U u) { tag = 1; }
 }
 
 int wrapGeneric<T : IArithmetic>(T t)
 {
-    // Aggregate target with a generic initializer must accept an opaque T.
+    // Aggregate target with a generic initializer must accept an opaque T
+    // through call syntax (dispatches as an explicit coercion site).
     let w = Wrapped(t);
+    return w.tag;
+}
+
+int wrapGenericInit<T : IArithmetic>(T t)
+{
+    // Same aggregate target reached through an *initializer* site: implicit
+    // coercion of an opaque T with toType=Wrapped (a struct, not a
+    // BasicExpressionType), so the rejection's target guard is what keeps
+    // this compiling.
+    Wrapped w = t;
     return w.tag;
 }
 
@@ -69,6 +92,15 @@ float explicitCast<T>(T t) where T == int
     // Explicit cast of an opaque T to a scalar builtin, valid only through the
     // nested equality-witness conversion T -> int.
     return float(t);
+}
+
+int implicitEqScalar<T>(T t) where T == int
+{
+    // Implicit T -> int at a scalar target with an equality witness in scope:
+    // must succeed through the type-equality-witness path, which _coerce
+    // consults before the fast rejection.
+    int x = t;
+    return x;
 }
 
 void accept<each T>(expand each T v) {}
@@ -86,7 +118,7 @@ void polyPack<each T : __BuiltinArithmeticType>(inout int offset, expand each T 
     accept(expand writePoly(offset, each args));
 }
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -127,4 +159,10 @@ void computeMain()
     polyPack(offset, 2, 3u);
     // CHECK: 12
     // CHECK: 24
+
+    outputBuffer[11] = wrapGenericInit<int>(4) + 3;
+    // CHECK: 4
+
+    outputBuffer[12] = implicitEqScalar<int>(17);
+    // CHECK: 17
 }
