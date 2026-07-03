@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -O0 -preserve-embedded-source
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -preserve-embedded-source
 // Tests generation of DebugFunction and DebugLine with #line preprocessor directive specifying different files
 
 // Get the IDs for the Source argument in DebugFunction/DebugLine
