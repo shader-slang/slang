@@ -2938,6 +2938,31 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             return true;
         }
+    case kIROp_MakeStruct:
+        {
+            // Emit a struct value with GLSL's struct-constructor syntax
+            // `StructType( f0, f1, ... )` instead of the base emitter's C-style
+            // `{ ... }`. Aggregate/brace initializers are only valid in GLSL 4.20+
+            // (GL_ARB_shading_language_420pack) and break on earlier profiles such as
+            // glsl_330, whereas struct constructors are portable (core since GLSL 1.10).
+            //
+            // This is a separate case from the array case above rather than folded into
+            // it: an array uses GLSL's bracket-split spelling `elementType[]( ... )`,
+            // which is invalid for a struct. A MakeStruct carries one operand per field
+            // in declaration order, matching GLSL constructor argument order.
+            emitType(inst->getDataType());
+            m_writer->emit("(");
+            UInt argCount = inst->getOperandCount();
+            for (UInt aa = 0; aa < argCount; ++aa)
+            {
+                if (aa != 0)
+                    m_writer->emit(", ");
+                emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
+
+            return true;
+        }
     default:
         break;
     }

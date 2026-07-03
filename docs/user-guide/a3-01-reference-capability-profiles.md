@@ -39,7 +39,7 @@ Capability Profiles
 `lib_6_{1,2,3,4,5,6,7}`
 * HLSL shader model for libraries
 
-`glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}`
+`glsl_{150,330,400,410,420,430,440,450,460}`
 * GLSL versions
 
 `spirv_1_{1,2,3,4,5,6}`
