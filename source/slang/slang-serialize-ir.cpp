@@ -5,11 +5,11 @@
 #include "core/slang-common.h"
 #include "core/slang-dictionary.h"
 #include "core/slang-performance-profiler.h"
+#include "core/slang-riff.h"
 #include "slang-ir-insts-stable-names.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-validate.h"
 #include "slang-serialize-fossil.h"
-#include "slang-serialize-riff.h"
 #include "slang-serialize-source-loc.h"
 #include "slang-serialize.h"
 #include "slang-tag-version.h"
@@ -18,9 +18,6 @@
 //
 #include "slang-serialize-ir.cpp.fiddle"
 
-// If USE_RIFF is set, then we serialize using the RIFF backend, it's the
-// slowest option
-#define USE_RIFF 0
 // If we are serializing using Fossil, DIRECT_FROM_FOSSIL will make it so that
 // we unflatten directly from the fossilized representation rather than
 // deserializing everything first. It is the fastest option
@@ -269,13 +266,8 @@ struct IRSerialWriteContext;
 
 // Specialize to the reader/writer for the specific backend we're targeting
 // instead of ISerializerImpl to avoid some virtual function calls
-#if USE_RIFF
-using IRWriteSerializer = Serializer<RIFFSerialWriter, IRSerialWriteContext>;
-using IRReadSerializer = Serializer<RIFFSerialReader, IRSerialReadContext>;
-#else
 using IRWriteSerializer = Serializer<Fossil::SerialWriter, IRSerialWriteContext>;
 using IRReadSerializer = Serializer<Fossil::SerialReader, IRSerialReadContext>;
-#endif
 
 struct IRSerialWriteContext : SourceLocSerialContext
 {
@@ -784,16 +776,6 @@ void writeSerializedModuleIR(
     moduleInfo.fullVersion = SLANG_TAG_VERSION;
     moduleInfo.module = irModule;
 
-#if USE_RIFF
-    {
-        IRSerialWriteContext context{sourceLocWriter};
-        RIFFSerialWriter writer(cursor.getCurrentChunk());
-        IRWriteSerializer serializer(&writer, &context);
-        serialize(serializer, moduleInfo);
-    }
-
-    ComPtr<ISlangBlob> blob;
-#else
     BlobBuilder blobBuilder;
     {
         IRSerialWriteContext context{sourceLocWriter};
@@ -808,7 +790,6 @@ void writeSerializedModuleIR(
     void const* data = blob->getBufferPointer();
     size_t size = blob->getBufferSize();
     cursor.addDataChunk(PropertyKeys<IRModule>::IRModule, data, size);
-#endif
 }
 
 Result readSerializedModuleInfo(
@@ -817,8 +798,6 @@ Result readSerializedModuleInfo(
     UInt& version,
     String& name)
 {
-    static_assert(!USE_RIFF); // unimplemented
-
     auto dataChunk = as<RIFF::DataChunk>(chunk);
     if (!dataChunk)
     {
@@ -848,22 +827,6 @@ Result readSerializedModuleInfo(
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule)
 {
-#if USE_RIFF
-    auto dataChunk = as<RIFF::ListChunk>(chunk);
-    if (!dataChunk)
-    {
-        SLANG_UNEXPECTED("invalid format for serialized module IR");
-    }
-
-    IRModuleInfo info;
-    auto sharedDecodingContext = RefPtr(new IRSerialReadContext(session, sourceLocReader));
-    {
-        RIFFSerialReader reader(dataChunk);
-
-        IRReadSerializer serializer(&reader, sharedDecodingContext);
-        serialize(serializer, info);
-    }
-#else
     auto dataChunk = as<RIFF::DataChunk>(chunk);
     if (!dataChunk)
     {
@@ -896,7 +859,6 @@ Result readSerializedModuleInfo(
         IRReadSerializer serializer(&reader, sharedDecodingContext);
         serialize(serializer, info);
     }
-#endif
     if (!info.module)
         return SLANG_FAIL;
     outIRModule = info.module;
