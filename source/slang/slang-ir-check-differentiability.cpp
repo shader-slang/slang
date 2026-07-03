@@ -92,9 +92,9 @@ public:
     // `LegacyBackwardDifferentiate` form used by the pre-2.0 auto-diff path); calling that value
     // is how a `bwd_diff(f)(...)` invocation appears in the IR at this checking stage.
     //
-    // For a generic callee such as `bwd_diff(g<float>)` the operand is wrapped as
-    // `Specialize(BackwardDifferentiate(g), float)`, so unwrap the `Specialize`/generic layers
-    // first (but not the differentiation op itself) before inspecting the opcode.
+    // Unwrap any `Specialize`/generic layers on the callee first (but not the differentiation op
+    // itself) before inspecting the opcode, so that a specialized/generic backward-derivative value
+    // such as `Specialize(BackwardDifferentiate(g), float)` is still recognized.
     static bool isBackwardDerivativeValue(IRInst* inst)
     {
         if (!inst)
@@ -102,11 +102,23 @@ public:
         inst = getResolvedInstForDecorations(inst, /*resolveThroughDifferentiation:*/ false);
         switch (inst->getOp())
         {
+        // The complete set of ops that yield a backward-derivative function (a `bwd_diff` result),
+        // covering the combined form, the primal/remat/propagate split, the legacy (pre-2.0) forms,
+        // and the trivial variants. The forward-mode ops (`ForwardDifferentiate`,
+        // `ForwardDifferentiatePropagate`, `TrivialForwardDifferentiate`) are deliberately
+        // excluded, since forward-mode derivatives may be nested.
         case kIROp_BackwardDifferentiate:
-        case kIROp_LegacyBackwardDifferentiate:
         case kIROp_BackwardDifferentiatePrimal:
+        case kIROp_BackwardRemat:
         case kIROp_BackwardDifferentiatePropagate:
+        case kIROp_TrivialBackwardDifferentiate:
+        case kIROp_TrivialBackwardDifferentiatePrimal:
+        case kIROp_TrivialBackwardRemat:
+        case kIROp_TrivialBackwardDifferentiatePropagate:
+        case kIROp_LegacyBackwardDifferentiate:
+        case kIROp_BackwardFromLegacyBwdDiffFunc:
         case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+        case kIROp_BackwardRematFromLegacyBwdDiffFunc:
         case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
             return true;
         default:
