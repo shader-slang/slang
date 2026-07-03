@@ -521,12 +521,14 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
 IRInst* TranslationContext::resolveInst(IRInst* inst)
 {
     // Fast path: a recorded structural fixed point resolves to itself with no side
-    // effects, so skip the (potentially O(operandCount)) operand re-walk. The entry is
-    // only valid while the inst remains attached to the module; use SLANG_RELEASE_ASSERT
-    // (not SLANG_ASSERT, which compiles to an assume in release) so a future caller that
-    // passes an inst removed/deallocated since it was recorded fails loudly in every
-    // build rather than reading a stale pointer.
-    if (inst && resolvedStructuralFixedPoints.contains(inst))
+    // effects, so skip the (potentially O(operandCount)) operand re-walk. A null `inst`
+    // needs no explicit guard: it can never have been recorded (`recordStructuralFixedPoint`
+    // asserts `IRSetBase`), so the lookup just misses and the slow path below returns
+    // nullptr as before. The entry is only valid while the inst remains attached to the
+    // module; use SLANG_RELEASE_ASSERT (not SLANG_ASSERT, which compiles to an assume in
+    // release) so a future caller that passes an inst removed/deallocated since it was
+    // recorded fails loudly in every build rather than reading a stale pointer.
+    if (resolvedStructuralFixedPoints.contains(inst))
     {
         SLANG_RELEASE_ASSERT(inst->getParent() && as<IRModuleInst>(inst->getParent()));
         return inst;
