@@ -2399,7 +2399,10 @@ bool SemanticsVisitor::_coerce(
     // per-`toType` "has a generic initializer" check. It is also specifically a
     // property of `BasicExpressionType`: `FloatE4M3`/`FloatE5M2`/`BFloat16`
     // *do* declare generic initializers, and stay on the search path only
-    // because they are `DeclRefType`s, not `BasicExpressionType`s.
+    // because they are `DeclRefType`s, not `BasicExpressionType`s. (Those
+    // initializers are not `__implicit_conversion`-marked, so at an implicit
+    // site the search's observable effect for them is the "explicit conversion
+    // is possible" note on the failure diagnostic — still worth preserving.)
     //
     // Explicit coercion sites must not take this shortcut: there nested
     // conversions are allowed, so the search below can legitimately succeed —
@@ -2410,10 +2413,15 @@ bool SemanticsVisitor::_coerce(
     // rejected. `vector<T,N>` / `matrix<T,N,M>` must still take the search
     // because a scalar generic `T` legitimately broadcasts into them via their
     // element constructor, and an aggregate/struct `toType` may expose a
-    // generic initializer that accepts `T`. The source-type test uses
-    // `GenericTypeParamDeclBase`, so it also covers generic type-pack
-    // parameters: a bare decl-ref to a pack parameter is just as opaque as an
-    // ordinary one, and no scalar-builtin initializer can accept a pack.
+    // generic initializer that accepts `T`. The source-type test is equally
+    // narrow: it fires only when `fromType` is directly a decl-ref to a
+    // `GenericTypeParamDeclBase` — in practice an ordinary generic parameter.
+    // A pack parameter declaration is a `GenericTypeParamDeclBase` too, so a
+    // bare decl-ref to one would be rejected on the same reasoning, but
+    // surface code never produces that shape at a coercion: a pack element
+    // written as `each T` carries an `EachType` (see `visitEachExpr`), which
+    // this test does not match, so pack elements continue into the search
+    // below unchanged.
     //
     // (The `ImplicitCastMethodKey` failure cache below cannot absorb this cost
     // instead: its key includes the `Type*`, and every generic declaration has
