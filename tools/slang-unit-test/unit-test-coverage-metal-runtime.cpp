@@ -33,19 +33,22 @@ using namespace Slang;
 // host following the descriptor-facing Metal binding contract actually
 // observes correct execution counts on a GPU. This test closes that gap:
 //
-//   1. compile a compute shader with `-trace-coverage` (32-bit counters —
-//      MSL provides `atomic_fetch_add_explicit` only for 32-bit
-//      `atomic_uint`, so 32-bit is the only executable width on Metal) to
-//      Metal shading language source,
+//   1. compile a compute shader with line, function, and branch coverage
+//      all enabled (32-bit counters — MSL provides
+//      `atomic_fetch_add_explicit` only for 32-bit `atomic_uint`, so
+//      32-bit is the only executable width on Metal) to Metal shading
+//      language source,
 //   2. discover the hidden `__slang_coverage` buffer's `[[buffer(N)]]`
 //      index through `ISyntheticResourceMetadata` (`binding >= 0`,
 //      `space == -1`, no CPU/CUDA marshaling fields),
 //   3. compile the MSL at runtime with the Metal framework's own compiler
 //      (no external toolchain needed), bind a zero-initialized counter
 //      buffer at the reported index, and dispatch one thread group,
-//   4. read the counters back and validate them against the exact
-//      execution counts the dispatch must produce, including a zero count
-//      for an unreached branch.
+//   4. read the counters back and validate exact counts for all three
+//      entry kinds: per-line execution counts (including an
+//      instrumented-but-zero count for a never-executed if-body line),
+//      branch-arm counts for the `if` condition (true arm zero, false arm
+//      once per thread), and the entry point's function-entry count.
 //
 // The test runs only on Apple platforms with a Metal device and reports
 // `Ignored` everywhere else.
@@ -132,23 +135,31 @@ SLANG_UNIT_TEST(coverageMetalRuntimeDispatch)
     targetDesc.format = SLANG_METAL;
     targetDesc.profile = globalSession->findProfile("metal");
 
-    // MSL only provides 32-bit `atomic_fetch_add_explicit`, so pin the
-    // counter width to 4 bytes. Emitting the default 64-bit counters would
-    // fail in the Metal compiler with "no matching function for call to
-    // 'atomic_fetch_add_explicit'".
-    slang::CompilerOptionEntry coverageOptions[2] = {};
-    coverageOptions[0].name = slang::CompilerOptionName::TraceCoverage;
-    coverageOptions[0].value.kind = slang::CompilerOptionValueKind::Int;
-    coverageOptions[0].value.intValue0 = 1;
-    coverageOptions[1].name = slang::CompilerOptionName::TraceCoverageCounterByteWidth;
-    coverageOptions[1].value.kind = slang::CompilerOptionValueKind::Int;
-    coverageOptions[1].value.intValue0 = 4;
+    // Enable all three coverage modes so line, function, and branch-arm
+    // counters are all validated against the same GPU dispatch. Pin the
+    // counter width to 4 bytes: MSL only provides 32-bit
+    // `atomic_fetch_add_explicit`, so emitting the default 64-bit counters
+    // would fail in the Metal compiler with "no matching function for call
+    // to 'atomic_fetch_add_explicit'".
+    slang::CompilerOptionEntry coverageOptions[4] = {};
+    uint32_t coverageOptionCount = 0;
+    auto addIntOption = [&](slang::CompilerOptionName name, int value)
+    {
+        auto& option = coverageOptions[coverageOptionCount++];
+        option.name = name;
+        option.value.kind = slang::CompilerOptionValueKind::Int;
+        option.value.intValue0 = value;
+    };
+    addIntOption(slang::CompilerOptionName::TraceCoverage, 1);
+    addIntOption(slang::CompilerOptionName::TraceFunctionCoverage, 1);
+    addIntOption(slang::CompilerOptionName::TraceBranchCoverage, 1);
+    addIntOption(slang::CompilerOptionName::TraceCoverageCounterByteWidth, 4);
 
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &targetDesc;
     sessionDesc.compilerOptionEntries = coverageOptions;
-    sessionDesc.compilerOptionEntryCount = SLANG_COUNT_OF(coverageOptions);
+    sessionDesc.compilerOptionEntryCount = coverageOptionCount;
 
     ComPtr<slang::ISession> session;
     SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
@@ -174,14 +185,16 @@ SLANG_UNIT_TEST(coverageMetalRuntimeDispatch)
 
     ComPtr<slang::IComponentType> linked;
     diagnostics.setNull();
-    SLANG_CHECK_ABORT(program->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+    SlangResult linkResult = program->link(linked.writeRef(), diagnostics.writeRef());
     diagnoseIfNeeded(diagnostics, "link");
+    SLANG_CHECK_ABORT(linkResult == SLANG_OK);
 
     diagnostics.setNull();
     ComPtr<slang::IBlob> mslBlob;
-    SLANG_CHECK_ABORT(
-        linked->getEntryPointCode(0, 0, mslBlob.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+    SlangResult codeResult =
+        linked->getEntryPointCode(0, 0, mslBlob.writeRef(), diagnostics.writeRef());
     diagnoseIfNeeded(diagnostics, "getEntryPointCode");
+    SLANG_CHECK_ABORT(codeResult == SLANG_OK);
 
     // Discover the hidden coverage buffer through the synthetic-resource
     // metadata contract, exactly the way a direct Metal host would.
@@ -256,7 +269,9 @@ SLANG_UNIT_TEST(coverageMetalRuntimeDispatch)
     MTL::CommandQueue* queue = device->newCommandQueue();
     SLANG_CHECK_ABORT(queue != nullptr);
     MTL::CommandBuffer* commandBuffer = queue->commandBuffer();
+    SLANG_CHECK_ABORT(commandBuffer != nullptr);
     MTL::ComputeCommandEncoder* encoder = commandBuffer->computeCommandEncoder();
+    SLANG_CHECK_ABORT(encoder != nullptr);
     encoder->setComputePipelineState(pipeline);
     encoder->setBuffer(outputBuffer, 0, 0);
     encoder->setBuffer(counterBuffer, 0, NS::UInteger(resourceInfo.binding));
@@ -292,9 +307,10 @@ SLANG_UNIT_TEST(coverageMetalRuntimeDispatch)
         SLANG_CHECK_ABORT(line != 0);
 
         // Sum every line-entry counter attributed to this source line. The
-        // unreached branch must still be instrumented (an entry exists) and
-        // read back as zero — that distinguishes "executed zero times" from
-        // "not instrumented at all".
+        // never-executed if-body line must still be instrumented (an entry
+        // exists) and read back as zero — that distinguishes "executed zero
+        // times" from "not instrumented at all". (Branch-arm counters for
+        // the `if` condition itself are asserted separately below.)
         uint32_t entriesOnLine = 0;
         uint64_t totalCount = 0;
         for (uint32_t i = 0; i < coverage->getEntryCount(); ++i)
@@ -311,6 +327,66 @@ SLANG_UNIT_TEST(coverageMetalRuntimeDispatch)
         }
         SLANG_CHECK(entriesOnLine == 1);
         SLANG_CHECK(totalCount == expected.expectedCount);
+    }
+
+    // Branch coverage: the `if (tid.x > 100u)` condition is false for all
+    // four threads, so its true arm must be instrumented-but-zero and its
+    // false arm must count one hit per thread. This validates branch-arm
+    // counters — not just line counters in an unreached body — against a
+    // real GPU dispatch.
+    {
+        const uint32_t ifLine = findLineContaining(kShaderSource, "if (tid.x > 100u)");
+        SLANG_CHECK_ABORT(ifLine != 0);
+
+        uint32_t trueArmEntries = 0;
+        uint64_t trueArmCount = 0;
+        uint32_t falseArmEntries = 0;
+        uint64_t falseArmCount = 0;
+        for (uint32_t i = 0; i < coverage->getEntryCount(); ++i)
+        {
+            slang::CoverageEntryInfo entry;
+            SLANG_CHECK_ABORT(coverage->getEntryInfo(i, &entry) == SLANG_OK);
+            if (entry.kind != slang::CoverageEntryKind::Branch)
+                continue;
+            if (entry.line != ifLine)
+                continue;
+            SLANG_CHECK_ABORT(entry.counterIndex < counterCount);
+            if (entry.branchArmKind == slang::CoverageBranchArmKind::TrueArm)
+            {
+                ++trueArmEntries;
+                trueArmCount += counters[entry.counterIndex];
+            }
+            else if (entry.branchArmKind == slang::CoverageBranchArmKind::FalseArm)
+            {
+                ++falseArmEntries;
+                falseArmCount += counters[entry.counterIndex];
+            }
+        }
+        SLANG_CHECK(trueArmEntries == 1);
+        SLANG_CHECK(trueArmCount == 0);
+        SLANG_CHECK(falseArmEntries == 1);
+        SLANG_CHECK(falseArmCount == kThreadCount);
+    }
+
+    // Function coverage: the entry point runs once per thread.
+    {
+        uint32_t functionEntries = 0;
+        uint64_t functionCount = 0;
+        for (uint32_t i = 0; i < coverage->getEntryCount(); ++i)
+        {
+            slang::CoverageEntryInfo entry;
+            SLANG_CHECK_ABORT(coverage->getEntryInfo(i, &entry) == SLANG_OK);
+            if (entry.kind != slang::CoverageEntryKind::Function)
+                continue;
+            SLANG_CHECK_ABORT(entry.functionName != nullptr);
+            if (UnownedStringSlice(entry.functionName).indexOf(toSlice("computeMain")) < 0)
+                continue;
+            SLANG_CHECK_ABORT(entry.counterIndex < counterCount);
+            ++functionEntries;
+            functionCount += counters[entry.counterIndex];
+        }
+        SLANG_CHECK(functionEntries == 1);
+        SLANG_CHECK(functionCount == kThreadCount);
     }
 
     queue->release();

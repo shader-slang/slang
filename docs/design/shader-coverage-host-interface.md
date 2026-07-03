@@ -205,11 +205,12 @@ through `ISyntheticResourceMetadata`.
 
 ## Backend usage
 
-| Backend / host style                            | Query path                                                                  | Binding action                                                                                                                             |
-| ----------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Vulkan / Metal / direct descriptor-backed hosts | `getResourceInfo(...)`                                                      | read `space` / `binding` and bind the coverage buffer using the host's descriptor-layout model                                             |
-| CUDA / CPU-style marshaling hosts               | `getResourceInfo(...)`                                                      | read `uniformOffset` / `uniformStride` from `SyntheticResourceInfo`                                                                        |
-| `slang-rhi` Vulkan / CUDA backends              | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` after `ISyntheticShaderProgram` resolves the location; provided by companion `slang-rhi` PR #739, not this PR |
+| Backend / host style                    | Query path                                                                  | Binding action                                                                                                                             |
+| --------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Vulkan / direct descriptor-backed hosts | `getResourceInfo(...)`                                                      | read `space` / `binding` and bind the coverage buffer using the host's descriptor-layout model                                             |
+| Direct Metal hosts                      | `getResourceInfo(...)`                                                      | read `binding` as the `[[buffer(N)]]` index; `space == -1` is the expected sentinel (see "Direct Metal host binding recipe" below)         |
+| CUDA / CPU-style marshaling hosts       | `getResourceInfo(...)`                                                      | read `uniformOffset` / `uniformStride` from `SyntheticResourceInfo`                                                                        |
+| `slang-rhi` Vulkan / CUDA backends      | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` after `ISyntheticShaderProgram` resolves the location; provided by companion `slang-rhi` PR #739, not this PR |
 
 D3D12 / HLSL hosts are expected to use the same `space` / `binding`
 metadata shape in a follow-up, but this PR does not define D3D register-space
