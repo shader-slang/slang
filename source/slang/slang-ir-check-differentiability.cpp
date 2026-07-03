@@ -87,84 +87,6 @@ public:
         return level;
     }
 
-    // True if `inst` is the value produced by a `bwd_diff(...)` operation, i.e. a callable
-    // backward-derivative function. `bwd_diff(f)` lowers to a `BackwardDifferentiate` (or the
-    // `LegacyBackwardDifferentiate` form used by the pre-2.0 auto-diff path); calling that value
-    // is how a `bwd_diff(f)(...)` invocation appears in the IR at this checking stage.
-    //
-    // Unwrap any `Specialize`/generic layers on the callee first (but not the differentiation op
-    // itself) before inspecting the opcode, so that a specialized/generic backward-derivative value
-    // such as `Specialize(BackwardDifferentiate(g), float)` is still recognized.
-    static bool isBackwardDerivativeValue(IRInst* inst)
-    {
-        if (!inst)
-            return false;
-        inst = getResolvedInstForDecorations(inst, /*resolveThroughDifferentiation:*/ false);
-        switch (inst->getOp())
-        {
-        // The complete set of ops that yield a backward-derivative function (a `bwd_diff` result),
-        // covering the combined form, the primal/remat/propagate split, the legacy (pre-2.0) forms,
-        // and the trivial variants. The forward-mode ops (`ForwardDifferentiate`,
-        // `ForwardDifferentiatePropagate`, `TrivialForwardDifferentiate`) are deliberately
-        // excluded, since forward-mode derivatives may be nested.
-        case kIROp_BackwardDifferentiate:
-        case kIROp_BackwardDifferentiatePrimal:
-        case kIROp_BackwardRemat:
-        case kIROp_BackwardDifferentiatePropagate:
-        case kIROp_TrivialBackwardDifferentiate:
-        case kIROp_TrivialBackwardDifferentiatePrimal:
-        case kIROp_TrivialBackwardRemat:
-        case kIROp_TrivialBackwardDifferentiatePropagate:
-        case kIROp_LegacyBackwardDifferentiate:
-        case kIROp_BackwardFromLegacyBwdDiffFunc:
-        case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
-        case kIROp_BackwardRematFromLegacyBwdDiffFunc:
-        case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
-            return true;
-        default:
-            return false;
-        }
-    }
-
-    // Diagnose an attempt to differentiate a function whose body itself calls a `bwd_diff(...)`
-    // result. The code produced by `bwd_diff` is not further differentiable (only forward-mode
-    // derivatives can be nested), so trying to take a derivative of such a function later produces
-    // a malformed differential of a non-differentiable value and crashes the auto-diff passes.
-    // Rejecting it here, while the original `bwd_diff` call is still present, replaces that
-    // internal error with an actionable diagnostic pointing at the offending call.
-    //
-    // Consider this example:
-    //
-    //     [Differentiable] float g(float x, float y) {
-    //         var xp = diffPair(x, 1.0);
-    //         bwd_diff(f)(xp, ..., 1.0);   // <- bwd_diff inside a differentiated function
-    //         return f(x, y) + xp.d;
-    //     }
-    //     ... bwd_diff(g)(...) ...          // g is used by an outer bwd_diff
-    //
-    // `g` is used by an outer `bwd_diff`, so `getCheckingLevelRequirementForFunc(g)` is non-`None`.
-    // By this stage `bwd_diff(f)` has been lowered to a callable backward-derivative value (a
-    // `LegacyBackwardDifferentiate`), and `g`'s body holds a `call` to it; we diagnose on that
-    // call.
-    bool diagnoseDifferentiatingBackwardDiffResult(IRGlobalValueWithCode* funcInst)
-    {
-        bool foundNestedBackwardDiff = false;
-        for (auto block : funcInst->getBlocks())
-        {
-            for (auto inst : block->getChildren())
-            {
-                auto call = as<IRCall>(inst);
-                if (call && isBackwardDerivativeValue(call->getCallee()))
-                {
-                    sink->diagnose(Diagnostics::CannotDifferentiateResultOfBackwardDifferentiation{
-                        .location = inst->sourceLoc});
-                    foundNestedBackwardDiff = true;
-                }
-            }
-        }
-        return foundNestedBackwardDiff;
-    }
-
     bool shouldTreatCallAsDifferentiable(IRInst* callInst)
     {
         SLANG_ASSERT(as<IRCall>(callInst));
@@ -471,8 +393,9 @@ public:
         // A function that is being differentiated cannot itself contain a `bwd_diff` operation,
         // because the result of `bwd_diff` is not further differentiable. Diagnose and stop before
         // the downstream data-flow analysis (and the auto-diff passes) trip over the un-splittable
-        // differential of that non-differentiable value.
-        if (diagnoseDifferentiatingBackwardDiffResult(funcInst))
+        // differential of that non-differentiable value. (The auto-diff translation carries the
+        // same check as a backstop for when this non-essential validation is disabled.)
+        if (diagnoseDifferentiatingBackwardDiffResult(sink, funcInst))
             return;
 
         DifferentiableTypeConformanceContext diffTypeContext(&sharedContext);
