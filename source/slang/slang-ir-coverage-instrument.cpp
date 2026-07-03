@@ -506,6 +506,34 @@ static bool shouldHonorReservedCoverageSpaces(TargetRequest* targetRequest)
     return isKhronosTarget(targetRequest);
 }
 
+static bool isCoverageInstrumentationTargetSupported(TargetRequest* targetRequest)
+{
+    return !isWGPUTarget(targetRequest) && !isCPUTargetViaLLVM(targetRequest);
+}
+
+// Maps the per-slot byte-width selector (`counterByteWidth`, in bytes)
+// to the counter buffer's element `IRType`: `8` -> `uint64_t`, `4` ->
+// `uint`. Both entry paths (the `-trace-coverage-counter-width` CLI
+// parser and the `TraceCoverageCounterByteWidth` API option) validate
+// the value to `{4, 8}` before reaching this helper, so any other
+// width indicates a compiler-internal bug rather than a user input
+// error — assert rather than coerce, so the bug surfaces at the
+// broken caller. For the uint32-vs-uint64 tradeoff and why the choice
+// is the caller's, see the `-trace-coverage-counter-width` flag docs
+// and `docs/design/shader-coverage.md`.
+static IRType* getCoverageCounterElementType(IRBuilder& builder, int counterByteWidth)
+{
+    switch (counterByteWidth)
+    {
+    case 4:
+        return builder.getUIntType();
+    case 8:
+        return builder.getUInt64Type();
+    default:
+        SLANG_UNEXPECTED("coverage counter byte width must be 4 or 8");
+    }
+}
+
 static void addReservedCoverageSpaces(
     List<UsedBindingRange>& ranges,
     const int* reservedSpaces,
@@ -645,6 +673,7 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     int explicitSpace,
     const int* reservedSpaces,
     int reservedSpaceCount,
+    int counterByteWidth,
     int& outSpace,
     int& outBinding)
 {
@@ -676,8 +705,12 @@ static IRGlobalParam* synthesizeCoverageBuffer(
             return nullptr;
     }
 
-    IRType* uintType = builder.getUIntType();
-    IRInst* typeOperands[2] = {uintType, builder.getType(kIROp_DefaultBufferLayoutType)};
+    // Counter element width is a caller choice (`-trace-coverage-counter-width`),
+    // not derived from the target — the compiler can't see the runtime
+    // driver that ultimately runs the SPIR-V/PTX, and that's the only
+    // thing that decides whether 64-bit shader atomics are usable.
+    IRType* counterElementType = getCoverageCounterElementType(builder, counterByteWidth);
+    IRInst* typeOperands[2] = {counterElementType, builder.getType(kIROp_DefaultBufferLayoutType)};
     auto bufferType = (IRType*)builder.getType(kIROp_HLSLRWStructuredBufferType, 2, typeOperands);
 
     auto param = builder.createGlobalParam(bufferType);
@@ -791,16 +824,29 @@ static IRVarLayout* extendScopeLayoutWithCoverageBuffer(
     return newScopeVarLayoutBuilder.build();
 }
 
-// Collect every IncrementCoverageCounter op in the module. Deterministic
-// traversal: module-scope insts in declaration order, then each
-// function's blocks in order, then each block's insts in position order.
-static void collectCoverageCounterOps(IRModule* module, List<IRInst*>& out)
+static bool isCoverageMarkerOp(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_IncrementCoverageCounter:
+    case kIROp_IncrementFunctionCoverageCounter:
+    case kIROp_IncrementBranchCoverageCounter:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Collect every coverage marker op in the module. Deterministic traversal:
+// module-scope insts in declaration order, then each function's blocks in
+// order, then each block's insts in position order.
+static void collectCoverageMarkerOps(IRModule* module, List<IRInst*>& out)
 {
     auto visitFunc = [&](IRFunc* func)
     {
         for (auto block : func->getBlocks())
             for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
-                if (inst->getOp() == kIROp_IncrementCoverageCounter)
+                if (isCoverageMarkerOp(inst->getOp()))
                     out.add(inst);
     };
 
@@ -820,98 +866,289 @@ static void collectCoverageCounterOps(IRModule* module, List<IRInst*>& out)
     }
 }
 
-// Resolve a counter op's source position from its built-in sourceLoc.
+// Resolve a marker op's source position from its built-in sourceLoc.
 // Returns false when the location is not valid, e.g. for synthetic/
 // unknown sources.
 static bool resolveHumaneLoc(
     SourceManager* sourceManager,
-    IRInst* counterOp,
+    IRInst* markerOp,
     String& outFile,
-    uint32_t& outLine)
+    uint32_t& outLine,
+    uint32_t& outColumn)
 {
-    if (!sourceManager || !counterOp->sourceLoc.isValid())
+    if (!sourceManager || !markerOp->sourceLoc.isValid())
         return false;
-    auto humane = sourceManager->getHumaneLoc(counterOp->sourceLoc, SourceLocType::Emit);
+    auto humane = sourceManager->getHumaneLoc(markerOp->sourceLoc, SourceLocType::Emit);
     if (humane.line <= 0)
         return false;
     outFile = humane.pathInfo.foundPath;
     outLine = (uint32_t)humane.line;
+    outColumn = humane.column > 0 ? (uint32_t)humane.column : 0;
     return true;
+}
+
+static String getStringOperandOrEmpty(IRInst* inst, UInt index)
+{
+    if (index >= inst->getOperandCount())
+        return String();
+    if (auto stringLit = as<IRStringLit>(inst->getOperand(index)))
+        return String(stringLit->getStringSlice());
+    return String();
+}
+
+static uint32_t getUInt32OperandOrZero(IRInst* inst, UInt index)
+{
+    if (index >= inst->getOperandCount())
+        return 0;
+    if (auto intLit = as<IRIntLit>(inst->getOperand(index)))
+    {
+        auto value = intLit->getValue();
+        if (value >= 0 && uint64_t(value) <= uint64_t(std::numeric_limits<uint32_t>::max()))
+            return uint32_t(value);
+    }
+    return 0;
+}
+
+static slang::CoverageBranchArmKind getBranchArmKindOperand(IRInst* inst, UInt index)
+{
+    switch (getUInt32OperandOrZero(inst, index))
+    {
+    case uint32_t(slang::CoverageBranchArmKind::TrueArm):
+        return slang::CoverageBranchArmKind::TrueArm;
+    case uint32_t(slang::CoverageBranchArmKind::FalseArm):
+        return slang::CoverageBranchArmKind::FalseArm;
+    case uint32_t(slang::CoverageBranchArmKind::CaseArm):
+        return slang::CoverageBranchArmKind::CaseArm;
+    case uint32_t(slang::CoverageBranchArmKind::DefaultArm):
+        return slang::CoverageBranchArmKind::DefaultArm;
+    default:
+        return slang::CoverageBranchArmKind::Unknown;
+    }
 }
 
 struct CoverageInstrumenter
 {
+    struct BranchSiteRemap
+    {
+        IRFunc* parentFunc = nullptr;
+        uint32_t originalSiteID = 0;
+        uint32_t remappedSiteID = 0;
+    };
+
     IRModule* module;
     IRGlobalParam* coverageBuffer;
     SourceManager* sourceManager;
     ArtifactPostEmitMetadata& outMetadata;
-    IRType* uintType;
-    IRType* uintPtrType;
+    // The counter element type comes from the synthesized buffer's
+    // own element type rather than re-querying the target, so the
+    // atomic op's operand width can never drift out of sync with the
+    // buffer's storage width even if a future change moves the type
+    // decision elsewhere. `intType` is the IR scalar type used for
+    // small integer literals threaded into the atomic op (slot
+    // index, memory-order constant) and is independent of the
+    // counter slot's storage width.
+    IRType* counterElementType;
+    IRType* counterElementPtrType;
     IRType* intType;
+    // Caller opted in to boolean recording (`-trace-coverage-boolean`): each
+    // counter is written with a plain non-atomic store of 1 instead of an
+    // atomic add, recording whether the entry executed (0 / non-zero) rather
+    // than an exact count.
+    bool booleanMode = false;
+    List<BranchSiteRemap> branchSiteRemaps;
+    uint32_t nextBranchSiteID = 1;
 
     CoverageInstrumenter(
         IRModule* m,
         IRGlobalParam* buf,
         SourceManager* sm,
-        ArtifactPostEmitMetadata& md)
-        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md)
+        ArtifactPostEmitMetadata& md,
+        bool booleanMode)
+        : module(m)
+        , coverageBuffer(buf)
+        , sourceManager(sm)
+        , outMetadata(md)
+        , booleanMode(booleanMode)
     {
         IRBuilder tmpBuilder(module);
-        uintType = tmpBuilder.getUIntType();
-        uintPtrType = tmpBuilder.getPtrType(uintType);
+        // The unchecked `cast` is safe: this instrumenter only ever runs
+        // on the buffer synthesized by `synthesizeCoverageBuffer`, which
+        // creates it as a structured-buffer type. We never construct a
+        // `CoverageInstrumenter` over a caller-provided buffer.
+        auto bufferType = cast<IRHLSLStructuredBufferTypeBase>(coverageBuffer->getDataType());
+        counterElementType = bufferType->getElementType();
+        counterElementPtrType = tmpBuilder.getPtrType(counterElementType);
         intType = tmpBuilder.getIntType();
     }
 
-    // Lower a single IncrementCoverageCounter op to an atomic add on
-    // `coverageBuffer[slot]`. Appends a metadata entry for `slot` and
-    // removes the op.
-    void lowerCounterOp(IRInst* counterOp, UInt slot)
+    uint32_t getRemappedBranchSiteID(IRInst* markerOp, uint32_t originalSiteID)
+    {
+        SLANG_RELEASE_ASSERT(originalSiteID != 0);
+        auto parentFunc = getParentFunc(markerOp);
+        SLANG_RELEASE_ASSERT(parentFunc);
+
+        // Lowering assigns branch-site IDs before module linking, so IDs are
+        // only unique within that lowering context. Remap them here to a single
+        // metadata-local namespace while preserving all arms of the same branch.
+        for (auto& remap : branchSiteRemaps)
+        {
+            if (remap.parentFunc == parentFunc && remap.originalSiteID == originalSiteID)
+                return remap.remappedSiteID;
+        }
+
+        BranchSiteRemap remap;
+        remap.parentFunc = parentFunc;
+        remap.originalSiteID = originalSiteID;
+        remap.remappedSiteID = nextBranchSiteID++;
+        branchSiteRemaps.add(remap);
+        return remap.remappedSiteID;
+    }
+
+    void populateEntryForMarker(IRInst* markerOp, UInt slot, CoverageTracingEntry& entry)
+    {
+        entry.counterIndex = (uint32_t)slot;
+        entry.counterMode =
+            booleanMode ? slang::CoverageCounterMode::Boolean : slang::CoverageCounterMode::Count;
+        resolveHumaneLoc(sourceManager, markerOp, entry.file, entry.line, entry.startColumn);
+
+        switch (markerOp->getOp())
+        {
+        case kIROp_IncrementFunctionCoverageCounter:
+            entry.kind = slang::CoverageEntryKind::Function;
+            entry.functionName = getStringOperandOrEmpty(markerOp, 0);
+            entry.functionMangledName = getStringOperandOrEmpty(markerOp, 1);
+            break;
+        case kIROp_IncrementBranchCoverageCounter:
+            entry.kind = slang::CoverageEntryKind::Branch;
+            entry.branchSiteID =
+                getRemappedBranchSiteID(markerOp, getUInt32OperandOrZero(markerOp, 0));
+            entry.branchArmID = getUInt32OperandOrZero(markerOp, 1);
+            entry.branchArmKind = getBranchArmKindOperand(markerOp, 2);
+            break;
+        case kIROp_IncrementCoverageCounter:
+            entry.kind = slang::CoverageEntryKind::Line;
+            break;
+        default:
+            entry.kind = slang::CoverageEntryKind::Unknown;
+            break;
+        }
+    }
+
+    // Lower a single coverage marker op to an atomic add on
+    // `coverageBuffer[slot]`. Appends the source-entry metadata that
+    // currently points at this direct counter slot, then removes the
+    // marker op.
+    void lowerMarkerOp(IRInst* markerOp, UInt slot)
     {
         CoverageTracingEntry entry;
-        resolveHumaneLoc(sourceManager, counterOp, entry.file, entry.line);
+        populateEntryForMarker(markerOp, slot, entry);
         outMetadata.m_coverageEntries.add(entry);
 
         IRBuilder builder(module);
-        builder.setInsertBefore(counterOp);
+        builder.setInsertBefore(markerOp);
 
         IRInst* getElemArgs[] = {
             coverageBuffer,
             builder.getIntValue(intType, (IRIntegerValue)slot),
         };
         IRInst* slotPtr = builder.emitIntrinsicInst(
-            uintPtrType,
+            counterElementPtrType,
             kIROp_RWStructuredBufferGetElementPtr,
             2,
             getElemArgs);
 
-        // Emit `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each
-        // backend emitter to its native atomic-increment idiom
-        // (InterlockedAdd on HLSL, atomicAdd on GLSL, OpAtomicIAdd on
-        // SPIR-V, etc.). Correct under GPU concurrency.
-        IRInst* atomicArgs[] = {
-            slotPtr,
-            builder.getIntValue(uintType, 1),
-            builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
-        };
-        builder.emitIntrinsicInst(uintType, kIROp_AtomicAdd, 3, atomicArgs);
+        if (booleanMode)
+        {
+            // Hit/miss recording: a plain, non-atomic store of `1`. Every
+            // lane that reaches this marker writes the same value, so
+            // concurrent same-value writes are a benign race for 32-bit
+            // counters — 32-bit StorageBuffer stores are single-copy atomic
+            // under the Vulkan memory model, so a reader always observes a
+            // complete 0 or 1 and the slot is 1 iff the entry executed.
+            //
+            // For 64-bit counters: a 64-bit StorageBuffer store is not
+            // guaranteed single-copy atomic unless shaderBufferInt64Atomics
+            // is enabled. In practice the host already requires that feature
+            // for 64-bit coverage, which implies single-copy atomic plain
+            // stores on all known drivers. If exact boolean semantics under
+            // 64-bit are required, prefer 32-bit counters
+            // (`-trace-coverage-counter-width 32`).
+            //
+            // Non-atomic is the whole point: a relaxed atomic store still
+            // serializes on the hot counter address (measured ~15x slower),
+            // defeating the purpose. Trade-off: no exact execution count
+            // (`CoverageCounterMode::Boolean`, not `Count`).
+            builder.emitStore(slotPtr, builder.getIntValue(counterElementType, 1));
+        }
+        else
+        {
+            // Emit `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each
+            // backend emitter to its native atomic-increment idiom
+            // (InterlockedAdd on HLSL, atomicAdd on GLSL, OpAtomicIAdd on
+            // SPIR-V, etc.). The immediate and the result type are typed
+            // against `counterElementType` (uint or uint64), so the same
+            // lowering path produces a 64-bit `OpAtomicIAdd` /
+            // `atomicAdd(ulonglong*)` when the buffer is wide.
+            IRInst* atomicArgs[] = {
+                slotPtr,
+                builder.getIntValue(counterElementType, 1),
+                builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
+            };
+            builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
+        }
 
-        // The counter op has void return type and, by construction, no uses.
+        // The marker op has void return type and, by construction, no uses.
         // Catch a future IR transform that takes a use of it before we reach
         // this removal — the op would otherwise be silently dropped here.
-        SLANG_ASSERT(!counterOp->hasUses());
-        counterOp->removeAndDeallocate();
+        SLANG_ASSERT(!markerOp->hasUses());
+        markerOp->removeAndDeallocate();
     }
 
-    void run(List<IRInst*> const& counterOps)
+    void run(List<IRInst*> const& markerOps)
     {
-        outMetadata.m_coverageEntries.reserve(counterOps.getCount());
-        // Each counter op gets its own slot: the op's identity IS the
+        const auto counterCount = markerOps.getCount();
+        // This concerns the counter *index* type, which is independent of
+        // the per-slot storage width recorded just below: the public
+        // metadata stores counter indices as uint32_t because the
+        // generated shader code indexes the buffer with a 32-bit index,
+        // regardless of whether each slot is a uint (4 bytes) or uint64_t
+        // (8 bytes).
+        SLANG_RELEASE_ASSERT(counterCount >= 0);
+        SLANG_RELEASE_ASSERT(
+            uint64_t(counterCount) <= uint64_t(std::numeric_limits<uint32_t>::max()));
+        outMetadata.m_coverageCounterCount = (uint32_t)counterCount;
+        // Record the per-slot byte width so the manifest writer and
+        // every host that reads back the buffer can pick the right
+        // element type without re-deriving it from the target. The
+        // value is sourced from the IR type of the synthesized buffer
+        // (rather than from the original `counterByteWidth` selector
+        // passed in) so the recorded width cannot drift from the
+        // actually-emitted storage if a future change moves the type
+        // decision elsewhere. `getCoverageCounterElementType`
+        // produces exactly `uint` or `uint64_t`; the release-mode
+        // assertion below enforces that invariant even when debug
+        // assertions are compiled out, so an unexpected element type
+        // in release surfaces as a crash at the broken producer
+        // instead of silently writing `4` into the manifest.
+        switch (counterElementType->getOp())
+        {
+        case kIROp_UIntType:
+            outMetadata.m_coverageCounterByteWidth = 4;
+            break;
+        case kIROp_UInt64Type:
+            outMetadata.m_coverageCounterByteWidth = 8;
+            break;
+        default:
+            SLANG_UNEXPECTED("coverage counter element type must be uint or uint64_t");
+        }
+        outMetadata.m_coverageEntries.reserve(counterCount);
+        // Each marker op gets its own slot: the op's identity IS the
         // UID, and we assign a consecutive index in traversal order.
-        // Multiple ops on the same source line get distinct slots; the
-        // LCOV converter aggregates per (file, line) at the host side
-        // via summation.
-        for (UInt slot = 0; slot < (UInt)counterOps.getCount(); ++slot)
-            lowerCounterOp(counterOps[slot], slot);
+        // Several source entries may later share counters when region
+        // coverage is added; this pass already keeps entry count and
+        // counter count separate through the public metadata API.
+        for (Index slot = 0; slot < counterCount; ++slot)
+            lowerMarkerOp(markerOps[slot], UInt(slot));
     }
 };
 
@@ -1063,41 +1300,41 @@ void instrumentCoverage(
     int explicitSpace,
     const int* reservedSpaces,
     int reservedSpaceCount,
+    int counterByteWidth,
+    bool booleanMode,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata)
 {
-    // Collect any counter ops so stale ones from cached modules can't
+    // Collect any coverage marker ops so stale ones from cached modules can't
     // leak into the backend when the flag is off.
-    List<IRInst*> counterOps;
-    collectCoverageCounterOps(module, counterOps);
+    List<IRInst*> markerOps;
+    collectCoverageMarkerOps(module, markerOps);
 
     if (!enabled)
     {
-        // Flag off: drop any counter ops without emitting atomics or
+        // Flag off: drop any marker ops without emitting atomics or
         // synthesizing a buffer.
-        for (auto op : counterOps)
+        for (auto op : markerOps)
             op->removeAndDeallocate();
         return;
     }
 
-    if (counterOps.getCount() == 0)
+    if (markerOps.getCount() == 0)
         return;
 
     // WGSL requires the buffer's element type to be `atomic<u32>` for
     // atomic ops; the IR coverage pass synthesizes a plain
     // `RWStructuredBuffer<uint>` which lowers to `array<u32>` on WGSL
-    // and fails WGSL validation at the `atomicAdd` call. Until the
-    // synthesized type is wrapped in `Atomic<...>` for WGSL targets,
-    // skip instrumentation with a clear warning rather than emitting
-    // invalid WGSL. Other backends are unaffected. (For WebGPU
-    // workflows that need coverage today, `-target spirv` works via
-    // the SPIR-V → WebGPU path.)
-    if (isWGPUTarget(targetRequest))
+    // and fails WGSL validation at the `atomicAdd` call. LLVM-emitted
+    // CPU targets similarly do not have a verified lowering path for
+    // the synthesized resource + atomic sequence. Skip unsupported
+    // targets with a clear warning rather than emitting invalid IR.
+    if (!isCoverageInstrumentationTargetSupported(targetRequest))
     {
         if (sink)
             sink->diagnose(Diagnostics::CoverageTargetNotSupported{});
-        for (auto op : counterOps)
+        for (auto op : markerOps)
             op->removeAndDeallocate();
         return;
     }
@@ -1108,16 +1345,19 @@ void instrumentCoverage(
             sink->diagnose(Diagnostics::CoverageReservedSpaceIgnored{});
     }
 
-    // Surface a warning if the user has declared a global parameter
-    // named `__slang_coverage`. The IR coverage pass synthesizes its
-    // own buffer with that name and the user declaration is silently
-    // shadowed (no counter writes ever target it). Reserving the name
-    // explicitly avoids a class of confusing wrong-coverage outcomes.
-    if (sink)
+    // Reject a user-declared global parameter named `__slang_coverage`.
+    // The IR coverage pass synthesizes its own hidden buffer with that
+    // name; allowing both to coexist would either shadow the user's
+    // resource or leave two globals with the same debug name in the
+    // final artifact.
+    if (auto userBuffer = findUserDeclaredCoverageBuffer(module))
     {
-        if (auto userBuffer = findUserDeclaredCoverageBuffer(module))
+        if (sink)
             sink->diagnose(
                 Diagnostics::CoverageBufferReservedName{.location = userBuffer->sourceLoc});
+        for (auto op : markerOps)
+            op->removeAndDeallocate();
+        return;
     }
 
     // When the user explicitly pins the coverage buffer with
@@ -1131,7 +1371,7 @@ void instrumentCoverage(
     // The collision check itself runs regardless of whether `sink` is
     // available — correctness must not depend on diagnostic plumbing.
     // The diagnostic emission is gated on `sink`, but the IR cleanup
-    // (drop queued counter ops, return without synthesizing) happens
+    // (drop queued marker ops, return without synthesizing) happens
     // unconditionally so the resulting program is well-formed.
     if (explicitSpace >= 0 && explicitBinding >= 0)
     {
@@ -1146,7 +1386,7 @@ void instrumentCoverage(
             if (sink)
                 sink->diagnose(
                     Diagnostics::CoverageBindingCollision{.location = colliding->sourceLoc});
-            for (auto op : counterOps)
+            for (auto op : markerOps)
                 op->removeAndDeallocate();
             return;
         }
@@ -1162,19 +1402,20 @@ void instrumentCoverage(
         explicitSpace,
         reservedSpaces,
         reservedSpaceCount,
+        counterByteWidth,
         chosenSpace,
         chosenBinding);
 
     // `synthesizeCoverageBuffer` returns nullptr when the
     // auto-allocator can't find a free binding (existing globals
     // occupy slots up to INT_MAX in space 0 — pathological but
-    // possible). Diagnose loudly and drop the queued counter ops so
+    // possible). Diagnose loudly and drop the queued marker ops so
     // the rest of the compile still runs without coverage.
     if (!buffer)
     {
         if (sink)
             sink->diagnose(Diagnostics::CoverageBindingExhausted{});
-        for (auto op : counterOps)
+        for (auto op : markerOps)
             op->removeAndDeallocate();
         return;
     }
@@ -1216,8 +1457,9 @@ void instrumentCoverage(
         module,
         buffer,
         sink ? sink->getSourceManager() : nullptr,
-        outMetadata);
-    instrumenter.run(counterOps);
+        outMetadata,
+        booleanMode);
+    instrumenter.run(markerOps);
 }
 
 void finalizeCoverageInstrumentationMetadata(

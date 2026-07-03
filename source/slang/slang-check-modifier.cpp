@@ -488,6 +488,152 @@ Modifier* SemanticsVisitor::validateAttribute(
 
         waveSizeAttr->numLanes = value;
     }
+    else if (auto nodeLaunchAttr = as<NodeLaunchAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        String mode;
+        if (!checkLiteralStringVal(attr->args[0], &mode))
+            return nullptr;
+        auto modeSlice = mode.getUnownedSlice();
+        if (modeSlice.caseInsensitiveEquals(toSlice("broadcasting")))
+        {
+            nodeLaunchAttr->mode = "broadcasting";
+        }
+        else if (modeSlice.caseInsensitiveEquals(toSlice("thread")))
+        {
+            nodeLaunchAttr->mode = "thread";
+        }
+        else if (modeSlice.caseInsensitiveEquals(toSlice("coalescing")))
+        {
+            nodeLaunchAttr->mode = "coalescing";
+        }
+        else
+        {
+            getSink()->diagnose(Diagnostics::InvalidNodeLaunchMode{.mode = mode, .attr = attr});
+            return nullptr;
+        }
+    }
+    else if (auto gridAttr = as<NodeMaxDispatchGridAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 3)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "3",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        gridAttr->x = checkConstantIntVal(attr->args[0]);
+        gridAttr->y = checkConstantIntVal(attr->args[1]);
+        gridAttr->z = checkConstantIntVal(attr->args[2]);
+        if (!gridAttr->x || !gridAttr->y || !gridAttr->z)
+            return nullptr;
+    }
+    else if (auto fixedGridAttr = as<NodeDispatchGridAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 3)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "3",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        fixedGridAttr->x = checkConstantIntVal(attr->args[0]);
+        fixedGridAttr->y = checkConstantIntVal(attr->args[1]);
+        fixedGridAttr->z = checkConstantIntVal(attr->args[2]);
+        if (!fixedGridAttr->x || !fixedGridAttr->y || !fixedGridAttr->z)
+            return nullptr;
+    }
+    else if (auto maxRecAttr = as<MaxRecordsAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        auto value = checkConstantIntVal(attr->args[0]);
+        if (!value)
+            return nullptr;
+        maxRecAttr->value = value;
+    }
+    else if (auto nodeIDAttr = as<NodeIDAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount < 1 || argCount > 2)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1...2",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+
+        String name;
+        if (!checkLiteralStringVal(attr->args[0], &name))
+            return nullptr;
+        nodeIDAttr->name = name;
+        if (argCount == 2)
+        {
+            auto arrayIndex = checkConstantIntVal(attr->args[1]);
+            if (!arrayIndex)
+                return nullptr;
+            nodeIDAttr->arrayIndex = arrayIndex;
+        }
+        else
+        {
+            nodeIDAttr->arrayIndex = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 0);
+        }
+    }
+    else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        auto count = checkConstantIntVal(attr->args[0]);
+        if (!count)
+            return nullptr;
+        nodeArraySizeAttr->count = count;
+    }
+    else if (as<NodeIsProgramEntryAttribute>(attr) || as<AllowSparseNodesAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 0)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "0",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+    }
     else if (auto anyValueSizeAttr = as<AnyValueSizeAttribute>(attr))
     {
         // This case handles GLSL-oriented layout attributes
@@ -1234,7 +1380,8 @@ Modifier* SemanticsVisitor::validateAttribute(
         requirePreludeAttr->capabilitySet = CapabilitySet(capName).freeze(getASTBuilder());
         if (auto stringLitExpr = as<StringLiteralExpr>(attr->args[1]))
         {
-            requirePreludeAttr->prelude = getStringLiteralTokenValue(stringLitExpr->token);
+            requirePreludeAttr->prelude =
+                getStringLiteralTokenValue(stringLitExpr->token, getSink());
         }
         else
         {
@@ -1269,6 +1416,17 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     UncheckedAttribute* uncheckedAttr,
     ModifiableSyntaxNode* attrTarget)
 {
+    // `__func_extension` is syntax sugar for a generated extension containing
+    // a synthesized derivative/apply function. Validate attributes against the
+    // eventual inner function so callable attributes like `[ForceInline]` work
+    // the same way they would on the desugared declaration.
+    auto effectiveAttrTarget = attrTarget;
+    if (auto funcExtensionDecl = as<FuncExtensionDecl>(attrTarget))
+    {
+        if (funcExtensionDecl->innerFunc)
+            effectiveAttrTarget = funcExtensionDecl->innerFunc;
+    }
+
     auto attrName = uncheckedAttr->getKeywordName();
     auto attrDecl = lookUpAttributeDecl(attrName, uncheckedAttr->scope);
 
@@ -1368,7 +1526,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     bool validTarget = false;
     for (auto attrTargetMod : attrDecl->getModifiersOfType<AttributeTargetModifier>())
     {
-        if (attrTarget->getClass().isSubClassOf(attrTargetMod->syntaxClass))
+        if (effectiveAttrTarget->getClass().isSubClassOf(attrTargetMod->syntaxClass))
         {
             validTarget = true;
             break;
@@ -1381,7 +1539,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     {
     // Allowed only on struct fields.
     case ASTNodeType::VkStructOffsetAttribute:
-        auto targetDecl = as<Decl>(attrTarget);
+        auto targetDecl = as<Decl>(effectiveAttrTarget);
         validTarget = validTarget && targetDecl && as<StructDecl>(getParentDecl(targetDecl));
         break;
     };
@@ -1394,7 +1552,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     }
 
     // Now apply type-specific validation to the attribute.
-    if (!validateAttribute(attr, attrDecl, attrTarget))
+    if (!validateAttribute(attr, attrDecl, effectiveAttrTarget))
     {
         return uncheckedAttr;
     }
@@ -1467,7 +1625,20 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::HLSLVolatileModifier:
     case ASTNodeType::GLSLPrecisionModifier:
     case ASTNodeType::HLSLGroupSharedModifier:
+    case ASTNodeType::NumThreadsAttribute:
         return modifierType;
+
+    case ASTNodeType::NodeLaunchAttribute:
+    case ASTNodeType::MaxRecordsAttribute:
+    case ASTNodeType::NodeIDAttribute:
+    case ASTNodeType::NodeIsProgramEntryAttribute:
+    case ASTNodeType::AllowSparseNodesAttribute:
+    case ASTNodeType::NodeArraySizeAttribute:
+        return modifierType;
+
+    case ASTNodeType::NodeDispatchGridAttribute:
+    case ASTNodeType::NodeMaxDispatchGridAttribute:
+        return ASTNodeType::NodeDispatchGridAttribute;
 
     case ASTNodeType::HLSLStaticModifier:
     case ASTNodeType::ActualGlobalModifier:
@@ -1599,10 +1770,14 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::PostfixModifier:
         return as<CallableDecl>(decl);
 
-    case ASTNodeType::BuiltinModifier:
     case ASTNodeType::PublicModifier:
     case ASTNodeType::PrivateModifier:
     case ASTNodeType::InternalModifier:
+        return as<VarDeclBase>(decl) || as<AggTypeDeclBase>(decl) || as<NamespaceDeclBase>(decl) ||
+               as<CallableDecl>(decl) || as<TypeDefDecl>(decl) || as<PropertyDecl>(decl) ||
+               as<SyntaxDecl>(decl) || as<AttributeDecl>(decl) || as<InheritanceDecl>(decl);
+
+    case ASTNodeType::BuiltinModifier:
     case ASTNodeType::ExternModifier:
     case ASTNodeType::HLSLExportModifier:
     case ASTNodeType::ExternCppModifier:
@@ -1953,6 +2128,11 @@ Modifier* SemanticsVisitor::checkModifier(
                     genDecl->ownedScope);
                 if (!scrutineeResults.isValid())
                 {
+                    // No "did you mean ...?" suggestion here (unlike the
+                    // `VarExpr` path): a `__target_intrinsic` scrutinee names a
+                    // capability/target identifier, not an ordinary in-scope
+                    // declaration, so a Levenshtein match against the lexical
+                    // scope would be misleading.
                     getSink()->diagnose(Diagnostics::UndefinedIdentifier{
                         .name = targetIntrinsic->scrutinee.name,
                         .location = targetIntrinsic->scrutinee.loc});

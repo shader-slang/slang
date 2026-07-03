@@ -193,6 +193,25 @@ static void _outputProfileTime(uint64_t startTicks, uint64_t endTicks)
     out.print("profile-time=%g\n", time);
 }
 
+static rhi::Feature _getFeatureFromName(const UnownedStringSlice& featureName)
+{
+    struct FeatureNameMapEntry
+    {
+        const char* name;
+        rhi::Feature feature;
+    };
+
+#define SLANG_RHI_FEATURES_X(id, name) {name, rhi::Feature::id},
+    static const FeatureNameMapEntry kFeatureNameMap[] = {SLANG_RHI_FEATURES(SLANG_RHI_FEATURES_X)};
+#undef SLANG_RHI_FEATURES_X
+
+    for (auto& entry : kFeatureNameMap)
+        if (featureName == UnownedStringSlice(entry.name))
+            return entry.feature;
+
+    return rhi::Feature::_Count;
+}
+
 class ProgramVars;
 
 struct ShaderOutputPlan
@@ -843,6 +862,17 @@ struct AssignValsFromLayoutContext
         ShaderCursor const& dstCursor,
         ShaderInputLayout::AccelerationStructureVal* srcVal)
     {
+        SLANG_UNUSED(srcVal);
+        if (isDescriptorHandleType(dstCursor))
+        {
+            if (!accelerationStructure)
+                return SLANG_E_NOT_AVAILABLE;
+            DescriptorHandle handle;
+            SLANG_RETURN_ON_FAIL(accelerationStructure->getDescriptorHandle(&handle));
+            SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
+            return SLANG_OK;
+        }
+
         dstCursor.setBinding(accelerationStructure);
         return SLANG_OK;
     }
@@ -1739,9 +1769,6 @@ static SlangResult _innerMain(
         }
     }
 
-    static renderer_test::CoreToRHIDebugBridge debugCallback;
-    debugCallback.setCoreCallback(stdWriters->getDebugCallback());
-
     // Use the profile name set on options if set
     input.profile = options.profileName.getLength() ? options.profileName : input.profile;
 
@@ -1872,12 +1899,13 @@ static SlangResult _innerMain(
     }
 
     CachedDeviceWrapper deviceWrapper;
+    // The acquired device's debug bridge; bound to this invocation's callback below (#11856).
+    Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> deviceBridge;
     {
         DeviceDesc desc = {};
         desc.deviceType = options.deviceType;
 
         desc.enableValidation = options.enableDebugLayers;
-        desc.debugCallback = &debugCallback;
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)
@@ -1885,9 +1913,9 @@ static SlangResult _innerMain(
         else
             desc.slang.targetFlags = 0;
 
-        List<const char*> requiredFeatureList;
+        List<rhi::Feature> requiredFeatureList;
         for (auto& name : options.renderFeatures)
-            requiredFeatureList.add(name.getBuffer());
+            requiredFeatureList.add(_getFeatureFromName(name.getUnownedSlice()));
 
         desc.requiredFeatures = requiredFeatureList.getBuffer();
         desc.requiredFeatureCount = (int)requiredFeatureList.getCount();
@@ -1938,7 +1966,7 @@ static SlangResult _innerMain(
             SlangResult res;
             if (options.cacheRhiDevice)
             {
-                res = DeviceCache::acquireDevice(desc, rhiDevice.writeRef());
+                res = DeviceCache::acquireDevice(desc, rhiDevice.writeRef(), &deviceBridge);
                 if (SLANG_FAILED(res))
                 {
                     rhiDevice = nullptr;
@@ -1946,6 +1974,9 @@ static SlangResult _innerMain(
             }
             else
             {
+                // Not caching: create the device wired to a fresh retained bridge.
+                deviceBridge = renderer_test::createRetainedCoreToRHIDebugBridge();
+                desc.debugCallback = deviceBridge.Ptr();
                 res = rhi::getRHI()->createDevice(desc, rhiDevice.writeRef());
                 if (SLANG_FAILED(res))
                 {
@@ -1989,6 +2020,13 @@ static SlangResult _innerMain(
             }
         }
     }
+
+    // Bind this invocation's callback to the device's bridge for the adapter query and rendering;
+    // clearing on scope exit lets a later cached-device message with no active scope drop (#11785).
+    SLANG_ASSERT(deviceBridge);
+    renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
+        *deviceBridge,
+        stdWriters->getDebugCallback());
 
     // Print adapter info after device creation but before any other operations
     if (options.showAdapterInfo)

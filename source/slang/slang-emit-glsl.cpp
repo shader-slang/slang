@@ -1643,6 +1643,25 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
                 // https://www.khronos.org/opengl/wiki/Early_Fragment_Test
                 m_writer->emit("layout(early_fragment_tests) in;\n");
             }
+            else if (as<IRGLSLFragDepthGreaterDecoration>(decoration))
+            {
+                // Redeclare the `gl_FragDepth` builtin with the conservative-depth
+                // layout qualifier so glslang emits the DepthGreater execution mode
+                // (HLSL SV_DepthGreaterEqual). Requires GL_ARB_conservative_depth
+                // (core since GLSL 4.20). An entry point carries at most one directional
+                // depth qualifier: a param has exactly one of SV_DepthGreaterEqual /
+                // SV_DepthLessEqual, and the producer deduplicates the decoration, so the
+                // two branches here are mutually exclusive (emitting both would redeclare
+                // `gl_FragDepth` twice — invalid GLSL).
+                _requireGLSLExtension(UnownedStringSlice("GL_ARB_conservative_depth"));
+                m_writer->emit("layout(depth_greater) out float gl_FragDepth;\n");
+            }
+            else if (as<IRGLSLFragDepthLessDecoration>(decoration))
+            {
+                // As above, for SV_DepthLessEqual -> DepthLess.
+                _requireGLSLExtension(UnownedStringSlice("GL_ARB_conservative_depth"));
+                m_writer->emit("layout(depth_less) out float gl_FragDepth;\n");
+            }
             else if (as<IRRequireFullQuadsDecoration>(decoration))
             {
                 requireQuadControlExtensions();
@@ -2753,18 +2772,65 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_glslExtensionTracker->requireExtension(toSlice("GL_EXT_debug_printf"));
             m_writer->emit("debugPrintfEXT(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            if (inst->getOperandCount() == 2)
+            if (inst->getOperandCount() > 1)
             {
-                auto operand = inst->getOperand(1);
-                if (auto makeStruct = as<IRMakeStruct>(operand))
+                List<IRInst*> args;
+                collectFlattenedVariadicOperands(inst, 1, args);
+                for (auto arg : args)
                 {
-                    // Flatten the tuple resulting from the variadic pack.
-                    for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
-                    {
-                        m_writer->emit(", ");
-                        emitOperand(makeStruct->getOperand(bb), getInfo(EmitOp::General));
-                    }
+                    m_writer->emit(", ");
+                    emitOperand(arg, getInfo(EmitOp::General));
                 }
+            }
+            m_writer->emit(")");
+            return true;
+        }
+    case kIROp_Abort:
+        {
+            // abortEXT() requires a literal format string. GLSL emission does
+            // not run the SPIR-V processAbort path, so keep this user-facing
+            // diagnostic here for GLSL targets.
+            if (!as<IRStringLit>(inst->getOperand(0)))
+            {
+                getSink()->diagnose(
+                    Diagnostics::AbortFormatMustBeStringLiteral{.location = inst->sourceLoc});
+                return true;
+            }
+            m_glslExtensionTracker->requireExtension(toSlice("GL_EXT_shader_abort"));
+
+            List<IRInst*> args;
+            collectFlattenedVariadicOperands(inst, 1, args);
+
+            m_writer->emit("abortEXT(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            for (auto arg : args)
+            {
+                m_writer->emit(", ");
+
+                IRVectorType* vectorType = as<IRVectorType>(arg->getDataType());
+                auto elementType = vectorType ? vectorType->getElementType() : arg->getDataType();
+                SLANG_RELEASE_ASSERT(as<IRBasicType>(elementType));
+
+                if (as<IRBoolType>(elementType))
+                {
+                    if (vectorType)
+                    {
+                        m_writer->emit("uvec");
+                        emitSimpleValue(vectorType->getElementCount());
+                        m_writer->emit("(");
+                        emitOperand(arg, getInfo(EmitOp::General));
+                        m_writer->emit(")");
+                    }
+                    else
+                    {
+                        m_writer->emit("uint(");
+                        emitOperand(arg, getInfo(EmitOp::General));
+                        m_writer->emit(")");
+                    }
+                    continue;
+                }
+
+                emitOperand(arg, getInfo(EmitOp::General));
             }
             m_writer->emit(")");
             return true;
@@ -2794,6 +2860,100 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
 
             maybeCloseParens(needClose);
+            return true;
+        }
+    case kIROp_MakeArray:
+    case kIROp_MakeArrayFromElement:
+        {
+            // Emit an array value using GLSL array-constructor syntax
+            // `elementType[]( e0, e1, ... )` rather than the base emitter's C-style
+            // `{ ... }`. Brace/aggregate initializers are only valid in GLSL 4.20+
+            // (GL_ARB_shading_language_420pack), so they break on earlier profiles such
+            // as glsl_330; the constructor form is the portable spelling that is valid
+            // across GLSL versions. Mirrors the WGSL emitter, which overrides the same
+            // ops for the same reason.
+            //
+            // GLSL splits array brackets around the (here absent) declarator, so a
+            // nested array writes its outermost dimension unsized and inner dimensions
+            // sized: `ivec2[]` for `ivec2[2]`, `int[][3]` for `int[2][3]`. The C-like
+            // base emitter spells array types via its declarator machinery, but a
+            // constructor prefix has no declarator name to thread through it, so the
+            // bracket sequence is emitted directly here.
+            //
+            // The outermost dimension is left unsized, so the emitted array length is
+            // fixed entirely by the number of constructor arguments below. That is
+            // correct because a MakeArray carries exactly one operand per declared
+            // element (array-literal lowering pads any missing trailing elements with
+            // the default value before building the inst); a short operand list would
+            // otherwise emit an array of the wrong length.
+            auto arrayType = cast<IRArrayType>(inst->getDataType());
+
+            IRType* elementType = arrayType->getElementType();
+            List<IRInst*> innerDimSizes;
+            while (auto innerArrayType = as<IRArrayType>(elementType))
+            {
+                innerDimSizes.add(innerArrayType->getElementCount());
+                elementType = innerArrayType->getElementType();
+            }
+
+            emitType(elementType);
+            m_writer->emit("[]");
+            for (auto innerDimSize : innerDimSizes)
+            {
+                m_writer->emit("[");
+                emitVal(innerDimSize, getInfo(EmitOp::General));
+                m_writer->emit("]");
+            }
+
+            m_writer->emit("(");
+            if (inst->getOp() == kIROp_MakeArrayFromElement)
+            {
+                // A single element value is broadcast across the outermost dimension.
+                UInt argCount = (UInt)cast<IRIntLit>(arrayType->getElementCount())->getValue();
+                for (UInt aa = 0; aa < argCount; ++aa)
+                {
+                    if (aa != 0)
+                        m_writer->emit(", ");
+                    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                }
+            }
+            else
+            {
+                UInt argCount = inst->getOperandCount();
+                for (UInt aa = 0; aa < argCount; ++aa)
+                {
+                    if (aa != 0)
+                        m_writer->emit(", ");
+                    emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
+                }
+            }
+            m_writer->emit(")");
+
+            return true;
+        }
+    case kIROp_MakeStruct:
+        {
+            // Emit a struct value with GLSL's struct-constructor syntax
+            // `StructType( f0, f1, ... )` instead of the base emitter's C-style
+            // `{ ... }`. Aggregate/brace initializers are only valid in GLSL 4.20+
+            // (GL_ARB_shading_language_420pack) and break on earlier profiles such as
+            // glsl_330, whereas struct constructors are portable (core since GLSL 1.10).
+            //
+            // This is a separate case from the array case above rather than folded into
+            // it: an array uses GLSL's bracket-split spelling `elementType[]( ... )`,
+            // which is invalid for a struct. A MakeStruct carries one operand per field
+            // in declaration order, matching GLSL constructor argument order.
+            emitType(inst->getDataType());
+            m_writer->emit("(");
+            UInt argCount = inst->getOperandCount();
+            for (UInt aa = 0; aa < argCount; ++aa)
+            {
+                if (aa != 0)
+                    m_writer->emit(", ");
+                emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
+
             return true;
         }
     default:

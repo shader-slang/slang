@@ -13,8 +13,15 @@ namespace Slang
 void _findDependenciesOfTypeInSet(
     IRType* type,
     HashSet<IRInterfaceType*>& targetSet,
-    List<IRInterfaceType*>& result)
+    List<IRInterfaceType*>& result,
+    HashSet<IRType*>& visited)
 {
+    // Guard against cyclic type graphs so the walk terminates: a generic
+    // specialized with its own enclosing struct is an unresolved IRSpecialize
+    // here (pre-specialization). Mirrors _sortTopologically / strongConnect below.
+    if (!visited.add(type))
+        return;
+
     switch (type->getOp())
     {
     case kIROp_InterfaceType:
@@ -32,7 +39,7 @@ void _findDependenciesOfTypeInSet(
             auto structType = cast<IRStructType>(type);
             for (auto field : structType->getFields())
             {
-                _findDependenciesOfTypeInSet(field->getFieldType(), targetSet, result);
+                _findDependenciesOfTypeInSet(field->getFieldType(), targetSet, result, visited);
             }
         }
         break;
@@ -58,7 +65,7 @@ void _findDependenciesOfTypeInSet(
             for (UInt i = 0; i < type->getOperandCount(); i++)
             {
                 if (auto operandType = as<IRType>(type->getOperand(i)))
-                    _findDependenciesOfTypeInSet(operandType, targetSet, result);
+                    _findDependenciesOfTypeInSet(operandType, targetSet, result, visited);
             }
         }
         break;
@@ -70,7 +77,8 @@ List<IRInterfaceType*> findDependenciesOfTypeInSet(
     HashSet<IRInterfaceType*> targetSet)
 {
     List<IRInterfaceType*> result;
-    _findDependenciesOfTypeInSet(type, targetSet, result);
+    HashSet<IRType*> visited;
+    _findDependenciesOfTypeInSet(type, targetSet, result, visited);
 
     return result;
 }

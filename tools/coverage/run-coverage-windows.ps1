@@ -390,6 +390,22 @@ Invoke-OCC -OccArgs @(
     '--export_type', "cobertura:$FullCobertura"
 )
 
+# Sanity-check the Cobertura: if `lines-valid` is implausibly low for slang's
+# code base (e.g. ~13K), something has broken the PDB-to-source mapping and
+# OCC is only seeing a sliver of slang-compiler.dll. Previously this slipped
+# through silently and we published 13% coverage as if it were real. See
+# PR #11077 (added /d1trimfile, which rewrites PDB source paths and shadowed
+# slang sources under OCC's --sources filter) for the original incident; the
+# CMakeLists guard now skips /d1trimfile for coverage builds, but keep this
+# check as a defense against future PDB-path regressions.
+$MinLinesValid = 100000
+[xml]$_cobCheck = Get-Content -LiteralPath $FullCobertura
+$linesValid = [int]$_cobCheck.coverage.'lines-valid'
+if ($linesValid -lt $MinLinesValid) {
+    throw "Cobertura lines-valid=$linesValid is below the sanity threshold $MinLinesValid -- the slang-compiler.dll PDB-to-source mapping is likely broken (OCC is only seeing external/auxiliary files). Inspect $FullCobertura; expected hundreds of thousands of lines under source\slang\, source\core\, etc."
+}
+Write-Host "Cobertura sanity OK: lines-valid=$linesValid (threshold $MinLinesValid)"
+
 if ($wantLcov) {
     Write-Host "`nConverting Cobertura -> LCOV (full)..."
     ConvertTo-Lcov -CoberturaPath $FullCobertura -LcovPath $LcovFile

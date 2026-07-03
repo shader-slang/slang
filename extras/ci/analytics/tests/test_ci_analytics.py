@@ -1,5 +1,6 @@
 import contextlib
 import io
+import importlib.util
 import json
 import os
 import sys
@@ -16,8 +17,19 @@ if ANALYTICS_DIR not in sys.path:
 import ci_health
 import ci_hosted_runner_usage
 import ci_job_collector
+import pr_collector
+import ci_post_status
 import ci_status
 import ci_visualization
+import gh_api
+
+
+def load_queue_status_module():
+    path = os.path.join(os.path.dirname(ANALYTICS_DIR), "ci-queue-status.py")
+    spec = importlib.util.spec_from_file_location("ci_queue_status_for_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class TestRunnerTypeCoverage(unittest.TestCase):
@@ -68,6 +80,90 @@ class TestRunnerTypeCoverage(unittest.TestCase):
 
         self.assertEqual(group, "Linux SM80Plus GPU (GCP)")
         self.assertTrue(self_hosted)
+
+    def test_classify_group_handles_gcp_pinned_linux_gpu_label(self):
+        """The Linux GPU test jobs request the extra "GCP" label to pin them to
+        the GCP scaler pool and exclude the nvrgfx Colossus hosts (see
+        ci-slang-test-container.yml / ci-rhi-test-container.yml). classify_group
+        matches by subset, so the shipped ["Linux","self-hosted","GPU"] entry
+        still classifies the 4-label set as "Linux GPU (GCP)" without a separate
+        config entry. This regression test locks that in so a future reorder or
+        removal of that entry can't silently bucket the pinned jobs into "Other".
+        """
+        config = ci_visualization.load_config()
+
+        # Job-label path (no runner name) and both runner-name paths must all
+        # resolve to the GCP Linux GPU group.
+        for runner_name in ("", "linux-test-abc123", "2u1g-x570-0558"):
+            group, self_hosted = ci_visualization.classify_group(
+                ["Linux", "self-hosted", "GPU", "GCP"],
+                config,
+                runner_name,
+            )
+            self.assertEqual(
+                group,
+                "Linux GPU (GCP)",
+                msg=f"GCP-pinned Linux GPU job misclassified for runner_name={runner_name!r}",
+            )
+            self.assertTrue(self_hosted)
+
+    def test_classify_group_handles_gcp_build_and_analytics_pools(self):
+        """The CPU-only Linux build and analytics scaler pools carry the labels
+        ["Linux","self-hosted","build","GCP"] and
+        ["Linux","self-hosted","analytics","GCP"], and their VMs are named
+        linux-build-* / linux-analytics-*. Both the job-label path and the
+        scale-set runner-name-prefix path (empty labels) must classify into
+        their own GCP groups rather than falling through to "Other". Locks in
+        the shipped config so these pools stay visible in CI analytics.
+        """
+        config = ci_visualization.load_config()
+
+        cases = [
+            (["Linux", "self-hosted", "build", "GCP"], "linux-build-abc123", "Linux Build (GCP)"),
+            (["Linux", "self-hosted", "analytics", "GCP"], "linux-analytics-abc123", "Linux Analytics (GCP)"),
+        ]
+        for labels, runner_name, expected in cases:
+            # Job-label path (no runner name) and the scale-set name-prefix path
+            # (empty labels) must both resolve to the expected GCP group.
+            for name in ("", runner_name):
+                lbls = labels if name == "" else []
+                group, self_hosted = ci_visualization.classify_group(lbls, config, name)
+                self.assertEqual(
+                    group,
+                    expected,
+                    msg=f"misclassified for labels={lbls} runner_name={name!r}",
+                )
+                self.assertTrue(self_hosted)
+
+    def test_shipped_config_classifies_june_2026_runner_labels(self):
+        """The shipped runner_config.json must classify the runner labels
+        introduced by the June 2026 CI refactors, or `classify_group` falls
+        back to ("Other", self_hosted=False) and silently mis-buckets the
+        jobs (under-reporting self-hosted load and corrupting the
+        build-vs-test wait split).
+
+        - `["Windows", "self-hosted", "build"]`: the dedicated Windows build
+          pool that the Falcor/regression/MDL/compile builds were split onto
+          (shader-slang/slang#11562, #11605, #11635, #11640). Must classify
+          as the same group as the `win-build-` runner-name prefix.
+        - `windows-2025` / `windows-2025-vs2026`: GitHub-hosted images used
+          after the windows-latest pin and the VS2026 matrix (#11579).
+        - `ubuntu-24.04`: GitHub-hosted image used by the RHI/test jobs in
+          ci.yml.
+        """
+        config = ci_visualization.load_config()
+
+        cases = [
+            (["Windows", "self-hosted", "build"], "Windows Build (GCP)", True),
+            (["windows-2025"], "Windows (GH)", False),
+            (["windows-2025-vs2026"], "Windows (GH)", False),
+            (["ubuntu-24.04"], "Linux (GH)", False),
+        ]
+        for labels, expected_group, expected_self_hosted in cases:
+            with self.subTest(labels=labels):
+                group, self_hosted = ci_visualization.classify_group(labels, config)
+                self.assertEqual(group, expected_group)
+                self.assertEqual(self_hosted, expected_self_hosted)
 
     def test_record_snapshot_counts_all_gcp_runner_types(self):
         queue_data = {
@@ -416,6 +512,121 @@ class TestGpuQuota(unittest.TestCase):
         html = ci_health.build_history_chart(snapshots)
         # The chart section HTML should not be present (JS guard is fine)
         self.assertNotIn("T4 GPU Usage", html)
+
+    def test_gpu_quota_partial_snapshot_renders_chart_gap(self):
+        snapshots = [
+            {
+                "timestamp": "2026-03-03T10:00:00Z",
+                "runner_groups": {},
+                "gpu_quota_by_metric": {
+                    "NVIDIA_T4_GPUS": {
+                        "name": "T4",
+                        "usage": 6,
+                        "limit": 8,
+                        "regions": {"us-central1": {"usage": 6, "limit": 8}},
+                    },
+                },
+            },
+            {
+                "timestamp": "2026-03-03T10:15:00Z",
+                "runner_groups": {},
+                "gpu_quota_partial": True,
+                "gpu_quota_by_metric": {
+                    "NVIDIA_T4_GPUS": {
+                        "name": "T4",
+                        "usage": 0,
+                        "limit": 8,
+                        "regions": {"us-central1": {"usage": 0, "limit": 8}},
+                    },
+                },
+            },
+        ]
+
+        charts = ci_health._build_gpu_quota_charts(snapshots)
+
+        self.assertEqual(charts[0]["regionData"]["us-central1"], [6, None])
+
+
+class TestHealthPartialRendering(unittest.TestCase):
+    def test_recent_failures_partial_does_not_render_false_healthy_empty_state(self):
+        queue_data = {
+            "summary": {
+                "jobs_queued": 0,
+                "jobs_running": 0,
+                "runs_queued": 0,
+                "runs_in_progress": 0,
+            },
+            "self_hosted_runners": [],
+            "queue_by_group": [],
+            "longest_waiting_jobs": [],
+        }
+        failures = {"failures": [], "partial": True, "errors": ["HTTP 502"]}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_health.generate_health_html(queue_data, failures, tmp)
+            with open(os.path.join(tmp, "health.html"), encoding="utf-8") as f:
+                html = f.read()
+
+        self.assertIn("Recent CI failure data unavailable", html)
+        self.assertNotIn("No recent CI failures", html)
+
+    def test_queue_partial_renders_warning(self):
+        queue_data = {
+            "summary": {
+                "jobs_queued": 0,
+                "jobs_running": 0,
+                "runs_queued": 0,
+                "runs_in_progress": 0,
+            },
+            "partial": True,
+            "list_errors": ["HTTP 502"],
+            "self_hosted_runners": [],
+            "queue_by_group": [],
+            "longest_waiting_jobs": [],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_health.generate_health_html(queue_data, [], tmp)
+            with open(os.path.join(tmp, "health.html"), encoding="utf-8") as f:
+                html = f.read()
+
+        self.assertIn("Queue sample is partial", html)
+
+
+class TestHealthApiBounds(unittest.TestCase):
+    def test_recent_failures_query_is_bounded_by_created_range(self):
+        calls = []
+
+        def fake_list(endpoint, key):
+            calls.append((endpoint, key))
+            return [], None
+
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=fake_list):
+            ci_health.fetch_recent_failures("shader-slang/slang")
+
+        self.assertEqual(calls[0][1], "workflow_runs")
+        self.assertIn("status=completed", calls[0][0])
+        self.assertIn("per_page=100", calls[0][0])
+        self.assertIn("&created=", calls[0][0])
+        self.assertIn("..", calls[0][0])
+
+    def test_merge_queue_query_is_bounded_by_created_range(self):
+        calls = []
+
+        def fake_list(endpoint, key):
+            calls.append((endpoint, key))
+            return [], None
+
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=fake_list):
+            result = ci_health.fetch_merge_queue_status("shader-slang/slang")
+
+        self.assertEqual(calls[0][1], "workflow_runs")
+        self.assertIn("event=merge_group", calls[0][0])
+        self.assertIn("per_page=100", calls[0][0])
+        self.assertIn("&created=", calls[0][0])
+        self.assertIn("..", calls[0][0])
+        self.assertFalse(result["partial"])
+        self.assertEqual(result["errors"], [])
 
 
 class TestStatisticsRunnerNamePrefixes(unittest.TestCase):
@@ -998,6 +1209,154 @@ class TestMonthlySplit(unittest.TestCase):
             self.assertEqual({j["id"] for j in mar_data}, {2, 3})
 
 
+class TestCollectionCompleteness(unittest.TestCase):
+    def test_run_listing_error_raises_completeness_error(self):
+        start = datetime(2026, 3, 1, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 3, 2, 0, 0, tzinfo=timezone.utc)
+
+        with mock.patch.object(
+            ci_job_collector,
+            "gh_api_list",
+            return_value=(None, "HTTP 502"),
+        ):
+            with self.assertRaises(ci_job_collector.DataCompletenessError):
+                ci_job_collector._fetch_runs_window(
+                    "shader-slang/slang",
+                    start,
+                    end,
+                    set(),
+                    workflow_id=123,
+                )
+
+    def test_pr_search_error_raises_completeness_error(self):
+        start = datetime(2026, 3, 1, 0, 0, tzinfo=timezone.utc)
+
+        with mock.patch.object(
+            pr_collector,
+            "gh_api_list",
+            return_value=(None, "HTTP 502"),
+        ):
+            with self.assertRaises(pr_collector.DataCompletenessError):
+                pr_collector.fetch_merged_prs(
+                    "shader-slang/slang",
+                    start,
+                )
+
+
+class TestQueueStatusJson(unittest.TestCase):
+    def test_json_mode_emits_zero_payload_when_no_active_runs(self):
+        module = load_queue_status_module()
+
+        with mock.patch.object(
+            module,
+            "fetch_runs",
+            return_value=([], None),
+        ), mock.patch.object(
+            module,
+            "fetch_runners",
+            return_value=([], True),
+        ), mock.patch.object(
+            module.sys,
+            "argv",
+            ["ci-queue-status.py", "--json"],
+        ):
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                module.main()
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["summary"]["runs_queued"], 0)
+        self.assertEqual(payload["summary"]["runs_in_progress"], 0)
+        self.assertEqual(payload["summary"]["jobs_queued"], 0)
+        self.assertEqual(payload["summary"]["jobs_running"], 0)
+        self.assertEqual(payload["queue_by_group"], [])
+        self.assertEqual(payload["longest_waiting_jobs"], [])
+
+    def test_json_mode_marks_listing_failures_partial(self):
+        module = load_queue_status_module()
+
+        def fake_runs(repo, status):
+            if status == "queued":
+                return [], "HTTP 502"
+            return [], None
+
+        with mock.patch.object(
+            module,
+            "fetch_runs",
+            side_effect=fake_runs,
+        ), mock.patch.object(
+            module,
+            "fetch_runners",
+            return_value=([], True),
+        ), mock.patch.object(
+            module.sys,
+            "argv",
+            ["ci-queue-status.py", "--json"],
+        ):
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                module.main()
+
+        payload = json.loads(stdout.getvalue())
+        self.assertTrue(payload["partial"])
+        self.assertEqual(payload["list_errors"], ["HTTP 502"])
+
+
+class TestStatusPosterPushRetry(unittest.TestCase):
+    def test_commit_and_push_rebases_and_retries_stale_push(self):
+        calls = []
+        push_count = {"value": 0}
+
+        def result(code, stderr="", stdout=""):
+            r = mock.Mock()
+            r.returncode = code
+            r.stdout = stdout
+            r.stderr = stderr
+            return r
+
+        def fake_run_git(args, cwd):
+            calls.append(args)
+            if args == ["config", "user.name"]:
+                return result(0, stdout="Test User\n")
+            if args == ["config", "user.email"]:
+                return result(0, stdout="test@example.com\n")
+            if args[:2] in (["config", "user.name"], ["config", "user.email"]):
+                return result(0)
+            if args == ["add", ci_post_status.STATUS_FILE]:
+                return result(0)
+            if args == ["diff", "--cached", "--quiet"]:
+                return result(1)
+            if args[:1] == ["commit"]:
+                return result(0)
+            if args == ["push"]:
+                push_count["value"] += 1
+                if push_count["value"] == 1:
+                    return result(1, "non-fast-forward")
+                return result(0)
+            if args == ["pull", "--rebase"]:
+                return result(0)
+            return result(0)
+
+        with mock.patch.object(
+            ci_post_status,
+            "get_slang_git_identity",
+            return_value=("Test User", "test@example.com"),
+        ), mock.patch.object(
+            ci_post_status,
+            "get_github_username",
+            return_value=None,
+        ), mock.patch.object(
+            ci_post_status,
+            "run_git",
+            side_effect=fake_run_git,
+        ):
+            ok = ci_post_status.commit_and_push("/tmp/repo", "Status: test")
+
+        self.assertTrue(ok)
+        self.assertEqual(push_count["value"], 2)
+        self.assertIn(["pull", "--rebase"], calls)
+
+
 class TestHostedRunnerUsage(unittest.TestCase):
     def test_classify_hosted_label_picks_first_hosted(self):
         self.assertEqual(
@@ -1339,6 +1698,155 @@ class TestHostedRunnerUsage(unittest.TestCase):
         self.assertEqual(snap["queued"]["by_workflow"], [{"name": "CMake Options", "count": 2}])
 
 
+class TestHostedRunnerCapResolution(unittest.TestCase):
+    """The hosted-runner cap is derived from the org's live GitHub plan
+    tier so a plan change (e.g. Free -> Team, 20 -> 60) is picked up
+    without a code edit. These tests cover the plan lookup, the tier
+    mapping, and the fallback path when the plan can't be queried.
+    """
+
+    def test_org_from_repo(self):
+        self.assertEqual(
+            ci_hosted_runner_usage.org_from_repo("shader-slang/slang"), "shader-slang"
+        )
+        # A bare org (no slash) is returned unchanged.
+        self.assertEqual(
+            ci_hosted_runner_usage.org_from_repo("shader-slang"), "shader-slang"
+        )
+
+    def test_fetch_org_plan_cap_maps_team_tier(self):
+        def fake_gh_api(endpoint):
+            self.assertEqual(endpoint, "orgs/shader-slang")
+            return {"login": "shader-slang", "plan": {"name": "team", "seats": 40}}, None
+
+        with mock.patch.object(ci_hosted_runner_usage, "gh_api", side_effect=fake_gh_api):
+            self.assertEqual(
+                ci_hosted_runner_usage.fetch_org_plan_cap("shader-slang"), 60
+            )
+
+    def test_fetch_org_plan_cap_maps_free_and_enterprise(self):
+        for tier, expected in (("free", 20), ("enterprise", 180), ("TEAM", 60)):
+            with mock.patch.object(
+                ci_hosted_runner_usage,
+                "gh_api",
+                side_effect=lambda ep, t=tier: ({"plan": {"name": t}}, None),
+            ):
+                self.assertEqual(
+                    ci_hosted_runner_usage.fetch_org_plan_cap("org"), expected
+                )
+
+    def test_fetch_org_plan_cap_returns_none_without_plan_field(self):
+        """An external/fork token sees no `plan` field. That must yield
+        None (caller falls back), not a crash.
+        """
+        with mock.patch.object(
+            ci_hosted_runner_usage,
+            "gh_api",
+            side_effect=lambda ep: ({"login": "shader-slang"}, None),
+        ):
+            self.assertIsNone(ci_hosted_runner_usage.fetch_org_plan_cap("shader-slang"))
+
+    def test_fetch_org_plan_cap_returns_none_on_api_error(self):
+        with mock.patch.object(
+            ci_hosted_runner_usage,
+            "gh_api",
+            side_effect=lambda ep: (None, "HTTP 403"),
+        ):
+            self.assertIsNone(ci_hosted_runner_usage.fetch_org_plan_cap("shader-slang"))
+
+    def test_fetch_org_plan_cap_returns_none_on_unknown_tier(self):
+        with mock.patch.object(
+            ci_hosted_runner_usage,
+            "gh_api",
+            side_effect=lambda ep: ({"plan": {"name": "galaxy-brain"}}, None),
+        ):
+            self.assertIsNone(ci_hosted_runner_usage.fetch_org_plan_cap("shader-slang"))
+
+    def test_resolve_hosted_runner_cap_none_when_plan_unqueryable(self):
+        """No plan -> None (not a guessed fallback), so consumers can
+        report "cap unknown" instead of a wrong denominator.
+        """
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_org_plan_cap", side_effect=lambda org: None
+        ):
+            self.assertIsNone(
+                ci_hosted_runner_usage.resolve_hosted_runner_cap("shader-slang/slang")
+            )
+
+    def test_resolve_hosted_runner_cap_prefers_live_plan(self):
+        with mock.patch.object(
+            ci_hosted_runner_usage, "fetch_org_plan_cap", side_effect=lambda org: 60
+        ):
+            self.assertEqual(
+                ci_hosted_runner_usage.resolve_hosted_runner_cap("shader-slang/slang"), 60
+            )
+
+    def test_sample_auto_detects_cap_when_none(self):
+        """With cap=None the sampler resolves the cap from the org plan."""
+
+        def fake_in_progress(repo):
+            return [], None
+
+        def fake_queued(repo):
+            return [], None
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "resolve_hosted_runner_cap", side_effect=lambda repo: 60
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage("shader-slang/slang")
+
+        self.assertEqual(snap["cap"], 60)
+
+    def test_sample_cap_is_none_when_undetectable(self):
+        """When the plan can't be queried and no --cap is given, the
+        snapshot carries cap=None so consumers know it's unknown.
+        """
+
+        def fake_in_progress(repo):
+            return [], None
+
+        def fake_queued(repo):
+            return [], None
+
+        with mock.patch.object(
+            ci_hosted_runner_usage, "resolve_hosted_runner_cap", side_effect=lambda repo: None
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_in_progress_runs", side_effect=fake_in_progress
+        ), mock.patch.object(
+            ci_hosted_runner_usage, "fetch_queued_runs", side_effect=fake_queued
+        ):
+            snap = ci_hosted_runner_usage.sample_hosted_runner_usage("shader-slang/slang")
+
+        self.assertIsNone(snap["cap"])
+
+    def test_plan_tier_map_values(self):
+        """The tier->cap map is the single source of truth for caps."""
+        self.assertEqual(
+            ci_hosted_runner_usage.PLAN_TIER_HOSTED_RUNNER_CAP,
+            {"free": 20, "team": 60, "enterprise": 180},
+        )
+
+    def test_format_summary_omits_cap_line_when_unknown(self):
+        """With cap=None the CLI summary drops the denominator/percentage
+        and warns, instead of printing a bogus `N / None`.
+        """
+        snapshot = {
+            "cap": None,
+            "in_progress": {"total": 7, "by_workflow": [], "by_label": []},
+            "queued": {"total": 0, "by_workflow": [], "by_label": []},
+        }
+        out = ci_hosted_runner_usage.format_summary(snapshot)
+        self.assertIn("Hosted runners in use: 7", out)
+        self.assertNotIn("/ None", out)
+        self.assertNotIn("%", out)
+        self.assertIn("WARNING", out)
+        self.assertIn("cap could not be detected", out)
+
+
 class TestHostedLabelPalette(unittest.TestCase):
     """Regression: variants must yield valid 6-digit `#RRGGBB` colors.
 
@@ -1449,6 +1957,40 @@ class TestHostedRunnerRender(unittest.TestCase):
         self.assertIn("PARTIAL", html)
         self.assertNotIn("OK", html)
         self.assertIn("partial", html.lower())
+
+    def test_render_banner_unknown_cap_omits_denominator(self):
+        """A None cap (org plan not queryable) renders UNKNOWN CAP with
+        raw usage and no `/ cap` or percentage — a wrong denominator is
+        worse than none.
+        """
+        html = ci_health.render_hosted_runner_usage(self._snapshot(in_use=12, cap=None))
+        self.assertIn("UNKNOWN CAP", html)
+        self.assertIn("12 hosted runners in use", html)
+        self.assertNotIn("/ None", html)
+        self.assertNotIn("%)", html)
+        self.assertNotIn("AT CAP", html)
+        self.assertIn("could not be detected", html)
+
+    def test_build_hosted_runner_chart_none_cap_when_undetectable(self):
+        """If no snapshot carries a cap, the chart's cap is None so the
+        JS omits the reference line rather than drawing a guessed one.
+        """
+        snapshots = [
+            {
+                "timestamp": "2026-07-02T10:00:00Z",
+                "hosted_runner_usage": {
+                    "cap": None,
+                    "in_progress": {
+                        "total": 2,
+                        "by_label": [{"label": "ubuntu-latest", "count": 2}],
+                    },
+                    "queued": {"total": 0},
+                },
+            }
+        ]
+        chart = ci_health._build_hosted_runner_chart(snapshots)
+        self.assertIsNotNone(chart)
+        self.assertIsNone(chart["cap"])
 
     def test_build_hosted_runner_chart_none_when_no_data(self):
         snapshots = [{"timestamp": "2026-05-13T10:00:00Z"}]

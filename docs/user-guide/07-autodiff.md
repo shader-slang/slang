@@ -240,6 +240,45 @@ struct syn_MyPartialDiffType_Differential
 };
 ```
 
+If you manually provide the `dzero` or `dadd` requirements for an `IDifferentiable`
+type, those methods must also be marked `[Differentiable]`. Their parameter and
+return types must be differentiable too, so a custom `Differential` type should
+usually conform to `IDifferentiable` as well:
+
+```csharp
+struct MyVecDiff : IDifferentiable
+{
+    float x;
+    float y;
+}
+
+struct MyVec : IDifferentiable
+{
+    typealias Differential = MyVecDiff;
+
+    [DerivativeMember(Differential.x)]
+    float x;
+
+    [DerivativeMember(Differential.y)]
+    float y;
+
+    [Differentiable]
+    static Differential dzero()
+    {
+        return { 0.0f, 0.0f };
+    }
+
+    [Differentiable]
+    static Differential dadd(Differential a, Differential b)
+    {
+        return { a.x + b.x, a.y + b.y };
+    }
+}
+```
+
+The same rule applies if the custom `Differential` type manually implements its
+own `dzero` or `dadd` methods.
+
 You can make existing types differentiable through Slang's extension mechanism.
 For instance, `extension MyType : IDifferentiable { }` will make `MyType` differentiable retroactively.
 
@@ -286,6 +325,11 @@ For types conforming to `IDifferentiablePtrType`, the corresponding pair to use 
 #### Example of defining and using an `IDifferentiablePtrType` object.
 Here is an example of creating a differentiable buffer pointer type, and using it within a differentiable function.
 You can find an interactive sample on the Slang playground [here](https://shader-slang.org/slang-playground/?target=WGSL&code=eJy1VF1v2kAQfPevWEWKYhfkmFdMkBrRSpHKhyBSpdIIHfgcTjFn9z4gEeK_d-_ONsZp1L6UF8MxOzszuz62K3KhoMjI27PINU9iTyqhNwrGb_c6TamY5YwrKqAPDyNmDihXjKwzOlPi8a2g3tED_NzewuOWQnKGZFAQpGYSCM_VFikYl4rwDYU8bdOHlkQhH8kYkTBq8ty10bFn4fPvC6tVC5q4_wdplhM1hLVOYwvRiMd2qaQq9k5Yhzq_Mf4CBDZaqnwHCRVsTxTbU295TzYvByKSUX3mI1-yWh-S4Mmz3GAO_HY4Rdd1Yjyhr0EZiaCojEMRopplEToV0HGgJ5Rj1UxyRUFtkRkzgnWpoCELJHvmxJg0WUrFsgwThRvGb9pxM8xxn7MEKtV-M0cc2Awhg5b44aX6LjifyVSryknbrmm7KpTAyRRh4pKuzqzb-kfLNHTuLLE1v7zcpypgqXfTdPFLE0HlIMPiCe4e9h2-T73SVxbmEgVFYVqux3JMXh8QJ_0JTs_icgG-s2qQMT4GMMFHpxNYgKM7U-5JtjJQO3SMiQVxjTDt0I6DfHJP9-_Ja84fcc7u-SXr9-efJyO_F6Guj5eY8UIrrL2s_PFlPl38rdRujym121AItDwmjPsfDdTN8ug6diE6OSO20L_6yoRU0IuMR01lH37yqzKIPybaixqRNniukz5cp1iMQXbLTJUwqQblyErgQu_MHSHdEpivaVtCyXOxLL1oaAhrtndra1Ip9_boInJeqxtsRiTeVvZFMk0LV4dH0g3D3VL4Xq3Mgvvt5oFfO_6X986Zr0UF3bq6F0Zlvs1UzreSEYc9dabgEIrQXR3_ZT61unJKp98JDfhi).
+
+This example uses GPU resource types (`RWStructuredBuffer`) and global shader
+parameters, so compile it with `slangc` to a GPU target. It cannot be run with
+the `slangi` CPU interpreter, which does not support global parameters or GPU
+resource types.
 ```csharp
 struct MyBufferPointer : IDifferentiablePtrType
 {
@@ -331,7 +375,7 @@ RWStructuredBuffer<float> derivs;
 void main()
 {
     MyBufferPointer ptr = {inputs, 0};
-    print("Sum of squares of first 10 values: ", sumOfSquares<10>(ptr));
+    printf("Sum of squares of first 10 values: %f\n", sumOfSquares<10>(ptr));
 
     MyBufferPointer deriv_ptr = {derivs, 0};
 
@@ -340,9 +384,9 @@ void main()
         DifferentialPtrPair<MyBufferPointer>(ptr, deriv_ptr),
         1.0);
     
-    print("Derivative of result w.r.t the 10 values: \n");
+    printf("Derivative of result w.r.t the 10 values: \n");
     for (uint i = 0; i < 10; i++)
-        print("%d: %f\n", i, load(deriv_ptr, i));
+        printf("%d: %f\n", i, load(deriv_ptr, i));
 }
 ```
 

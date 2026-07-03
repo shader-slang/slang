@@ -2455,7 +2455,7 @@ public vector<T.Element,4> textureLod(_Texture<
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
 {
     __target_switch
@@ -2473,13 +2473,16 @@ public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
     }
 }
 
+__glsl_extension(GL_EXT_texture_shadow_lod)
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_shadowlod_ext)]
 public float textureLod(sampler2DArrayShadow sampler, vec4 p, float lod)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod";
     case spirv:
     {
         float compareValue = p.w;
@@ -2492,22 +2495,38 @@ public float textureLod(sampler2DArrayShadow sampler, vec4 p, float lod)
     }
 }
 
+__glsl_extension(GL_EXT_texture_shadow_lod)
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_shadowlod_ext)]
 public float textureLod(samplerCubeShadow sampler, vec4 p, float lod)
 {
-    return sampler.SampleCmpLevel(p.xyz, p.w, lod);
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        return sampler.SampleCmpLevel(p.xyz, p.w, lod);
+    default:
+        return sampler.SampleCmpLevel(p.xyz, p.w, lod);
+    }
 }
 
+__glsl_extension(GL_EXT_texture_shadow_lod)
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_shadowlod_ext)]
 public float textureLod(samplerCubeArrayShadow sampler, vec4 p, float compareValue, float lod)
 {
-    return sampler.SampleCmpLevel(p, compareValue, lod);
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        return sampler.SampleCmpLevel(p, compareValue, lod);
+    default:
+        return sampler.SampleCmpLevel(p, compareValue, lod);
+    }
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 {
     __target_switch
@@ -2526,7 +2545,7 @@ public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLod(sampler1DArrayShadow sampler, vec3 p, float lod)
 {
     __target_switch
@@ -3194,7 +3213,7 @@ public vector<T.Element,4> textureLodOffset(_Texture<
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLodOffset(sampler1DShadow sampler, vec3 p, float lod, constexpr int offset)
 {
     __target_switch
@@ -3214,7 +3233,7 @@ public float textureLodOffset(sampler1DShadow sampler, vec3 p, float lod, conste
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, constexpr ivec2 offset)
 {
     __target_switch
@@ -3234,7 +3253,7 @@ public float textureLodOffset(sampler2DShadow sampler, vec3 p, float lod, conste
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public float textureLodOffset(sampler1DArrayShadow sampler, vec3 p, float lod, constexpr int offset)
 {
     __target_switch
@@ -4455,6 +4474,11 @@ __generic<T : __BuiltinType>
 internal typealias __ImagePtr<T> =
     Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::Image)>;
 
+// Form a texel pointer for image atomics at the IR level.
+// Kept outside spirv_asm so NonUniform propagates to the texel pointer.
+__intrinsic_op($(kIROp_ImageTexelPointer))
+__ImagePtr<T> __imageTexelPointer<T, TImage, TCoord>(TImage image, TCoord coord, int sample);
+
 ${
 {
     struct ImageTypeInfo
@@ -4668,11 +4692,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVTypePrefix)Add$(targetType.SPVAtomicSuffix) %ptr Device None $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVTypePrefix)Add$(targetType.SPVAtomicSuffix) $ptr Device None $data
                 };
             }
             }
@@ -4690,11 +4715,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicExchange %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicExchange $ptr Device Relaxed $data
                 };
             }
             }
@@ -4712,11 +4738,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) $ptr Device Relaxed $data
                 };
             }
             }
@@ -4734,11 +4761,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) $ptr Device Relaxed $data
                 };
             }
             }
@@ -4759,11 +4787,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicAnd %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicAnd $ptr Device Relaxed $data
                 };
             }
             }
@@ -4780,11 +4809,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicOr %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicOr $ptr Device Relaxed $data
                 };
             }
             }
@@ -4802,11 +4832,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicXor %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicXor $ptr Device Relaxed $data
                 };
             }
             }
@@ -4823,11 +4854,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device Relaxed Relaxed $data $compare
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicCompareExchange $ptr Device Relaxed Relaxed $data $compare
                 };
             }
             }
@@ -5657,7 +5689,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public void hitObjectTraceRayNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5689,7 +5721,7 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
-[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_motion_raygen_closesthit_miss)]
 public void hitObjectTraceRayMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5755,7 +5787,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public void hitObjectRecordHitNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5820,7 +5852,7 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
-[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_motion_raygen_closesthit_miss)]
 public void hitObjectRecordHitMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5841,7 +5873,7 @@ public void hitObjectRecordHitMotionNV(
     {
     case _GL_NV_shader_invocation_reorder_motion:
     {
-        HitObject::__glslMakeMotionHit(
+        HitObject::__glslMakeMotionHitNV(
             hitObject,
             topLevel,
             instanceid,
@@ -5889,7 +5921,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public void hitObjectRecordHitWithIndexNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5951,7 +5983,7 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
-[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_motion_raygen_closesthit_miss)]
 public void hitObjectRecordHitWithIndexMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5971,7 +6003,7 @@ public void hitObjectRecordHitWithIndexMotionNV(
     {
     case _GL_NV_shader_invocation_reorder_motion:
     {
-        HitObject::__glslMakeMotionHitWithIndex(
+        HitObject::__glslMakeMotionHitWithIndexNV(
             hitObject,
             topLevel,
             instanceid,
@@ -6017,7 +6049,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public void hitObjectRecordMissNV(
     inout hitObjectNV hitObject,
     uint sbtRecordIndex,
@@ -6037,7 +6069,7 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
-[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_motion_raygen_closesthit_miss)]
 public void hitObjectRecordMissMotionNV(
     inout hitObjectNV hitObject,
     uint sbtRecordIndex,
@@ -6058,7 +6090,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public void hitObjectRecordEmptyNV(hitObjectNV hitObject)
 {
     hitObject = HitObject::MakeNop();
@@ -6068,7 +6100,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public void hitObjectExecuteShaderNV(
     inout hitObjectNV hitObject,
     constexpr int payload)
@@ -6095,7 +6127,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public bool hitObjectIsEmptyNV(hitObjectNV hitObject)
 {
     return hitObject.IsNop();
@@ -6105,7 +6137,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public bool hitObjectIsMissNV(hitObjectNV hitObject)
 {
     return hitObject.IsMiss();
@@ -6115,7 +6147,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public bool hitObjectIsHitNV(hitObjectNV hitObject)
 {
     return hitObject.IsHit();
@@ -6125,7 +6157,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public float hitObjectGetRayTMinNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().TMin;
@@ -6135,7 +6167,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public float hitObjectGetRayTMaxNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().TMax;
@@ -6145,7 +6177,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public vec3 hitObjectGetWorldRayOriginNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().Origin;
@@ -6155,7 +6187,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public vec3 hitObjectGetWorldRayDirectionNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().Direction;
@@ -6165,7 +6197,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public vec3 hitObjectGetObjectRayOriginNV(hitObjectNV hitObject)
 {
     return hitObject.GetObjectRayOrigin();
@@ -6175,7 +6207,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public vec3 hitObjectGetObjectRayDirectionNV(hitObjectNV hitObject)
 {
     return hitObject.GetObjectRayDirection();
@@ -6185,7 +6217,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public mat4x3 hitObjectGetObjectToWorldNV(hitObjectNV hitObject)
 {
     return hitObject.GetObjectToWorld();
@@ -6195,7 +6227,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public mat4x3 hitObjectGetWorldToObjectNV(hitObjectNV hitObject)
 {
     return hitObject.GetWorldToObject();
@@ -6205,7 +6237,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public int hitObjectGetInstanceCustomIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetInstanceID();
@@ -6215,7 +6247,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public int hitObjectGetInstanceIdNV(hitObjectNV hitObject)
 {
     return hitObject.GetInstanceIndex();
@@ -6225,7 +6257,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public int hitObjectGetGeometryIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetGeometryIndex();
@@ -6235,7 +6267,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public int hitObjectGetPrimitiveIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetPrimitiveIndex();
@@ -6245,7 +6277,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public uint hitObjectGetHitKindNV(hitObjectNV hitObject)
 {
     return hitObject.GetHitKind();
@@ -6255,7 +6287,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public void hitObjectGetAttributesNV(
     inout hitObjectNV hitObject,
     constexpr int attributeLocation)
@@ -6281,7 +6313,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public uvec2 hitObjectGetShaderRecordBufferHandleNV(hitObjectNV hitObject)
 {
     return hitObject.GetShaderRecordBufferHandle();
@@ -6291,7 +6323,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public uint hitObjectGetShaderBindingTableRecordIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetShaderTableIndex();
@@ -6301,7 +6333,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public float hitObjectGetCurrentTimeNV(hitObjectNV hitObject)
 {
     return hitObject.GetCurrentTime();
@@ -6311,7 +6343,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen)]
+[require(glsl_spirv, ser_nv_raygen)]
 public void reorderThreadNV(uint hint, uint bits)
 {
     ReorderThread(hint, bits);
@@ -6321,7 +6353,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen)]
+[require(glsl_spirv, ser_nv_raygen)]
 public void reorderThreadNV(hitObjectNV hitObject)
 {
     ReorderThread(hitObject);
@@ -6331,7 +6363,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen)]
+[require(glsl_spirv, ser_nv_raygen)]
 public void reorderThreadNV(hitObjectNV hitObject, uint hint, uint bits)
 {
     ReorderThread(hitObject, hint, bits);
@@ -7248,19 +7280,21 @@ void setupExtForSubgroupBallotBuiltIn() {
     }
 }
 
+[require(glsl_spirv, subgroup_workgroup_index)]
 public property uint gl_NumSubgroups
 {
     [ForceInline]
-    [require(glsl_spirv, subgroup_basic)]
+    [require(glsl_spirv, subgroup_workgroup_index)]
     get {
         return WaveGetNumWaves();
     }
 }
 
+[require(glsl_spirv, subgroup_workgroup_index)]
 public property uint gl_SubgroupID
 {
     [ForceInline]
-    [require(glsl_spirv, subgroup_basic)]
+    [require(glsl_spirv, subgroup_workgroup_index)]
     get {
         return WaveGetWaveIndex();
     }

@@ -505,4 +505,4 @@ In the current implementation, when a function with an interface-typed parameter
 at compile time, the function is specialized for the concrete type. This essentially creates a copy of the
 function with the interface-typed parameter replaced with a concrete-typed parameter.
 
-See also [Generic Functions](TODO-Generics.md).
+See also [Generic Functions](generics.md).

@@ -38,6 +38,8 @@ public:
 
     IRInst* maybeTranslateInst(IRInst* inst);
 
+    IRInst* maybeTranslateIdentityRemat(IRInst* inst);
+
     IRInst* resolveInst(IRInst* inst);
 
     IRModule* getModule() const { return irModule; }

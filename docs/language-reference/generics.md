@@ -23,118 +23,129 @@ function, but this does not specialize the generic.
 > 📝 **Remark 2:** Slang does not currently support using interface-typed variables that require dynamic dispatch as
 > generic parameters. See GitHub issue [#10263](https://github.com/shader-slang/slang/issues/10263).
 
-
 ## Syntax
 
 Generic [structure](types-struct.md) syntax:
+
 > **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
-> **`'{'`** *`member-list`* **`'}'`**
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\*<br>
+> **`'{'`** _`member-list`_ **`'}'`**
 
 Generic [interface](types-interface.md) syntax:
-> **`'interface'`** *`identifier`* [*`generic-params-decl`*]<br>
+
+> **`'interface'`** _`identifier`_ [*`generic-params-decl`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
-> **`'{'`** *`member-list`* **`'}'`**
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\*<br>
+> **`'{'`** _`member-list`_ **`'}'`**
 
 Generic type alias syntax:
-> **`'typealias'`** *`identifier`* [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'='`** *`simple-type-spec`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\* **`';'`**
+
+> **`'typealias'`** _`identifier`_ [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'='`** _`simple-type-spec`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\* **`';'`**
 
 Generic function and member function declaration (traditional syntax):
-> *`simple-type-spec`* *`identifier`* [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'('`** *`param-list`* **`')'`**<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`';'`** | **`'{'`** *`body-stmt`*\*  **`'}'`**)
+
+> _`simple-type-spec`_ _`identifier`_ [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'('`** _`param-list`_ **`')'`**<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`';'`** | **`'{'`** _`body-stmt`_\* **`'}'`**)
 
 Generic function and member function declaration (modern syntax):
-> **`'func'`** *`identifier`* [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'('`** *`param-list`* **`')'`**<br>
+
+> **`'func'`** _`identifier`_ [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'('`** _`param-list`_ **`')'`**<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`'throws'`** *`simple-type-spec`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`'->'`** *`simple-type-spec`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`';'`** | **`'{'`** *`body-stmt`*\*  **`'}'`**)
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`';'`** | **`'{'`** _`body-stmt`_\* **`'}'`**)
 
 Generic [constructor](types-struct.md#constructor) declaration:
-> **`'__init'`** [*`generic-params-decl`*] **`'('`** *`param-list`* **`')'`**<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`';'`** | **`'{'`** *`body-stmt`*\*  **`'}'`**)
+
+> **`'__init'`** [*`generic-params-decl`*] **`'('`** _`param-list`_ **`')'`**<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`';'`** | **`'{'`** _`body-stmt`_\* **`'}'`**)
 
 Generic [subscript operator](types-struct.md#subscript-op) declaration:
-> **`'__subscript'`** [*`generic-params-decl`*] **`'('`** *`param-list`* **`')'`**<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'->'`** *`simple-type-spec`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`';'`** | **`'{'`** *`body-stmt`*\*  **`'}'`**)
+
+> **`'__subscript'`** [*`generic-params-decl`*] **`'('`** _`param-list`_ **`')'`**<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'->'`** _`simple-type-spec`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`';'`** | **`'{'`** _`body-stmt`_\* **`'}'`**)
 
 Generic parameters declaration:
-> *`generic-params-decl`* =<br>
+
+> _`generic-params-decl`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'<'`** [*`generic-param-decl`* (**`','`** *`generic-param-decl`*)\* ] **`'>'`**
 >
-> *`generic-param-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`generic-value-param-decl`* |<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`generic-value-param-pack-decl`* |<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`generic-value-param-trad-decl`* |<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`generic-value-param-pack-trad-decl`* |<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`generic-type-param-decl`* |<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`generic-type-param-pack-decl`*
+> _`generic-param-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`generic-value-param-decl`_ |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`generic-value-param-pack-decl`_ |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`generic-value-param-trad-decl`_ |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`generic-value-param-pack-trad-decl`_ |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`generic-type-param-decl`_ |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`generic-type-param-pack-decl`_
 >
-> *`generic-value-param-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'let'`** *`identifier`*<br>
+> _`generic-value-param-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'let'`** _`identifier`_<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`simple-type-spec`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`'='`** *`init-expr`*]<br>
 >
-> *`generic-value-param-pack-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'let'`** **`'each'`** *`identifier`*<br>
+> _`generic-value-param-pack-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'let'`** **`'each'`** _`identifier`_<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`simple-type-spec`*]<br>
 >
-> *`generic-value-param-trad-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`simple-type-spec`* <br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`identifier`*<br>
+> _`generic-value-param-trad-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`simple-type-spec`_ <br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`identifier`_<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`'='`** *`init-expr`*]<br>
 >
-> *`generic-value-param-pack-trad-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'each'`** *`simple-type-spec`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`identifier`*<br>
+> _`generic-value-param-pack-trad-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'each'`** _`simple-type-spec`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`identifier`_<br>
 >
-> *`generic-type-param-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`'typename'`**] *`identifier`*<br>
+> _`generic-type-param-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`'typename'`**] _`identifier`_<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`simple-type-spec`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`'='`** *`simple-type-spec`*]<br>
 >
-> *`generic-type-param-pack-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'each'`** *`identifier`*<br>
+> _`generic-type-param-pack-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'each'`** _`identifier`_<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`simple-type-spec`*]<br>
 
-
 Generic parameter constraint clause:
-> *`where-clause`* =<br>
+
+> _`where-clause`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`'optional'`**]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`where-clause-body`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`where-clause-body`_<br>
 >
-> *`where-clause-body`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`generic-non-empty-pack-constraint-decl`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|(*`simple-type-spec`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(*`generic-type-constraint-decl`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|*`generic-type-constraint-eq-decl`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|*`generic-type-constraint-coercion-decl`*))<br>
+> _`where-clause-body`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`generic-non-empty-pack-constraint-decl`_ |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`generic-pack-count-constraint-decl`_ |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(_`simple-type-spec`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(_`generic-type-constraint-decl`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|_`generic-type-constraint-eq-decl`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|_`generic-type-constraint-coercion-decl`_))<br>
 >
-> *`generic-non-empty-pack-constraint-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'nonempty'`** **`'('`** *`identifier`* **`')'`**<br>
+> _`generic-non-empty-pack-constraint-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'nonempty'`** **`'('`** _`identifier`_ **`')'`**<br>
 >
-> *`generic-type-constraint-decl`* =<br>
+> _`generic-pack-count-constraint-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'countof'`** **`'('`** _`identifier`_ **`')'`** **`'=='`** _`expr`_<br>
+>
+> _`generic-type-constraint-decl`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`':'`**<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`simple-type-spec`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`','`** *`simple-type-spec`*)\*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`simple-type-spec`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`','`** _`simple-type-spec`_)\*<br>
 >
-> *`generic-type-constraint-eq-decl`* =<br>
+> _`generic-type-constraint-eq-decl`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'=='`**<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`simple-type-spec`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`simple-type-spec`_<br>
 >
-> *`generic-type-constraint-coercion-decl`* =<br>
+> _`generic-type-constraint-coercion-decl`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'('`**<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`simple-type-spec`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`simple-type-spec`_<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`')'`**<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`'implicit'`**]<br>
 
@@ -143,64 +154,65 @@ Generic parameter constraint clause:
 
 ### Parameters
 
-- *`generic-params-decl`* declares a list of generic parameters.
-- *`generic-param-decl`* declares a generic value parameter, type parameter, or type parameter pack.
-- *`generic-value-param-decl`* declares a generic value parameter.
-- *`generic-value-param-pack-decl`* declares a generic value parameter pack using `let each` syntax.
-- *`generic-value-param-trad-decl`* declares a generic value parameter using traditional syntax.
-- *`generic-value-param-pack-trad-decl`* declares a generic value parameter pack using traditional syntax.
-- *`generic-type-param-decl`* declares a generic type parameter.
-- *`generic-type-param-pack-decl`* declares a generic type parameter pack.
-- *`where-clause`* is a generic parameter constraint clause.
-- *`generic-non-empty-pack-constraint-decl`* declares a non-emptiness requirement on a generic type pack or value pack parameter.
-- *`generic-type-constraint-decl`* declares a generic type conformance constraint, requiring the left-hand-side
+- _`generic-params-decl`_ declares a list of generic parameters.
+- _`generic-param-decl`_ declares a generic value parameter, type parameter, or type parameter pack.
+- _`generic-value-param-decl`_ declares a generic value parameter.
+- _`generic-value-param-pack-decl`_ declares a generic value parameter pack using `let each` syntax.
+- _`generic-value-param-trad-decl`_ declares a generic value parameter using traditional syntax.
+- _`generic-value-param-pack-trad-decl`_ declares a generic value parameter pack using traditional syntax.
+- _`generic-type-param-decl`_ declares a generic type parameter.
+- _`generic-type-param-pack-decl`_ declares a generic type parameter pack.
+- _`where-clause`_ is a generic parameter constraint clause.
+- _`generic-non-empty-pack-constraint-decl`_ declares a non-emptiness requirement on a generic type pack or value pack parameter.
+- _`generic-pack-count-constraint-decl`_ declares an exact cardinality requirement on a generic type pack or
+  value pack parameter.
+- _`generic-type-constraint-decl`_ declares a generic type conformance constraint, requiring the left-hand-side
   type expression to conform to one or more constraining type expressions.
-- *`generic-type-constraint-eq-decl`* declares a generic type equality constraint, requiring the left-hand-side
+- _`generic-type-constraint-eq-decl`_ declares a generic type equality constraint, requiring the left-hand-side
   type expression to be equal to the right-hand-side type expression.
-- *`generic-type-constraint-coercion-decl`* declares a generic type coercion constraint, requiring the type
+- _`generic-type-constraint-coercion-decl`_ declares a generic type coercion constraint, requiring the type
   expression in parentheses to be coercible to the type expression outside the parentheses.
   This constraint may be used only in [generic extensions](types-extension.md#generic-struct).
   See GitHub issue [#10087](https://github.com/shader-slang/slang/issues/10087).
-- *`identifier`*: see the respective syntax for a description.
-- *`bases-clause`*: see the respective syntax for a description.
-- *`member-list`*: see the respective syntax for a description.
-- *`simple-type-spec`*: see the respective syntax for a description.
-- *`param-list`*: see the respective syntax for a description.
-- *`body-stmt`*: see the respective syntax for a description.
-
+- _`identifier`_: see the respective syntax for a description.
+- _`bases-clause`_: see the respective syntax for a description.
+- _`member-list`_: see the respective syntax for a description.
+- _`simple-type-spec`_: see the respective syntax for a description.
+- _`param-list`_: see the respective syntax for a description.
+- _`body-stmt`_: see the respective syntax for a description.
 
 ## Description
 
-A generic parameter declaration list *`generic-params-decl`* adds any number of parameters to structures,
+A generic parameter declaration list _`generic-params-decl`_ adds any number of parameters to structures,
 interfaces, type aliases, functions, subscript operators, and constructors. These parameterized constructs are
-called *generic structures*, *generic interfaces*, *generic type aliases*, *generic functions*, *generic
-subscript operators*, and *generic constructors*.
+called _generic structures_, _generic interfaces_, _generic type aliases_, _generic functions_, _generic
+subscript operators_, and _generic constructors_.
 
 A generic parameter declaration is one of:
 
-- Generic value parameter declaration *`generic-value-param-decl`* or *`generic-value-param-trad-decl`*, which
+- Generic value parameter declaration _`generic-value-param-decl`_ or _`generic-value-param-trad-decl`_, which
   adds a value parameter with an optional default value. The value type must be a [Boolean](types-fundamental.md#boolean),
   an [integer](types-fundamental.md#integer), or an [enumeration (TODO)](TODO.md).
-- Generic value parameter pack declaration *`generic-value-param-pack-decl`* or *`generic-value-param-pack-trad-decl`*,
+- Generic value parameter pack declaration _`generic-value-param-pack-decl`_ or _`generic-value-param-pack-trad-decl`_,
   which adds a variadic value parameter pack. A value parameter pack is a variable-length list of generic
   value parameters of a single declared type.
-- Generic type parameter declaration *`generic-type-param-decl`*, which adds a type parameter with an optional
+- Generic type parameter declaration _`generic-type-param-decl`_, which adds a type parameter with an optional
   type constraint and an optional default type. The keyword `typename` is optional.
-- Generic type parameter pack declaration *`generic-type-param-pack-decl`*, which adds a type parameter
+- Generic type parameter pack declaration _`generic-type-param-pack-decl`_, which adds a type parameter
   pack. A type parameter pack is a variable-length list of types.
 
 Types may be constrained by:
 
-- Specifying an inline type constraint in *`generic-type-param-decl`* using the form
+- Specifying an inline type constraint in _`generic-type-param-decl`_ using the form
   `TypeParam : ConstrainingType`. This adds a single conformance requirement such that `TypeParam` must conform to
   `ConstrainingType`.
-- Specifying one or more `where` clauses (*`where-clause`*). A `where` clause adds a single requirement using
+- Specifying one or more `where` clauses (_`where-clause`_). A `where` clause adds a single requirement using
   one of the following forms:
-  - Conformance constraint declaration *`generic-type-constraint-decl`* adds a requirement that the left-hand-side type
+  - Conformance constraint declaration _`generic-type-constraint-decl`_ adds a requirement that the left-hand-side type
     expression must conform to the right-hand-side type expressions.
-  - Equivalence constraint declaration *`generic-type-constraint-eq-decl`* adds a requirement that the left-hand-side
+  - Equivalence constraint declaration _`generic-type-constraint-eq-decl`_ adds a requirement that the left-hand-side
     type expression must be equal to the right-hand-side type expression.
-  - Coercion constraint declaration *`generic-type-constraint-coercion-decl`* adds a requirement that the parenthesized
+  - Coercion constraint declaration _`generic-type-constraint-coercion-decl`_ adds a requirement that the parenthesized
     type expression must be coercible to the left-hand-side type expression.
 
 Conformance and equivalence constraints may be declared as optional. When optional, the expression `ParamType is
@@ -215,18 +227,20 @@ A constraint on a type parameter pack applies to every type in the pack.
 Type and value parameter packs may also be constrained with `where nonempty(P)`, which requires the pack `P`
 to be non-empty at specialization time.
 
+Type and value parameter packs may also be constrained with `where countof(P) == IntExpr`, which requires the
+pack `P` to have exactly the compile-time integer count denoted by `IntExpr` at specialization time.
+
 Value parameters that are not packs cannot be constrained.
 
 > 📝 **Remark 1:** In Slang, a conformance requirement `TypeParam : ConstrainingType` means that `TypeParam` must
 > have `ConstrainingType` as a base (either directly or transitively), and `ConstrainingType` must be an interface.
 
 > 📝 **Remark 2:** Slang also has the `__generic` modifier, which can be used to declare generic parameters as
-> an alternative to *`generic-params-decl`*. Using *`generic-params-decl`* is recommended.
+> an alternative to _`generic-params-decl`_. Using _`generic-params-decl`_ is recommended.
 
 > 📝 **Remark 3:** Optional conformance constraints are currently an experimental feature. See GitHub issues
 > [#10078](https://github.com/shader-slang/slang/issues/10078) and
 > [#10185](https://github.com/shader-slang/slang/issues/10185).
-
 
 ### Type Parameter Packs {#type-param-packs}
 
@@ -236,10 +250,10 @@ specialized, a (possibly empty) sequence of type arguments is bound to the param
 A type parameter pack is expanded using the `expand`/`each` construct with the following syntax:
 
 > Expand-expression:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`expand-expr`* = **`'expand'`** *`expr`*
+> &nbsp;&nbsp;&nbsp;&nbsp;_`expand-expr`_ = **`'expand'`** _`expr`_
 
 > Each-expression:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`each-expr`* = **`'each'`** *`expr`*
+> &nbsp;&nbsp;&nbsp;&nbsp;_`each-expr`_ = **`'each'`** _`expr`_
 
 An expression in an each-expression evaluates to a type parameter pack, tuple, or variable whose type is a
 type parameter pack.
@@ -270,20 +284,20 @@ multiple declared expand/each parameters, in which case the type parameter packs
 
 Slang provides the following pack-query operations for type packs, value packs, and tuple-like pack sources:
 
-> *`pack-query-expr`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`pack-first-expr`* | *`pack-last-expr`* | *`pack-trim-head-expr`* | *`pack-trim-tail-expr`*<br>
+> _`pack-query-expr`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`pack-first-expr`_ | _`pack-last-expr`_ | _`pack-trim-first-expr`_ | _`pack-trim-last-expr`_<br>
 >
-> *`pack-first-expr`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'__first'`** **`'('`** *`expr`* **`')'`**<br>
+> _`pack-first-expr`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'__first'`** **`'('`** _`expr`_ **`')'`**<br>
 >
-> *`pack-last-expr`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'__last'`** **`'('`** *`expr`* **`')'`**<br>
+> _`pack-last-expr`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'__last'`** **`'('`** _`expr`_ **`')'`**<br>
 >
-> *`pack-trim-first-expr`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'__trimFirst'`** **`'('`** *`expr`* **`')'`**<br>
+> _`pack-trim-first-expr`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'__trimFirst'`** **`'('`** _`expr`_ **`')'`**<br>
 >
-> *`pack-trim-last-expr`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'__trimLast'`** **`'('`** *`expr`* **`')'`**<br>
+> _`pack-trim-last-expr`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'__trimLast'`** **`'('`** _`expr`_ **`')'`**<br>
 
 - `__first(P)`
 - `__last(P)`
@@ -304,6 +318,46 @@ void foo<each T>() where nonempty(T)
 > 📝 **Remark:** The operand of `nonempty(...)` must be a direct reference to a generic type pack or value pack
 > parameter declared in the current generic declaration. `optional nonempty(...)` is parsed but rejected as invalid.
 
+### Pack count constraints
+
+A pack count constraint has the form:
+
+```hlsl
+void foo<let N : int, each T>() where countof(T) == N
+{
+}
+```
+
+The operand of the left-side `countof(...)` must be a direct reference to a generic type pack or value pack
+parameter declared in the current generic declaration. The right side must be a compile-time integer expression.
+
+Pack count constraints are oriented. The constrained pack is always the pack named by the left-side
+`countof(...)` expression. The following forms are not pack count constraints:
+
+```hlsl
+void reversed<let N : int, each T>() where N == countof(T) {}
+void notEqual<let N : int, each T>() where countof(T) != N {}
+void greaterEqual<let N : int, each T>() where countof(T) >= N {}
+```
+
+A right-side expression may itself use `countof(...)` as a compile-time integer expression. This allows an
+inner generic to require that one of its packs has the same count as an outer pack:
+
+```hlsl
+struct Outer<let each D : int>
+{
+    void inner<each TIndex>(TIndex indices)
+        where TIndex == int
+        where countof(TIndex) == countof(D)
+    {}
+}
+```
+
+However, `countof(D) == countof(TIndex)` is not equivalent in this context, because the left-side pack `D`
+is not declared by `inner`.
+
+The exact oriented proof matters when checking generic bodies. A declared constraint `countof(T) == countof(U)`
+can satisfy a callee requirement about `T`, but it is not used backwards to satisfy a requirement about `U`.
 
 ## Type Checking
 
@@ -312,6 +366,7 @@ before specialization. In general, an operation on a parameterized generic type 
 legal for all possible concrete types conforming to the declared constraints.
 
 The rules are as follows:
+
 - If a parameterized type `T` has a type equality constraint `T == U`, type `T` is considered to be type `U`
   for all intents and purposes.
 - If a parameterized type `T` has a type conformance constraint `T : U`, type `T` is considered to conform to
@@ -323,12 +378,15 @@ parameters. For example, `where T : IFace where T.AssocT == int` requires that `
 `IFace` must declare associated type `AssocT`. (See [interfaces](types-interface.md) for associated type
 declarations.)
 
-No assumptions are made about generic value parameters other than their declared type.
+Pack count constraints are checked as exact shape requirements. During specialization, `countof(P)` must equal
+the expected compile-time integer value. While checking an unspecialized generic body, a call that requires a
+pack count constraint is valid only when an in-scope declared constraint provides the exact same oriented proof
+after substitution.
 
+No assumptions are made about generic value parameters other than their declared type.
 
 > 📝 **Remark:** In contrast to C++ templates, type checking of Slang generics is performed before
 > specialization. In C++, type checking is performed after template specialization and instantiation.
-
 
 ## Parameter Binding
 
@@ -344,6 +402,7 @@ parameters against the call site argument expressions. It is an error if an argu
 be inferred from the call site.
 
 If inference is ambiguous for a generic type parameter, the following rules are used to determine the type:
+
 - If all inferred types are [fundamental scalar types](types-fundamental.md#scalar) or
   [vector types](types-vector-and-matrix.md) of the same length, the element type with the highest promotion rank is
   used. The promotion ranks from the lowest to the highest are: `int8_t`, `uint8_t`, `int16_t`,
@@ -353,6 +412,10 @@ If inference is ambiguous for a generic type parameter, the following rules are 
 
 It is an error when inference yields multiple options for a generic value argument.
 
+Pack count constraints do not infer generic value arguments. For example, `where countof(T) == N` does not infer
+`N` from the number of arguments supplied for `T`; `N` must be bound explicitly or inferred by other ordinary
+generic argument rules.
+
 Mixing explicit and implicit parameter binding is allowed. The leftmost generic parameters use the provided
 generic arguments and the rest are inferred.
 
@@ -360,10 +423,10 @@ generic arguments and the rest are inferred.
 > or element type, the behavior is currently undefined. See GitHub issue
 > [#10164](https://github.com/shader-slang/slang/issues/10164) for details.
 
-
 ## Examples
 
 ### Generic structure with type and value parameters
+
 ```hlsl
 RWStructuredBuffer<float> outputBuffer;
 
@@ -383,6 +446,7 @@ void main(uint3 id : SV_DispatchThreadID)
 ```
 
 ### Generic type alias for partial type binding
+
 ```hlsl
 struct ArrayOfElements<T, let size : uint>
 {
@@ -405,6 +469,7 @@ void main(uint3 id : SV_DispatchThreadID)
 ```
 
 ### Generic function with type parameter
+
 ```hlsl
 RWStructuredBuffer<float> outputBuffer;
 
@@ -438,6 +503,7 @@ void main(uint3 id : SV_DispatchThreadID)
 ```
 
 ### Generic constructor
+
 ```hlsl
 RWStructuredBuffer<float> outputBuffer;
 
@@ -461,6 +527,7 @@ void main(uint3 id : SV_DispatchThreadID)
 ```
 
 ### Generic subscript
+
 ```hlsl
 struct TestStruct
 {
@@ -476,6 +543,7 @@ struct TestStruct
 ```
 
 ### Type constraint
+
 ```hlsl
 RWStructuredBuffer<float> outputBuffer;
 
@@ -493,6 +561,7 @@ void main(uint3 id : SV_DispatchThreadID)
 ```
 
 ### Optional type constraint
+
 ```hlsl
 RWStructuredBuffer<float> outputBuffer;
 
@@ -515,6 +584,7 @@ void main(uint3 id : SV_DispatchThreadID)
 ```
 
 ### Type equality constraint for associated type
+
 ```hlsl
 RWStructuredBuffer<float> outputBuffer;
 
@@ -560,6 +630,7 @@ void main(uint3 id : SV_DispatchThreadID)
 ```
 
 ### Type coercion constraint
+
 ```hlsl
 struct Foo<A>
 {
@@ -576,6 +647,7 @@ extension<A> Foo<A> where int(A)
 ```
 
 ### Type parameter pack
+
 ```hlsl
 RWStructuredBuffer<float> outputBuffer;
 
@@ -607,6 +679,7 @@ void main(uint3 id : SV_DispatchThreadID)
 ```
 
 ### Multiple function parameter packs
+
 ```hlsl
 void dotProductHelper(float a, float b, inout float ret)
 {
@@ -639,6 +712,7 @@ void main(uint3 id : SV_DispatchThreadID)
 ```
 
 ### Generic extension for generic types
+
 ```hlsl
 struct GenericStruct<T>
 {
@@ -666,6 +740,7 @@ void main(uint3 id : SV_DispatchThreadID)
     outputBuffer[1] = uintObj.isInt();
 }
 ```
+
 > 📝 **Remark:** An extension cannot currently be used to override a more generic implementation.
 > See GitHub issue [#10146](https://github.com/shader-slang/slang/issues/10146).
 
@@ -696,6 +771,7 @@ void main(uint3 id : SV_DispatchThreadID)
 ```
 
 ### Implicit parameter binding for type and value
+
 ```hlsl
 // Note: assumes N >= 1
 ElementType sumElements<ElementType : IArithmetic, let N : uint>
@@ -722,6 +798,7 @@ void main(uint3 id : SV_DispatchThreadID)
 ```
 
 ### Implicit parameter binding, ambiguous value argument
+
 ```hlsl
 uint len<let N : uint>(int[N] arr, int[N] arr2)
 {
@@ -742,6 +819,7 @@ void main(uint3 id : SV_DispatchThreadID)
 ```
 
 ### Implicit parameter binding, ambiguous type argument
+
 ```hlsl
 interface IBase
 {

@@ -73,14 +73,15 @@ public void testOuterProductAccumulate<
 // Callers with arbitrary sizes should pad via PadToTile before calling.
 // ---------------------------------------------------------------------------
 
+[ForceInline]
 public void testOuterProductAccumulateTiled<
         DType : __BuiltinFloatingPointType,
         int InputSize,
         int OutputSize,
         ShMemSize : ISharedMemorySize,
         int SubgroupCount>
-    (DType[InputSize] inputData,
-     DType[OutputSize] dOutData,
+    (__constref WaveTangledVector<DType, ShMemSize, InputSize, 32, SubgroupCount> inputVector,
+     __constref WaveTangledVector<DType, ShMemSize, OutputSize, 32, SubgroupCount> dOutVector,
      RWStructuredBuffer<DType>.Handle outputBuffer)
         where DType.Differential == DType
 {
@@ -101,7 +102,7 @@ public void testOuterProductAccumulateTiled<
         {
             half h[OutputSize];
             for (int i = 0; i < OutputSize; i++)
-                h[i] = __realCast<half>(dOutData[i]);
+                h[i] = __realCast<half>(dOutVector.data[i]);
             let packed = bit_cast<uint[PackedSizeOut]>(h);
             dOutMat.fromArrayPacked<PackedSizeOut>(packed);
         }
@@ -110,7 +111,7 @@ public void testOuterProductAccumulateTiled<
         {
             half h[InputSize];
             for (int i = 0; i < InputSize; i++)
-                h[i] = __realCast<half>(inputData[i]);
+                h[i] = __realCast<half>(inputVector.data[i]);
             let packed = bit_cast<uint[PackedSizeIn]>(h);
             inputMat.fromArrayPacked<PackedSizeIn>(packed);
         }
@@ -129,16 +130,21 @@ public void testOuterProductAccumulateTiled<
 
         DType dOutArr[OutputSize];
         for (int i = 0; i < OutputSize; i++)
-            dOutArr[i] = dOutData[i];
+            dOutArr[i] = dOutVector.data[i];
 
         MatrixA<OutputSize, N> dOutA;
         dOutA.fromVectorViaShMem<ShMemSize, DType, OutputSize, false>(dOutArr, perWarpBase);
 
         DType inputArr[InputSize];
         for (int i = 0; i < InputSize; i++)
-            inputArr[i] = inputData[i];
+            inputArr[i] = inputVector.data[i];
 
         Vulkan.outerProductAccumulate<Address, InputSize>(dOutA, inputArr, address, 0u);
+    }
+    case metal:
+    {
+        typealias Metal = TiledMMAMetal<DType, InputSize, OutputSize, N, TargetEnum.Metal, ShMemSize, false, SubgroupCount>;
+        Metal.outerProductAccumulate<DType, Address>(dOutVector, inputVector, address);
     }
     default:
         static_assert(false, "Unsupported target");
