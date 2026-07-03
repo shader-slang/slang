@@ -259,6 +259,11 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
                 public int Z = 9;
             }
 
+            public struct AtomicPair
+            {
+                public Atomic<int> value;
+            }
+
             public enum Mode : int
             {
                 A = 0,
@@ -269,6 +274,17 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
             {
                 Low = 2,
                 High = 250,
+            }
+
+            public enum BoolMode : bool
+            {
+                Off = false,
+                On = true,
+            }
+
+            public enum LongMode : int64_t
+            {
+                Far = 0x100000001LL,
             }
 
             public static const float ScalarFloat = 1.5f;
@@ -307,13 +323,20 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
             public static const Pair StructDefault = {};
             public static const Derived DerivedDefault = {};
             public static const Derived DerivedExplicit = { 3 };
+            public static const AtomicPair AtomicDefault = {};
             public static const Mode EnumValue = Mode.B;
             public static const Mode EnumAlias = EnumValue;
+            public static const Mode EnumAlias2 = EnumAlias;
+            public static const Mode EnumAlias3 = EnumAlias2;
             public static const Mode EnumCast = Mode(5);
             public static const Mode EnumDefault = {};
             public static const ByteMode ByteEnumValue = ByteMode.High;
+            public static const BoolMode BoolEnumValue = BoolMode.On;
+            public static const LongMode LongEnumValue = LongMode.Far;
             public Derived ValueWithoutInitializer;
         }
+
+        void HelperFunction() {}
         )";
 
     String moduleName = "DefaultValueBlobReflection";
@@ -572,6 +595,10 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
     SLANG_CHECK(derivedExplicitBaseData[1] == 8.0f);
     SLANG_CHECK(*(const int32_t*)(derivedExplicitBytes + sizeof(float) * 2) == 3);
 
+    auto atomicDefault = getDefaultBlob("AtomicDefault");
+    SLANG_CHECK(atomicDefault->getBufferSize() == sizeof(int32_t));
+    SLANG_CHECK(((const int32_t*)atomicDefault->getBufferPointer())[0] == 0);
+
     auto enumValue = getDefaultBlob("EnumValue");
     SLANG_CHECK(enumValue->getBufferSize() == sizeof(int32_t));
     SLANG_CHECK(((const int32_t*)enumValue->getBufferPointer())[0] == 3);
@@ -579,6 +606,10 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
     auto enumAlias = getDefaultBlob("EnumAlias");
     SLANG_CHECK(enumAlias->getBufferSize() == sizeof(int32_t));
     SLANG_CHECK(((const int32_t*)enumAlias->getBufferPointer())[0] == 3);
+
+    auto enumAlias3 = getDefaultBlob("EnumAlias3");
+    SLANG_CHECK(enumAlias3->getBufferSize() == sizeof(int32_t));
+    SLANG_CHECK(((const int32_t*)enumAlias3->getBufferPointer())[0] == 3);
 
     auto enumCast = getDefaultBlob("EnumCast");
     SLANG_CHECK(enumCast->getBufferSize() == sizeof(int32_t));
@@ -591,6 +622,14 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
     auto byteEnumValue = getDefaultBlob("ByteEnumValue");
     SLANG_CHECK(byteEnumValue->getBufferSize() == sizeof(uint8_t));
     SLANG_CHECK(((const uint8_t*)byteEnumValue->getBufferPointer())[0] == 250);
+
+    auto boolEnumValue = getDefaultBlob("BoolEnumValue");
+    SLANG_CHECK(boolEnumValue->getBufferSize() == sizeof(uint32_t));
+    SLANG_CHECK(((const uint32_t*)boolEnumValue->getBufferPointer())[0] == 1);
+
+    auto longEnumValue = getDefaultBlob("LongEnumValue");
+    SLANG_CHECK(longEnumValue->getBufferSize() == sizeof(int64_t));
+    SLANG_CHECK(((const int64_t*)longEnumValue->getBufferPointer())[0] == 0x100000001LL);
 
     SLANG_CHECK_ABORT(topModeType->getFieldCount() == 2);
     auto enumCase = topModeType->getFieldByIndex(1);
@@ -608,6 +647,14 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
     auto scalarFloatVar = programLayout->findVarByNameInType(defaultsType, "ScalarFloat");
     SLANG_CHECK_ABORT(scalarFloatVar != nullptr);
     SLANG_CHECK(scalarFloatVar->getDefaultValueBlob(nullptr) == SLANG_E_INVALID_ARG);
+
+    auto helperFunction = programLayout->findFunctionByName("HelperFunction");
+    SLANG_CHECK_ABORT(helperFunction != nullptr);
+    ComPtr<slang::IBlob> wrongDeclKind;
+    SLANG_CHECK(
+        ((slang::VariableReflection*)helperFunction)
+            ->getDefaultValueBlob(wrongDeclKind.writeRef()) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(wrongDeclKind == nullptr);
 }
 
 
