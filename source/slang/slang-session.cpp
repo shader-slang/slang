@@ -51,6 +51,15 @@ static String findStandardModulePath(String const& stdModuleDirPath, String cons
     return String();
 }
 
+static SHA1::Digest computeSourceBlobDigest(ISlangBlob* blob)
+{
+    SLANG_RELEASE_ASSERT(blob);
+
+    DigestBuilder<SHA1> digestBuilder;
+    digestBuilder.append(blob);
+    return digestBuilder.finalize();
+}
+
 Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage)
     : m_session(session)
     , m_retainedSession(session)
@@ -237,28 +246,44 @@ slang::IModule* Linkage::loadModuleFromBlob(
 
     try
     {
-        auto getDigestStr = [](auto x)
-        {
-            DigestBuilder<SHA1> digestBuilder;
-            digestBuilder.append(x);
-            return digestBuilder.finalize().toString();
-        };
+        SHA1::Digest sourceDigest = computeSourceBlobDigest(source);
 
         String moduleNameStr = moduleName;
         if (!moduleName)
-            moduleNameStr = getDigestStr(source);
+            moduleNameStr = sourceDigest.toString();
 
         auto name = getNamePool()->getName(moduleNameStr);
         RefPtr<LoadedModule> loadedModule;
         if (mapNameToLoadedModules.tryGetValue(name, loadedModule))
         {
-            return loadedModule;
+            if (!loadedModule)
+                return nullptr;
+
+            if (blobType != ModuleBlobType::Source)
+                return loadedModule;
+
+            // Returning the cached module is only safe when the incoming source
+            // is identical to whatever produced the cached module; otherwise the
+            // caller expects a module they have never actually loaded, leading
+            // to silent wrong-module use (and sometimes crashes) downstream.
+            // See #10957.
+            if (loadedModule->getSourceDigest() == sourceDigest)
+            {
+                return loadedModule;
+            }
+
+            sink.diagnose(Diagnostics::ModuleAlreadyLoadedWithDifferentSource{
+                .moduleName = name,
+                .location = SourceLoc(),
+            });
+            sink.getBlobIfNeeded(outDiagnostics);
+            return nullptr;
         }
         String pathStr = path;
         if (pathStr.getLength() == 0)
         {
             // If path is empty, use a digest from source as path.
-            pathStr = getDigestStr(source);
+            pathStr = sourceDigest.toString();
         }
         auto pathInfo = PathInfo::makeFromString(pathStr);
         if (File::exists(pathStr))
@@ -271,6 +296,8 @@ slang::IModule* Linkage::loadModuleFromBlob(
         }
         RefPtr<Module> module =
             loadModuleImpl(name, pathInfo, source, SourceLoc(), &sink, nullptr, blobType);
+        if (module)
+            module->setSourceDigest(sourceDigest);
         sink.getBlobIfNeeded(outDiagnostics);
         return asExternal(module.get());
     }
@@ -1703,7 +1730,11 @@ RefPtr<Module> Linkage::findOrImportModule(
             // out any other options.
             //
             if (module)
+            {
+                if (type == ModuleBlobType::Source)
+                    module->setSourceDigest(computeSourceBlobDigest(fileContents));
                 return module;
+            }
         }
     }
 
@@ -1808,7 +1839,12 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
     String moduleSrcPath = "";
 
     auto dependencyChunks = moduleChunk->getFileDependencies();
-    if (auto firstDependencyChunk = dependencyChunks.getFirst())
+    // The first dependency is the module's own source file. We still check it like the rest of
+    // the dependencies, but if that primary source is unavailable we accept the standalone
+    // precompiled module instead of treating it as stale. Missing later dependencies still
+    // indicate a stale source-backed module cache.
+    auto firstDependencyChunk = dependencyChunks.getFirst();
+    if (firstDependencyChunk)
     {
         moduleSrcPath = firstDependencyChunk->getValue();
 
@@ -1824,6 +1860,7 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
         }
     }
 
+    Index dependencyIndex = 0;
     for (auto dependencyChunk : dependencyChunks)
     {
         auto file = dependencyChunk->getValue();
@@ -1836,8 +1873,21 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
                 sourceFile = loadSourceFile(moduleSrcPath, file);
         }
         if (!sourceFile)
-            return false;
+        {
+            if (dependencyIndex == 0)
+            {
+                // If the module's own source file is unavailable, we can't prove staleness, so
+                // fall back to accepting the standalone precompiled module. Missing later
+                // dependencies still indicate a stale source-backed module cache.
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
         digestBuilder.append(sourceFile->getDigest());
+        dependencyIndex++;
     }
     return digestBuilder.finalize() == existingDigest;
 }

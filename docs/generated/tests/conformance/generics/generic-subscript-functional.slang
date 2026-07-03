@@ -1,48 +1,43 @@
 //META: generated=true
-//META: model=claude-sonnet-4-6
-//META: generated_at=2026-06-02T07:02:43+00:00
-//META: source_commit=9c1a6a00ef413932805da5b813465a7a9d517fb9
-//META: doc_ref=docs/language-reference/generics.md#description
-//META: doc_section_digest=7b3e1c2f4d8a0e9f5b2c6d1e3f7a4b8c0d2e6f9a1b5c3e7f0d4a8b2c6e0f4a
-//META: purpose=A generic subscript operator `__subscript<T>(T i) -> float where T : IInteger` accepts any integer type as the index.
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: doc_ref=docs/language-reference/generics.md#examples
+//META: doc_section_digest=2843e3e730992c3b4a58e5dcb338c66a5db5be57ab33d9c88e766fe31406de61
+//META: purpose=A generic subscript operator `__subscript<T>(T i) where T : IInteger` accepts any IInteger index type for get and set.
 //META: intent=functional
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// From the doc Examples section (Generic subscript).
-// The subscript accepts any IInteger index type and performs integer conversion.
+// Verifies the doc's "Generic subscript" example: a struct declares
+// `__subscript<T>(T i) -> float where T : IInteger` that indexes its float
+// array via `i.toInt()`. The kernel writes through the set accessor with a
+// uint index and reads back through get with an int index; CHECK asserts the
+// stored value (99.0) is retrieved, proving both accessors specialized for the
+// integer index types.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
 struct TestStruct
 {
-    float arr[5];
-
-    __subscript<T>(T i) -> float
-        where T : IInteger
+    float arr[10];
+    __subscript<T>(T i) -> float where T : IInteger
     {
         get { return arr[i.toInt()]; }
         set { arr[i.toInt()] = newValue; }
     }
 }
 
-void main()
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
+RWStructuredBuffer<float> outputBuffer;
+
+[numthreads(1, 1, 1)]
+void computeMain()
 {
-    TestStruct ts;
-    ts.arr[0] = 0.0;
-    ts.arr[1] = 10.0;
-    ts.arr[2] = 20.0;
-    ts.arr[3] = 30.0;
-    ts.arr[4] = 40.0;
-
-    // Access using int index
-    float v0 = ts[int(2)];
-    // Access using uint index
-    uint idx = 4;
-    float v1 = ts[idx];
-
-    // CHECK: 20
-    printf("%d\n", (int)v0);
-    // CHECK: 40
-    printf("%d\n", (int)v1);
+    TestStruct obj;
+    uint uidx = 3;
+    obj[uidx] = 99.0;
+    int iidx = 3;
+    outputBuffer[0] = obj[iidx];
 }
+// CHECK: 99.0
