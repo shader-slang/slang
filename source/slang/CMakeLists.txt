@@ -246,6 +246,7 @@ set(slang_build_args
     # a warning is disabled for a memset boundary check.
     # everything looked fine and it is unclear why the checking fails
     $<$<CXX_COMPILER_ID:GNU>:-Wno-error=stringop-overflow>
+    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<BOOL:${SLANG_ENABLE_ASAN}>>:/bigobj>
     INCLUDE_DIRECTORIES_PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
     ${CMAKE_CURRENT_BINARY_DIR}/../standard-modules/slang-standard-module-config-header

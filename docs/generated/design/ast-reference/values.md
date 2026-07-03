@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-12T09:38:10+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 4f74d91e4cf48490043c25f1aa4fe35ca34e369bae1bba7089a2d3a8a0006cd1
+model: claude-opus-4.8
+generated_at: 2026-06-29T15:16:46Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 59d9c296dab00215747c1612d4e02a2ca0687dc420a756bf65f6af88fc474010
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -12,11 +12,9 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 The reference for the **non-Type** `Val` subclasses in the Slang AST:
 the `DeclRefBase` family, the `IntVal` family, the `Witness` family,
 the `ModifierVal` family, the `DifferentiateVal` family, and a few
-standalone Vals.
-
-Audience: a contributor reading or writing checker / IR-lowering code
-that touches compile-time values, conformance witnesses, or generic
-specialization.
+standalone Vals. It is for a contributor reading or writing checker /
+IR-lowering code that touches compile-time values, conformance
+witnesses, or generic specialization.
 
 ## Source
 
@@ -57,7 +55,7 @@ flowchart TD
   IntVal --> ConstantIntVal
   IntVal --> DeclRefIntVal
   IntVal --> TypeCastIntVal
-  IntVal --> FuncCallIntVal
+  IntVal --> BuiltinOperationIntVal
   IntVal --> SizeOfLikeIntVal
   IntVal --> FirstIntVal
   IntVal --> LastIntVal
@@ -81,6 +79,8 @@ flowchart TD
   Witness --> TypeCoercionWitness
   Witness --> NoneWitness
   Witness --> HasDiffTypeInfoWitness
+  Witness --> DeclaredVariadicPackCountWitness
+  Witness --> ConcreteVariadicPackCountWitness
   Witness --> NonEmptyPackWitness
   SubtypeWitness --> TypePackSubtypeWitness
   SubtypeWitness --> EachSubtypeWitness
@@ -126,11 +126,11 @@ can take. The user-facing API is the template `DeclRef<T>`, declared
 in [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
 and described in [base.md](base.md#support-types).
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `DirectDeclRef` | `DeclRefBase` | `Decl* targetDecl` | (none) | A bare decl-ref to a `Decl` with no substitutions. |
 | `MemberDeclRef` | `DeclRefBase` | `parent: DeclRefBase`, `member: Decl` | (none) | A decl-ref expressed relative to a parent decl-ref. |
-| `LookupDeclRef` | `DeclRefBase` | `base: DeclRefBase`, `requirementKey`, witness operands | (none) | A decl-ref reached by lookup through a `SubtypeWitness` (used for interface-requirement satisfaction). |
+| `LookupDeclRef` | `DeclRefBase` | `declToLookup: Decl`, `lookupSource: Type`, `witness: SubtypeWitness` | (none) | A decl-ref reached by lookup through a `SubtypeWitness` (used for interface-requirement satisfaction). |
 | `GenericAppDeclRef` | `DeclRefBase` | `base: DeclRefBase`, generic-arg `Val` operands | (none) | A generic decl-ref with its arguments applied. |
 
 ### IntVal family
@@ -140,12 +140,12 @@ exist because some forms (constants) are immediately reducible while
 others (e.g. `DeclRefIntVal`) name an unsubstituted generic
 parameter and only collapse to a constant after substitution.
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `ConstantIntVal` | `IntVal` | `value: int64_t`, `type: Type*` | (none) | A literal compile-time integer. |
 | `DeclRefIntVal` | `IntVal` | `declRef: DeclRefBase` (to a value generic param) | (none) | An unsubstituted generic value parameter. |
 | `TypeCastIntVal` | `IntVal` | `value: IntVal`, `targetType: Type` | (none) | An integer cast to a different integer type. |
-| `FuncCallIntVal` | `IntVal` | `funcDecl: DeclRefBase`, arg `IntVal` operands | (none) | A compile-time call to an integer-returning function. |
+| `BuiltinOperationIntVal` | `IntVal` | `type: Type*`, `op: BuiltinOperationKind` (operand 1), arg `IntVal` operands (from slot 2) | (none) | A still-symbolic builtin operator (e.g. `N / 2`); folds to a `ConstantIntVal` once its operands are concrete. |
 | `SizeOfIntVal` | `SizeOfLikeIntVal` | `target type or expr` operand, optional layout operand | (none) | Compile-time `sizeof`. |
 | `AlignOfIntVal` | `SizeOfLikeIntVal` | (same shape as `SizeOfIntVal`) | (none) | Compile-time `alignof`. |
 | `CountOfIntVal` | `SizeOfLikeIntVal` | target-type operand | (none) | Compile-time `countof` (array length). |
@@ -169,9 +169,9 @@ parameter and only collapse to a constant after substitution.
 These are `Val`s (so they can be hash-consed) but are not `IntVal`s
 themselves: they appear as operands of a `PolynomialIntVal`.
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `PolynomialIntValFactor` | `Val` | `param: DeclRefBase`, `power: int` | (none) | One factor `param^power` of a polynomial term. |
+| `PolynomialIntValFactor` | `Val` | `param: IntVal`, `power: IntegerLiteralValue` | (none) | One factor `param^power` of a polynomial term. |
 | `PolynomialIntValTerm` | `Val` | `coefficient: int64_t`, list of `PolynomialIntValFactor` operands | (none) | One term of a `PolynomialIntVal`: coefficient times a product of factors. |
 
 ### Witness family
@@ -183,7 +183,7 @@ and that the checker passes around alongside generic substitutions.
 
 #### Subtype witnesses
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `DeclaredSubtypeWitness` | `SubtypeWitness` | `sub: Type`, `sup: Type`, declaration that introduced the relation | (none) | Evidence reported by an `InheritanceDecl` on a user-declared type. |
 | `TransitiveSubtypeWitness` | `SubtypeWitness` | composing witnesses (`A:B` and `B:C` -> `A:C`) | (none) | Subtype evidence obtained by composing two existing witnesses. |
@@ -199,21 +199,23 @@ and that the checker passes around alongside generic substitutions.
 | `PackBranchSubtypeWitness` | `SubtypeWitness` | pack operand + empty / non-empty witnesses | (none) | Pack-conditional subtype witness. |
 | `ExpandSubtypeWitness` | `SubtypeWitness` | pack-witness operand | (none) | `expand` of a pack-witness. |
 | `DiffTypeInfoWitness` | `SubtypeWitness` | type operand | (none) | Evidence that a type has differential information. |
-| `HigherOrderDiffTypeTranslationWitness` | `SubtypeWitness` | function-type operands | (none) | Evidence for higher-order differentiable-type translation. |
+| `HigherOrderDiffTypeTranslationWitness` | `SubtypeWitness` | `baseWitness: Witness` | (none) | Evidence for higher-order differentiable-type translation. |
 
 #### Type-coercion witnesses
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `BuiltinTypeCoercionWitness` | `TypeCoercionWitness` | from-type / to-type operands | (none) | Coercion evidence for built-in conversions. |
 | `DeclRefTypeCoercionWitness` | `TypeCoercionWitness` | user-defined-conversion decl-ref | (none) | Coercion evidence backed by a user-defined conversion. |
 
 #### Other witnesses
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `NoneWitness` | `Witness` | (no operands) | (none) | Empty / placeholder witness. |
-| `HasDiffTypeInfoWitness` | `Witness` | type operand | (none) | Evidence for the `IDifferentiable` constraint. |
+| `HasDiffTypeInfoWitness` | `Witness` | `declRef: DeclRef<HasDiffTypeInfoConstraintDecl>` | (none) | Evidence for the `IDifferentiable` constraint. |
+| `DeclaredVariadicPackCountWitness` | `Witness` | `declRef: GenericVariadicPackCountConstraintDecl` | (none) | Unsubstituted evidence for a variadic-pack count constraint, carried by a `GenericVariadicPackCountConstraintDecl`. |
+| `ConcreteVariadicPackCountWitness` | `Witness` | `pack: Val`, `expectedCount: IntVal` | (none) | Evidence that a concrete type pack has a given element count. |
 | `NonEmptyPackWitness` | `Witness` | pack operand | (none) | Evidence that a type pack is non-empty. |
 
 ### Modifier values
@@ -223,7 +225,7 @@ participate in deduplication (rather than the AST `Modifier`s that
 live in [modifiers.md](modifiers.md)). Used primarily inside
 `ModifiedType` and `ModifiedTypeExpr` to track type-level modifiers.
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `ModifierVal` | `Val` | (no operands) | (none) | Concrete base for type-level modifier values. |
 | `TypeModifierVal` | `ModifierVal` | (no operands) | (none) | Modifier that adjusts a type. |
@@ -239,7 +241,7 @@ how to differentiate a callable; the checker materializes them
 alongside `ForwardDifferentiateExpr` / `BackwardDifferentiateExpr`
 (see [expressions.md](expressions.md)).
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `DifferentiateVal` | `Val` | base function operand | (none) | Concrete base for differentiation Vals. |
 | `ForwardDifferentiateVal` | `DifferentiateVal` | base function operand | (none) | Forward-mode derivative. |
@@ -250,7 +252,7 @@ alongside `ForwardDifferentiateExpr` / `BackwardDifferentiateExpr`
 
 ### Misc Vals
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `UIntSetVal` | `Val` | sequence of `ConstantIntVal` bitmasks | (none) | A hash-consed bitset used by the capability system. |
 
@@ -267,7 +269,7 @@ a generic parameter, not yet known. Modeling integer values as
 `Val`s gives Slang a single substitutable-and-hash-consable
 representation for both "fully known" and "still-symbolic" integers.
 `ConstantIntVal` is the leaf for a known constant;
-`DeclRefIntVal`, `WitnessLookupIntVal`, `FuncCallIntVal`, and
+`DeclRefIntVal`, `WitnessLookupIntVal`, `BuiltinOperationIntVal`, and
 `PolynomialIntVal` are the symbolic forms.
 
 ### PolynomialIntVal and polynomial canonicalization
@@ -279,6 +281,23 @@ each of which is a coefficient times a product of
 that equations like `2*N + 3 == 3 + 2*N` resolve to the same
 hash-consed `PolynomialIntVal*`, which is essential for type
 equality on dependent array types.
+
+### BuiltinOperationIntVal and the single-representation invariant
+
+`BuiltinOperationIntVal` is the symbolic form of a builtin operator
+whose operands are not all concrete yet — for example `N / 2` where
+`N` is a generic value parameter. It identifies the operator by a
+`BuiltinOperationKind` enum (stored in operand slot 1) rather than a
+resolved operator `DeclRef`, so the same `IntVal` shape is used
+whether the expression was rewritten by the fast path
+(`BuiltinOperatorExpr`) or reached as a resolved operator call (`?:`,
+`&&`, `||`, or operators on enum / generic operands). It re-evaluates
+on substitution and folds to a `ConstantIntVal` once its operands
+become concrete. By invariant it is never constructed for `+`, `-`,
+`*`, or unary `-`: those are always a `PolynomialIntVal` so value
+unification can canonicalize them, and the constructor
+`SLANG_ASSERT`s this. (`BuiltinOperationKind` is documented in
+[base.md](base.md#support-types).)
 
 ### Witness and witness-table evidence
 
@@ -298,7 +317,13 @@ the `witness table` entry in [../glossary.md](../glossary.md).
 `ExpandSubtypeWitness` mirror the type-pack operators (see
 [types.md](types.md)) at the witness level. The checker carries
 one witness per element of a type pack so that variadic generics can
-be type-checked element-wise.
+be type-checked element-wise. Separately, the *count* of a variadic
+pack carries its own evidence: `DeclaredVariadicPackCountWitness`
+holds the still-symbolic count from a
+`GenericVariadicPackCountConstraintDecl`, and
+`ConcreteVariadicPackCountWitness` pairs a concrete pack with its
+known element count (`expectedCount: IntVal`); the former resolves
+into the latter once the pack is bound.
 
 ### ExtractExistentialSubtypeWitness
 

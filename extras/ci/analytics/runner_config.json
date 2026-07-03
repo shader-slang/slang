@@ -56,6 +56,11 @@
       "self_hosted": true
     },
     {
+      "labels": ["Windows", "self-hosted", "build"],
+      "name": "Windows Build (GCP)",
+      "self_hosted": true
+    },
+    {
       "labels": ["Linux", "self-hosted", "test-driver-upgrade"],
       "name": "Linux GPU (GCP)",
       "self_hosted": true
@@ -72,6 +77,11 @@
     },
     {
       "labels": ["ubuntu-22.04"],
+      "name": "Linux (GH)",
+      "self_hosted": false
+    },
+    {
+      "labels": ["ubuntu-24.04"],
       "name": "Linux (GH)",
       "self_hosted": false
     },
@@ -102,6 +112,16 @@
     },
     {
       "labels": ["windows-2022"],
+      "name": "Windows (GH)",
+      "self_hosted": false
+    },
+    {
+      "labels": ["windows-2025"],
+      "name": "Windows (GH)",
+      "self_hosted": false
+    },
+    {
+      "labels": ["windows-2025-vs2026"],
       "name": "Windows (GH)",
       "self_hosted": false
     }

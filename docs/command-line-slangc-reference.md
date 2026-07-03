@@ -192,7 +192,7 @@ Accepted profiles are:
 
 * sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6,6_7,6_8,6_9,6_10} 
 
-* glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460} 
+* glsl_{150,330,400,410,420,430,440,450,460} 
 
 Additional profiles that include [-stage](#stage-1) information: 
 
@@ -256,6 +256,14 @@ all - Treat all warnings as errors.
 **-warnings-disable &lt;id&gt;\[,&lt;id&gt;...\]**
 
 Disable specific warning ids. 
+
+
+<a id="wall"></a>
+### -Wall, -Wextra, -Wpedantic
+
+**-Wall | -Wextra | -Wpedantic**
+
+Enable the corresponding group of opt-in warnings (additive). Staging: the pedantic group is currently enabled by default, so passing the pedantic flag is a no-op today; a future release will make it opt-in. 
 
 
 <a id="w"></a>
@@ -644,6 +652,11 @@ Specify the byte stride for the resource descriptor heap when generating SPIRV w
 Specify the byte stride for the sampler descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(OpTypeSampler). 
 
 
+<a id="spirv-unified-descriptor-heap-stride"></a>
+### -spirv-unified-descriptor-heap-stride
+When generating SPIRV with spvDescriptorHeapEXT, emit each resource descriptor-heap runtime array's ArrayStride as the maximum of image and buffer descriptor sizes, so a single heap shared by buffers and images is indexed at the device's unified stride. Only affects the default OpConstantSizeOfEXT path (used when [-spirv-resource-heap-stride](#spirv-resource-heap-stride) is 0); mutually exclusive with a non-zero [-spirv-resource-heap-stride](#spirv-resource-heap-stride) (combining the two is an error). Does not affect the sampler heap or acceleration-structure entries. 
+
+
 <a id="separate-debug-info"></a>
 ### -separate-debug-info
 Emit debug data to a separate file, and strip it from the main output file. 
@@ -695,6 +708,16 @@ Downstream compiler options
 **-&lt;[compiler](#compiler)&gt;-path &lt;path&gt;**
 
 Specify path to a downstream [&lt;compiler&gt;](#compiler) executable or library. 
+
+
+
+
+<a id="none-version"></a>
+### -&lt;compiler&gt;-version
+
+**-&lt;[compiler](#compiler)&gt;-version**
+
+Print the version of the downstream [&lt;compiler&gt;](#compiler) that Slang would load for that pass-through, then continue. Reports "not found" if the compiler cannot be located. Takes no value. 
 
 
 
@@ -1292,6 +1315,7 @@ Stage
 * `mesh` 
 * `amplification`, `task` 
 * `dispatch` 
+* `node` 
 
 <a id="vulkan-shift"></a>
 ## vulkan-shift
@@ -1622,6 +1646,7 @@ A capability describes an optional feature that a target may or may not support.
 * `mesh` 
 * `task` 
 * `amplification` 
+* `node` 
 * `any_stage` 
 * `amplification_mesh` 
 * `raytracing_stages` 
@@ -1774,6 +1799,7 @@ A capability describes an optional feature that a target may or may not support.
 * `shader5_sm_5_0` 
 * `pack_vector` 
 * `subgroup_basic` 
+* `subgroup_workgroup_index` 
 * `subgroup_ballot` 
 * `subgroup_ballot_activemask` 
 * `subgroup_basic_ballot` 

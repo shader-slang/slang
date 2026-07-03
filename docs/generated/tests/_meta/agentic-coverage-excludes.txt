@@ -7,7 +7,7 @@
 # the tail of the suite down with it, so we exclude those tests up
 # front to keep the rest of the suite running and producing coverage.
 #
-# This file is NOT consulted by ci-agentic-tests-nightly.yml — those
+# This file is NOT consulted by nightly-slang-test.yml — those
 # tests still run in the nightly against the uninstrumented binary,
 # where they bucket as `failed(expected)` via expected-failures.txt
 # where appropriate. The exclude is purely a coverage-stability hack.
@@ -38,7 +38,7 @@
 #      entry removed).
 #   3. If the run completes without a SIGSEGV in slang-test, the
 #      underlying crash has been fixed — drop the entry for real.
-# A green ci-agentic-tests-nightly run on the same test is a
+# A green nightly-slang-test.yml run on the same test is a
 # necessary but NOT sufficient condition: the nightly uses an
 # uninstrumented binary, and the crash here is
 # coverage-instrumentation-specific.
