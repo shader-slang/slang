@@ -786,8 +786,8 @@ void writeSerializedModuleIR(
 
 #if USE_RIFF
     {
-        RIFFSerialWriter writer(cursor.getCurrentChunk());
         IRSerialWriteContext context{sourceLocWriter};
+        RIFFSerialWriter writer(cursor.getCurrentChunk());
         IRWriteSerializer serializer(&writer, &context);
         serialize(serializer, moduleInfo);
     }

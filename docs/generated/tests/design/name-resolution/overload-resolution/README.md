@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-4-7
-generated_at: 2026-05-20T16:48:41Z
-source_commit: bbd84dc65e58598bfa71fafe72764b4076b0869b
-watched_paths_digest: d7fae8a1806639a15313fe59c01c12b8f4ae0fe974bd4ed186d70b04f6e3bcd5
+model: claude-opus-4-8
+generated_at: 2026-07-02T00:00:00+00:00
+source_commit: 8e2a63cbf22c85332796702fd02a875466486a23
+watched_paths_digest: 92bc84d918f8d6f3d9d7a36baf3b6659758ef0cb88391aa38104fe0399a60629
 source_doc: docs/generated/design/name-resolution/overload-resolution.md
-source_doc_digest: 95e33141dfae79469a1ce5e5765e1021a5332906f7b6d8c7f1b50495fc3bd3b1
+source_doc_digest: f30d2e1d8317631f0556f7a128cddc81436ff846d442456e3b363935106421f1
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
