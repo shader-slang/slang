@@ -10728,9 +10728,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl)
     {
-        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
+        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl);
+            globalGenericParamDecl)
         {
-            SLANG_UNUSED(globalGenericParamDecl);
             auto builder = getBuilder();
             auto fromType = lowerType(context, decl->fromType.Ptr());
             auto toType = lowerType(context, decl->toType);
@@ -10746,9 +10746,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitNonEmptyPackConstraintDecl(NonEmptyPackConstraintDecl* decl)
     {
-        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
+        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl);
+            globalGenericParamDecl)
         {
-            SLANG_UNUSED(globalGenericParamDecl);
             auto witnessType = getBuilder()->getWitnessTableType(getBuilder()->getVoidType());
             auto inst = getBuilder()->emitGlobalGenericParam(witnessType);
             addLinkageDecoration(context, inst, decl);
