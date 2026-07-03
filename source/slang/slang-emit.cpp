@@ -1093,11 +1093,15 @@ Result linkAndOptimizeIR(
         // compiler can't see the runtime driver, so the choice is the
         // caller's responsibility.
         int counterByteWidth = kDefaultCoverageCounterByteWidth;
+        bool hasExplicitCounterByteWidth = false;
         if (auto values =
                 opts.options.tryGetValue(CompilerOptionName::TraceCoverageCounterByteWidth))
         {
             if (values->getCount() > 0)
+            {
                 counterByteWidth = (int)(*values)[0].intValue;
+                hasExplicitCounterByteWidth = true;
+            }
         }
         // Validate the byte width on the API path. The CLI parser
         // (`slang-options.cpp`) already validates the user-facing bit
@@ -1115,12 +1119,22 @@ Result linkAndOptimizeIR(
             });
             return SLANG_FAIL;
         }
-        // Metal's MSL atomic API only provides 32-bit atomics; `atomic_ulong`
-        // does not exist and the Metal compiler rejects it. This is a platform
-        // limitation, not a caller error, so we silently cap to 4 bytes rather
-        // than failing — the validated width is already 4 or 8 at this point.
-        // Boolean mode uses non-atomic stores so the width is irrelevant there;
-        // skip the cap to leave counterByteWidth untouched for that path.
+        // Metal cannot execute 64-bit counting-mode coverage: MSL provides no
+        // 64-bit atomic fetch-add (its `_valid_fetch_add_type` constraint
+        // rejects `device atomic_ulong*`), so the Metal compiler fails every
+        // counter increment with "no matching function for call to
+        // 'atomic_fetch_add_explicit'". Cap counting-mode counters to 4 bytes
+        // for Metal targets (`metal`, `metallib`, `metallib-asm`). Unlike the
+        // validation block above, which rejects out-of-contract widths loudly
+        // because they indicate a caller bug, this cap adjusts a *valid* width
+        // to a platform limitation: the uncapped default (8) is capped
+        // silently, and an explicitly requested 8 is capped with warning
+        // E45115 so a caller who spelled out `-trace-coverage-counter-width
+        // 64` learns their choice was not honored.
+        // Boolean mode (`-trace-coverage-boolean`) is exempt: it writes plain
+        // non-atomic stores (`*slot = 1`), which MSL accepts at either width —
+        // verified against the Metal compiler — so the requested width is
+        // honored there.
         bool coverageBoolean = false;
         if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
         {
@@ -1128,7 +1142,11 @@ Result linkAndOptimizeIR(
                 coverageBoolean = (*values)[0].intValue != 0;
         }
         if (isMetalTarget(targetRequest) && counterByteWidth > 4 && !coverageBoolean)
+        {
+            if (hasExplicitCounterByteWidth)
+                sink->diagnose(Diagnostics::CoverageCounterWidthCappedForMetal{});
             counterByteWidth = 4;
+        }
         SLANG_PASS(
             instrumentCoverage,
             sink,

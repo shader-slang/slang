@@ -5143,6 +5143,12 @@ err(
     "coverage counter width API option value is invalid: the `CompilerOptionName::TraceCoverageCounterByteWidth` API option accepts only `4` (uint32) or `8` (uint64), but got `~byteWidth:Int`. This is the API-path counterpart to `E45113` (the CLI parser, which validates bits 32/64 before storing the byte width here); a host setting the API option directly must pass the byte width (divide bits by 8), not the bit width."
 )
 
+warning(
+    "coverage-counter-width-capped-for-metal",
+    45115,
+    "the explicitly requested 64-bit coverage counter width is not executable on Metal targets (`metal`, `metallib`, `metallib-asm`): MSL provides no 64-bit atomic fetch-add, so counting-mode coverage counters are capped to uint32 for this compile. Pass `-trace-coverage-counter-width 32` to make the effective width explicit; uint32 counters wrap silently at 2^32 hits per slot."
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(
