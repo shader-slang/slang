@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:00:00+00:00
-//META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#container-level-overload-accumulation
-//META: doc_section_digest=abaee536cf032e619ae16ca54b65e279f6271cecbdc254213692b2f9ca5f2f4e
+//META: doc_section_digest=183604b4c53eafdb228be2cd528d196c82f8f0a1a566388e1da5cf02e4ceb198
 //META: purpose=Same-named functions in one container accumulate into an overload set; overload resolution picks each by argument type at the call site.
 //META: intent=functional
 //META: pipeline_stage=check

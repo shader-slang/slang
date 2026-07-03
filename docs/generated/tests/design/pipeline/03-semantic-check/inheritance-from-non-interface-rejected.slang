@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:00:00+00:00
-//META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
-//META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#failure-modes
-//META: doc_section_digest=ba8996c1b140750bb2e807ee33d646c0a62d626b5b41e86bf40fe00640f5b270
-//META: purpose=Slang's inheritance checker rejects a struct attempting to inherit from a built-in non-interface type, naming the offending base type.
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#files-and-responsibilities
+//META: doc_section_digest=dfab593613903d0888a3e07660f6118db1ff7f0717e05368cfb4b5561eae574b
+//META: purpose=Slang's inheritance checker rejects a struct attempting to inherit from a built-in non-interface (sealed) type, naming the offending base type (E30831).
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
@@ -18,7 +18,6 @@
 
 struct B : int {}
 //CHECK:   ^^^ cannot inherit from type 'int' in module 'core' because it is implicitly 'sealed'
-// CHECK: E30830
 // CHECK: E30831
 
 void main() {}

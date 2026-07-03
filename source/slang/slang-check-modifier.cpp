@@ -1625,6 +1625,7 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::HLSLVolatileModifier:
     case ASTNodeType::GLSLPrecisionModifier:
     case ASTNodeType::HLSLGroupSharedModifier:
+    case ASTNodeType::NumThreadsAttribute:
         return modifierType;
 
     case ASTNodeType::NodeLaunchAttribute:

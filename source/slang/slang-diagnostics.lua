@@ -122,6 +122,12 @@ local err = helpers.err
 local warning = helpers.warning
 local internal = helpers.internal
 local fatal = helpers.fatal
+-- Warning-level (group) sentinel: pass one positionally to warning() to make that warning
+-- opt-in behind a -W group flag, e.g.
+--   warning("my-warning", 123, "message", span{...}, pedantic)
+-- Only `pedantic` is used today; `helpers.all` and `helpers.extra` exist for the other groups
+-- and can be bound here when a diagnostic needs them.
+local pedantic = helpers.pedantic
 
 --
 -- 0xxxx - Command line and interaction with host platform APIs.
@@ -939,7 +945,10 @@ warning(
     "keyword-used-as-name",
     20103,
     "keyword used as a name",
-    span { loc = "location", message = "'~name:Name' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts" }
+    span { loc = "location", message = "'~name:Name' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts" },
+    -- Pedantic: using a type keyword as a name is legal and usually works; this is a
+    -- style/portability hint rather than a likely bug, so it belongs in the pedantic group.
+    pedantic
 )
 
 err(
@@ -3612,6 +3621,13 @@ err(
     span { loc = "param:Decl" }
 )
 
+err(
+    "multiple-depth-output-semantics",
+    30705,
+    "a fragment entry point can declare at most one depth output, but '~conflictingSemantic' conflicts with the earlier '~earlierSemantic'",
+    span { loc = "location" }
+)
+
 --
 -- 308xx: inheritance
 --
@@ -4454,6 +4470,13 @@ err(
     38201,
     "'glsl' module not available",
     span { loc = "location", message = "'glsl' module is not available from the current global session. To enable GLSL compatibility mode, specify 'SlangGlobalSessionDesc::enableGLSL' when creating the global session." }
+)
+
+err(
+    "module-already-loaded-with-different-source",
+    38202,
+    "module already loaded with different source",
+    span { loc = "location", message = "a module named '~moduleName:Name' is already loaded from different source contents in this session. Use a different module name or drop references to the previous module before reloading." }
 )
 
 -- Note: compilationCeased is a fatal diagnostic that is locationless
@@ -5338,6 +5361,12 @@ err(
     52012,
     "ref accessor incompatible with dynamic dispatch",
     span { loc = "location", message = "'ref' accessor returning type '~valueType:Type' is incompatible with dynamic dispatch because interface types require AnyValue marshalling." }
+)
+
+err(
+    "global-param-not-supported-by-interpreter",
+    52013,
+    "global shader parameter '~name' is not supported by the Slang interpreter (slangi), which runs on the CPU and does not support global parameters or GPU resource types; compile this program with slangc to a GPU target instead."
 )
 
 warning(
