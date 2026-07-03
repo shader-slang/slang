@@ -169,12 +169,14 @@ static mz_file_read_func _calcReadFunc()
     void* buf;
     size_t size;
     mz_zip_writer_finalize_heap_archive(&archive, &buf, &size);
-    // `buf` is owned by miniz's allocator. Copy it into Slang-owned storage and release the
-    // original with miniz's own `mz_free`, so allocation/deallocation stay paired rather than
-    // relying on `ScopedAllocation` (which always frees via `::free`).
+    // `buf` was allocated by the archive's own allocator (`m_pAlloc`), so copy it into
+    // Slang-owned storage and release the original with the archive's matching free callback
+    // (`m_pFree`) rather than `ScopedAllocation`'s `::free`. This keeps allocation and
+    // deallocation paired even if the archive is given custom allocator callbacks. The callback
+    // must be read before `mz_zip_writer_end` tears the archive down.
     ScopedAllocation alloc;
     alloc.set(buf, size);
-    mz_free(buf);
+    archive.m_pFree(archive.m_pAlloc_opaque, buf);
     mz_zip_writer_end(&archive);
 
     // Read
@@ -401,11 +403,13 @@ SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
                     void* buf;
                     size_t size;
                     mz_zip_writer_finalize_heap_archive(&m_archive, &buf, &size);
-                    // `buf` is owned by miniz's allocator. Copy it into the member allocation and
-                    // release the original with miniz's own `mz_free`, so allocation/deallocation
-                    // stay paired rather than relying on `ScopedAllocation`'s `::free`.
+                    // `buf` was allocated by the archive's own allocator (`m_pAlloc`); copy it
+                    // into the member allocation and release the original with the archive's
+                    // matching free callback (`m_pFree`) rather than `ScopedAllocation`'s
+                    // `::free`, so alloc/free stay paired even under custom allocator callbacks.
+                    // The callback must be read before `mz_zip_writer_end` below.
                     const void* copied = m_data.set(buf, size);
-                    mz_free(buf);
+                    m_archive.m_pFree(m_archive.m_pAlloc_opaque, buf);
 
                     mz_zip_writer_end(&m_archive);
 
