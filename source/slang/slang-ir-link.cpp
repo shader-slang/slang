@@ -2076,31 +2076,40 @@ bool isDiffPairType(IRInst* type)
     return as<IRDifferentialPairTypeBase>(type) != nullptr;
 }
 
-// Returns true if `module` requests any auto-diff translation, i.e. contains a
-// module-scope `IRTranslateBase` inst (`ForwardDifferentiate`,
-// `BackwardDifferentiatePropagate`, ...) — the representation of a
-// `fwd_diff`/`bwd_diff` request before auto-diff processing runs.
+// Returns true if `inst` or any inst nested under it is an `IRTranslateBase`
+// (`ForwardDifferentiate`, `BackwardDifferentiatePropagate`, ...) — the
+// representation of a `fwd_diff`/`bwd_diff` request before auto-diff
+// processing runs.
+static bool containsTranslateInst(IRInst* inst)
+{
+    if (as<IRTranslateBase>(inst))
+        return true;
+    for (auto child : inst->getChildren())
+    {
+        if (containsTranslateInst(child))
+            return true;
+    }
+    return false;
+}
+
+// Returns true if `module` requests any auto-diff translation, i.e. contains
+// an `IRTranslateBase` inst anywhere in its inst tree.
 //
 // This detector gates auto-diff link-time pruning in the final codegen link
 // (see `IRSharedSpecContext::canPruneAutodiffLinkArtifacts`), which makes its
 // completeness load-bearing: a false negative does not just skip extra link
 // work, it strips annotations and defers witness entries that auto-diff
-// processing would later need. Scanning module-scope insts suffices for
-// translation requests on concrete callees, because `IRTranslateBase` is
-// hoistable and therefore surfaces at module scope. A request whose callee
-// depends on a generic parameter hoists only to the enclosing generic and is
-// not visible to this scan — the auto-diff tests under tests/autodiff/ (e.g.
-// the generic differentiable-function cases) guard that such programs still
-// compile correctly.
+// processing would later need. The scan is therefore a full recursive walk,
+// not just a walk of module-scope insts: a translation request on a concrete
+// callee hoists to module scope (`IRTranslateBase` is hoistable), but a
+// request whose callee depends on a generic parameter hoists only into the
+// enclosing generic — e.g. `__fwd_diff(genericFn)` lowers to a generic
+// wrapper whose inner value is `ForwardDifferentiate(specialize(genericFn,
+// T, ...))` (see tests/autodiff/no-diff-interface-subscript.slang, which
+// miscompiled with an ICE in DiffPair lowering when the scan missed it).
 bool doesModuleUseAutodiff(IRModule* module)
 {
-    for (auto globalInst : module->getGlobalInsts())
-    {
-        if (as<IRTranslateBase>(globalInst))
-            return true;
-    }
-
-    return false;
+    return containsTranslateInst(module->getModuleInst());
 }
 
 void cloneUsedWitnessTableEntries(IRSpecContext* context)

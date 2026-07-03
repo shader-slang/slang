@@ -534,7 +534,8 @@ bool unrollLoopsInFunc(
     TargetProgram* targetProgram,
     IRModule* module,
     IRGlobalValueWithCode* func,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    bool* outChanged)
 {
     List<IRLoop*> loops = collectLoopsInFunc(
         func,
@@ -542,6 +543,9 @@ bool unrollLoopsInFunc(
 
     if (loops.getCount() == 0)
         return true;
+
+    if (outChanged)
+        *outChanged = true;
 
     for (auto loop : loops)
     {
@@ -569,7 +573,11 @@ bool unrollLoopsInFunc(
     return true;
 }
 
-bool unrollLoopsInModule(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
+bool unrollLoopsInModule(
+    IRModule* module,
+    TargetProgram* target,
+    DiagnosticSink* sink,
+    bool* outChanged)
 {
     SLANG_PROFILE;
 
@@ -580,7 +588,7 @@ bool unrollLoopsInModule(IRModule* module, TargetProgram* target, DiagnosticSink
 
         if (auto func = as<IRGlobalValueWithCode>(inst))
         {
-            bool result = unrollLoopsInFunc(target, module, func, sink);
+            bool result = unrollLoopsInFunc(target, module, func, sink, outChanged);
             if (!result)
                 return false;
         }
