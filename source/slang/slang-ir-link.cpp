@@ -81,10 +81,7 @@ struct IRSharedSpecContext
     // referenced by mangled name, and anything unused is removed by later DCE.
     // `prelinkIR` must never prune, because its output stays live and must
     // remain complete (see `isFinalCodegenLink` above).
-    bool canPruneAutodiffLinkArtifacts()
-    {
-        return isFinalCodegenLink && !useAutodiff;
-    }
+    bool canPruneAutodiffLinkArtifacts() { return isFinalCodegenLink && !useAutodiff; }
 
     IRBuilder builderStorage;
 
