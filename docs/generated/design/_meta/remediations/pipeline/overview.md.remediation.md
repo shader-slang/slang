@@ -1,22 +1,26 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.8
-remediated_at: 2026-06-12T14:12:51Z
+remediated_at: 2026-06-30T14:05:31Z
 target_doc: pipeline/overview.md
 review_report: ../../reviews/pipeline/overview.md.review.md
-target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-actions: { fixed: 1, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 0, escalated: 0 }
+target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+actions:
+  fixed: 0
+  rejected_bogus: 0
+  rejected_out_of_scope: 0
+  deferred: 0
+  escalated: 0
 ---
 
 # Remediation report for pipeline/overview.md
 
 ## Summary
 
-The review raised one nit finding and no other issues. I fixed it: the intended-reader sentence was a separate second paragraph, but `_common.md` requires the first body paragraph itself to state both what the document covers and who its intended reader is. The breakdown is 1 fixed, 0 rejected-bogus, 0 rejected-out-of-scope, 0 deferred, 0 escalated.
+The review report records `finding_count: 0` and an empty `## Findings` table; all six checklist items (factual accuracy, cross-references, completeness, style consistency, source alignment, front-matter validity) passed. There is nothing to act on, so no edits were made to the target document and `target_doc_source_commit_after` equals `target_doc_source_commit_before`. The action breakdown is zero fixed, zero rejected-bogus, zero rejected-out-of-scope, zero deferred, zero escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Verified against `docs/generated/design/_meta/prompts/_common.md:65-66`, which requires the first body paragraph to state both the coverage and the intended reader; the doc split these across two paragraphs. Correct and in-contract. | Merged the intended-reader clause into the first paragraph so it states both purpose and audience. |

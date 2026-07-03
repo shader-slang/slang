@@ -1,22 +1,27 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.8
-remediated_at: 2026-06-12T14:16:04Z
+remediated_at: 2026-06-30T14:01:27Z
 target_doc: ir-reference/types.md
 review_report: ../../reviews/ir-reference/types.md.review.md
-target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-actions: { fixed: 2, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 0, escalated: 0 }
+target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+actions:
+  fixed: 3
+  rejected_bogus: 0
+  rejected_out_of_scope: 0
+  deferred: 0
+  escalated: 0
 ---
 
 # Remediation report for ir-reference/types.md
 
 ## Summary
-Both findings from the review were verified against source at `eb9403ef595a99c2ff6def1d538dbd7a792d9371` and both were correct and in-contract, so both were fixed. F-001 (the `interface` row claiming `interface_req_entry` children) was corrected to describe the entries as operands. F-002 (the two missing sentinel-like Type opcodes) was fixed by adding rows for `AfterBaseType` and `AfterRawPointerTypeBase`. No findings were rejected, deferred, or escalated.
+All three findings were verified against the watched sources at HEAD and resolved in the target document. F-001 corrected the overstated "hoistable throughout" claim in `## Source`; F-003 filled in the `TorchTensor` operands cell; F-002 reworked the `## Family hierarchy` diagram to use the actual immediate Lua subgroup names as children of `Type`, and I completed it this cycle by adding the missing `TranslatedTypeBase` group node so every immediate Lua intermediate group appears. No findings were rejected, deferred, or escalated. The operator refreshes `source_commit` via `mark-fresh`; `_after` is HEAD since the body changed.
 
 ## Actions
-
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Verified: `slang-ir-insts.lua:656` declares `interface` as `global = true` (not `parent`), and `slang-lower-to-ir.cpp:11915-11918` stores each `interface_req_entry` via `irInterface->setOperand(entryIndex, constraintEntry)` after `createInterfaceType(operandCount, ...)` at `:11697-11698`. The entries are operands, not children; the existing `G` flag was already correct. | Changed the `interface` Operands cell from `(children: interface_req_entry)` to `(operands: interface_req_entry...)` and updated the summary to state the requirements are operands set via `setOperand`, with a cross-link to structure.md for the `witness_table`-children distinction. |
-| F-002 | fixed | Verified: `slang-ir-insts.lua:42` declares `{ AfterBaseType = {} }` (direct child of `Type`, no `hoistable`) and `:67` declares `{ AfterRawPointerTypeBase = {} }` (inside the `hoistable` `RawPointerTypeBase` group). `process_inst` (`:3312-3324`) marks both `is_leaf` with a defaulted `struct_name`, and `slang-ir.h.lua:288-290` emits a `kIROp_` enum per leaf; stable names 18 and 26 are assigned in `slang-ir-insts-stable-names.lua:22,30`. They are concrete leaf opcodes, not abstract group parents, so the coverage rule requires them in the table. | Added a row for `AfterBaseType` to the Basic scalar types table (em-dash C++ wrapper, blank Flags since it does not inherit `hoistable`) and a row for `AfterRawPointerTypeBase` to the Raw and RTTI pointers table (em-dash wrapper, `H` flag inherited from its group); both summaries explain the range-marker role. |
+| F-001 | fixed | `slang-ir-insts.lua` line 149 `Enum` `parent=true` only; lines 662/666 `struct`/`class` `parent=true`; line 668 `interface` `global=true`; `AfterBaseType` (line 42) and `MakeTensorAddressing*` (lines 642-643) unflagged. `slang-ir.h` lines 51-56 define `Parent`/`Hoistable`/`Global` as distinct flags; "hoistable throughout" overstated the invariant. | Source para now says most leaf opcodes are hoistable plus an exceptions clause naming the parent/global/unflagged entries and deferring to the Flags column. |
+| F-002 | fixed | Prompt `ir-reference-types.md` lines 47-49 and `_common.md` line 223 require the diagram to show every immediate Lua subgroup as a child of `Type`. The immediate intermediate groups in the Lua are the 18 `*TypeBase`/group entries (`BasicType` ... `WitnessTableTypeBase`), including `TranslatedTypeBase` (line 168), interleaved with concrete leaves. | Diagram first level uses the actual Lua subgroup node names; this cycle added the missing `Type --> TranslatedTypeBase` edge so all 18 immediate groups are present. |
+| F-003 | fixed | `slang-ir.cpp` lines 3001-3004 `getTorchTensorType(IRType* elementType)` creates `kIROp_TorchTensorType` with one operand, though the Lua entry (line 222) omits an explicit `operands` field. | TorchTensor row operands cell reads `elementType: IRType`. |

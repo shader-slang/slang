@@ -49,12 +49,15 @@ private:
     Slang::IDebugCallback* m_coreCallback = nullptr;
 };
 
-/// Creates an RHI debug bridge that remains alive for process teardown.
+/// Creates an RHI debug bridge and keeps it alive for the lifetime of the process.
 ///
-/// Device descriptors store debug callbacks as raw pointers, and retained RHI
-/// state may emit messages after the harness invocation that created a device.
-/// Each invocation gets a distinct bridge so old emitters can only reach their
-/// own cleared bridge, not the next invocation's callback.
+/// A device holds its bridge as a raw, creation-time-only `debugCallback` pointer,
+/// and retained RHI state may emit messages after the invocation that created the
+/// device; keeping every bridge alive process-wide means such a late message always
+/// reaches a live (possibly cleared) bridge rather than freed storage. This function
+/// only mints and retains the bridge - callers own how it is associated with a device
+/// and rebound to the active per-invocation callback (see DeviceCache::acquireDevice
+/// and #11856).
 inline Slang::RefPtr<CoreToRHIDebugBridge> createRetainedCoreToRHIDebugBridge()
 {
     static std::mutex* mutex = new std::mutex;
@@ -123,10 +126,22 @@ public:
         m_buf.clear();
     }
 
+    /// Returns a snapshot of the captured messages that does not alias the
+    /// builder's storage, so a concurrent reader can safely inspect it after the
+    /// lock is released.
+    ///
+    /// `Slang::String`'s copy constructor shares the underlying reference-counted
+    /// `StringRepresentation`, so `m_buf.toString()` would hand back a `String`
+    /// pointing into the same char buffer that `handleMessage` keeps appending to.
+    /// Once this method returns and the lock is dropped, a later in-place append
+    /// (`String::appendInPlace`, taken whenever the buffer is uniquely referenced
+    /// again) would then race the reader's access to that buffer. Constructing a
+    /// fresh `String` from the builder's slice forces an independent allocation
+    /// while still under the lock, breaking the alias.
     Slang::String getString()
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        return m_buf.toString();
+        return Slang::String(m_buf.getUnownedSlice());
     }
 
 private:

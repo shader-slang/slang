@@ -1,0 +1,37 @@
+name: Check Submodule Pointers
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "external/**"
+      - ".gitmodules"
+      - ".github/workflows/check-submodules.yml"
+      - "extras/check-submodule-commits.sh"
+  merge_group:
+    types: [checks_requested]
+
+# This check is not a required status check, so a path-skipped job on an
+# unrelated PR is harmless — it simply never reports, and nothing waits on it.
+# The pull_request paths: filter above therefore restricts the work to PRs that
+# actually touch a submodule pointer, the workflow, or the script. merge_group
+# has no paths: filter (GitHub ignores paths: on merge_group), so the check
+# re-runs over every submodule in the queue as a final gate.
+jobs:
+  check-submodules:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    # verify_reachable can escalate to a full `git fetch --unshallow` per submodule
+    # against its upstream remote. Bound the job so a slow or unresponsive remote
+    # cannot hold a runner to GitHub's 360-minute default; 20 minutes still leaves
+    # ample headroom for full-history fetches of every tracked submodule.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify submodule pins
+        run: ./extras/check-submodule-commits.sh

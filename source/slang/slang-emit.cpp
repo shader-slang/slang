@@ -523,6 +523,10 @@ void calcRequiredLoweringPassSet(
     case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
         break;
+    case kIROp_HLSLAppendStructuredBufferType:
+    case kIROp_HLSLConsumeStructuredBufferType:
+        result.appendConsumeStructuredBuffer = true;
+        break;
     case kIROp_DynamicResourceType:
         result.dynamicResource = true;
         break;
@@ -549,6 +553,10 @@ void calcRequiredLoweringPassSet(
     case kIROp_IncrementFunctionCoverageCounter:
     case kIROp_IncrementBranchCoverageCounter:
         result.coverageTracing = true;
+        break;
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+    case kIROp_GetEnumBarrierSemanticFlags:
+        result.barrierFlagValidation = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1580,10 +1588,28 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    if ((target == CodeGenTarget::HLSL || isD3DTarget(targetRequest)) &&
+        requiredLoweringPassSet.barrierFlagValidation)
+    {
+        SLANG_PASS(validateBarrierFlagsForHLSL, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
+
     // On non-HLSL targets, there isn't an implementation of `AppendStructuredBuffer`
     // and `ConsumeStructuredBuffer` types, so we lower them into normal struct types
     // of `RWStructuredBuffer` typed fields now.
-    if (target != CodeGenTarget::HLSL)
+    //
+    // Gated on `appendConsumeStructuredBuffer` to skip this whole-module walk when
+    // neither type is present. `calcRequiredLoweringPassSet` flags accumulate across the
+    // post-link and post-specialization scans (they are not reset between them). These
+    // types are produced by the front-end and are never synthesized by an IR pass, so in
+    // particular none is created after the last scan: any instance present here was
+    // recorded by a scan and set the flag, and the gate can never be a false-negative
+    // (skip a needed lowering). The flag can only be stale-true (e.g. an unused buffer
+    // dead-code-eliminated after a scan), a harmless no-op walk — so gating is
+    // behavior-preserving.
+    if (target != CodeGenTarget::HLSL && requiredLoweringPassSet.appendConsumeStructuredBuffer)
     {
         SLANG_PASS(lowerAppendConsumeStructuredBuffers, targetProgram, sink);
     }
@@ -1685,6 +1711,21 @@ Result linkAndOptimizeIR(
         if (isD3DTarget(targetRequest))
         {
             SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+
+            // HLSL SM 6.7+ requires every member of a `[raypayload]` struct to declare
+            // both a `read(...)` and a `write(...)` qualifier. The call-site fill above
+            // only covers payload structs reached through a `TraceRay`-style call, so a
+            // user-authored struct with one-sided PAQ that only reaches a hit shader
+            // (e.g. a per-stage-compiled shader library) would slip through. Fill any
+            // missing per-side PAQs structurally on every `[raypayload]` struct.
+            auto profile = getEffectiveTargetProfile(
+                targetProgram->getTargetReq(),
+                targetProgram->getOptionSet());
+            if (profile.getFamily() == ProfileFamily::DX &&
+                profile.getVersion() >= ProfileVersion::DX_6_7)
+            {
+                SLANG_PASS(legalizeRayPayloadAccessQualifiersForHLSL);
+            }
         }
 
         if (requiredLoweringPassSet.existentialTypeLayout)
@@ -3115,9 +3156,79 @@ static SlangResult createArtifactFromIR(
 
     artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
 
-    IDownstreamCompiler* compiler = codeGenContext->getSession()->getOrLoadDownstreamCompiler(
-        PassThroughMode::SpirvOpt,
-        codeGenContext->getSink());
+    // Decide whether any downstream (slang-glslang / SPIRV-Tools) work is actually required
+    // for this artifact before paying the cost of loading the downstream compiler module.
+    //
+    // Slang emits and legalizes SPIR-V natively, so the natively emitted blob added above is
+    // already a complete, valid module. The downstream `slang-glslang` compiler is only needed
+    // to: (a) run the SPIRV-Tools optimizer when an optimization level above `None` is
+    // requested; (b) link multiple SPIR-V modules together when separately compiled / embedded
+    // downstream modules are present; (c) validate the result when SPIR-V validation is enabled;
+    // or (d) emit separate debug info, which is produced as a side effect of the downstream
+    // compile step. When none of these apply -- for example a single-module `-O0 -target spirv`
+    // compile -- the natively emitted SPIR-V is the final output, so we skip loading
+    // `slang-glslang` entirely and leave the artifact as-is. This keeps a default `-O0` SPIR-V
+    // compile free of any dependency on the `slang-glslang` module (issue #11662); without this
+    // gate the load was unconditional and a build without `slang-glslang` failed with E00100
+    // even though no downstream work was needed.
+    bool isPrecompilation = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
+        CompilerOptionName::EmbedDownstreamIR);
+
+    // Collect the SPIR-V modules that would participate in a downstream link. This walks IR
+    // only (it does not need the downstream compiler), so it is safe to do before deciding
+    // whether to load that compiler, and we reuse the result for the link below.
+    List<uint32_t*> spirvFiles;
+    List<uint32_t> spirvSizes;
+    const bool downstreamLinkingAllowed =
+        !isPrecompilation && !codeGenContext->shouldSkipDownstreamLinking();
+    if (downstreamLinkingAllowed)
+    {
+        // Start with the SPIR-V we just generated.
+        // SPIRV-Tools-link expects the size in 32-bit words
+        // whereas the spirv blob size is in bytes.
+        spirvFiles.add((uint32_t*)spirv.getBuffer());
+        spirvSizes.add(int(spirv.getCount()) / 4);
+
+        // Iterate over all modules in the linkedIR. For each module, if it
+        // contains an embedded downstream ir instruction, add it to the list
+        // of spirv files.
+        auto program = codeGenContext->getProgram();
+
+        program->enumerateIRModules(
+            [&](IRModule* irModule)
+            {
+                for (auto globalInst : irModule->getModuleInst()->getChildren())
+                {
+                    if (auto inst = as<IREmbeddedDownstreamIR>(globalInst))
+                    {
+                        if (inst->getTarget() == CodeGenTarget::SPIRV)
+                        {
+                            auto slice = inst->getBlob()->getStringSlice();
+                            spirvFiles.add((uint32_t*)slice.begin());
+                            spirvSizes.add(int(slice.getLength()) / 4);
+                        }
+                    }
+                }
+            });
+
+        SLANG_ASSERT(int(spirv.getCount()) % 4 == 0);
+        SLANG_ASSERT(spirvFiles.getCount() == spirvSizes.getCount());
+    }
+
+    const bool needsLink = downstreamLinkingAllowed && spirvFiles.getCount() > 1;
+    const bool needsOptimization =
+        codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel() !=
+        OptimizationLevel::None;
+    const bool needsValidation = shouldRunSPIRVValidation(codeGenContext);
+    const bool needsSeparateDebugInfo = targetCompilerOptions.shouldEmitSeparateDebugInfo();
+    const bool needsDownstreamCompiler =
+        needsLink || needsOptimization || needsValidation || needsSeparateDebugInfo;
+
+    IDownstreamCompiler* compiler = needsDownstreamCompiler
+                                        ? codeGenContext->getSession()->getOrLoadDownstreamCompiler(
+                                              PassThroughMode::SpirvOpt,
+                                              codeGenContext->getSink())
+                                        : nullptr;
     if (compiler)
     {
 #if 0
@@ -3125,68 +3236,26 @@ static SlangResult createArtifactFromIR(
         compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
 #endif
 
-        bool isPrecompilation = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
-            CompilerOptionName::EmbedDownstreamIR);
-
-        if (!isPrecompilation && !codeGenContext->shouldSkipDownstreamLinking())
+        if (needsLink)
         {
             ComPtr<IArtifact> linkedArtifact;
+            SlangResult linkresult = compiler->link(
+                (const uint32_t**)spirvFiles.getBuffer(),
+                (const uint32_t*)spirvSizes.getBuffer(),
+                (uint32_t)spirvFiles.getCount(),
+                linkedArtifact.writeRef());
 
-            // collect spirv files
-            List<uint32_t*> spirvFiles;
-            List<uint32_t> spirvSizes;
-
-            // Start with the SPIR-V we just generated.
-            // SPIRV-Tools-link expects the size in 32-bit words
-            // whereas the spirv blob size is in bytes.
-            spirvFiles.add((uint32_t*)spirv.getBuffer());
-            spirvSizes.add(int(spirv.getCount()) / 4);
-
-            // Iterate over all modules in the linkedIR. For each module, if it
-            // contains an embedded downstream ir instruction, add it to the list
-            // of spirv files.
-            auto program = codeGenContext->getProgram();
-
-            program->enumerateIRModules(
-                [&](IRModule* irModule)
-                {
-                    for (auto globalInst : irModule->getModuleInst()->getChildren())
-                    {
-                        if (auto inst = as<IREmbeddedDownstreamIR>(globalInst))
-                        {
-                            if (inst->getTarget() == CodeGenTarget::SPIRV)
-                            {
-                                auto slice = inst->getBlob()->getStringSlice();
-                                spirvFiles.add((uint32_t*)slice.begin());
-                                spirvSizes.add(int(slice.getLength()) / 4);
-                            }
-                        }
-                    }
-                });
-
-            SLANG_ASSERT(int(spirv.getCount()) % 4 == 0);
-            SLANG_ASSERT(spirvFiles.getCount() == spirvSizes.getCount());
-
-            if (spirvFiles.getCount() > 1)
+            if (linkresult != SLANG_OK)
             {
-                SlangResult linkresult = compiler->link(
-                    (const uint32_t**)spirvFiles.getBuffer(),
-                    (const uint32_t*)spirvSizes.getBuffer(),
-                    (uint32_t)spirvFiles.getCount(),
-                    linkedArtifact.writeRef());
-
-                if (linkresult != SLANG_OK)
-                {
-                    return SLANG_FAIL;
-                }
-
-                ComPtr<ISlangBlob> blob;
-                linkedArtifact->loadBlob(ArtifactKeep::No, blob.writeRef());
-                artifact = _Move(linkedArtifact);
+                return SLANG_FAIL;
             }
+
+            ComPtr<ISlangBlob> blob;
+            linkedArtifact->loadBlob(ArtifactKeep::No, blob.writeRef());
+            artifact = _Move(linkedArtifact);
         }
 
-        if (shouldRunSPIRVValidation(codeGenContext))
+        if (needsValidation)
         {
             if (SLANG_FAILED(
                     compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly -entry computeMain -stage compute -capability cooperative_vector
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly -entry computeMain -stage compute -capability cooperative_vector -O3
 
 // Check that cooperative vector StructuredBuffer overloads preserve distinct
 // std140/std430 ArrayStride decorations for runtime arrays and pointers.

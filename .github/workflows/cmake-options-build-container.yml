@@ -115,9 +115,8 @@ jobs:
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 -DSLANG_USE_SCCACHE=OFF \
-                -LA 2>/dev/null \
-              | grep -E "^${option}:(BOOL|STRING)=" \
-              | sed 's/.*=//' \
+                -LA \
+              | sed -n -E "s/^${option}:(BOOL|STRING)=//p" \
               | tr '[:upper:]' '[:lower:]'
             )
             case "$defaultVal" in

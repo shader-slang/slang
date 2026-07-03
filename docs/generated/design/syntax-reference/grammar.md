@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:13:30Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: fa970dcce70dd7f3374f9d33120c59e4a2f243c4f0bee9756c52610ae322f450
+generated_at: 2026-06-29T13:37:46Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 962d2141d549a42c3603fbba721e8817eaf5daac65cba1a9fd6292074754985b
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -70,10 +70,12 @@ implements it (in
 
 ```
 SourceFile      ::= ModuleHeader? TopDecl* EOF                -- parseSourceFile (-> parseDecls)
-ModuleHeader    ::= ('module' | 'implementing') IDENT ';'
-                                              -- parseModuleDeclarationDecl,
-                                              --   parseImplementingDecl (both
-                                              --   ReadToken the trailing ';')
+ModuleHeader    ::= 'module' ModuleName? ';'                 -- parseModuleDeclarationDecl
+                                              --   (an omitted name falls back to the
+                                              --   current module name)
+                  | 'implementing' ModuleName ';'            -- parseImplementingDecl
+                                              --   (via parseFileReferenceDeclBase)
+ModuleName      ::= IDENT ('.' IDENT)* | STRING_LIT          -- dotted identifier or string literal
 
 TopDecl         ::= ImportDecl                                -- parseDecls -> ParseDecl
                   | NamespaceDecl
@@ -83,10 +85,15 @@ TopDecl         ::= ImportDecl                                -- parseDecls -> P
 
 ImportDecl      ::= ('import' | '__import') ImportPath ';'  -- parseImportDecl
                   | '__include' ImportPath ';'              -- parseIncludeDecl
-ImportPath      ::= IDENT ('.' IDENT)*                       -- context-sensitive
+ImportPath      ::= IDENT ('.' IDENT)* | STRING_LIT          -- parseFileReferenceDeclBase;
+                                                              --   dotted identifier or string literal
 
-NamespaceDecl   ::= 'namespace' IDENT '{' TopDecl* '}'      -- parseNamespaceDecl
-UsingDecl       ::= 'using' QualifiedName ';'                -- parseUsingDecl
+NamespaceDecl   ::= 'namespace' IDENT (('.' | '::') IDENT)* '{' TopDecl* '}'
+                                                              -- parseNamespaceDecl (loops over
+                                                              --   '.' / '::' to build a nested chain)
+UsingDecl       ::= 'using' 'namespace'? Expr ';'            -- parseUsingDecl (the entity is an
+                                                              --   arbitrary expression; valid checked
+                                                              --   code is narrower than this parse grammar)
 FileDecl        ::= '__file_decl' '{' TopDecl* '}'           -- parseFileDecl
 
 QualifiedName   ::= IDENT ('::' IDENT)*                       -- parsed via the expression machinery
@@ -105,6 +112,7 @@ CoreDecl        ::= TypedefDecl | TypeAliasDecl
                   | ExtensionDecl
                   | GenericDecl
                   | FuncDecl    | ConstructorDecl | SubscriptDecl | PropertyDecl
+                  | FuncExtensionDecl
                   | VarDecl     | LetDecl
                   | AssocTypeDecl
                   | RequireCapabilityDecl
@@ -113,12 +121,32 @@ CoreDecl        ::= TypedefDecl | TypeAliasDecl
                   | CBufferDecl | TBufferDecl
                   | NamespaceDecl
                   | UsingDecl
+                  | InternalDecl
+```
+
+`CoreDecl` is dispatched by keyword through the `g_parseSyntaxEntries[]`
+table (`parseDecl` looks the leading keyword up in that table). Besides
+the user-facing forms above, the table registers compiler-internal
+declaration keywords that share the same dispatch:
+
+```
+InternalDecl    ::= '__constraint' ...                        -- InterfaceConstraintDecl (see above)
+                  | '__associatedfunc' ...                     -- parseAssocFunc
+                  | 'type_param' ...                           -- parseGlobalGenericTypeParamDecl
+                  | '__generic_value_param' ...                -- parseGlobalGenericValueParamDecl
+                  | 'semantic' ...                             -- parseSemanticDecl
+                  | '__ignored_block' ...                      -- parseIgnoredBlockDecl
+                  | '__transparent_block' ...                  -- parseTransparentBlockDecl
 ```
 
 ### Type-defining declarations
 
 ```
-TypedefDecl     ::= 'typedef' Type IDENT ';'                  -- parseTypeDef
+TypedefDecl     ::= 'typedef' Type Declarator ';'             -- parseTypeDef
+                                                              -- the alias name is a full (non-abstract)
+                                                              -- declarator, so trailing array suffixes and
+                                                              -- the prefix-'*' / parenthesized forms are
+                                                              -- folded onto the alias type (see Declarator)
 TypeAliasDecl   ::= 'typealias' IDENT ('<' GenericParams '>')? '=' Type ';'
                                                               -- parseTypeAliasDecl
 
@@ -190,7 +218,11 @@ FuncDecl        ::= 'func' IDENT GenericParams? '(' ParamList? ')' ('throws' Typ
 ConstructorDecl ::= '__init' GenericParams? '(' ParamList? ')'
                     WhereClause? FuncBody                      -- parseConstructorDecl
 SubscriptDecl   ::= '__subscript' GenericParams? '(' ParamList? ')' '->' Type
-                    AccessorBlock                              -- parseSubscriptDecl
+                    WhereClause? AccessorBlock                 -- parseSubscriptDecl
+                                                              -- routed through parseOptGenericDecl, so it
+                                                              -- accepts inline generic params and a 'where'
+                                                              -- clause; an interface subscript may supply
+                                                              -- default accessor bodies
 PropertyDecl    ::= 'property' IDENT ':' Type AccessorBlock    -- parsePropertyDecl
 
 FuncExtensionDecl
@@ -211,9 +243,16 @@ Param           ::= ModifierList? Type IDENT ('=' Expr)?       -- traditional, t
                                                               --   _peekModernStyleVarDecl succeeds; the
                                                               --   ':' Type is optional)
 
-WhereClause     ::= 'where' WhereTerm (',' WhereTerm)*
-WhereTerm       ::= Type ':' Type                              -- conformance constraint
-                  | Type '==' Type                             -- equality constraint
+WhereClause     ::= ('where' WhereTerm)+                       -- maybeParseGenericConstraints
+WhereTerm       ::= 'optional'? Type ':' Type (',' Type)*      -- conformance constraint(s)
+                  | 'optional'? Type '==' Type                 -- equality constraint
+                  | 'optional'? 'nonempty' '(' Expr ')'        -- non-empty pack constraint
+                  | 'optional'? 'countof' '(' Expr ')' '==' Expr -- variadic pack-count constraint
+                  | '__hasDiffTypeInfo' '(' Type ')'           -- differentiable-type-info constraint
+                  | Type '(' Type ')' 'implicit'?              -- type-coercion constraint
+                                                              --   (TypeCoercionConstraintDecl: toType '(' fromType ')')
+                                                              -- each 'where' introduces one WhereTerm; the
+                                                              -- ':' form may list several supertypes. See note.
 
 FuncBody        ::= ';'                                        -- prototype only
                   | '{' BodyTokens '}'                         -- captured as UnparsedStmt in stage 1
@@ -221,7 +260,8 @@ BodyTokens      ::= (anything but unbalanced '{' / '}')*       -- see two-stage 
 
 AccessorBlock   ::= ';' | '{' AccessorDecl* '}'
 AccessorDecl    ::= ModifierList? AccessorName FuncBody
-AccessorName    ::= 'get' | 'set' | 'modify' | 'ref'
+AccessorName    ::= 'get' | 'set' | 'ref'        -- parseAccessorDecl; any other
+                                                  -- accessor name is diagnosed (Unexpected)
 ```
 
 ### Variable / binding declarations
@@ -234,7 +274,17 @@ VarDeclarator   ::= IDENT ArraySuffix? Initializer?
 ArraySuffix     ::= '[' Expr? ']' ArraySuffix?
 Initializer     ::= '=' Expr | '{' InitList '}'
 InitList        ::= Expr (',' Expr)* ','?
+
+Declarator      ::= '*'? (IDENT | '(' Declarator ')') ArraySuffix?  -- parseDeclarator / UnwrapDeclarator
 ```
+
+`Declarator` is the shared C-style name-plus-suffix grammar
+(`parseDeclarator`, folded onto a base type by `UnwrapDeclarator`).
+It is used by `VarDecl`'s C-style form (`VarDeclarator` is its
+common case) and, since the move to the shared machinery, by
+`TypedefDecl`: `typedef int arr[2];` and `typedef int* p;` now parse,
+with the trailing array suffix and the prefix `*` folded onto the
+alias type exactly as for a variable declaration.
 
 ### HLSL-compatibility declarations
 
@@ -284,11 +334,14 @@ SwitchStmt      ::= 'switch' '(' Expr ')' '{' SwitchCase* '}'  -- ParseSwitchStm
 SwitchCase      ::= ('case' Expr ':' | 'default' ':') Stmt*    -- ParseCaseStmt / ParseDefaultStmt
 
 BreakStmt       ::= 'break' IDENT? ';'                          -- ParseBreakStatement
-ContinueStmt    ::= 'continue' IDENT? ';'                       -- ParseContinueStatement
+ContinueStmt    ::= 'continue' ';'                             -- ParseContinueStatement
+                                                              -- (no optional label, unlike BreakStmt)
 ReturnStmt      ::= 'return' Expr? ';'                          -- ParseReturnStatement
 DiscardStmt     ::= 'discard' ';'                               -- ParseStatement (inline)
 DeferStmt       ::= 'defer' Stmt                                -- ParseDeferStatement
-ThrowStmt       ::= 'throw' Expr ';'                            -- ParseThrowStatement
+ThrowStmt       ::= 'throw' Expr                                -- ParseThrowStatement
+                                                              -- (does not consume ';'; a trailing
+                                                              --   ';' is parsed as a separate EmptyStmt)
 
 DeclStmt        ::= Decl
 ExprStmt        ::= Expr ';'
@@ -311,7 +364,7 @@ bind looser (assignment).
 | 3 | `*` `/` `%` | left |
 | 4 | `+` `-` | left |
 | 5 | `<<` `>>` | left |
-| 6 | `<` `<=` `>` `>=` | left |
+| 6 | `<` `<=` `>` `>=` `is` `as` (right operand is a Type) | left |
 | 7 | `==` `!=` | left |
 | 8 | `&` | left |
 | 9 | `^` | left |
@@ -332,9 +385,12 @@ BitOrExpr       ::= BitXorExpr ('|' BitXorExpr)*               -- parseInfixExpr
 BitXorExpr      ::= BitAndExpr ('^' BitAndExpr)*               -- parseInfixExprWithPrecedence
 BitAndExpr      ::= EqualityExpr ('&' EqualityExpr)*           -- parseInfixExprWithPrecedence
 EqualityExpr    ::= RelationalExpr (('==' | '!=') RelationalExpr)*  -- parseInfixExprWithPrecedence
-RelationalExpr  ::= ShiftExpr (('<' | '<=' | '>' | '>=') ShiftExpr)*
+RelationalExpr  ::= ShiftExpr (('<' | '<=' | '>' | '>=') ShiftExpr | ('is' | 'as') Type)*
                                                               -- parseInfixExprWithPrecedence;
-                                                              -- '<' is context-sensitive (generic vs comparison)
+                                                              -- '<' is context-sensitive (generic vs comparison);
+                                                              -- 'is' / 'as' are special-cased identifier operators
+                                                              --   (IsTypeExpr / AsTypeExpr) whose right operand is
+                                                              --   parsed as a Type, not a general expression
 ShiftExpr       ::= AddExpr (('<<' | '>>') AddExpr)*           -- parseInfixExprWithPrecedence
 AddExpr         ::= MulExpr (('+' | '-') MulExpr)*            -- parseInfixExprWithPrecedence
 MulExpr         ::= UnaryExpr (('*' | '/' | '%') UnaryExpr)*  -- parseInfixExprWithPrecedence
@@ -475,10 +531,28 @@ GenericParam    ::= IDENT (':' TypeList)?                      -- type parameter
                   | 'let' IDENT ':' Type ('=' Expr)?           -- value parameter
                   | 'each' IDENT (':' TypeList)?               -- pack parameter
 
-WhereClause     ::= 'where' WhereTerm (',' WhereTerm)*         -- see FuncDecl
-WhereTerm       ::= Type ':' Type                              -- conformance constraint
-                  | Type '==' Type                             -- equality constraint
+WhereClause     ::= ('where' WhereTerm)+                       -- see FuncDecl
+WhereTerm       ::= 'optional'? Type ':' Type (',' Type)*      -- conformance constraint(s)
+                  | 'optional'? Type '==' Type                 -- equality constraint
+                  | 'optional'? 'nonempty' '(' Expr ')'        -- non-empty pack constraint
+                  | 'optional'? 'countof' '(' Expr ')' '==' Expr -- variadic pack-count constraint
+                  | '__hasDiffTypeInfo' '(' Type ')'           -- differentiable-type-info constraint
+                  | Type '(' Type ')' 'implicit'?              -- type-coercion constraint
+                                                              --   (maybeParseGenericConstraints builds a
+                                                              --   TypeCoercionConstraintDecl: toType '(' fromType ')')
 ```
+
+Each `where` keyword introduces exactly one `WhereTerm`
+(`maybeParseGenericConstraints` loops over `while (AdvanceIf("where"))`);
+to state several constraints, repeat the keyword. A leading
+`optional` modifier (parsed as `OptionalConstraintModifier`) is
+accepted on every term except `__hasDiffTypeInfo`. The
+`countof(Pack) == IntExpr` form is *oriented*: the reversed spelling
+`N == countof(Pack)` is recognized only to emit a targeted
+diagnostic. `nonempty(Pack)` and `countof(Pack) == IntExpr` are
+pack-shape constraints on a variadic `each` parameter;
+`__hasDiffTypeInfo(Type)` is a compiler-internal differentiability
+constraint.
 
 Where-clauses appear after the parameter list (or after the result
 clause for function-style declarations) and are syntactically optional

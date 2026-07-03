@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:17:31Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
+generated_at: 2026-06-29T17:00:31Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -25,9 +25,14 @@ The entire `Type` family lives under the top-level `Type` entry
 at line ~19 of
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) and
 runs to the closing `},` around line ~784. The family is
-intentionally large and hoistable throughout — identical types
-deduplicate to one IR value, which lets the IR's type-equality
-check be a pointer comparison.
+intentionally large, and most leaf type opcodes are hoistable —
+identical types deduplicate to one IR value, which lets the IR's
+type-equality check be a pointer comparison. The exceptions are the
+parent/container and global entries (`Enum`, `struct`, `class` are
+`parent`; `interface` is `global`) and a few unflagged helper entries
+(`AfterBaseType`, `MakeTensorAddressingTensorLayout`,
+`MakeTensorAddressingTensorView`); consult the per-opcode Flags column
+below for the authoritative state.
 
 C++ wrappers are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). Builder
@@ -42,6 +47,14 @@ classes documented in [../ast-reference/types.md](../ast-reference/types.md).
 
 ## Family hierarchy
 
+The nodes below are the abstract intermediate group entries that the
+Lua file nests directly under `Type` (in Lua order); the many concrete
+leaf opcodes that sit directly under `Type` between them (`CapabilitySet`,
+`DynamicType`, `AnyValueType`, `Func`, `BasicBlock`, `Vec`, `Mat`,
+`MetalPackedVec`, `Atomic`, the layout markers, `struct`, `class`,
+`interface`, the set-theoretic types, ...) appear in the `## Opcodes`
+tables rather than here.
+
 ```mermaid
 flowchart TD
   IRInst --> Type
@@ -50,46 +63,20 @@ flowchart TD
   Type --> PackedFloatType
   Type --> RawPointerTypeBase
   Type --> ArrayTypeBase
-  Type --> Composite["Composite and parametric"]
+  Type --> DifferentialPairTypeBase
+  Type --> TranslatedTypeBase
+  Type --> BindExistentialsTypeBase
+  Type --> Rate
+  Type --> Kind
   Type --> PtrTypeBase
-  Type --> Resource["Resource family"]
-  Type --> Diff["Differentiation types"]
-  Type --> Existential["Existential / interface"]
-  Type --> RatesKinds["Rates and kinds"]
-  Type --> Aggregates["Struct / class / interface containers"]
-  Type --> Tuples["Tuple / pack / target-tuple"]
-  Type --> Sets["Set-theoretic types"]
-  Composite --> Vec
-  Composite --> Mat
-  Composite --> FuncType[Func]
-  Composite --> AtomicNode[Atomic]
-  Composite --> ResultOptional["Result / Optional / Conditional / Enum"]
-  PtrTypeBase --> PtrNode[Ptr]
-  PtrTypeBase --> RefBorrow["RefParam / BorrowInParam / BorrowInOutParam"]
-  PtrTypeBase --> PseudoPtrNode[PseudoPtr]
-  Resource --> Sampler["Sampler family"]
-  Resource --> TextureFamily["TextureTypeBase"]
-  Resource --> Buffer["UntypedBufferResourceType"]
-  Resource --> RayTrace["RayQuery / HitObject / RaytracingAccelerationStructure"]
-  Resource --> Coop["CoopVector / CoopMatrix"]
-  Resource --> PatchStream["HLSLPatch / HLSLStreamOutput / MeshOutput"]
-  Resource --> ParamGroup["PointerLikeType / ParameterGroupType"]
-  Diff --> DiffPairBase[DifferentialPairTypeBase]
-  Diff --> TranslatedTypeBase
-  Diff --> DiffFunc["ForwardDiffFuncType / BackwardDiffFuncType / RematFuncType / ..."]
-  Existential --> BindExistentialsBase[BindExistentialsTypeBase]
-  Existential --> DynamicTypeNode[DynamicType]
-  Existential --> AnyValueTypeNode[AnyValueType]
-  Existential --> RTTITypes["RTTIType / RTTIHandleType / RTTIPointerType"]
-  Existential --> ThisAssoc["this_type / associated_type"]
-  Existential --> WitnessTableTypeBase
-  RatesKinds --> RateNode["Rate (ConstExpr / SpecConst / GroupShared / ActualGlobalRate)"]
-  RatesKinds --> RateQualifiedNode[RateQualified]
-  RatesKinds --> Kind["Kind (Type / TypeParameterPack / Rate / Generic)"]
-  Sets --> UntaggedUnionTypeNode[UntaggedUnionType]
-  Sets --> ElementOfSetTypeNode[ElementOfSetType]
-  Sets --> SetTagTypeNode[SetTagType]
-  Sets --> TaggedUnionTypeNode[TaggedUnionType]
+  Type --> SamplerStateTypeBase
+  Type --> ResourceTypeBase
+  Type --> UntypedBufferResourceType
+  Type --> HLSLPatchType
+  Type --> BuiltinGenericType
+  Type --> TupleTypeBase
+  Type --> WitnessTableTypeBase
+  ResourceTypeBase --> TextureTypeBase
 ```
 
 ## Opcodes
@@ -182,6 +169,7 @@ Both are built by `IRBuilder::getArrayTypeBase`.
 | --- | --- | --- | --- | --- | --- |
 | `Vec` | `VectorType` | `elementType: IRType, elementCount` | H | `VectorExpressionType` | Fixed-length vector. |
 | `Mat` | `MatrixType` | `elementType: IRType, rowCount, columnCount, layout` | H | `MatrixExpressionType` | Fixed-shape matrix; `layout` is an int literal selecting row-major / column-major. |
+| `MetalPackedVec` | `MetalPackedVectorType` | `elementType: IRType, elementCount` | H | (synthesized) | Element-aligned, unpadded vector storage type for Metal device buffers; emitted as MSL `packed_T<N>`. |
 | `Atomic` | `AtomicType` | `elementType: IRType` | H | Atomic-intrinsic lowering | Atomic-typed view of an element type. |
 | `Result` | `ResultType` | `valueType: IRType, errorType: IRType` | H | `ResultType` (`Result<T, E>`) | Sum of a success value type and an error type. |
 | `Optional` | `OptionalType` | `valueType: IRType` | H | `OptionalType` (`Optional<T>`) | Value-or-none. |
@@ -218,7 +206,7 @@ The context-channel types are built by helpers such as
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `TensorView` | `TensorViewType` | `elementType: IRType` | H | Tensor-API lowering | View of a tensor element type. |
-| `TorchTensor` | `TorchTensorType` | — | H | Torch-tensor API lowering | PyTorch-style tensor handle. |
+| `TorchTensor` | `TorchTensorType` | `elementType: IRType` | H | Torch-tensor API lowering | PyTorch-style tensor handle. |
 | `ArrayListVector` | `ArrayListType` | `elementType: IRType` | H | `ArrayList`-style lowering | Dynamic-array-like container. |
 | `TensorAddressingTensorLayoutType` | — | `dimension, clampMode` | H | (synthesized) | Tensor-addressing layout descriptor. |
 | `TensorAddressingTensorViewType` | — | `dimension, hasDimension` | H | (synthesized) | Tensor-addressing view descriptor. |
@@ -416,6 +404,24 @@ the row-major / column-major convention. Both types are
 hoistable, so the same vector type appears as a single IR value
 across the module — which is why structural type-equality is
 implemented as an `IRInst*` comparison.
+
+### `MetalPackedVec`
+
+`MetalPackedVec(elementType, elementCount)` mirrors `Vec` in shape but
+carries Metal's natural (scalar-aligned, tightly packed) buffer layout
+rather than the std-style padded layout of a plain `Vec` — for example a
+3-vector of 32-bit floats occupies 12 bytes with no trailing padding. It
+has no AST origin; it is synthesized by the Metal buffer-element-type
+legalization in
+[slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp)
+via `IRBuilder::getMetalPackedVectorType` when rewriting the element type
+of a Metal device buffer. Its size and layout contribution are computed in
+[slang-ir-layout.cpp](../../../../source/slang/slang-ir-layout.cpp), and the
+Metal emitter in
+[slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp)
+prints it as MSL `packed_T<N>` (e.g. `packed_float3`). Element extraction
+projects out `elementType`, the same as for `Vec` (see
+[slang-ir.cpp](../../../../source/slang/slang-ir.cpp)).
 
 ### `Func`
 

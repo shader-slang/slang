@@ -363,6 +363,11 @@ struct ParameterInfo : RefObject
     ParameterBindingInfo bindingInfo[kLayoutResourceKindCount];
 };
 
+static void applyBindingInfoToParameter(
+    RefPtr<VarLayout> varLayout,
+    ParameterBindingInfo bindingInfos[kLayoutResourceKindCount],
+    bool updateExistingResourceInfo = false);
+
 struct EntryPointParameterBindingContext
 {
     // What ranges of resources bindings are already claimed for this translation unit
@@ -920,8 +925,29 @@ static void addExplicitParameterBinding(
             // Record that the particular binding space was
             // used by an explicit binding, so that we don't
             // claim it for auto-generated bindings that
-            // need to grab a full space
-            markSpaceUsed(context, parameterInfo->varLayout, semanticInfo.space);
+            // need to grab a full space.
+            //
+            // `InputAttachmentIndex` does not occupy a descriptor set: it lowers to
+            // `OpDecorateInputAttachmentIndex` only, never `OpDecorateDescriptorSet`, and its
+            // `semanticInfo.space` reaching here is a hardcoded placeholder `0` (the producers
+            // have no descriptor set to supply). Marking that placeholder space "used" would
+            // falsely occupy descriptor set 0 -- e.g. making a requested `-bindless-space-index 0`
+            // report unavailable. So skip the space-occupancy marking for this kind, while still
+            // recording the input-attachment index range below for overlap detection.
+            //
+            // This exclusion is intentionally narrow (only `InputAttachmentIndex`), matching the
+            // scope of the regression it fixes (#11860). It is NOT the only kind that reaches
+            // this branch with a placeholder `space == 0`: `VaryingInput`/`VaryingOutput` (with
+            // an explicit `[[vk::location]]`) and `SpecializationConstant` (with
+            // `[[vk::constant_id]]`) arrive here the same way via
+            // `addExplicitParameterBindings_GLSL`, so they share the latent false-set-0 pattern.
+            // Widening the guard to those (or replacing it with a shared "does this kind occupy a
+            // descriptor space?" predicate) has broader, untested blast radius and is deliberately
+            // left as a separate change rather than folded into this fix.
+            if (semanticInfo.kind != LayoutResourceKind::InputAttachmentIndex)
+            {
+                markSpaceUsed(context, parameterInfo->varLayout, semanticInfo.space);
+            }
 
             overlappedVarLayout = usedRangeSet->usedResourceRanges[(int)semanticInfo.kind].Add(
                 parameterInfo->varLayout,
@@ -1381,6 +1407,181 @@ static void addExplicitParameterBindings_GLSL(
         count);
 }
 
+// Return whether `kind` is one of the descriptor-shaped resource kinds that an
+// explicit `[[vk::binding(binding, set)]]` annotation can place on an entry-point
+// parameter. The closed list is the contract: a plain resource/buffer/sampler
+// consumes a `DescriptorTableSlot`, and a whole-space parameter (e.g. a
+// `ParameterBlock`) consumes a `SubElementRegisterSpace`. No other kind is
+// positioned by `vk::binding`.
+static bool isVkBindingEntryPointParameterResourceKind(LayoutResourceKind kind)
+{
+    switch (kind)
+    {
+    case LayoutResourceKind::DescriptorTableSlot:
+    case LayoutResourceKind::SubElementRegisterSpace:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Return the single resource info that an explicit `[[vk::binding(...)]]` should
+// position for `varLayout`, or null if there is none. The lookup order is
+// meaningful: a parameter that consumes a `DescriptorTableSlot` is bound by
+// (binding, set), so that takes precedence; only a whole-space parameter that
+// has no descriptor slot is bound by its `SubElementRegisterSpace`.
+static TypeLayout::ResourceInfo* findVkBindingEntryPointParameterResourceInfo(VarLayout* varLayout)
+{
+    if (auto descriptorTableSlot =
+            varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::DescriptorTableSlot))
+        return descriptorTableSlot;
+
+    if (auto subElementRegisterSpace =
+            varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::SubElementRegisterSpace))
+        return subElementRegisterSpace;
+
+    return nullptr;
+}
+
+// Return whether `varLayout` is an entry-point parameter that carries an
+// explicit `[[vk::binding(...)]]` annotation we can honor: the target supports
+// the feature, the parameter has the attribute, and its type actually consumes a
+// descriptor-shaped resource that the annotation can position.
+static bool hasSupportedVkBindingOnEntryPointParameter(
+    ParameterBindingContext* context,
+    VarLayout* varLayout)
+{
+    if (!doesTargetSupportVkBindingOnEntryPointParameters(context->getTargetRequest()))
+        return false;
+
+    if (!varLayout->varDecl)
+        return false;
+
+    auto varDecl = varLayout->varDecl.as<VarDeclBase>();
+    if (!varDecl)
+        return false;
+
+    if (!varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
+        return false;
+
+    return findVkBindingEntryPointParameterResourceInfo(varLayout) != nullptr;
+}
+
+// Reserve the explicit bindings requested by the annotations on a single
+// entry-point parameter `varLayout`, returning whether any reservation was made.
+//
+// This is the entry-point analogue of the global Khronos path in
+// `_generateParameterBindings` (see the `isKhronosTarget(...) || isWGPUTarget(...)`
+// block above): `[[vk::binding(binding, set)]]` positions the descriptor-shaped
+// resource (a `DescriptorTableSlot`, or the `SubElementRegisterSpace` of a
+// whole-space parameter such as a `ParameterBlock`), and `[[vk::input_attachment_index]]`
+// independently positions the `InputAttachmentIndex` of a `SubpassInput`. A
+// `SubpassInput` consumes both kinds at once, so both must be reserved here;
+// reserving only the descriptor slot would silently drop the input-attachment
+// index and emit the wrong (positionally-defaulted) value.
+static bool addExplicitVkBindingForEntryPointParameter(
+    ParameterBindingContext* context,
+    RefPtr<VarLayout> varLayout)
+{
+    if (!doesTargetSupportVkBindingOnEntryPointParameters(context->getTargetRequest()))
+        return false;
+
+    auto varDecl = varLayout->varDecl.as<VarDeclBase>();
+    if (!varDecl)
+        return false;
+
+    RefPtr<ParameterInfo> parameterInfo = new ParameterInfo();
+    parameterInfo->varLayout = varLayout;
+    bool reservedAny = false;
+
+    // `[[vk::input_attachment_index(index)]]` positions the input-attachment
+    // index of a `SubpassInput`, independently of its descriptor binding.
+    if (auto inputAttachmentIndexAttr =
+            varDecl.getDecl()->findModifier<GLSLInputAttachmentIndexLayoutAttribute>())
+    {
+        if (auto inputAttachmentResourceInfo =
+                varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::InputAttachmentIndex))
+        {
+            LayoutSemanticInfo semanticInfo;
+            semanticInfo.kind = LayoutResourceKind::InputAttachmentIndex;
+            semanticInfo.index = (UInt)inputAttachmentIndexAttr->location;
+            semanticInfo.space = 0;
+            addExplicitParameterBinding(
+                context,
+                parameterInfo,
+                varDecl.getDecl(),
+                semanticInfo,
+                inputAttachmentResourceInfo->count);
+            reservedAny = true;
+        }
+    }
+
+    // `[[vk::binding(binding, set)]]` positions the descriptor-shaped resource.
+    if (auto attr = varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
+    {
+        if (auto explicitResourceInfo = findVkBindingEntryPointParameterResourceInfo(varLayout))
+        {
+            LayoutSemanticInfo semanticInfo;
+            LayoutSize count = explicitResourceInfo->count;
+            if (explicitResourceInfo->kind == LayoutResourceKind::DescriptorTableSlot)
+            {
+                semanticInfo.kind = LayoutResourceKind::DescriptorTableSlot;
+                semanticInfo.index = attr->binding;
+                semanticInfo.space = attr->set;
+            }
+            else if (explicitResourceInfo->kind == LayoutResourceKind::SubElementRegisterSpace)
+            {
+                semanticInfo.kind = LayoutResourceKind::SubElementRegisterSpace;
+                if (attr->binding != 0)
+                {
+                    getSink(context)->diagnose(Diagnostics::WholeSpaceParameterRequiresZeroBinding{
+                        .paramName = varDecl.getName(),
+                        .binding = (int64_t)attr->binding,
+                        .location = attr->loc});
+                }
+                semanticInfo.index = attr->set;
+                semanticInfo.space = 0;
+            }
+            else
+            {
+                SLANG_UNEXPECTED("unexpected vk::binding entry-point parameter resource kind");
+            }
+            addExplicitParameterBinding(
+                context,
+                parameterInfo,
+                varDecl.getDecl(),
+                semanticInfo,
+                count);
+            reservedAny = true;
+        }
+    }
+
+    if (!reservedAny)
+        return false;
+
+    applyBindingInfoToParameter(
+        varLayout,
+        parameterInfo->bindingInfo,
+        /* updateExistingResourceInfo */ true);
+    return true;
+}
+
+// Reserve the explicit `[[vk::binding]]` / `[[vk::input_attachment_index]]`
+// bindings for every parameter of `entryPointLayout`. Called once per entry point
+// before automatic allocation, so that later automatic allocation cannot claim a
+// range a user requested explicitly (mirroring how global explicit bindings are
+// reserved up front).
+static void addExplicitVkBindingsForEntryPointParameters(
+    ParameterBindingContext* context,
+    EntryPointLayout* entryPointLayout)
+{
+    auto paramsStructLayout = getScopeStructLayout(entryPointLayout);
+    for (auto fieldLayout : paramsStructLayout->fields)
+    {
+        addExplicitVkBindingForEntryPointParameter(context, fieldLayout);
+    }
+}
+
 // Given a single parameter, collect whatever information we have on
 // how it has been explicitly bound, which may come from multiple declarations
 void _generateParameterBindings(
@@ -1612,7 +1813,8 @@ static void completeBindingsForParameterImpl(
 
 static void applyBindingInfoToParameter(
     RefPtr<VarLayout> varLayout,
-    ParameterBindingInfo bindingInfos[kLayoutResourceKindCount])
+    ParameterBindingInfo bindingInfos[kLayoutResourceKindCount],
+    bool updateExistingResourceInfo)
 {
     for (auto k = 0; k < kLayoutResourceKindCount; ++k)
     {
@@ -1623,10 +1825,33 @@ static void applyBindingInfoToParameter(
         if (bindingInfo.count.compare(0) == std::partial_ordering::equivalent)
             continue;
 
-        // Add a record to the variable layout
-        auto varRes = varLayout->AddResourceInfo(kind);
+        auto varRes = updateExistingResourceInfo ? varLayout->findOrAddResourceInfo(kind)
+                                                 : varLayout->AddResourceInfo(kind);
         varRes->space = (int)bindingInfo.space;
         varRes->index = bindingInfo.index;
+    }
+}
+
+// Seed `bindingInfos` from the explicit bindings already recorded on `varLayout`
+// (by `addExplicitVkBindingForEntryPointParameter`), so that
+// `completeBindingsForParameterImpl` treats those kinds as already placed and
+// only auto-allocates the remaining (implicit) ones. This is what lets a
+// parameter mix an explicit vk::binding with other implicitly-allocated resource
+// kinds without the completion pass overwriting the explicit choice.
+static void copyExistingBindingInfoFromParameter(
+    RefPtr<VarLayout> varLayout,
+    ParameterBindingInfo bindingInfos[kLayoutResourceKindCount])
+{
+    for (auto resInfo : varLayout->resourceInfos)
+    {
+        auto typeResInfo = varLayout->typeLayout->FindResourceInfo(resInfo.kind);
+        if (!typeResInfo)
+            continue;
+
+        auto& bindingInfo = bindingInfos[(int)resInfo.kind];
+        bindingInfo.count = typeResInfo->count;
+        bindingInfo.index = resInfo.index.getValidValue();
+        bindingInfo.space = resInfo.space;
     }
 }
 
@@ -1649,11 +1874,81 @@ static void completeBindingsForParameter(
 
 static void completeBindingsForParameter(
     ParameterBindingContext* context,
-    RefPtr<VarLayout> varLayout)
+    RefPtr<VarLayout> varLayout,
+    bool preserveExistingBindingInfo = false)
 {
     ParameterBindingInfo bindingInfos[kLayoutResourceKindCount];
+    if (preserveExistingBindingInfo)
+        copyExistingBindingInfoFromParameter(varLayout, bindingInfos);
     completeBindingsForParameterImpl(context, varLayout, bindingInfos);
-    applyBindingInfoToParameter(varLayout, bindingInfos);
+    applyBindingInfoToParameter(
+        varLayout,
+        bindingInfos,
+        /* updateExistingResourceInfo */ preserveExistingBindingInfo);
+}
+
+// Return whether any parameter of this entry point carries a vk::binding we can
+// honor. Used to decide whether the entry point needs the per-field completion
+// path (`completeBindingsForEntryPointParameters`) instead of the default
+// aggregate path, which has no notion of per-parameter explicit bindings.
+static bool entryPointHasSupportedVkBindingParameters(
+    ParameterBindingContext* context,
+    EntryPointLayout* entryPointLayout)
+{
+    auto paramsStructLayout = getScopeStructLayout(entryPointLayout);
+    for (auto fieldLayout : paramsStructLayout->fields)
+    {
+        if (hasSupportedVkBindingOnEntryPointParameter(context, fieldLayout))
+            return true;
+    }
+    return false;
+}
+
+// Drop the synthetic, field-relative descriptor offsets from an entry-point
+// parameter's var layout before completion, so that completion allocates those
+// kinds from the global binding context instead of treating the relative offset
+// as final. The explicitly-bound kind (if any) is kept, since
+// `addExplicitVkBindingForEntryPointParameter` already recorded its absolute
+// binding. The type-layout resource usage is left intact, so an implicit field
+// still receives a real descriptor binding from the global context.
+static void removeNonExplicitEntryPointParameterDescriptorOffsets(
+    ParameterBindingContext* context,
+    RefPtr<VarLayout> fieldLayout)
+{
+    auto explicitResourceInfo = hasSupportedVkBindingOnEntryPointParameter(context, fieldLayout)
+                                    ? findVkBindingEntryPointParameterResourceInfo(fieldLayout)
+                                    : nullptr;
+    auto explicitKind =
+        explicitResourceInfo ? explicitResourceInfo->kind : LayoutResourceKind::None;
+
+    for (auto typeResInfo : fieldLayout->typeLayout->resourceInfos)
+    {
+        // Drop synthetic field offsets that should be allocated from the global binding context.
+        // The type resource usage remains, so implicit fields still receive descriptor bindings.
+        auto kind = typeResInfo.kind;
+        if (isVkBindingEntryPointParameterResourceKind(kind) && kind != explicitKind)
+            fieldLayout->removeResourceUsage(kind);
+    }
+}
+
+// Complete bindings for an entry point that has at least one honored vk::binding,
+// field by field. Each parameter has its synthetic descriptor offsets dropped and
+// is then completed while preserving the explicit bindings already reserved, so
+// explicit and implicit parameters coexist: explicit kinds keep their requested
+// (binding, set), and implicit kinds are allocated from the global context.
+static void completeBindingsForEntryPointParameters(
+    ParameterBindingContext* context,
+    EntryPointLayout* entryPointLayout)
+{
+    auto paramsStructLayout = getScopeStructLayout(entryPointLayout);
+    for (auto fieldLayout : paramsStructLayout->fields)
+    {
+        removeNonExplicitEntryPointParameterDescriptorOffsets(context, fieldLayout);
+        completeBindingsForParameter(
+            context,
+            fieldLayout,
+            /* preserveExistingBindingInfo */ true);
+    }
 }
 
 struct SimpleSemanticInfo
@@ -3689,7 +3984,14 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
         // We mostly treat an entry point like a single shader parameter that
         // uses its `parametersLayout`.
         //
-        completeBindingsForParameter(m_context, globalEntryPointInfo->parametersLayout);
+        if (entryPointHasSupportedVkBindingParameters(m_context, globalEntryPointInfo))
+        {
+            completeBindingsForEntryPointParameters(m_context, globalEntryPointInfo);
+        }
+        else
+        {
+            completeBindingsForParameter(m_context, globalEntryPointInfo->parametersLayout);
+        }
     }
 
     void visitRenamedEntryPoint(
@@ -3781,6 +4083,100 @@ static void _completeBindings(ParameterBindingContext* context, ComponentType* p
     _completeBindings(context, program, &counters);
 }
 
+// Return whether an entry-point parameter consuming `kind` would need a default
+// space/set to live in. Resource kinds that are placed by other mechanisms
+// (push constants, whole register spaces, varying in/out, ray-tracing payloads,
+// input-attachment indices, etc.) do not, so they are excluded; anything else does.
+static bool doesEntryPointParameterResourceNeedDefaultSpace(LayoutResourceKind kind)
+{
+    switch (kind)
+    {
+    default:
+        return true;
+    case LayoutResourceKind::PushConstantBuffer:
+    case LayoutResourceKind::RegisterSpace:
+    case LayoutResourceKind::SubElementRegisterSpace:
+    case LayoutResourceKind::VaryingInput:
+    case LayoutResourceKind::VaryingOutput:
+    case LayoutResourceKind::HitAttributes:
+    case LayoutResourceKind::RayPayload:
+    // `InputAttachmentIndex` positions a Vulkan input-attachment index, not a
+    // descriptor-set-bound resource, so an entry-point parameter that consumes it (a
+    // `SubpassInput`) must not force allocation of a default descriptor space. Otherwise
+    // descriptor set 0 is reserved for nothing -- e.g. making a requested
+    // `-bindless-space-index 0` report unavailable when a `SubpassInput` is present.
+    case LayoutResourceKind::InputAttachmentIndex:
+        return false;
+    }
+}
+
+// Return true if `fieldLayout` (a single entry-point parameter) carries an
+// explicit `[[vk::binding(...)]]` annotation that places its `kind` resource,
+// on a target that honors such annotations on entry-point parameters.
+static bool isEntryPointParameterResourceExplicitlyBoundByVkBinding(
+    SharedParameterBindingContext& sharedContext,
+    VarLayout* fieldLayout,
+    LayoutResourceKind kind)
+{
+    if (!doesTargetSupportVkBindingOnEntryPointParameters(sharedContext.getTargetRequest()))
+        return false;
+
+    if (!fieldLayout->varDecl)
+        return false;
+
+    auto varDecl = fieldLayout->varDecl.as<VarDeclBase>();
+    if (!varDecl)
+        return false;
+
+    if (!varDecl.getDecl()->findModifier<GLSLBindingAttribute>())
+        return false;
+
+    auto explicitResourceInfo = findVkBindingEntryPointParameterResourceInfo(fieldLayout);
+    return explicitResourceInfo && explicitResourceInfo->kind == kind;
+}
+
+// Return true if every entry-point parameter of `entryPoint` that consumes
+// `kind` has an explicit `[[vk::binding(...)]]` annotation for that kind. When
+// this holds, the kind is fully placed by the explicit sets requested by the
+// user, so no default space is needed for it; when it does not (a mix of
+// explicit and implicit, or all implicit), the implicitly-bound fields still
+// need a default space. Used by `_calcNeedsDefaultSpace` to subtract explicitly
+// bound entry-point parameters from the aggregate default-space requirement.
+static bool allEntryPointParametersOfKindAreExplicitlyVkBound(
+    SharedParameterBindingContext& sharedContext,
+    EntryPointLayout* entryPoint,
+    LayoutResourceKind kind)
+{
+    // Only meaningful for the resource kinds that explicit entry-point
+    // `[[vk::binding(...)]]` annotations actually place. For any other kind
+    // (e.g. a promoted push constant or a uniform that landed in a default
+    // constant buffer), no entry-point parameter can be "explicitly bound" for
+    // it, so the aggregate requirement stands.
+    if (!isVkBindingEntryPointParameterResourceKind(kind))
+        return false;
+
+    auto paramsStructLayout = getScopeStructLayout(entryPoint);
+    bool sawConsumingField = false;
+    for (auto fieldLayout : paramsStructLayout->fields)
+    {
+        // Only fields that actually consume `kind` are relevant to whether a
+        // default space is needed for it.
+        if (!fieldLayout->typeLayout->FindResourceInfo(kind))
+            continue;
+
+        sawConsumingField = true;
+        if (!isEntryPointParameterResourceExplicitlyBoundByVkBinding(
+                sharedContext,
+                fieldLayout,
+                kind))
+            return false;
+    }
+
+    // If the aggregate reports consumption of `kind` but no individual field
+    // claims it, be conservative and keep the default-space requirement.
+    return sawConsumingField;
+}
+
 static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
 {
     // Next we will look at the global-scope parameters and see if
@@ -3846,24 +4242,37 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
     // We also need a default space for any entry-point parameters
     // that consume appropriate resource kinds.
     //
+    // We make this determination from the *aggregate* entry-point parameter
+    // layout (`parametersLayout`) rather than per-field, because that aggregate
+    // layout reflects how the parameters are actually realized after promotion.
+    // For example, a scalar `uniform` entry-point parameter is promoted to a
+    // push constant on Khronos targets, so the aggregate layout reports a
+    // `PushConstantBuffer` resource (which needs no default space) even though
+    // the individual field's type layout still reports plain `Uniform` bytes.
+    // Iterating per-field would miss that promotion and wrongly force a default
+    // space (see `tests/spirv/push-constant-space.slang`).
+    //
     for (auto& entryPoint : sharedContext.programLayout->entryPoints)
     {
         auto paramsLayout = entryPoint->parametersLayout->getTypeLayout();
         for (auto resInfo : paramsLayout->resourceInfos)
         {
-            switch (resInfo.kind)
-            {
-            default:
-                break;
-            case LayoutResourceKind::PushConstantBuffer:
-            case LayoutResourceKind::RegisterSpace:
-            case LayoutResourceKind::SubElementRegisterSpace:
-            case LayoutResourceKind::VaryingInput:
-            case LayoutResourceKind::VaryingOutput:
-            case LayoutResourceKind::HitAttributes:
-            case LayoutResourceKind::RayPayload:
+            if (!doesEntryPointParameterResourceNeedDefaultSpace(resInfo.kind))
                 continue;
-            }
+
+            // The aggregate layout cannot tell us *which* field contributed this
+            // resource kind, so it cannot itself account for explicit
+            // `[[vk::binding(...)]]` annotations. If every field that consumes
+            // this kind has an explicit binding, the kind is fully placed by the
+            // explicit sets and needs no default space; otherwise (a mix of
+            // explicit and implicit, or all implicit) a default space is still
+            // required for the implicitly-bound fields.
+            //
+            if (allEntryPointParametersOfKindAreExplicitlyVkBound(
+                    sharedContext,
+                    entryPoint,
+                    resInfo.kind))
+                continue;
 
             return true;
         }
@@ -4100,9 +4509,10 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
     // Along the way we will issue diagnostics if there appear to
     // be overlapping, conflicting, or inconsistent explicit bindings.
     //
-    // Note that we do *not* support explicit binding annotations
-    // on entry point parameters, so we only consider global shader
-    // parameters here.
+    // Entry-point parameters also support `[[vk::binding(...)]]` for Khronos and WGPU targets.
+    // Those bindings are reserved here, before automatic allocation, for the same reason global
+    // parameter bindings are reserved here: later automatic allocation must not claim an explicitly
+    // requested binding range.
     //
     // (Also note that explicit bindings end up being the main
     // source of complexity in the layout system, and we could greatly
@@ -4112,6 +4522,10 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
     for (auto& parameter : sharedContext.parameters)
     {
         _generateParameterBindings(&context, parameter);
+    }
+    for (auto& entryPoint : sharedContext.programLayout->entryPoints)
+    {
+        addExplicitVkBindingsForEntryPointParameters(&context, entryPoint);
     }
 
     // It is possible that code has specified an explicit location
