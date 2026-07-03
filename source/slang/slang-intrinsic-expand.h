@@ -55,10 +55,13 @@ protected:
     //
     Index m_argIndexOffset = 0;
 
-    // Set by the `$X` marker when a combined texture-sampler has been lowered into a
+    // Set by the `$q` marker when a combined texture-sampler has been lowered into a
     // `{texture, sampler}` pair, which inserts a sampler operand at index 1. Texture-only
     // queries (e.g. `GetDimensions`) take no sampler, so their positional `$N` (for N >= 1)
-    // indices must skip over that injected sampler operand. See shader-slang/slang#11669.
+    // indices must skip over that injected sampler operand. This is the counterpart of the
+    // `$p` marker (`m_argIndexOffset`): `$p` handles a string numbered with an absent sampler
+    // slot, `$q` a string numbered without the sampler that lowering injected. See
+    // shader-slang/slang#11669.
     bool m_skipCombinedSamplerOperand = false;
 };
 

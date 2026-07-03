@@ -466,12 +466,16 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
-    case 'X':
+    case 'q':
         {
-            // Marker that emits nothing; used by texture-only queries such as `GetDimensions`.
+            // Marker that emits nothing; used by a texture-only query (`GetDimensions`) on a
+            // combined texture-sampler. It is the mirror of `$p` below: `$p` compensates for a
+            // string numbered *with* a sampler slot that is absent, while `$q` compensates for a
+            // string numbered *without* the sampler that lowering injected.
             //
             // When a combined `Sampler2D`-style value is lowered into a `{texture, sampler}` pair
-            // (HLSL/Metal/WGSL/CPU/CUDA), the lowered call gains an injected sampler operand at
+            // (HLSL/Metal/WGSL/CPU; see `lowerCombinedTextureSamplers`), the lowered call gains an
+            // injected sampler operand at
             // index 1 that a texture-only query never consumes. Without compensation the positional
             // `$N` accessors in the query's intrinsic string would address the sampler and shift
             // every output argument by one (see shader-slang/slang#11669). Setting this flag makes
