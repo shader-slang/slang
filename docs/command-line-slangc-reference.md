@@ -361,7 +361,7 @@ Write shader coverage manifest metadata to an explicit JSON sidecar path. Use th
 
 **-trace-coverage-counter-width &lt;bits&gt;**
 
-Per-slot bit width of the synthesized `__slang_coverage` buffer. Accepts `64` (default) or `32`. uint64 counters effectively cannot wrap within any practical run; uint32 counters wrap silently at 2^32 hits per slot. Use `32` when targeting a runtime driver that does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon, which exposes `shaderBufferInt64Atomics = false`). Implies `-trace-coverage` is meaningful; ignored when no coverage mode is enabled. 
+Per-slot bit width of the synthesized `__slang_coverage` buffer. Accepts `64` (default) or `32`. uint64 counters effectively cannot wrap within any practical run; uint32 counters wrap silently at 2^32 hits per slot. Use `32` when targeting a runtime driver that does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon, which exposes `shaderBufferInt64Atomics = false`). Metal targets (`metal`, `metallib`, `metallib-asm`): MSL provides no 64-bit atomic fetch-add, so counting-mode counters are capped to 32 bits; an explicitly requested `64` is capped with warning E45115. Boolean coverage (`-trace-coverage-boolean`) writes plain non-atomic stores and honors the requested width on all targets. Implies `-trace-coverage` is meaningful; ignored when no coverage mode is enabled. 
 
 
 <a id="report-dynamic-dispatch-sites"></a>
