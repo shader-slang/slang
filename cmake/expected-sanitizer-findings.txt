@@ -31,17 +31,23 @@
 #   cmake/sanitizer-ignorelist.txt     -- suppresses UBSan checks at compile level
 #   This file                          -- accepts real findings as known issues
 
-# #10828: Preprocessor ExpansionInputStream leak during slangc-test
-# Leak from _maybeBeginMacroInvocation() and type layout objects
-# created during compilation.
-LEAK: _maybeBeginMacroInvocation
+# Record-replay proxy leaks during the replay unit tests: the replay
+# path invokes proxied methods with default-initialized out-parameters
+# and discards the results, so replayed object-creating calls (sessions
+# via tryWrap, digest blobs via getSessionDescDigest, wrapped
+# filesystems) are never released. Root allocation sites:
+#   SlangRecord::tryWrap<...>          (proxy-base.cpp)
+#   Slang::RawBlob::tryCreate          (via GlobalSessionProxy digest replay)
+LEAK: SlangRecord::tryWrap
+LEAK: SlangRecord::wrapObject
+LEAK: Slang::RawBlob::tryCreate
 
-# #10893: Use-after-free of TypeLayoutReflection in slang-rhi
-# ShaderObjectLayout cache during render-test CPU compute tests.
-# All three SUMMARY lines below cascade from a single dangling vptr
-# dereference in TypeLayout::FindResourceInfo / List::begin(). UBSan
-# SUMMARY lines only carry file:line -- update line numbers if the
-# surrounding code shifts, or remove entries when #10893 is fixed.
-Slang::List<Slang::TypeLayout::ResourceInfo, Slang::StandardAllocator>::begin()
-slang-reflection-api.cpp:1384
-slang-type-layout.h:772
+# Historical entries, removed when their findings stopped occurring
+# (nightly run 28644605608 flagged them as never-matched):
+#   #10828 LEAK: _maybeBeginMacroInvocation -- fixed (wrong-arg-count
+#     macro invocation error paths now free the MacroInvocation).
+#   #10893 TypeLayoutReflection use-after-free SUMMARY patterns
+#     (List<ResourceInfo>::begin / slang-reflection-api.cpp /
+#     slang-type-layout.h) -- the UBSan finding no longer occurs even
+#     though render-test CPU compute tests still run; re-add (with
+#     current line numbers) if #10893 resurfaces.
