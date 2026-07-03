@@ -225,7 +225,7 @@ emscripten::val Session::createCompositeComponentType(emscripten::val components
         for (size_t i = 0U; i < componentsArray.size(); i++)
         {
             auto componentVal = componentsArray[i];
-            if (componentVal.instanceof(emscripten::val::module_property("ComponentType")))
+            if (componentVal.instanceof (emscripten::val::module_property("ComponentType")))
             {
                 auto componentType = componentVal.as<ComponentType>();
                 nativeComponents.push_back(componentType.interface());
@@ -446,28 +446,29 @@ TypeLayoutReflection* ProgramLayout::getGlobalParamsTypeLayout()
     return (slang::wgsl::TypeLayoutReflection*)(interface()->getGlobalParamsTypeLayout());
 }
 
-FunctionReflection* ProgramLayout::findFunctionByName(std::string name)
+FunctionReflection* ProgramLayout::findFunctionByName(const std::string& name)
 {
     return (slang::wgsl::FunctionReflection*)(interface()->findFunctionByName(name.c_str()));
 }
 
-TypeReflection* ProgramLayout::findTypeByName(std::string name)
+TypeReflection* ProgramLayout::findTypeByName(const std::string& name)
 {
     return (slang::wgsl::TypeReflection*)(interface()->findTypeByName(name.c_str()));
 }
 
 VariableReflection* ProgramLayout::findVarByNameInType(
     slang::wgsl::TypeReflection* type,
-    std::string name)
+    const std::string& name)
 {
     if (!type)
         return nullptr;
+
     return (slang::wgsl::VariableReflection*)interface()->findVarByNameInType(
         type->interface(),
         name.c_str());
 }
 
-EntryPointReflection* ProgramLayout::findEntryPointByName(std::string name)
+EntryPointReflection* ProgramLayout::findEntryPointByName(const std::string& name)
 {
     return (slang::wgsl::EntryPointReflection*)(interface()->findEntryPointByName(name.c_str()));
 }

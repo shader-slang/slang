@@ -2349,26 +2349,6 @@ public:                                                              \
 
     typedef SlangReflectionVariableLayout SlangReflectionParameter;
 
-    /** Retrieves a variable's default initializer as a blob.
-     *
-     * If no explicit initializer exists, returns `SLANG_OK` and sets `*outBlob` to `nullptr`.
-     * On success with an initializer, `*outBlob` receives an `ISlangBlob*` with an added
-     * reference.
-     *
-     * Supported types include scalar values, vectors, matrices, fixed-size arrays,
-     * structs/aggregates, and enums. The blob stores scalar-layout bytes in natural scalar/field
-     * order without aggregate padding; bool values are emitted as 4-byte values to match Slang's
-     * GPU scalar layout. `intptr_t` and `uintptr_t` values are emitted as fixed 8-byte signed and
-     * unsigned values because the blob API is target-independent; consumers for narrower pointer
-     * targets must narrow explicitly. Matrices are emitted row-by-row, struct base fields are
-     * emitted before derived fields, and enum values use the enum's underlying tag type.
-     *
-     * Returns `SLANG_E_INVALID_ARG` for invalid arguments and `SLANG_E_NOT_AVAILABLE` when the
-     * initializer cannot be represented as a default-value blob.
-     */
-    SLANG_API SlangResult
-    spReflectionVariable_GetDefaultValueBlob(SlangReflectionVariable* inVar, ISlangBlob** outBlob);
-
 #ifdef __cplusplus
 }
 #endif
@@ -3208,26 +3188,28 @@ struct VariableReflection
         return spReflectionVariable_GetDefaultValueFloat((SlangReflectionVariable*)this, value);
     }
 
-    /// Gets default initializer bytes for variables with representable initializers.
-    ///
-    /// If the variable has no explicit initializer, this succeeds with a null blob. On success with
-    /// an initializer, `outBlob` receives an `ISlangBlob*` with an added reference.
-    ///
-    /// Supported types include scalar values, vectors, matrices, fixed-size arrays,
-    /// structs/aggregates, and enums. The returned blob stores scalar-layout bytes in natural
-    /// scalar/field order without aggregate padding; bool values are emitted as 4-byte values to
-    /// match Slang's GPU scalar layout. `intptr_t` and `uintptr_t` values are emitted as fixed
-    /// 8-byte signed and unsigned values because the blob API is target-independent; consumers for
-    /// narrower pointer targets must narrow explicitly. Matrices are emitted row-by-row, struct
-    /// base fields are emitted before derived fields, and enum values use the enum's underlying tag
-    /// type.
-    ///
-    /// Returns SLANG_E_INVALID_ARG for invalid arguments and SLANG_E_NOT_AVAILABLE when an
-    /// initializer cannot be represented as a default-value blob.
-    SlangResult getDefaultValueBlob(ISlangBlob** outBlob)
-    {
-        return spReflectionVariable_GetDefaultValueBlob((SlangReflectionVariable*)this, outBlob);
-    }
+    /** Retrieves a variable's default initializer as a packed byte blob.
+     *
+     * If the variable has no explicit initializer, returns `SLANG_OK` and sets `*outBlob` to
+     * `nullptr`. Otherwise `*outBlob` receives an `ISlangBlob*` with an added reference holding the
+     * initializer's bytes; the caller owns that reference. Returns `SLANG_E_INVALID_ARG` for null
+     * arguments and `SLANG_E_NOT_AVAILABLE` when the initializer cannot be represented as a
+     * default-value blob.
+     *
+     * Scalars, vectors, matrices, fixed-size arrays, structs/aggregates, and enums are supported.
+     * Values are packed in natural scalar/field order with no aggregate padding: matrices
+     * row-by-row, base-class fields before derived fields, and a field with no explicit initializer
+     * as its zero/default representation. Encoding is target-independent: `bool` occupies 4 bytes
+     * to match Slang's GPU scalar layout, `intptr_t`/`uintptr_t` always occupy 8 bytes
+     * signed/unsigned (consumers on narrower-pointer targets must narrow explicitly), and enums use
+     * their underlying tag type.
+     *
+     * Scalars are stored in host byte order (little-endian on all supported platforms), and the
+     * buffer is aligned to at least `alignof(max_align_t)`, which covers every scalar type encoded
+     * by this API. After checking the blob size, callers may cast `getBufferPointer()` directly to
+     * the payload element type.
+     */
+    SLANG_API SlangResult getDefaultValueBlob(ISlangBlob** outBlob);
 
     GenericReflection* getGenericContainer()
     {

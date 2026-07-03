@@ -1865,9 +1865,8 @@ SlangBindingType _calcResourceBindingType(Type* type)
             return SlangBindingType(SLANG_BINDING_TYPE_TYPED_BUFFER | mutableFlag);
         }
     }
-    else if (
-        const auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type);
-        structuredBufferType)
+    else if (const auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type);
+             structuredBufferType)
     {
         if (as<HLSLStructuredBufferType>(type))
         {
@@ -3341,22 +3340,20 @@ SLANG_API SlangReflectionUserAttribute* spReflectionVariable_FindUserAttributeBy
 
 SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inVar)
 {
+    if (!inVar)
+        return false;
+
     auto decl = convert(inVar).getDecl();
     if (auto varDecl = as<VarDeclBase>(decl))
-    {
         return varDecl->initExpr != nullptr;
-    }
     if (auto enumCaseDecl = as<EnumCaseDecl>(decl))
-    {
-        auto constantVal = as<ConstantIntVal>(enumCaseDecl->tagVal);
-        return constantVal != nullptr;
-    }
+        return as<ConstantIntVal>(enumCaseDecl->tagVal) != nullptr;
 
     return false;
 }
 
 // Removes cast wrappers that do not change which initializer value should be serialized.
-static Expr* unwrapDefaultValueExpr(Expr* expr)
+static Expr* unwrapDefaultValueCastExpr(Expr* expr)
 {
     for (;;)
     {
@@ -3373,6 +3370,11 @@ static Expr* unwrapDefaultValueExpr(Expr* expr)
             expr = builtinCastExpr->base;
             continue;
         }
+        if (auto parenExpr = as<ParenExpr>(expr))
+        {
+            expr = parenExpr->base;
+            continue;
+        }
         return expr;
     }
 }
@@ -3380,7 +3382,7 @@ static Expr* unwrapDefaultValueExpr(Expr* expr)
 // Counts initializer arguments after removing AST wrappers that do not change the value.
 static Count getDefaultValueArgCount(Expr* expr)
 {
-    expr = unwrapDefaultValueExpr(expr);
+    expr = unwrapDefaultValueCastExpr(expr);
     if (auto initializerListExpr = as<InitializerListExpr>(expr))
         return initializerListExpr->args.getCount();
     if (auto argExpr = as<ExprWithArgsBase>(expr))
@@ -3391,7 +3393,7 @@ static Count getDefaultValueArgCount(Expr* expr)
 // Gets one initializer argument after the same value-preserving unwrap as the count helper.
 static Expr* getDefaultValueArg(Expr* expr, Index index)
 {
-    expr = unwrapDefaultValueExpr(expr);
+    expr = unwrapDefaultValueCastExpr(expr);
     if (auto initializerListExpr = as<InitializerListExpr>(expr))
         return initializerListExpr->args[index];
     if (auto argExpr = as<ExprWithArgsBase>(expr))
@@ -3423,29 +3425,25 @@ static bool hasDefaultValueBlobCapacity(List<uint8_t> const& bytes)
     return bytes.getCount() <= kMaxDefaultValueBlobBytes;
 }
 
-// Finds the AST builder that can resolve types and generic substitutions for a reflected decl.
-static bool getDefaultValueASTBuilder(Decl* decl, ASTBuilder*& outASTBuilder)
+// Gets the AST builder that can resolve types and generic substitutions for a reflected decl.
+static ASTBuilder* getDefaultValueASTBuilder(Decl* decl)
 {
-    outASTBuilder = nullptr;
-
     auto module = getModule(decl);
-    if (!module)
-        return false;
+    SLANG_ASSERT(module);
 
     auto linkage = module->getLinkage();
-    if (!linkage)
-        return false;
+    SLANG_ASSERT(linkage);
 
-    outASTBuilder = linkage->getASTBuilder();
-    return outASTBuilder != nullptr;
+    auto astBuilder = linkage->getASTBuilder();
+    SLANG_ASSERT(astBuilder);
+    return astBuilder;
 }
 
 // Appends an integer literal converted to the requested serialized scalar type.
 template<typename T>
 static bool appendIntegerLiteralDefaultValue(IntegerLiteralExpr* expr, List<uint8_t>& outBytes)
 {
-    if (!expr)
-        return false;
+    SLANG_ASSERT(expr);
 
     appendDefaultValueBytes(outBytes, T(expr->value));
     return true;
@@ -3463,6 +3461,8 @@ static bool appendIntegerLikeLiteralDefaultValue(
         appendDefaultValueBytes(outBytes, T(boolLiteral->value ? 1 : 0));
         return true;
     }
+    if (!intLiteral)
+        return false;
     return appendIntegerLiteralDefaultValue<T>(intLiteral, outBytes);
 }
 
@@ -3556,7 +3556,7 @@ static bool appendHalfLiteralDefaultValue(
 // Appends non-basic packed floating-point literal types that are represented by custom Type nodes.
 static bool appendSpecialFloatLiteralDefaultValue(Type* type, Expr* expr, List<uint8_t>& outBytes)
 {
-    expr = unwrapDefaultValueExpr(expr);
+    expr = unwrapDefaultValueCastExpr(expr);
 
     float value = 0.0f;
     if (auto floatLiteral = as<FloatingPointLiteralExpr>(expr))
@@ -3670,9 +3670,7 @@ static bool appendDefaultValue(Type* type, Expr* expr, List<uint8_t>& outBytes);
 static bool appendDefaultValueFromDecl(DeclRef<VarDeclBase> decl, List<uint8_t>& outBytes)
 {
     auto varDecl = decl.getDecl();
-    ASTBuilder* astBuilder = nullptr;
-    if (!getDefaultValueASTBuilder(varDecl, astBuilder))
-        return false;
+    auto astBuilder = getDefaultValueASTBuilder(varDecl);
 
     SLANG_AST_BUILDER_RAII(astBuilder);
     auto type = getType(astBuilder, decl);
@@ -3731,7 +3729,7 @@ static bool appendScalarDefaultConstructedValue(BasicExpressionType* type, List<
 // Emits one basic scalar initializer, accepting only literal forms that can be represented.
 static bool appendScalarDefaultValue(BasicExpressionType* type, Expr* expr, List<uint8_t>& outBytes)
 {
-    expr = unwrapDefaultValueExpr(expr);
+    expr = unwrapDefaultValueCastExpr(expr);
 
     auto intLiteral = as<IntegerLiteralExpr>(expr);
     auto floatLiteral = as<FloatingPointLiteralExpr>(expr);
@@ -3861,7 +3859,7 @@ static bool appendEnumDefaultValue(
 
     if (varDecl->initExpr)
     {
-        auto initExpr = unwrapDefaultValueExpr(varDecl->initExpr);
+        auto initExpr = unwrapDefaultValueCastExpr(varDecl->initExpr);
         if (auto declRefExpr = as<DeclRefExpr>(initExpr))
             return appendEnumDefaultValue(declRefExpr->declRef, tagType, outBytes, depth + 1);
         return appendDefaultValue(tagType, initExpr, outBytes);
@@ -3995,9 +3993,7 @@ static bool appendStructDefaultValue(
     const auto argCount = getDefaultValueArgCount(expr);
     Index argIndex = 0;
 
-    ASTBuilder* astBuilder = nullptr;
-    if (!getDefaultValueASTBuilder(aggTypeDeclRef.getDecl(), astBuilder))
-        return false;
+    auto astBuilder = getDefaultValueASTBuilder(aggTypeDeclRef.getDecl());
 
     if (auto structTypeDeclRef = aggTypeDeclRef.as<StructDecl>())
     {
@@ -4038,7 +4034,7 @@ static bool appendDefaultValue(Type* type, Expr* expr, List<uint8_t>& outBytes)
 {
     const bool isInitializerList = as<InitializerListExpr>(expr) != nullptr;
     type = unwrapDefaultValueType(type);
-    expr = unwrapDefaultValueExpr(expr);
+    expr = unwrapDefaultValueCastExpr(expr);
 
     if (as<DefaultConstructExpr>(expr))
         return appendDefaultConstructedValue(type, outBytes);
@@ -4068,9 +4064,7 @@ static bool appendDefaultValue(Type* type, Expr* expr, List<uint8_t>& outBytes)
     {
         if (auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())
         {
-            ASTBuilder* astBuilder = nullptr;
-            if (!getDefaultValueASTBuilder(enumDeclRef.getDecl(), astBuilder))
-                return false;
+            auto astBuilder = getDefaultValueASTBuilder(enumDeclRef.getDecl());
 
             auto tagType = getTagType(astBuilder, enumDeclRef);
             if (auto declRefExpr = as<DeclRefExpr>(expr))
@@ -4140,9 +4134,7 @@ static bool appendDefaultConstructedValue(Type* type, List<uint8_t>& outBytes)
     {
         if (auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())
         {
-            ASTBuilder* astBuilder = nullptr;
-            if (!getDefaultValueASTBuilder(enumDeclRef.getDecl(), astBuilder))
-                return false;
+            auto astBuilder = getDefaultValueASTBuilder(enumDeclRef.getDecl());
 
             return appendDefaultConstructedValue(getTagType(astBuilder, enumDeclRef), outBytes);
         }
@@ -4154,26 +4146,22 @@ static bool appendDefaultConstructedValue(Type* type, List<uint8_t>& outBytes)
     return false;
 }
 
-SLANG_API SlangResult
-spReflectionVariable_GetDefaultValueBlob(SlangReflectionVariable* inVar, ISlangBlob** outBlob)
+SLANG_API SlangResult slang::VariableReflection::getDefaultValueBlob(ISlangBlob** outBlob)
 {
-    if (!inVar || !outBlob)
+    if (!outBlob)
         return SLANG_E_INVALID_ARG;
 
     *outBlob = nullptr;
 
-    auto var = convert(inVar);
+    auto var = convert((SlangReflectionVariable*)this);
     if (var.is<EnumCaseDecl>())
     {
         auto enumCaseDeclRef = var.as<EnumCaseDecl>();
         auto enumCaseDecl = enumCaseDeclRef.getDecl();
         auto enumDecl = as<EnumDecl>(enumCaseDecl->parentDecl);
-        if (!enumDecl)
-            return SLANG_E_INVALID_ARG;
+        SLANG_ASSERT(enumDecl);
 
-        ASTBuilder* astBuilder = nullptr;
-        if (!getDefaultValueASTBuilder(enumDecl, astBuilder))
-            return SLANG_E_NOT_AVAILABLE;
+        auto astBuilder = getDefaultValueASTBuilder(enumDecl);
 
         SLANG_AST_BUILDER_RAII(astBuilder);
         auto tagType = getTagType(astBuilder, DeclRef<EnumDecl>(enumDecl));

@@ -3153,8 +3153,6 @@ static SlangResult createArtifactFromIR(
     }
 #endif
 
-    artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
-
     // Decide whether any downstream (slang-glslang / SPIRV-Tools) work is actually required
     // for this artifact before paying the cost of loading the downstream compiler module.
     //
@@ -3222,6 +3220,9 @@ static SlangResult createArtifactFromIR(
     const bool needsSeparateDebugInfo = targetCompilerOptions.shouldEmitSeparateDebugInfo();
     const bool needsDownstreamCompiler =
         needsLink || needsOptimization || needsValidation || needsSeparateDebugInfo;
+
+    artifact->addRepresentationUnknown(
+        needsDownstreamCompiler ? ListBlob::create(spirv) : ListBlob::moveCreate(spirv));
 
     IDownstreamCompiler* compiler = needsDownstreamCompiler
                                         ? codeGenContext->getSession()->getOrLoadDownstreamCompiler(

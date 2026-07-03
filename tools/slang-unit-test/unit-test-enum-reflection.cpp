@@ -60,9 +60,7 @@ SLANG_UNIT_TEST(enumReflection)
         SLANG_CHECK_ABORT(blob != nullptr);
         SLANG_CHECK_ABORT(blob->getBufferSize() == sizeof(int32_t));
 
-        int32_t value = 0;
-        memcpy(&value, blob->getBufferPointer(), sizeof(value));
-        return value;
+        return *(const int32_t*)blob->getBufferPointer();
     };
 
     auto case0 = enumType->getFieldByIndex(0);

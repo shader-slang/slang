@@ -215,9 +215,7 @@ SLANG_UNIT_TEST(linkTimeStaticConstIntReflection)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(valueVar->getDefaultValueBlob(blob.writeRef())));
         SLANG_CHECK_ABORT(blob != nullptr);
         SLANG_CHECK_ABORT(blob->getBufferSize() == sizeof(int32_t));
-        int32_t value = 0;
-        memcpy(&value, blob->getBufferPointer(), sizeof(value));
-        return value;
+        return *(const int32_t*)blob->getBufferPointer();
     };
 
     SLANG_CHECK(getStaticInt("StaticConstCarrier<5>", "Value") == 6);
@@ -275,6 +273,7 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
 
             public static const float ScalarFloat = 1.5f;
             public static const int ScalarInt = -7;
+            public static const int ScalarParen = (42);
             public static const bool ScalarBool = true;
             public static const bool ScalarBoolFromInt = 1;
             public static const bool ScalarBoolFalse = false;
@@ -400,6 +399,10 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
     auto scalarInt = getDefaultBlob("ScalarInt");
     SLANG_CHECK(scalarInt->getBufferSize() == sizeof(int32_t));
     SLANG_CHECK(((const int32_t*)scalarInt->getBufferPointer())[0] == -7);
+
+    auto scalarParen = getDefaultBlob("ScalarParen");
+    SLANG_CHECK(scalarParen->getBufferSize() == sizeof(int32_t));
+    SLANG_CHECK(((const int32_t*)scalarParen->getBufferPointer())[0] == 42);
 
     auto scalarBool = getDefaultBlob("ScalarBool");
     SLANG_CHECK(scalarBool->getBufferSize() == sizeof(uint32_t));
@@ -602,15 +605,9 @@ SLANG_UNIT_TEST(defaultValueBlobReflection)
         SLANG_SUCCEEDED(getDefaultBlobResult("ValueWithoutInitializer", valueWithoutInitializer)));
     SLANG_CHECK(valueWithoutInitializer == nullptr);
 
-    ComPtr<slang::IBlob> invalidArgBlob;
-    SLANG_CHECK(
-        spReflectionVariable_GetDefaultValueBlob(nullptr, invalidArgBlob.writeRef()) ==
-        SLANG_E_INVALID_ARG);
-    SLANG_CHECK(
-        spReflectionVariable_GetDefaultValueBlob(
-            (SlangReflectionVariable*)
-                programLayout->findVarByNameInType(defaultsType, "ScalarFloat"),
-            nullptr) == SLANG_E_INVALID_ARG);
+    auto scalarFloatVar = programLayout->findVarByNameInType(defaultsType, "ScalarFloat");
+    SLANG_CHECK_ABORT(scalarFloatVar != nullptr);
+    SLANG_CHECK(scalarFloatVar->getDefaultValueBlob(nullptr) == SLANG_E_INVALID_ARG);
 }
 
 

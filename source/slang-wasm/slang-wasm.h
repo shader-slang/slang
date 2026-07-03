@@ -203,14 +203,14 @@ public:
 
     slang::wgsl::TypeLayoutReflection* getGlobalParamsTypeLayout();
 
-    slang::wgsl::EntryPointReflection* findEntryPointByName(std::string name);
+    slang::wgsl::EntryPointReflection* findEntryPointByName(const std::string& name);
 
-    slang::wgsl::FunctionReflection* findFunctionByName(std::string name);
+    slang::wgsl::FunctionReflection* findFunctionByName(const std::string& name);
 
-    slang::wgsl::TypeReflection* findTypeByName(std::string name);
+    slang::wgsl::TypeReflection* findTypeByName(const std::string& name);
     slang::wgsl::VariableReflection* findVarByNameInType(
         slang::wgsl::TypeReflection* type,
-        std::string name);
+        const std::string& name);
 
     slang::ProgramLayout* interface() const { return (slang::ProgramLayout*)this; }
 

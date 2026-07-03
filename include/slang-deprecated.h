@@ -710,13 +710,13 @@ extern "C"
         SlangReflectionVariable* var,
         SlangSession* globalSession,
         char const* name);
-    /** DEPRECATED: use `spReflectionVariable_GetDefaultValueBlob` and check for a null blob
+    /** DEPRECATED: use `slang::VariableReflection::getDefaultValueBlob` and check for a null blob
      * instead. */
     SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inVar);
-    /** DEPRECATED: use `spReflectionVariable_GetDefaultValueBlob` instead. */
+    /** DEPRECATED: use `slang::VariableReflection::getDefaultValueBlob` instead. */
     SLANG_API SlangResult
     spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t* rs);
-    /** DEPRECATED: use `spReflectionVariable_GetDefaultValueBlob` instead. */
+    /** DEPRECATED: use `slang::VariableReflection::getDefaultValueBlob` instead. */
     SLANG_API SlangResult
     spReflectionVariable_GetDefaultValueFloat(SlangReflectionVariable* inVar, float* rs);
     SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(
