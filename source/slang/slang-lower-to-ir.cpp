@@ -15110,6 +15110,40 @@ static void lowerFrontEndEntryPointToIR(
             entryPointName->text.getUnownedSlice(),
             moduleName.getUnownedSlice());
     }
+
+    // The `[Shader64BitIndexing]` attribute requires the `spvShader64BitIndexingEXT` capability,
+    // which the semantic checker unions into `inferredCapabilityRequirements` for the attributed
+    // function and, transitively, for every entry point that can reach it through its call graph.
+    // The corresponding SPIR-V `Shader64BitIndexingEXT` execution mode (and its owning
+    // `OpCapability`/`OpExtension`) is entry-point scoped, so we lift the requirement onto the
+    // entry point here (never onto an attributed callee, where an execution mode would be invalid).
+    // The SPIR-V back-end emits all three from this single decoration. Reading the inferred
+    // capability set rather than the attribute directly covers the direct, call-graph, and
+    // `[require(spvShader64BitIndexingEXT)]` cases uniformly.
+    if (auto inferredCaps = entryPointFuncDecl->inferredCapabilityRequirements)
+    {
+        CapabilitySet caps{inferredCaps};
+        bool requiresShader64BitIndexing = false;
+        // Scan for membership of the atom in *any* alternative of the capability set. We iterate
+        // `getAtomSets()` rather than calling `caps.implies(spvShader64BitIndexingEXT)` because
+        // `implies()` is AND-across-all-alternatives: it would only report the atom when *every*
+        // target alternative requires it, which is too strict for a presence test.
+        for (auto atomSet : caps.getAtomSets())
+        {
+            for (auto atomVal : atomSet)
+            {
+                if (asAtom(atomVal) == CapabilityAtom::spvShader64BitIndexingEXT)
+                {
+                    requiresShader64BitIndexing = true;
+                    break;
+                }
+            }
+            if (requiresShader64BitIndexing)
+                break;
+        }
+        if (requiresShader64BitIndexing)
+            builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(instToDecorate);
+    }
 }
 
 static void lowerProgramEntryPointToIR(
