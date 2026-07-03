@@ -74,8 +74,8 @@ SlangResult DeflateCompressionSystemImpl::compress(
     // `compressed` is owned by miniz's allocator (allocated via `MZ_MALLOC`). Copy it into a
     // Slang-owned blob and release the original with miniz's own `mz_free`, rather than handing
     // it to `ScopedAllocation` (which always reclaims via `::free`). This keeps allocation and
-    // deallocation paired if miniz is ever built with a custom allocator (redefined
-    // `MZ_MALLOC`/`MZ_FREE`, or per-archive alloc callbacks).
+    // deallocation paired if miniz is ever built with a custom allocator (e.g. redefined
+    // `MZ_MALLOC`/`MZ_FREE`).
     ComPtr<ISlangBlob> blob;
     const SlangResult res = RawBlob::tryCreate(compressed, compressedSizeInBytes, blob);
     mz_free(compressed);
