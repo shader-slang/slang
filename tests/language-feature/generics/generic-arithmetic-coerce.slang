@@ -27,6 +27,14 @@
 //   legitimately succeeds through `float.__init(int)` plus the cost-0
 //   equality-witness conversion `T -> int`; the rejection must not fire for
 //   explicit sites.
+// - `polyPack` pins the variadic-generics neighborhood: pack elements flow
+//   through the same constrained-generic arithmetic (`poly`) whose checking
+//   hits the fast rejection, at mixed scalar instantiations. (A *bare* pack
+//   parameter as a coercion source — the `GenericTypeParamDeclBase` pack case
+//   the C++ comment argues about — was not reachable from surface code in
+//   instrumented probes; pack elements are checked as `each T` types that
+//   never enter the initializer search with a scalar target. This case keeps
+//   the rejection honest around pack expansion regardless.)
 
 T poly<T : IArithmetic>(T a, T b)
 {
@@ -63,7 +71,22 @@ float explicitCast<T>(T t) where T == int
     return float(t);
 }
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4)
+void accept<each T>(expand each T v) {}
+
+int writePoly<T : __BuiltinArithmeticType>(inout int offset, T value)
+{
+    // Routes one pack element through the same constrained-generic arithmetic
+    // as `poly` and records the result.
+    outputBuffer[offset++] = __intCast<int>(poly(value, value));
+    return 0;
+}
+
+void polyPack<each T : __BuiltinArithmeticType>(inout int offset, expand each T args)
+{
+    accept(expand writePoly(offset, each args));
+}
+
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -98,4 +121,10 @@ void computeMain()
 
     outputBuffer[8] = int(explicitCast<int>(9));
     // CHECK: 9
+
+    // poly(v, v) = 2*v*v + 2*v: 2 -> 12, 3u -> 24 (mixed int/uint pack).
+    int offset = 9;
+    polyPack(offset, 2, 3u);
+    // CHECK: 12
+    // CHECK: 24
 }
