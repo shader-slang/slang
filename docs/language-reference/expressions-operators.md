@@ -35,11 +35,11 @@ Slang operators come in the following forms:
 | `++`		| `__postfix T operator ++ (inout T val)` | increment in place, return value before increment |
 | `--`		| `__prefix T operator -- (inout T val)`  | decrement in place, return decremented value      |
 | `--`		| `__postfix T operator -- (inout T val)` | decrement in place, return value before decrement |
-| `*`       | `T operator * (T lhs, T rhs)`         | multiplication                                    |
-| `/`       | `T operator / (T lhs, T rhs)`         | division                                          |
-| `%`       | `T operator % (T lhs, T rhs)`         | remainder                                         |
-| `+`       | `T operator + (T lhs, T rhs)`         | addition                                          |
-| `-`       | `T operator - (T lhs, T rhs)`         | subtraction                                       |
+| `*`       | `T operator * (T lhs, T rhs)`           | multiplication                                    |
+| `/`       | `T operator / (T lhs, T rhs)`           | division                                          |
+| `%`       | `T operator % (T lhs, T rhs)`           | remainder                                         |
+| `+`       | `T operator + (T lhs, T rhs)`           | addition                                          |
+| `-`       | `T operator - (T lhs, T rhs)`           | subtraction                                       |
 
 The arithmetic operators are defined for
 [IArithmetic](../../../core-module-reference/interfaces/iarithmetic-01/index.html) types. This includes
@@ -130,101 +130,146 @@ built-in integer and Boolean scalar types.
 
 Description:
 
-- The *less-than* comparison operator returns `true` if `lhs` is less than `rhs`. Otherwise, it returns
+- The **less-than** comparison operator returns `true` if `lhs` is less than `rhs`. Otherwise, it returns
   `false`.
   See [IComparable.lessThan](../../../core-module-reference/interfaces/icomparable-01/lessthan-4.html) for details.
-- The *less-than-or-equal-to* comparison operator returns `true` if `lhs` is less than or equal to
+- The **less-than-or-equal-to** comparison operator returns `true` if `lhs` is less than or equal to
   `rhs`. Otherwise, it returns `false`.
   See [IComparable.lessThanOrEquals](../../../core-module-reference/interfaces/icomparable-01/lessthanorequals-48a.html)
   for details.
-- The *greater-than* comparison operator returns `true` if `lhs` is greater than `rhs`. Otherwise, it returns
-  `false`. Implemented using `IComparable.lessThan` with arguments reversed.
-- The *greater-than-or-equal-to* comparison operator returns `true` if `lhs` is greater than or equal to
-  `rhs`. Otherwise, it returns `false`. Implemented using `IComparable.lessThanOrEquals` with arguments reversed.
-- The *equal-to* comparison operator returns `true` if `lhs` is equal to `rhs`. Otherwise, it returns `false`.
+- The **greater-than** comparison operator returns `true` if `lhs` is greater than `rhs`. Otherwise, it returns
+  `false`. Implemented using `IComparable.lessThan` with arguments swapped.
+- The **greater-than-or-equal-to** comparison operator returns `true` if `lhs` is greater than or equal to
+  `rhs`. Otherwise, it returns `false`. Implemented using `IComparable.lessThanOrEquals` with arguments swapped.
+- The **equal-to** comparison operator returns `true` if `lhs` is equal to `rhs`. Otherwise, it returns `false`.
   See [IComparable.equals](../../../core-module-reference/interfaces/icomparable-01/equals.html) for details.
-- The *not-equal-to* comparison operator returns `true` if `lhs` is not equal to `rhs`. Otherwise, it returns
-  `false`. Implemented using `IComparable.equals` with the result negated (logical NOT).
+- The **not-equal-to** comparison operator returns `true` if `lhs` is not equal to `rhs`. Otherwise, it
+  returns `false`. Implemented using `IComparable.equals` with the comparison result negated (logical NOT).
 
 
 ### Assignment Operators (scalar)
 
-| `=`       | `R operator = (inout T1, T2)`       | assignment                                   |
-| `+=`      | `R operator += (inout T1, T2)`      | compound addition and assignment             |
-| `-=`      | `R operator -= (inout T1, T2)`      | compound subtraction and assignment          |
-| `*=`      | `R operator *= (inout T1, T2)`      | compound multiplication and assignment       |
-| `/=`      | `R operator /= (inout T1, T2)`      | compound division and assignment             |
-| `%=`      | `R operator %= (inout T1, T2)`      | compound remainder and assignment            |
-| `<<=`     | `R operator <<= (inout T1, T2)`     | compound bitwise left shift and assignment   |
-| `>>=`     | `R operator >>= (inout T1, T2)`     | compound bitwise right shift and assignment  |
-| `&=`      | `R operator &= (inout T1, T2)`      | compound bitwise AND shift and assignment    |
-| `^=`      | `R operator ^= (inout T1, T2)`      | compound bitwise XOR and assignment          |
-| `|=`      | `R operator |= (inout T1, T2)`      | compound bitwise OR and assignment           |
-| `,`       | `R operator ,  (T1, T2)`            | comma operator (Slang 2025 and earlier)      |
+| Operator 	| Operator function                      | Description                                  |
+|-----------|----------------------------------------|----------------------------------------------|
+| `=`       | `T operator = (inout T lhs, T rhs)`    | assignment (non-overloadable built-in type)  |
+| `+=`      | `T operator += (inout T lhs, T rhs)`   | compound addition and assignment             |
+| `-=`      | `T operator -= (inout T lhs, T rhs)`   | compound subtraction and assignment          |
+| `*=`      | `T operator *= (inout T lhs, T rhs)`   | compound multiplication and assignment       |
+| `/=`      | `T operator /= (inout T lhs, T rhs)`   | compound division and assignment             |
+| `%=`      | `T operator %= (inout T lhs, T rhs)`   | compound remainder and assignment            |
+| `&=`      | `T operator &= (inout T lhs, T rhs)`   | compound bitwise AND shift and assignment    |
+| `|=`      | `T operator |= (inout T lhs, T rhs)`   | compound bitwise OR and assignment           |
+| `^=`      | `T operator ^= (inout T lhs, T rhs)`   | compound bitwise XOR and assignment          |
+| `<<=`     | `T operator <<= (inout T, int amount)` | compound bitwise left shift and assignment   |
+| `>>=`     | `T operator >>= (inout T, int amount)` | compound bitwise right shift and assignment  |
+
+The assignment operator is a built-in definition available for all copyable types. The assignment operator is
+not overloadable. See [Special Types](types-special.md) for a discussion on non-copyable types.
+
+The compound assignment default operators are defined using the following template:
+
+```hlsl
+__generic<L: ..., R: ...>
+L operator COMPOUND_ASSIGN_OP (inout L left, R right)
+{
+    left = left OP right;
+    return left;
+}
+```
+
+where `COMPOUND_ASSIGN_OP` is the combined assignment and operator and `OP` is the operator without
+assignment.
+
+The compound assignment operator is defined for the same types as `OP`. For example, `+=` is defined for
+[IArithmetic](../../../core-module-reference/interfaces/iarithmetic-01/index.html) types.
 
 
-### Pointer Operators
+> 📝 **Remark:** Unlike in C/C++, the assignment operators return an R-value.
 
-| Operator 	| Operator function                  | Description                                  |
-|-----------|------------------------------------|----------------------------------------------|
-| `*`		| `__prefix R operator * (T)`        | pointer dereference (experimental)           |
-| `&`		| `__prefix R operator & (__ref T)`  | address of (experimental)                    |
+
+
+### Miscellaneous Operators (scalar)
+
+| Operator 	| Operator function                                                                 | Description                             |
+|-----------|-----------------------------------------------------------------------------------|-----------------------------------------|
+| `*`		| `__prefix Ref<T, a, s> operator * (Ptr<T, a, s, L)`                               | pointer dereference (experimental)      |
+| `&`		| `__prefix Ptr<T, Access::ReadWrite, AddressSpace::Device> operator & (__ref T v)` | address of (experimental)               |
+| `,`       | `T2 operator , (T1 lhs, T2 rhs)`                                                  | comma operator (Slang 2025 and earlier) |
 
 Canonical semantics:
 
 - The **pointer dereference** operator returns the pointed value (L-value). The operand type is a pointer.
 - The **address of** operator returns a pointer to the operand. The operand must be
   [addressable](expressions-value-categories.md).
+- The **comma operator** (Slang 2025 and earlier) returns the right-hand-side parameter. Starting from Slang
+  2026, the comma is no longer an overloadable operator.
 
-
-
+> ⚠️ **Warning:** The _pointer dereference_ and _address of_ operators are currently experimental in Slang. The
+> details are subject to change.
 
 
 ### Ternary Conditional Operator
 
-| Operator  | Operator function                   | Description                                  |
-|-----------|-------------------------------------|----------------------------------------------|
-| `?:`      | `R operator ?: (T1, T2, T3)`        | Conditional selection                        |
+| Operator | Operator function                                  | Description           |
+|          |                                                    |                       |
+|----------|----------------------------------------------------|-----------------------|
+| `?:`     | `T operator ?: (bool cond, T trueVal, T falseVal)` | Conditional selection |
 
-The conditional operator, `?:`, is used to select between two expressions based on the value of a condition:
+Description:
 
-```hlsl
-useNegative ? -1.0f : 1.0f
-```
+The conditional operator `?:` is used to select between two values based on the condition (`cond`). If the condition is true,
+`trueVal` is returned. Otherwise, `falseVal` is returned.
 
-The condition may be either a single value of type `bool`, or a vector of `bool`.
-When a vector of `bool` is used, the two values being selected between must be vectors, and selection is performed component-wise.
+The default ternary conditional operator is provided for all copyable types.
 
-> Note: Unlike C, C++, GLSL, and most other C-family languages, Slang currently follows the precedent of HLSL where `?:` does not short-circuit.
->
-> This decision may change (for the scalar case) in a future version of the language.
-> Programmer are encouraged to write code that does not depend on whether or not `?:` short-circuits.
+> ⚠️ **Warning:** Unlike C, C++, GLSL, and most other C-family languages, Slang currently follows the precedent
+> of HLSL where `?:` does not short-circuit. That is, both `trueVal` and `falseVal` are evaluated before
+> either is selected. This is subject to change in future Slang language versions. It is recommended to write
+> write code that does not depend on whether `?:` short-circuits or not. When short-circuiting is required,
+> use `if`/`else` construct, instead.
 
 ### Call Expression
 
-A _call expression_ consists of a base expression and a list of argument expressions, separated by commas and enclosed in `()`:
+**Grammar:**
 
-```hlsl
-myFunction( 1.0f, 20 )
-```
+> *`callable-expr`* **`'('`** [ *`arg-expr`* (**`','`** *`arg-expr`*)\* ] **`')'`**
 
-When the base expression (e.g., `myFunction`) is overloaded, a call expression can disambiguate the overloaded expression based on the number and type or arguments present.
+A _call expression_ consists of a base expression *`callable-expr`* and a list of argument expressions
+*`arg-expr`*.
 
-The base expression of a call may be a member reference expression:
+The base expression must be a [function](declarations-functions.md), a [member function](types-struct.md), an
+invocable object (a [struct](types-struct.md) with the function call operator defined), or a constructible
+type. In case the base expression is an [identifier expression](expressions-identifier.md) that is overloaded
+with multiple declarations, [overload resolution](expressions-overload-resolution.md) selects the most
+appropriate one.
 
-```hlsl
-myObject.myFunc( 1.0f )
-```
+If the callable expression is a function, a member function, or an invocable object, the value of the expression
+is the return value of the invocation.
 
-In this case the base expression of the member reference (e.g., `myObject` in this case) is used as the argument for the implicit `this` parameter of the callee.
+If the callable expression is a type, then an object of that type is instantiated and the arguments are passed
+to the constructor. The value of the call expression is the instantiated object.
+
+If the argument type does not match with the parameter type, it is implicitly
+[converted](expressions-conversions.md) to the target type. It is an error if the implicit conversion is not
+available.
+
+If an argument is not supplied to a parameter that has a default value, the default value is used. It is an
+error to omit an argument for a parameter that does not have a default.
+
+If the callable expression is an invocable object or an object member and the function declaration is not
+static, then the object is passed as the argument to the implicit `this` parameter.
+
+
 
 ### Subscript Expression
 
-A _subscript expression_ consists of a base expression and a list of argument expressions, separated by commas and enclosed in `[]`:
+**Grammar:**
 
-```hlsl
-myVector[someIndex]
-```
+> *`base-expr`* **`'('`** [ *`arg-expr`* (**`','`** *`arg-expr`*)\* ] **`')'`**
+
+A _subscript expression_ consists of a base expression and a list of argument expressions.
+
+TODO
 
 A subscript expression invokes one of the subscript declarations in the type of the base expression. Which subscript declaration is invoked is resolved based on the number and types of the arguments.
 
@@ -258,21 +303,6 @@ The semantics of such a cast are equivalent to initialization from an empty init
 MyStruct s = {};
 ```
 
-Assignment Expression
----------------------
-
-An _assignment expression_ consists of a left-hand side expression, an equals sign (`=`), and a right-hand-side expressions:
-
-```hlsl
-myVar = someValue
-```
-
-The semantics of an assignment expression are to:
-
-* Evaluate the left-hand side to produce an l-value,
-* Evaluate the right-hand side to produce a value
-* Store the value of the right-hand side to the l-value of the left-hand side
-* Yield the l-value of the left-hand-side
 
 ### Operators with Vector and Matrix Operands
 
