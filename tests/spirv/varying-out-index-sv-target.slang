@@ -6,6 +6,8 @@
 //TEST:SIMPLE(filecheck=CHECKGLSL): -stage fragment -entry pmain -target glsl
 //TEST:SIMPLE(filecheck=CHECKDIRECT): -stage fragment -entry pmainDirect -target spirv -emit-spirv-directly
 //TEST:SIMPLE(filecheck=CHECKDIRECTGLSL): -stage fragment -entry pmainDirect -target glsl
+//TEST:SIMPLE(filecheck=CHECKOUT): -stage fragment -entry pmainOut -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECKOUTGLSL): -stage fragment -entry pmainOut -target glsl
 
 struct PixelOutput
 {
@@ -48,4 +50,22 @@ PixelOutput pmain()
 float4 pmainDirect() : SV_Target1
 {
     return float4(float3(1.0), 1.0);
+}
+
+// The same out-of-order struct delivered through a top-level `out` parameter (the exact shape from
+// the issue report) must also honor the SV_Target index, exercising the parameter-binding path
+// rather than the entry-point-result path.
+// CHECKOUT-DAG: OpDecorate %{{.*}}colorOut1 Location 1
+// CHECKOUT-DAG: OpDecorate %{{.*}}colorOut0 Location 0
+
+// CHECKOUTGLSL: layout(location = 1)
+// CHECKOUTGLSL-NEXT: out vec4 {{.*}}colorOut1
+// CHECKOUTGLSL: layout(location = 0)
+// CHECKOUTGLSL-NEXT: out vec4 {{.*}}colorOut0
+
+[shader("pixel")]
+void pmainOut(out PixelOutput o)
+{
+    o.colorOut0 = float4(float3(0.0), 1.0);
+    o.colorOut1 = float4(float3(1.0), 1.0);
 }
