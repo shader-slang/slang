@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:27:59Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: f2252c95d32fee4775bd65d49036aee55db1092712080349ad9e8984834f2521
+generated_at: 2026-06-29T20:13:03Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: d6ab7e839f67ff67089c6ff596134280c2acd4d4480e7715012652269230eb0f
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -44,6 +44,8 @@ and tables below.
   — HLSL legalization helpers (notably
   `legalizeNonStructParameterToStructForHLSL` and
   `legalizeEmptyRayPayloadsForHLSL`).
+- [slang-ir-wrap-structured-buffers.cpp](../../../../source/slang/slang-ir-wrap-structured-buffers.cpp)
+  — `wrapStructuredBuffersOfMatrices`, the HLSL-only structured-buffer-of-matrices wrapper.
 - [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/slang-ir-legalize-binary-operator.cpp)
   — `legalizeLogicalAndOr` runs for HLSL.
 - [slang-target-program.h](../../../../source/slang/slang-target-program.h)
@@ -302,7 +304,8 @@ flowchart TD
 | 63 | `specializeFuncsForBufferLoadArgs` | [slang-ir-specialize-buffer-load-arg.cpp](../../../../source/slang/slang-ir-specialize-buffer-load-arg.cpp) | (always) | |
 | 64 | `deferBufferLoad` | [slang-ir-defer-buffer-load.cpp](../../../../source/slang/slang-ir-defer-buffer-load.cpp) | (always) | |
 | 65 | `specializeArrayParameters` | [slang-ir-specialize-arrays.cpp](../../../../source/slang/slang-ir-specialize-arrays.cpp) | (always) | |
-| 66 | `wrapStructuredBuffersOfMatrices` | [slang-ir-wrap-structured-buffers.cpp](../../../../source/slang/slang-ir-wrap-structured-buffers.cpp) | `case HLSL` (line ~1798) | **HLSL-only.** Wraps structured buffers whose element type is a matrix so that the `#pragma pack_matrix` directive applies. |
+| 66 | `checkStaticAssert` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Direct call (not `SLANG_PASS`) at line ~1795; processes `static_assert` after specialization. |
+| 67 | `wrapStructuredBuffersOfMatrices` | [slang-ir-wrap-structured-buffers.cpp](../../../../source/slang/slang-ir-wrap-structured-buffers.cpp) | `case HLSL` (line ~1798) | **HLSL-only.** Wraps structured buffers whose element type is a matrix so that the `#pragma pack_matrix` directive applies. |
 
 Filtered out for HLSL in this phase: the CUDA-derivative-wrapper
 arm; PyTorch / CUDA passes; CPP/HostCPP arms
@@ -371,7 +374,9 @@ flowchart TD
   aVSC[applyVariableScopeCorrection]
   cCM[collectCooperativeMetadata]
   uNEI[unexportNonEmbeddableIR]
-  cM[collectMetadata]
+  dhGate{"target != PyTorch &&<br/>targetCaps imply descriptor_handle"}
+  eLayout["getOrCreateLayout"]
+  cM["collectMetadata(targetProgram, *metadata)"]
   cUI[checkUnsupportedInst]
 
   babbGate -->|true| lBABOps_hlsl --> vAO
@@ -399,7 +404,10 @@ flowchart TD
   ePhi --> livenessEndGate
   livenessEndGate -->|true| lEnd --> sNSIR
   livenessEndGate -->|false| sNSIR
-  sNSIR --> aVSC --> cCM --> uNEI --> cM --> cUI
+  sNSIR --> aVSC --> cCM --> uNEI --> dhGate
+  dhGate -->|true| eLayout --> cM
+  dhGate -->|false| cM
+  cM --> cUI
 ```
 
 | # | Pass | File | Gate | Notes |
@@ -436,8 +444,9 @@ flowchart TD
 | 30 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../../source/slang/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` | |
 | 31 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | HLSL exposes cooperative matrices via DXR / DXC extensions. |
 | 32 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `EmbedDownstreamIR` | |
-| 33 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | |
-| 34 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | |
+| 33 | `getOrCreateLayout` | [slang-target-program.h](../../../../source/slang/slang-target-program.h) (defined in [slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp)) | `target != PyTorchCppBinding && targetCaps imply descriptor_handle` ([slang-emit.cpp lines 2520-2529](../../../../source/slang/slang-emit.cpp)) | Ensures the program layout exists before `collectMetadata` reads it; fires for HLSL when the target capabilities imply `descriptor_handle`. Returns `SLANG_FAIL` if layout creation fails. |
+| 34 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | Now takes `targetProgram` as its first argument (line 2530), so it can consult the program layout when emitting descriptor-handle metadata. |
+| 35 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | |
 
 Filtered out for HLSL in this phase: `synthesizeActiveMask` (CUDA
 only); `resolveTextureFormat` (GLSL / SPIR-V / WGSL only);
@@ -469,7 +478,7 @@ only); `applyGLSLLiveness` (Khronos only);
 
 Phase D begins immediately after `linkAndOptimizeIR` returns to
 `emitEntryPointsSourceFromIR`. The `HLSLSourceEmitter`
-(constructed at line ~2616 of `slang-emit.cpp`) walks the IR and
+(constructed at line ~2630 of `slang-emit.cpp`) walks the IR and
 produces HLSL text. The downstream chain depends on which
 `CodeGenTarget` was requested:
 
@@ -505,12 +514,12 @@ flowchart TD
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
 | 1 | `emitEntryPointsSourceFromIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (entry point) | |
-| 2 | `new HLSLSourceEmitter` | [slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp) | `case SourceLanguage::HLSL` | Constructed at line ~2616. |
+| 2 | `new HLSLSourceEmitter` | [slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp) | `case SourceLanguage::HLSL` | Constructed at line ~2630. |
 | 3 | `sourceEmitter->init` | [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) | (always) | |
 | 4 | `linkAndOptimizeIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Runs Phases A-C. |
 | 5 | `simplifyForEmit` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
 | 6 | `sourceEmitter->emitModule` | [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) (+ HLSL overrides in `slang-emit-hlsl.cpp`) | (always) | Walks IR and writes HLSL text; prelude comes from `slang-emit-hlsl-prelude.cpp`. |
-| 7 | `createArtifactForCompileTarget` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | At line ~2752 of `emitEntryPointsSourceFromIR`; wraps the HLSL text as an `IArtifact`. (`createArtifactFromIR` is the SPIR-V-direct helper and is not on the HLSL path.) |
+| 7 | `createArtifactForCompileTarget` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | At line ~2766 of `emitEntryPointsSourceFromIR`; wraps the HLSL text as an `IArtifact`. (`createArtifactFromIR` is the SPIR-V-direct helper and is not on the HLSL path.) |
 | 8 | `compile` (DXC) | (downstream) | `target == DXIL || target == DXILAssembly` | Reached via `emitWithDownstreamForEntryPoints` after `_getDefaultSourceForTarget` maps the target to `CodeGenTarget::HLSL`. DXC is the default for SM 6.0+; output is DXIL bytecode (or its disassembly). |
 | 9 | `compile` (fxc) | (downstream) | `target == DXBytecode || target == DXBytecodeAssembly` | Reached via `emitWithDownstreamForEntryPoints`. Legacy path; fxc compiles HLSL into D3D bytecode (or its disassembly) for SM 5.x. |
 
@@ -581,6 +590,7 @@ Flags that exist but **never gate an HLSL pass**:
 | `codeGenContext->shouldTrackLiveness()` | `LivenessUtil::addVariableRangeStarts/addRangeEnds`. |
 | `codeGenContext->removeAvailableInDownstreamIR` | `removeAvailableInDownstreamModuleDecorations`. |
 | `targetCaps` implies `cooperative_matrix` or `cooperative_vector` | `collectCooperativeMetadata`. |
+| `targetCaps` implies `descriptor_handle` (and `target != PyTorchCppBinding`) | `getOrCreateLayout` before `collectMetadata`. |
 
 ### HLSL-specific runtime predicates
 

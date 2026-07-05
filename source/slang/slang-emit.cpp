@@ -523,6 +523,10 @@ void calcRequiredLoweringPassSet(
     case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
         break;
+    case kIROp_HLSLAppendStructuredBufferType:
+    case kIROp_HLSLConsumeStructuredBufferType:
+        result.appendConsumeStructuredBuffer = true;
+        break;
     case kIROp_DynamicResourceType:
         result.dynamicResource = true;
         break;
@@ -549,6 +553,10 @@ void calcRequiredLoweringPassSet(
     case kIROp_IncrementFunctionCoverageCounter:
     case kIROp_IncrementBranchCoverageCounter:
         result.coverageTracing = true;
+        break;
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+    case kIROp_GetEnumBarrierSemanticFlags:
+        result.barrierFlagValidation = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1085,11 +1093,15 @@ Result linkAndOptimizeIR(
         // compiler can't see the runtime driver, so the choice is the
         // caller's responsibility.
         int counterByteWidth = kDefaultCoverageCounterByteWidth;
+        bool hasExplicitCounterByteWidth = false;
         if (auto values =
                 opts.options.tryGetValue(CompilerOptionName::TraceCoverageCounterByteWidth))
         {
             if (values->getCount() > 0)
+            {
                 counterByteWidth = (int)(*values)[0].intValue;
+                hasExplicitCounterByteWidth = true;
+            }
         }
         // Validate the byte width on the API path. The CLI parser
         // (`slang-options.cpp`) already validates the user-facing bit
@@ -1107,13 +1119,33 @@ Result linkAndOptimizeIR(
             });
             return SLANG_FAIL;
         }
-        // Opt-in boolean mode (off by default): record whether each entry
-        // executed (non-atomic store of 1) instead of an exact count.
+        // Metal cannot execute 64-bit counting-mode coverage: MSL provides no
+        // 64-bit atomic fetch-add (its `_valid_fetch_add_type` constraint
+        // rejects `device atomic_ulong*`), so the Metal compiler fails every
+        // counter increment with "no matching function for call to
+        // 'atomic_fetch_add_explicit'". Cap counting-mode counters to 4 bytes
+        // for Metal targets (`metal`, `metallib`, `metallib-asm`). Unlike the
+        // validation block above, which rejects out-of-contract widths loudly
+        // because they indicate a caller bug, this cap adjusts a *valid* width
+        // to a platform limitation: the uncapped default (8) is capped
+        // silently, and an explicitly requested 8 is capped with warning
+        // E45115 so a caller who spelled out `-trace-coverage-counter-width
+        // 64` learns their choice was not honored.
+        // Boolean mode (`-trace-coverage-boolean`) is exempt: it writes plain
+        // non-atomic stores (`*slot = 1`), which MSL accepts at either width —
+        // verified against the Metal compiler — so the requested width is
+        // honored there.
         bool coverageBoolean = false;
         if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
         {
             if (values->getCount() > 0)
                 coverageBoolean = (*values)[0].intValue != 0;
+        }
+        if (isMetalTarget(targetRequest) && counterByteWidth > 4 && !coverageBoolean)
+        {
+            if (hasExplicitCounterByteWidth)
+                sink->diagnose(Diagnostics::CoverageCounterWidthCappedForMetal{});
+            counterByteWidth = 4;
         }
         SLANG_PASS(
             instrumentCoverage,
@@ -1580,10 +1612,28 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    if ((target == CodeGenTarget::HLSL || isD3DTarget(targetRequest)) &&
+        requiredLoweringPassSet.barrierFlagValidation)
+    {
+        SLANG_PASS(validateBarrierFlagsForHLSL, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
+
     // On non-HLSL targets, there isn't an implementation of `AppendStructuredBuffer`
     // and `ConsumeStructuredBuffer` types, so we lower them into normal struct types
     // of `RWStructuredBuffer` typed fields now.
-    if (target != CodeGenTarget::HLSL)
+    //
+    // Gated on `appendConsumeStructuredBuffer` to skip this whole-module walk when
+    // neither type is present. `calcRequiredLoweringPassSet` flags accumulate across the
+    // post-link and post-specialization scans (they are not reset between them). These
+    // types are produced by the front-end and are never synthesized by an IR pass, so in
+    // particular none is created after the last scan: any instance present here was
+    // recorded by a scan and set the flag, and the gate can never be a false-negative
+    // (skip a needed lowering). The flag can only be stale-true (e.g. an unused buffer
+    // dead-code-eliminated after a scan), a harmless no-op walk — so gating is
+    // behavior-preserving.
+    if (target != CodeGenTarget::HLSL && requiredLoweringPassSet.appendConsumeStructuredBuffer)
     {
         SLANG_PASS(lowerAppendConsumeStructuredBuffers, targetProgram, sink);
     }
@@ -1685,6 +1735,21 @@ Result linkAndOptimizeIR(
         if (isD3DTarget(targetRequest))
         {
             SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+
+            // HLSL SM 6.7+ requires every member of a `[raypayload]` struct to declare
+            // both a `read(...)` and a `write(...)` qualifier. The call-site fill above
+            // only covers payload structs reached through a `TraceRay`-style call, so a
+            // user-authored struct with one-sided PAQ that only reaches a hit shader
+            // (e.g. a per-stage-compiled shader library) would slip through. Fill any
+            // missing per-side PAQs structurally on every `[raypayload]` struct.
+            auto profile = getEffectiveTargetProfile(
+                targetProgram->getTargetReq(),
+                targetProgram->getOptionSet());
+            if (profile.getFamily() == ProfileFamily::DX &&
+                profile.getVersion() >= ProfileVersion::DX_6_7)
+            {
+                SLANG_PASS(legalizeRayPayloadAccessQualifiersForHLSL);
+            }
         }
 
         if (requiredLoweringPassSet.existentialTypeLayout)

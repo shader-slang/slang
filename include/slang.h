@@ -585,6 +585,20 @@ typedef uint32_t SlangSizeT;
                 */
     };
 
+    /* A warning "level" (group), modeled on the clang/gcc -Wall/-Wextra/-Wpedantic
+    groups. Each group is enabled independently: a warning tagged with a group is
+    emitted only when that group has been enabled, while warnings in the implicit
+    Default group are always emitted. */
+    typedef int SlangWarningLevelIntegral;
+    enum SlangWarningLevel : SlangWarningLevelIntegral
+    {
+        SLANG_WARNING_LEVEL_DEFAULT = 0,  /**< Always emitted; this is the baseline group and is not
+                                             something a caller enables explicitly. */
+        SLANG_WARNING_LEVEL_ALL = 1,      /**< Warnings enabled by -Wall. */
+        SLANG_WARNING_LEVEL_EXTRA = 2,    /**< Warnings enabled by -Wextra. */
+        SLANG_WARNING_LEVEL_PEDANTIC = 3, /**< Warnings enabled by -Wpedantic. */
+    };
+
     typedef int SlangDiagnosticFlags;
     enum
     {
@@ -851,6 +865,7 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_MESH = 13,
         SLANG_STAGE_AMPLIFICATION = 14,
         SLANG_STAGE_DISPATCH = 15,
+        SLANG_STAGE_NODE = 16,
         //
         SLANG_STAGE_COUNT,
 
@@ -950,7 +965,7 @@ typedef uint32_t SlangSizeT;
     //
     // IMPORTANT: ABI STABILITY POLICY FOR CompilerOptionName
     //
-    // Every enumerator has an explicit integer value. Rules:
+    // Every enumerator except the terminal CountOf sentinel has an explicit integer value. Rules:
     //   1. NEVER insert a new enumerator in the middle of the list.
     //   2. NEVER remove an enumerator; rename to REMOVED_<Name> and keep the value.
     //   3. NEVER reuse an integer value from a removed/deprecated entry.
@@ -1203,6 +1218,12 @@ typedef uint32_t SlangSizeT;
                  //   of `1`, eliminating atomic contention (much faster, and avoids the GPU
                  //   watchdog timeouts heavy coverage can trigger) at the cost of exact
                  //   counts. Off by default.
+        // CLI-only query option `-<compiler>-version`: prints the version of the downstream
+        // <compiler> Slang would actually load for that pass-through (via
+        // IGlobalSession::getDownstreamCompilerVersion). It takes no value and is never stored on
+        // an option set; it only drives the print-and-continue handler in the command-line parser.
+        CompilerVersion = 153,
+
         SPIRVUnifiedDescriptorHeapStride =
             154, // bool: when set, emit each SPIRV resource descriptor-heap runtime array's
                  //   ArrayStride as the maximum of image and buffer descriptor sizes, so a
@@ -1210,12 +1231,13 @@ typedef uint32_t SlangSizeT;
                  //   stride. Opt-in; mutually exclusive with a non-zero
                  //   `-spirv-resource-heap-stride` (combining the two is an error).
 
-        // CLI-only query option `-<compiler>-version`: prints the version of the downstream
-        // <compiler> Slang would actually load for that pass-through (via
-        // IGlobalSession::getDownstreamCompilerVersion). It takes no value and is never stored on
-        // an option set; it only drives the print-and-continue handler in the command-line parser.
-        CompilerVersion = 153,
+        // intValue0: a SlangWarningLevel group to enable (e.g. SLANG_WARNING_LEVEL_PEDANTIC).
+        // Repeatable: enabling multiple groups is additive, matching how -Wall/-Wextra/-Wpedantic
+        // combine on the command line. CLI spellings: -Wall, -Wextra, -Wpedantic.
+        WarningLevel = 155,
 
+        // Do not assign an explicit value to CountOf. It must remain one past the last option,
+        // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
     };
 
@@ -4524,6 +4546,12 @@ struct ISession : public ISlangUnknown
 
     /** Checks if a precompiled binary module is up-to-date with the current compiler
      *   option settings and the source file contents.
+     *
+     *   When the module's primary source file cannot be located on the search paths, the
+     *   binary module is treated as a standalone artifact and reported as up-to-date so
+     *   that callers distributing precompiled-only modules can load them. In that case the
+     *   compiler-version and option-set hash carried in the binary are NOT compared. If a
+     *   later (secondary) dependency is missing the module is still reported as stale.
      */
     virtual SLANG_NO_THROW bool SLANG_MCALL
     isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob) = 0;

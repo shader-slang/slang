@@ -61,8 +61,7 @@ Workloads run per release. Synthetic ones are generated deterministically by
 | **autodiff**              | `N` `[Differentiable]` functions in bounded-depth groups, differentiated forward + reverse, plus a differentiable generic                            | the **autodiff IR transform**                                                                                                                                                 | `linkAndOptimizeIR`                                 |
 | **dynamic_dispatch**      | one interface with `N` implementations, dispatched through a runtime-typed existential (defeats static specialization → real witness-table dispatch) | **dynamic-dispatch lowering / specialization**                                                                                                                                | `specializeModule`                                  |
 | **existential_aggregate** | an interface-typed **field** inside a struct (`Scene { IMat m; }`) + `N` impls selected via a switch                                                 | boxing the existential in an aggregate forces **existential-layout legalization** + a witness-per-case specialization blowup (uncovered by the bare-local `dynamic_dispatch`) | `legalizeExistentialTypeLayout`, `specializeModule` |
-| **diagnostics_errors**    | `N` functions each with undefined symbols → ~2N diagnostics (compile fails on purpose)                                                               | the **diagnostic-emission path**                                                                                                                                              | `SemanticChecking`                                  |
-| **diagnostics_clean**     | same shape, but compiles                                                                                                                             | **size-matched control** — `errors − clean` isolates diagnostic cost                                                                                                          | `SemanticChecking`                                  |
+| **diagnostics_clean**     | `N` functions with distinct compile-time constants, no errors                                                                                                                             | **semantic checking** at scale — same shape as the old error workload but compiling cleanly, so `SemanticChecking` reflects pure checking cost without diagnostic emission    | `SemanticChecking`                                  |
 
 ### Core compiler-stage tests
 
@@ -235,8 +234,5 @@ via `--results <checkout-path>`.
 - **Summed timers can exceed `compileInner`:** timers invoked many times
   (e.g. `simplifyIR`) sum across invocations and the profiler is re-entrant;
   compare such timers version-over-version, not as a fraction of the total.
-- **`diagnostics_errors` exits non-zero by design**; the runner treats "produced
-  real errors + timers" as success and ignores benign missing-`spirv-opt`
-  (`E00100`) messages on hosts without that tool.
 - **Cross-version error formats:** the runner recognizes both modern
   (`error[E30015]:`) and legacy (`error 30015:`) slangc diagnostics.

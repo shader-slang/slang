@@ -1,46 +1,44 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-12T13:17:44+00:00
+reviewed_at: 2026-06-30T13:31:00+00:00
 target_doc: syntax-reference/keywords-and-builtins.md
-target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_watched_paths_digest: 12225714da6281dfb4ac737612c99f7829fb0cf890341684715ac2d919b445cb
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: f75116b2323ea549005589e147bdc7c2b79a63ace127358d8904fccc95cf2272
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
-  completeness: pass
+  completeness: partial
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
 finding_count: 1
 severity_breakdown:
   critical: 0
-  major: 0
-  minor: 1
+  major: 1
+  minor: 0
   nit: 0
 ---
 
 # Review report for syntax-reference/keywords-and-builtins.md
 
 ## Summary
-The keyword inventory is broadly aligned with the parser syntax table, hardcoded statement dispatch, token catalog, and watched meta-module files. The only finding is a stale source citation for the `new` expression keyword; the behavior is described correctly, but the line reference points at the wrong parser function.
+The page is mostly source-aligned, but the keyword inventory is incomplete. The main issue is that the hardcoded parser vocabulary includes internal statement keywords and type-specifier keywords that are not mentioned in the document, even though the prompt asks for an inventory of syntactic keywords and built-in syntax declarations.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show syntax-reference/keywords-and-builtins.md`; reviewed the listed watched files and dependency doc `syntax-reference/tokens.md`.
-- Verified the target front matter fields, source commit, digest shape, title, required sections, and relative links.
-- Checked all explicit line-number citations in the target body against `source/slang/slang-parser.cpp`, including statement dispatch, `g_parseSyntaxEntries[]`, struct/class/enum special cases, `catch`, and `new`.
-- Spot-checked more than 30 listed keywords against `slang-parser.cpp`, including declaration, statement, modifier, and expression registrations.
-- Checked representative builtin names in `core.meta.slang`, `hlsl.meta.slang`, `glsl.meta.slang`, and `diff.meta.slang`, including `Optional`, `Tuple`, `vector`, `Texture2D`, `RWStructuredBuffer`, `WaveGetWaveIndex`, `SV_WaveIndex`, `SV_GroupIndex`, `vec3`, `mat4`, `gl_Position`, and `DifferentialPair`.
+- Ran `regenerate.py show syntax-reference/keywords-and-builtins.md` and reviewed the target document, `_common.md`, the per-document prompt, the dependency document `syntax-reference/tokens.md`, and the resolved watched-file set.
+- Checked front matter for all required keys, the recorded source commit, the warning string, and a 64-character hex watched-path digest.
+- Resolved the relative markdown links in the body to source files or generated peer documents.
+- Spot-checked source-backed claims against watched files, including `TokenType::Identifier`, `SyntaxDecl`, `LookAheadToken("if")`, `LookAheadToken("for")`, `parseCompileTimeForStmt`, `parseIfStatement`, `g_parseSyntaxEntries[]`, `_makeParseDecl`, `_makeParseModifier`, `_makeParseExpr`, `getSyntaxParseInfos()`, `struct`/`class`/`enum` special-casing, `new`, `Optional`, `Tuple`, `Texture2D`, `WaveGetWaveIndex`, `vec3`, `mat4`, `gl_Position`, and `DifferentialPair`.
+- Checked the document's required sections against `syntax-keywords-and-builtins.md` and the universal generated-doc contract.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## Parser-registered syntax keywords`, expression keyword row for `new` | The `new` row says it is parsed by `parsePrefixExpr` at `slang-parser.cpp line 9372` and that `parsePrefixExpr` is defined at line 9364, but those lines now belong to SPIR-V assembly parsing. The behavior claim is correct, but the source citation is stale by about 80 lines. | `source/slang/slang-parser.cpp:9370-9373` starts `parseSPIRVAsmExpr`; `source/slang/slang-parser.cpp:9441-9453` defines `parsePrefixExpr` and handles `AdvanceIf(parser, "new")`. | Update the row to cite `parsePrefixExpr` at the current line range, especially the `AdvanceIf(parser, "new")` branch. |
+| F-001 | major | `## Parser-registered syntax keywords`, statement/type-specifier inventory | The inventory omits several hardcoded parser keywords. The statement table lists ordinary control-flow keywords but not internal statement forms such as `__target_switch`, `__stage_switch`, `__intrinsic_asm`, and `__GPU_FOREACH`; the decl/type discussion calls out `struct`, `class`, and `enum` but not the hardcoded type-specifier forms `expand` and `each`. | `source/slang/slang-parser.cpp:6939`-`source/slang/slang-parser.cpp:6953` directly dispatches `__target_switch`, `__stage_switch`, `__intrinsic_asm`, and `__GPU_FOREACH`; `source/slang/slang-parser.cpp:3435`-`source/slang/slang-parser.cpp:3441` directly recognizes `expand` and `each` alongside the shape expression forms. | Add these hardcoded parser keywords to the appropriate parser-keyword discussion, marking the double-underscore / GPU forms as internal or experimental where appropriate. |
 
 ## No-issues notes
-- The document correctly distinguishes lexer-level token kinds from parser-recognized identifier keywords.
-- The declaration and modifier keyword tables match the current `g_parseSyntaxEntries[]` entries spot-checked in `source/slang/slang-parser.cpp`.
-- The `struct`, `class`, and `enum` explanation correctly notes that these are special-cased in the type-specifier parser rather than registered through `_makeParseDecl`.
-- The HLSL, GLSL, core, and autodiff meta-module examples are present in the watched `*.meta.slang` files.
+- The document keeps generated-doc links workspace-relative and avoids absolute source paths.
+- The page stays within the documented scope for its family and does not copy handwritten documentation prose.
+- The source citations are concentrated in the watched paths listed by the manifest entry.

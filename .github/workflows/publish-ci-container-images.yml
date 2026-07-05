@@ -35,7 +35,14 @@ jobs:
   validate:
     if: github.repository == 'shader-slang/slang' && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
     name: Validate tag policy ${{ matrix.name }}
-    runs-on: ["Linux", "self-hosted", "build", "GCP"]
+    # RUNNER SELECTION — switchable via the `CONTAINER_PUBLISH_RUNS_ON`
+    # repository variable, WITHOUT a code change (Settings → Secrets and
+    # variables → Actions → Variables): unset (default) → GitHub-hosted
+    # `ubuntu-latest`; set to a runs-on JSON string (e.g. `["Linux",
+    # "self-hosted", "build", "GCP"]`) → the GCP build pool. Same variable
+    # drives the `publish` job below. This job only reads the tag/version
+    # contract and queries GHCR (no Dockerfile build), so it runs on either.
+    runs-on: ${{ vars.CONTAINER_PUBLISH_RUNS_ON && fromJSON(vars.CONTAINER_PUBLISH_RUNS_ON) || fromJSON('["ubuntu-latest"]') }}
     timeout-minutes: 120
     permissions:
       contents: read # Required for actions/checkout.
@@ -194,7 +201,14 @@ jobs:
     # images, and manual dispatches from non-master refs only run validation.
     if: github.repository == 'shader-slang/slang' && github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     name: Publish ${{ matrix.name }}
-    runs-on: ["Linux", "self-hosted", "build", "GCP"]
+    # RUNNER SELECTION — switchable via the `CONTAINER_PUBLISH_RUNS_ON`
+    # repository variable (same as the `validate` job above): unset (default) →
+    # GitHub-hosted `ubuntu-latest`; set to a runs-on JSON string (e.g.
+    # `["Linux", "self-hosted", "build", "GCP"]`) → the GCP build pool. This job
+    # does `docker build` + push to GHCR; GitHub-hosted runners have Docker
+    # preinstalled, so it runs on either. NOTE: publishing is master-only, so
+    # this never runs untrusted PR code regardless of runner.
+    runs-on: ${{ vars.CONTAINER_PUBLISH_RUNS_ON && fromJSON(vars.CONTAINER_PUBLISH_RUNS_ON) || fromJSON('["ubuntu-latest"]') }}
     timeout-minutes: 120
     permissions:
       contents: read # Required for actions/checkout.

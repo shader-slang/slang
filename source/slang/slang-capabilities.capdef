@@ -511,6 +511,8 @@ def geometry : stage;
 /// [Stage]
 def dispatch : stage;
 
+def _node : stage;
+
 def _raygen : stage;
 alias _raygeneration = _raygen;
 def _intersection : stage;
@@ -693,6 +695,10 @@ def SPV_KHR_untyped_pointers : _spirv_1_0;
 /// Represents the SPIR-V extension for BFloat16 types.
 /// [EXT]
 def SPV_KHR_bfloat16: _spirv_1_0;
+
+/// Represents the SPIR-V extension for 64-bit integer indexing of resources and arrays.
+/// [EXT]
+def SPV_EXT_shader_64bit_indexing : _spirv_1_0;
 
 // SPIRV Capabilities.
 
@@ -955,6 +961,10 @@ def spvBindlessTextureNV : SPV_NV_bindless_texture;
 /// Represents the SPIR-V capability for descriptor heaps.
 /// [EXT]
 def spvDescriptorHeapEXT : SPV_EXT_descriptor_heap + SPV_KHR_untyped_pointers;
+
+/// Represents the SPIR-V capability for 64-bit integer indexing of resources and arrays.
+/// [EXT]
+def spvShader64BitIndexingEXT : SPV_EXT_shader_64bit_indexing;
 
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core
@@ -1503,12 +1513,16 @@ alias task = _amplification + _meshshading;
 /// [Stage]
 alias amplification = _amplification + _meshshading;
 
+/// Work-graph node stage (requires SM 6.8 or later)
+/// [Stage]
+alias node = _node + _sm_6_8;
+
 // shader stage groups
 /// Collection of all shader stages
 /// [Compound]
 alias any_stage = vertex | fragment | compute | hull | domain | geometry
                  | raygen | intersection | anyhit | closesthit | miss | mesh
-                 | amplification | callable
+                 | amplification | callable | node
                  ;
 
 /// Collection of shader stages

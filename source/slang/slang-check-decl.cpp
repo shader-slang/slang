@@ -11087,10 +11087,9 @@ bool SemanticsVisitor::checkConformance(
             if (superTypeDecl->findModifier<ComInterfaceAttribute>())
             {
                 auto subTypeDecl = declRef.getDecl();
-                if (auto classDecl = as<ClassDecl>(subTypeDecl))
+                if (auto classDecl = as<ClassDecl>(subTypeDecl); classDecl)
                 {
                     // Classes can implement COM interfaces.
-                    SLANG_UNUSED(classDecl);
                 }
                 else if (auto subInterfaceDecl = as<InterfaceDecl>(subTypeDecl))
                 {
@@ -20368,6 +20367,9 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
             {
                 if (auto decoration = as<RequireCapabilityAttribute>(mod))
                     localDeclaredCaps.unionWith(decoration->capabilitySet);
+                else if (as<Shader64BitIndexingAttribute>(mod))
+                    localDeclaredCaps.unionWith(
+                        CapabilitySet(CapabilityName::spvShader64BitIndexingEXT));
                 else if (auto entrypoint = as<EntryPointAttribute>(mod))
                     stageToJoin = entrypoint->capabilitySet
                                       ? entrypoint->capabilitySet->getTargetStage()

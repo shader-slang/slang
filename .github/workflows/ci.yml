@@ -65,11 +65,22 @@ jobs:
   wait-for-human-priority:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
-    # Run on the lightweight CPU-only GCP analytics pool, not a GitHub-hosted
-    # runner: this gate fires for every PR revision, and the GitHub-hosted pool
-    # is only ~20 runners. That pool image already serves the same shape of work
-    # (checkout + Python + `gh api`, no GPU) for ci-health/ci-analytics.
-    runs-on: ["Linux", "self-hosted", "analytics", "GCP"]
+    # This gate fires for every PR revision and does light work (checkout +
+    # Python + `gh api`, no GPU) — the same shape as ci-health/ci-analytics.
+    #
+    # RUNNER SELECTION — switchable via the `ANALYTICS_RUNS_ON` repository
+    # variable, WITHOUT a code change (Settings → Secrets and variables →
+    # Actions → Variables):
+    #   - variable UNSET (default): run on GitHub-hosted `ubuntu-latest`.
+    #   - variable SET to a runs-on JSON string, e.g.
+    #     `["Linux", "self-hosted", "analytics", "GCP"]`: run on the GCP
+    #     analytics pool.
+    # It was offloaded to the GCP analytics pool in June 2026 to keep it off the
+    # 20-runner org cap. NOTE: ci-health.yml runs on the same variable; keeping
+    # it on GCP avoids the self-starvation blind spot where the cap monitor is
+    # itself starved by the cap it measures — prefer the GCP pool for this group
+    # unless the Teams-tier cap has ample headroom.
+    runs-on: ${{ vars.ANALYTICS_RUNS_ON && fromJSON(vars.ANALYTICS_RUNS_ON) || fromJSON('["ubuntu-latest"]') }}
     timeout-minutes: 10
     # Only reads Actions API state and runs a script; no write access needed.
     permissions:
@@ -103,9 +114,23 @@ jobs:
           echo "::error::priority-gate-yielded: higher-priority CI is active; ci-retry-yielded-bot will rerun this bot CI when quiet"
           exit 1
 
-  # Linux x86_64 builds run in the CI container on the GCP self-hosted build
-  # pool. container-user is the GCP build runner image's UID:GID (1003), which
-  # owns _work; the reusable workflow defaults to 1001 for GitHub-hosted runners.
+  # Linux x86_64 builds run in the CI container.
+  #
+  # RUNNER SELECTION — switchable between GitHub-hosted and the GCP self-hosted
+  # build pool via the `LINUX_BUILD_RUNS_ON` repository variable, WITHOUT a code
+  # change (Settings → Secrets and variables → Actions → Variables):
+  #   - variable UNSET (default): run on GitHub-hosted `ubuntu-22.04`.
+  #   - variable SET to a runs-on JSON string, e.g.
+  #     `["Linux", "self-hosted", "build", "GCP"]`: run on the GCP build pool.
+  # These builds were offloaded to GCP in June 2026 (PR #11738) to relieve the
+  # GitHub-hosted 20-runner org cap; with the Teams-tier 60-runner cap they can
+  # ride the GitHub-hosted pool again by default, while the variable keeps a
+  # zero-code-change escape hatch back to GCP if the cap tightens.
+  #
+  # container-user must track the runner: the GCP build image's runner owns
+  # _work as UID:GID 1003, while GitHub-hosted runners use 1001 (the reusable
+  # workflow's default). It is keyed off the SAME variable so the two never
+  # diverge — set the variable → get the GCP UID; unset → get the hosted UID.
   build-linux-debug-gcc-x86_64:
     needs: [filter, wait-for-human-priority]
     if: >-
@@ -123,9 +148,11 @@ jobs:
       packages: read
     with:
       config: debug
-      runs-on: '["Linux", "self-hosted", "build", "GCP"]'
-      container-user: "1003:1003"
+      runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
+      container-user: ${{ vars.LINUX_BUILD_RUNS_ON && '1003:1003' || '1001:1001' }}
 
+  # Runner selection and container-user tracking: see build-linux-debug-gcc-x86_64
+  # above (both keyed off the `LINUX_BUILD_RUNS_ON` repository variable).
   build-linux-release-gcc-x86_64:
     needs: [filter, wait-for-human-priority]
     if: >-
@@ -143,14 +170,19 @@ jobs:
       packages: read
     with:
       config: release
-      runs-on: '["Linux", "self-hosted", "build", "GCP"]'
-      container-user: "1003:1003"
+      runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
+      container-user: ${{ vars.LINUX_BUILD_RUNS_ON && '1003:1003' || '1001:1001' }}
 
-  # WASM build runs directly on the host (no container) via ci-slang-build.yml.
-  # Stays on GitHub-hosted ubuntu-22.04 for now: the GCP build image lacks the
-  # gcc host toolchain it needs (the native generators stage fails with
-  # CMAKE_CXX_COMPILER not set — no g++). Moving it requires either adding g++
-  # to the image or running the build in a container; tracked as a follow-up.
+  # WASM build runs directly on the host (no container). It needs the gcc host
+  # toolchain (g++) for the native generators build; emsdk is downloaded by the
+  # build itself. Both GitHub-hosted `ubuntu-22.04` and the GCP linux-cpu-runner
+  # image provide g++, so this job runs on either.
+  #
+  # RUNNER SELECTION — switchable via the `LINUX_BUILD_RUNS_ON` repository
+  # variable, same as the x86_64 builds above: unset → GitHub-hosted
+  # `ubuntu-22.04`; set to a runs-on JSON string → the GCP build pool. id-token
+  # is requested for the reusable workflow's GCP Workload Identity auth step
+  # (never part of the default GITHUB_TOKEN); it is harmless on GitHub-hosted.
   build-linux-release-gcc-wasm:
     needs: [filter, wait-for-human-priority]
     if: >-
@@ -158,16 +190,26 @@ jobs:
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
     with:
       os: linux
       compiler: gcc
       platform: wasm
       config: release
-      runs-on: '["ubuntu-22.04"]'
+      runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
 
   # Sanitizer build+test (blocking via check-ci, runs on every PR). Runs in the
-  # clang CI container (`--user root`, so no container-user concern) on the GCP
-  # build pool. id-token requested explicitly for GCP Workload Identity auth.
+  # clang CI container as `--user root`, so there is no container-user concern
+  # and no runner-UID coupling — only the runner label switches.
+  #
+  # RUNNER SELECTION — switchable via the `LINUX_BUILD_RUNS_ON` repository
+  # variable, same as the x86_64 builds above: unset → GitHub-hosted
+  # `ubuntu-22.04`; set to a runs-on JSON string → the GCP build pool. id-token
+  # is requested explicitly for GCP Workload Identity auth (never part of the
+  # default GITHUB_TOKEN); it is harmless on GitHub-hosted.
   sanitizer-linux-clang-x86_64:
     needs: [filter, wait-for-human-priority]
     if: >-
@@ -182,7 +224,7 @@ jobs:
       contents: read
       packages: read
     with:
-      runs-on: '["Linux", "self-hosted", "build", "GCP"]'
+      runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
 
   # macOS builds
   build-macos-debug-clang-aarch64:
