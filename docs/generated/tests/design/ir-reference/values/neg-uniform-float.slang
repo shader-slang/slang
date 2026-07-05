@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ir-reference/values.md#arithmetic-and-bitwise
-//META: doc_section_digest=300bbe3c39d84a3dd7997f5a048fb4bd6e896b95057fa5fb8b7116c32840a6b7
+//META: doc_section_digest=1d2f08dfecd3e2ccb26b50652f1294ebe4c1c5182a6aab140a589ccecd16faa1
 //META: purpose=Boundary: prefix `-` on a `uniform float` lowers to `neg(%fa)` — the float-typed sibling of the integer `neg` exercised in the smoke test.
 //META: intent=boundary
 //META: pipeline_stage=lower

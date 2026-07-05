@@ -548,7 +548,7 @@ void initCommandOptions(CommandOptions& options)
          "Specify the shader profile for code generation.\n"
          "Accepted profiles are:\n"
          "* sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6,6_7,6_8,6_9,6_10}\n"
-         "* glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}\n"
+         "* glsl_{150,330,400,410,420,430,440,450,460}\n"
          "Additional profiles that include -stage information:\n"
          "* {vs,hs,ds,gs,ps}_<version>\n"
          "See -capability for information on <capability>\n"
@@ -585,6 +585,11 @@ void initCommandOptions(CommandOptions& options)
          "-warnings-disable",
          "-warnings-disable <id>[,<id>...]",
          "Disable specific warning ids."},
+        {OptionKind::WarningLevel,
+         "-Wall,-Wextra,-Wpedantic",
+         "-Wall | -Wextra | -Wpedantic",
+         "Enable the corresponding group of warnings (additive). The groups are independent: "
+         "-Wextra is on by default, while -Wall and -Wpedantic are off by default."},
         {OptionKind::EnableWarning, "-W...", "-W<id>", "Enable a warning with the specified id."},
         {OptionKind::DisableWarning, "-Wno-...", "-Wno-<id>", "Disable warning with <id>"},
         {OptionKind::DumpWarningDiagnostics,
@@ -676,8 +681,14 @@ void initCommandOptions(CommandOptions& options)
          "within any practical run; uint32 counters wrap silently at 2^32 hits per "
          "slot. Use `32` when targeting a runtime driver that does not support "
          "64-bit shader atomic add (notably MoltenVK on Apple Silicon, which "
-         "exposes `shaderBufferInt64Atomics = false`). Implies `-trace-coverage` "
-         "is meaningful; ignored when no coverage mode is enabled."},
+         "exposes `shaderBufferInt64Atomics = false`). Metal targets (`metal`, "
+         "`metallib`, `metallib-asm`): MSL provides no 64-bit atomic fetch-add, so "
+         "counting-mode counters are capped to 32 bits; an explicitly requested "
+         "`64` is capped with warning E45115. Boolean coverage "
+         "(`-trace-coverage-boolean`) writes plain non-atomic stores and honors "
+         "the requested width on all targets. "
+         "Implies `-trace-coverage` is meaningful; ignored when no coverage mode "
+         "is enabled."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -3048,6 +3059,28 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // Enable the warning
                 // SLANG_RETURN_ON_FAIL(_overrideDiagnostic(name, Severity::Warning,
                 // Severity::Warning));
+                break;
+            }
+        case OptionKind::WarningLevel:
+            {
+                // The flag spelling (-Wall/-Wextra/-Wpedantic) selects which warning group to
+                // enable. Exact-match options take priority over the -W<id> prefix, so these are
+                // never confused with `-W<name>`.
+                auto flag = argValue.getUnownedSlice();
+                SlangWarningLevel level;
+                if (flag == "-Wall")
+                    level = SLANG_WARNING_LEVEL_ALL;
+                else if (flag == "-Wextra")
+                    level = SLANG_WARNING_LEVEL_EXTRA;
+                else if (flag == "-Wpedantic")
+                    level = SLANG_WARNING_LEVEL_PEDANTIC;
+                else
+                {
+                    // Only the three exact flags above are registered for WarningLevel, so any
+                    // other spelling reaching here is a wiring bug, not user input.
+                    SLANG_UNEXPECTED("unhandled -W warning-level flag");
+                }
+                linkage->m_optionSet.add(OptionKind::WarningLevel, (int)level);
                 break;
             }
         case OptionKind::VerifyDebugSerialIr:
