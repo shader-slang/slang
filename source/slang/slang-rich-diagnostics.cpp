@@ -26,7 +26,7 @@ namespace Diagnostics
 %     local class_name = lua_module.toPascalCase(diagnostic.name)
 %     -- Escape quotes and backslashes in the message
 %     local escaped_message = diagnostic.message:gsub('\\', '\\\\'):gsub('"', '\\"')
-const DiagnosticInfo $(camel_name)Info = {$(diagnostic.code), $(lua_module.getSeverityEnum(diagnostic.severity)), "$(camel_name)", "$(escaped_message)"};
+const DiagnosticInfo $(camel_name)Info = {$(diagnostic.code), $(lua_module.getSeverityEnum(diagnostic.severity)), "$(camel_name)", "$(escaped_message)", $(lua_module.getWarningLevelEnum(diagnostic.level))};
 const DiagnosticInfo* $(class_name)::getInfo() { return &$(camel_name)Info; }
 % end
 

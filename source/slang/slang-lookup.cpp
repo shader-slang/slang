@@ -472,6 +472,16 @@ static void _lookupMembersInSuperTypeFacets(
         {
             if (as<ThisTypeDecl>(parentDeclRef.getDecl()) && getText(name) == "This")
             {
+                if (auto declRefType = as<DeclRefType>(selfType))
+                {
+                    // An interface's own `This` declaration shadows the `This`
+                    // declarations that arrive through base-interface facets.
+                    // Returning an inherited `This.This` candidate here makes
+                    // plain `This` ambiguous in derived interfaces.
+                    if (declRefType->getDeclRef().as<InterfaceDecl>())
+                        continue;
+                }
+
                 // If we are going looking for `This` in a `ThisType`, we just need to return the
                 // declRef itself.
                 AddToLookupResult(ioResult, CreateLookupResultItem(parentDeclRef, inBreadcrumbs));
@@ -765,9 +775,8 @@ static bool _isDeclOverloadable(Decl* decl)
     // It seems not as they are both function-like and potentially overloadable
 
     // If it's callable, it's a function-like and so overloadable
-    if (auto callableDecl = as<CallableDecl>(decl))
+    if (auto callableDecl = as<CallableDecl>(decl); callableDecl)
     {
-        SLANG_UNUSED(callableDecl);
         return true;
     }
 

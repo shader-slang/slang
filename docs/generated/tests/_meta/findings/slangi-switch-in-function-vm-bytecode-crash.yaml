@@ -1,0 +1,33 @@
+schema_version: 1
+id: slangi-switch-in-function-vm-bytecode-crash
+bundle: conformance/statements
+suspected_kind: wrong-codegen
+observed_at: "2026-06-02T07:58:55+00:00"
+scope: ir
+title: "[slangi] switch in a called function crashes VM bytecode gen"
+evidence:
+  command: "./build/Release/bin/slangi docs/generated/tests/conformance/statements/switch-basic-functional.slang"
+  source_slang: docs/generated/tests/conformance/statements/switch-basic-functional.slang
+  observed_summary: |
+    slangi crashes with E99997 "unimplemented: VM bytecode gen for inst" when a switch
+    statement is placed inside a user-defined function called from main(). A switch in
+    main() itself works fine. The same switch function compiles and runs correctly with
+    -cpu compute (COMPARE_COMPUTE) and with -target hlsl emit.
+  exit_code: 5
+  stderr_tail: "error[E99997]: Slang compilation aborted due to an exception of N5Slang13InternalErrorE unimplemented: VM bytecode gen for inst."
+expected:
+  claim: |
+    The doc (statements.md#switch-statement) describes switch as a standard control-flow
+    statement usable anywhere a statement is allowed, including inside helper functions.
+    slangi must be able to interpret switch statements inside called functions.
+  citation_kind: doc
+  citation: docs/language-reference/statements.md
+provenance:
+  agent_model: claude-sonnet-4-6
+  source_commit: a01e79278cf0be9772deb8b2be52ee87687697a3
+  doc_anchor: docs/language-reference/statements.md#switch-statement
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — the switch syntax is valid Slang and compiles correctly to hlsl/cpu targets."
+    - "slangi limitation for complex control flow: switch inside main() works; only fails when switch is in a called function. This points to an IR lowering or VM bytecode emission issue for switch inside inlined/non-inlined callees."

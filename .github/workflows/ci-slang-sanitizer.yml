@@ -10,10 +10,6 @@ on:
         required: false
         type: number
         default: 2
-      test-category:
-        required: false
-        type: string
-        default: smoke
       timeout-minutes:
         required: false
         type: number
@@ -26,13 +22,10 @@ jobs:
     permissions:
       id-token: write
       contents: read
-      packages: read
+      packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
 
     container:
       image: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
       options: --user root
 
     env:
@@ -44,9 +37,9 @@ jobs:
 
     steps:
       - name: Configure Git safe directory
-        run: git config --global --add safe.directory '*'
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           submodules: "recursive"
           # Need full history to diff PR changes against the base branch
@@ -71,7 +64,7 @@ jobs:
 
       - name: Authenticate to Google Cloud
         if: env.IS_FORK_PR != 'true'
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
@@ -81,8 +74,12 @@ jobs:
         with:
           platform: linux
 
+      # sccache is a build accelerator, not a correctness input: a cache miss
+      # or a transient cache-service error must degrade to a slower (cold)
+      # build, never fail the job.
       - name: Restore sccache cache
-        uses: actions/cache/restore@v4
+        continue-on-error: true
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache
           key: sccache-linux-clang-18-x86_64-asan-v2-${{ github.sha }}
@@ -162,7 +159,7 @@ jobs:
 
       - name: Save sccache cache
         if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache
           key: sccache-linux-clang-18-x86_64-asan-v2-${{ github.sha }}
@@ -190,7 +187,6 @@ jobs:
       - name: Run Tests with Sanitizers
         if: steps.build.outcome == 'success'
         env:
-          TEST_CATEGORY: ${{ inputs.test-category }}
           SERVER_COUNT: ${{ inputs.server-count }}
         run: |
           # halt_on_error=0: continue after each error to find more issues
@@ -209,7 +205,6 @@ jobs:
           ldd "$bin_dir/slang-test" 2>&1 | head -30 || true
 
           slang_test_args=(
-            "-category" "$TEST_CATEGORY"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-expected-failure-list" "tests/expected-failure-no-gpu.txt"
             "-expected-failure-list" "tests/expected-failure-linux.txt"
@@ -222,6 +217,12 @@ jobs:
             slang_test_args+=("-use-test-server")
             slang_test_args+=("-server-count" "$SERVER_COUNT")
           fi
+
+          # Print the fully-resolved command so the CI log shows exactly which
+          # arguments were used (the conditional logic only shows the source).
+          printf '+ %q' "$bin_dir/slang-test"
+          printf ' %q' "${slang_test_args[@]}"
+          printf '\n'
 
           # Non-zero exits are expected (sanitizer errors, test failures); this
           # job gates only on sanitizer log output in the Summary step.
@@ -620,7 +621,7 @@ jobs:
 
       - name: Upload Sanitizer Logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: sanitizer-logs
           path: asan-logs/

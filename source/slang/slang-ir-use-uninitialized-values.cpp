@@ -175,9 +175,55 @@ static bool canIgnoreType(IRType* type, IRType* upper)
     return false;
 }
 
-static List<IRInst*> getAliasableInstructions(IRInst* inst)
+// If `argUse` is an *argument* operand of an unconditional branch or loop (i.e. a phi
+// edge value, not one of the branch's target/break/continue block operands), return the
+// target block parameter that receives that argument. Otherwise return null.
+//
+// Branch arguments map positionally to the target block's parameters, so the value passed
+// as the i-th argument becomes the i-th block parameter (the SSA phi) along this edge.
+static IRParam* getBranchArgPhiParam(IRUse* argUse)
 {
-    List<IRInst*> addresses;
+    auto branch = as<IRUnconditionalBranch>(argUse->getUser());
+    if (!branch)
+        return nullptr;
+
+    // `getArgs()` points into the branch's contiguous operand storage and, by
+    // construction, excludes the non-argument operand slots (the target block, plus the
+    // break/continue blocks for an `IRLoop`). So the argument index is just the offset of
+    // `argUse` within that range; anything outside it (e.g. the target/break/continue use)
+    // is not a phi argument.
+    auto args = branch->getArgs();
+    UInt argCount = branch->getArgCount();
+    UInt argIndex = UInt(argUse - args);
+    if (argIndex >= argCount)
+        return nullptr;
+
+    // The target block parameter at the same index receives this argument. In well-formed
+    // IR the target always has at least `argCount` parameters, so `getParamAt` resolves it
+    // (and asserts otherwise).
+    return getParamAt(branch->getTargetBlock(), argIndex);
+}
+
+// Collect all instructions that alias `inst` for the purpose of the uninitialized-use
+// analysis. This follows two kinds of aliasing:
+//
+//  - Address aliasing: instructions like `getElementPtr`/`fieldAddress` produce a
+//    derived reference to the same storage (see `isAliasable`).
+//  - SSA value flow through phis: when `inst` (a value) is passed as a branch/loop
+//    argument, the receiving block parameter is the same value along that edge, so its
+//    uses are uses of `inst`. This is what lets a loop-carried use be seen: an
+//    uninitialized value passed as a loop's initial phi argument flows to the loop-header
+//    parameter, whose first-iteration read is a genuine use of the uninitialized value.
+//
+// A `visited` set guards against the cycles that phi following introduces (a loop-header
+// phi is reachable from its own back-edge argument).
+static void getAliasableInstructionsRec(
+    IRInst* inst,
+    HashSet<IRInst*>& visited,
+    List<IRInst*>& addresses)
+{
+    if (!visited.add(inst))
+        return;
 
     addresses.add(inst);
     for (auto use = inst->firstUse; use; use = use->nextUse)
@@ -185,13 +231,124 @@ static List<IRInst*> getAliasableInstructions(IRInst* inst)
         IRInst* user = use->getUser();
 
         // Meta instructions only use the argument type
-        if (isMetaOp(user) || !isAliasable(user))
+        if (isMetaOp(user))
             continue;
 
-        addresses.addRange(getAliasableInstructions(user));
-    }
+        if (isAliasable(user))
+        {
+            getAliasableInstructionsRec(user, visited, addresses);
+            continue;
+        }
 
+        // Follow SSA value flow through a phi: an argument passed to a branch/loop
+        // becomes the corresponding block parameter, which is the same value along
+        // this edge.
+        if (auto phiParam = getBranchArgPhiParam(use))
+            getAliasableInstructionsRec(phiParam, visited, addresses);
+    }
+}
+
+static List<IRInst*> getAliasableInstructions(IRInst* inst, HashSet<IRInst*>& aliasSet)
+{
+    List<IRInst*> addresses;
+    getAliasableInstructionsRec(inst, aliasSet, addresses);
     return addresses;
+}
+
+static List<IRInst*> getAliasableInstructions(IRInst* inst)
+{
+    HashSet<IRInst*> aliasSet;
+    return getAliasableInstructions(inst, aliasSet);
+}
+
+// Does `inst` depend (transitively, through its operands) on any value in `aliasSet`?
+// Used to tell a genuinely-defined phi argument from one that is merely the tracked
+// uninitialized value carried/derived through computation. For example, with a
+// loop-carried accumulator the back-edge argument is `add(total1, a[i])`, which depends on
+// the loop-header phi `total1` (an alias) and so is *not* a real definition; whereas a
+// conditionally-stored value like `load(candidateProceduralAttrs)` depends on nothing in
+// the alias set and *is* a real definition. A `seen` set bounds the operand walk against
+// cycles (phis can be mutually recursive).
+static bool dependsOnAlias(IRInst* inst, const HashSet<IRInst*>& aliasSet, HashSet<IRInst*>& seen)
+{
+    if (aliasSet.contains(inst))
+        return true;
+    if (!seen.add(inst))
+        return false;
+    // Stop at block boundaries: a block parameter's "operands" are its phi arguments,
+    // which we reach via the predecessors, not via getOperand. Following an alias param is
+    // already handled by aliasSet membership above; any non-alias param is treated as an
+    // independent definition.
+    if (as<IRParam>(inst))
+        return false;
+    for (UInt i = 0, n = inst->getOperandCount(); i < n; i++)
+    {
+        auto operand = inst->getOperand(i);
+        if (operand && dependsOnAlias(operand, aliasSet, seen))
+            return true;
+    }
+    return false;
+}
+
+// Given the set of aliases of the tracked uninitialized value (the values that are the
+// uninitialized value or are it carried along a phi edge), find the phi merge points where
+// a *genuinely defined* value also flows in. Each such incoming argument is reported as a
+// "store": along its edge the variable holds a real, initialized value, so a read reached
+// after it is not a may-init (never-initialized) use.
+//
+// This is what keeps the analysis honest once phi following is enabled. Consider a value
+// that is assigned only on some paths and then read after a loop:
+//
+//     MyAttrs attrs;                       // uninitialized
+//     for (;;) { ...; if (cond) attrs = computed; ... }
+//     use(attrs);                          // reads the loop-header phi
+//
+// The loop-header phi merges the undefined pre-loop value with `computed`. Without this,
+// the post-loop read would be flagged may-init (no IR `store` exists for an SSA value),
+// even though a defined value reaches it on the assigning path — making it a conditional
+// (must-init) situation that the definite-assignment pass deliberately suppresses for
+// zero-trip loops. Registering `computed` as a store lets `cancelLoads` reclassify the read
+// out of may-init. A purely loop-carried accumulator (`total += a[i]`) has no such defined
+// incoming value -- its only non-undefined phi argument, `add(total1, a[i])`, depends on
+// the phi itself -- so `dependsOnAlias` rejects it and the accumulator correctly stays a
+// may-init violation.
+static void collectPhiMergeStores(
+    const HashSet<IRInst*>& aliasSet,
+    const List<IRInst*>& aliases,
+    List<IRInst*>& stores)
+{
+    for (auto alias : aliases)
+    {
+        auto param = as<IRParam>(alias);
+        if (!param)
+            continue;
+        auto block = as<IRBlock>(param->getParent());
+        if (!block)
+            continue;
+        Index paramIndex = getParamIndexInBlock(param);
+        if (paramIndex < 0)
+            continue;
+
+        for (auto pred : block->getPredecessors())
+        {
+            auto branch = as<IRUnconditionalBranch>(pred->getTerminator());
+            if (!branch || UInt(paramIndex) >= branch->getArgCount())
+                continue;
+            auto arg = branch->getArg(UInt(paramIndex));
+            // Only an argument that does not derive from the tracked uninitialized value is
+            // a genuine definition reaching this merge point.
+            HashSet<IRInst*> seen;
+            if (dependsOnAlias(arg, aliasSet, seen))
+                continue;
+            // Record the store at the predecessor edge (its terminator), not at the
+            // argument's definition. The variable becomes initialized only on this incoming
+            // edge; the value `arg` may have been defined earlier (e.g. `float y = 1; if
+            // (cond) x = y;`), and using its definition point as the store would make the
+            // definite-assignment walk treat the unassigned edge as initialized too,
+            // suppressing the legitimate "may be uninitialized" diagnostic.
+            stores.add(branch);
+        }
+    }
 }
 
 enum InstructionUsageType
@@ -280,12 +437,33 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
         // in as a out parameter or not
         return getCallUsageType(as<IRCall>(user), inst);
 
-    // These instructions will store data...
     case kIROp_Store:
+    case kIROp_AtomicStore:
     case kIROp_SwizzledStore:
     case kIROp_MatrixSwizzleStore:
+        // Each of these writes to its destination pointer (operand 0) but
+        // *reads* the value/source being stored (operand 1). When the tracked
+        // instruction is that value -- rather than the destination -- the store
+        // reads it, so classify it as a `Load`. This lets a direct copy of an
+        // uninitialized value (e.g. `x = uninit;` or `v.x = uninit;`) be
+        // detected just like feeding it to an expression (`x = uninit + 1.0;`).
+        //
+        // A pointer-typed operand is excluded: a store whose value is an
+        // address (e.g. a variable's own address in `self.self = &self;`, which
+        // lowers to `store(getFieldAddr(self), self)` with the `self` pointer as
+        // the value) stores that address without reading the pointed-to memory,
+        // so it is not a use of the location. This applies the same
+        // pointer-vs-value rule as the `default` case below, but on a different
+        // subject: here it tests the stored value's type
+        // (`inst->getDataType()`), whereas the `default` case tests the using
+        // instruction's type (`user->getDataType()`).
+        if (inst == user->getOperand(1) && !as<IRPtrTypeBase>(inst->getDataType()))
+            return Load;
+        return Store;
+
+    // A SPIR-V asm block is opaque -- its operands have no fixed read/write
+    // role -- so conservatively treat any use by one as a store (a write).
     case kIROp_SPIRVAsm:
-    case kIROp_AtomicStore:
         return Store;
 
     case kIROp_SPIRVAsmOperandInst:
@@ -357,9 +535,285 @@ static void cancelLoads(
     }
 }
 
+// If `block` ends in an `ifElse` whose condition is one of `block`'s own parameters
+// (a phi), and the value that parameter receives along the edge from `fromPred` is a
+// boolean constant, then only one of the two branches is feasible when arriving from
+// `fromPred`. Returns the block that is *not* taken (the infeasible successor), or
+// null if both successors remain feasible.
+//
+// This captures the short-circuit `&&`/`||` lowering: the merge block of `a && b`
+// carries a phi that is the literal `false` along the "a is false" edge, so a later
+// branch on that phi cannot take its true-side from that edge. Without this, the
+// flat CFG admits an infeasible store-free path through the merge, producing a false
+// "possibly uninitialized" warning for patterns like `f(out x) && use(x)`.
+static IRBlock* getInfeasibleBranchFromPredecessor(IRBlock* block, IRBlock* fromPred)
+{
+    auto ifElse = as<IRIfElse>(block->getTerminator());
+    if (!ifElse)
+        return nullptr;
+
+    auto cond = ifElse->getCondition();
+    auto condParam = as<IRParam>(cond);
+    if (!condParam || condParam->getParent() != block)
+        return nullptr;
+
+    // Find the index of this parameter among the block's parameters.
+    UInt paramIndex = 0;
+    bool found = false;
+    for (auto p : block->getParams())
+    {
+        if (p == condParam)
+        {
+            found = true;
+            break;
+        }
+        paramIndex++;
+    }
+    if (!found)
+        return nullptr;
+
+    // Get the branch argument supplied for that parameter along the edge from
+    // `fromPred`.
+    auto branch = as<IRUnconditionalBranch>(fromPred->getTerminator());
+    if (!branch || paramIndex >= branch->getArgCount())
+        return nullptr;
+
+    auto argVal = as<IRBoolLit>(branch->getArg(paramIndex));
+    if (!argVal)
+        return nullptr;
+
+    // A constant condition makes the opposite branch infeasible from this edge.
+    return argVal->getValue() ? ifElse->getFalseBlock() : ifElse->getTrueBlock();
+}
+
+// Remove all loads that are "definitely assigned": every control-flow path from
+// the function entry to the load passes through at least one store.
+//
+// A load is kept (a must-init violation) only when there exists a path from entry
+// to the load that does not pass through any store first — i.e. the variable can
+// be read while still uninitialized on at least one path.
+//
+// This is the standard definite-assignment property. We compute it directly with a
+// forward CFG walk from entry that is blocked by store-containing blocks, rather
+// than using simple dominance. Dominance is too strict: "the load is dominated by
+// some single store" misses the common-and-safe case where different paths are
+// guarded by different stores, producing false positives on patterns like
+// short-circuit `&&` chains (`f(out x) && use(x)`), where the only way to reach the
+// use is through the store, but no individual store-block dominates the use-block
+// because the join block has a store-free predecessor whose path never reaches the
+// use.
+static void cancelLoadsByDefiniteAssignment(
+    IRGlobalValueWithCode* func,
+    const List<IRInst*>& stores,
+    List<IRInst*>& loads)
+{
+    if (loads.getCount() == 0)
+        return;
+
+    // Map each store to the block that contains it.
+    //
+    // `collectInstructionByUsage` records most stores as the storing instruction, but
+    // for the `StoreParent` case (e.g. inline SPIRV-asm operands) it records the
+    // *containing block* itself as the "store". Such a block is treated as initializing
+    // the variable somewhere within it, matching the block-reachability granularity the
+    // may-init analysis already uses. We track those separately as `wholeBlockStores`
+    // so that every load in them counts as definitely assigned.
+    HashSet<IRBlock*> blocksWithStore;
+    HashSet<IRBlock*> wholeBlockStores;
+    HashSet<IRInst*> storeSet;
+    for (auto store : stores)
+    {
+        if (auto storeBlock = as<IRBlock>(store))
+        {
+            blocksWithStore.add(storeBlock);
+            wholeBlockStores.add(storeBlock);
+        }
+        else if (auto block = as<IRBlock>(store->getParent()))
+        {
+            blocksWithStore.add(block);
+            storeSet.add(store);
+        }
+    }
+
+    // For blocks that contain both a store and a load, the relative order matters:
+    // a load that appears before any store in the same block is reachable while
+    // uninitialized (along the store-free entry path into the block), whereas a load
+    // after a store in the same block is definitely assigned by that store.
+    //
+    // Precompute, for each load, whether a store precedes it within its own block.
+    HashSet<IRInst*> loadHasPriorStoreInBlock;
+    for (auto load : loads)
+    {
+        auto block = as<IRBlock>(load->getParent());
+        if (!block)
+            continue;
+        // A whole-block (StoreParent) store covers the entire block, so any load in it
+        // is considered definitely assigned.
+        if (wholeBlockStores.contains(block))
+        {
+            loadHasPriorStoreInBlock.add(load);
+            continue;
+        }
+        if (!blocksWithStore.contains(block))
+            continue;
+        for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
+        {
+            if (inst == load)
+                break;
+            if (storeSet.contains(inst))
+            {
+                loadHasPriorStoreInBlock.add(load);
+                break;
+            }
+        }
+    }
+
+    // Loop relaxation: element-wise initialization inside a loop is extremely common
+    // (e.g. `[ForceUnroll] for (i) result[i] = ...;` filling an array/vector before
+    // use). Such a store does not strictly dominate the post-loop use — the loop could
+    // run zero times — but in practice these loops have constant trip counts >= 1, so
+    // treating the zero-trip path as leaving the variable uninitialized produces noisy
+    // false positives (this is what previously forced large parts of the core module
+    // and many tests to disable the warning).
+    //
+    // To suppress those while still catching genuine first-iteration reads (the #10658
+    // motivating bug, where the use appears *inside* the loop before any store), we
+    // treat a loop whose body contains a store as initializing the variable by the time
+    // control reaches the loop-exit (break) block: that break block is never marked
+    // clean-reachable. The break block is the loop's reconvergence point, so every path
+    // that reaches it first goes through the loop; excluding it does not hide store-free
+    // paths that bypass the loop entirely. Clean state still flows into the loop body, so
+    // uses that precede the store inside the body are still reported.
+    HashSet<IRBlock*> suppressedBreakBlocks;
+    for (auto block : func->getBlocks())
+    {
+        auto loop = as<IRLoop>(block->getTerminator());
+        if (!loop)
+            continue;
+        auto breakBlock = loop->getBreakBlock();
+
+        // Collect the loop body: blocks reachable from the loop target without passing
+        // through the break block. If any of them contains a store, treat the loop as
+        // initializing the variable by the time control reaches the break block.
+        //
+        // This is deliberately conservative toward *fewer* false positives. Loops that
+        // fill a variable element-by-element (e.g. `[ForceUnroll] for (i) result[i] =
+        // ...;`, including nested loops over compile-time-constant bounds) are extremely
+        // common and safe in practice, but the store is not guaranteed to dominate the
+        // post-loop use under a purely structural analysis (the loop "might" run zero
+        // times, or an inner loop might). Distinguishing those from a genuine
+        // conditionally-initialized-in-a-loop bug would require trip-count reasoning, so
+        // we accept the rare missed in-loop conditional-store case rather than warn on
+        // the pervasive element-wise pattern. Uses that occur *inside* the loop before
+        // the store are still reported, since clean state still flows into the body.
+        HashSet<IRBlock*> bodyVisited;
+        List<IRBlock*> bodyWork;
+        bodyVisited.add(breakBlock); // sentinel: never traverse past the break block
+        if (auto target = loop->getTargetBlock())
+        {
+            if (bodyVisited.add(target))
+                bodyWork.add(target);
+        }
+        bool bodyHasStore = false;
+        while (bodyWork.getCount())
+        {
+            auto b = bodyWork.getLast();
+            bodyWork.removeLast();
+            if (blocksWithStore.contains(b))
+            {
+                bodyHasStore = true;
+                break;
+            }
+            for (auto succ : b->getSuccessors())
+            {
+                if (bodyVisited.add(succ))
+                    bodyWork.add(succ);
+            }
+        }
+        if (bodyHasStore)
+            suppressedBreakBlocks.add(breakBlock);
+    }
+
+    // Forward CFG reachability from entry, treating any block that contains a store
+    // as a barrier: we can enter such a block "clean" (still uninitialized) but its
+    // successors are reached only after the store has executed, so they are not
+    // propagated as clean.
+    //
+    // The set of "clean-reachable" blocks is exactly the set of blocks reachable
+    // from entry along a path with no preceding store (subject to the loop relaxation
+    // above, and pruning of short-circuit-infeasible edges below).
+    //
+    // We propagate over CFG edges rather than blocks so that, when entering a block,
+    // we know which predecessor we came from and can prune outgoing edges that are
+    // statically infeasible due to short-circuit `&&`/`||` constant-phi conditions
+    // (see getInfeasibleBranchFromPredecessor). A block is clean-reachable if some
+    // clean, feasible edge enters it (the entry block is clean by definition).
+    //
+    // The worklist holds (predecessor, block) edges. `predecessor` is null for the
+    // synthetic entry edge.
+    HashSet<IRBlock*> cleanReachable;
+    HashSet<KeyValuePair<IRBlock*, IRBlock*>> visitedEdges;
+    List<KeyValuePair<IRBlock*, IRBlock*>> worklist;
+
+    auto enqueueEdge = [&](IRBlock* pred, IRBlock* succ)
+    {
+        // Don't mark a loop's break block clean when the loop body initializes the
+        // variable: by the time control reconverges at the break block, the loop has
+        // run at least once and performed the store.
+        if (suppressedBreakBlocks.contains(succ))
+            return;
+        KeyValuePair<IRBlock*, IRBlock*> edge(pred, succ);
+        if (visitedEdges.add(edge))
+        {
+            cleanReachable.add(succ);
+            worklist.add(edge);
+        }
+    };
+
+    if (auto entry = func->getFirstBlock())
+        enqueueEdge(nullptr, entry);
+
+    while (worklist.getCount())
+    {
+        auto edge = worklist.getLast();
+        worklist.removeLast();
+        IRBlock* pred = edge.key;
+        IRBlock* block = edge.value;
+
+        // A store in this block blocks propagation to its successors.
+        if (blocksWithStore.contains(block))
+            continue;
+
+        // Prune the outgoing branch that is infeasible given the predecessor we
+        // arrived from (short-circuit constant-phi correlation).
+        IRBlock* infeasibleSucc = pred ? getInfeasibleBranchFromPredecessor(block, pred) : nullptr;
+
+        for (auto succ : block->getSuccessors())
+        {
+            if (succ == infeasibleSucc)
+                continue;
+            enqueueEdge(block, succ);
+        }
+    }
+
+    // A load is a violation iff its block is clean-reachable and no store precedes
+    // it within that block.
+    for (Index i = 0; i < loads.getCount();)
+    {
+        auto block = as<IRBlock>(loads[i]->getParent());
+        bool definitelyAssigned = !block || !cleanReachable.contains(block) ||
+                                  loadHasPriorStoreInBlock.contains(loads[i]);
+        if (definitelyAssigned)
+            loads.fastRemoveAt(i);
+        else
+            i++;
+    }
+}
+
 static void collectAliasableLoadStores(IRInst* inst, List<IRInst*>& stores, List<IRInst*>& loads)
 {
-    auto addresses = getAliasableInstructions(inst);
+    HashSet<IRInst*> aliasSet;
+    auto addresses = getAliasableInstructions(inst, aliasSet);
 
     for (auto alias : addresses)
     {
@@ -367,6 +821,11 @@ static void collectAliasableLoadStores(IRInst* inst, List<IRInst*>& stores, List
         for (auto use = alias->firstUse; use; use = use->nextUse)
             collectInstructionByUsage(stores, loads, use->getUser(), alias);
     }
+
+    // A defined value flowing into a phi alias is a store of an initialized value reaching
+    // that merge point; record it so reads after it are not mistaken for never-initialized
+    // (may-init) uses.
+    collectPhiMergeStores(aliasSet, addresses, stores);
 }
 
 static List<IRInst*> getUnresolvedParamLoads(
@@ -395,17 +854,97 @@ static List<IRInst*> getUnresolvedParamLoads(
     return loads;
 }
 
-static List<IRInst*> getUnresolvedVariableLoads(ReachabilityContext& reachability, IRInst* inst)
+// The two disjoint classes of uninitialized-use violations for a single variable,
+// computed from one shared collection pass over its aliasable loads/stores.
+struct UninitializedUseLoads
 {
-    // Partition instructions
+    // Loads with NO store reaching them at all (the may-init violations, 41016/41033).
+    List<IRInst*> mayInit;
+
+    // Loads that some store reaches (so not may-init) but for which a store-free path
+    // from the function entry can still reach the load — i.e. the variable is only
+    // conditionally initialized (the must-init / definite-assignment violations,
+    // 41035/41036).
+    List<IRInst*> mustInit;
+};
+
+static UninitializedUseLoads getUninitializedUseLoads(
+    ReachabilityContext& reachability,
+    IRGlobalValueWithCode* func,
+    IRInst* inst)
+{
+    // Collect the aliasable loads/stores once and derive both violation sets from it.
     List<IRInst*> stores;
-    List<IRInst*> loads;
+    List<IRInst*> allLoads;
+    collectAliasableLoadStores(inst, stores, allLoads);
 
-    collectAliasableLoadStores(inst, stores, loads);
+    UninitializedUseLoads result;
 
-    cancelLoads(reachability, stores, loads);
+    // May-init violations: loads not reachable from any store.
+    result.mayInit = allLoads;
+    cancelLoads(reachability, stores, result.mayInit);
 
-    return loads;
+    // Must-init only adds information when there is at least one store (otherwise every
+    // load is already a may-init violation) and at least one load.
+    if (stores.getCount() == 0 || allLoads.getCount() == 0)
+        return result;
+
+    HashSet<IRInst*> mayInitSet;
+    for (auto load : result.mayInit)
+        mayInitSet.add(load);
+
+    result.mustInit = allLoads;
+    cancelLoadsByDefiniteAssignment(func, stores, result.mustInit);
+
+    // Keep the two sets disjoint: drop loads already reported as may-init violations.
+    for (Index i = 0; i < result.mustInit.getCount();)
+    {
+        if (mayInitSet.contains(result.mustInit[i]))
+            result.mustInit.fastRemoveAt(i);
+        else
+            i++;
+    }
+
+    return result;
+}
+
+// Emit an uninitialized-use diagnostic at each load location. The named-variable form
+// (`TVarDiag`, carrying `varName`) is used when `inst` has a user-visible name; the
+// typed-value form (`TValDiag`, carrying `typeName`) is used otherwise (e.g. poison ops
+// and other compiler-synthesized intermediates). This is shared by the may-init
+// (41016/41033) and must-init (41035/41036) paths, which differ only in the diagnostic
+// pair they pass.
+template<typename TVarDiag, typename TValDiag>
+static void diagnoseUninitializedUses(
+    DiagnosticSink* sink,
+    IRInst* inst,
+    IRType* type,
+    const List<IRInst*>& loads)
+{
+    bool hasName = inst->findDecoration<IRNameHintDecoration>() != nullptr ||
+                   inst->findDecoration<IRLinkageDecoration>() != nullptr;
+
+    for (auto load : loads)
+    {
+        if (hasName)
+        {
+            StringBuilder varNameSb;
+            printDiagnosticArg(varNameSb, inst);
+            sink->diagnose(TVarDiag{
+                .varName = varNameSb.produceString(),
+                .location = load->sourceLoc,
+            });
+        }
+        else
+        {
+            StringBuilder typeNameSb;
+            printDiagnosticArg(typeNameSb, type);
+            sink->diagnose(TValDiag{
+                .typeName = typeNameSb.produceString(),
+                .location = load->sourceLoc,
+            });
+        }
+    }
 }
 
 static bool isInstStoredInto(ReachabilityContext& reachability, IRInst* reference, IRInst* inst)
@@ -534,10 +1073,19 @@ static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, Di
             printDiagnosticArg(fieldNameSb, field->getKey());
             if (synthesized)
             {
+                // The field key's source location can be empty (e.g. when the
+                // struct definition comes from a linked module). Fall back to
+                // the struct type's location and then the constructor function
+                // so the warning always points somewhere meaningful.
+                SourceLoc loc = field->getKey()->sourceLoc;
+                if (!loc.isValid())
+                    loc = stype->sourceLoc;
+                if (!loc.isValid())
+                    loc = func->sourceLoc;
                 sink->diagnose(Diagnostics::FieldNotDefaultInitialized{
                     .typeName = typeNameSb.produceString(),
                     .fieldName = fieldNameSb.produceString(),
-                    .location = field->getKey()->sourceLoc,
+                    .location = loc,
                 });
             }
             else
@@ -638,33 +1186,20 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
             if (canIgnoreType(type, nullptr))
                 continue;
 
-            auto loads = getUnresolvedVariableLoads(reachability, inst);
-            for (auto load : loads)
-            {
-                // Check if we have a meaningful name for the variable
-                bool hasName = inst->findDecoration<IRNameHintDecoration>() != nullptr ||
-                               inst->findDecoration<IRLinkageDecoration>() != nullptr;
+            // Collect both may-init and must-init violations from a single shared
+            // load/store collection pass.
+            auto useLoads = getUninitializedUseLoads(reachability, func, inst);
 
-                if (hasName)
-                {
-                    StringBuilder varNameSb;
-                    printDiagnosticArg(varNameSb, inst);
-                    sink->diagnose(Diagnostics::UsingUninitializedVariable{
-                        .varName = varNameSb.produceString(),
-                        .location = load->sourceLoc,
-                    });
-                }
-                else
-                {
-                    // For poison ops and other unnamed instructions, show type instead
-                    StringBuilder typeNameSb;
-                    printDiagnosticArg(typeNameSb, type);
-                    sink->diagnose(Diagnostics::UsingUninitializedValue{
-                        .typeName = typeNameSb.produceString(),
-                        .location = load->sourceLoc,
-                    });
-                }
-            }
+            // May-init: the variable is read on a path where no store reaches it at all.
+            diagnoseUninitializedUses<
+                Diagnostics::UsingUninitializedVariable,
+                Diagnostics::UsingUninitializedValue>(sink, inst, type, useLoads.mayInit);
+
+            // Must-init: some store reaches the use, but a store-free path from entry can
+            // still reach it — the variable is only conditionally initialized.
+            diagnoseUninitializedUses<
+                Diagnostics::PossiblyUsingUninitializedVariable,
+                Diagnostics::PossiblyUsingUninitializedValue>(sink, inst, type, useLoads.mustInit);
         }
     }
 

@@ -113,6 +113,18 @@ local insts = {
 					hoistable = true,
 				},
 			},
+			{
+				-- A vector with element alignment and no padding (12 bytes for a
+				-- 3-vector of 32-bit floats), used as the storage type for vectors
+				-- in Metal device buffers, which use natural (scalar-aligned,
+				-- tightly packed) layout. Emitted as MSL `packed_T<N>` (e.g.
+				-- `packed_float3`).
+				MetalPackedVec = {
+					struct_name = "MetalPackedVectorType",
+					operands = { { "elementType", "IRType" }, { "elementCount" } },
+					hoistable = true,
+				},
+			},
 			{ Conjunction = { struct_name = "ConjunctionType", hoistable = true } },
 			{
 				Attributed = {
@@ -216,6 +228,56 @@ local insts = {
 				},
 			},
 			{ Atomic = { struct_name = "AtomicType", operands = { { "elementType", "IRType" } }, hoistable = true } },
+			{
+				WorkGraphRecordTypeBase = {
+					hoistable = true,
+					{
+						DispatchNodeInputRecord = {
+							struct_name = "DispatchNodeInputRecordType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						ThreadNodeInputRecord = {
+							struct_name = "ThreadNodeInputRecordType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						GroupNodeInputRecords = {
+							struct_name = "GroupNodeInputRecordsType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{ EmptyNodeInput = { struct_name = "EmptyNodeInputType" } },
+					{
+						ThreadNodeOutputRecords = {
+							struct_name = "ThreadNodeOutputRecordsType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						GroupNodeOutputRecords = {
+							struct_name = "GroupNodeOutputRecordsType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						NodeOutput = {
+							struct_name = "NodeOutputType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						NodeOutputArray = {
+							struct_name = "NodeOutputArrayType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{ EmptyNodeOutput = { struct_name = "EmptyNodeOutputType" } },
+					{ EmptyNodeOutputArray = { struct_name = "EmptyNodeOutputArrayType" } },
+				},
+			},
 			{
 				BindExistentialsTypeBase = {
 					hoistable = true,
@@ -814,6 +876,23 @@ local insts = {
 	-- for linkage).
 	--
 	{ key = { struct_name = "StructKey", global = true } },
+	-- A requirement key for a recognized built-in interface requirement (e.g. an
+	-- `IDifferentiable` requirement identified by `BuiltinRequirementKind`).
+	-- Unlike an ordinary struct key -- which is a distinct `global` symbol per
+	-- field/requirement decl, unified across modules by its `key_<mangled>`
+	-- linkage name -- a built-in requirement key is `hoistable`, so it is
+	-- deduplicated *by construction* from its `kind` operand. This guarantees the
+	-- same logical built-in requirement always resolves to a single key inst,
+	-- even when referenced from several decls (the canonical interface constraint
+	-- and a constraint synthesized while building a type's `Differential`) or
+	-- across the precompiled-core-module boundary.
+	{
+		builtinRequirementKey = {
+			struct_name = "BuiltinRequirementKey",
+			operands = { { "kindOperand", "IRIntLit" } },
+			hoistable = true,
+		},
+	},
 	{ global_generic_param = { global = true } },
 	{ witness_table = { hoistable = true } },
 	{ indexedFieldKey = { operands = { { "baseType" }, { "index" } }, hoistable = true } },
@@ -890,7 +969,7 @@ local insts = {
 		--
 		-- Corresponds to the LLVM `poison` instruction.
 		--
-		{ Poison = {} },
+		{ Poison = { hoistable = true } },
 	}},
 
 	-- A `defaultConstruct` operation creates an initialized
@@ -1096,17 +1175,46 @@ local insts = {
 			{ atomicDec = { operands = { { "ptr" } } } },
 		},
 	},
-	-- Emitted at AST lowering when `-trace-coverage` is on. The
-	-- instruction has no operands; its source position is carried on
-	-- the standard per-instruction `sourceLoc` field, which is always
-	-- preserved and never stripped by `stripDebugInfo`. The coverage-
-	-- instrument IR pass later rewrites each occurrence into an atomic
-	-- add on the IR-synthesized `__slang_coverage` buffer; counter slots are
-	-- assigned one-per-op in traversal order. Host-side tooling reads
-	-- source coverage entries and aggregates line entries when producing LCOV.
-	-- Inherent side-effect semantics keep the optimizer from deleting
-	-- or hoisting this op.
+	-- Emitted at AST lowering when line coverage is on. The instruction
+	-- has no operands; its source position is carried on the standard
+	-- per-instruction `sourceLoc` field, which is always preserved and
+	-- never stripped by `stripDebugInfo`. The coverage-instrument IR pass
+	-- later rewrites each coverage marker into an atomic add on the IR-
+	-- synthesized `__slang_coverage` buffer. The current line/function/
+	-- branch producers assign one direct counter per marker; future
+	-- source-region coverage can keep using marker metadata without
+	-- preserving that one-to-one lowering. Host-side tooling reads
+	-- source coverage entries and projects them to LCOV records.
+	-- Inherent side-effect semantics keep the optimizer from deleting or
+	-- hoisting these ops.
 	{ IncrementCoverageCounter = {} },
+	-- Function-entry coverage marker. The marker's sourceLoc points at
+	-- the function declaration/body start. Display and mangled names are
+	-- carried as operands so later IR passes do not need AST access.
+	{
+		IncrementFunctionCoverageCounter =
+		{
+			operands =
+			{
+				{ "functionName", "IRStringLit" },
+				{ "functionMangledName", "IRStringLit" },
+			}
+		}
+	},
+	-- Branch-arm coverage marker. SourceLoc points at the branch
+	-- condition. Site/arm ids are local to the emitted metadata object;
+	-- semantic arm kind lets LCOV export distinguish true/false/case.
+	{
+		IncrementBranchCoverageCounter =
+		{
+			operands =
+			{
+				{ "branchSiteID", "IRIntLit" },
+				{ "branchArmID", "IRIntLit" },
+				{ "branchArmKind", "IRIntLit" },
+			}
+		}
+	},
 	-- Produced and removed during backward auto-diff pass as a temporary placeholder representing the
 	-- currently accumulated derivative to pass to some dOut argument in a nested call.
 	{ LoadReverseGradient = { operands = { { "value" } } } },
@@ -1157,6 +1265,8 @@ local insts = {
 	},
 	-- Store into an Image.
 	{ imageStore = { operands = { { "image" }, { "coord" }, { "value" } } } },
+	-- Form a pointer to a texel of an image for atomic operations.
+	{ ImageTexelPointer = { operands = { { "image" }, { "coord" }, { "sample" } } } },
 	-- Load from a SubpassInput.
 	{ SubpassLoad = { operands = { { "subpassInput" }, { "sample", optional = true } } } },
 	-- Load (almost) arbitrary-type data from a byte-address buffer
@@ -1216,6 +1326,7 @@ local insts = {
 	{ nonUniformResourceIndex = { operands = { { "index" } } } },
 	{ getNaturalStride = { operands = { { "type" } } } },
 	{ meshOutputRef = { operands = { { "base" }, { "index" } } } },
+	{ nodeOutputRecordGetElementPtr = { operands = { { "base" }, { "index" } } } },
 	{ meshOutputSet = { operands = { { "base" }, { "index" }, { "elementValue" } } } },
 	-- only two parameters as they are effectively static
 	-- TODO: make them reference the _slang_mesh object directly
@@ -1384,6 +1495,7 @@ local insts = {
 	{ RequireComputeDerivative = {} },
 	{ StaticAssert = { operands = { { "condition" }, { "message" } } } },
 	{ Printf = { operands = { { "format" } } } },
+	{ Abort = { operands = { { "format" } } } },
 	-- Quad control execution modes.
 	{ RequireMaximallyReconverges = {} },
 	{ RequireQuadDerivatives = {} },
@@ -1765,6 +1877,15 @@ local insts = {
 			{ vulkanCallablePayload = { struct_name = "VulkanCallablePayloadDecoration" } },
 			{ vulkanCallablePayloadIn = { struct_name = "VulkanCallablePayloadInDecoration" } },
 			{ earlyDepthStencil = { struct_name = "EarlyDepthStencilDecoration" } },
+			-- Marks a fragment entry point whose `gl_FragDepth` output is constrained to
+			-- only ever increase / decrease the fixed-function depth (HLSL
+			-- SV_DepthGreaterEqual / SV_DepthLessEqual). Carried on the entry point so the
+			-- GLSL emitter can redeclare `layout(depth_greater)` / `layout(depth_less) out
+			-- float gl_FragDepth;`, which glslang maps to the DepthGreater / DepthLess
+			-- SPIR-V execution mode.
+			{ glslFragDepthGreater = { struct_name = "GLSLFragDepthGreaterDecoration" } },
+			{ glslFragDepthLess = { struct_name = "GLSLFragDepthLessDecoration" } },
+			{ shader64BitIndexing = { struct_name = "Shader64BitIndexingDecoration" } },
 			{ precise = { struct_name = "PreciseDecoration" } },
 			{ public = { struct_name = "PublicDecoration" } },
 			{ hlslExport = { struct_name = "HLSLExportDecoration" } },
@@ -1824,6 +1945,65 @@ local insts = {
 				waveSize = {
 					struct_name = "WaveSizeDecoration",
 					operands = { { "numLanes", "IRIntLit" } },
+				},
+			},
+			{
+				nodeLaunch = {
+					struct_name = "NodeLaunchDecoration",
+					operands = { { "mode", "IRStringLit" } },
+				},
+			},
+			{
+				nodeMaxDispatchGrid = {
+					struct_name = "NodeMaxDispatchGridDecoration",
+					operands = { { "x", "IRIntLit" }, { "y", "IRIntLit" }, { "z", "IRIntLit" } },
+				},
+			},
+			{
+				nodeDispatchGrid = {
+					struct_name = "NodeDispatchGridDecoration",
+					operands = { { "x", "IRIntLit" }, { "y", "IRIntLit" }, { "z", "IRIntLit" } },
+				},
+			},
+			{
+				maxRecords = {
+					struct_name = "MaxRecordsDecoration",
+					operands = { { "count", "IRIntLit" } },
+				},
+			},
+			{
+				nodeID = {
+					struct_name = "NodeIDDecoration",
+					operands = { { "name", "IRStringLit" }, { "arrayIndex", "IRIntLit" } },
+				},
+			},
+			{
+				nodeIsProgramEntry = {
+					struct_name = "NodeIsProgramEntryDecoration",
+				},
+			},
+			{
+				nodeArraySize = {
+					struct_name = "NodeArraySizeDecoration",
+					operands = { { "count", "IRIntLit" } },
+				},
+			},
+			{
+				allowSparseNodes = {
+					struct_name = "AllowSparseNodesDecoration",
+				},
+			},
+			{
+				-- Keep these decoration names reserved for stable IR serialization; new
+				-- workgraph records use dedicated Type.WorkGraphRecordTypeBase ops.
+				workGraphRecordType = {
+					struct_name = "WorkGraphRecordTypeDecoration",
+				},
+			},
+			{
+				workGraphRecordElementType = {
+					struct_name = "WorkGraphRecordElementTypeDecoration",
+					operands = { { "elementType", "IRType" } },
 				},
 			},
 			{
@@ -2058,6 +2238,16 @@ local insts = {
 					-- Attaches a name to this instruction so that it can be identified
 					-- later in the compiler reliably
 					operands = { { "nameOperand", "IRIntLit" } },
+				},
+			},
+			{
+				BuiltinRequirementDecoration = {
+					-- Marks an interface requirement key with the `BuiltinRequirementKind`
+					-- (stored as its integer value) of the built-in requirement it
+					-- represents. This lets consumers (e.g. autodiff) identify a built-in
+					-- requirement entry by its role rather than by its position in the
+					-- interface's requirement list, which is not semantically meaningful.
+					operands = { { "kindOperand", "IRIntLit" } },
 				},
 			},
 			{
@@ -2959,7 +3149,10 @@ local insts = {
 		--         discriminate which witness table to use, and the rest of the parameters.
 		--
 		hoistable = true,
-		operands = {{"witnessTableSet", "IRWitnessTableSet"}, {"lookupKey", "IRStructKey"}}
+		-- `lookupKey` is an `IRInst` (not `IRStructKey`) because a built-in interface
+		-- requirement reached through dynamic dispatch uses the hoistable
+		-- `IRBuiltinRequirementKey`, which is not an `IRStructKey`.
+		operands = {{"witnessTableSet", "IRWitnessTableSet"}, {"lookupKey", "IRInst"}}
 	} },
 	{ GetSpecializedDispatcher = {
 		-- Get a specialized dispatcher function for a given witness table set + key, where
@@ -3175,7 +3368,11 @@ local insts = {
 	{ constexprFloatCast = { operands = { { "value" } }, hoistable = true } },
 	{ constexprCastIntToEnum = { operands = { { "value" } }, hoistable = true } },
 	{ constexprCastEnumToInt = { operands = { { "value" } }, hoistable = true } },
-	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } }
+	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } },
+	-- Work-graph Barrier flag intrinsics: convert a compile-time BarrierMemoryTypeFlags/BarrierSemanticFlags
+	-- integer value to the corresponding target named-constant expression (e.g. "(UAV_MEMORY)").
+	{ getEnumBarrierMemoryTypeFlags = { operands = { { "flags" } }, hoistable = true } },
+	{ getEnumBarrierSemanticFlags = { operands = { { "flags" } }, hoistable = true } }
 }
 
 -- A function to calculate some useful properties and put it in the table,

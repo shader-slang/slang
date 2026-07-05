@@ -378,13 +378,13 @@ void emitVal(ManglingContext* context, Val* val)
         emitRaw(context, "k");
         emit(context, (UInt)constantIntVal->getValue());
     }
-    else if (auto funcCallIntVal = dynamicCast<FuncCallIntVal>(val))
+    else if (auto builtinOpIntVal = dynamicCast<BuiltinOperationIntVal>(val))
     {
-        emitRaw(context, "KC");
-        emit(context, funcCallIntVal->getArgs().getCount());
-        emitName(context, funcCallIntVal->getFuncDeclRef().getName());
-        for (Index i = 0; i < funcCallIntVal->getArgs().getCount(); i++)
-            emitVal(context, funcCallIntVal->getArgs()[i]);
+        emitRaw(context, "KB");
+        emit(context, builtinOpIntVal->getArgs().getCount());
+        emitNameImpl(context, getBuiltinOperationOpText(builtinOpIntVal->getOp()));
+        for (Index i = 0; i < builtinOpIntVal->getArgs().getCount(); i++)
+            emitVal(context, builtinOpIntVal->getArgs()[i]);
     }
     else if (auto lookupIntVal = dynamicCast<WitnessLookupIntVal>(val))
     {
@@ -620,6 +620,28 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
     {
         emit(context, "I");
         emitType(context, getSup(context->astBuilder, inheritanceDeclRef));
+
+        // An interface-level constraint that is a direct member of an interface
+        // (a `GenericTypeConstraintDecl` produced by relocating an associated
+        // type's bound -- `associatedtype A : IFoo`, an `associatedtype ...
+        // where` clause, or an explicit `__constraint`) is not uniquely
+        // identified by the parent interface and the bound `sup` alone: a single
+        // interface may constrain several associated types to the *same* bound,
+        // e.g. `associatedtype A : IFoo; associatedtype B : IFoo;`. Without
+        // encoding the constrained type these would mangle to the same
+        // requirement-key name and collide (e.g. in the witness-table cloning
+        // dictionary during linking). Emit the constrained `sub` type so each
+        // such constraint gets a distinct name. Ordinary inheritance
+        // (`InheritanceDecl`) and generic `where` constraints (whose parent is a
+        // generic, not an interface) are unaffected.
+        if (auto genConstraintDeclRef = declRef.as<GenericTypeConstraintDecl>())
+        {
+            if (isInterfaceRequirement(genConstraintDeclRef.getDecl()))
+            {
+                emitType(context, getSub(context->astBuilder, genConstraintDeclRef));
+            }
+        }
+
         if (parentGenericDeclRef)
         {
             ignoreName = true;

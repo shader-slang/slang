@@ -1,5 +1,6 @@
 #pragma warning(disable: 41017)
 
+import slang.neural;
 
 public bool equals<T>(T a, T b) where T : __BuiltinFloatingPointType
 {
@@ -72,6 +73,14 @@ public struct PadToTile<int Size>
     public static const int Value = ((Size + 15) / 16) * 16;
 }
 
+// Pad a size up to the target-native tiled MMA alignment used by the tests.
+public struct PadToTargetTile<int Size, TargetEnum Target>
+{
+    public static const int Value = (Target == TargetEnum.Metal)
+        ? ((Size + 7) / 8) * 8
+        : PadToTile<Size>.Value;
+}
+
 public void setBufferOneValue<int Size, int WorkgroupSize, T>(uint tid, RWStructuredBuffer<T> buffer, T value)
     where T : __BuiltinFloatingPointType
 {
@@ -112,32 +121,35 @@ int rowMajorToNativeMatB(int row, int col)
 // row = output dimension (M), col = input dimension (K).
 // CUDA weight is MatB<K, M> — native layout indexed as (K_row, M_col).
 // Vulkan weight is MatA<M, K> — row-major indexed as (M_row, K_col).
-public int tiledWeightOffset(int row, int col)
+// Metal weight is row-major with the supplied row stride.
+public int tiledWeightOffset<int RowStride>(int row, int col)
 {
     __target_switch
     {
     case cuda:  return rowMajorToNativeMatB(col, row);
     case spirv: return row * 16 + col;
+    case metal: return row * RowStride + col;
     }
 }
 
 // Offset for element (row, col) in the dWeight buffer's tiled layout.
 // On CUDA: native MatC fragment layout (from storeRaw + atomicAdd).
 // On Vulkan: row-major within each 16×16 tile (from storeTileRowToGlobal).
-// Single-tile version (row, col both < 16).
-public int tiledDWeightOffset(int row, int col)
+// On Metal: row-major with the supplied row stride.
+public int tiledDWeightOffset<int RowStride>(int row, int col)
 {
     __target_switch
     {
     case cuda:  return rowMajorToNativeMatC(row, col);
     case spirv: return row * 16 + col;
+    case metal: return row * RowStride + col;
     }
 }
 
 // Convert a row-major 16x16 tile to MatB native register layout.
 // MatB packs vertically: same column (gid), adjacent rows (tid*2, tid*2+1).
 public void convertTileRowMajorToNativeB<T>(
-    uint tid, int srcTileOffset, int dstOffset,
+    uint tid, int tileOffset,
     RWStructuredBuffer<T>.Handle buffer)
     where T : __BuiltinFloatingPointType
 {
@@ -146,16 +158,18 @@ public void convertTileRowMajorToNativeB<T>(
     int tidLocal = int(tid) & 3;
 
     T b[8];
-    b[0] = buffer[srcTileOffset + (tidLocal*2)   * S + gid];
-    b[1] = buffer[srcTileOffset + (tidLocal*2+1) * S + gid];
-    b[2] = buffer[srcTileOffset + (tidLocal*2+8) * S + gid];
-    b[3] = buffer[srcTileOffset + (tidLocal*2+9) * S + gid];
-    b[4] = buffer[srcTileOffset + (tidLocal*2)   * S + gid + 8];
-    b[5] = buffer[srcTileOffset + (tidLocal*2+1) * S + gid + 8];
-    b[6] = buffer[srcTileOffset + (tidLocal*2+8) * S + gid + 8];
-    b[7] = buffer[srcTileOffset + (tidLocal*2+9) * S + gid + 8];
+    b[0] = buffer[tileOffset + (tidLocal*2)   * S + gid];
+    b[1] = buffer[tileOffset + (tidLocal*2+1) * S + gid];
+    b[2] = buffer[tileOffset + (tidLocal*2+8) * S + gid];
+    b[3] = buffer[tileOffset + (tidLocal*2+9) * S + gid];
+    b[4] = buffer[tileOffset + (tidLocal*2)   * S + gid + 8];
+    b[5] = buffer[tileOffset + (tidLocal*2+1) * S + gid + 8];
+    b[6] = buffer[tileOffset + (tidLocal*2+8) * S + gid + 8];
+    b[7] = buffer[tileOffset + (tidLocal*2+9) * S + gid + 8];
 
-    int nativeBase = dstOffset + int(tid) * 8;
+    AllMemoryBarrierWithWaveSync();
+
+    int nativeBase = tileOffset + int(tid) * 8;
     [ForceUnroll]
     for (int i = 0; i < 8; i++)
         buffer[nativeBase + i] = b[i];
@@ -163,7 +177,8 @@ public void convertTileRowMajorToNativeB<T>(
 
 // Convert all tiles in a PaddedRows x PaddedCols tiled matrix from
 // row-major tiled layout to native MatB register layout (CUDA only).
-// Uses TempOffset = PaddedRows*PaddedCols as scratch space in the same buffer.
+// The first warp converts each tile in-place, using registers to hold all
+// source elements before writing the native layout back over the tile.
 public void convertTiledToNativeB<T, int PaddedRows, int PaddedCols, int WorkgroupSize>(
     uint tid, RWStructuredBuffer<T>.Handle buffer)
     where T : __BuiltinFloatingPointType
@@ -177,27 +192,17 @@ public void convertTiledToNativeB<T, int PaddedRows, int PaddedCols, int Workgro
         static const int NTileCols = PaddedCols / TileSize;
         static const int TotalTiles = NTileRows * NTileCols;
         static const int TileElements = TileSize * TileSize;
-        static const int TotalElements = PaddedRows * PaddedCols;
-        static const int TempOffset = TotalElements;
 
         if (tid < 32)
         {
             for (int t = 0; t < TotalTiles; t++)
-                convertTileRowMajorToNativeB<T>(tid, t * TileElements, TempOffset + t * TileElements, buffer);
-        }
-        AllMemoryBarrierWithGroupSync();
-
-        static const int CopyIters = (TotalElements + WorkgroupSize - 1) / WorkgroupSize;
-        [ForceUnroll]
-        for (int iter = 0; iter < CopyIters; iter++)
-        {
-            int index = iter * WorkgroupSize + tid;
-            if (index < TotalElements)
-                buffer[index] = buffer[TempOffset + index];
+                convertTileRowMajorToNativeB<T>(tid, t * TileElements, buffer);
         }
         AllMemoryBarrierWithGroupSync();
     }
     case spirv:
+        break;
+    case metal:
         break;
     }
 }
@@ -289,6 +294,8 @@ public void convertNativeToRowMajorTiled<T, int PaddedRows, int PaddedCols, int 
     }
     case spirv:
         break;
+    case metal:
+        break;
     }
 }
 
@@ -368,6 +375,18 @@ public void fillTransposeWeightTiled<T, int Rows, int Cols, int WorkgroupSize, b
             }
         }
     }
+    case metal:
+    {
+        static const int NumRowIters = (Rows + WorkgroupSize - 1) / WorkgroupSize;
+        for (int iter = 0; iter < NumRowIters; iter++)
+        {
+            int row = iter * WorkgroupSize + tid;
+            if (row >= Rows) break;
+            int scaleFactor = (row % 3 == 0) ? -1 : ((row % 3 == 1) ? 0 : 1);
+            for (int col = 0; col < Cols; col++)
+                buffer[row * PaddedCols + col] = T(scaleFactor * (col + 1));
+        }
+    }
     }
 }
 
@@ -416,7 +435,7 @@ public void fillForwardWeightTiled<T, int InputSize, int OutputSize, int Workgro
         AllMemoryBarrierWithGroupSync();
         convertTiledToNativeB<T, PaddedK, PaddedM, WorkgroupSize>(tid, buffer);
     }
-    default:
+    case spirv:
     {
         static const int TotalElements = PaddedK * PaddedM;
         static const int NumClearIters = (TotalElements + WorkgroupSize - 1) / WorkgroupSize;
@@ -446,5 +465,121 @@ public void fillForwardWeightTiled<T, int InputSize, int OutputSize, int Workgro
         }
         AllMemoryBarrierWithGroupSync();
     }
+    case metal:
+    {
+        static const int TotalElements = PaddedK * PaddedM;
+        static const int NumClearIters = (TotalElements + WorkgroupSize - 1) / WorkgroupSize;
+        for (int iter = 0; iter < NumClearIters; iter++)
+        {
+            int idx = iter * WorkgroupSize + tid;
+            if (idx < TotalElements)
+                buffer[idx] = T(0);
+        }
+        AllMemoryBarrierWithGroupSync();
+
+        static const int NumRowIters = (OutputSize + WorkgroupSize - 1) / WorkgroupSize;
+        for (int iter = 0; iter < NumRowIters; iter++)
+        {
+            int row = iter * WorkgroupSize + tid;
+            if (row >= OutputSize) break;
+            for (int col = 0; col < InputSize; col++)
+                buffer[row * PaddedK + col] = fillValue;
+        }
+        AllMemoryBarrierWithGroupSync();
+    }
+    }
+}
+
+void identityWeightMatrixTiledMetal<T, int InputSize, int WorkgroupSize, bool Clear>(
+    uint tid, RWStructuredBuffer<T>.Handle buffer)
+    where T : __BuiltinFloatingPointType
+{
+    static const int PaddedSize = PadToTargetTile<InputSize, TargetEnum.Metal>.Value;
+    static const int TotalElements = PaddedSize * PaddedSize;
+    static const int NumClearIters = (TotalElements + WorkgroupSize - 1) / WorkgroupSize;
+
+    for (int iter = 0; iter < NumClearIters; iter++)
+    {
+        int index = iter * WorkgroupSize + tid;
+        if (index < TotalElements)
+            buffer[index] = T(0);
+    }
+
+    if (Clear)
+        return;
+
+    AllMemoryBarrierWithGroupSync();
+
+    static const int NumDiagIters = (InputSize + WorkgroupSize - 1) / WorkgroupSize;
+    for (int iter = 0; iter < NumDiagIters; iter++)
+    {
+        int row = iter * WorkgroupSize + tid;
+        if (row >= InputSize)
+            break;
+
+        buffer[row * PaddedSize + row] = T(1);
+    }
+
+    AllMemoryBarrierWithGroupSync();
+}
+
+void identityWeightMatrixTiledNative<T, int InputSize, int WorkgroupSize, bool Clear, TargetEnum Target>(
+    uint tid, RWStructuredBuffer<T>.Handle buffer)
+    where T : __BuiltinFloatingPointType
+{
+    static const int TileSize = 16;
+    static const int PaddedSize = PadToTargetTile<InputSize, Target>.Value;
+    static const int NTileCols = PaddedSize / TileSize;
+    static const int TotalElements = PaddedSize * PaddedSize;
+    static const int NumClearIters = (TotalElements + WorkgroupSize - 1) / WorkgroupSize;
+
+    for (int iter = 0; iter < NumClearIters; iter++)
+    {
+        int index = iter * WorkgroupSize + tid;
+        if (index < TotalElements)
+            buffer[index] = T(0);
+    }
+
+    if (Clear)
+        return;
+
+    AllMemoryBarrierWithGroupSync();
+
+    static const int NumDiagIters = (InputSize + WorkgroupSize - 1) / WorkgroupSize;
+    for (int iter = 0; iter < NumDiagIters; iter++)
+    {
+        int row = iter * WorkgroupSize + tid;
+        if (row >= InputSize)
+            break;
+
+        int tileRow = row / TileSize;
+        int tileCol = row / TileSize;
+        int localRow = row % TileSize;
+        int localCol = row % TileSize;
+        int tileIndex = tileRow * NTileCols + tileCol;
+        int offset = tileIndex * TileSize * TileSize + localRow * TileSize + localCol;
+        buffer[offset] = T(1);
+    }
+
+    AllMemoryBarrierWithGroupSync();
+    convertTiledToNativeB<T, PaddedSize, PaddedSize, WorkgroupSize>(tid, buffer);
+}
+
+// Initialize the forward weight matrix used by tiled mat-vec tests.
+//
+// CUDA/Vulkan use a 16x16 tiled layout. Metal uses row-major weights with an
+// 8-element alignment.
+public void identityWeightMatrixTiled<T, int InputSize, int WorkgroupSize, bool Clear>(
+    uint tid, RWStructuredBuffer<T>.Handle buffer)
+    where T : __BuiltinFloatingPointType
+{
+    __target_switch
+    {
+    case cuda:
+        identityWeightMatrixTiledNative<T, InputSize, WorkgroupSize, Clear, TargetEnum.CUDA>(tid, buffer);
+    case spirv:
+        identityWeightMatrixTiledNative<T, InputSize, WorkgroupSize, Clear, TargetEnum.SPIR_V>(tid, buffer);
+    case metal:
+        identityWeightMatrixTiledMetal<T, InputSize, WorkgroupSize, Clear>(tid, buffer);
     }
 }

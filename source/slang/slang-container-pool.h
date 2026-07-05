@@ -11,6 +11,9 @@
 namespace Slang
 {
 static const int kContainerPoolSize = 1024;
+static const size_t kContainerPoolMinRetireBucketCount = 4096;
+static const size_t kContainerPoolRetireUnderuseDivisor = 8;
+static const int kContainerPoolRetireUnderuseCount = 2;
 
 template<typename T>
 struct ObjectPool
@@ -29,9 +32,16 @@ struct ObjectPool
         return &m_objects[id];
     }
 
-    void freeObject(T* object)
+    int getObjectIndex(T* object)
     {
         auto id = (int)(object - m_objects.getBuffer());
+        SLANG_RELEASE_ASSERT(id >= 0 && id < m_objects.getCount());
+        return id;
+    }
+
+    void freeObject(T* object)
+    {
+        auto id = getObjectIndex(object);
         m_pool.free(id, 1);
     }
 
@@ -44,12 +54,21 @@ struct ContainerPool
     ObjectPool<List<void*>> m_listPool;
     ObjectPool<Dictionary<void*, void*>> m_dictionaryPool;
     ObjectPool<HashSet<void*>> m_hashSetPool;
+    List<int> m_dictionaryUnderuseStreaks;
+    List<int> m_hashSetUnderuseStreaks;
 
     ContainerPool()
         : m_listPool(kContainerPoolSize)
         , m_dictionaryPool(kContainerPoolSize)
         , m_hashSetPool(kContainerPoolSize)
     {
+        m_dictionaryUnderuseStreaks.setCount(kContainerPoolSize);
+        m_hashSetUnderuseStreaks.setCount(kContainerPoolSize);
+        for (Index i = 0; i < kContainerPoolSize; i++)
+        {
+            m_dictionaryUnderuseStreaks[i] = 0;
+            m_hashSetUnderuseStreaks[i] = 0;
+        }
     }
 
     template<typename T>
@@ -70,6 +89,36 @@ struct ContainerPool
         return (HashSet<T*>*)m_hashSetPool.getObject();
     }
 
+    bool updateUnderuseStreakAndShouldRetire(
+        List<int>& underuseStreaks,
+        int objectIndex,
+        size_t liveCount,
+        size_t bucketCount)
+    {
+        // Dictionaries and hash sets normally keep their buckets after `clear()` so the next large
+        // use can reuse that storage. On long runs, though, a pool slot can become expensive if one
+        // large use is followed by many tiny uses: every return clears the same large table even
+        // though the live count stays small. Track that pattern per slot and only release the
+        // buckets after it repeats, so an occasional small use after a large pass does not cause
+        // allocation churn.
+        bool isUnderused = bucketCount >= kContainerPoolMinRetireBucketCount &&
+                           liveCount <= bucketCount / kContainerPoolRetireUnderuseDivisor;
+        if (!isUnderused)
+        {
+            underuseStreaks[objectIndex] = 0;
+            return false;
+        }
+
+        if (underuseStreaks[objectIndex] < kContainerPoolRetireUnderuseCount)
+            underuseStreaks[objectIndex]++;
+
+        if (underuseStreaks[objectIndex] < kContainerPoolRetireUnderuseCount)
+            return false;
+
+        underuseStreaks[objectIndex] = 0;
+        return true;
+    }
+
     template<typename T>
     void free(List<T*>* list)
     {
@@ -80,15 +129,51 @@ struct ContainerPool
     template<typename T, typename U>
     void free(Dictionary<T*, U*>* dict)
     {
-        dict->clear();
-        m_dictionaryPool.freeObject((Dictionary<void*, void*>*)dict);
+        auto pooledDict = (Dictionary<void*, void*>*)dict;
+        auto objectIndex = m_dictionaryPool.getObjectIndex(pooledDict);
+        auto liveCount = dict->getCount();
+        auto bucketCount = dict->getBucketCount();
+        bool shouldRetire = updateUnderuseStreakAndShouldRetire(
+            m_dictionaryUnderuseStreaks,
+            objectIndex,
+            liveCount,
+            bucketCount);
+
+        if (shouldRetire)
+        {
+            dict->clearAndDeallocate();
+        }
+        else
+        {
+            dict->clear();
+        }
+        m_dictionaryPool.freeObject(pooledDict);
     }
 
     template<typename T>
     void free(HashSet<T*>* set)
     {
-        set->clear();
-        m_hashSetPool.freeObject((HashSet<void*>*)set);
+        auto pooledSet = (HashSet<void*>*)set;
+        auto objectIndex = m_hashSetPool.getObjectIndex(pooledSet);
+        auto liveCount = set->getCount();
+        auto bucketCount = set->getBucketCount();
+        bool shouldRetire = updateUnderuseStreakAndShouldRetire(
+            m_hashSetUnderuseStreaks,
+            objectIndex,
+            liveCount,
+            bucketCount);
+
+        if (shouldRetire)
+        {
+            // Swap with an empty set instead of clearing first, because the oversized bucket array
+            // is exactly the cost we are trying to stop paying on later small uses of this slot.
+            set->clearAndDeallocate();
+        }
+        else
+        {
+            set->clear();
+        }
+        m_hashSetPool.freeObject(pooledSet);
     }
 };
 } // namespace Slang

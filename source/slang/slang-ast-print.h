@@ -158,6 +158,13 @@ public:
         const DeclRef<GenericDecl>& genericDeclRef,
         List<Slang::Range<Index>>* outParamRanges = nullptr);
 
+    /// Append a human-readable rendering of a generic `where`-clause constraint
+    /// declaration, matching Slang surface syntax so diagnostics echo what the
+    /// user wrote: subtype `T : I`, equality `T == X`, coercion `To(From)`, or
+    /// non-empty pack `nonempty(P)`. Falls back to the declaration's name for
+    /// any other constraint kind.
+    void addGenericConstraint(Decl* constraintDecl);
+
     /// Get the specified part type. Returns empty slice if not found
     UnownedStringSlice getPartSlice(Part::Type partType) const;
     /// Get the slice for a part
@@ -185,6 +192,11 @@ public:
 
     static String getDeclSignatureString(const LookupResultItem& item, ASTBuilder* astBuilder);
     static String getDeclSignatureString(DeclRef<Decl> declRef, ASTBuilder* astBuilder);
+
+    /// Render a generic `where`-clause constraint declaration to a string via
+    /// `addGenericConstraint`. Used by diagnostics that name an unsatisfied
+    /// constraint.
+    static String getGenericConstraintString(Decl* constraintDecl, ASTBuilder* astBuilder);
 
 protected:
     void _addDeclPathRec(const DeclRef<Decl>& declRef, Index depth);

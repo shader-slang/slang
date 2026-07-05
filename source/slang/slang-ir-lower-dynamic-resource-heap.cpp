@@ -15,17 +15,15 @@ namespace Slang
 /// ensuring consistency with reflection data.
 UInt getBindlessSpaceIndex(TargetProgram* targetProgram)
 {
-    // Get the bindless space index from the program layout.
-    // This is always allocated during generateParameterBindings().
-    if (auto programLayout = targetProgram->getExistingLayout())
-    {
-        SLANG_ASSERT(programLayout->bindlessSpaceIndex >= 0);
-        return (UInt)programLayout->bindlessSpaceIndex;
-    }
+    SLANG_RELEASE_ASSERT(targetProgram);
+    auto programLayout = targetProgram->getExistingLayout();
+    SLANG_RELEASE_ASSERT(programLayout);
 
-    // Fallback: if no layout exists yet, use the user-specified index or default to 0.
-    // This shouldn't normally happen since layout is generated before this pass runs.
-    return (UInt)targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
+    // Do not fall back to the requested option here; only layout knows the
+    // bindless space that was actually reserved after conflict resolution.
+    SLANG_RELEASE_ASSERT(programLayout->bindlessSpaceIndex >= 0);
+
+    return (UInt)programLayout->bindlessSpaceIndex;
 }
 
 IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
@@ -58,9 +56,11 @@ void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, Di
         }
     }
 
+    if (workList.getCount() == 0)
+        return;
+
     // If there are GetDynamicResourceHeap instructions, verify that the target
     // supports descriptor_handle capability.
-    if (workList.getCount() > 0)
     {
         auto targetCaps = targetProgram->getTargetReq()->getTargetCaps();
         if (targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(

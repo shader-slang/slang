@@ -937,6 +937,9 @@ class NamedExpressionType : public Type
 /// This function adjusts the mode to account for non-copyable types and for
 /// types that transitively contain non-copyable fields (e.g. a struct whose
 /// field is `Atomic<T>`), which cannot use copy-in/copy-out semantics.
+/// It also forces mesh-shader output parameters (`MeshOutputType`) to a
+/// direction-neutral mode, since their output direction is intrinsic to the
+/// type rather than to an explicit `out` modifier.
 ///
 /// `astBuilder` is used to apply generic substitutions when inspecting field
 /// types. Passing null is accepted but may miss non-copyable fields inside

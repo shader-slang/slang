@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# Compatibility: this script must run on bash 3.2, the version Apple ships as
+# /bin/bash on macOS. Do NOT use bash 4+ only features such as ${var,,}/${var^^}
+# (case conversion), associative arrays (declare -A), mapfile/readarray, or
+# namerefs (local -n). Lowercasing is done via the to_lower() helper below.
 set -euo pipefail
 
 is_wsl() {
@@ -70,6 +74,12 @@ log() {
 die() {
   echo "Error: $*" >&2
   exit 1
+}
+
+# Lowercase a string. Uses tr instead of ${var,,} so the script runs on
+# bash 3.2 (the version Apple ships as /bin/bash).
+to_lower() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
 require_command() {
@@ -225,7 +235,7 @@ review_repo_matches_configured_remote() {
     if ! remoteRepo="$(github_repo_from_url "$remoteUrl")"; then
       continue
     fi
-    if [[ "${remoteRepo,,}" == "${reviewRepoFull,,}" ]]; then
+    if [[ "$(to_lower "$remoteRepo")" == "$(to_lower "$reviewRepoFull")" ]]; then
       return 0
     fi
   done < <(git_run remote)

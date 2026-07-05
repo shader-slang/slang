@@ -240,16 +240,22 @@ struct ByteAddressBufferLegalizationContext
         return false;
     }
 
-    // Helper function to check if the alignment value passed is
-    // divisible by the offset at which the resource is indexed into
-    // in order to ensure if the load or store can be vectorized.
-    bool isAligned(IRInst* offset, IRInst* unknownOffsetAlignment, IRIntegerValue alignmentVal)
+    // Returns true if a vectorized load or store of `alignmentVal` bytes at
+    // `baseOffset + immediateOffset` is known to be sufficiently aligned.
+    bool isAligned(
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* unknownOffsetAlignment,
+        IRIntegerValue alignmentVal)
     {
-        if (auto baseOffsetVal = as<IRIntLit>(offset))
+        if (alignmentVal <= 0)
+            return false;
+
+        if (auto baseOffsetVal = as<IRIntLit>(baseOffset))
         {
             // If the offset is a constant known at compile time, simply check if it aligned to
             // the elementsize of the underlying resource.
-            return (baseOffsetVal->getValue() % alignmentVal) == 0;
+            return ((baseOffsetVal->getValue() + immediateOffset) % alignmentVal) == 0;
         }
         else if (auto alignInst = as<IRIntLit>(unknownOffsetAlignment))
         {
@@ -262,6 +268,9 @@ struct ByteAddressBufferLegalizationContext
             if (!alignInst->getValue())
                 return false;
 
+            if ((immediateOffset % alignmentVal) != 0)
+                return false;
+
             if ((alignInst->getValue() % alignmentVal) == 0)
             {
                 return true;
@@ -269,10 +278,35 @@ struct ByteAddressBufferLegalizationContext
             m_sink->diagnose(Diagnostics::ByteAddressBufferUnaligned{
                 .alignment = alignInst->getValue(),
                 .elementSize = alignmentVal,
-                .location = offset->sourceLoc,
+                .location = baseOffset->sourceLoc,
             });
         }
         return false;
+    }
+
+    IRType* getDescriptorHandleStorageType()
+    {
+        if (!m_options.translateToStructuredBufferOps)
+            return nullptr;
+
+        if (m_target->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+            return m_builder.getUInt64Type();
+
+        return m_builder.getVectorType(m_builder.getUIntType(), 2);
+    }
+
+    IROp getCastDescriptorHandleToStorageOp()
+    {
+        return m_target->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV)
+                   ? kIROp_CastDescriptorHandleToUInt64
+                   : kIROp_CastDescriptorHandleToUInt2;
+    }
+
+    IROp getCastStorageToDescriptorHandleOp()
+    {
+        return m_target->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV)
+                   ? kIROp_CastUInt64ToDescriptorHandle
+                   : kIROp_CastUInt2ToDescriptorHandle;
     }
 
     SlangResult getOffset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset)
@@ -408,10 +442,7 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isAligned(
-                        emitOffsetAddIfNeeded(baseOffset, immediateOffset),
-                        alignment,
-                        alignmentVal))
+                if (!isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -427,6 +458,22 @@ struct ByteAddressBufferLegalizationContext
                 {
                     return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
                 }
+            }
+        }
+        else if (auto descriptorHandleType = as<IRDescriptorHandleType>(type))
+        {
+            if (auto storageType = getDescriptorHandleStorageType())
+            {
+                auto storageVal =
+                    emitLegalLoad(storageType, buffer, baseOffset, immediateOffset, alignment);
+                if (!storageVal)
+                    return nullptr;
+                IRInst* args[] = {storageVal};
+                return m_builder.emitIntrinsicInst(
+                    descriptorHandleType,
+                    getCastStorageToDescriptorHandleOp(),
+                    1,
+                    args);
             }
         }
         else if (auto matType = as<IRMatrixType>(type))
@@ -507,10 +554,7 @@ struct ByteAddressBufferLegalizationContext
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
                 if (m_options.scalarizeVectorLoadStore ||
-                    !isAligned(
-                        emitOffsetAddIfNeeded(baseOffset, immediateOffset),
-                        alignment,
-                        alignmentVal))
+                    !isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -575,6 +619,26 @@ struct ByteAddressBufferLegalizationContext
         }
         else if (auto basicType = as<IRBasicType>(type))
         {
+            // Only split misaligned 8-byte scalar loads for targets that translate
+            // byte-address buffers into typed structured buffers. Targets that keep
+            // byte-address-buffer operations use the simple/lowerBasicTypeOps paths.
+            if (m_options.translateToStructuredBufferOps)
+            {
+                IRSizeAndAlignment sizeAlignment;
+                SLANG_RETURN_NULL_ON_FAIL(
+                    getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
+                if (sizeAlignment.size == 8 &&
+                    !isAligned(baseOffset, immediateOffset, alignment, sizeAlignment.getStride()))
+                {
+                    return emitLegalUnaligned64BitLoadFromTwoUInts(
+                        type,
+                        buffer,
+                        baseOffset,
+                        immediateOffset,
+                        alignment);
+                }
+            }
+
             // Most basic scalar types can be handled directly on targets,
             // but as described above for vectors, the D3D11/DXBC target
             // only support loading `uint` values, so we need to emulate
@@ -649,6 +713,31 @@ struct ByteAddressBufferLegalizationContext
         //
         return m_builder
             .emitIntrinsicInst(type, op, elementVals.getCount(), elementVals.getBuffer());
+    }
+
+    IRInst* emitLegalUnaligned64BitLoadFromTwoUInts(
+        IRType* type,
+        IRInst* buffer,
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* alignment)
+    {
+        auto uintType = m_builder.getUIntType();
+        auto uint64Type = m_builder.getUInt64Type();
+
+        auto loLoad = emitLegalLoad(uintType, buffer, baseOffset, immediateOffset, alignment);
+        if (!loLoad)
+            return nullptr;
+
+        auto hiLoad = emitLegalLoad(uintType, buffer, baseOffset, immediateOffset + 4, alignment);
+        if (!hiLoad)
+            return nullptr;
+
+        auto lo64 = m_builder.emitCast(uint64Type, loLoad);
+        auto hi64 = m_builder.emitCast(uint64Type, hiLoad);
+        auto shift = m_builder.emitShl(uint64Type, hi64, m_builder.getIntValue(uint64Type, 32));
+        auto fullValue = m_builder.emitBitOr(uint64Type, lo64, shift);
+        return m_builder.emitBitCast(type, fullValue);
     }
 
     // All of the loading operations above eventually bottom out at `emitSimpleLoad`,
@@ -967,6 +1056,33 @@ struct ByteAddressBufferLegalizationContext
                 1,
                 &arg);
         }
+        else if (auto loadDescriptor = as<IRSPIRVLoadDescriptorFromHeap>(byteAddressBuffer))
+        {
+            auto structuredBufferType =
+                getEquivalentStructuredBufferParamType(elementType, loadDescriptor->getDataType());
+            if (!structuredBufferType)
+                return nullptr;
+
+            return m_builder.emitLoadDescriptorFromHeap(
+                structuredBufferType,
+                loadDescriptor->getHeap(),
+                loadDescriptor->getIndex());
+        }
+        else if (auto resourceDescriptor = as<IRLoadResourceDescriptorFromHeap>(byteAddressBuffer))
+        {
+            auto structuredBufferType = getEquivalentStructuredBufferParamType(
+                elementType,
+                resourceDescriptor->getDataType());
+            if (!structuredBufferType)
+                return nullptr;
+
+            auto index = resourceDescriptor->getIndex();
+            return m_builder.emitIntrinsicInst(
+                structuredBufferType,
+                kIROp_LoadResourceDescriptorFromHeap,
+                1,
+                &index);
+        }
 
         if (byteAddressBuffer->getOp() == kIROp_GetElement)
         {
@@ -1280,10 +1396,7 @@ struct ByteAddressBufferLegalizationContext
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isAligned(
-                        emitOffsetAddIfNeeded(baseOffset, immediateOffset),
-                        alignment,
-                        alignmentVal))
+                if (!isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceStore(
                         buffer,
@@ -1303,6 +1416,25 @@ struct ByteAddressBufferLegalizationContext
                         immediateOffset,
                         value);
                 }
+            }
+        }
+        else if (as<IRDescriptorHandleType>(type))
+        {
+            if (auto storageType = getDescriptorHandleStorageType())
+            {
+                IRInst* args[] = {value};
+                auto storageVal = m_builder.emitIntrinsicInst(
+                    storageType,
+                    getCastDescriptorHandleToStorageOp(),
+                    1,
+                    args);
+                return emitLegalStore(
+                    storageType,
+                    buffer,
+                    baseOffset,
+                    immediateOffset,
+                    alignment,
+                    storageVal);
             }
         }
         else if (auto matType = as<IRMatrixType>(type))
@@ -1374,10 +1506,7 @@ struct ByteAddressBufferLegalizationContext
                 IRIntegerValue elementStride = elementLayout.getStride();
                 auto alignmentVal = elementStride * elementCountInst->getValue();
                 if (m_options.scalarizeVectorLoadStore ||
-                    !isAligned(
-                        emitOffsetAddIfNeeded(baseOffset, immediateOffset),
-                        alignment,
-                        alignmentVal))
+                    !isAligned(baseOffset, immediateOffset, alignment, alignmentVal))
                 {
                     return emitLegalSequenceStore(
                         buffer,
@@ -1422,6 +1551,24 @@ struct ByteAddressBufferLegalizationContext
         }
         else if (auto basicType = as<IRBasicType>(type))
         {
+            // Match the load path: this split is only needed when byte-address buffers
+            // are translated into typed structured buffers.
+            if (m_options.translateToStructuredBufferOps)
+            {
+                IRSizeAndAlignment sizeAlignment;
+                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
+                if (sizeAlignment.size == 8 &&
+                    !isAligned(baseOffset, immediateOffset, alignment, sizeAlignment.getStride()))
+                {
+                    return emitLegalUnaligned64BitStoreAsTwoUInts(
+                        buffer,
+                        baseOffset,
+                        immediateOffset,
+                        alignment,
+                        value);
+                }
+            }
+
             if (m_options.useBitCastFromUInt)
             {
                 if (auto unsignedType = getSameSizeUIntType(basicType))
@@ -1438,6 +1585,29 @@ struct ByteAddressBufferLegalizationContext
         }
 
         return emitSimpleStore(type, buffer, baseOffset, immediateOffset, value);
+    }
+
+    Result emitLegalUnaligned64BitStoreAsTwoUInts(
+        IRInst* buffer,
+        IRInst* baseOffset,
+        IRIntegerValue immediateOffset,
+        IRInst* alignment,
+        IRInst* value)
+    {
+        auto uintType = m_builder.getUIntType();
+        auto uint64Type = m_builder.getUInt64Type();
+
+        auto uint64Val = m_builder.emitBitCast(uint64Type, value);
+        auto loVal = m_builder.emitCast(uintType, uint64Val);
+        auto hiVal = m_builder.emitCast(
+            uintType,
+            m_builder.emitShr(uint64Type, uint64Val, m_builder.getIntValue(uint64Type, 32)));
+
+        SLANG_RETURN_ON_FAIL(
+            emitLegalStore(uintType, buffer, baseOffset, immediateOffset, alignment, loVal));
+        SLANG_RETURN_ON_FAIL(
+            emitLegalStore(uintType, buffer, baseOffset, immediateOffset + 4, alignment, hiVal));
+        return SLANG_OK;
     }
 
     Result emitSimpleStore(

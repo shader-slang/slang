@@ -1249,6 +1249,13 @@ class EarlyDepthStencilAttribute : public Attribute
 };
 // `[earlydepthstencil]`
 
+FIDDLE()
+class Shader64BitIndexingAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+// `[Shader64BitIndexing]`
+
 // An HLSL `[numthreads(x,y,z)]` attribute
 FIDDLE()
 class NumThreadsAttribute : public Attribute
@@ -1275,6 +1282,67 @@ class WaveSizeAttribute : public Attribute
     // followings: 4, 8, 16, 32, 64 or 128.
     //
     FIDDLE() IntVal* numLanes;
+};
+
+// Work-graph node shader attributes
+
+FIDDLE()
+class NodeLaunchAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() String mode; // "broadcasting" | "thread" | "coalescing"
+};
+
+FIDDLE()
+class NodeMaxDispatchGridAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* x;
+    FIDDLE() IntVal* y;
+    FIDDLE() IntVal* z;
+};
+
+FIDDLE()
+class NodeDispatchGridAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* x;
+    FIDDLE() IntVal* y;
+    FIDDLE() IntVal* z;
+};
+
+FIDDLE()
+class MaxRecordsAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* value;
+};
+
+FIDDLE()
+class NodeIDAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() String name;
+    FIDDLE() IntVal* arrayIndex;
+};
+
+FIDDLE()
+class NodeIsProgramEntryAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class AllowSparseNodesAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class NodeArraySizeAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* count;
 };
 
 FIDDLE()
@@ -1381,6 +1449,19 @@ class MutatingAttribute : public Attribute
 //
 FIDDLE()
 class NonmutatingAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+// A `[NoDiscard]` attribute, which indicates that the result of a
+// function call should not be discarded. When a call to a function
+// marked with this attribute is made in a context where its result is
+// discarded — an expression statement, or a `for` loop's side-effect
+// expression, including through parentheses and pass-through operands —
+// the compiler emits an error.
+//
+FIDDLE()
+class NoDiscardAttribute : public Attribute
 {
     FIDDLE(...)
 };
