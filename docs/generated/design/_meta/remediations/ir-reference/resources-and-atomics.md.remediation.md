@@ -1,13 +1,13 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.8
-remediated_at: 2026-06-05T15:45:00Z
+remediated_at: 2026-06-30T14:01:53Z
 target_doc: ir-reference/resources-and-atomics.md
 review_report: ../../reviews/ir-reference/resources-and-atomics.md.review.md
-target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 actions:
-  fixed: 3
+  fixed: 2
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -17,17 +17,10 @@ actions:
 # Remediation report for ir-reference/resources-and-atomics.md
 
 ## Summary
-
-All three findings were fixed; none were rejected, deferred, or
-escalated. Two missing varying-input opcodes were added to Shader IO,
-a required sampling notable callout was added, and target-specific
-lowering prose forbidden by the prompt was trimmed in three places and
-replaced with a link to the emit page.
+Both findings were valid and in-scope; both were fixed by minimal edits to the target document. F-001 corrected the atomic-opcode operand cells to include the `IRMemoryOrder` operand(s) the emitters actually read, and updated the `atomicCompareExchange` callout to match. F-002 renamed the misleading notable-opcode heading so it no longer implies a non-existent `EntryPointParam` opcode. No rejections, deferrals, or escalations.
 
 ## Actions
-
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `source/slang/slang-ir-insts.lua:1534,1539` declare `GetPerVertexInputArray` / `ResolveVaryingInputRef` (both hoistable); no sibling page lists them. Semantics verified at `source/slang/slang-ir-resolve-varying-input-ref.cpp:8-31`. | Added `GetPerVertexInputArray` and `ResolveVaryingInputRef` rows to the `### Shader IO` table. |
-| F-002 | fixed | `ir-reference-resources-and-atomics.md:59` requires implicit/explicit/gradient sampling notable coverage; `sample` / `sampleGrad` at `source/slang/slang-ir-insts.lua:1508-1509`. | Added a `### sample and sampleGrad` notable callout contrasting implicit-LOD vs explicit-gradient encodings. |
-| F-003 | fixed | `ir-reference-resources-and-atomics.md:75-77` forbids target-specific lowering content. | Trimmed SPIR-V/HLSL/Metal lowering detail from the `SubpassLoad` row, the `imageLoad`/`imageStore` notable, and the `ControlBarrier` notable, replacing each with a link to `../pipeline/06-emit.md`. |
+| F-001 | fixed | Confirmed: `source/slang/slang-emit-spirv.cpp:5452/5481/5505/5531-5533/5562` read memory-order operands at slots 1/2/2/3-4/2; `source/slang/slang-ir.cpp:5556` builds `AtomicStore(dstPtr, srcVal, memoryOrder)`. The doc's own prose and the per-doc prompt mandate the memory-order operand. | Atomic table: `atomicLoad`->`ptr, memoryOrder`; `atomicStore`/`atomicExchange`/RMW->`ptr, val, memoryOrder`; CAS->`ptr, expected, desired, memoryOrderEqual, memoryOrderUnequal`; updated CAS callout to match |
+| F-002 | fixed | Confirmed: `source/slang/slang-ir-insts.lua:817` declares the `global_param` opcode; `source/slang/slang-ir-insts.lua:1974-1979` declares `EntryPointParamDecoration` (a decoration); no `EntryPointParam` opcode exists. | Renamed heading to "global_param and EntryPointParamDecoration (cross-link)" and clarified entry-point origin is carried by the decoration, not an opcode |

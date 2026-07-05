@@ -1,42 +1,44 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:58:02+00:00
+reviewed_at: 2026-06-30T13:31:00+00:00
 target_doc: syntax-reference/keywords-and-builtins.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 20804753dbe34bcc88e551a3b9b9e42d42729a73662c7d2065776e63a87d47a1
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: f75116b2323ea549005589e147bdc7c2b79a63ace127358d8904fccc95cf2272
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
   completeness: partial
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
-finding_count: 2
+finding_count: 1
 severity_breakdown:
   critical: 0
   major: 1
-  minor: 1
+  minor: 0
   nit: 0
 ---
 
 # Review report for syntax-reference/keywords-and-builtins.md
 
 ## Summary
-The page is largely source-aligned: parser-registered declarations, modifiers, expressions, and sampled meta-module names match the watched files. Two issues remain: several required sections are renamed or split away from the prompt contract, and the reserved-prefix discussion names public spellings the parser does not register.
+The page is mostly source-aligned, but the keyword inventory is incomplete. The main issue is that the hardcoded parser vocabulary includes internal statement keywords and type-specifier keywords that are not mentioned in the document, even though the prompt asks for an inventory of syntactic keywords and built-in syntax declarations.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show syntax-reference/keywords-and-builtins.md` and used the listed watched files at `52339028a2aa703271533454c6b9528a534bac31`.
-- Read the per-document prompt, `_common.md`, and dependency doc `syntax-reference/tokens.md`.
-- Resolved all relative markdown links and anchors in the target document.
-- Verified required front matter keys and checked that the target digest is a 64-character hex value.
-- Spot-checked at least 14 source-alignment claims, including statement keyword dispatch, `g_parseSyntaxEntries`, `_makeParseDecl`, `_makeParseModifier`, `_makeParseExpr`, `new` handling in `parsePrefixExpr`, `struct`, `class`, and `enum` special handling, core scalar aliases, HLSL wave builtins, GLSL vector aliases, and diff attribute declarations.
-- Checked the required section list from `docs/generated/design/_meta/prompts/syntax-keywords-and-builtins.md`.
+- Ran `regenerate.py show syntax-reference/keywords-and-builtins.md` and reviewed the target document, `_common.md`, the per-document prompt, the dependency document `syntax-reference/tokens.md`, and the resolved watched-file set.
+- Checked front matter for all required keys, the recorded source commit, the warning string, and a 64-character hex watched-path digest.
+- Resolved the relative markdown links in the body to source files or generated peer documents.
+- Spot-checked source-backed claims against watched files, including `TokenType::Identifier`, `SyntaxDecl`, `LookAheadToken("if")`, `LookAheadToken("for")`, `parseCompileTimeForStmt`, `parseIfStatement`, `g_parseSyntaxEntries[]`, `_makeParseDecl`, `_makeParseModifier`, `_makeParseExpr`, `getSyntaxParseInfos()`, `struct`/`class`/`enum` special-casing, `new`, `Optional`, `Tuple`, `Texture2D`, `WaveGetWaveIndex`, `vec3`, `mat4`, `gl_Position`, and `DifferentialPair`.
+- Checked the document's required sections against `syntax-keywords-and-builtins.md` and the universal generated-doc contract.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | Required section headings | The prompt requires `## Lexer-recognized keywords`, `## Parser-registered syntax keywords`, and `## Core-module syntax declarations`, but the document uses `## Lexer-recognized symbols`, splits parser syntax across separate statement, declaration, modifier, and expression sections, and uses `## Core-module-supplied vocabulary`. | `docs/generated/design/_meta/prompts/syntax-keywords-and-builtins.md:28-54` names the required sections; the target headings are `## Lexer-recognized symbols`, `## Statement keywords`, `## Decl keywords`, `## Modifier keywords`, `## Expression keywords`, and `## Core-module-supplied vocabulary`. | Rename and regroup the sections to match the prompt contract, preserving the useful subgroups as subsections under `## Parser-registered syntax keywords` and renaming the core-module section to `## Core-module syntax declarations`. |
-| F-002 | minor | `## Reserved identifier prefixes` | The text says many double-underscore names have public spellings without underscores and gives `init`, `subscript`, and `include` as examples, but the parser registers only `__init`, `__subscript`, and `__include` for those three. | `source/slang/slang-parser.cpp:10397-10406` registers `__init`, `__subscript`, and `__include`; the same range registers public spellings only for `extension` and `import`. | Remove `init`, `subscript`, and `include` from the public-spelling examples, or qualify the sentence so only `extension` and `import` are presented as parser-registered public spellings. |
+| F-001 | major | `## Parser-registered syntax keywords`, statement/type-specifier inventory | The inventory omits several hardcoded parser keywords. The statement table lists ordinary control-flow keywords but not internal statement forms such as `__target_switch`, `__stage_switch`, `__intrinsic_asm`, and `__GPU_FOREACH`; the decl/type discussion calls out `struct`, `class`, and `enum` but not the hardcoded type-specifier forms `expand` and `each`. | `source/slang/slang-parser.cpp:6939`-`source/slang/slang-parser.cpp:6953` directly dispatches `__target_switch`, `__stage_switch`, `__intrinsic_asm`, and `__GPU_FOREACH`; `source/slang/slang-parser.cpp:3435`-`source/slang/slang-parser.cpp:3441` directly recognizes `expand` and `each` alongside the shape expression forms. | Add these hardcoded parser keywords to the appropriate parser-keyword discussion, marking the double-underscore / GPU forms as internal or experimental where appropriate. |
+
+## No-issues notes
+- The document keeps generated-doc links workspace-relative and avoids absolute source paths.
+- The page stays within the documented scope for its family and does not copy handwritten documentation prose.
+- The source citations are concentrated in the watched paths listed by the manifest entry.

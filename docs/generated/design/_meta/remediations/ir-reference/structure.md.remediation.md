@@ -1,14 +1,14 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.8
-remediated_at: 2026-06-05T15:45:00Z
+remediated_at: 2026-06-30T14:01:36Z
 target_doc: ir-reference/structure.md
 review_report: ../../reviews/ir-reference/structure.md.review.md
-target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 actions:
-  fixed: 2
-  rejected_bogus: 0
+  fixed: 1
+  rejected_bogus: 1
   rejected_out_of_scope: 0
   deferred: 0
   escalated: 0
@@ -17,16 +17,10 @@ actions:
 # Remediation report for ir-reference/structure.md
 
 ## Summary
-
-Both findings were fixed; none were rejected, deferred, or escalated.
-The `## Source` paragraph now cites the lowering functions that
-actually exist, and the `witness_table` opcode is documented with its
-concrete-type operand and result-type conformance plus a dedicated
-notable callout.
+Two findings: one rejected-bogus, one fixed. F-001 is bogus — the `generic` callout already says the body ends with `return_val` / `IRReturn`, not `yield`, matching `findGenericReturnVal` and the Lua comment. F-002 mis-cited its example rows (the four it named already carried wrappers) but flagged a real gap: filled every remaining `—` wrapper cell whose opcode has a FIDDLE-generated wrapper, per the "from `struct_name` or implicit" rule. Edits touch only the wrapper column, no watched source, so `source_commit` is unchanged.
 
 ## Actions
-
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | The cited `lowerProgram` / `lowerCallableDecl` / `lowerGenericDecl` / `lowerStructDecl` / `lowerInterfaceDecl` / `lowerInheritanceDecl` do not exist; real symbols are `lowerFuncDecl` (`slang-lower-to-ir.cpp:14089`), `visitGenericDecl` (`:14100`), `visitAggTypeDecl` (`:11938`, calls `createStructType` `:11994`), `visitInterfaceDecl` (`:11520`), `visitInheritanceDecl` (`:10671`), `lowerGlobalVarDecl` (`:11199`), `generateIRForTranslationUnit`/`ensureAllDeclsRec` (`:14672`). | Rewrote the `## Source` lowering sentence to cite the real visitor/helper names. |
-| F-002 | fixed | `slang-ir.cpp:4992-4998` records `concreteType` as operand 0 and the interface in the `WitnessTableType` result; `slang-ir-insts.h:2211-2216` exposes `getConcreteType()` / `getConformanceType()`. `ir-reference-structure.md:58-59` requires a `witness_table` notable. | Updated the `witness_table` row's Operands/Summary to name `concreteType` and result-type conformance, and added a `### witness_table` notable callout. |
+| F-001 | rejected-bogus | Doc line 98 and the `### generic` callout already read "ends with `return_val` / `IRReturn`"; the word "yield" appears only as the value the generic yields, matching `source/slang/slang-ir-insts.lua:809`. `findGenericReturnVal` casts the terminator to `IRReturn` (`source/slang/slang-ir.cpp:9743`). The reviewer's premise that the callout names `yield` as the terminator is false. | — |
+| F-002 | fixed | Wrapper column is mandatory and admits implicit wrappers (`_common.md` line 234: "from `struct_name` or implicit"). Reviewer's four cited rows already had wrappers; the genuinely-empty cells were `call`, `global_generic_param`, `indexedFieldKey`, `thisTypeWitness`, `TypeEqualityWitness`, `SymbolAlias`, all of which have wrappers: `IRCall` (`source/slang/slang-ir-insts.h:1697`), `IRGlobalGenericParam` (`:2266`), `IRIndexedFieldKey` (`source/slang/slang-ir.h:1765`), `IRThisTypeWitness` (`source/slang/slang-ir.h:1730`), `IRTypeEqualityWitness` (`build/source/slang/fiddle/slang-ir-insts.h.fiddle:8307`), `IRSymbolAlias` (`cast<IRSymbolAlias>` at `source/slang/slang-ir-link.cpp:1445`). | Filled wrapper cells `—` -> `IRCall` / `IRGlobalGenericParam` / `IRIndexedFieldKey` / `IRThisTypeWitness` / `IRTypeEqualityWitness` / `IRSymbolAlias` |

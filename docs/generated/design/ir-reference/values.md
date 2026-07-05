@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T10:25:25+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
+generated_at: 2026-06-29T18:32:20Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -79,19 +79,22 @@ flowchart TD
 
 ### Literals (`Constant` group)
 
-Literals are hoistable so two `IntLit 42` produce the same IR value.
-Each literal stores its payload (integer, float, bytes, ...) inline
-on the `IRInst`, *not* in the operand list.
+Two `IntLit 42` produce the same IR value: the `Constant` opcodes
+are not marked with the `H` (hoistable) opcode flag, but are
+deduplicated through the constant map by
+`IRBuilder::_findOrEmitConstant`. Each literal stores its payload
+(integer, float, bytes, ...) inline on the `IRInst`, *not* in the
+operand list.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `boolConst` | `BoolLit` | (payload: bool) | H | `BoolLiteralExpr` in `slang-lower-to-ir.cpp` | `true` / `false`. |
-| `integer_constant` | `IntLit` | (payload: int64) | H | `IntegerLiteralExpr` | Integer literal; signedness encoded in the result type. |
-| `float_constant` | `FloatLit` | (payload: double) | H | `FloatingPointLiteralExpr` | Floating-point literal. |
-| `ptr_constant` | `PtrLit` | (payload: pointer bits) | H | `NullPtrExpr` and other pointer-constant lowerings | Pointer constant (e.g. `nullptr`). |
-| `void_constant` | `VoidLit` | — | H | `VoidLiteralExpr` | The unique `void` value. |
-| `string_constant` | `StringLit` | (payload: bytes) | H | `StringLiteralExpr` | String constant; bytes inline. |
-| `blob_constant` | `BlobLit` | (payload: bytes) | H | (synthesized) | Arbitrary blob literal; used by embedded-IR support. |
+| `boolConst` | `BoolLit` | (payload: bool) | | `BoolLiteralExpr` in `slang-lower-to-ir.cpp` | `true` / `false`. |
+| `integer_constant` | `IntLit` | (payload: int64) | | `IntegerLiteralExpr` | Integer literal; signedness encoded in the result type. |
+| `float_constant` | `FloatLit` | (payload: double) | | `FloatingPointLiteralExpr` | Floating-point literal. |
+| `ptr_constant` | `PtrLit` | (payload: pointer bits) | | `NullPtrLiteralExpr` and other pointer-constant lowerings | Pointer constant (e.g. `nullptr`). |
+| `void_constant` | `VoidLit` | — | | `NoneLiteralExpr` / synthesized `IRBuilder::getVoidValue` | The unique `void` value. |
+| `string_constant` | `StringLit` | (payload: bytes) | | `StringLiteralExpr` | String constant; bytes inline. |
+| `blob_constant` | `BlobLit` | (payload: bytes) | | (synthesized) | Arbitrary blob literal; used by embedded-IR support. |
 
 ### Undefined and default-construct
 
@@ -101,7 +104,7 @@ and `Poison`; only its concrete children are listed here.
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `LoadFromUninitializedMemory` | — | — | | (synthesized) | A load from uninitialized memory; like LLVM's `freeze(undef)`. Frontend diagnostics surface uses. |
-| `Poison` | — | — | | (synthesized) | Infectious undefined value; analogue of LLVM `poison`. |
+| `Poison` | — | — | H | (synthesized) | Infectious undefined value; analogue of LLVM `poison`. Hoistable, so all poison values of the same type dedupe to one inst (built via `IRBuilder::getPoison`). |
 | `defaultConstruct` | — | — | | `DefaultConstructExpr` and synthesized in IR passes | Produces a default-initialized value of the result type. |
 
 ### Arithmetic and bitwise
@@ -131,7 +134,7 @@ and `Poison`; only its concrete children are listed here.
 | --- | --- | --- | --- | --- | --- |
 | `logicalAnd` | `And` | `left, right` | | `InfixExpr` (`&&`) | Boolean AND of two already-evaluated `bool` operands; short-circuiting is handled by control flow during lowering, not by this opcode. |
 | `logicalOr` | `Or` | `left, right` | | `InfixExpr` (`\|\|`) | Boolean OR of two already-evaluated `bool` operands; short-circuiting is handled by control flow during lowering, not by this opcode. |
-| `select` | `Select` | `condition, trueResult, falseResult` | | `SelectExpr` and ternary `cond ? a : b` lowering | Branch-free conditional selection. |
+| `select` | `Select` | `condition, trueResult, falseResult` | | `SelectExpr` for vector-typed or global-scope selects (via `visitInvokeExpr`); scalar in-function ternaries lower to `ifElse` + block `Param` instead | Branch-free conditional selection. |
 
 ### Comparison
 
@@ -169,6 +172,13 @@ and `Poison`; only its concrete children are listed here.
 | `EnumCast` | — | `value` | | Enum-conversion lowering | Casts between two enum types with the same underlying type. |
 | `CastUInt2ToDescriptorHandle` | — | `value` | | (synthesized) | Packs a `uint2` as a descriptor handle. |
 | `CastDescriptorHandleToUInt2` | — | `value` | | (synthesized) | Reverse of `CastUInt2ToDescriptorHandle`. |
+| `CastStorageToLogical` | `CastStorageToLogical` | (variadic, `min=2`) | | (synthesized) | Pseudo-cast from a storage-type location to its original (logical) type; operand 2 is a `MakeStorageTypeLoweringConfig`. |
+| `CastStorageToLogicalDeref` | `CastStorageToLogicalDeref` | (variadic, `min=2`) | | (synthesized) | Dereferencing variant of `CastStorageToLogical`. |
+| `CastUInt64ToDescriptorHandle` | — | `value` | | (synthesized) | Packs a `uint64` as a descriptor handle. |
+| `CastDescriptorHandleToUInt64` | — | `value` | | (synthesized) | Reverse of `CastUInt64ToDescriptorHandle`. |
+| `CastDescriptorHandleToResource` | — | `handle` | | (synthesized) | No-op cast from a descriptor handle to a resource on targets with concrete resource handles. |
+| `CastResourceToDescriptorHandle` | — | `resource` | | (synthesized) | Reverse of `CastDescriptorHandleToResource`. |
+| `TreatAsDynamicUniform` | — | `value` | | (synthesized) | Marks a value as dynamically uniform for downstream legalization. |
 
 ### Memory
 
@@ -228,6 +238,8 @@ and `Poison`; only its concrete children are listed here.
 | `makeStruct` | — | (variadic) | | `MakeStructExpr`, aggregate-initializer lowering | Constructs a struct from its field values. |
 | `makeTuple` | — | (variadic) | | `MakeTupleExpr` | Constructs a tuple. |
 | `makeTargetTuple` | `MakeTargetTuple` | (variadic) | | (synthesized) | Tuple-typed value keyed by target name (used by `targetSwitch`). |
+| `makeValuePack` | — | (variadic) | H | (synthesized) | Constructs a value-pack aggregate; hoistable. |
+| `makeCombinedTextureSampler` | — | `texture, sampler` | | (synthesized) | Bundles a texture and a sampler into a combined texture-sampler value. |
 | `makeUInt64` | — | `low, high` | | `MakeUInt64Expr` and synthesized | Constructs a `uint64` from two `uint32` halves. |
 | `matrixReshape` | — | `matrix` | | (synthesized) | Reshapes a matrix to a different element type / shape with the same underlying storage. |
 | `vectorReshape` | — | `vector` | | (synthesized) | Reshapes a vector. |
@@ -257,41 +269,53 @@ and `Poison`; only its concrete children are listed here.
 ### Constexpr arithmetic and casts
 
 Hoistable variants of the regular arithmetic and cast opcodes used
-to lower compile-time integer expressions (`IntVal` subclasses such
-as `PolynomialIntVal`) so that identical compile-time values dedupe.
-Operand and result types mirror their non-`constexpr` counterparts.
+to lower compile-time integer expressions (`IntVal` subclasses) so
+that identical compile-time values dedupe. Operand and result types
+mirror their non-`constexpr` counterparts. These opcodes are produced
+by `lowerVal` in
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp),
+not by an expression visitor: `visitBuiltinOperationIntVal` maps a
+`BuiltinOperationIntVal` (the checked, folded form of a constant
+operator expression — see [../ast-reference/expressions.md](../ast-reference/expressions.md))
+to the matching `constexpr*` op keyed on its `BuiltinOperationKind`;
+`visitPolynomialIntVal` emits `constexprMul` / `constexprAdd` to
+materialize each term; and `visitTypeCastIntVal` calls
+`IRBuilder::emitConstexprCast`, whose 4x4 type-style table picks the
+typed `constexpr*Cast` op (e.g. `constexprIntCast`,
+`constexprCastIntToFloat`) for the from/to pair. The `AST origin`
+column below records the originating `IntVal` subclass.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `constexprAdd` | — | `left, right` | H | (synthesized) | Compile-time integer addition. |
-| `constexprSub` | — | `left, right` | H | (synthesized) | Compile-time integer subtraction. |
-| `constexprMul` | — | `left, right` | H | (synthesized) | Compile-time integer multiplication. |
-| `constexprNeg` | — | `value` | H | (synthesized) | Compile-time unary negation. |
-| `constexprDiv` | — | `left, right` | H | (synthesized) | Compile-time integer division. |
-| `constexprIRem` | — | `left, right` | H | (synthesized) | Compile-time integer remainder. |
-| `constexprShl` | — | `left, right` | H | (synthesized) | Compile-time left-shift. |
-| `constexprShr` | — | `left, right` | H | (synthesized) | Compile-time right-shift. |
-| `constexprBitAnd` | — | `left, right` | H | (synthesized) | Compile-time bitwise AND. |
-| `constexprBitOr` | — | `left, right` | H | (synthesized) | Compile-time bitwise OR. |
-| `constexprBitXor` | — | `left, right` | H | (synthesized) | Compile-time bitwise XOR. |
-| `constexprBitNot` | — | `value` | H | (synthesized) | Compile-time bitwise NOT. |
-| `constexprNot` | — | `value` | H | (synthesized) | Compile-time logical NOT. |
-| `constexprEql` | — | `left, right` | H | (synthesized) | Compile-time equality. |
-| `constexprNeq` | — | `left, right` | H | (synthesized) | Compile-time inequality. |
-| `constexprGreater` | — | `left, right` | H | (synthesized) | Compile-time greater-than. |
-| `constexprLess` | — | `left, right` | H | (synthesized) | Compile-time less-than. |
-| `constexprGeq` | — | `left, right` | H | (synthesized) | Compile-time greater-or-equal. |
-| `constexprLeq` | — | `left, right` | H | (synthesized) | Compile-time less-or-equal. |
-| `constexprAnd` | — | `left, right` | H | (synthesized) | Compile-time logical AND. |
-| `constexprOr` | — | `left, right` | H | (synthesized) | Compile-time logical OR. |
-| `constexprSelect` | — | `condition, ifTrue, ifFalse` | H | (synthesized) | Compile-time branch-free selection. |
-| `constexprIntCast` | — | `value` | H | (synthesized) | Compile-time integer-to-integer cast. |
-| `constexprCastIntToFloat` | — | `value` | H | (synthesized) | Compile-time integer-to-float cast. |
-| `constexprCastFloatToInt` | — | `value` | H | (synthesized) | Compile-time float-to-integer cast. |
-| `constexprFloatCast` | — | `value` | H | (synthesized) | Compile-time float-to-float cast. |
-| `constexprCastIntToEnum` | — | `value` | H | (synthesized) | Compile-time integer-to-enum cast. |
-| `constexprCastEnumToInt` | — | `value` | H | (synthesized) | Compile-time enum-to-integer cast. |
-| `constexprEnumCast` | — | `value` | H | (synthesized) | Compile-time enum-to-enum cast. |
+| `constexprAdd` | — | `left, right` | H | `BuiltinOperationIntVal` (`+`); `PolynomialIntVal` | Compile-time integer addition. |
+| `constexprSub` | — | `left, right` | H | `BuiltinOperationIntVal` (`-`) | Compile-time integer subtraction. |
+| `constexprMul` | — | `left, right` | H | `BuiltinOperationIntVal` (`*`); `PolynomialIntVal` | Compile-time integer multiplication. |
+| `constexprNeg` | — | `value` | H | `BuiltinOperationIntVal` (`-`) | Compile-time unary negation. |
+| `constexprDiv` | — | `left, right` | H | `BuiltinOperationIntVal` (`/`) | Compile-time integer division. |
+| `constexprIRem` | — | `left, right` | H | `BuiltinOperationIntVal` (`%`) | Compile-time integer remainder. |
+| `constexprShl` | — | `left, right` | H | `BuiltinOperationIntVal` (`<<`) | Compile-time left-shift. |
+| `constexprShr` | — | `left, right` | H | `BuiltinOperationIntVal` (`>>`) | Compile-time right-shift. |
+| `constexprBitAnd` | — | `left, right` | H | `BuiltinOperationIntVal` (`&`) | Compile-time bitwise AND. |
+| `constexprBitOr` | — | `left, right` | H | `BuiltinOperationIntVal` (`\|`) | Compile-time bitwise OR. |
+| `constexprBitXor` | — | `left, right` | H | `BuiltinOperationIntVal` (`^`) | Compile-time bitwise XOR. |
+| `constexprBitNot` | — | `value` | H | `BuiltinOperationIntVal` (`~`) | Compile-time bitwise NOT. |
+| `constexprNot` | — | `value` | H | `BuiltinOperationIntVal` (`!`) | Compile-time logical NOT. |
+| `constexprEql` | — | `left, right` | H | `BuiltinOperationIntVal` (`==`) | Compile-time equality. |
+| `constexprNeq` | — | `left, right` | H | `BuiltinOperationIntVal` (`!=`) | Compile-time inequality. |
+| `constexprGreater` | — | `left, right` | H | `BuiltinOperationIntVal` (`>`) | Compile-time greater-than. |
+| `constexprLess` | — | `left, right` | H | `BuiltinOperationIntVal` (`<`) | Compile-time less-than. |
+| `constexprGeq` | — | `left, right` | H | `BuiltinOperationIntVal` (`>=`) | Compile-time greater-or-equal. |
+| `constexprLeq` | — | `left, right` | H | `BuiltinOperationIntVal` (`<=`) | Compile-time less-or-equal. |
+| `constexprAnd` | — | `left, right` | H | `BuiltinOperationIntVal` (`&&`) | Compile-time logical AND. |
+| `constexprOr` | — | `left, right` | H | `BuiltinOperationIntVal` (`\|\|`) | Compile-time logical OR. |
+| `constexprSelect` | — | `condition, ifTrue, ifFalse` | H | `BuiltinOperationIntVal` (`?:`) | Compile-time branch-free selection. |
+| `constexprIntCast` | — | `value` | H | `TypeCastIntVal` (via `emitConstexprCast`) | Compile-time integer-to-integer cast. |
+| `constexprCastIntToFloat` | — | `value` | H | `TypeCastIntVal` | Compile-time integer-to-float cast. |
+| `constexprCastFloatToInt` | — | `value` | H | `TypeCastIntVal` | Compile-time float-to-integer cast. |
+| `constexprFloatCast` | — | `value` | H | `TypeCastIntVal` | Compile-time float-to-float cast. |
+| `constexprCastIntToEnum` | — | `value` | H | `TypeCastIntVal` | Compile-time integer-to-enum cast. |
+| `constexprCastEnumToInt` | — | `value` | H | `TypeCastIntVal` | Compile-time enum-to-integer cast. |
+| `constexprEnumCast` | — | `value` | H | `TypeCastIntVal` | Compile-time enum-to-enum cast. |
 
 ## Notable opcodes
 
@@ -352,7 +376,12 @@ moving the swizzle to the source side.
 conditional. Unlike the `ifElse` terminator (documented in
 [control-flow.md](control-flow.md)), `select` is an *expression* —
 it produces a value and does not affect control flow. Both result
-operands must already be computed; their types must match.
+operands must already be computed; their types must match. Note that
+`visitSelectExpr` only emits this opcode for vector-typed selects or
+selects at global (constant) scope (both routed through
+`visitInvokeExpr`); a scalar `SelectExpr` inside a function instead
+lowers to an `ifElse` with `then`/`else` blocks and a join-block
+`Param`, to preserve the short-circuiting semantics of `?:`.
 
 ### `Poison`
 
@@ -363,6 +392,12 @@ which lets the optimizer assume the original expression had no
 defined value and rewrite freely. The Lua comment notes the
 exceptions (`select` and block parameters, which can pass through
 a poison operand on a non-taken edge without poisoning the result).
+`Poison` is hoistable, so every poison value of a given type
+deduplicates to a single inst; it is constructed through
+`IRBuilder::getPoison` (declared in
+[slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h)),
+whose `get`-prefixed name reflects the deduplicated, hoistable
+construction.
 
 ### `defaultConstruct`
 
@@ -381,6 +416,24 @@ direct `uint64` literal form; the IR carries the two halves as
 explicit operands so the backend can emit either a single literal
 (when supported) or the two halves combined at runtime.
 
+### `constexpr*` family
+
+The `constexpr*` arithmetic, comparison, logic, and cast opcodes are
+not produced from an `Expr` visitor. They are produced from the
+*checked, folded* `IntVal` representation of a compile-time
+expression by `lowerVal` in
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
+`visitBuiltinOperationIntVal` switches on the `IntVal`'s
+`BuiltinOperationKind` and emits the matching `constexpr*` op (for
+example `Mod` becomes `constexprIRem` and `Conditional` becomes
+`constexprSelect`); `visitPolynomialIntVal` builds a sum-of-products
+out of `constexprMul` / `constexprAdd`; and `visitTypeCastIntVal`
+calls `IRBuilder::emitConstexprCast`, which uses a 4x4 type-style
+table to pick the typed `constexpr*Cast` opcode for the source/target
+pair. All of these opcodes are hoistable so that equal compile-time
+values deduplicate to one inst, mirroring the literal opcodes' own
+hoisting.
+
 ## See also
 
 - [../cross-cutting/ir-instructions.md](../cross-cutting/ir-instructions.md)
@@ -397,9 +450,8 @@ explicit operands so the backend can emit either a single literal
   `extractTaggedUnionTag` / `extractTaggedUnionPayload`,
   `packAnyValue` / `unpackAnyValue`, and other existential-side
   opcodes that share lowering paths with the value opcodes here.
-- [misc.md](misc.md) — `bitfieldExtract` and `bitfieldInsert` and
-  the type-introspection predicates that complement the conversion
-  family.
+- [misc.md](misc.md) — the type-introspection predicates
+  (`IsType`, `IsInt`) that complement the conversion family.
 - [../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md) — the
   expression visitors that produce these opcodes.
 - [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md) —

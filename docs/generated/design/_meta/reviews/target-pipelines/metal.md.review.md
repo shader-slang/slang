@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T16:52:54+00:00
+reviewed_at: 2026-06-30T13:46:47+00:00
 target_doc: target-pipelines/metal.md
-target_doc_source_commit: 43e8ca0cef30f575bd1750589b2c7cd9f2b6e030
-target_doc_watched_paths_digest: 751b986b2d853e8242f650fcb4a698ce747155b40fac3ebc58e2361363790674
-source_commit: 76c9a59695365016093e84dd12b5fc57d1e751d8
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: 3bfc164e382505a7acce894d60950a1812eb10280d5da247c705758df95dccb7
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
   factual_accuracy: partial
   cross_references: pass
   completeness: partial
-  style_consistency: partial
+  style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 3
+finding_count: 2
 severity_breakdown:
-  critical: 0
-  major: 3
+  critical: 1
+  major: 1
   minor: 0
   nit: 0
 ---
@@ -24,24 +24,22 @@ severity_breakdown:
 # Review report for target-pipelines/metal.md
 
 ## Summary
-The Metal page has the requested structure, valid front matter, and all checked relative links resolve. The rebuilt Phase B diagram is much closer to the contract because runtime gates are now rendered as diamonds, but Phase B still misses reachable minimal-optimization branch passes and misdraws one false branch. The Phase C table also has one ordered row pair that contradicts `linkAndOptimizeIR`.
+The page is mostly aligned with the Metal pass sequence in `linkAndOptimizeIR`, but its downstream-target narrative is misleading for `MetalLibAssembly`. The most important problem is that the document describes the normal assembly target as skipping `wrapCBufferElementsForMetal`, while the public emission path first produces `MetalLib` from `Metal` source and therefore runs the `CodeGenTarget::Metal` source pipeline before disassembly.
 
 ## Items checked
-- Read `regenerate.py show target-pipelines/metal.md`, `docs/generated/design/_meta/prompts/target-pipelines-metal.md`, `docs/generated/design/_meta/prompts/_common.md`, and the dependency docs listed by `show`.
-- Confirmed the target document front matter has `source_commit` `43e8ca0cef30f575bd1750589b2c7cd9f2b6e030` and watched digest `751b986b2d853e8242f650fcb4a698ce747155b40fac3ebc58e2361363790674`.
-- Verified the resolved watched source files have no diff from the target document's recorded `source_commit` to current `HEAD`.
-- Resolved all 157 Markdown links in the page.
-- Spot-checked the Phase A-D pass ordering, Phase B gate drawing, `legalizeIRForMetal`, `wrapCBufferElementsForMetal`, Metal parameter handling, Metal pointer lowering, `DescriptorHandle<T>` layout emission, downstream `MetalLib` handling, and loop claims against the watched source files.
+- Ran `regenerate.py show target-pipelines/metal.md` and reviewed the target document, `_common.md`, the per-document prompt, and the resolved watched files for this page.
+- Checked the target document front matter for all required keys, the recorded source commit, the required warning string, and a 64-character hex watched-path digest.
+- Read dependency context from `pipeline/04-ast-to-ir.md`, `pipeline/05-ir-passes.md`, `pipeline/06-emit.md`, `ir-reference/index.md`, and `cross-cutting/targets.md`.
+- Verified the required target-pipeline sections: Source, High-level phase diagram, four phase sections, Conditional gates, Loops in the pipeline, Notable passes, and See also.
+- Spot-checked more than 10 source-backed claims, including `linkAndOptimizeIR`, `legalizeIRForMetal`, `legalizeEntryPointVaryingParamsForMetal`, `lowerCombinedTextureSamplers`, `legalizeEmptyTypes`, `wrapCBufferElementsForMetal`, `legalizeByteAddressBufferOps`, `specializeAddressSpaceForMetal`, `MetalSourceEmitter::emitFuncParamLayoutImpl`, `emitEntryPointsSourceFromIR`, and the `MetalLib` / `MetalLibAssembly` downstream transitions.
 
 ## Findings
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Phase B: Specialization and type legalization` | The Phase B diagram and table omit reachable `SLANG_PASS` calls on the minimal-optimization branches. After `lowerSumVectorMatrixInsts`, the source can run `eliminateDeadCode` when `minimalOptimization` is true and generics are required; after `performForceInlining`, the source runs `applySparseConditionalConstantPropagation` and `eliminateDeadCode` when `minimalOptimization` is true. | `source/slang/slang-emit.cpp:1410-1417` contains the minimal-plus-generics `eliminateDeadCode` branch, and `source/slang/slang-emit.cpp:1516-1529` contains the minimal branch with `applySparseConditionalConstantPropagation` followed by `eliminateDeadCode`. | Add those conditional branch nodes to the Phase B diagram and add ordered table rows for each reachable `SLANG_PASS`, with gates matching the two source conditions. |
-| F-002 | major | `## Phase B: Specialization and type legalization` | The `shouldLegalizeExistentialAndResourceTypes` diamond draws the false arm as falling through to `legalizeExistentialTypeLayout`, `validateStructuredBufferResourceTypes`, `legalizeResourceTypes`, and the Metal-arm `legalizeEmptyTypes`. In source, the false branch skips the existential/resource block and runs only the else-path `legalizeEmptyTypes` before continuing to matrix legalization. | `source/slang/slang-emit.cpp:1591-1684` contains the true branch with the existential/resource legalization sequence; `source/slang/slang-emit.cpp:1685-1690` shows the false branch is a separate `legalizeEmptyTypes` call. | Either treat this gate as always true for the actual Metal source-emission path and remove the diamond, or redraw the false arm so it goes to the else-path `legalizeEmptyTypes` and then rejoins before `legalizeMatrixTypes`. |
-| F-003 | major | `## Phase C: Metal legalization, lowering, phi elimination` | The Phase C ordered table lists `legalizeImageSubscript` before `legalizeIRForMetal`, but the source runs `legalizeIRForMetal` first, then `floatNonUniformResourceIndex`, then `legalizeLogicalAndOr`, and only then `legalizeImageSubscript`. The Phase C diagram has the right order, so the companion table is inconsistent with both the diagram and source. | `source/slang/slang-emit.cpp:1993-1998` runs `legalizeIRForMetal`; `source/slang/slang-emit.cpp:2033-2040` runs the following non-SPIR-V and Metal logical-op passes; `source/slang/slang-emit.cpp:2046-2057` runs `legalizeImageSubscript` afterward. | Move the `legalizeImageSubscript` row after `legalizeLogicalAndOr`, renumber the Phase C table, and keep the diagram and table in the same order. |
+| F-001 | critical | Intro, lines 16-22; Phase B, lines 178-182; Notable passes, lines 836-840 | The document says `MetalLibAssembly` skips `wrapCBufferElementsForMetal`, including the claim `a direct request for MetalLibAssembly would not get the wrap`. That is not the normal public emission path: a `MetalLibAssembly` request first emits an intermediate `MetalLib`, and the `MetalLib` request emits intermediate `Metal` source, so `linkAndOptimizeIR` sees `CodeGenTarget::Metal` and runs the switch arm containing `wrapCBufferElementsForMetal`. | `source/slang/slang-code-gen.cpp:1047-1058` maps `MetalLibAssembly` to intermediate `MetalLib`; `source/slang/slang-code-gen.cpp:1089-1101` emits that intermediate target; `source/slang/slang-code-gen.cpp:246-270` maps `MetalLib` to source target `Metal`; `source/slang/slang-code-gen.cpp:527-531` emits that source target; `source/slang/slang-emit.cpp:1812-1816` runs `wrapCBufferElementsForMetal` for `CodeGenTarget::Metal`. | Remove the skip/inconsistency narrative for `MetalLibAssembly`. State that the assembly target is produced through the `MetalLib` downstream path and therefore inherits the Metal-source IR pass sequence; if the raw `CodeGenTarget::MetalLibAssembly` switch behavior is worth mentioning, clearly mark it as not the ordinary `_emitEntryPoints` route. |
+| F-002 | major | Phase D, lines 620-622 and 642-651; Conditional gates, lines 717-720; Downstream Apple `metal` compiler, lines 891-895 | The Phase D table collapses `MetalLib` and `MetalLibAssembly` into one `compile` step gated by both binary targets, and the prose says the Apple `metal` compiler produces `.metallib` "or its disassembly." The source has two downstream steps: `MetalLib` compiles Metal source through the `MetalC` transition, while `MetalLibAssembly` first gets an intermediate `MetalLib` artifact and then disassembles it with `metal-objdump --disassemble`. | `source/slang/slang-global-session.cpp:217-234` declares separate `Metal` to `MetalLib` and `MetalLib` to `MetalLibAssembly` transitions; `source/slang/slang-code-gen.cpp:1089-1111` disassembles the intermediate artifact for assembly targets; `source/compiler-core/slang-metal-compiler.cpp:45-63` implements Metal AIR disassembly with `metal-objdump --disassemble`. | Split the Phase D downstream branch into `Metal` source-only, `MetalLib` compile via Apple `metal`, and `MetalLibAssembly` intermediate `MetalLib` plus `(downstream) metal-objdump --disassemble`. Update the conditional gates table and notable downstream callout to name the disassembler explicitly. |
 
 ## No-issues notes
-- The target document front matter contains all required generated-document keys and the requested `source_commit` and digest values.
-- The rebuilt Phase B diagram now uses diamond nodes with `true` and `false` arms for many runtime gates instead of omitting gates wholesale.
-- The loops section is consistent with `source/slang/slang-ir-metal-legalize.cpp`: the Metal legalizer has ordinary traversal `for` loops but no iterative pipeline loop or fixed-point pass.
-- The `DescriptorHandle<T>` parameter-binding description matches `source/slang/slang-emit-metal.cpp:135-198`, including the unwrap and system-semantic fallback.
+- The front matter uses the required keys and preserves the target document's recorded `source_commit` and `watched_paths_digest`.
+- The Metal legalization callout matches `legalizeIRForMetal`: it runs `legalizeSubpassInputsForMetal`, `legalizeEntryPointVaryingParamsForMetal`, and `processInst`.
+- The main Phase C table correctly captures the Metal byte-address-buffer options, `floatNonUniformResourceIndex` textual mode, default phi elimination, late Metal pointer lowering, and `collectMetadata(targetProgram, *metadata)`.

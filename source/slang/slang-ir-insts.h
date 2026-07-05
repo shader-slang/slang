@@ -2998,7 +2998,13 @@ struct IRCompilerDictionaryEntry : IRInst
         {
             if (auto dictValue = as<IRCompilerDictionaryValue>(child))
             {
-                return dictValue->getValue();
+                auto value = dictValue->getValue();
+                // Dictionary values are weak cache references. If DCE collected the cached
+                // result, the weak operand is rewritten to poison. Keep scanning because a later
+                // lookup may already have refreshed this cache row with a live replacement.
+                if (value && value->getOp() == kIROp_Poison)
+                    continue;
+                return value;
             }
         }
 
@@ -3908,7 +3914,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitGpuForeach(List<IRInst*> args);
 
     IRLoadFromUninitializedMemory* emitLoadFromUninitializedMemory(IRType* type);
-    IRPoison* emitPoison(IRType* type);
+    IRPoison* getPoison(IRType* type);
 
     IRInst* emitReinterpret(IRInst* type, IRInst* value);
     IRInst* emitOutImplicitCast(IRInst* type, IRInst* value);
@@ -4869,6 +4875,16 @@ $(type_info.return_type) $(type_info.method_name)(
 
     void addSPIRVNonUniformResourceDecoration(IRInst* value)
     {
+        // A constant is dynamically uniform by definition, so it can never be
+        // NonUniform; never decorate one. This matters beyond tidiness: integer
+        // literals are deduplicated module-wide, so decorating a shared literal
+        // (e.g. a fixed [0] access-chain index reached via a non-uniform base)
+        // would make NonUniform propagation see every other uniform access chain
+        // that reuses that literal as "already NonUniform" and spuriously
+        // decorate it -- potentially pulling in an unrelated
+        // *ArrayNonUniformIndexing capability the shader does not need.
+        if (as<IRConstant>(value))
+            return;
         addDecoration(value, kIROp_SPIRVNonUniformResourceDecoration);
     }
 

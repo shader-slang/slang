@@ -652,6 +652,22 @@ if (coopMeta)
 }
 ```
 
+### Experimental Standard Modules
+
+Some standard-library APIs are packaged as experimental modules. A shader must enable
+experimental features before importing one of these modules, for example with
+`slangc -experimental-feature`.
+
+The work graph APIs are available from:
+
+```slang
+import experimental.workgraph;
+```
+
+`experimental.workgraph` provides work graph node attributes, record types, and barrier
+helpers for HLSL Shader Model 6.8 work graph shaders. The module is experimental and the API
+surface may change before it is stabilized.
+
 ## Using the Compilation API
 
 The C++ API provided by Slang is meant to provide more complete control over compilation for applications that need it.
@@ -1056,6 +1072,7 @@ meanings of their `CompilerOptionValue` encodings.
 | DisableWarnings    | Specifies a list of warnings to disable. `stringValue0` encodes comma separated list of warning codes or names. |
 | EnableWarning      | Specifies a list of warnings to enable. `stringValue0` encodes comma separated list of warning codes or names. |
 | DisableWarning     | Specify a warning to disable. `stringValue0` encodes the warning code or name. |
+| WarningLevel       | Enable a group of opt-in warnings, modeled on clang/gcc. `intValue0` encodes a `SlangWarningLevel` group (`SLANG_WARNING_LEVEL_ALL`/`_EXTRA`/`_PEDANTIC`; `SLANG_WARNING_LEVEL_DEFAULT` is the always-on group and is a no-op here). Repeatable and additive, matching the `-Wall`/`-Wextra`/`-Wpedantic` command-line flags. The groups are independent (not nested): `extra` is on by default while `pedantic` is off by default, and warnings in the always-on default group are unaffected. |
 | ReportDownstreamTime | Turn on/off downstream compilation time report. `intValue0` encodes a bool value for the setting. |
 | ReportPerfBenchmark | Turn on/off reporting of time spent in different parts of the compiler. `intValue0` encodes a bool value for the setting. |
 | SkipSPIRVValidation | Specifies whether or not to skip the validation step after emitting SPIR-V. `intValue0` encodes a bool value for the setting. |
@@ -1087,10 +1104,11 @@ meanings of their `CompilerOptionValue` encodings.
 | DebugInformationFormat | Specifies the format of debug info. `intValue0` a value defined in the `SlangDebugInfoFormat` enum. |
 | VulkanBindShiftAll | Specifies the `-fvk-bind-shift` option for all spaces. `intValue0`: kind, `intValue1`: shift. |
 | GenerateWholeProgram | When set will emit target code for the entire program instead of for a specific entry point. `intValue0` specifies a bool value for the setting. |
-| UseUpToDateBinaryModule | When set will only load precompiled modules if it is up-to-date with its source. `intValue0` specifies a bool value for the setting. |
+| UseUpToDateBinaryModule | When set, the compiler verifies that a precompiled `.slang-module` is up-to-date with its source before loading it; out-of-date binaries are recompiled from source. Standalone binaries whose primary source is not on the search path are still loaded (compiler-version and option-set validation are skipped in that path). `intValue0` specifies a bool value for the setting. |
 | ValidateUniformity | When set will perform [uniformity analysis](a1-05-uniformity.md).|
-| SPIRVResourceHeapStride | Specifies the byte stride for the resource descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
+| SPIRVResourceHeapStride | Specifies the byte stride for the resource descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to emit `OpConstantSizeOfEXT(ResourceType)` as the default stride. For `RaytracingAccelerationStructure` entries, the 0 default emits a literal 8-byte `ArrayStride` for the `uint64` device address elements; explicit stride values still override these defaults, but must be at least 8 bytes for acceleration-structure entries. |
 | SPIRVSamplerHeapStride | Specifies the byte stride for the sampler descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
+| SPIRVUnifiedDescriptorHeapStride | When generating SPIR-V with `spvDescriptorHeapEXT`, emits each resource descriptor-heap runtime array's `ArrayStride` as the maximum of the image and buffer descriptor sizes, so a single heap shared by buffers and images is indexed at the device's unified stride. Only affects the default `OpConstantSizeOfEXT` path (used when `SPIRVResourceHeapStride` is 0); mutually exclusive with a non-zero `SPIRVResourceHeapStride` (combining the two is an error). Does not affect the sampler heap or acceleration-structure entries. `intValue0` specifies a bool value for the setting. |
 | ForceDXLayout | When set forces the compiler to use DirectX-compatible (HLSL register packing) rules when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |
 | ForceCLayout | When set forces the compiler to use C struct layout rules (natural alignment, no HLSL/GLSL padding) when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |
 | DenormalModeFp16 | Specifies how 16-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |

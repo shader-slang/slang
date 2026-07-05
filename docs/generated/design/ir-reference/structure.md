@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T10:25:25+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
+generated_at: 2026-06-29T15:32:39Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -23,13 +23,16 @@ top-level structure of a module.
 The structural opcodes live in two clusters of
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua):
 
-- The `GlobalValueWithCode` group plus the module, struct-key,
-  witness-table, and witness-fact opcodes occupy lines ~786-834
-  (and overlap conceptually with the type-side `StructType` /
-  `InterfaceType` / `ClassType` declarations around lines 645-666).
+- The `GlobalValueWithCode` group (around lines 797-826) plus the
+  `key` / `StructKey`, `builtinRequirementKey`, `witness_table`,
+  `thisTypeWitness`, `TypeEqualityWitness`,
+  `global_hashed_string_literals`, `module`, and `SymbolAlias`
+  opcodes occupy lines ~797-863 (and overlap conceptually with the
+  type-side `StructType` / `InterfaceType` / `ClassType` declarations
+  earlier in the file).
 - The `param`, `field`, `call`, `witness_table_entry`,
   `interface_req_entry` opcodes, plus the structural body of a
-  function, occupy lines ~1042-1056.
+  function, occupy lines ~1060-1075.
 
 C++ wrappers are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). The
@@ -46,6 +49,11 @@ Lowering from the AST is in
 (witness tables), and `lowerGlobalVarDecl` (global variables). The
 module itself is created in `generateIRForTranslationUnit`, whose
 member declarations are lowered through `ensureAllDeclsRec`.
+
+Requirement keys are produced by `getInterfaceRequirementKey`, which
+returns an `IRInst*` (not strictly an `IRStructKey*`): an ordinary
+requirement lowers to a `StructKey`, but a recognized built-in
+requirement lowers to the hoistable `BuiltinRequirementKey` instead.
 
 ## Family hierarchy
 
@@ -65,6 +73,7 @@ flowchart TD
   GlobalValueWithParams --> genericNode[generic]
   StructInternals --> structFieldNode["field / StructField"]
   StructInternals --> structKeyNode["key / StructKey"]
+  StructInternals --> builtinReqKeyNode["builtinRequirementKey / BuiltinRequirementKey"]
   StructInternals --> indexedFieldKeyNode[indexedFieldKey]
   InterfaceInternals --> interfaceReqEntryNode["interface_req_entry / InterfaceRequirementEntry"]
   WitnessTables --> witness_tableNode[witness_table]
@@ -86,19 +95,19 @@ flowchart TD
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `func` | `IRFunc` | (variadic) | P | `FuncDecl`, `AccessorDecl`, lambda lowering in `slang-lower-to-ir.cpp` | Function; children are blocks. The first block's `Param`s are the function parameters; the function signature is on the `func` itself via its type. |
-| `generic` | `IRGeneric` | (variadic) | P | `GenericDecl` in `slang-lower-to-ir.cpp` | Function-shaped instruction whose single block computes a type-level value; ends with `yield`. |
+| `generic` | `IRGeneric` | (variadic) | P | `GenericDecl` in `slang-lower-to-ir.cpp` | Function-shaped instruction whose single block computes a type-level value; ends with `return_val` / `IRReturn`. |
 | `param` | `IRParam` | (variadic) | | `ParamDecl`, block-parameter introduction | Function or block parameter declared inside a `func`/`generic` or `block` parent. Documented in detail in [control-flow.md](control-flow.md). |
-| `call` | — | `callee, args...` | | `InvokeExpr` in `slang-lower-to-ir.cpp` | Calls `callee` with the remaining operands as arguments; result type is the callee's return type. |
+| `call` | `IRCall` | `callee, args...` | | `InvokeExpr` in `slang-lower-to-ir.cpp` | Calls `callee` with the remaining operands as arguments; result type is the callee's return type. |
 
 ### Global state
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `global_var` | `IRGlobalVar` | (variadic) | G | `VarDecl` at module scope in `slang-lower-to-ir.cpp` | Module-scope mutable variable. |
-| `global_param` | — | (variadic) | G | Entry-point and module-scope parameter declarations | Module-scope parameter (shader uniform, push-constant, ...). |
-| `globalConstant` | — | (variadic) | G | `VarDecl` with `const`/`static const` at module scope | Module-scope constant value. |
-| `global_generic_param` | — | — | G | `GenericTypeParamDecl` at module scope | Declares a generic parameter at module level. |
-| `global_hashed_string_literals` | — | (variadic) | | (synthesized) | Container for the module's hashed-string-literal pool. |
+| `global_param` | `IRGlobalParam` | (variadic) | G | Entry-point and module-scope parameter declarations | Module-scope parameter (shader uniform, push-constant, ...). |
+| `globalConstant` | `IRGlobalConstant` | (variadic) | G | `VarDecl` with `const`/`static const` at module scope | Module-scope constant value. |
+| `global_generic_param` | `IRGlobalGenericParam` | — | G | `GenericTypeParamDecl` at module scope | Declares a generic parameter at module level. |
+| `global_hashed_string_literals` | `IRGlobalHashedStringLiterals` | (variadic) | | (synthesized) | Container for the module's hashed-string-literal pool; a module is expected to hold at most one. |
 
 ### Struct internals
 
@@ -112,18 +121,19 @@ container that owns `field` and `key` children.
 | `class` (parent) | `IRClassType` | (children: `field`, `key`) | P | `ClassDecl` in `slang-lower-to-ir.cpp` | Owns the class's field and key children; cross-linked to [types.md](types.md). |
 | `field` | `StructField` | `key, fieldType` | | (synthesized as part of `StructDecl` lowering) | Declares one named member of a `StructType` parent. |
 | `key` | `StructKey` | — | G | Member-name lowering in `slang-lower-to-ir.cpp` | Identity for a field or interface requirement; carries linkage so the field is addressable across compilation units. |
-| `indexedFieldKey` | — | `baseType, index` | H | (synthesized) | Synthetic key for the *n*-th field of a tuple-like type when no named key exists. |
+| `builtinRequirementKey` | `BuiltinRequirementKey` | `kindOperand` | H | `getInterfaceRequirementKey` for a `BuiltinRequirementModifier`-tagged requirement | Key for a recognized built-in interface requirement (e.g. an `IDifferentiable` member); deduplicated by construction from its `BuiltinRequirementKind` operand. |
+| `indexedFieldKey` | `IRIndexedFieldKey` | `baseType, index` | H | (synthesized) | Synthetic key for the *n*-th field of a tuple-like type when no named key exists. |
 
 ### Interface internals
 
 The `InterfaceType` *type* opcode is documented in
-[types.md](types.md); here we describe its role as a parent
-container that owns `interface_req_entry` children.
+[types.md](types.md); here we describe its role as the carrier of
+`interface_req_entry` operands.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `interface` | `IRInterfaceType` | (children: `interface_req_entry`) | G | `InterfaceDecl` in `slang-lower-to-ir.cpp` | Interface declaration; children are the requirement entries. |
-| `interface_req_entry` | `InterfaceRequirementEntry` | `requirementKey, requirementVal` | G | (synthesized as part of `InterfaceDecl` lowering) | One requirement slot of an interface. Cross-link to [generics-and-existentials.md](generics-and-existentials.md). |
+| `interface` | `IRInterfaceType` | (operands: `interface_req_entry`) | G | `InterfaceDecl` in `slang-lower-to-ir.cpp` | Interface declaration; its operands are the requirement entries. |
+| `interface_req_entry` | `InterfaceRequirementEntry` | `requirementKey, requirementVal` | G | (synthesized as part of `InterfaceDecl` lowering) | One requirement slot of an interface; `requirementKey` is an `IRStructKey` or a hoistable `IRBuiltinRequirementKey`. Cross-link to [generics-and-existentials.md](generics-and-existentials.md). |
 
 ### Witness tables and witness facts
 
@@ -134,16 +144,16 @@ rows below describe their structural role.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `witness_table` | — | `concreteType` (+ children: `witness_table_entry`) | H | `InheritanceDecl` lowering in `slang-lower-to-ir.cpp` | Conformance of `concreteType` (operand 0) to the interface carried in its result type; owns one `witness_table_entry` per requirement. Hoistable so identical conformances dedupe. |
-| `witness_table_entry` | — | `requirementKey, satisfyingVal` | | (synthesized) | One row of a `witness_table`. |
-| `thisTypeWitness` | — | `type` | | (synthesized inside `InterfaceDecl` lowering) | Placeholder witness that `ThisType` implements the enclosing interface; only valid inside an interface definition. |
-| `TypeEqualityWitness` | — | `subType, superType` | H | (synthesized) | Witness certifying two types are equal. |
+| `witness_table` | `IRWitnessTable` | `concreteType` (+ children: `witness_table_entry`) | H | `InheritanceDecl` lowering in `slang-lower-to-ir.cpp` | Conformance of `concreteType` (operand 0) to the interface carried in its result type; owns one `witness_table_entry` per requirement. Hoistable so identical conformances dedupe. |
+| `witness_table_entry` | `IRWitnessTableEntry` | `requirementKey, satisfyingVal` | | (synthesized) | One row of a `witness_table`. |
+| `thisTypeWitness` | `IRThisTypeWitness` | `type` | | (synthesized inside `InterfaceDecl` lowering) | Placeholder witness that `ThisType` implements the enclosing interface; only valid inside an interface definition. |
+| `TypeEqualityWitness` | `IRTypeEqualityWitness` | `subType, superType` | H | (synthesized) | Witness certifying two types are equal. |
 
 ### Symbol aliasing
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `SymbolAlias` | — | `symbol` | | (synthesized as part of linking) | Module-level alias of another symbol under a different mangled name. Must be eliminated by the linker — every use is replaced with the canonical symbol. |
+| `SymbolAlias` | `IRSymbolAlias` | `symbol` | | (synthesized as part of linking) | Module-level alias of another symbol under a different mangled name. Must be eliminated by the linker — every use is replaced with the canonical symbol. |
 
 ## Notable opcodes
 
@@ -164,13 +174,15 @@ function's `Param`s as that block's parameters, and only ordinary
 
 `generic` is structurally the same as `func` — a parent opcode
 that owns blocks — but its body is interpreted as type-level
-computation. Each `generic` has a single block, and that block
-ends with a `yield` (not a `return_val`) whose operand is the
-result of the type-level computation. `specialize` (see
+computation. In practice each `generic` holds a single block, and
+that block ends with a `return_val` (`IRReturn`) whose operand is
+the result of the type-level computation; `findGenericReturnVal`
+in [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) reads it
+back as the terminator's value. `specialize` (see
 [generics-and-existentials.md](generics-and-existentials.md))
 applies arguments to a `generic` value; the specialization pass
 replaces matched applications with the concrete result of the
-yield.
+generic's `return_val`.
 
 ### `module` / `ModuleInst`
 
@@ -182,6 +194,19 @@ information used by the linker; the module is also the unit that
 serialization writes and reads (see
 [../cross-cutting/serialization.md](../cross-cutting/serialization.md)).
 
+The `IRModule` owning the `module` inst (in
+[slang-ir.h](../../../../source/slang/slang-ir.h)) can build a
+`ModuleLinkingInfo` acceleration cache (`_getOrCreateLinkingInfo`)
+that pre-indexes the module-scope structure the linker repeatedly
+scans for: the `global_param` instructions (`getGlobalParams`),
+`HLSLExportDecoration` globals, `KnownBuiltinDecoration` globals, and
+the single `global_hashed_string_literals` aggregate
+(`getGlobalHashedStringLiterals`). The cache assumes the module is
+not mutated after it is built; callers that change module-scope state
+must `_invalidateLinkingInfo`. The serialized module-version range
+this layout participates in is `k_minSupportedModuleVersion` (4) ..
+`k_maxSupportedModuleVersion` (22).
+
 ### `key` / `StructKey`
 
 `StructKey` is the identity of a struct field or an interface
@@ -192,6 +217,28 @@ Field access opcodes (`FieldAddress`, `FieldExtract`, see
 [values.md](values.md)) use the key as their selector, which
 makes structural reorganization (e.g. struct splitting) a
 key-rewriting task rather than a string-rewriting task.
+
+### `builtinRequirementKey` / `BuiltinRequirementKey`
+
+`BuiltinRequirementKey` is the requirement-key variant for a
+recognized built-in interface requirement — for example the
+`Differential` associated type, `dzero`, or `dadd` of
+`IDifferentiable`. Unlike a `StructKey`, which is a distinct
+`global` symbol per requirement decl unified across modules by its
+`key_<mangled>` linkage name, a `BuiltinRequirementKey` is
+hoistable: its identity is its single `kindOperand` (an `IRIntLit`
+holding a `BuiltinRequirementKind` value), so it is deduplicated by
+construction and the same logical built-in requirement always
+resolves to one key inst — even across decls and the
+precompiled-core-module boundary. `getInterfaceRequirementKey` in
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+emits it via `IRBuilder::getBuiltinRequirementKey` and tags it with
+an `IRBuiltinRequirementDecoration` (see
+[decorations.md](decorations.md)) so role-scanning consumers (e.g.
+autodiff) can find the requirement by role rather than by entry
+order. Because either key kind can appear, the `lookupKey` operand
+of `lookupWitness`-style dispatch is typed `IRInst`, not
+`IRStructKey`.
 
 ### `witness_table`
 
@@ -208,9 +255,10 @@ witness table across all uses.
 
 ### `witness_table_entry` vs `interface_req_entry`
 
-`interface_req_entry` lives inside an `InterfaceType` parent and
-declares one requirement — the `requirementKey` (a `StructKey`)
-plus the requirement's type (`requirementVal`).
+`interface_req_entry` is an operand of an `InterfaceType` and
+declares one requirement — the `requirementKey` (a `StructKey`, or
+a `BuiltinRequirementKey` for a built-in requirement) plus the
+requirement's type (`requirementVal`).
 `witness_table_entry` lives inside a `witness_table` parent and
 *satisfies* a requirement — pairing the same `requirementKey` with
 the concrete implementing function or value. The two opcodes are

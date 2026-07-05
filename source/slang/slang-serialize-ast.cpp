@@ -10,7 +10,6 @@
 #include "slang-parser.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-serialize-fossil.h"
-#include "slang-serialize-riff.h"
 
 //
 #include "slang-serialize-ast.cpp.fiddle"
@@ -412,6 +411,7 @@ struct ContainerDeclDirectMemberDeclsInfo
 %   "TryClauseType",
 %   "DeclVisibility",
 %   "BuiltinRequirementKind",
+%   "BuiltinOperationKind",
 %   "ImageFormat",
 %   "PreferRecomputeAttribute::SideEffectBehavior",
 %   "TreatAsDifferentiableExpr::Flavor",

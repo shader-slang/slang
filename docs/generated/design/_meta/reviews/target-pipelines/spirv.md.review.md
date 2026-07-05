@@ -1,21 +1,21 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T15:06:52+00:00
+reviewed_at: 2026-06-30T13:31:00+00:00
 target_doc: target-pipelines/spirv.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 45c7187ec9e14c4b9df481b096e07d7166024478913e182332f481afa116f29f
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: 68a85e13aad997a240500c6924c43cbfb5c7a2705b13eee149bc97d9ad794aeb
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
   factual_accuracy: partial
   cross_references: pass
   completeness: partial
-  style_consistency: partial
+  style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 4
+finding_count: 3
 severity_breakdown:
-  critical: 1
+  critical: 0
   major: 1
   minor: 2
   nit: 0
@@ -24,18 +24,23 @@ severity_breakdown:
 # Review report for target-pipelines/spirv.md
 
 ## Summary
-The SPIR-V page covers the required sections and the two documented SPIR-V loops, and all checked relative links resolve at the recorded source commit. The main issue is a pass-ordering error shared with the other target pages: three passes are shown in Phase A but actually run in Phase C. The downstream-tool section also overstates the validation-after-link flow.
+The document is broadly aligned with the SPIR-V direct-emit path, but it needs a small remediation pass. The most important issue is that the Phase D diagram omits the active downstream `compiler->compile` spirv-opt step and places the disabled in-source `optimizeSPIRV` node after validation, which does not match source order.
 
 ## Items checked
-- Read `regenerate.py show target-pipelines/spirv.md`, the SPIR-V prompt, `_common.md`, and dependency docs.
-- Checked front matter, required sections, direct-emit precondition, Phase A-D source ranges, SPIR-V legalizer loop bounds, forward-declared-pointer fixup loop, and downstream `spirv-link` / `spirv-val` / `spirv-opt` handling against `source_commit` `52339028a2aa703271533454c6b9528a534bac31`.
-- Resolved all 176 relative links in the page at the recorded source commit.
-- Spot-checked 16 SPIR-V claims, including `legalizeEntryPointsForGLSL`, `removeRawDefaultConstructors`, SPIR-V phi options, `applyGLSLLiveness`, `legalizeIRForSPIRV`, `simplifyIRForSpirvLegalization`, downstream linking, validation, and the disabled in-source `optimizeSPIRV` block.
+- Ran `regenerate.py show target-pipelines/spirv.md` and used only the listed prompt, five dependency docs, and eight resolved watched source files.
+- Checked front matter for all required keys, `target_doc_source_commit`, the warning string, and the 64-character hex watched-path digest.
+- Resolved all 188 relative markdown links in the document body; none were broken.
+- Verified required target-pipeline sections: intro, Source, High-level phase diagram, Phase A-D sections, Conditional gates, Loops in the pipeline, Notable passes, and See also.
+- Spot-checked more than 10 concrete claims against watched source, including `linkAndOptimizeIR`, `emitSPIRVForEntryPointsDirectly`, `createArtifactFromIR`, `shouldRunSPIRVValidation`, `emitSPIRVFromIR`, `legalizeIRForSPIRV`, `simplifyIRForSpirvLegalization`, `processAbort`, `emitAbort`, the forward-declared-pointer loop, `legalizeEntryPointsForGLSL`, `legalizeLogicalAndOr`, `TargetProgram::shouldEmitSPIRVDirectly`, and descriptor-heap stride handling.
 
 ## Findings
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | critical | `## Phase A: Link and entry-point prep` and `## Phase C: SPIR-V legalization, lowering, phi elimination` | The Phase A diagram/table place `translateGlobalVaryingVar`, `resolveVaryingInputRef`, and `fixEntryPointCallsites` before uniform collection, but the source runs those passes in Phase C, after `resolveTextureFormat` and before `legalizeEntryPointsForGLSL`. This makes the ordered SPIR-V pipeline materially wrong. | `source/slang/slang-emit.cpp:1955-1962` runs `translateGlobalVaryingVar`, `resolveVaryingInputRef`, and `fixEntryPointCallsites` in the Phase C range, not in the Phase A range around `source/slang/slang-emit.cpp:982-1001`. | Move those three nodes and rows from Phase A to Phase C, placing them after `resolveTextureFormat` and before `legalizeEntryPointsForGLSL`; update row numbering and Phase A prose. |
-| F-002 | major | `## Phase D: IR-to-SPIR-V emit, simplification loop, downstream tools` | The Phase D prose and diagram show validation after optional `spirv-link`, implying the linked artifact is what `spirv-val` checks. In source, linking may replace `artifact`, but validation still calls `compiler->validate` on the original `spirv` buffer. | `source/slang/slang-emit.cpp:3116-3132` may replace `artifact` with `linkedArtifact`, while `source/slang/slang-emit.cpp:3135-3138` validates `spirv.getBuffer()` rather than the linked artifact. | Clarify that `spirv-val` validates the freshly emitted SPIR-V buffer in this code path, or adjust the diagram so linking and validation do not imply validation of the linked artifact. |
-| F-003 | minor | `## Phase C: SPIR-V legalization, lowering, phi elimination` | The Phase C row for `legalizeEmptyTypes` links the pass to `slang-ir-legalize-empty-array.cpp`, but the pass is defined in `slang-ir-legalize-types.cpp`. | `source/slang/slang-ir-legalize-types.cpp:4026` defines `void legalizeEmptyTypes(...)`. | Change the `legalizeEmptyTypes` row's File cell to `source/slang/slang-ir-legalize-types.cpp`. |
-| F-004 | minor | `## Notable passes`, `Downstream spirv-link / spirv-val / spirv-opt chain` | The closing sentence tells future readers they should re-enable the disabled `optimizeSPIRV` block to recover original behavior. That is an editorial action recommendation rather than descriptive source documentation, and the source only shows a disabled block. | `source/slang/slang-emit.cpp:3053-3060` contains the disabled `#if 0` block but no source comment recommending that readers re-enable it. | Delete the future-reader recommendation or replace it with a neutral statement that the in-source `optimizeSPIRV` block is currently disabled. |
+| F-001 | major | `## Phase D: IR-to-SPIR-V emit, simplification loop, downstream tools`, lines 654-745 | The Phase D diagram shows only `optimizeSPIRV [disabled]` after `spirv-val`, but the active downstream `compiler->compile` spirv-opt step that row 20 describes is missing from the diagram. The disabled `#if 0` `optimizeSPIRV` block also appears before downstream linking and validation in source, not after validation. | `source/slang/slang-emit.cpp:3106` starts the disabled `#if 0` `optimizeSPIRV` block before downstream setup; `source/slang/slang-emit.cpp:3198` creates `DownstreamCompileOptions`, and `source/slang/slang-emit.cpp:3224` calls `compiler->compile(downstreamOptions, optimizedArtifact.writeRef())`. | Update the Phase D diagram to include an active `(downstream) compiler->compile spirv-opt` node after the validation gate, and either move the disabled `optimizeSPIRV [disabled]` note to its source-order position before downstream linking or describe it only in the table/prose. |
+| F-002 | minor | `## Source`, `## Phase D`, and `### simplifyIRForSpirvLegalization`, lines 49-59, 641-647, 842-865 | Several line-number citations for the SPIR-V emitter/legalizer are stale by far more than a few lines, even though the named symbols exist. Examples include `emitSPIRVFromIR` cited as line ~11598 and `legalizeIRForSPIRV` cited as line 3104; the current watched source defines them at materially different lines. | `source/slang/slang-emit-spirv.cpp:11803` defines `emitSPIRVFromIR`; `source/slang/slang-ir-spirv-legalize.cpp:3039` defines `simplifyIRForSpirvLegalization`; `source/slang/slang-ir-spirv-legalize.cpp:3265` defines `legalizeIRForSPIRV`. | Refresh the affected line-number citations in the Source, Phase D, and Loops sections to match the recorded source commit, including the loop body citation currently pointing at lines 2885-2914. |
+| F-003 | minor | Opening paragraphs, lines 12-39 | The first body paragraph explains what the page covers, but it does not say who the intended reader is, which the common contract requires. The audience appears only in the per-doc prompt, not in the generated page. | `docs/generated/design/_meta/prompts/_common.md:65` says the first paragraph must state what the document covers and who its intended reader is. | Amend the opening paragraph to name the intended reader, for example a compiler developer debugging or modifying the SPIR-V direct-emit pipeline. |
+
+## No-issues notes
+- The front matter uses the target doc's recorded source commit and watched-path digest, and all mandatory fields are present.
+- The direct-emit scope and via-GLSL exclusion are consistent with the per-doc prompt.
+- The fixed-point-loop behavior is correctly described: `iterationCounter` and `funcIterationCount` are initialized but not incremented in the watched source.

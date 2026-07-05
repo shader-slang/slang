@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T15:06:28+00:00
+reviewed_at: 2026-06-30T13:32:54+00:00
 target_doc: ir-reference/values.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -13,29 +13,37 @@ checklist:
   style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 2
+finding_count: 5
 severity_breakdown:
   critical: 0
-  major: 2
-  minor: 0
+  major: 3
+  minor: 2
   nit: 0
 ---
 
 # Review report for ir-reference/values.md
 
 ## Summary
-The page has valid front matter, all required top-level sections, and all relative links resolve at the recorded source commit. Two major issues remain: several prompt-required value opcodes are missing from the tables, and `logicalAnd` plus `logicalOr` are described with source-language short-circuit semantics that the IR instructions do not have.
+The page has the required generated-doc structure, valid front matter, and resolving links, but it is not fully aligned with the value-opcode source. The most important issue is coverage: the opcode tables omit concrete value-family entries that the per-document prompt explicitly calls out or that sit in the documented Lua ranges. I also found a few source-labeling errors in the literal and selection rows.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show ir-reference/values.md` and verified the prompt, dependency list, watched paths, target source commit, and digest against the document front matter.
-- Read the target doc, `_common.md`, `ir-reference-values.md`, and the dependency docs `cross-cutting/ir-instructions.md`, `pipeline/04-ast-to-ir.md`, `ast-reference/expressions.md`, and `ir-reference/types.md`.
-- Resolved all 22 relative links in the target document against `52339028a2aa703271533454c6b9528a534bac31`.
-- Checked required sections and extracted 144 opcode rows from the `## Opcodes` tables.
-- Spot-checked more than 10 factual claims against `source/slang/slang-ir-insts.lua`, `source/slang/slang-ir-insts.h`, `source/slang/slang-ir.cpp`, and `source/slang/slang-lower-to-ir.cpp`, including literal payloads, `LoadFromUninitializedMemory`, `Poison`, `defaultConstruct`, arithmetic op operands, comparison op wrappers, conversion op operands, `var`, `load`, `store`, field and element access, swizzles, aggregate constructors, optional helpers, and constexpr rows.
+- Ran `regenerate.py show ir-reference/values.md` and used only the listed prompt, dependency documents, and resolved watched files.
+- Read the target document front matter/body, `_common.md`, `ir-reference-values.md`, and the four `depends_on` documents.
+- Verified the target front matter contains all required keys, uses source commit `c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8`, and carries a 64-character hex watched-path digest.
+- Resolved all 26 relative markdown links in the document body; none were missing in the workspace.
+- Checked the required IR-reference sections: `## Source`, `## Family hierarchy`, `## Opcodes`, `## Notable opcodes`, and `## See also`.
+- Spot-checked source claims against the watched files, including `Constant`, `Undefined`, `Poison`, `defaultConstruct`, `makeUInt64`, `makeValuePack`, `makeCombinedTextureSampler`, `select`, `logicalAnd`, `CastStorageToLogical`, `CastDescriptorHandleToUInt64`, `NullPtrLiteralExpr`, literal payload storage, `IRBuilder::emitDefaultConstruct`, and `IRBuilder::_findOrEmitConstant`.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Opcodes`, lines 215-255 | The values prompt explicitly includes aggregate and conversion helpers that are absent from the tables. In particular, `makeValuePack`, `makeCombinedTextureSampler`, `packAnyValue`, and `unpackAnyValue` are concrete Lua opcodes in the watched ranges, but none has a row in this page. | `docs/generated/design/_meta/prompts/ir-reference-values.md:38-47` lists `Pack*`, `Unpack*`, and `makeCombinedTextureSampler`; `source/slang/slang-ir-insts.lua:970-971` defines `makeValuePack` and `makeCombinedTextureSampler`; `source/slang/slang-ir-insts.lua:1040-1041` defines `packAnyValue` and `unpackAnyValue`. | Add rows for these opcodes in the relevant aggregate or conversion sub-tables, or revise the manifest and prompt if ownership is intentionally moved to another IR-reference page. |
-| F-002 | major | `### Logical`, lines 132-133 | The table describes `logicalAnd` and `logicalOr` as short-circuiting, but the IR opcodes are ordinary two-operand instructions. Short-circuit behavior belongs to source-expression lowering before both operands become IR values, not to these opcodes themselves. | `source/slang/slang-ir-insts.lua:1465-1471` defines `logicalAnd` and `logicalOr` with `left, right` operands; `source/slang/slang-ir.cpp:6730-6739` emits `kIROp_And` and `kIROp_Or` from already supplied `left` and `right` operands. | Change the summaries to describe boolean AND and boolean OR over already-lowered operands, and remove the word `Short-circuit` from both rows. |
+| F-001 | major | `## Opcodes` / `### Aggregate constructors` | The aggregate constructor table omits concrete opcodes in the documented `make*` cluster, including the prompt-required `makeCombinedTextureSampler` and the adjacent `makeValuePack`. | `docs/generated/design/_meta/prompts/ir-reference-values.md:43-47` explicitly includes `makeCombinedTextureSampler`; `source/slang/slang-ir-insts.lua:996-1000` declares `makeStruct`, `makeTuple`, `makeTargetTuple`, `makeValuePack`, and `makeCombinedTextureSampler`; `source/slang/slang-ir.cpp:3246-3249` and `source/slang/slang-ir.cpp:4577-4589` show builder support for the omitted opcodes. | Add rows for `makeValuePack` and `makeCombinedTextureSampler` in the aggregate constructors table, with operand and AST-origin text matching their Lua declarations and builder usage. |
+| F-002 | major | `## Opcodes` / `### Conversions` | The conversions table stops before several concrete conversion/pseudo-conversion opcodes in the same source range, so the page is not exhaustive for the conversion cluster. Missing rows include `CastStorageToLogical`, `CastStorageToLogicalDeref`, `CastUInt64ToDescriptorHandle`, `CastDescriptorHandleToUInt64`, `CastDescriptorHandleToResource`, `CastResourceToDescriptorHandle`, and `TreatAsDynamicUniform`. | `source/slang/slang-ir-insts.lua:2596-2612` declares those concrete opcodes; `source/slang/slang-ir.cpp:6576-6595` implements the storage-to-logical builder helpers. | Extend the conversions table with the omitted rows, or move any deliberately out-of-scope resource-specific casts to the correct peer page and cross-link them explicitly so the coverage decision is visible. |
+| F-003 | minor | `## Opcodes` / `### Literals (Constant group)` | The literals table marks every literal with `H` and says literals are hoistable, but the Lua entries do not set `hoistable = true`. They are deduplicated through the constant map, which is related but not the `H` opcode flag required by the table contract. | `source/slang/slang-ir-insts.lua:867-880` declares the `Constant` children without `hoistable = true`; `source/slang/slang-ir.h:51-56` defines `H` as `kIROpFlag_Hoistable`; `source/slang/slang-ir.cpp:2301-2393` shows constants are found/emitted through `_findOrEmitConstant` and the constant map. | Clear the `H` flags from literal rows and adjust the prose to say constants are deduplicated by `IRBuilder::_findOrEmitConstant`, not marked with the hoistable opcode flag. |
+| F-004 | major | `## Opcodes` / `### Literals (Constant group)` | Two AST-origin cells name AST classes that do not match the dependency/lowering sources: `NullPtrExpr` and `VoidLiteralExpr`. The dependency doc names the null pointer AST node `NullPtrLiteralExpr`, and the watched lowering source shows `void_constant` coming from `getVoidValue` paths such as `NoneLiteralExpr`, not a `VoidLiteralExpr` visitor. | `docs/generated/design/ast-reference/expressions.md:85-86` lists `NullPtrLiteralExpr` and `NoneLiteralExpr`; `source/slang/slang-lower-to-ir.cpp:6843-6850` lowers `NullPtrLiteralExpr` and `NoneLiteralExpr`. | Change `ptr_constant` origin to `NullPtrLiteralExpr` and change `void_constant` origin to `NoneLiteralExpr` / synthesized `IRBuilder::getVoidValue` use, avoiding mismatched class names. |
+| F-005 | minor | `## Opcodes` / `### Logical`; `## Notable opcodes` / `### select` | The page describes `select` as the ternary `SelectExpr` lowering generally, but scalar `SelectExpr` inside a function lowers to `ifElse` blocks and a block parameter. Only vector-typed selects or global-scope constants fall back through invoke/intrinsic lowering that can produce the `select` opcode. | `source/slang/slang-lower-to-ir.cpp:6897-6931` branches: non-basic-typed `SelectExpr` and global-scope cases call `visitInvokeExpr`, while scalar in-function `SelectExpr` emits `ifElse`, branches, and a `Param`. | Qualify the `select` AST-origin text and notable callout to say it represents vector/global intrinsic select lowering, while scalar ternary expressions lower through control flow. |
+
+## No-issues notes
+- The body includes the required first paragraph and all required section headings from the IR-reference family contract.
+- The 26 markdown links are workspace-relative and resolve to source files or generated peer documents.
+- The front matter values match the target document's recorded source commit and watched-path digest.

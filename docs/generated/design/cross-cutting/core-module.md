@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T09:24:37Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 19ad329c51b4e53e37b131c94d49631623fa525a7de092b35d5852c27a4bca02
+generated_at: 2026-06-29T13:36:12Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 2c33d82801bf8c85c90f7a72974d48339879a5c470ed66dd9ad1279eeab52e62
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -118,9 +118,13 @@ GLSL-flavored aliases (`vec3`, `mat4`, `gl_*` system values) and is
 embedded by
 [source/slang-glsl-module/](../../../../source/slang-glsl-module) via
 [slang-embedded-glsl-module.cpp](../../../../source/slang-glsl-module/slang-embedded-glsl-module.cpp).
-Loading it is target-conditional: the compiler pulls it in
-when the user is compiling GLSL or asks for GLSL-flavoured names from
-Slang code.
+The global session loads the GLSL builtin module at creation time when
+`SlangGlobalSessionDesc::enableGLSL` is set (the `if (desc->enableGLSL)`
+branch in
+[slang-api.cpp](../../../../source/slang/slang-api.cpp)); a later
+`import glsl` then retrieves that already-loaded builtin module via the
+`glslModuleName` special-case in
+[slang-session.cpp](../../../../source/slang/slang-session.cpp).
 
 ## Standard modules
 
@@ -165,6 +169,18 @@ The single standard module shipping today is the **neural** module:
   `${SLANG_STANDARD_MODULE_DIR_NAME}/slang/` next to the loaded
   `libslang` (per
   [source/standard-modules/README.md](../../../../source/standard-modules/README.md)).
+
+Each standard module is compiled at build time by `slang-bootstrap`
+(see
+[neural/CMakeLists.txt](../../../../source/standard-modules/neural/CMakeLists.txt)):
+the `add_custom_command` invokes `slang-bootstrap` with
+`-load-core-module <archive>` pointing at the `slang-core-module.bin`
+archive produced by the core-module build (see
+[Building the core module](#building-the-core-module)). Loading the
+prebuilt core archive means the standard-module step does not recompile
+the core module, and using `slang-bootstrap` rather than `slangc`
+removes any dependency on a binary-module mismatch or on
+`SLANG_ENABLE_SLANGC`.
 
 The standard-module mechanism is intended to grow: new modules go
 under `source/standard-modules/<name>/` with an `add_subdirectory` in
@@ -213,6 +229,28 @@ The `SLANG_EMBED_CORE_MODULE_SOURCE` option similarly controls
 whether the original Slang source text is embedded alongside the
 precompiled bytes (used by `slang-bootstrap` for cross-compilation
 scenarios).
+
+A single `slang-bootstrap` invocation in
+[source/slang-core-module/CMakeLists.txt](../../../../source/slang-core-module/CMakeLists.txt)
+produces three build products with one `-compile-core-module` run:
+
+- `slang-core-module.bin` — a standalone RIFF/LZ4 archive of the
+  compiled core module (written via `-save-core-module`). This archive
+  is fed to the standard-module build through `-load-core-module` so
+  that the modules above are compiled against the same core module
+  without recompiling it.
+- the embeddable core-module header (`-save-core-module-bin-source`),
+  consumed by `slang-embedded-core-module`.
+- the embeddable GLSL-module header (`-save-glsl-module-bin-source`),
+  consumed by `slang-embedded-glsl-module`.
+
+These outputs are wired through the custom targets
+`generate_core_module`, `generate_glsl_module_header`, and the umbrella
+`generate_core_module_headers`. Downstream targets depend on the
+custom *targets* rather than on the generated files directly: with the
+Visual Studio generator a file-level dependency on a byproduct copies
+the producer command into each dependent project, which would run the
+core generation more than once.
 
 ## Adding a new built-in
 

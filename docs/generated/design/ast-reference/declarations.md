@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T09:24:37Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 4fbff6632ead047a5c7b8f1f94ae347684e102e096ad26276f0083b8dab39d3e
+generated_at: 2026-06-29T15:19:27Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 4edc6b90abd358684a288a1139580cde8c06f54b81ac587b2fb00f57fb475a83
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -23,7 +23,7 @@ All declarations in this page are declared in
 [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h). The parser
 functions that produce them live in
 [slang-parser.cpp](../../../../source/slang/slang-parser.cpp); the
-top-level dispatch is `parseDecl()` and the syntax-decl table is
+top-level dispatch is `ParseDecl` and the syntax-decl table is
 `SyntaxParseInfo` (see
 [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md)).
 
@@ -120,14 +120,15 @@ carry no FIDDLE concrete tag. Concrete leaves below.
 | `IncludeDecl` | `IncludeDeclBase` | `fileDecl: FileDecl*` | [__include](../syntax-reference/grammar.md#top-level-structure) | `__include`-style file inclusion. |
 | `ImplementingDecl` | `IncludeDeclBase` | `fileDecl: FileDecl*` | [__implementing](../syntax-reference/grammar.md#top-level-structure) | `__implementing` companion to module files. |
 | `ModuleDeclarationDecl` | `Decl` | (no additional state) | [module decl](../syntax-reference/grammar.md#top-level-structure) | The `module M;` form that names the module of the current file. |
-| `RequireCapabilityDecl` | `Decl` | (no additional state) | [require capability](../syntax-reference/grammar.md#top-level-structure) | `require_capability` declaration; expressed as a decl so it can be exported. |
+| `RequireCapabilityDecl` | `Decl` | (no additional state) | [require capability](../syntax-reference/grammar.md#top-level-structure) | `__require_capability` declaration; expressed as a decl so it can be exported. |
 | `GenericDecl` | `ContainerDecl` | `inner: Decl*`, `_cachedArgsForDefaultSubstitution` | [generics](../syntax-reference/grammar.md#declarations) | Generic wrapper: the parameter list lives as members; `inner` is the genericized decl. |
 | `InterfaceDefaultImplDecl` | `GenericDecl` | `thisTypeDecl: GenericTypeParamDecl*`, `thisTypeConstraintDecl` | (none) | Synthetic generic that wraps a default implementation of an interface requirement. |
 | `GenericTypeParamDecl` | `GenericTypeParamDeclBase` | `initType: TypeExp` | [generic type param](../syntax-reference/grammar.md#declarations) | A type parameter of a `GenericDecl`. |
 | `GenericTypePackParamDecl` | `GenericTypeParamDeclBase` | (inherits) | [generic type-pack param](../syntax-reference/grammar.md#declarations) | A variadic type-pack parameter. |
-| `GenericTypeConstraintDecl` | `TypeConstraintDecl` | `sub: TypeExp`, `sup: TypeExp`, `isEqualityConstraint: bool` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | A generic constraint `T : U` or `T == U`. |
+| `GenericTypeConstraintDecl` | `TypeConstraintDecl` | `sub: TypeExp`, `sup: TypeExp`, `isEqualityConstraint: bool` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | A constraint `T : U` or `T == U`; produced by a generic `where` / `<T : I>` clause, an interface `__constraint`, or a relocated `associatedtype` bound. |
 | `TypeCoercionConstraintDecl` | `Decl` | `fromType: TypeExp`, `toType: TypeExp` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | A coercion constraint in a `where` clause. |
 | `NonEmptyPackConstraintDecl` | `Decl` | `packExpr: Expr*` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | Constraint that a type pack is non-empty. |
+| `GenericVariadicPackCountConstraintDecl` | `Decl` | `packExpr: Expr*`, `expectedCountExpr: Expr*`, `expectedCountVal: IntVal*` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | Constraint that a variadic pack's element count equals a value (`where countof(Pack) == N`). |
 | `HasDiffTypeInfoConstraintDecl` | `Decl` | `type: TypeExp` | [where clause](../syntax-reference/grammar.md#constraints-solved-at-check-time) | Differentiable-type constraint. |
 | `EmptyDecl` | `Decl` | (no additional state) | (none) | An empty declaration that exists only to carry modifiers (e.g. GLSL `layout(...) in;`). |
 | `SyntaxDecl` | `Decl` | `syntaxClass: SyntaxClass<NodeBase>`, `parseCallback: SyntaxParseCallback` | (none) | Binds a keyword to a parser callback; see `## Notable nodes` and [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md). |
@@ -165,10 +166,7 @@ definition. The parser stores the target as a higher-order `Expr*`
 (e.g. a `ForwardDifferentiateExpr` wrapping the function reference)
 and the user-written body as an `innerFunc: FuncDecl*`; semantic
 checking desugars the whole thing into an `ExtensionDecl` so the
-rest of the pipeline never sees the shorthand. The IR lowering
-visitor treats the `FuncExtensionDecl` itself as ignored
-(`IGNORED_CASE` in
-[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)).
+rest of the pipeline never sees the shorthand.
 
 ### AggTypeDecl, StructDecl, ClassDecl, EnumDecl
 
@@ -225,9 +223,11 @@ enclosing enum.
 ### AccessorDecl family
 
 `GetterDecl`, `SetterDecl`, and `RefAccessorDecl` model the accessors
-on a `PropertyDecl` or `SubscriptDecl`. The parser will synthesize a
-default `GetterDecl` for `PropertyDecl`s that have an initializer but
-no explicit accessor block. The body of each accessor is parsed
+on a `PropertyDecl` or `SubscriptDecl`. The parser only creates an
+accessor when an explicit `get`/`set`/`ref` keyword is present; an
+empty property or subscript body is recorded as a case to be treated
+like `{ get; }`, and semantic checking later materializes the implicit
+`GetterDecl`. The body of each accessor is parsed
 lazily, like any other function body, by the two-stage parser.
 
 ### RequirementDecl-style nodes inside InterfaceDecl
@@ -240,6 +240,37 @@ via `isInterfaceRequirement(Decl*)` (declared at the bottom of
 [slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h)) rather
 than by class.
 
+### GenericTypeConstraintDecl as an interface requirement
+
+A `GenericTypeConstraintDecl` is not only the product of a generic
+`where` clause or `<T : I>` parameter bound — inside an interface body
+it is also a constraint *requirement* of that interface, refining the
+implicit `This` type and/or associated types inherited from base
+interfaces. Three surface forms collapse to this same node, all parsed
+in [slang-parser.cpp](../../../../source/slang/slang-parser.cpp):
+
+- `__constraint <type> : <type>;` / `__constraint <type> == <type>;`,
+  parsed by `parseInterfaceConstraintDecl` (registered in the
+  `g_parseSyntaxEntries` table). The `OpEql` form sets
+  `isEqualityConstraint`. For example, `interface IDerived : IBase {
+  __constraint DataType == This; }` asserts `This.DataType == This` for
+  any conformer.
+- An inheritance-style bound on an associated type
+  (`associatedtype A : IBar`).
+- A `where`-clause bound on an associated type
+  (`associatedtype A where A : IBar`).
+
+For the latter two, `parseAssocType` redirects the constraint to the
+enclosing `InterfaceDecl` via the `constraintTarget` parameter of
+`parseOptionalGenericConstraints`, so the resulting
+`GenericTypeConstraintDecl` becomes a sibling of the associated type
+rather than a child of it — the same representation `__constraint`
+produces. Nesting validity is enforced centrally: a
+`GenericTypeConstraintDecl` is permitted under an `InterfaceDecl` (as a
+requirement) and under a `GenericDecl` (as a parameter sibling), checked
+by `isDeclAllowed` in
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp).
+
 ## See also
 
 - [base.md](base.md) — abstract roots (`DeclBase`, `Decl`,
@@ -251,7 +282,7 @@ than by class.
 - [values.md](values.md) — `WitnessTable` referenced by
   `InheritanceDecl` and `GenericTypeConstraintDecl`.
 - [../pipeline/02-parse-ast.md](../pipeline/02-parse-ast.md) —
-  parsing of declarations (entry points such as `parseDecl`,
+  parsing of declarations (entry points such as `ParseDecl`,
   `parseAggTypeDecl`, `parseGenericDecl`).
 - [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md)
   — declaration checking and witness-table construction.

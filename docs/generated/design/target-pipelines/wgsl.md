@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T13:22:46Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: f76d76915e55fca2f6089859682d44515d2961d21271a2b24e0eda6e9187f22f
+generated_at: 2026-06-29T20:13:14Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 893e68384601fb6107ed1d9426d6ba0a0ad7b13bd39f42f529bf8c28e6020a47
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -22,8 +22,8 @@ maps to `WGSL` (`source/slang/slang-code-gen.cpp:271-272`); WGSL is
 emitted first, then handed to Tint to translate to SPIR-V for the
 `WGSLSPIRV*` arms. Inside `linkAndOptimizeIR` the shared predicate
 is `isWGPUTarget(targetRequest)`, but several individual switch
-arms list only `CodeGenTarget::WGSL` (for example
-`slang-emit.cpp:1947-1949` and `slang-emit.cpp:2082-2086`); those
+arms list only `CodeGenTarget::WGSL` among the WGSL family (for
+example `slang-emit.cpp:1986-1988` and `slang-emit.cpp:2123-2125`); those
 arms still fire for the `WGSLSPIRV*` variants because of the
 source-target reduction, not because the arm's case label mentions
 them.
@@ -39,7 +39,7 @@ and tables below.
 
 - [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) —
   `linkAndOptimizeIR` (line ~895) is the orchestrator;
-  `emitEntryPointsSourceFromIR` (line ~2487) constructs the
+  `emitEntryPointsSourceFromIR` (line ~2526) constructs the
   `WGSLSourceEmitter` and emits WGSL text.
 - [slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp)
   — `WGSLSourceEmitter` implementation.
@@ -50,9 +50,9 @@ and tables below.
   — `legalizeIRForWGSL` (line ~215) is the central WGSL
   legalization driver.
 - [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp)
-  — `legalizeEntryPointVaryingParamsForWGSL` (line ~4829).
+  — `legalizeEntryPointVaryingParamsForWGSL` (line ~4854).
 - [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/slang-ir-legalize-binary-operator.cpp)
-  — `legalizeLogicalAndOr` runs for WGSL (line ~2040 of
+  — `legalizeLogicalAndOr` runs for WGSL (line ~2079 of
   `slang-emit.cpp`).
 - [slang-target-program.h](../../../../source/slang/slang-target-program.h)
   / [slang-compiler-options.h](../../../../source/slang/slang-compiler-options.h)
@@ -77,7 +77,7 @@ Phase C.
 
 ## Phase A: Link and entry-point prep
 
-Spans roughly lines 931-1208 of
+Spans roughly lines 931-1245 of
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp). WGSL hits
 the `default` arm of every per-target switch in this phase. One
 WGSL-relevant difference from SPIR-V: WGSL is non-Khronos, so the
@@ -160,7 +160,7 @@ the entry-point-param switch
 
 ## Phase B: Specialization and type legalization
 
-Spans roughly lines 1210-1752 of `slang-emit.cpp`. WGSL is in the
+Spans roughly lines 1247-1795 of `slang-emit.cpp`. WGSL is in the
 `default` arm for most decision points; it diverges from SPIR-V at
 `lowerCooperativeVectors` (which runs for WGSL), the
 HLSL-or-SPIR-V byte-address-buffer arms (which don't apply), and
@@ -382,13 +382,13 @@ flowchart TD
 | 42 | `lowerTuples` | [slang-ir-lower-tuple-types.cpp](../../../../source/slang/slang-ir-lower-tuple-types.cpp) | (always) | |
 | 43 | `generateAnyValueMarshallingFunctions` | [slang-ir-any-value-marshalling.cpp](../../../../source/slang/slang-ir-any-value-marshalling.cpp) | (always) | |
 | 44 | `specializeStageSwitch` | [slang-ir-specialize-stage-switch.cpp](../../../../source/slang/slang-ir-specialize-stage-switch.cpp) | `reqSet.specializeStageSwitch` | |
-| 45 | `lowerCooperativeVectors` | [slang-ir-lower-coopvec.cpp](../../../../source/slang/slang-ir-lower-coopvec.cpp) | (always, WGSL via `default` arm at line ~1506) | |
+| 45 | `lowerCooperativeVectors` | [slang-ir-lower-coopvec.cpp](../../../../source/slang/slang-ir-lower-coopvec.cpp) | (always, WGSL via `default` arm at line ~1545) | |
 | 46 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | |
 | 47 | `applySparseConditionalConstantPropagation` | [slang-ir-sccp.cpp](../../../../source/slang/slang-ir-sccp.cpp) | `minimalOptimization` | Plus `eliminateDeadCode`. |
 | 48 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `minimalOptimization` | |
 | 49 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | `defaultIRSimplificationOptions`. |
 | 50 | `lowerAppendConsumeStructuredBuffers` | [slang-ir-lower-append-consume-structured-buffer.cpp](../../../../source/slang/slang-ir-lower-append-consume-structured-buffer.cpp) | `target != HLSL` (true for WGSL) | |
-| 51 | `lowerCombinedTextureSamplers` | [slang-ir-lower-combined-texture-sampler.cpp](../../../../source/slang/slang-ir-lower-combined-texture-sampler.cpp) | `reqSet.combinedTextureSamplers` (WGSL is in the HLSL / Metal / WGSL arm at line ~1563) | |
+| 51 | `lowerCombinedTextureSamplers` | [slang-ir-lower-combined-texture-sampler.cpp](../../../../source/slang/slang-ir-lower-combined-texture-sampler.cpp) | `reqSet.combinedTextureSamplers` (WGSL is in the HLSL / Metal / WGSL arm at line ~1602) | |
 | 52 | `addUserTypeHintDecorations` | [slang-ir-user-type-hint.cpp](../../../../source/slang/slang-ir-user-type-hint.cpp) | `getBoolOption(VulkanEmitReflection)` | Rare for WGSL. |
 | 53 | `legalizeEmptyArray` | [slang-ir-legalize-empty-array.cpp](../../../../source/slang/slang-ir-legalize-empty-array.cpp) | (always) | |
 | 54 | `legalizeVectorTypes` | [slang-ir-legalize-vector-types.cpp](../../../../source/slang/slang-ir-legalize-vector-types.cpp) | (always) | |
@@ -404,6 +404,7 @@ flowchart TD
 | 64 | `specializeFuncsForBufferLoadArgs` | [slang-ir-specialize-buffer-load-arg.cpp](../../../../source/slang/slang-ir-specialize-buffer-load-arg.cpp) | (always, first invocation) | |
 | 65 | `deferBufferLoad` | [slang-ir-defer-buffer-load.cpp](../../../../source/slang/slang-ir-defer-buffer-load.cpp) | (always) | |
 | 66 | `specializeArrayParameters` | [slang-ir-specialize-arrays.cpp](../../../../source/slang/slang-ir-specialize-arrays.cpp) | (always) | |
+| 67 | `checkStaticAssert` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Direct call (static helper at line ~580); runs after specialization so static-assert info is available. |
 
 Filtered out for WGSL in this phase: the
 `CUDASource / CUDAHeader / PyTorchCppBinding` derivative-wrapper
@@ -424,8 +425,8 @@ parameter-block arm; the `isCPUTargetViaLLVM` LLVM arm; the HLSL
 
 ## Phase C: WGSL legalization, lowering, phi elimination
 
-Spans roughly lines 1897-2483 of `slang-emit.cpp`. WGSL's central
-legalizer is `legalizeIRForWGSL` (line ~2021, defined in
+Spans roughly lines 1934-2522 of `slang-emit.cpp`. WGSL's central
+legalizer is `legalizeIRForWGSL` (line ~2064, defined in
 [slang-ir-wgsl-legalize.cpp](../../../../source/slang/slang-ir-wgsl-legalize.cpp)),
 which is treated as a single node in the diagram below.
 
@@ -474,7 +475,9 @@ flowchart TD
   cCM[collectCooperativeMetadata]
   ediGate{EmbedDownstreamIR}
   uNEI[unexportNonEmbeddableIR]
-  cM[collectMetadata]
+  dhGate{"descriptor_handle implied and target != PyTorchCppBinding"}
+  gocl[getOrCreateLayout]
+  cM["collectMetadata(targetProgram)"]
   minOpt5{not shouldPerformMinimumOptimizations}
   cUI[checkUnsupportedInst]
 
@@ -504,8 +507,10 @@ flowchart TD
   sNSIR --> aVSC --> coopGate
   coopGate -->|true| cCM --> ediGate
   coopGate -->|false| ediGate
-  ediGate -->|true| uNEI --> cM
-  ediGate -->|false| cM
+  ediGate -->|true| uNEI --> dhGate
+  ediGate -->|false| dhGate
+  dhGate -->|true| gocl --> cM
+  dhGate -->|false| cM
   cM --> minOpt5
   minOpt5 -->|true| cUI
 ```
@@ -515,7 +520,7 @@ flowchart TD
 | 1 | `legalizeByteAddressBufferOps` | [slang-ir-byte-address-legalize.cpp](../../../../source/slang/slang-ir-byte-address-legalize.cpp) | `reqSet.byteAddressBuffer` | WGSL options: `scalarizeVectorLoadStore=true`, `treatGetEquivalentStructuredBufferAsGetThis=true`, `translateToStructuredBufferOps=false`, `lowerBasicTypeOps=true`, `useBitCastFromUInt=true`. |
 | 2 | `validateAtomicOperations` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | `target != SPIRV && target != SPIRVAssembly` (true for WGSL) | `skipFuncParamValidation = true`. |
 | 3 | `resolveTextureFormat` | [slang-ir-resolve-texture-format.cpp](../../../../source/slang/slang-ir-resolve-texture-format.cpp) | (`GLSL` / `SPIRV` / `WGSL` arm) | |
-| 4 | `translateGlobalVaryingVar` | [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/slang-ir-translate-global-varying-var.cpp) | `reqSet.globalVaryingVar` | Runs after specialization (line ~1956), not in Phase A. |
+| 4 | `translateGlobalVaryingVar` | [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/slang-ir-translate-global-varying-var.cpp) | `reqSet.globalVaryingVar` | Runs after specialization (line ~1996), not in Phase A. |
 | 5 | `resolveVaryingInputRef` | [slang-ir-resolve-varying-input-ref.cpp](../../../../source/slang/slang-ir-resolve-varying-input-ref.cpp) | `reqSet.resolveVaryingInputRef` | |
 | 6 | `fixEntryPointCallsites` | [slang-ir-fix-entrypoint-callsite.cpp](../../../../source/slang/slang-ir-fix-entrypoint-callsite.cpp) | (always) | |
 | 7 | `legalizeIRForWGSL` | [slang-ir-wgsl-legalize.cpp](../../../../source/slang/slang-ir-wgsl-legalize.cpp) | (`WGSL` / `WGSLSPIRV` / `WGSLSPIRVAssembly` arm) | The central WGSL legalizer; runs `legalizeEntryPointVaryingParamsForWGSL` and struct/varying fix-ups. |
@@ -544,8 +549,9 @@ flowchart TD
 | 30 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../../source/slang/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` (true for WGSL) | |
 | 31 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | Rare for WGSL. |
 | 32 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `getBoolOption(EmbedDownstreamIR)` | Static helper. |
-| 33 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | |
-| 34 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | |
+| 33 | `getOrCreateLayout` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (call site; defined in [slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp)) | `target != PyTorchCppBinding && targetCaps imply descriptor_handle` (line ~2520) | Forces the program layout to exist so `collectMetadata` can read it; returns `SLANG_FAIL` if layout creation fails. WGSL only hits this when its capability set implies `descriptor_handle`. |
+| 34 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | Now takes `targetProgram` (line ~2530); reads the layout populated above when collecting descriptor-handle metadata. |
+| 35 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | |
 
 Filtered out for WGSL in this phase: `lowerCPUResourceTypes` (CPU
 LLVM only); `synthesizeActiveMask` (CUDA only);
@@ -576,8 +582,8 @@ emit only).
 ## Phase D: WGSL emit and downstream tools
 
 Phase D begins immediately after `linkAndOptimizeIR` returns to
-`emitEntryPointsSourceFromIR` (line ~2487 of `slang-emit.cpp`).
-The `WGSLSourceEmitter` (constructed at line ~2592) walks the IR
+`emitEntryPointsSourceFromIR` (line ~2526 of `slang-emit.cpp`).
+The `WGSLSourceEmitter` (constructed at line ~2631) walks the IR
 and produces WGSL text. After
 `createArtifactFromIR` packages the artifact, the optional
 downstream chain (Tint, for `WGSLSPIRV` / `WGSLSPIRVAssembly`)
@@ -595,25 +601,30 @@ flowchart TD
   artifact[createArtifactFromIR]
   spirvGate{target is WGSLSPIRV or WGSLSPIRVAssembly}
   tint["(downstream) Tint WGSL to SPIR-V"]
+  asmGate{target is WGSLSPIRVAssembly}
+  glslang["(downstream) glslang SPIR-V to SPIR-V assembly"]
   done[final artifact]
 
   ent --> selectEmit
   selectEmit -->|"WGSL / WGSLSPIRV*"| newEmit
   newEmit --> linkOpt2 --> simpForEmit --> emitModule --> textOut --> artifact --> spirvGate
-  spirvGate -->|yes| tint --> done
+  spirvGate -->|yes| tint --> asmGate
   spirvGate -->|no| done
+  asmGate -->|yes| glslang --> done
+  asmGate -->|no| done
 ```
 
-| # | Pass / step | File | Gate | Notes |
+| # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `emitEntryPointsSourceFromIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (entry point) | Sets `LineDirectiveMode::None` for WGSL (line ~2520) because WGSL has no `#line` directive. |
-| 2 | `new WGSLSourceEmitter` | [slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp) | `case SourceLanguage::WGSL` | Constructed at line ~2592 of `slang-emit.cpp`. |
+| 1 | `emitEntryPointsSourceFromIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (entry point) | Sets `LineDirectiveMode::None` for WGSL (line ~2559) because WGSL has no `#line` directive. |
+| 2 | `new WGSLSourceEmitter` | [slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp) | `case SourceLanguage::WGSL` | Constructed at line ~2631 of `slang-emit.cpp`. |
 | 3 | `sourceEmitter->init` | [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) | (always) | |
 | 4 | `linkAndOptimizeIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Runs Phases A-C. |
 | 5 | `simplifyForEmit` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | Final pre-emit simplification. |
 | 6 | `sourceEmitter->emitModule` | [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) (+ WGSL overrides in `slang-emit-wgsl.cpp`) | (always) | Walks IR and writes WGSL text. |
 | 7 | `createArtifactFromIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Wraps the WGSL text as an `IArtifact`. |
-| 8 | `compile` (Tint) | (downstream) | `target == WGSLSPIRV || target == WGSLSPIRVAssembly` | The downstream-compile path hands the WGSL text to Tint (the Dawn / Chromium WGSL implementation) which produces SPIR-V. |
+| 8 | `compile` (Tint) | (downstream) | `target == WGSLSPIRV \|\| target == WGSLSPIRVAssembly` | The downstream-compile path hands the WGSL text to Tint (the Dawn / Chromium WGSL implementation) which produces SPIR-V. |
+| 9 | `dissassembleWithDownstream` (glslang) | (downstream) | `target == WGSLSPIRVAssembly` | Disassembles the intermediate `WGSLSPIRV` module to SPIR-V assembly via glslang. |
 
 The bare `WGSL` target stops at the text artifact; no validation
 is performed inside Slang. Tint enforces WGSL's grammar and
@@ -678,15 +689,16 @@ Flags that exist but **never gate a WGSL pass**:
 | `codeGenContext->shouldTrackLiveness()` | `LivenessUtil::addVariableRangeStarts`, `LivenessUtil::addRangeEnds`. The Khronos-only `applyGLSLLiveness` does **not** apply to WGSL. |
 | `codeGenContext->removeAvailableInDownstreamIR` | `removeAvailableInDownstreamModuleDecorations`. |
 | `targetCaps` implies `cooperative_matrix` or `cooperative_vector` | `collectCooperativeMetadata`. |
+| `targetCaps` imply `descriptor_handle` (and `target != PyTorchCppBinding`) | Forces `targetProgram->getOrCreateLayout(sink)` immediately before `collectMetadata` so descriptor-handle metadata has a layout to read. |
 
 ### WGSL-specific runtime predicates
 
 | Gate | Where evaluated | Effect |
 | --- | --- | --- |
-| `isWGPUTarget(targetRequest)` | Multiple sites (line 2039, 2218, 2244) | Selects WGSL-specific arms: `legalizeLogicalAndOr`, `specializeAddressSpaceForWGSL`, `lowerBufferElementTypeToStorageType` policy = `WGSL`. |
-| `target == WGSL` / `WGSLSPIRV` / `WGSLSPIRVAssembly` (byte-address switch) | Line ~1852-1860 | Selects the WGSL `legalizeByteAddressBufferOps` options (`scalarizeVectorLoadStore`, `treatGetEquivalentStructuredBufferAsGetThis`, `translateToStructuredBufferOps=false`, `lowerBasicTypeOps`, `useBitCastFromUInt`). |
-| `target == CodeGenTarget::WGSL` (vs `WGSLSPIRV*`) | `emitEntryPointsSourceFromIR` line ~2515-2520 | Selects `LineDirectiveMode::None` and the source-only artifact path. |
-| `target == CodeGenTarget::WGSLSPIRV` / `WGSLSPIRVAssembly` | Downstream compile | Triggers the Tint downstream invocation. |
+| `isWGPUTarget(targetRequest)` | Multiple sites (line 2078, 2257, 2283) | Selects WGSL-specific arms: `legalizeLogicalAndOr`, `specializeAddressSpaceForWGSL`, `lowerBufferElementTypeToStorageType` policy = `WGSL`. |
+| `target == WGSL` / `WGSLSPIRV` / `WGSLSPIRVAssembly` (byte-address switch) | Line ~1891-1900 | Selects the WGSL `legalizeByteAddressBufferOps` options (`scalarizeVectorLoadStore`, `treatGetEquivalentStructuredBufferAsGetThis`, `translateToStructuredBufferOps=false`, `lowerBasicTypeOps`, `useBitCastFromUInt`). |
+| `target == CodeGenTarget::WGSL` (vs `WGSLSPIRV*`) | `emitEntryPointsSourceFromIR` line ~2556-2559 | Selects `LineDirectiveMode::None` and the source-only artifact path. |
+| `target == CodeGenTarget::WGSLSPIRV` / `WGSLSPIRVAssembly` | Downstream compile | Triggers the Tint downstream invocation (`WGSL -> WGSLSPIRV`). For `WGSLSPIRVAssembly`, the target reduces to the `WGSLSPIRV` intermediate first (`slang-code-gen.cpp:1059-1060`), then glslang disassembles that intermediate to SPIR-V assembly (`slang-global-session.cpp:222-225`). |
 
 ## Loops in the pipeline
 
@@ -719,9 +731,9 @@ producing the per-stage entry-point shapes that WGSL requires
 
 ### `specializeAddressSpaceForWGSL`
 
-Runs at line ~2246 of `slang-emit.cpp`. WGSL has explicit address
+Runs at line ~2285 of `slang-emit.cpp`. WGSL has explicit address
 spaces (`function`, `private`, `storage`, `uniform`,
-`workgroup`, `push_constant`) that the IR must annotate before
+`workgroup`) that the IR must annotate before
 emit. Unlike SPIR-V (which defers address-space propagation to
 `legalizeIRForSPIRV`), WGSL must do it here so that the
 `WGSLSourceEmitter` can write the `var<X>` qualifier when
@@ -729,20 +741,25 @@ emitting global variables.
 
 ### `legalizeLogicalAndOr`
 
-Runs at line ~2040. WGSL is in the
+Runs at line ~2079. WGSL is in the
 `isD3DTarget || isKhronosTarget || isWGPUTarget || isMetalTarget`
-arm. The pass rewrites short-circuit `&&` and `||` over vector
-operands into element-wise selects, because WGSL (like the other
-shader languages in that arm) only allows the C short-circuit
-operators on scalars.
+arm. The pass legalizes the operand and result types of vector and
+array logical `And` / `Or`: it casts non-boolean vector operands and
+results to `vector<bool,N>` and rebuilds the `And` / `Or`, and for
+array-lowered matrices loops over the array elements emitting a
+per-element `And` / `Or` and reassembling the array.
 
 ### `floatNonUniformResourceIndex`
 
-Runs at line ~2035 for every `!isSPIRV` target. WGSL needs to
-preserve a textual representation of `NonUniformResourceIndex(...)`
-because Tint forwards the marker to the SPIR-V `NonUniform`
-decoration. WGSL's surface syntax does not have a keyword for the
-marker, so the pass keeps it as an opaque intrinsic call.
+Runs at line ~2074 for every `!isSPIRV` target in
+`NonUniformResourceIndexFloatMode::Textual`. In textual mode the
+pass only repositions the `NonUniformResourceIndex(...)` wrapper
+onto the index expression and emits no decoration. For WGSL there
+is nothing to carry: WGSL/WebGPU has no non-uniform-resource-index
+annotation, so the `CLikeSourceEmitter` base drops the wrapper at
+emit time (it emits operand 0). The full decoration machinery in
+[slang-ir-float-non-uniform-resource-index.cpp](../../../../source/slang/slang-ir-float-non-uniform-resource-index.cpp)
+is SPIR-V-only.
 
 ### `legalizeByteAddressBufferOps` with WGSL options
 
@@ -765,13 +782,42 @@ construct means the emitted output uses explicit per-branch
 assignments to a function-local variable, which is what the
 default elimination produces.
 
+### `WGSLSourceEmitter` module-scope array constants
+
+The Phase-D emitter applies two WGSL-specific rules to module-scope
+constants in
+[slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp).
+First, `emitVarKeywordImpl` emits a `static const` *array* as
+`var<private>` rather than `const`
+(`emitModuleScopeArrayConstAsPrivateVar`): a WGSL `const` array may
+only be indexed by a const-expression, so a constant array indexed
+by a runtime value would be rejected by the validator, whereas an
+addressable `var<private>` with the same initializer is
+runtime-indexable. The matching `<private>` address space is emitted
+by the same function's storage-space chain, so the keyword and
+address space stay in lockstep (a module-scope `var` without an
+address space is invalid WGSL). A `kIROp_GlobalParam` array is
+excluded so descriptor arrays keep their own address space. Second,
+`shouldFoldInstIntoUseSites` folds a module-scope `MakeArray` /
+`MakeStruct` / `MakeArrayFromElement` inline when it is used only as
+a constituent of another aggregate, so a nested `static const`
+(e.g. `int g[2][3]`) does not emit its inner arrays as separate
+named decls that the outer array's `var<private>` initializer would
+illegally reference.
+
 ### Downstream Tint
 
 For `WGSLSPIRV` and `WGSLSPIRVAssembly`, the Slang downstream
 compile path invokes Tint with `sourceLanguage = WGSL` and
 `targetType = SPIRV`. Slang does not validate the WGSL it emits;
-all WGSL grammar and semantic checking is delegated to Tint, and
-the resulting SPIR-V module is what client code consumes.
+all WGSL grammar and semantic checking is delegated to Tint. For
+`WGSLSPIRV` the resulting SPIR-V module is what client code
+consumes. For `WGSLSPIRVAssembly`, `_emitEntryPoints` first
+compiles the `WGSLSPIRV` intermediate
+(`slang-code-gen.cpp:1059-1104`) and then disassembles it to
+SPIR-V assembly through glslang
+(`slang-global-session.cpp:222-225`), so the assembly target adds a
+second downstream transition after Tint.
 
 ## See also
 
@@ -783,6 +829,8 @@ the resulting SPIR-V module is what client code consumes.
   overview.
 - [../cross-cutting/targets.md](../cross-cutting/targets.md) —
   per-target options, capability sets, and target predicates.
+- [../../../user-guide/a2-03-wgsl-target-specific.md](../../../user-guide/a2-03-wgsl-target-specific.md) —
+  user-facing WGSL target-specific documentation.
 - [../ir-reference/index.md](../ir-reference/index.md) —
   per-opcode catalog.
 - [spirv.md](spirv.md), [hlsl.md](hlsl.md), [metal.md](metal.md),

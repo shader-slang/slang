@@ -1,41 +1,47 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T15:06:28+00:00
+reviewed_at: 2026-06-30T13:32:56+00:00
 target_doc: ir-reference/types.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
-  factual_accuracy: pass
+  factual_accuracy: partial
   cross_references: pass
   completeness: partial
   style_consistency: pass
-  source_alignment: pass
+  source_alignment: partial
   front_matter_validity: pass
-finding_count: 2
+finding_count: 3
 severity_breakdown:
   critical: 0
   major: 2
-  minor: 0
+  minor: 1
   nit: 0
 ---
 
 # Review report for ir-reference/types.md
 
 ## Summary
-The page is broadly source-aligned: front matter is valid, links resolve, and the Type-family opcode table covers the concrete Lua entries I checked. The remaining issues are prompt-contract gaps: `Enum` is required as a notable opcode but is absent, and many sub-tables do not include the required lowering or builder citation.
+The page is broadly useful and most checked opcode rows match the watched sources, but this review found three issues. The most important is that the Source section says the Type family is "hoistable throughout", while the Lua definition includes parent/global and unflagged type-family entries such as `Enum`, `struct`, `class`, `interface`, and tensor-addressing helper opcodes.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show ir-reference/types.md` and verified the prompt, dependency list, watched paths, target source commit, and digest against the document front matter.
-- Read the target doc, `_common.md`, `ir-reference-types.md`, and the dependency docs `cross-cutting/ir-instructions.md`, `pipeline/04-ast-to-ir.md`, and `ast-reference/types.md`.
-- Resolved all 23 relative links in the target document against `52339028a2aa703271533454c6b9528a534bac31`.
-- Checked all required IR-reference sections and extracted 154 opcode rows from the `## Opcodes` tables.
-- Spot-checked more than 10 factual claims against `source/slang/slang-ir-insts.lua`, including `Void`, `Int`, `Array`, `UnsizedArray`, `Func`, `Vec`, `Mat`, `Enum`, `Ptr`, `AnyValueType`, `BindExistentials`, `BoundInterface`, `TextureType`, `witness_table_t`, `RateQualified`, `TaggedUnionType`, and `OptionalNoneType`.
+- Ran `regenerate.py show ir-reference/types.md` and reviewed the target document, the common contract, its per-document prompt, and the resolved watched-file set (`source/slang/slang-ir-insts.h`, `source/slang/slang-ir-insts.lua`, `source/slang/slang-ir.cpp`, `source/slang/slang-ir.h`, `source/slang/slang-lower-to-ir.cpp`).
+- Checked front matter for all required keys, the recorded source commit, the warning string, and a 64-character hex watched-path digest.
+- Resolved the generated peer-doc links in `See also`, the `docs/design/ir.md` link, and the source links that are named in the page body.
+- Verified the required IR-reference sections: Source, Family hierarchy, Opcodes, Notable opcodes, See also.
+- Spot-checked more than 10 concrete source-backed claims against the watched files, including the `Type` family range, `IRType : IRInst`, the IR op flags, `BasicType` children, `AnyValueType(size)`, `Array` and `UnsizedArray` operands, `Func(resultType, paramTypes...)`, `Vec`, `Mat`, `MetalPackedVec`, pointer operands, texture operands, interface/global flags, witness-table types, and set-theoretic type entries.
+- Compared the family hierarchy and opcode tables against the Lua nesting and operands in `source/slang/slang-ir-insts.lua`, with helper cross-checks in `source/slang/slang-ir.cpp` and declarations in `source/slang/slang-ir-insts.h`.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Notable opcodes`, lines 360-449 | The per-document prompt requires `Enum` to be covered in `## Notable opcodes`, but the section has no `Enum` callout. The table row alone does not explain the parent opcode behavior or case children that the prompt asks to highlight. | `docs/generated/design/_meta/prompts/ir-reference-types.md:61` requires `Enum` coverage; `source/slang/slang-ir-insts.lua:137` defines `Enum` with `tagType` and `parent = true`; `source/slang/slang-ir.cpp:5068-5070` creates `kIROp_EnumType` with the tag type. | Add a `### Enum` notable callout explaining the `tagType` operand and parent relationship to enum case children. |
-| F-002 | major | `## Opcodes`, lines 95-358 | The type prompt requires at least one row in each sub-table to cite a `slang-lower-to-ir.cpp` visitor or `IRBuilder::getXType` helper, but many sub-tables only name AST categories or synthesized origins. For example, the basic scalar rows use `BasicExpressionType(...)`, and the array rows use `ArrayExpressionType`, with no concrete lowering or builder citation in those sub-tables. | `docs/generated/design/_meta/prompts/ir-reference-types.md:84-85` requires one such citation per sub-table; concrete helpers exist in `source/slang/slang-ir.cpp:2943` for `IRBuilder::getVectorType`, `source/slang/slang-ir.cpp:5053-5070` for struct, class, and enum creation, and `source/slang/slang-lower-to-ir.cpp:897` for the `lowerType` family. | Add at least one concrete lowering visitor or `IRBuilder::getXType` helper citation to every type sub-table, either in an AST-origin cell or a short sentence immediately before the table. |
+| F-001 | major | `## Source`, lines 24-30 | The page says the Type family is "hoistable throughout" and that identical types deduplicate to one IR value. That overstates the invariant: several Type-family entries are not hoistable, including `Enum` (`parent = true` only), `struct` / `class` (`parent = true`), `interface` (`global = true`), `AfterBaseType`, and `MakeTensorAddressingTensorLayout` / `MakeTensorAddressingTensorView` with no hoistable flag. | `source/slang/slang-ir-insts.lua` lines 149, 642-668; `source/slang/slang-ir.h` lines 51-56 define `Parent`, `Hoistable`, and `Global` as distinct flags. | Change the Source paragraph to say that most leaf type opcodes are hoistable/deduplicated, while parent/global/container and helper entries are exceptions; point readers at the Flags column for per-opcode truth. |
+| F-002 | major | `## Family hierarchy`, lines 45-94 | The hierarchy diagram does not mirror the immediate Lua subgroups required by the prompt. It introduces summary nodes such as `Resource family`, `Differentiation types`, `Existential / interface`, `Struct / class / interface containers`, `Tuple / pack / target-tuple`, and `Set-theoretic types`, while omitting exact immediate Lua groups such as `SamplerStateTypeBase`, `ResourceTypeBase`, `UntypedBufferResourceType`, `HLSLPatchType`, `BuiltinGenericType`, `TupleTypeBase`, and `WitnessTableTypeBase`. | `docs/generated/design/_meta/prompts/ir-reference-types.md` lines 47-49 require the diagram to show immediate Lua subgroups as children of `Type`; `source/slang/slang-ir-insts.lua` lines 380, 409, 440, 457, 475, 687, and 737 show immediate subgroup names not present in the diagram. | Rework the diagram so the first level under `Type` uses the Lua subgroup names, and only use friendlier labels inside or after those exact subgroup nodes. |
+| F-003 | minor | `## Opcodes` / `### Tensor and torch-tensor types`, line 223 | The `TorchTensor` row lists operands as `—`, but the watched builder helper takes an `IRType* elementType` and creates `kIROp_TorchTensorType` with one operand. | `source/slang/slang-ir.cpp` lines 3001-3004: `IRBuilder::getTorchTensorType(IRType* elementType)` calls `getType(kIROp_TorchTensorType, 1, (IRInst**)&elementType)`. | Change the `TorchTensor` operands cell to `elementType: IRType` or add a short note if the Lua entry intentionally omits the operand schema. |
+
+## No-issues notes
+- The document keeps generated-doc links workspace-relative and avoids absolute source paths.
+- The front matter has all required keys, and the target source commit and watched-path digest match the reviewed document.
+- The checked rows for `BasicType`, `Array`, `UnsizedArray`, `Func`, `Vec`, `Mat`, `Ptr`, `TextureType`, `BindExistentials`, `BoundInterface`, rate/kind opcodes, and witness-table types matched the watched source files.

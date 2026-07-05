@@ -34,9 +34,11 @@ slangc shader.slang -target spirv -stage compute -entry main \
 
 Every executable statement in the shader gets instrumented to
 increment a counter at runtime. The compiler synthesizes a
-`RWStructuredBuffer<uint> __slang_coverage` directly in the IR
-coverage pass — no AST decl, so it does not appear in Slang's
-public reflection. Hosts discover the hidden resource binding through
+`RWStructuredBuffer<uint64_t> __slang_coverage` directly in the IR
+coverage pass (or `RWStructuredBuffer<uint>` under
+`-trace-coverage-counter-width 32`; see [Counter buffer
+format](#counter-buffer-format)) — no AST decl, so it does not
+appear in Slang's public reflection. Hosts discover the hidden resource binding through
 `slang::ISyntheticResourceMetadata` and use
 `slang::ICoverageTracingMetadata` to learn how many counters to
 allocate and how source coverage entries map to those counters.
@@ -176,7 +178,9 @@ for (uint32_t i = 0; i < entryCount; ++i) {
 }
 ```
 
-The host allocates a `uint32_t[counterCount]` counter buffer, binds it
+The host allocates a `counterCount`-element counter buffer at the width
+reported by `CoverageBufferInfo::elementByteWidth` (`uint64` by default,
+`uint32` under `-trace-coverage-counter-width 32`), binds it
 using the hidden binding information reported through
 `ISyntheticResourceMetadata`, dispatches the shader, reads the
 counters back, and consumes the source entries however it likes —
@@ -283,22 +287,26 @@ contract.
 
 ## CLI reference
 
-| Flag                                      | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `-trace-coverage`                         | Enables per-statement line coverage. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites marker ops to atomic increments, and emits `<output>.coverage-manifest.json` sidecar when writing to a file.                                                                                                                                                                         |
-| `-trace-function-coverage`                | Adds per-function-entry source entries and counters. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object.                                                                                                                                                                                                                                                                                        |
-| `-trace-branch-coverage`                  | Adds per-branch-arm source entries and counters for `if`/`else`, loop-condition true/false, and source `switch` case/default dispatch arms, including the implicit no-match default path when no `default` label exists. Expression-level short-circuit and ternary branches are not instrumented yet. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object.                                          |
-| `-coverage-manifest-output <path>`         | Writes the coverage manifest JSON sidecar to an explicit path instead of the default `<output>.coverage-manifest.json`. Use this when the compiled artifact is written to stdout or the build needs a stable manifest path. Requires at least one coverage tracing mode, is rejected for container outputs, and is valid only when exactly one compiled artifact carries coverage metadata.                                                                         |
-| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time.                                                                                                                                                                                                                            |
-| `-trace-coverage-reserved-space <space>`  | Marks a whole Khronos descriptor set as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent.                                                                                                                                                                                                                                                                                                          |
+| Flag                                      | Effect                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `-trace-coverage`                         | Enables per-statement line coverage. The IR coverage pass synthesizes `__slang_coverage` as an `IRGlobalParam` directly in the linked program IR (no AST decl), rewrites marker ops to atomic increments, and emits `<output>.coverage-manifest.json` sidecar when writing to a file.                                                                                                                                    |
+| `-trace-function-coverage`                | Adds per-function-entry source entries and counters. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object.                                                                                                                                                                                                                                                   |
+| `-trace-branch-coverage`                  | Adds per-branch-arm source entries and counters for `if`/`else`, loop-condition true/false, and source `switch` case/default dispatch arms, including the implicit no-match default path when no `default` label exists. Expression-level short-circuit and ternary branches are not instrumented yet. Can be used with or without `-trace-coverage`; it shares the same synthesized counter buffer and metadata object. |
+| `-coverage-manifest-output <path>`        | Writes the coverage manifest JSON sidecar to an explicit path instead of the default `<output>.coverage-manifest.json`. Use this when the compiled artifact is written to stdout or the build needs a stable manifest path. Requires at least one coverage tracing mode, is rejected for container outputs, and is valid only when exactly one compiled artifact carries coverage metadata.                              |
+| `-trace-coverage-binding <index> <space>` | Pins the synthesized `__slang_coverage` buffer at the explicit `(register index, space)` pair, instead of letting the IR pass auto-allocate. Implies `-trace-coverage`. Useful when the host needs the slot fixed at compile time.                                                                                                                                                                                       |
+| `-trace-coverage-reserved-space <space>`  | Marks a whole Khronos descriptor set as externally occupied during auto-allocation. Repeat the option for multiple spaces; duplicates are idempotent.                                                                                                                                                                                                                                                                    |
 
 ---
 
 ## Counter buffer format
 
-`uint32_t counters[N]` — flat little-endian array, no header. Indexed
-by `CoverageEntryInfo::counterIndex` / manifest `counter`. Saturates
-at ~4 × 10⁹ hits per slot (see [Current limitations](#current-limitations)).
+Flat little-endian array of `N` counters, no header. Element width is
+`uint64` by default (`uint32` under `-trace-coverage-counter-width 32`),
+reported by `manifest.buffer.element_stride` /
+`CoverageBufferInfo::elementByteWidth`. Indexed by
+`CoverageEntryInfo::counterIndex` / manifest `counter`. uint64 slots
+effectively never wrap; uint32 slots saturate at ~4 × 10⁹ hits per slot
+(see [Current limitations](#current-limitations)).
 
 ---
 
@@ -309,7 +317,9 @@ at ~4 × 10⁹ hits per slot (see [Current limitations](#current-limitations)).
                                  Produced by slangc alongside the
                                  compiled artifact, or hand-built from
                                  ICoverageTracingMetadata.
---counters <file.bin>            Binary uint32 little-endian
+--counters <file.bin>            Binary little-endian; element width
+                                 (uint32 or uint64) auto-detected from
+                                 the manifest's buffer.element_stride
   OR
 --counters-text <file-or-'->     Whitespace-separated decimal ints
                                  ('-' reads stdin)
@@ -337,16 +347,16 @@ declares the slot in its own pipeline layout / root signature.
 
 ### Compiler instrumentation
 
-| Backend                                   | Default `-trace-coverage`                                                                                                                                                                                                                                                                         | `-trace-coverage-binding=N:0`          | `-trace-coverage-binding=N:M` (M ≠ 0) |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------- |
-| CPU source                                | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
-| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported. Auto-allocation uses the descriptor set after the highest shader-visible or host-reserved set at binding 0.                                                                                                                                                                            | Supported                              | Compiler-side decoration correct      |
-| D3D12 / HLSL                              | Compiler metadata/codegen supported. D3D12 runtime binding policy is follow-up; hosts should query `ISyntheticResourceMetadata` and declare the reported UAV slot in their root signature.                                                                                                        | Supported                              | Compiler-side decoration correct      |
-| CUDA                                      | Supported                                                                                                                                                                                                                                                                                         | (no-op — backend uses uniform offsets) | (no-op)                               |
-| Metal (direct)                            | Compiles. End-to-end dispatch is unreliable due to a pre-existing slang-rhi Metal binding quirk ([shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724)) — not a coverage-feature defect.                                                                             | (untested)                             | (untested)                            |
-| GLSL                                      | Supported codegen                                                                                                                                                                                                                                                                                 | (untested)                             | (untested)                            |
-| LLVM-emitted CPU                          | **Not supported** — coverage tracing emits a warning (E45102) and skips instrumentation until the synthesized resource + atomic sequence has a verified LLVM lowering path.                                                                                                                       | (n/a)                                  | (n/a)                                 |
-| WGSL / WebGPU                             | **Not supported** — coverage tracing emits a warning (E45102) and skips instrumentation. WGSL requires the synthesized counter buffer to use `atomic<u32>` element type, which the IR coverage pass does not yet produce. Use `-target spirv` for Vulkan-based WebGPU workflows as a workaround. | (n/a)                                  | (n/a)                                 |
+| Backend                                   | Default `-trace-coverage`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `-trace-coverage-binding=N:0`          | `-trace-coverage-binding=N:M` (M ≠ 0) |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------- |
+| CPU source                                | Supported                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | (no-op — backend uses uniform offsets) | (no-op)                               |
+| Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported. Auto-allocation uses the descriptor set after the highest shader-visible or host-reserved set at binding 0.                                                                                                                                                                                                                                                                                                                                                                                                                                     | Supported                              | Compiler-side decoration correct      |
+| D3D12 / HLSL                              | Compiler metadata/codegen supported. D3D12 runtime binding policy is follow-up; hosts should query `ISyntheticResourceMetadata` and declare the reported UAV slot in their root signature.                                                                                                                                                                                                                                                                                                                                                                 | Supported                              | Compiler-side decoration correct      |
+| CUDA                                      | Supported                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | (no-op — backend uses uniform offsets) | (no-op)                               |
+| Metal (direct)                            | Supported with `-trace-coverage-counter-width 32` (MSL has no 64-bit `atomic_fetch_add_explicit`, so 32-bit is the only executable width). End-to-end GPU dispatch with counter readback is validated by the `coverageMetalRuntimeDispatch` unit test; the direct-host binding recipe is documented in `docs/design/shader-coverage-host-interface.md`. The earlier "unreliable counters" observation was a slang-rhi Metal binding quirk ([shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724)), not a Metal-target defect. | (untested)                             | (untested)                            |
+| GLSL                                      | Supported codegen                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | (untested)                             | (untested)                            |
+| LLVM-emitted CPU                          | **Not supported** — coverage tracing emits a warning (E45102) and skips instrumentation until the synthesized resource + atomic sequence has a verified LLVM lowering path.                                                                                                                                                                                                                                                                                                                                                                                | (n/a)                                  | (n/a)                                 |
+| WGSL / WebGPU                             | **Not supported** — coverage tracing emits a warning (E45102) and skips instrumentation. WGSL requires the synthesized counter buffer to use `atomic<u32>` element type, which the IR coverage pass does not yet produce. Use `-target spirv` for Vulkan-based WebGPU workflows as a workaround.                                                                                                                                                                                                                                                           | (n/a)                                  | (n/a)                                 |
 
 ### Format scope
 
@@ -359,9 +369,10 @@ declares the slot in its own pipeline layout / root signature.
   source `switch` case/default dispatch arms, including the implicit
   no-match default path when no `default` label exists.
 - **Column position is dropped.** Only `(file, line)` reaches LCOV.
-- **Counter type is `uint32`.** Saturates at ~4 × 10⁹ hits per
-  slot. Multiple ops on the same source line accumulate
-  independently before LCOV-emit-time aggregation.
+- **Counter width is selectable.** `uint64` by default (effectively
+  never wraps); `-trace-coverage-counter-width 32` opts down to `uint32`,
+  which saturates at ~4 × 10⁹ hits per slot. Multiple ops on the same
+  source line accumulate independently before LCOV-emit-time aggregation.
 
 ## Current limitations
 

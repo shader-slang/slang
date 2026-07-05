@@ -1,13 +1,13 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.8
-remediated_at: 2026-06-05T15:45:00Z
+remediated_at: 2026-06-30T13:58:23Z
 target_doc: ast-reference/statements.md
 review_report: ../../reviews/ast-reference/statements.md.review.md
-target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 actions:
-  fixed: 3
+  fixed: 4
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,16 +18,13 @@ actions:
 
 ## Summary
 
-All three findings were fixed (fixed=3; no rejections, deferrals, or
-escalations). F-001 corrected the `CatchStmt` row to describe `do ...
-catch` syntax. F-002 reconciled the `UniqueStmtIDNode` prose with the
-table row that lists it. F-003 added the missing notable-node coverage
-for `ReturnStmt`, `ContinueStmt`, `DiscardStmt`, and `EmptyStmt`.
+All four minor source-alignment findings were verified against the watched parser `source/slang/slang-parser.cpp` at HEAD and fixed in the target document. The fixes correct one parser-method name, one surface-syntax overstatement, one internal-keyword spelling plus its grammar cell, and one unsupported lowering analogy. None were rejected, deferred, or escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `source/slang/slang-parser.cpp:7063-7065` routes `do` then `catch` to `ParseDoCatchStatement`; `try` is parsed as an expression statement, so `CatchStmt` is `do ... catch`. | Changed the `CatchStmt` grammar text to `do-catch` and the summary from `try { ... } catch` to `do { ... } catch (e) { ... }`. |
-| F-002 | fixed | The header declares `UniqueStmtIDNode` with `FIDDLE()` and a prior cycle added its table row; the prose still claimed it was excluded. | Reworded the hierarchy prose to say the row is listed as a helper (FIDDLE-declared) though not in the `Stmt` hierarchy or parsed, removing the "excluded" contradiction. |
-| F-003 | fixed | `docs/generated/design/_meta/prompts/ast-reference-statements.md:37-46` requires notable callouts for `ReturnStmt`, `ContinueStmt`, `DiscardStmt`, `EmptyStmt`, which were absent. | Added a `### ReturnStmt` callout, expanded the LabelStmt callout to cover `ContinueStmt` and `DiscardStmt`, and expanded the DeclStmt/ExpressionStmt callout to cover `EmptyStmt`. |
+| F-001 | fixed | `slang-parser.cpp:209` declares and `:6902` defines `Parser::ParseStatement` (capital P); doc had `parseStatement`. | `## Source`: `parseStatement` -> `Parser::ParseStatement`. |
+| F-002 | fixed | `ParseThrowStatement` (`slang-parser.cpp:7568-7575`) reads `throw` + expression and returns without a `ReadToken(Semicolon)`, unlike `ParseExpressionStatement` (`:7577`). | Nodes ThrowStmt summary: `throw e;` -> `throw e` with a note that the routine consumes no trailing `;`. |
+| F-003 | fixed | Statement keyword is `__requireCapability` (`slang-parser.cpp:6969`, `:7593`); `require_capability` was wrong and the grammar page exposes no statement production for it. | Nodes row: keyword corrected to `__requireCapability(...)`, Grammar -> `(none)`; notable prose names `__requireCapability` / `Parser::ParseRequireCapabilityStatement`. |
+| F-004 | fixed | `parseCompileTimeForStmt` (`slang-parser.cpp:6842-6885`, leading `$` at `:6888`) parses `$for (name in Range(...))`; no `[ForceInline]` connection exists in this parse path. | `### CompileTimeForStmt`: replaced the `[ForceInline]`-style claim with the actual `$for (... in Range(...))` parser shape (`parseCompileTimeForStmt`). |

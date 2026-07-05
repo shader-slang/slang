@@ -1,43 +1,47 @@
 //META: generated=true
-//META: model=claude-sonnet-4-6
-//META: generated_at=2026-06-02T07:02:43+00:00
-//META: source_commit=9c1a6a00ef413932805da5b813465a7a9d517fb9
-//META: doc_ref=docs/language-reference/generics.md#type-checking
-//META: doc_section_digest=7b3e1c2f4d8a0e9f5b2c6d1e3f7a4b8c0d2e6f9a1b5c3e7f0d4a8b2c6e0f4a
-//META: purpose=A type whose associated type does not satisfy a `where T.AssocType == int` equality constraint is rejected at the call site.
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: doc_ref=docs/language-reference/generics.md#examples
+//META: doc_section_digest=2843e3e730992c3b4a58e5dcb338c66a5db5be57ab33d9c88e766fe31406de61
+//META: purpose=A call violating an associated-type equality constraint (`where T.PropertyType == int` applied to a conformer whose PropertyType is float) is rejected.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// From the doc Examples section (Type equality constraint for associated type).
-// FloatProperty's PropertyType is float, not int. Calling addTwoInts with FloatProperty
-// must be rejected at compile time.
+// Verifies the commented-out negative case in the doc's "Type equality
+// constraint for associated type" example: `addTwoInts<T:IFace> where
+// T.PropertyType == int` requires the associated type be int, but FloatProperty
+// has PropertyType == float. Calling addTwoInts with FloatProperty values
+// cannot satisfy the equality constraint; CHECK asserts E39999 "could not
+// specialize generic" fires (non-exhaustive skips the "see declaration" note).
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl
 
 interface IFace
 {
     associatedtype PropertyType;
-    property prop : PropertyType { get; }
+    property prop : PropertyType;
 }
 
 struct FloatProperty : IFace
 {
     typealias PropertyType = float;
-    float _val;
-    property prop : float { get { return _val; } }
+    PropertyType prop;
 }
 
 int addTwoInts<T : IFace>(T a, T b) where T.PropertyType == int
 {
-    return 0;
+    return a.prop + b.prop;
 }
 
+RWStructuredBuffer<int> outputBuffer;
+
 [numthreads(1, 1, 1)]
-void computeMain(uint3 id : SV_DispatchThreadID)
+void computeMain()
 {
-    FloatProperty fp1;
-    FloatProperty fp2;
-    int r = addTwoInts(fp1, fp2);
-//CHECK: E39999
+    FloatProperty f1 = { 1.0 };
+    FloatProperty f2 = { 2.0 };
+    outputBuffer[0] = addTwoInts(f1, f2);
+    //CHECK: E39999
 }

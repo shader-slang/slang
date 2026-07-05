@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:19:16+00:00
+reviewed_at: 2026-06-30T13:24:00+00:00
 target_doc: cross-cutting/core-module.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 19ad329c51b4e53e37b131c94d49631623fa525a7de092b35d5852c27a4bca02
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: 2c33d82801bf8c85c90f7a72974d48339879a5c470ed66dd9ad1279eeab52e62
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -24,23 +24,25 @@ severity_breakdown:
 # Review report for cross-cutting/core-module.md
 
 ## Summary
-The document satisfies the requested structure and all relative links resolve at the target source commit. One minor factual issue remains: the core-module inventory names `Result` as a provided type, but the watched meta-Slang files at the target commit do not declare such a type.
+
+The document largely matches the prompt contract and the watched source files: it covers the core, HLSL, GLSL, diff meta-slang files, the neural standard module, and all resolved prelude headers. The only issue I found is a small but real source-alignment error in the GLSL module loading description: the source gates loading on the global-session `enableGLSL` flag, not directly on the current target or an on-demand request for GLSL-flavored names.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show cross-cutting/core-module.md` and reviewed the resolved watched paths plus the dependency document `architecture/overview.md`.
-- Checked front matter for the required generated-doc keys, source commit shape, warning string, and watched-path digest value.
-- Resolved all 41 markdown links in the document against `52339028a2aa703271533454c6b9528a534bac31`; no dangling links were found.
-- Verified the required prompt sections: shipped-code families, core module, GLSL module, standard modules, preludes, and building the core module.
-- Spot-checked more than 10 source claims, including the `*.meta.slang` file set, the core and GLSL embedding CMake targets, generated module headers, neural standard-module output layout, every listed prelude header, and representative declarations in `core.meta.slang`, `hlsl.meta.slang`, `diff.meta.slang`, and `glsl.meta.slang`.
-- Checked that no body line-number citations needed verification; the document uses file links without source line anchors.
+
+- Verified the required front matter fields and copied `target_doc_source_commit` / `target_doc_watched_paths_digest` from the target document.
+- Used `regenerate.py show cross-cutting/core-module.md` to identify the prompt, dependency document, watched paths, and resolved watched files.
+- Read `_common.md`, `cross-cutting-core-module.md`, the target document, and the dependency document `architecture/overview.md`.
+- Spot-checked more than 10 concrete claims against resolved watched files: `core.meta.slang`, `hlsl.meta.slang`, `diff.meta.slang`, `glsl.meta.slang`, `source/slang-core-module/CMakeLists.txt`, the embedded core / GLSL module glue, `source/standard-modules/README.md`, `source/standard-modules/CMakeLists.txt`, `source/standard-modules/neural/CMakeLists.txt`, `neural.slang`, `slang-standard-module-config.h.in`, and every resolved `prelude/*.h`.
+- Resolved all 43 Markdown links in the target document; none were missing.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## Core module`, lines 100-105 | The page says the core declarations include `Optional`, `Result`, and `Tuple`, but `Result` was not found in the watched meta-Slang sources at the recorded source commit. | `source/slang/core.meta.slang:1790` declares `Optional`, `source/slang/core.meta.slang:1921` declares `Tuple`, and a search of the watched `core.meta.slang`, `hlsl.meta.slang`, `diff.meta.slang`, and `glsl.meta.slang` files at `52339028a2aa703271533454c6b9528a534bac31` found no `Result` declaration. | Remove `Result` from that sentence, or replace it with a type that is actually declared in the watched meta-Slang files. |
+| F-001 | minor | `## GLSL module`, lines 121-123 | The statement `Loading it is target-conditional: the compiler pulls it in when the user is compiling GLSL or asks for GLSL-flavoured names from Slang code` describes the trigger too narrowly. The source loads the GLSL builtin module during global session creation when `desc->enableGLSL` is true; explicit `import glsl` then retrieves that builtin module if it is available. | `source/slang/slang-api.cpp:218` gates GLSL loading with `if (desc->enableGLSL)`, and `source/slang/slang-session.cpp:1520` handles `moduleName == getSessionImpl()->glslModuleName` by returning `getBuiltinModule(BuiltinModuleName::GLSL)`. `include/slang.h:5657` documents `enableGLSL` as the global-session flag. | Replace the sentence with wording tied to `SlangGlobalSessionDesc::enableGLSL`, for example: "The global session loads the GLSL builtin module when `enableGLSL` is set; later GLSL-language scopes or `import glsl` use that loaded builtin module." |
 
 ## No-issues notes
-- The page mentions every resolved prelude header under `prelude/`.
-- The standard-module section correctly identifies `neural` as the only module under `source/standard-modules/` at the target commit.
-- The embedding description matches the generator-expression wiring in `source/slang/CMakeLists.txt` and the generated-header flow in `source/slang-core-module/CMakeLists.txt`.
+
+- The standard-module build description matches `source/standard-modules/neural/CMakeLists.txt`: the module is built with `slang-bootstrap` and `-load-core-module ${core_module_archive}`.
+- The core-module build-product description matches `source/slang-core-module/CMakeLists.txt`: one `-compile-core-module` command writes the core archive plus core and GLSL embeddable headers.
+- The prelude table covers all resolved `prelude/*.h` files from the manifest output.

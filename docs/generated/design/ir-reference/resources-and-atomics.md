@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T09:24:37Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
+generated_at: 2026-06-29T18:20:46Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -26,34 +26,35 @@ opcodes.
 The opcodes documented here are scattered through
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua):
 
-- `AtomicOperation` group at line ~1071, plus the coverage markers
-  `IncrementCoverageCounter` (line ~1111),
-  `IncrementFunctionCoverageCounter` (line ~1116), and
-  `IncrementBranchCoverageCounter` (line ~1129), each also synthesized
+- `AtomicOperation` group at line ~1100, plus the coverage markers
+  `IncrementCoverageCounter` (line ~1140),
+  `IncrementFunctionCoverageCounter` (line ~1145), and
+  `IncrementBranchCoverageCounter` (line ~1158), each also synthesized
   as an atomic add.
 - Image and texture access opcodes (`imageSubscript`, `imageLoad`,
-  `imageStore`) at lines ~1180-1188.
+  `imageStore`, `ImageTexelPointer`, `SubpassLoad`) at lines
+  ~1209-1221.
 - Buffer access opcodes (`byteAddressBufferLoad/Store`,
   `structuredBuffer*`, `rwstructuredBuffer*`,
-  `StructuredBufferAppend/Consume/GetDimensions`) at lines ~1198-1243.
+  `StructuredBufferAppend/Consume/GetDimensions`) at lines ~1229-1274.
 - Resource modifiers and queries (`nonUniformResourceIndex`,
-  `getNaturalStride`, `castDynamicResource`) at lines ~1166 and
-  ~1245-1246.
-- Mesh-shader outputs at lines ~1251-1257.
+  `getNaturalStride`, `castDynamicResource`) at lines ~1195,
+  ~1276-1277.
+- Mesh-shader outputs at lines ~1278-1284.
 - Texture-sampling shortcuts (`sample`, `sampleGrad`) and
-  wave-intrinsic mask ops at lines ~1502-1509.
+  wave-intrinsic mask ops at lines ~1536-1541.
 - Memory barriers (`GroupMemoryBarrierWithGroupSync`,
-  `ControlBarrier`) at lines ~1510-1511.
-- Raytracing-payload accessors at lines ~1516-1544.
-- Texture-access tagging helpers at lines ~1550-1556.
-- Descriptor-heap and buffer-pointer helpers at lines ~978-998 and
-  ~2640-2644.
-- Combined sampler accessors at lines ~1031-1032; combined-sampler
+  `ControlBarrier`) at lines ~1542-1543.
+- Raytracing-payload accessors at lines ~1548-1563.
+- Texture-access tagging helpers at lines ~1583-1591.
+- Descriptor-heap and buffer-pointer helpers at lines ~1007-1024 and
+  ~2696-2700.
+- Combined sampler accessors at lines ~1060-1061; combined-sampler
   constructor at line ~1000.
 - `GetWorkGroupSize`, `GetCurrentStage` (entry-point introspection)
-  at lines ~1052-1054.
+  at lines ~1081-1083.
 - `BindingQuery` (`getRegisterIndex`, `getRegisterSpace`) at line
-  ~1609.
+  ~1639.
 
 C++ wrappers are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). The
@@ -94,6 +95,7 @@ flowchart TD
 | `imageSubscript` | — | `image, coord, sampleCoord?` | | `IndexExpr` on a `RWTexture*` in `slang-lower-to-ir.cpp` | Returns a pointer-like value for a texel of an image; used as the lvalue side of `image[coord] = ...`. |
 | `imageLoad` | — | `image, coord, auxCoord1?, auxCoord2?` | | `Texture*::Load` method invocations | Loads a texel from an image. |
 | `imageStore` | — | `image, coord, value` | | `RWTexture*` element-store lowering | Stores a value to a texel of an image. |
+| `ImageTexelPointer` | — | `image, coord, sample` | | GLSL `imageAtomic*` lowering | Forms a pointer to a texel of an image so atomic ops can target it; lowers directly to `SpvOpImageTexelPointer` at emit time. |
 | `SubpassLoad` | `SubpassLoad` | `subpassInput, sample?` | | `SubpassInput*::SubpassLoad` method (raster-input attachment access) | Loads a fragment-shader input attachment value; the optional `sample` operand selects an MSAA sample. Per-target lowering is covered in [../pipeline/06-emit.md](../pipeline/06-emit.md). |
 | `MetalCastToDepthTexture` | — | `texture` | | (synthesized) | Metal-backend-specific cast from a regular texture to a depth texture. |
 | `IsTextureAccess` | — | (variadic, `min=1`) | | (synthesized) | True if the operand was produced by a texture-access opcode; used by the texture-access legalization pass. |
@@ -108,7 +110,7 @@ flowchart TD
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `sample` | — | `texture, sampler, coord` | | `Texture*::Sample` method | Implicit-LOD texture sample. |
-| `sampleGrad` | — | `texture, sampler, coord, gradX, ...` | | `Texture*::SampleGrad` method | Explicit-gradient texture sample (variadic; trailing operands are `gradY`, optional offset, optional bias, ...). |
+| `sampleGrad` | — | `texture, sampler, coord, gradX` | | `Texture*::SampleGrad` method | Explicit-gradient texture sample. |
 | `MakeCombinedTextureSamplerFromHandle` | — | `handle` | | (synthesized) | Constructs a `SamplerState`-paired texture value from a runtime handle. |
 | `CombinedTextureSamplerGetTexture` | — | `sampler` | | (synthesized) | Projects the texture half of a combined texture/sampler. |
 | `CombinedTextureSamplerGetSampler` | — | `sampler` | | (synthesized) | Projects the sampler half of a combined texture/sampler. |
@@ -187,19 +189,19 @@ enum IRMemoryOrder
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `atomicLoad` | — | (variadic, `min=1`) | | Atomic intrinsic lowering in `slang-lower-to-ir.cpp` | Atomically reads from `ptr`. |
-| `atomicStore` | — | (variadic, `min=2`) | | Atomic intrinsic lowering | Atomically writes to `ptr`. |
-| `atomicExchange` | — | (variadic, `min=2`) | | Atomic intrinsic lowering | Atomically writes and returns the previous value. |
-| `atomicCompareExchange` | — | `ptr, expected, desired` | | `InterlockedCompareExchange` intrinsic | Atomic CAS; returns the value previously stored. |
-| `atomicAdd` | — | `ptr, val` | | `InterlockedAdd` intrinsic | Atomically adds `val` to `*ptr`. |
-| `atomicSub` | — | `ptr, val` | | Atomic intrinsic lowering | Atomically subtracts. |
-| `atomicAnd` | — | `ptr, val` | | `InterlockedAnd` intrinsic | Atomic bitwise AND. |
-| `atomicOr` | — | `ptr, val` | | `InterlockedOr` intrinsic | Atomic bitwise OR. |
-| `atomicXor` | — | `ptr, val` | | `InterlockedXor` intrinsic | Atomic bitwise XOR. |
-| `atomicMin` | — | `ptr, val` | | `InterlockedMin` intrinsic | Atomic minimum. |
-| `atomicMax` | — | `ptr, val` | | `InterlockedMax` intrinsic | Atomic maximum. |
-| `atomicInc` | — | `ptr` | | `InterlockedAdd` (with `1` constant) | Atomic increment. |
-| `atomicDec` | — | `ptr` | | `InterlockedAdd` (with `-1` constant) | Atomic decrement. |
+| `atomicLoad` | — | `ptr, memoryOrder` | | Atomic intrinsic lowering in `slang-lower-to-ir.cpp` | Atomically reads from `ptr`. |
+| `atomicStore` | — | `ptr, val, memoryOrder` | | Atomic intrinsic lowering | Atomically writes to `ptr`. |
+| `atomicExchange` | — | `ptr, val, memoryOrder` | | Atomic intrinsic lowering | Atomically writes and returns the previous value. |
+| `atomicCompareExchange` | — | `ptr, expected, desired, memoryOrderEqual, memoryOrderUnequal` | | `InterlockedCompareExchange` intrinsic | Atomic CAS; returns the value previously stored. |
+| `atomicAdd` | — | `ptr, val, memoryOrder` | | `InterlockedAdd` intrinsic | Atomically adds `val` to `*ptr`. |
+| `atomicSub` | — | `ptr, val, memoryOrder` | | Atomic intrinsic lowering | Atomically subtracts. |
+| `atomicAnd` | — | `ptr, val, memoryOrder` | | `InterlockedAnd` intrinsic | Atomic bitwise AND. |
+| `atomicOr` | — | `ptr, val, memoryOrder` | | `InterlockedOr` intrinsic | Atomic bitwise OR. |
+| `atomicXor` | — | `ptr, val, memoryOrder` | | `InterlockedXor` intrinsic | Atomic bitwise XOR. |
+| `atomicMin` | — | `ptr, val, memoryOrder` | | `InterlockedMin` intrinsic | Atomic minimum. |
+| `atomicMax` | — | `ptr, val, memoryOrder` | | `InterlockedMax` intrinsic | Atomic maximum. |
+| `atomicInc` | — | `ptr, memoryOrder` | | `InterlockedAdd` (with `1` constant) | Atomic increment. |
+| `atomicDec` | — | `ptr, memoryOrder` | | `InterlockedAdd` (with `-1` constant) | Atomic decrement. |
 | `IncrementCoverageCounter` | — | — | | (synthesized when line coverage is on) | Line-coverage marker rewritten to `atomicAdd` on the synthesized coverage buffer; documented in the Lua comment block. |
 | `IncrementFunctionCoverageCounter` | — | `functionName, functionMangledName` | | (synthesized when function coverage is on) | Function-entry coverage marker; carries display and mangled names as operands so later passes need no AST access. |
 | `IncrementBranchCoverageCounter` | — | `branchSiteID, branchArmID, branchArmKind` | | (synthesized when branch coverage is on) | Branch-arm coverage marker; site/arm ids are local to the emitted metadata and the arm kind distinguishes true/false/case for LCOV export. |
@@ -284,10 +286,12 @@ In this source revision the texture-sampling shortcuts are `sample`
 and `sampleGrad`. `sample(texture, sampler, coord)` is the
 *implicit-LOD* form: the mip level is selected automatically from
 screen-space derivatives, so it is only valid where derivatives are
-available. `sampleGrad(texture, sampler, coord, gradX, ...)` is the
-*explicit-gradient* form: the caller supplies the `gradX` / `gradY`
-derivative vectors that drive LOD selection, plus optional trailing
-operands (offset, bias). A fixed explicit-LOD sample is expressed
+available. `sampleGrad(texture, sampler, coord, gradX)` is the
+*explicit-gradient* form: the caller supplies the `gradX`
+derivative operand that drives LOD selection. The opcode has a
+fixed four-operand shape in this revision; richer gradient/offset/bias
+semantics live in core-module sampling intrinsics rather than as
+extra operands on this IR opcode. A fixed explicit-LOD sample is expressed
 through the ordinary core-module sampling intrinsics rather than a
 dedicated opcode in this revision.
 
@@ -303,17 +307,22 @@ the whole struct.
 
 ### `atomicCompareExchange`
 
-`atomicCompareExchange(ptr, expected, desired)` is the IR encoding
-of the CAS primitive. The operand triple is exactly the one
-emitted by HLSL's `InterlockedCompareExchange`; the returned value
+`atomicCompareExchange(ptr, expected, desired, memoryOrderEqual,
+memoryOrderUnequal)` is the IR encoding of the CAS primitive. The
+`ptr`/`expected`/`desired` triple is exactly the one emitted by
+HLSL's `InterlockedCompareExchange`, followed by the two
+`IRMemoryOrder` operands for the matched and unmatched cases; the
+returned value
 is the value previously stored, which the user code typically
 compares to `expected` to decide whether the swap succeeded.
 
-### `EntryPointParam` and `GlobalParam` (cross-link)
+### `global_param` and `EntryPointParamDecoration` (cross-link)
 
-The shader-IO opcode hierarchy ultimately bottoms out at
-`global_param` (see [structure.md](structure.md) for its
-structural role). The layout opcodes documented in
+The shader-IO opcode hierarchy ultimately bottoms out at the
+`global_param` opcode (see [structure.md](structure.md) for its
+structural role); entry-point-origin information is carried by the
+`EntryPointParamDecoration` decoration on a `global_param`, not by a
+separate opcode. The layout opcodes documented in
 [metadata.md](metadata.md) attach to `global_param` instances to
 record their resource binding; backend emit walks the children of
 each `global_param` to discover them.

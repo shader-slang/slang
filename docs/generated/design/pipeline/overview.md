@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T09:24:37Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 2b1f264a09ca0945624e60f437a309169a899a6be06ea582244f6b6933989b9c
+generated_at: 2026-06-29T13:35:55Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 2854d32691b21394b5c128e6ff961825c7bcc6f4a9a204e7f97ca918b148ec26
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -12,10 +12,9 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 This document is the index to the per-stage pipeline documents under
 [pipeline/](.). It traces the flow of data from a source buffer to an
 emitted target artefact and points at the file(s) that drive each
-stage. Readers who want depth should follow the per-stage links.
-
-The intended reader knows what a compiler is in general but has not yet
-mapped Slang's pipeline onto its source layout.
+stage. It is written for a reader who knows what a compiler is in
+general but has not yet mapped Slang's pipeline onto its source layout;
+readers who want depth should follow the per-stage links.
 
 ## End-to-end flow
 
@@ -107,7 +106,7 @@ Detail: [04-ast-to-ir.md](04-ast-to-ir.md).
 ### IR passes
 
 The `linkAndOptimizeIR` function in
-[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (line 895 at
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (line 896 at
 `source_commit`) drives a long, target-sensitive sequence of IR
 transformations between lowering and emit. The
 [source/slang/](../../../../source/slang) directory contains roughly
@@ -124,7 +123,7 @@ Detail: [05-ir-passes.md](05-ir-passes.md).
 ### Emit
 
 `emitEntryPointsSourceFromIR`
-([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2487 at
+([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2540 at
 `source_commit`) selects the right backend for each `TargetRequest`
 and produces a target artefact: HLSL, GLSL, SPIR-V, Metal, WGSL, C++,
 CUDA, Torch glue, LLVM IR / native via `slang-llvm`, or VM bytecode.

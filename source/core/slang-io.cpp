@@ -750,7 +750,13 @@ String Path::getRelativePath(String base, String path)
     std::filesystem::path p2(path.getBuffer());
     std::error_code ec;
     auto result = std::filesystem::relative(p2, p1, ec);
-    if (ec)
+    // `std::filesystem::relative` yields an empty path when no relative path exists between the
+    // two inputs -- most notably when they have different root names, e.g. distinct Windows drive
+    // letters (`C:\...` vs `D:\...`). An empty string is never a usable relative path, so fall
+    // back to the original (absolute) `path`, matching the `ec` failure case. This keeps callers
+    // that store or re-resolve the result (such as serialized module dependency paths) from
+    // recording an empty, unresolvable path across volumes.
+    if (ec || result.empty())
         return path;
     return String(reinterpret_cast<const char*>(result.generic_u8string().c_str()));
 }
@@ -1244,18 +1250,20 @@ String URI::getPath() const
     for (Index i = startIndex; i < endIndex;)
     {
         auto ch = uri[i];
-        if (ch == '%')
+        if (ch == '%' && i + 2 < endIndex)
         {
-            Int charVal = CharUtil::getHexDigitValue(uri[i + 1]) * 16 +
-                          CharUtil::getHexDigitValue(uri[i + 2]);
-            sb.appendChar((char)charVal);
-            i += 3;
+            Int highDigit = CharUtil::getHexDigitValue(uri[i + 1]);
+            Int lowDigit = CharUtil::getHexDigitValue(uri[i + 2]);
+            if (highDigit >= 0 && lowDigit >= 0)
+            {
+                sb.appendChar((char)(highDigit * 16 + lowDigit));
+                i += 3;
+                continue;
+            }
         }
-        else
-        {
-            sb.appendChar(uri[i]);
-            i++;
-        }
+
+        sb.appendChar(uri[i]);
+        i++;
     }
     return sb.produceString();
 }
@@ -1297,7 +1305,7 @@ URI URI::fromLocalFilePath(UnownedStringSlice path)
         else
         {
             char buffer[32];
-            int length = intToAscii(buffer, (int)ch, 16);
+            int length = intToAscii(buffer, int((unsigned char)ch), 16, 2);
             sb << "%" << UnownedStringSlice(buffer, length);
         }
     }

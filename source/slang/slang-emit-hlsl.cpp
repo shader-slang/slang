@@ -3,6 +3,7 @@
 
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
+#include "slang-ir-util-hlsl.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
@@ -10,6 +11,16 @@
 
 namespace Slang
 {
+
+bool HLSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
+{
+    // Barrier flag conversion ops do not have a standalone HLSL temporary form. The
+    // use-site emitter expands their folded integer operand to DXC barrier flag tokens.
+    if (isBarrierFlagGetterOp(inst->getOp()))
+        return true;
+
+    return Super::shouldFoldInstIntoUseSites(inst);
+}
 
 
 void HLSLSourceEmitter::_emitHLSLDecorationSingleString(
@@ -424,7 +435,7 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
 
     if (profile.getFamily() == ProfileFamily::DX)
     {
-        if (profile.getVersion() >= ProfileVersion::DX_6_1)
+        if (profile.getVersion() >= ProfileVersion::DX_6_1 || stage == Stage::Node)
         {
             char const* stageName = getStageName(stage);
             if (stageName)
@@ -568,6 +579,51 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
     case Stage::Amplification:
         {
             emitNumThreadsAttribute();
+            break;
+        }
+    case Stage::Node:
+        {
+            auto launchDecor = irFunc->findDecoration<IRNodeLaunchDecoration>();
+            if (launchDecor)
+            {
+                m_writer->emit("[NodeLaunch(\"");
+                m_writer->emit(launchDecor->getMode()->getStringSlice());
+                m_writer->emit("\")]\n");
+            }
+            if (auto decor = irFunc->findDecoration<IRNodeMaxDispatchGridDecoration>())
+            {
+                m_writer->emit("[NodeMaxDispatchGrid(");
+                m_writer->emit(getIntVal(decor->getX()));
+                m_writer->emit(", ");
+                m_writer->emit(getIntVal(decor->getY()));
+                m_writer->emit(", ");
+                m_writer->emit(getIntVal(decor->getZ()));
+                m_writer->emit(")]\n");
+            }
+            if (auto decor = irFunc->findDecoration<IRNodeDispatchGridDecoration>())
+            {
+                m_writer->emit("[NodeDispatchGrid(");
+                m_writer->emit(getIntVal(decor->getX()));
+                m_writer->emit(", ");
+                m_writer->emit(getIntVal(decor->getY()));
+                m_writer->emit(", ");
+                m_writer->emit(getIntVal(decor->getZ()));
+                m_writer->emit(")]\n");
+            }
+            if (auto decor = irFunc->findDecoration<IRNodeIDDecoration>())
+            {
+                m_writer->emit("[NodeID(");
+                emitStringLiteral(String(decor->getName()->getStringSlice()));
+                m_writer->emit(", ");
+                m_writer->emit(getIntVal(decor->getArrayIndex()));
+                m_writer->emit(")]\n");
+            }
+            if (irFunc->findDecoration<IRNodeIsProgramEntryDecoration>())
+            {
+                m_writer->emit("[NodeIsProgramEntry]\n");
+            }
+            if (!launchDecor || launchDecor->getMode()->getStringSlice() != toSlice("thread"))
+                emitNumThreadsAttribute();
             break;
         }
     // TODO: There are other stages that will need this kind of handling.
@@ -1079,6 +1135,27 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 {
     switch (inst->getOp())
     {
+    case kIROp_InOutImplicitCast:
+    case kIROp_OutImplicitCast:
+        SLANG_RELEASE_ASSERT(
+            isBarrierFlagValueCast(inst, inst->getOperand(0)->getDataType(), inst->getDataType()));
+        emitOperand(inst->getOperand(0), inOuterPrec);
+        return true;
+
+    case kIROp_NodeOutputRecordGetElementPtr:
+        {
+            auto base = inst->getOperand(0);
+            auto outerPrec = inOuterPrec;
+            auto prec = getInfo(EmitOp::Postfix);
+            bool needClose = maybeEmitParens(outerPrec, prec);
+            emitOperand(base, leftSide(outerPrec, prec));
+            m_writer->emit(".Get(");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            maybeCloseParens(needClose);
+            return true;
+        }
+
     case kIROp_SubpassLoad:
         {
             auto subpassLoad = as<IRSubpassLoad>(inst);
@@ -1094,6 +1171,26 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             {
                 m_writer->emit(".SubpassLoad()");
             }
+            return true;
+        }
+
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+        {
+            SLANG_UNUSED(inOuterPrec);
+            auto flagLit = as<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
+            SLANG_RELEASE_ASSERT(flagLit);
+            auto flagVal = (uint32_t)getIntVal(flagLit);
+            emitNamedMemoryTypeFlagSet(flagVal);
+            return true;
+        }
+
+    case kIROp_GetEnumBarrierSemanticFlags:
+        {
+            SLANG_UNUSED(inOuterPrec);
+            auto flagLit = as<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
+            SLANG_RELEASE_ASSERT(flagLit);
+            auto flagVal = (uint32_t)getIntVal(flagLit);
+            emitNamedSemanticFlagSet(flagVal);
             return true;
         }
     case kIROp_MakeCoopVector:
@@ -1645,6 +1742,15 @@ void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
         m_writer->emit("[noinline]\n");
         break;
 
+    case kIROp_MaxRecordsDecoration:
+        {
+            auto maxRecordsDecor = cast<IRMaxRecordsDecoration>(decoration);
+            m_writer->emit("[MaxRecords(");
+            m_writer->emit(getIntVal(maxRecordsDecor->getCount()));
+            m_writer->emit(")]\n");
+            break;
+        }
+
     default:
         break;
     }
@@ -1760,6 +1866,21 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("uint");
         return;
 
+    case kIROp_DispatchNodeInputRecordType:
+    case kIROp_ThreadNodeInputRecordType:
+    case kIROp_GroupNodeInputRecordsType:
+    case kIROp_EmptyNodeInputType:
+    case kIROp_ThreadNodeOutputRecordsType:
+    case kIROp_GroupNodeOutputRecordsType:
+    case kIROp_NodeOutputType:
+    case kIROp_NodeOutputArrayType:
+    case kIROp_EmptyNodeOutputType:
+    case kIROp_EmptyNodeOutputArrayType:
+        {
+            emitWorkGraphRecordType(type);
+            return;
+        }
+
     case kIROp_StructType:
         m_writer->emit(getName(type));
         return;
@@ -1848,17 +1969,17 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             auto nvapiCapabilitySet = CapabilitySet(CapabilityName::hlsl_nvapi);
             auto sm69CapabilitySet = CapabilitySet(CapabilityName::_sm_6_9);
 
-            if (targetCaps.implies(sm69CapabilitySet))
+            if (targetCaps.implies(nvapiCapabilitySet))
             {
-                // DXR 1.3 native: use dx::HitObject namespace
-                m_writer->emit("dx::HitObject");
-            }
-            else if (targetCaps.implies(nvapiCapabilitySet))
-            {
-                // NVAPI extension: use NvHitObject
+                // NVAPI extension: use NvHitObject (matches `case hlsl_nvapi:` calls)
                 m_writer->emit("NvHitObject");
                 // Ensure NVAPI header is included when using NvHitObject type
                 m_extensionTracker->m_requiresNVAPI = true;
+            }
+            else if (targetCaps.implies(sm69CapabilitySet))
+            {
+                // DXR 1.3 native: use dx::HitObject namespace
+                m_writer->emit("dx::HitObject");
             }
             else
             {
@@ -2222,11 +2343,91 @@ void HLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
 
 void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
+    auto emitMeshOutputParam = [&]
+    {
+        auto modifier = param->findDecoration<IRMeshOutputDecoration>();
+        if (!modifier)
+            return false;
+
+        auto func = getParentFunc(param);
+        if (!func || !func->findDecoration<IREntryPointDecoration>())
+            return false;
+
+        // HLSL mesh-output parameter syntax is only valid on mesh entry points.
+        // Helper functions that receive mesh outputs are legalized to ordinary array params.
+        auto paramName = getName(param);
+        auto paramType = param->getDataType();
+
+        if (auto layoutDecoration = param->findDecoration<IRLayoutDecoration>())
+        {
+            auto layout = as<IRVarLayout>(layoutDecoration->getLayout());
+            SLANG_ASSERT(layout);
+
+            if (layout->usesResourceKind(LayoutResourceKind::VaryingInput) ||
+                layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
+            {
+                emitInterpolationModifiers(param, paramType, layout);
+            }
+        }
+
+        const char* prefix = as<IRVerticesDecoration>(modifier)     ? "out vertices "
+                             : as<IRIndicesDecoration>(modifier)    ? "out indices "
+                             : as<IRPrimitivesDecoration>(modifier) ? "out primitives "
+                                                                    : nullptr;
+        SLANG_ASSERT(prefix && "Unhandled type of mesh output decoration");
+
+        auto valueType = paramType;
+        if (auto outType = as<IROutParamTypeBase>(valueType))
+        {
+            valueType = outType->getValueType();
+        }
+        else if (auto refType = as<IRRefParamType>(valueType))
+        {
+            valueType = refType->getValueType();
+        }
+        else if (auto constRefType = as<IRBorrowInParamType>(valueType))
+        {
+            valueType = constRefType->getValueType();
+        }
+
+        m_writer->emit(prefix);
+        emitType(valueType, paramName);
+        emitSemantics(param);
+        emitPostDeclarationAttributesForType(paramType);
+        return true;
+    };
+
     // A mesh shader input payload has it's own weird stuff going on, handled
     // in emitMeshShaderModifiers, skip this bit which will introduce an
     // invalid "groupshared" keyword.
     if (!param->findDecoration<IRHLSLMeshPayloadDecoration>())
         emitRateQualifiersAndAddressSpace(param);
+
+    // [MaxRecords(n)] on work-graph node input/output parameters.
+    if (auto decor = param->findDecoration<IRMaxRecordsDecoration>())
+    {
+        m_writer->emit("[MaxRecords(");
+        m_writer->emit(getIntVal(decor->getCount()));
+        m_writer->emit(")] ");
+    }
+    if (auto decor = param->findDecoration<IRNodeIDDecoration>())
+    {
+        m_writer->emit("[NodeID(");
+        emitStringLiteral(String(decor->getName()->getStringSlice()));
+        m_writer->emit(", ");
+        m_writer->emit(getIntVal(decor->getArrayIndex()));
+        m_writer->emit(")] ");
+    }
+    if (auto decor = param->findDecoration<IRNodeArraySizeDecoration>())
+    {
+        m_writer->emit("[NodeArraySize(");
+        m_writer->emit(getIntVal(decor->getCount()));
+        m_writer->emit(")] ");
+    }
+    if (param->findDecoration<IRAllowSparseNodesDecoration>())
+    {
+        m_writer->emit("[AllowSparseNodes] ");
+    }
 
     if (auto decor = param->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
     {
@@ -2252,6 +2453,9 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             break;
         }
     }
+
+    if (emitMeshOutputParam())
+        return;
 
     Super::emitSimpleFuncParamImpl(param);
 }
@@ -2293,16 +2497,6 @@ void HLSLSourceEmitter::emitPackOffsetModifier(
 
 void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 {
-    if (auto modifier = varInst->findDecoration<IRMeshOutputDecoration>())
-    {
-        // DXC requires that mesh payload parameters have "out" specified
-        const char* s = as<IRVerticesDecoration>(modifier)     ? "out vertices "
-                        : as<IRIndicesDecoration>(modifier)    ? "out indices "
-                        : as<IRPrimitivesDecoration>(modifier) ? "out primitives "
-                                                               : nullptr;
-        SLANG_ASSERT(s && "Unhandled type of mesh output decoration");
-        m_writer->emit(s);
-    }
     if (varInst->findDecoration<IRHLSLMeshPayloadDecoration>())
     {
         // DXC requires that mesh payload parameters have "in" specified

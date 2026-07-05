@@ -1962,6 +1962,10 @@ struct TypeFlowSpecializationContext
         // Handle interprocedural edge
         auto callInst = edge.callInst;
         auto targetCallee = edge.targetContext;
+        // If the target has no function body, it is likely an intrinsic method.
+        // There is no callee body for type-flow information to propagate into.
+        if (!getFuncDefinitionForContext(targetCallee))
+            return;
 
         switch (edge.direction)
         {
@@ -4307,27 +4311,10 @@ struct TypeFlowSpecializationContext
 
     IRFuncType* maybeExpandFuncType(IRFuncType* funcType)
     {
-        List<IRType*> newArgTypes;
-
-        for (auto paramType : funcType->getParamTypes())
-        {
-            if (auto typePack = as<IRTypePack>(paramType))
-            {
-                for (UInt elementIndex = 0; elementIndex < typePack->getOperandCount();
-                     elementIndex++)
-                {
-                    newArgTypes.add((IRType*)typePack->getOperand(elementIndex));
-                }
-            }
-            else
-            {
-                newArgTypes.add(paramType);
-            }
-        }
-
         IRBuilder builder(module);
-        return as<IRFuncType>(
-            builder.getFuncType(newArgTypes.getArrayView(), funcType->getResultType()));
+        // Keep typeflow call-site analysis on the same concrete-pack expansion helper used by
+        // autodiff, so both paths flatten only already-specialized `IRTypePack` parameters.
+        return maybeExpandConcreteFuncTypePacks(&builder, funcType);
     }
 
     void expandPacksInFunc(IRFunc* func)
@@ -4564,6 +4551,13 @@ struct TypeFlowSpecializationContext
                 // An unbounded element represents an unknown function,
                 // so we can't propagate anything in this case.
                 //
+                return;
+            }
+            if (as<IRPoison>(callee))
+            {
+                // A poison callee represents an impossible call path. The rewrite phase
+                // replaces such calls with a default value, so there is no callee body to
+                // discover or propagate into.
                 return;
             }
 
@@ -5776,6 +5770,16 @@ struct TypeFlowSpecializationContext
 
     bool specializeLookupWitnessMethod(IRInst* context, IRLookupWitnessMethod* inst)
     {
+        if (as<IRPoison>(inst->getWitnessTable()))
+        {
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            auto poison = builder.getPoison(inst->getDataType());
+            inst->replaceUsesWith(poison);
+            inst->removeAndDeallocate();
+            return true;
+        }
+
         // Handle trivial case where inst's operand is a concrete table.
         if (auto witnessTable = as<IRWitnessTable>(inst->getWitnessTable()))
         {
@@ -5807,7 +5811,7 @@ struct TypeFlowSpecializationContext
         }
         else if (elementOfSetType->getSet()->isEmpty())
         {
-            auto poison = builder.emitPoison(inst->getDataType());
+            auto poison = builder.getPoison(inst->getDataType());
             inst->replaceUsesWith(poison);
             inst->removeAndDeallocate();
             return true;
@@ -5892,7 +5896,7 @@ struct TypeFlowSpecializationContext
             }
             else if (elementOfSetType->getSet()->isEmpty())
             {
-                inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+                inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
                 inst->removeAndDeallocate();
                 return true;
             }
@@ -5937,7 +5941,7 @@ struct TypeFlowSpecializationContext
             IRBuilder builder(inst);
             builder.setInsertAfter(inst);
 
-            inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+            inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
             inst->removeAndDeallocate();
             return true;
         }
@@ -5970,7 +5974,7 @@ struct TypeFlowSpecializationContext
             {
                 IRBuilder builder(inst);
                 builder.setInsertBefore(inst);
-                inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+                inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
                 inst->removeAndDeallocate();
                 return true;
             }
@@ -6704,6 +6708,17 @@ struct TypeFlowSpecializationContext
 
         List<IRInst*>& callArgs = *module->getContainerPool().getList<IRInst>();
 
+        auto replaceCallWithDefaultValue = [&]()
+        {
+            IRBuilder builder(context);
+            builder.setInsertBefore(inst);
+            auto defaultVal = builder.emitDefaultConstruct(inst->getDataType());
+            inst->replaceUsesWith(defaultVal);
+            inst->removeAndDeallocate();
+            module->getContainerPool().free(&callArgs);
+            return true;
+        };
+
         // This is a bit of a workaround for specialized callee's
         // whose function types haven't been specialized yet (can
         // occur for concrete IRSpecialize insts that are created
@@ -6841,20 +6856,14 @@ struct TypeFlowSpecializationContext
             // Occasionally, we will determine that there are absolutely no possible callees
             // for a call site. This typically happens to impossible branches.
             //
-            // If this happens, the inst representing the callee would have been replaced
-            // with a poison value. In this case, we're simply going to replace the entire call
-            // with a default-constructed value of the appropriate type.
+            // If this happens, the inst representing the callee would have been replaced with a
+            // poison value. In this case, we're simply going to replace the entire call with a
+            // default-constructed value of the appropriate type.
             //
             // Note that it doesn't matter what we replace it with since this code should be
             // effectively unreachable.
             //
-            IRBuilder builder(context);
-            builder.setInsertBefore(inst);
-            auto defaultVal = builder.emitDefaultConstruct(inst->getDataType());
-            inst->replaceUsesWith(defaultVal);
-            inst->removeAndDeallocate();
-            module->getContainerPool().free(&callArgs);
-            return true;
+            return replaceCallWithDefaultValue();
         }
         else if (isGlobalInst(callee))
         {
@@ -6866,24 +6875,28 @@ struct TypeFlowSpecializationContext
             }
             auto calleeSet = as<IRElementOfSetType>(*callSiteInfoPtr)->getSet();
             SLANG_ASSERT(calleeSet->isSingleton());
+            auto selectedCallee = calleeSet->getElement(0);
+
+            if (as<IRPoison>(selectedCallee))
+                return replaceCallWithDefaultValue();
 
             if (isIntrinsic(callee))
                 effectiveFuncType = as<IRFuncType>(callee->getDataType());
             else
-                effectiveFuncType = getEffectiveFuncType(calleeSet->getElement(0));
+                effectiveFuncType = getEffectiveFuncType(selectedCallee);
 
             // If we're dealing with bindings, materialize a new function now.
-            if (as<IRSpecializeExistentialsInFunc>(calleeSet->getElement(0)))
+            if (as<IRSpecializeExistentialsInFunc>(selectedCallee))
             {
                 // If our callee is a SpecializeExistentialsInFunc, we need to lower it to get a
                 // concrete
                 // function.
                 callee = lowerSpecializeExistentialsInFunc(
-                    as<IRSpecializeExistentialsInFunc>(calleeSet->getElement(0)));
+                    as<IRSpecializeExistentialsInFunc>(selectedCallee));
             }
             else
             {
-                callee = calleeSet->getElement(0);
+                callee = selectedCallee;
             }
 
             globalsWorkList.enqueue(callee);
@@ -7171,7 +7184,7 @@ struct TypeFlowSpecializationContext
 
         inst->replaceUsesWith(builder.emitMakeTaggedUnion(
             taggedUnionType,
-            builder.emitPoison(makeTagType(typeSet)),
+            builder.getPoison(makeTagType(typeSet)),
             witnessTableTag,
             packedValue));
         inst->removeAndDeallocate();
@@ -7287,7 +7300,7 @@ struct TypeFlowSpecializationContext
 
         auto newInst = builder.emitMakeTaggedUnion(
             (IRType*)taggedUnionType,
-            builder.emitPoison(makeTagType(taggedUnionType->getTypeSet())),
+            builder.getPoison(makeTagType(taggedUnionType->getTypeSet())),
             translatedTag,
             packedValue);
 
@@ -8014,7 +8027,7 @@ struct TypeFlowSpecializationContext
 
                 auto newTaggedUnion = builder.emitMakeTaggedUnion(
                     getLoweredType(destTaggedUnionType),
-                    builder.emitPoison(makeTagType(destTaggedUnionType->getTypeSet())),
+                    builder.getPoison(makeTagType(destTaggedUnionType->getTypeSet())),
                     downcastedTag,
                     unpackedValue);
 

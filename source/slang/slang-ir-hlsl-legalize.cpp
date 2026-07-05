@@ -4,13 +4,90 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-specialize-function-call.h"
+#include "slang-ir-util-hlsl.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-
-#include <functional>
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
+
+static String getBarrierFlagValueString(uint32_t flagVal)
+{
+    StringBuilder sb;
+    sb << "0x" << String(flagVal, 16);
+    return sb.produceString();
+}
+
+static void validateBarrierFlagsForHLSLInst(IRInst* inst, DiagnosticSink* sink)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+        {
+            auto intLit = cast<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
+            auto rawFlagVal = getIntVal(intLit);
+            auto flagVal = (uint32_t)rawFlagVal;
+            if (!isValidBarrierMemoryTypeFlags(flagVal))
+            {
+                sink->diagnose(Diagnostics::InvalidBarrierMemoryTypeFlagsValue{
+                    .value = getBarrierFlagValueString(flagVal),
+                    .location = inst->sourceLoc});
+            }
+            break;
+        }
+    case kIROp_GetEnumBarrierSemanticFlags:
+        {
+            auto intLit = cast<IRIntLit>(getBarrierFlagValueInst(inst->getOperand(0)));
+            auto rawFlagVal = getIntVal(intLit);
+            auto flagVal = (uint32_t)rawFlagVal;
+            if (!isValidBarrierSemanticFlags(flagVal))
+            {
+                sink->diagnose(Diagnostics::InvalidBarrierSemanticFlagsValue{
+                    .value = getBarrierFlagValueString(flagVal),
+                    .location = inst->sourceLoc});
+            }
+            break;
+        }
+    default:
+        break;
+    }
+
+    for (auto child : inst->getChildren())
+        validateBarrierFlagsForHLSLInst(child, sink);
+}
+
+static void validateBarrierFlagsForHLSLFunc(IRFunc* func, DiagnosticSink* sink)
+{
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+            validateBarrierFlagsForHLSLInst(inst, sink);
+    }
+}
+
+void validateBarrierFlagsForHLSL(IRModule* module, DiagnosticSink* sink)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        switch (globalInst->getOp())
+        {
+        case kIROp_GetEnumBarrierMemoryTypeFlags:
+        case kIROp_GetEnumBarrierSemanticFlags:
+            validateBarrierFlagsForHLSLInst(globalInst, sink);
+            break;
+        case kIROp_Func:
+            validateBarrierFlagsForHLSLFunc(as<IRFunc>(globalInst), sink);
+            break;
+        case kIROp_Generic:
+            if (auto innerFunc = as<IRFunc>(findGenericReturnVal(as<IRGeneric>(globalInst))))
+                validateBarrierFlagsForHLSLFunc(innerFunc, sink);
+            break;
+        default:
+            break;
+        }
+    }
+}
 
 static void addDefaultPayloadAccessQualifiersToField(IRBuilder& builder, IRStructKey* fieldKey)
 {
@@ -258,6 +335,39 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
             makeStructInst->replaceUsesWith(newMakeStruct);
             makeStructInst->removeAndDeallocate();
         }
+    }
+}
+
+void legalizeRayPayloadAccessQualifiersForHLSL(IRModule* module)
+{
+    // Walk every `[raypayload]` struct in the module and fill in any missing per-side
+    // PAQs. This is a structural pass keyed on `IRRayPayloadDecoration`, rather than a
+    // call-site fixup, because the call-site PAQ fill in
+    // `searchChildrenForForceVarIntoStructTemporarily` only fires when the frontend wraps
+    // a payload argument with `__forceVarIntoRayPayloadStructTemporarily`, which it does
+    // only around `TraceRay` / `HitObject::TraceRay` / `HitObject::Invoke` payload args.
+    // A hit-shader-only translation unit (typical for per-stage-compiled, runtime-linked
+    // shader libraries) has no such call, so a user-authored struct with one-sided PAQ
+    // would keep its one-sided PAQ and be rejected by DXC at SM 6.7+.
+    // Collect first: filling a struct's PAQs reaches `builder.getStringValue(...)` and
+    // adds decorations, which inserts new global instructions and would invalidate a
+    // live `getGlobalInsts()` walk (the same hazard documented in
+    // `legalizeEmptyRayPayloadsForHLSL`).
+    List<IRStructType*> rayPayloadStructs;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto structType = as<IRStructType>(globalInst);
+        if (!structType)
+            continue;
+        if (!structType->findDecoration<IRRayPayloadDecoration>())
+            continue;
+        rayPayloadStructs.add(structType);
+    }
+
+    IRBuilder builder(module);
+    for (auto structType : rayPayloadStructs)
+    {
+        addDefaultPayloadAccessQualifiersToStruct(builder, structType);
     }
 }
 

@@ -775,9 +775,8 @@ static bool _isDeclOverloadable(Decl* decl)
     // It seems not as they are both function-like and potentially overloadable
 
     // If it's callable, it's a function-like and so overloadable
-    if (auto callableDecl = as<CallableDecl>(decl))
+    if (auto callableDecl = as<CallableDecl>(decl); callableDecl)
     {
-        SLANG_UNUSED(callableDecl);
         return true;
     }
 

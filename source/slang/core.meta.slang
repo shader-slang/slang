@@ -343,6 +343,26 @@ interface IFloat : IArithmetic, IDifferentiable
     This scale<T:__BuiltinFloatingPointType>(T scale);
 }
 
+// Interface for value types that support arithmetic through IArithmetic-style methods
+// and can expose those methods as differentiable operations.
+interface IDifferentiableArithmetic : IArithmetic, IDifferentiable
+{
+    [Differentiable]
+    This add(This other);
+
+    [Differentiable]
+    This sub(This other);
+
+    [Differentiable]
+    This mul(This other);
+
+    [Differentiable]
+    This div(This other);
+
+    [Differentiable]
+    This neg();
+}
+
 /// A type that can be used as an operand for builtins
 [sealed]
 [builtin]
@@ -701,7 +721,7 @@ interface IForwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
     [MaybeDifferentiable]
-    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff 
+    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff
 };
 
 // Core library interfaces:
@@ -718,10 +738,10 @@ __magic_type(BwdDiffFuncInterfaceType)
 [__FunctionInterface]
 interface IBackwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
-    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType))
     associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
 
-    __builtin_requirement($( (int)BuiltinRequirementKind::MinimalContextType)) 
+    __builtin_requirement($( (int)BuiltinRequirementKind::MinimalContextType))
     associatedtype MinimalContext; // -> minimal_context_type
 
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
@@ -1322,7 +1342,7 @@ $}
         {
             return a + b;
         }
-        
+
 ${
         break;
     }
@@ -2067,7 +2087,12 @@ T __attachToNativeRef(NativeRef<T> nativeVal)
 //@public:
 
 /// Represents a string.
-/// This type can only be used on the CPU target.
+/// This type is backed by the Slang core runtime (`Slang::String`), which is
+/// available on host CPU targets (e.g. `-target host-cpp`) and the LLVM-backed
+/// CPU path (`-emit-cpu-via-llvm`). It is explicitly rejected when generating
+/// kernel C++/CUDA output (`-target cpp`, `-target cuda`, `-target ptx`); use
+/// `NativeString` (a null-terminated `const char*`) there instead. On other
+/// GPU/shader targets `String` is not a supported value type.
 __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
 struct String
@@ -2455,7 +2480,7 @@ extension matrix<T,N,M,L> : IFloat
     [__unsafeForceInlineEarly]
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
     __init(float v) { this = matrix<T,N,M>(T(v)); }
-    
+
     /// Initialize a matrix where all elements have the same scalar `value`.
     [OverloadRank(-1)]
     [Differentiable]
@@ -3612,6 +3637,53 @@ ${
     } // foreach ["IArithmetic", "IFloat"]
 $}
 
+// Let differentiable arithmetic-only types use the normal operators inside AD code without
+// requiring those types to satisfy the richer IFloat interface.
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+T operator +(T v0, T v1)
+{
+    return v0.add(v1);
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+T operator -(T v0, T v1)
+{
+    return v0.sub(v1);
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+T operator *(T v0, T v1)
+{
+    return v0.mul(v1);
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+T operator /(T v0, T v1)
+{
+    return v0.div(v1);
+}
+
+__generic<T : IDifferentiableArithmetic>
+[Differentiable]
+[__unsafeForceInlineEarly]
+[OverloadRank(-1)]
+__prefix T operator -(T v0)
+{
+    return v0.neg();
+}
+
 __generic<T : ILogical>
 [__unsafeForceInlineEarly]
 [OverloadRank(-10)]
@@ -3715,6 +3787,31 @@ __prefix T operator !(T v0)
     return v0.not();
 }
 
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator &=(in out T v0, T v1)
+{
+    v0 = v0 & v1;
+    return v0;
+}
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator |=(in out T v0, T v1)
+{
+    v0 = v0 | v1;
+    return v0;
+}
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator ^=(in out T v0, T v1)
+{
+    v0 = v0 ^ v1;
+    return v0;
+}
+
 // The operator overloads defined above already allows Enum types to be used
 // in logical operators, but we still provide overloads for __EnumTypes and map
 // them directly to intrinsic op to allow constant propagation at AST level to
@@ -3729,6 +3826,11 @@ __generic<T : __EnumType>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitOr))
 T operator |(T v0, T v1);
+
+__generic<T : __EnumType>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitXor))
+T operator ^(T v0, T v1);
 
 __generic<T : __EnumType>
 [__unsafeForceInlineEarly]
@@ -4427,6 +4529,19 @@ attribute_syntax [instance(count: int)]         : InstanceAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
 
+// SPIR-V 64-bit indexing
+/// Used on a function to require the `SPV_EXT_shader_64bit_indexing` SPIR-V extension.
+/// @remarks When this attribute is applied to a SPIR-V entry point, or to any function in the
+/// entry point's call graph, the emitted SPIR-V entry point requires the `Shader64BitIndexingEXT`
+/// capability, declares `OpExtension "SPV_EXT_shader_64bit_indexing"`, and enables the
+/// `Shader64BitIndexingEXT` execution mode. This permits 64-bit (`int64`/`uint64`) indices into
+/// arrays, buffers, and resources. The requirement propagates up the call graph like `[require()]`.
+/// @remarks This attribute is a pure opt-in marker: the requirement is honored only where the
+/// programmer applies it. The compiler does not infer it from the use of 64-bit indices, nor does
+/// it diagnose 64-bit indexing performed without the attribute.
+__attributeTarget(FuncDecl)
+attribute_syntax [Shader64BitIndexing]  : Shader64BitIndexingAttribute;
+
 // Compute Shader
 
 /// Specifies the size of the thread group a compute shader.
@@ -4524,6 +4639,31 @@ attribute_syntax [mutating] : MutatingAttribute;
 ///
 __attributeTarget(AccessorDecl)
 attribute_syntax [nonmutating] : NonmutatingAttribute;
+
+/// Marks a function whose return value should not be discarded. When a call to a
+/// function marked with `[NoDiscard]` is made in a context where its result is
+/// discarded — an expression statement, or a `for` loop's side-effect expression,
+/// including through transparent wrappers (parentheses) and pass-through operands
+/// (comma, ternary arms, the right-hand side of `&&`/`||`) — the compiler emits an
+/// error. Applying `[NoDiscard]` to a function that returns `void` is itself an
+/// error, reported at the declaration, since such a function has no result to discard.
+/// @remarks
+/// This is useful for functions that look like they mutate the object they are called
+/// on, but instead return a result. For example, a member function `load` that returns
+/// the loaded value rather than mutating `this`:
+/// ```
+/// struct MyType
+/// {
+///    [NoDiscard]
+///    MyType load() { ... }
+/// }
+/// MyType t;
+/// t.load(); // error: result of '[NoDiscard]' function is discarded.
+/// let loaded = t.load(); // OK
+/// ```
+///
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [NoDiscard] : NoDiscardAttribute;
 
 /// @internal
 /// Marks a member function to make `this` argument passed by const reference.
@@ -4806,9 +4946,6 @@ attribute_syntax [QuadDerivatives] : QuadDerivativesAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
 
-__generic<T>
-typealias NodePayloadPtr = Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::NodePayloadAMDX)>;
-
 __attributeTarget(StructDecl)
 attribute_syntax [raypayload] : RayPayloadAttribute;
 
@@ -4948,16 +5085,19 @@ semantic sv_dispatchthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -4969,16 +5109,19 @@ semantic sv_groupid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -4987,6 +5130,7 @@ semantic sv_groupindex
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 }
 
@@ -4998,16 +5142,19 @@ semantic sv_groupthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 

@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T09:24:37Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: d21a76a8273d89c3084ce7ab14317bb6c3306843578006bdf09a9bc0860cfb4a
+generated_at: 2026-06-29T13:50:01Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 08a85b2139e6f95014abd9994f69cdb88937d3ed412d5d370aa4c584aca92640
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -174,14 +174,31 @@ them all):
   [slang-ast-type.h](../../../../source/slang/slang-ast-type.h).
 - `Modifier` — qualifiers / attributes attached to decls; rooted in
   [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h).
-- `Val` — compile-time values used by generics; rooted in
+- `Val` — compile-time values used by generics; the base `Val`
+  class is declared in
+  [slang-ast-base.h](../../../../source/slang/slang-ast-base.h),
+  with concrete value subclasses in
   [slang-ast-val.h](../../../../source/slang/slang-ast-val.h).
 
 In a freshly-parsed AST, both types and expressions use `Expr`
 representation (since at parse time `A(B)` could resolve to a function
 call or a type construction); the semantic checker
 ([03-semantic-check.md](03-semantic-check.md)) is what re-classifies
-them. AST node casts use the templated `as<T>` helpers in
+them. The checker may also rewrite a parsed node into a more
+specialized one: for example, an `InvokeExpr` whose callee is a builtin
+arithmetic / comparison / bitwise / shift / unary operator over builtin
+scalar, vector, or matrix operands is converted to a
+`BuiltinOperatorExpr`
+([slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h)) by
+`convertToBuiltinArithmeticOp`
+([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)),
+which records the resolved `BuiltinOperationKind` so the operator-name →
+kind mapping happens exactly once instead of being re-parsed by each
+consumer (constant folding, IR lowering, for-loop trip-count
+inference). This node is synthesized during checking, not produced by
+the parser.
+
+AST node casts use the templated `as<T>` helpers in
 [slang-ast-base.h](../../../../source/slang/slang-ast-base.h):
 
 ```cpp
@@ -228,6 +245,64 @@ solving and substitution happen during checking
 and IR specialization (see
 [../pipeline/05-ir-passes.md](05-ir-passes.md)).
 
+Constraints are parsed by `parseOptionalGenericConstraints` (the
+inheritance-clause form, `: Base1, Base2`) and
+`maybeParseGenericConstraints` (the `where` form), both in
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp). Each
+produces `GenericTypeConstraintDecl` members
+([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h)). For a
+generic, those constraint decls are siblings of the parameters under
+the enclosing `GenericDecl`. `parseOptionalGenericConstraints` takes an
+optional `constraintTarget` parameter that decouples the constrained
+subject (derived from the decl being parsed) from the container the
+constraint decls are added to.
+
+`maybeParseGenericConstraints` accepts several spellings after `where`,
+each mapping to its own constraint decl class
+([slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h)):
+
+- a type/witness bound (`T : IBar`, `T == U`) → `GenericTypeConstraintDecl`;
+- `nonempty(Pack)` → `NonEmptyPackConstraintDecl`;
+- `countof(Pack) == IntExpr` → `GenericVariadicPackCountConstraintDecl`,
+  parsed by `_parsePackCountConstraintCountOfExpr` plus
+  `_readPackCountConstraintOperator`. This spelling is one-sided on
+  purpose: the reversed form `IntExpr == countof(Pack)` is detected by
+  `_hasCountOfOnRightOfPackCountComparison` and rejected with
+  `Diagnostics::VariadicPackCountConstraintRequiresCountofOnLeft` rather
+  than misread as an unrelated type constraint;
+- `__hasDiffTypeInfo(T)` → `HasDiffTypeInfoConstraintDecl`.
+
+Each form may be prefixed with `optional`, which attaches an
+`OptionalConstraintModifier`.
+
+### Interface associated-type and `__constraint` requirements
+
+When an `associatedtype` is declared inside an interface, its
+constraints — whether written as an inheritance clause
+(`associatedtype A : IBar`) or a `where` clause
+(`associatedtype A where A : IBar`) — are relocated to the enclosing
+`InterfaceDecl` so that they become interface-level requirements,
+siblings of the associated type. `parseAssocType`
+([slang-parser.cpp](../../../../source/slang/slang-parser.cpp)) detects
+the enclosing interface through `parser->currentScope` and passes it as
+the `constraintTarget`. This yields the same representation as the
+`__constraint` syntax-as-declaration form:
+
+```slang
+interface IDerived : IBase { __constraint DataType == This; }
+```
+
+The `__constraint` keyword is registered in the syntax-parse table
+(`g_parseSyntaxEntries` in
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp)) and
+handled by `parseInterfaceConstraintDecl`, which builds a
+`GenericTypeConstraintDecl`, parsing the subject type, then either
+`==` (setting `isEqualityConstraint`) or `:` (a subtype requirement),
+then the bound type. Where a `__constraint` is legal is enforced
+centrally by `isDeclAllowed`, which permits a
+`GenericTypeConstraintDecl` only as a member of an `InterfaceDecl` or a
+`GenericDecl`.
+
 The deeper treatment of the disambiguation strategy lives in
 [../../../design/parsing.md](../../../design/parsing.md).
 
@@ -244,7 +319,12 @@ against the kind of declaration they modify
 The list of modifier classes is in
 [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h);
 attribute parsing is just modifier parsing in disguise — the
-`[name(args)]` tokens become an `AttributeBase` modifier.
+`[name(args)]` tokens become an `AttributeBase` modifier. Adding an
+attribute that needs its own semantics is therefore a matter of giving
+it a dedicated `Attribute` subclass; for instance `NoDiscardAttribute`
+(the `[NoDiscard]` attribute, which causes the checker to error when a
+call to the marked function appears in a result-discarding context such
+as an expression statement).
 
 ## Failure modes
 
@@ -254,5 +334,15 @@ attribute parsing is just modifier parsing in disguise — the
 - Heuristic disambiguation can be wrong; in those cases the parser
   prefers to produce *some* AST and let the checker either succeed or
   emit a more specific error, rather than aborting parsing.
+- Some constructs parse cleanly but are still diagnosed because they
+  could never be referenced. `maybeDiagnoseKeywordUsedAsName`
+  ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp)) warns
+  (`Diagnostics::KeywordUsedAsName`) when a declarator name is a
+  reserved type keyword (`struct`, `class`, `enum`, `typealias`,
+  `typedef`; see `isReservedKeywordName`), and a parsed operator name
+  used where only a variable name is legal is rejected during
+  completion. These checks run from the shared declarator path so they
+  cover `var`, `let`, parameter, field, and `typedef` declarations
+  uniformly.
 - The grammar that the parser actually accepts is reverse-engineered
   in [../syntax-reference/grammar.md](../syntax-reference/grammar.md).

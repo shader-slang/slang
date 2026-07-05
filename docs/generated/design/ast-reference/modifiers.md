@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T09:24:37Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 27e8704d639742ca3f3a7523ba881ce0c549f37a2ecf72d2fba11ec9fd4e0064
+generated_at: 2026-06-29T15:16:35Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: f26e2da5bc0040a0dfba76f743caea5d5bd4cb0277c616e126e276adefc2eb13
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -225,7 +225,7 @@ Abstract intermediates: `VisibilityModifier`,
 | `GLSLExtensionDirective` | `GLSLPreprocessorDirective` | extension name, behavior | (none) | `#extension` directive. |
 | `GLSLLayoutModifierGroupBegin` | `GLSLLayoutModifierGroupMarker` | (no additional state) | (none) | Start marker of a `layout(...)` group. |
 | `GLSLLayoutModifierGroupEnd` | `GLSLLayoutModifierGroupMarker` | (no additional state) | (none) | End marker of a `layout(...)` group. |
-| `GLSLUnparsedLayoutModifier` | `Modifier` | text `Token` | (none) | Raw text of a layout qualifier deferred to later parsing. |
+| `GLSLUnparsedLayoutModifier` | `Modifier` | (no additional state) | (none) | Raw text of a layout qualifier deferred to later parsing. |
 | `GLSLBufferDataLayoutModifier` | `Modifier` | (no additional state) | (none) | Base for buffer-layout modifiers. |
 | `GLSLStd140Modifier` | `GLSLBufferDataLayoutModifier` | (no additional state) | [layout(std140)](../syntax-reference/grammar.md#modifiers) | `std140`. |
 | `GLSLStd430Modifier` | `GLSLBufferDataLayoutModifier` | (no additional state) | [layout(std430)](../syntax-reference/grammar.md#modifiers) | `std430`. |
@@ -258,13 +258,13 @@ Abstract intermediates: `VisibilityModifier`,
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `ToBeSynthesizedModifier` | `Modifier` | (no additional state) | (none) | Placeholder marking a decl that the checker should synthesize. |
-| `SynthesizedModifier` | `Modifier` | (no additional state) | (none) | Marks decls produced by checker synthesis. |
+| `SynthesizedModifier` | `Modifier` | `op: uint32_t`, `operands: List<Val*>` | (none) | Marks decls produced by checker synthesis. |
 | `SynthesizedStaticLambdaFuncModifier` | `Modifier` | (no additional state) | (none) | Marks the static-lambda function synthesized for `LambdaDecl`. |
-| `ExplicitlyDeclaredCapabilityModifier` | `Modifier` | (no additional state) | (none) | Marks capability sets that were written by the user. |
+| `ExplicitlyDeclaredCapabilityModifier` | `Modifier` | `declaredCapabilityRequirements: CapabilitySetVal*` | (none) | Marks capability sets that were written by the user. |
 | `LocalTempVarModifier` | `Modifier` | (no additional state) | (none) | Marks compiler-introduced local temporaries. |
 | `ExistentialOpenedOnVarModifier` | `Modifier` | (no additional state) | (none) | Marks a variable as the result of opening an existential. |
 | `VarReassignedModifier` | `Modifier` | (no additional state) | (none) | Marks a variable that has been re-assigned (data-flow info). |
-| `ExtensionExternVarModifier` | `Modifier` | (no additional state) | (none) | Marks variables surfaced from an extension via `extern`. |
+| `ExtensionExternVarModifier` | `Modifier` | `originalDecl: DeclRef<Decl>` | (none) | Marks variables surfaced from an extension via `extern`. |
 | `ActualGlobalModifier` | `Modifier` | (no additional state) | (none) | Marks the real backing decl behind a global generic. |
 | `IgnoreForLookupModifier` | `Modifier` | (no additional state) | (none) | Hides a decl from ordinary name lookup. |
 | `OptionalConstraintModifier` | `Modifier` | (no additional state) | (none) | Marks a constraint as optional during inference. |
@@ -273,7 +273,7 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `IntrinsicOpModifier` | `Modifier` | `opcode: int`, `irOp: uint32_t` | (none) | Binds a decl to a Slang IR opcode (core-module intrinsics). |
+| `IntrinsicOpModifier` | `Modifier` | `opToken: Token`, `op: uint32_t` | (none) | Binds a decl to a Slang IR opcode (core-module intrinsics). |
 | `TargetIntrinsicModifier` | `Modifier` | target name, definition text, predicate | (none) | Binds a decl to a target-backend intrinsic. |
 | `SpecializedForTargetModifier` | `Modifier` | target token | (none) | Marks a decl as specialized for a target. |
 | `RequiredGLSLExtensionModifier` | `Modifier` | extension name | (none) | Marks a required GLSL extension. |
@@ -298,7 +298,7 @@ Abstract intermediates: `VisibilityModifier`,
 | `ImplicitParameterGroupElementTypeModifier` | `Modifier` | (no additional state) | (none) | Internal marker on auto-introduced element types. |
 | `ParameterGroupReflectionName` | `Modifier` | name | (none) | Carries the reflection name for an implicit parameter group. |
 | `SharedModifiers` | `Modifier` | (no additional state) | (none) | Aggregates modifiers shared between several decls (e.g. multiple declarators in one declaration). |
-| `HasInterfaceDefaultImplModifier` | `Modifier` | (no additional state) | (none) | Marks an interface as having default-implementation requirements. |
+| `HasInterfaceDefaultImplModifier` | `Modifier` | `defaultImplDecl: Decl*` | (none) | Marks an interface as having default-implementation requirements. |
 
 ### Attributes (`AttributeBase` and `UncheckedAttribute`)
 
@@ -359,7 +359,7 @@ Abstract intermediates: `VisibilityModifier`,
 | `AllowAttribute` | `Attribute` | (no additional state) | (none) | `[allow]` (capability allow). |
 | `FormatAttribute` | `Attribute` | format token | (none) | `[format(...)]`. |
 | `ExternAttribute` | `Attribute` | (no additional state) | (none) | `[extern]`. |
-| `ComInterfaceAttribute` | `Attribute` | UUID, options | (none) | `[ComInterface(...)]`. |
+| `ComInterfaceAttribute` | `Attribute` | `guid: String` | (none) | `[ComInterface(...)]`. |
 
 ### Layout / binding attributes
 
@@ -417,10 +417,10 @@ Abstract intermediates: `VisibilityModifier`,
 | `DomainAttribute` | `Attribute` | domain | (none) | `[domain(...)]`. |
 | `EarlyDepthStencilAttribute` | `Attribute` | (no additional state) | (none) | `[earlydepthstencil]`. |
 | `NumThreadsAttribute` | `Attribute` | x, y, z | [numthreads](../syntax-reference/grammar.md#attributes-and-decorations) | `[numthreads(x,y,z)]`. |
-| `WaveSizeAttribute` | `Attribute` | preferred, min, max | (none) | `[WaveSize(...)]`. |
+| `WaveSizeAttribute` | `Attribute` | `numLanes: IntVal*` | (none) | `[WaveSize(...)]`. |
 | `MaxVertexCountAttribute` | `Attribute` | count | (none) | `[maxvertexcount(...)]`. |
 | `InstanceAttribute` | `Attribute` | (no additional state) | (none) | `[instance(...)]`. |
-| `EntryPointAttribute` | `Attribute` | stage | [shader](../syntax-reference/grammar.md#attributes-and-decorations) | `[shader("stage")]`. |
+| `EntryPointAttribute` | `Attribute` | `capabilitySet: CapabilitySetVal*` | [shader](../syntax-reference/grammar.md#attributes-and-decorations) | `[shader("stage")]`. |
 | `ExperimentalModuleAttribute` | `Attribute` | (no additional state) | (none) | `[ExperimentalModule]`. |
 | `FunctionInterfaceAttribute` | `Attribute` | (no additional state) | (none) | `[FunctionInterface]`. |
 
@@ -433,7 +433,7 @@ Abstract intermediates: `VisibilityModifier`,
 | `VulkanCallablePayloadAttribute` | `Attribute` | location | (none) | `[vk::callable_payload(...)]`. |
 | `VulkanCallablePayloadInAttribute` | `Attribute` | location | (none) | `[vk::callable_payload_in(...)]`. |
 | `VulkanHitAttributesAttribute` | `Attribute` | (no additional state) | (none) | `[vk::hit_attributes]`. |
-| `VulkanHitObjectAttributesAttribute` | `Attribute` | (no additional state) | (none) | `[vk::hit_object_attributes(...)]`. |
+| `VulkanHitObjectAttributesAttribute` | `Attribute` | `location: int` | (none) | `[vk::hit_object_attributes(...)]`. |
 | `RayPayloadAttribute` | `Attribute` | location | (none) | Older HLSL `[raypayload]`. |
 
 ### Mutability / autodiff annotations
@@ -442,6 +442,7 @@ Abstract intermediates: `VisibilityModifier`,
 | --- | --- | --- | --- | --- |
 | `MutatingAttribute` | `Attribute` | (no additional state) | (none) | `[mutating]`. |
 | `NonmutatingAttribute` | `Attribute` | (no additional state) | (none) | `[nonmutating]`. |
+| `NoDiscardAttribute` | `Attribute` | (no additional state) | [attribute](../syntax-reference/grammar.md#attributes-and-decorations) | `[NoDiscard]`; flags a function whose result must not be discarded. |
 | `ConstRefAttribute` | `Attribute` | (no additional state) | (none) | `[ConstRef]`. |
 | `RefAttribute` | `Attribute` | (no additional state) | (none) | `[Ref]`. |
 | `AnyValueSizeAttribute` | `Attribute` | size | (none) | `[AnyValueSize(...)]`. |
@@ -450,7 +451,7 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `DifferentiableAttribute` | `Attribute` | mode | [Differentiable](../syntax-reference/grammar.md#attributes-and-decorations) | `[Differentiable]` / `[Differentiable(...)]`. |
+| `DifferentiableAttribute` | `Attribute` | `m_associatedValMapping: OrderedDictionary<Val*, OrderedDictionary<SlangInt, Val*>>` | [Differentiable](../syntax-reference/grammar.md#attributes-and-decorations) | `[Differentiable]` / `[Differentiable(...)]`. |
 | `TreatAsDifferentiableAttribute` | `DifferentiableAttribute` | (no additional state) | (none) | `[TreatAsDifferentiable]`. |
 | `HasTrivialForwardDerivativeAttribute` | `DifferentiableAttribute` | (no additional state) | (none) | `[HasTrivialForwardDerivative]`. |
 | `ForwardDifferentiableAttribute` | `DifferentiableAttribute` | (no additional state) | (none) | `[ForwardDifferentiable]`. |
@@ -458,7 +459,7 @@ Abstract intermediates: `VisibilityModifier`,
 | `ForwardDerivativeAttribute` | `UserDefinedDerivativeAttribute` | derivative function expr | (none) | `[ForwardDerivative(fn)]`. |
 | `DerivativeOfAttribute` | `DifferentiableAttribute` | primal function expr | (none) | Base for "X is the derivative of Y" attributes. |
 | `ForwardDerivativeOfAttribute` | `DerivativeOfAttribute` | primal function expr | (none) | `[ForwardDerivativeOf(fn)]`. |
-| `BackwardDifferentiableAttribute` | `DifferentiableAttribute` | (no additional state) | (none) | `[BackwardDifferentiable]`. |
+| `BackwardDifferentiableAttribute` | `DifferentiableAttribute` | `maxOrder: int` | (none) | `[BackwardDifferentiable]`. |
 | `BackwardDerivativeAttribute` | `UserDefinedDerivativeAttribute` | derivative function expr | (none) | `[BackwardDerivative(fn)]`. |
 | `BackwardDerivativeOfAttribute` | `DerivativeOfAttribute` | primal function expr | (none) | `[BackwardDerivativeOf(fn)]`. |
 | `PrimalSubstituteAttribute` | `Attribute` | substitute expr | (none) | `[PrimalSubstitute(fn)]`. |
@@ -478,13 +479,13 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `DllImportAttribute` | `Attribute` | library | (none) | `[DllImport(...)]`. |
+| `DllImportAttribute` | `Attribute` | `modulePath: String, functionName: String` | (none) | `[DllImport(...)]`. |
 | `DllExportAttribute` | `Attribute` | (no additional state) | (none) | `[DllExport]`. |
 | `TorchEntryPointAttribute` | `Attribute` | (no additional state) | (none) | `[TorchEntryPoint]`. |
 | `CudaDeviceExportAttribute` | `Attribute` | (no additional state) | (none) | `[CudaDeviceExport]`. |
 | `CudaKernelAttribute` | `Attribute` | (no additional state) | (none) | `[CudaKernel]`. |
 | `CudaHostAttribute` | `Attribute` | (no additional state) | (none) | `[CudaHost]`. |
-| `AutoPyBindCudaAttribute` | `Attribute` | options | (none) | `[AutoPyBindCuda]`. |
+| `AutoPyBindCudaAttribute` | `Attribute` | `fwdDiffFuncDeclRef: DeclRefExpr*, bwdDiffFuncDeclRef: DeclRefExpr*` | (none) | `[AutoPyBindCuda]`. |
 | `PyExportAttribute` | `Attribute` | name | (none) | `[PyExport]`. |
 | `DerivativeGroupQuadAttribute` | `Attribute` | (no additional state) | (none) | `[DerivativeGroupQuad]`. |
 | `DerivativeGroupLinearAttribute` | `Attribute` | (no additional state) | (none) | `[DerivativeGroupLinear]`. |

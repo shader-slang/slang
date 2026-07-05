@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:11:45+00:00
+reviewed_at: 2026-06-30T13:26:46+00:00
 target_doc: architecture/module-map.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 3e84425a669764ca340ed7a1190856897496ac2f667956b0a8228b11c7f4ab35
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: 3fedec1d8eadc2bf2e0fb417739cd43fb662af67bb19d9334c40fa0168b98cc4
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
   factual_accuracy: pass
   cross_references: pass
-  completeness: partial
+  completeness: fail
   style_consistency: pass
   source_alignment: pass
   front_matter_validity: pass
-finding_count: 1
+finding_count: 2
 severity_breakdown:
   critical: 0
-  major: 1
+  major: 2
   minor: 0
   nit: 0
 ---
@@ -24,15 +24,22 @@ severity_breakdown:
 # Review report for architecture/module-map.md
 
 ## Summary
-The source-backed spot checks and relative links look good, but the page is only partially complete against its prompt contract. The remaining issue is structural: several `source/` subdirectories introduced by `overview.md` are collapsed into a two-column catch-all table instead of receiving their own level-2 logical-unit sections.
+The included rows I spot-checked are generally accurate, but the document does not meet its prompt's exhaustive lookup-table contract. Two major watched file families are missing from the map: several `source/compiler-core/` infrastructure families and multiple `source/slang/` families such as the language server and reflection API.
 
 ## Items checked
-- Ran `regenerate.py show architecture/module-map.md` and reviewed the manifest prompt, watched files, and `depends_on` peer `architecture/overview.md`.
-- Verified front matter, required link style, all 56 markdown links, and prompt-required table shape for the main `source/core`, `source/compiler-core`, `source/slang`, standard-module, and `prelude` sections.
-- Spot-checked 18 symbol/file responsibility claims against commit `52339028a2aa703271533454c6b9528a534bac31`, including `Linkage`, `Session`, `Module`, `DiagnosticSink`, `IRBuilder`, `slang-emit*`, `slang-check*`, `slang-parser*`, and prelude headers.
+- Ran `regenerate.py show architecture/module-map.md` and reviewed the target document, `_common.md`, `architecture-module-map.md`, the dependency document `architecture/overview.md`, and representative resolved watched source files from `prelude/`, `source/core/`, `source/compiler-core/`, `source/slang/`, `source/slangc/`, and peer `source/*` directories.
+- Checked front matter for all required keys, the recorded target source commit, the warning string, and a 64-character hex watched-path digest copied from the target document.
+- Spot-checked more than 10 concrete included claims against source files, including claims about `slang-lexer`, `slang-token`, `SourceManager`, `DiagnosticSink`, `slang-parser`, `slang-preprocessor`, AST families, `slang-lower-to-ir`, `slang-ir-insts.lua`, `slang-emit-hlsl`, and `source/slangc/main.cpp`.
+- Checked representative omitted watched files against the prompt's "mechanical, exhaustive decomposition" requirement and the quality checklist requiring table paths to come from watched paths.
+- Checked the visible relative links used for generated peer documents and representative workspace files; no dangling relative links were found in the checked set.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Other source/ subdirectories`, lines 278-288 | The page collapses multiple overview logical-unit groups (`source/slang-llvm/`, `source/slang-glslang/`, `source/slang-dispatcher/`, `source/slang-rt/`, `source/slang-record-replay/`, `source/slang-wasm/`, and `source/slangc/`) into a single two-column table for subdirectory and role. The prompt requires each logical unit group from `overview.md` to have its own level-2 section followed by a table with `Logical unit`, `Files`, and `Responsibility` columns. | `docs/generated/design/_meta/prompts/architecture-module-map.md:23-31` specifies the per-group level-2 heading and required table columns, and `docs/generated/design/_meta/prompts/architecture-module-map.md:66-67` requires every logical unit group in `overview.md` to have its own level-2 section. `docs/generated/design/architecture/overview.md:104-125` introduces the affected downstream, runtime/bindings, and driver groups individually. | Split the catch-all section into one level-2 section per affected `source/` group and give each section the required `Logical unit`, `Files`, and `Responsibility` table, even if a small group only has one row. |
+| F-001 | major | `## source/compiler-core/ — language-agnostic compiler infrastructure`, lines 56-70 | The compiler-core table is not exhaustive. It includes lexer, diagnostics, artifacts, downstream compiler glue, include search, JSON lexer, and command-line args, but omits watched logical units for JSON parsing/value/RPC, language-server protocol types, rich diagnostic rendering, source maps, and several downstream compiler adapters. | `source/compiler-core/slang-json-parser.cpp:14` defines `JSONParser::_parseObject`; `source/compiler-core/slang-json-rpc-connection.cpp:19` defines `JSONRPCConnection::init`; `source/compiler-core/slang-language-server-protocol.h:13` opens the `LanguageServerProtocol` namespace; `source/compiler-core/slang-rich-diagnostics-render.cpp:33-37` describes diagnostic layout and rendering. | Add compact rows for the omitted compiler-core families, grouping related files where appropriate, for example JSON parsing/value/RPC, language-server protocol, rich diagnostic rendering, source maps, and remaining downstream compiler adapters. |
+| F-002 | major | `## source/slang/ — frontend, IR, passes, emit`, lines 72-235 | The `source/slang/` section omits major watched file families, so the page is not the promised file-level lookup table. In particular, there is no row or subgroup for the Slang language server family and no row for the reflection API implementation. | `source/slang/slang-language-server.cpp:3` says the file implements the Slang language server and includes the completion, document-symbol, inlay-hint, semantic-token, and AST-lookup helpers at `source/slang/slang-language-server.cpp:20-24`; `source/slang/slang-reflection-api.cpp:27` starts conversion routines for the strongly typed reflection API. | Add rows or a short subgroup for `slang-language-server*` and `slang-reflection-*` / reflection API files, and sweep the remaining watched `source/slang/*.h` and `*.cpp` files for similar omitted families before marking the map complete. |
+
+## No-issues notes
+- The front matter is structurally valid and uses the target document's own source commit and watched-path digest.
+- The large `slang-ir-*` pass family is appropriately summarized by category rather than enumerating hundreds of pass files, which matches the per-doc prompt.
+- The `source/slang-record-replay/` and `source/slang-llvm/` sections correctly identify those peer directories as separate logical unit groups from the main `source/slang/` target.

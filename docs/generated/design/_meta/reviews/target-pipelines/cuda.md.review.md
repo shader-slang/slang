@@ -1,45 +1,47 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T15:05:26+00:00
+reviewed_at: 2026-06-30T13:34:34+00:00
 target_doc: target-pipelines/cuda.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 697128ce2b824225966f830d21ac028faff0ac0feee6366f3549b55ad9f0d9b1
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: 14e144c55f95a3a6bcf4a07633067a3feb34968de49ae572e8b9c5be07287d5b
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: fail
   cross_references: pass
   completeness: partial
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: fail
   front_matter_validity: pass
-finding_count: 7
+finding_count: 4
 severity_breakdown:
   critical: 1
-  major: 4
-  minor: 2
+  major: 2
+  minor: 1
   nit: 0
 ---
 
 # Review report for target-pipelines/cuda.md
 
 ## Summary
-The CUDA page has the required high-level shape and all checked relative links resolve at the recorded source commit. However, the ordered pass view is only partially aligned with `linkAndOptimizeIR`: Phase A includes three passes that actually run in Phase C, and several PTX-reachable branches are either omitted or described as skipped. The most important fix is to split the CUDA source/header path from the PTX path wherever the source uses explicit `CodeGenTarget` switch arms.
+The CUDA page is not ready for remediation as-is because it misdescribes the ordinary `PTX` path. The source maps final `PTX` requests to a `CUDASource` intermediate before NVRTC runs, but the document repeatedly treats `PTX` as if `linkAndOptimizeIR` sees `CodeGenTarget::PTX` directly and therefore takes the default switch arms. I also found one phase table completeness gap, one watched-source coverage gap, and several stale line references.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show target-pipelines/cuda.md` and used the target front matter source commit and digest in this report.
-- Read the CUDA target doc, `_common.md`, `target-pipelines-cuda.md`, and the dependency docs `pipeline/04-ast-to-ir.md`, `pipeline/05-ir-passes.md`, `pipeline/06-emit.md`, `ir-reference/index.md`, and `cross-cutting/targets.md`.
-- Resolved all 155 relative Markdown links at `52339028a2aa703271533454c6b9528a534bac31`; no dangling links were found.
-- Checked the required target-pipeline sections, front matter keys, Phase D table columns, conditional-gate grouping, loops section, adjacent-target section, and peer links.
-- Verified more than 20 factual claims against source at the target commit, including the `linkAndOptimizeIR` phase ranges, OptiX uniform collection, PTX branch behavior, cooperative-vector lowering, existential/resource legalization options, CUDA immutable-load lowering, `synthesizeActiveMask`, CUDA varying-param legalization, phi elimination options, and nvrtc pass-through.
+- Ran `regenerate.py show target-pipelines/cuda.md` and reviewed the target document, `_common.md`, `target-pipelines-cuda.md`, and the five dependency documents listed by `depends_on`.
+- Checked the target front matter for required keys, the recorded target source commit, warning string, and 64-character hex watched-path digest.
+- Spot-checked more than 10 source-backed claims against `slang-emit.cpp`, `slang-code-gen.cpp`, `slang-global-session.cpp`, `slang-emit-c-like.cpp`, `slang-emit-cuda.cpp`, `slang-ir-cuda-immutable-load.cpp`, `slang-ir-legalize-varying-params.cpp`, `slang-ir-optix-entry-point-uniforms.cpp`, and `slang-ir-pytorch-cpp-binding.cpp`.
+- Verified the main CUDA-specific pass gates for OptiX uniform collection, cooperative vectors, CUDA varying-parameter legalization, immutable-buffer loads, and `shouldLegalizeExistentialAndResourceTypes = false`.
+- Checked required target-pipeline sections and compared the Phase B diagram/table shape against the target-pipeline contract.
 
 ## Findings
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | critical | `## Phase A: Link and entry-point prep` and `## Phase C: CUDA legalization, lowering, phi elimination` | The Phase A diagram and table place `translateGlobalVaryingVar`, `resolveVaryingInputRef`, and `fixEntryPointCallsites` before uniform collection, but the source runs those passes later in the Phase C range after target-specific active-mask and texture-format handling. This makes the ordered CUDA pipeline materially wrong. | `source/slang/slang-emit.cpp:982-1001` has only SSBO lowering, `translateEntryPointInParamToBorrow`, `replaceGlobalConstants`, and `bindExistentialSlots` in this early region; `source/slang/slang-emit.cpp:1952-1962` runs `translateGlobalVaryingVar`, `resolveVaryingInputRef`, and `fixEntryPointCallsites`. | Move those three nodes and rows from Phase A to Phase C, placing them after the CUDA `synthesizeActiveMask` and filtered `resolveTextureFormat` point and before `legalizeEntryPointVaryingParamsForCUDA`; update Phase A prose and row numbering. |
-| F-002 | major | `## Phase A: Link and entry-point prep` | The page covers `PTX`, but Phase A describes the CUDA family as skipping `collectEntryPointUniformParams`, `moveEntryPointUniformParamsToGlobalScope`, and `removeTorchAndCUDAEntryPoints`. That is true for `CUDASource` and `CUDAHeader`, but `PTX` falls through the default arms and runs those passes. | `source/slang/slang-emit.cpp:1124-1138` sends only `CUDASource` and `CUDAHeader` to `collectOptiXEntryPointUniformParams`, so `PTX` reaches `collectEntryPointUniformParams`; `source/slang/slang-emit.cpp:1144-1148` runs `moveEntryPointUniformParamsToGlobalScope` in the default arm; `source/slang/slang-emit.cpp:1165-1173` runs `removeTorchAndCUDAEntryPoints` in the default arm. | Split the Phase A flow into a CUDA source/header arm and a PTX arm, or explicitly add PTX rows for those default passes instead of showing them as skipped for the whole CUDA target family. |
-| F-003 | major | `## Phase B: Specialization and type legalization` | The page gates `lowerCooperativeVectors` only on `case CUDASource` with the `optix_coopvec` capability check, omitting the PTX path. In source, `PTX` reaches the `default` switch arm and runs `lowerCooperativeVectors` unconditionally for this switch. | `source/slang/slang-emit.cpp:1492-1506` breaks for SPIR-V and HLSL, conditionally runs the pass for `CUDASource`, and then runs `lowerCooperativeVectors` in the `default` arm that includes `PTX`. | Add the PTX/default branch to the Phase B diagram, table, and conditional-gates section, distinguishing it from the `CUDASource` capability-gated branch. |
-| F-004 | major | `## Phase B: Specialization and type legalization` and `## Notable passes` | The page repeatedly says CUDA always runs `inlineGlobalConstantsForLegalization`, but the source only short-circuits on `CodeGenTarget::CUDASource` among the CUDA family. With CUDA source-language emission, the broader existential/resource legalization option is set false, so the generated text overstates this pass for `CUDAHeader` and `PTX`. | `source/slang/slang-emit.cpp:1577-1588` runs `inlineGlobalConstantsForLegalization` for `CUDASource`, CPU kernel targets, or when `shouldLegalizeExistentialAndResourceTypes` is true; `source/slang/slang-emit.cpp:2624-2627` sets that option false for `SourceLanguage::CUDA`. | Change the CUDA-wide wording to say the pass is always forced for `CUDASource`; separately document whether `CUDAHeader` and `PTX` reach it through another option path or omit it from those rows. |
-| F-005 | major | `## Phase C: CUDA legalization, lowering, phi elimination` | The page marks `floatNonUniformResourceIndex` as skipped for CUDA, but the source calls it for every non-SPIR-V target before the narrower `legalizeLogicalAndOr` gate. The document appears to apply the later four-way gate to the wrong pass. | `source/slang/slang-emit.cpp:2033-2035` calls `floatNonUniformResourceIndex` whenever the target is not SPIR-V; the four-way D3D/Khronos/WGPU/Metal condition begins only at `source/slang/slang-emit.cpp:2038-2040` for `legalizeLogicalAndOr`. | Add `floatNonUniformResourceIndex` as a Phase C pass for CUDA with the non-SPIR-V gate, and keep only `legalizeLogicalAndOr` in the skipped CUDA list. |
-| F-006 | minor | `## Adjacent targets` | The PyTorch adjacent-target bullet lists `removeTorchKernels` as part of the PyTorch arm, but the source PyTorch branch does not call that pass. `removeTorchKernels` is in the CUDA source/header branch instead. | `source/slang/slang-emit.cpp:1353-1357` runs `generateHostFunctionsForAutoBindCuda`, `lowerBuiltinTypesForKernelEntryPoints`, `generatePyTorchCppBinding`, and `handleAutoBindNames` for `PyTorchCppBinding`; `source/slang/slang-emit.cpp:1359-1363` runs `removeTorchKernels` for `CUDASource` and `CUDAHeader`. | Remove `removeTorchKernels` from the PyTorch adjacent-target list and mention it only in the CUDA source/header branch. |
-| F-007 | minor | `## Phase D: CUDA emit and downstream tools` | The Phase D table header uses `Pass / step` instead of the required `Pass` column. The contract requires the ordered phase table columns to be exactly `#`, `Pass`, `File`, `Gate`, and `Notes`. | `docs/generated/design/_meta/prompts/_common.md:326-335` defines the required table columns; the target doc Phase D table header uses `Pass / step`. | Rename the Phase D table column to `Pass`, keeping downstream compiler rows in that column as pass-like steps if needed. |
+| F-001 | critical | Intro, Phase A, Phase B, Phase C, and Conditional gates; lines 14-26, 92-109, 153-156, 204-210, 478-494, 685-693 | The page says final `PTX` compilation falls through `linkAndOptimizeIR` default arms and runs `collectEntryPointUniformParams`, `moveEntryPointUniformParamsToGlobalScope`, and `removeTorchAndCUDAEntryPoints`, while skipping some `CUDASource`-only passes. In the ordinary downstream path, final `PTX` requests first map to `CodeGenTarget::CUDASource`, so the source-emission pipeline sees `CUDASource`, not `PTX`. This makes the PTX pass ordering and several PTX-only table rows actively misleading. | `source/slang/slang-code-gen.cpp:261-266` maps `CodeGenTarget::PTX` to `CodeGenTarget::CUDASource`; `source/slang/slang-code-gen.cpp:377-381` chooses that source target before downstream compilation; `source/slang/slang-code-gen.cpp:527-531` emits source from the source target; `source/slang/slang-global-session.cpp:211-213` registers the `CUDASource -> PTX` NVRTC transition. | Rewrite the PTX discussion to say that final `PTX` uses the `CUDASource` IR/source pipeline followed by NVRTC. Remove or clearly mark the current `PTX`-only default-arm rows as not describing the ordinary final-PTX emit path, and update affected claims about `inlineGlobalConstantsForLegalization`, entry-point uniforms, and CUDA varying-parameter legalization. |
+| F-002 | major | Phase B diagram/table; lines 215-365 | The Phase B diagram contains `cSA[checkStaticAssert]`, but the companion ordered table has no `checkStaticAssert` row. The target-pipeline contract requires one table row per pass node in the diagram, so readers cannot map that diagram node to its file, gate, or notes. | `_common.md` requires a companion ordered table with one row per pass node in the diagram; `source/slang/slang-emit.cpp:1793-1795` shows `checkStaticAssert(irModule->getModuleInst(), sink)` immediately after `specializeArrayParameters`. | Add a `checkStaticAssert` row after `specializeArrayParameters` with file `slang-emit.cpp`, gate `(always)`, and a note that it is a direct call rather than `SLANG_PASS`, or remove the diagram node if the page intentionally excludes direct calls. |
+| F-003 | major | Source and `synthesizeActiveMask`; lines 61-62 and 721-729 | The document makes target-specific claims about `synthesizeActiveMask` and links its implementation, but the resolved watched files from `regenerate.py show target-pipelines/cuda.md` do not include `source/slang/slang-ir-synthesize-active-mask.cpp`. Changes to the pass implementation would not make this generated page stale even though the page describes its behavior. | `source/slang/slang-emit.cpp:1969-1973` shows the CUDA-family `synthesizeActiveMask` call; `source/slang/slang-ir-synthesize-active-mask.cpp` is the implementation file cited by the page but absent from the resolved watched-file set. | Add `source/slang/slang-ir-synthesize-active-mask.cpp` to the CUDA page's manifest `watched_paths` so the digest tracks the source the page summarizes. |
+| F-004 | minor | Phase D and `shouldLegalizeExistentialAndResourceTypes` references; lines 80-83, 537-574, 769-811 | Several approximate line references are stale by more than a few lines. For example, the page cites line 2666 for `shouldLegalizeExistentialAndResourceTypes = false`, line ~2621 for `new CUDASourceEmitter`, and line ~2752 for artifact wrapping, but the current source has those at lines 2680, 2635, and 2766 respectively. | `source/slang/slang-emit.cpp:2633-2635` constructs `CUDASourceEmitter`; `source/slang/slang-emit.cpp:2677-2680` sets `shouldLegalizeExistentialAndResourceTypes = false` for CUDA source; `source/slang/slang-emit.cpp:2766-2767` wraps the text artifact. | Refresh the cited line numbers in the Source, Phase D, and notable-pass prose after fixing the PTX path description. |
+
+## No-issues notes
+- The non-PTX `CUDASource`/`CUDAHeader` OptiX uniform branch matches `source/slang/slang-emit.cpp:1164-1167`.
+- The CUDA immutable-load claim is supported by `source/slang/slang-emit.cpp:2304-2308` and `source/slang/slang-ir-cuda-immutable-load.cpp:292-295`.
+- The CUDA emitter construction and source artifact wrapping are correctly described apart from stale line references.

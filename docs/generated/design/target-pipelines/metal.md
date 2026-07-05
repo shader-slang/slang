@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T16:44:02Z
-source_commit: 43e8ca0cef30f575bd1750589b2c7cd9f2b6e030
-watched_paths_digest: 751b986b2d853e8242f650fcb4a698ce747155b40fac3ebc58e2361363790674
+generated_at: 2026-06-29T20:13:10Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 3bfc164e382505a7acce894d60950a1812eb10280d5da247c705758df95dccb7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -12,9 +12,20 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 This page documents the ordered IR-pass and downstream-binary
 sequence executed when Slang compiles for the Metal target family.
 The corresponding `CodeGenTarget` values are `Metal`, `MetalLib`,
-and `MetalLibAssembly`. All three share the same IR pipeline; they
-differ only in the downstream tool that consumes the emitted
-Metal text. The shared predicate inside `linkAndOptimizeIR` is
+and `MetalLibAssembly`. All three share most of the Metal
+legalization pipeline and differ mainly in the downstream tool
+that consumes the emitted Metal text. On the normal public
+emission path the IR pipeline is identical for all three: a
+`MetalLibAssembly` request first emits an intermediate `MetalLib`,
+and a `MetalLib` request first emits intermediate `Metal` source
+(see `_getIntermediateTarget` / `_getDefaultSourceForTarget` in
+[slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp)),
+so `linkAndOptimizeIR` always runs with `CodeGenTarget::Metal` and
+the `Metal` / `MetalLib` switch arm — including
+`wrapCBufferElementsForMetal` at
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp)
+line ~1811 — fires for every Metal output. The shared predicate
+inside `linkAndOptimizeIR` is
 `isMetalTarget(targetRequest)` (see
 [slang-type-layout.cpp](../../../../source/slang/slang-type-layout.cpp)
 line 3230).
@@ -30,7 +41,7 @@ and tables below.
 
 - [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) —
   `linkAndOptimizeIR` (line ~895) is the orchestrator;
-  `emitEntryPointsSourceFromIR` (line ~2487) constructs the
+  `emitEntryPointsSourceFromIR` (line ~2526) constructs the
   `MetalSourceEmitter` and emits Metal text.
 - [slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp)
   — `MetalSourceEmitter` implementation.
@@ -71,11 +82,11 @@ arm, the `MetalParameterBlock` buffer-element policy).
 
 ## Phase A: Link and entry-point prep
 
-Spans roughly lines 931-1208 of
+Spans roughly lines 931-1236 of
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp). Metal
 hits the `default` arm of every per-target switch in this phase.
 Like WGSL, Metal is non-Khronos, so the
-`!isKhronosTarget && reqSet.glslSSBO` gate at line 983 lets
+`!isKhronosTarget && reqSet.glslSSBO` gate lets
 `lowerGLSLShaderStorageBufferObjectsToStructuredBuffers` fire.
 
 ```mermaid
@@ -131,7 +142,7 @@ flowchart TD
 | 5 | `translateEntryPointInParamToBorrow` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/slang-ir-transform-params-to-constref.cpp) | (always) | |
 | 6 | `replaceGlobalConstants` | [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp) | (always) | |
 | 7 | `bindExistentialSlots` | [slang-ir-bind-existentials.cpp](../../../../source/slang/slang-ir-bind-existentials.cpp) | `reqSet.bindExistential` | |
-| 8 | `instrumentCoverage` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | |
+| 8 | `instrumentCoverage` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | SLANG_PASS at line ~1118. Now takes a `counterByteWidth` (default `kDefaultCoverageCounterByteWidth`, overridable via `CompilerOptionName::TraceCoverageCounterByteWidth`; must be 4 or 8 or the API path raises `Diagnostics::CoverageCounterWidthBytesInvalid` / `E45113`) and a `coverageBoolean` flag (`CompilerOptionName::TraceCoverageBoolean`, off by default). Not Metal-specific. |
 | 9 | `collectGlobalUniformParameters` | [slang-ir-collect-global-uniforms.cpp](../../../../source/slang/slang-ir-collect-global-uniforms.cpp) | (always) | |
 | 10 | `checkEntryPointDecorations` | [slang-ir-entry-point-decorations.cpp](../../../../source/slang/slang-ir-entry-point-decorations.cpp) | (always) | |
 | 11 | `addDenormalModeDecorations` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Static helper at line ~681. |
@@ -148,32 +159,33 @@ of the entry-point-param switch
 
 ## Phase B: Specialization and type legalization
 
-Spans roughly lines 1210-1752 of `slang-emit.cpp`. Metal hits the
+Spans roughly lines 1240-1788 of `slang-emit.cpp`. Metal hits the
 `default` arm at most decision points and runs
-`lowerCooperativeVectors` (the `default` arm of line 1492-1507).
+`lowerCooperativeVectors` (the `default` arm at line ~1545).
 Metal-specific decisions:
 
 - `lowerCombinedTextureSamplers` fires (Metal is in the
-  HLSL / Metal / WGSL arm at line ~1563).
+  HLSL / Metal / WGSL arm).
 - `lowerAppendConsumeStructuredBuffers` fires
   (`target != HLSL` is true for Metal).
-- Inside the `shouldLegalizeExistentialAndResourceTypes` block at
-  line ~1592, the `isMetalTarget(targetRequest)` arm runs an
+- Inside the `shouldLegalizeExistentialAndResourceTypes` block,
+  the `isMetalTarget(targetRequest)` arm runs an
   extra `lowerBufferElementTypeToStorageType` with
   `BufferElementTypeLoweringPolicyKind::MetalParameterBlock`
-  (line ~1606) to translate resource-typed fields inside
+  (line ~1646) to translate resource-typed fields inside
   parameter blocks into descriptor handles before the general
   resource legalization.
 - `legalizeEmptyTypes` runs in two places for Metal:
-  - The Metal arm of the inner switch at line ~1679 (after
+  - The Metal arm of the inner switch at line ~1718 (after
     `legalizeResourceTypes`, under
     `shouldLegalizeExistentialAndResourceTypes`).
   - The unconditional invocation later in Phase C.
-- `wrapCBufferElementsForMetal` fires (line ~1776).
-  Note that `MetalLibAssembly` is **not** in the case list at
-  lines 1772-1776; only `Metal` and `MetalLib` are. This is a
-  minor inconsistency — `MetalLibAssembly` goes through the
-  default arm and skips this pass.
+- `wrapCBufferElementsForMetal` fires (line ~1815).
+  The case list at line ~1815 contains only `Metal` and
+  `MetalLib`, but `MetalLibAssembly` is never seen here directly:
+  on the public emission path it is produced by disassembling an
+  intermediate `MetalLib` artifact, so `linkAndOptimizeIR` runs
+  with `CodeGenTarget::Metal` and this pass always fires.
 
 ```mermaid
 flowchart TD
@@ -382,7 +394,7 @@ with its exact gate expression.
 | 27 | `unpinWitnessTables` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/slang-ir-strip-legalization-insts.cpp) | (always) | |
 | 28 | `lowerSumVectorMatrixInsts` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Static helper. |
 | 29 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | `fastIRSimplificationOptions`. |
-| 30 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `minimalOptimization && reqSet.generics` | `else if` arm of the simplify gate (line ~1414); replaces row 29 on the minimal-optimization path. |
+| 30 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `minimalOptimization && reqSet.generics` | `else if` arm of the simplify gate (line ~1452); replaces row 29 on the minimal-optimization path. |
 | 31 | `lowerTaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | |
 | 32 | `lowerUntaggedUnionTypes` | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | (always) | |
 | 33 | `lowerReinterpret` | [slang-ir-lower-reinterpret.cpp](../../../../source/slang/slang-ir-lower-reinterpret.cpp) | `reqSet.reinterpret` | |
@@ -397,22 +409,22 @@ with its exact gate expression.
 | 42 | `lowerTuples` | [slang-ir-lower-tuple-types.cpp](../../../../source/slang/slang-ir-lower-tuple-types.cpp) | (always) | |
 | 43 | `generateAnyValueMarshallingFunctions` | [slang-ir-any-value-marshalling.cpp](../../../../source/slang/slang-ir-any-value-marshalling.cpp) | (always) | |
 | 44 | `specializeStageSwitch` | [slang-ir-specialize-stage-switch.cpp](../../../../source/slang/slang-ir-specialize-stage-switch.cpp) | `reqSet.specializeStageSwitch` | |
-| 45 | `lowerCooperativeVectors` | [slang-ir-lower-coopvec.cpp](../../../../source/slang/slang-ir-lower-coopvec.cpp) | (always, Metal via `default` arm at line ~1506) | |
+| 45 | `lowerCooperativeVectors` | [slang-ir-lower-coopvec.cpp](../../../../source/slang/slang-ir-lower-coopvec.cpp) | (always, Metal via `default` arm at line ~1545) | |
 | 46 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | |
-| 47 | `applySparseConditionalConstantPropagation` | [slang-ir-sccp.cpp](../../../../source/slang/slang-ir-sccp.cpp) | `minimalOptimization` | Minimal-optimization arm (line ~1525); cleans up dead branches revealed by force-inlining. |
-| 48 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `minimalOptimization` | Paired with the SCCP pass (line ~1528). |
-| 49 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | `else` arm (line ~1532); `defaultIRSimplificationOptions`. |
+| 47 | `applySparseConditionalConstantPropagation` | [slang-ir-sccp.cpp](../../../../source/slang/slang-ir-sccp.cpp) | `minimalOptimization` | Minimal-optimization arm (line ~1556); cleans up dead branches revealed by force-inlining. |
+| 48 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `minimalOptimization` | Paired with the SCCP pass (line ~1564). |
+| 49 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | `else` arm (line ~1571); `defaultIRSimplificationOptions`. |
 | 50 | `lowerAppendConsumeStructuredBuffers` | [slang-ir-lower-append-consume-structured-buffer.cpp](../../../../source/slang/slang-ir-lower-append-consume-structured-buffer.cpp) | `target != HLSL` | |
-| 51 | `lowerCombinedTextureSamplers` | [slang-ir-lower-combined-texture-sampler.cpp](../../../../source/slang/slang-ir-lower-combined-texture-sampler.cpp) | `reqSet.combinedTextureSamplers` (Metal arm at line ~1563) | |
+| 51 | `lowerCombinedTextureSamplers` | [slang-ir-lower-combined-texture-sampler.cpp](../../../../source/slang/slang-ir-lower-combined-texture-sampler.cpp) | `reqSet.combinedTextureSamplers` (Metal arm) | |
 | 52 | `legalizeEmptyArray` | [slang-ir-legalize-empty-array.cpp](../../../../source/slang/slang-ir-legalize-empty-array.cpp) | (always) | |
 | 53 | `legalizeVectorTypes` | [slang-ir-legalize-vector-types.cpp](../../../../source/slang/slang-ir-legalize-vector-types.cpp) | (always) | |
 | 54 | `inlineGlobalConstantsForLegalization` | [slang-ir-legalize-global-values.cpp](../../../../source/slang/slang-ir-legalize-global-values.cpp) | `shouldLegalizeExistentialAndResourceTypes` (default `true` for Metal) | |
-| 55 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | `isMetalTarget` | Inside the existential/resource block at line ~1606; `loweringPolicyKind = MetalParameterBlock`. **Metal-only first invocation.** |
+| 55 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | `isMetalTarget` | Inside the existential/resource block at line ~1646; `loweringPolicyKind = MetalParameterBlock`. **Metal-only first invocation.** |
 | 56 | `legalizeExistentialTypeLayout` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `reqSet.existentialTypeLayout` | |
 | 57 | `validateStructuredBufferResourceTypes` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | (always) | Direct call. |
 | 58 | `legalizeResourceTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | (always) | |
-| 59 | `legalizeEmptyTypes` (Metal arm) | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `case Metal / MetalLib / MetalLibAssembly` (line ~1679) | **Metal-only**; the `true` arm of `shouldLegalizeExistentialAndResourceTypes`. Runs again unconditionally later. |
-| 60 | `legalizeEmptyTypes` (else path) | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `!shouldLegalizeExistentialAndResourceTypes` | `else` branch (line ~1689); the only pass on the false arm, which skips rows 54-59 and rejoins before `legalizeMatrixTypes`. |
+| 59 | `legalizeEmptyTypes` (Metal arm) | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `case Metal / MetalLib / MetalLibAssembly` (line ~1718) | **Metal-only**; the `true` arm of `shouldLegalizeExistentialAndResourceTypes`. Runs again unconditionally later. |
+| 60 | `legalizeEmptyTypes` (else path) | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `!shouldLegalizeExistentialAndResourceTypes` | `else` branch (line ~1728); the only pass on the false arm, which skips rows 54-59 and rejoins before `legalizeMatrixTypes`. |
 | 61 | `legalizeMatrixTypes` | [slang-ir-legalize-matrix-types.cpp](../../../../source/slang/slang-ir-legalize-matrix-types.cpp) | (always) | |
 | 62 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | `fastIRSimplificationOptions`. |
 | 63 | `lowerDynamicResourceHeap` | [slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/slang-ir-lower-dynamic-resource-heap.cpp) | `reqSet.dynamicResourceHeap` | |
@@ -420,7 +432,8 @@ with its exact gate expression.
 | 65 | `specializeFuncsForBufferLoadArgs` | [slang-ir-specialize-buffer-load-arg.cpp](../../../../source/slang/slang-ir-specialize-buffer-load-arg.cpp) | (always) | |
 | 66 | `deferBufferLoad` | [slang-ir-defer-buffer-load.cpp](../../../../source/slang/slang-ir-defer-buffer-load.cpp) | (always) | |
 | 67 | `specializeArrayParameters` | [slang-ir-specialize-arrays.cpp](../../../../source/slang/slang-ir-specialize-arrays.cpp) | (always) | |
-| 68 | `wrapCBufferElementsForMetal` | [slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp) | `target == Metal || target == MetalLib` (line ~1772) | **`MetalLibAssembly` is omitted from the case list.** |
+| 68 | `checkStaticAssert` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Direct helper call (line ~1794), not a `SLANG_PASS`; evaluates `static_assert` after specialization. |
+| 69 | `wrapCBufferElementsForMetal` | [slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp) | `target == Metal || target == MetalLib` (line ~1815) | **`MetalLibAssembly` is omitted from the case list.** |
 
 Filtered out for Metal in this phase: the
 `CUDASource / CUDAHeader / PyTorchCppBinding` derivative-wrapper
@@ -434,11 +447,11 @@ D3D `legalizeEmptyRayPayloadsForHLSL` arm; the HLSL
 
 ## Phase C: Metal legalization, lowering, phi elimination
 
-Spans roughly lines 1897-2483 of `slang-emit.cpp`. Metal's
-central legalizer is `legalizeIRForMetal` (line ~1997, defined at
+Spans roughly lines 1900-2519 of `slang-emit.cpp`. Metal's
+central legalizer is `legalizeIRForMetal` (line ~2036, defined at
 line ~397 of
 [slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp)).
-Metal's parameter handling at line ~2096 is more elaborate than
+Metal's parameter handling at line ~2142 is more elaborate than
 the other shader targets: Metal goes through `undoParameterCopy`,
 then (because `isMetalTarget` is true) `transformParamsToConstRef`,
 then **falls through** to the
@@ -475,7 +488,7 @@ flowchart TD
   lMO[legalizeMeshOutputTypes]
   bcGate{reqSet.bitcast}
   lBC[lowerBitCast]
-  lBETST_def["lowerBufferElementTypeToStorageType<br/>(Default policy)"]
+  lBETST_def["lowerBufferElementTypeToStorageType<br/>(Metal policy)"]
   sASMetal[specializeAddressSpaceForMetal]
   pFI2[performForceInlining]
   eMB[eliminateMultiLevelBreak]
@@ -524,16 +537,16 @@ flowchart TD
 | --- | --- | --- | --- | --- |
 | 1 | `legalizeByteAddressBufferOps` | [slang-ir-byte-address-legalize.cpp](../../../../source/slang/slang-ir-byte-address-legalize.cpp) | `reqSet.byteAddressBuffer` | Metal options: `scalarizeVectorLoadStore=true`, `treatGetEquivalentStructuredBufferAsGetThis=true`, `translateToStructuredBufferOps=false`, `lowerBasicTypeOps=true`. |
 | 2 | `validateAtomicOperations` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | `target != SPIRV && target != SPIRVAssembly` | `skipFuncParamValidation = true`. |
-| 3 | `translateGlobalVaryingVar` | [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/slang-ir-translate-global-varying-var.cpp) | `reqSet.globalVaryingVar` | Runs after specialization (line ~1956), not in Phase A. |
+| 3 | `translateGlobalVaryingVar` | [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/slang-ir-translate-global-varying-var.cpp) | `reqSet.globalVaryingVar` | Runs after specialization, not in Phase A. |
 | 4 | `resolveVaryingInputRef` | [slang-ir-resolve-varying-input-ref.cpp](../../../../source/slang/slang-ir-resolve-varying-input-ref.cpp) | `reqSet.resolveVaryingInputRef` | |
 | 5 | `fixEntryPointCallsites` | [slang-ir-fix-entrypoint-callsite.cpp](../../../../source/slang/slang-ir-fix-entrypoint-callsite.cpp) | (always) | |
-| 6 | `legalizeIRForMetal` | [slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp) | (`Metal` / `MetalLib` / `MetalLibAssembly` arm at line ~1997) | The central Metal legalizer. |
-| 7 | `floatNonUniformResourceIndex` | [slang-ir-float-non-uniform-resource-index.cpp](../../../../source/slang/slang-ir-float-non-uniform-resource-index.cpp) | `!isSPIRV(target)` (true for Metal, line ~2035) | `NonUniformResourceIndexFloatMode::Textual`. |
-| 8 | `legalizeLogicalAndOr` | [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/slang-ir-legalize-binary-operator.cpp) | `isMetalTarget` (in the four-way arm at line ~2040) | |
-| 9 | `legalizeImageSubscript` | [slang-ir-legalize-image-subscript.cpp](../../../../source/slang/slang-ir-legalize-image-subscript.cpp) | (`Metal` / `MetalLib` / `MetalLibAssembly` / `GLSL` / `SPIRV` / `SPIRVAssembly` arm at line ~2056) | Metal needs this because MSL uses Metal-specific texture access patterns. |
-| 10 | `undoParameterCopy` | [slang-ir-undo-param-copy.cpp](../../../../source/slang/slang-ir-undo-param-copy.cpp) | (CPU / CUDA / Metal arm at line ~2096) | |
-| 11 | `transformParamsToConstRef` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/slang-ir-transform-params-to-constref.cpp) | `isCPUTarget || isCUDATarget || isMetalTarget` (line ~2108) | |
-| 12 | `moveGlobalVarInitializationToEntryPoints` | [slang-ir-explicit-global-init.cpp](../../../../source/slang/slang-ir-explicit-global-init.cpp) | (via `[[fallthrough]]` from Metal arm into ShaderLLVMIR arm at line ~2115) | |
+| 6 | `legalizeIRForMetal` | [slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp) | (`Metal` / `MetalLib` / `MetalLibAssembly` arm at line ~2036) | The central Metal legalizer. |
+| 7 | `floatNonUniformResourceIndex` | [slang-ir-float-non-uniform-resource-index.cpp](../../../../source/slang/slang-ir-float-non-uniform-resource-index.cpp) | `!isSPIRV(target)` (true for Metal, line ~2074) | `NonUniformResourceIndexFloatMode::Textual`. |
+| 8 | `legalizeLogicalAndOr` | [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/slang-ir-legalize-binary-operator.cpp) | `isMetalTarget` (in the four-way arm at line ~2079) | |
+| 9 | `legalizeImageSubscript` | [slang-ir-legalize-image-subscript.cpp](../../../../source/slang/slang-ir-legalize-image-subscript.cpp) | (`Metal` / `MetalLib` / `MetalLibAssembly` / `GLSL` / `SPIRV` / `SPIRVAssembly` arm at line ~2095) | Metal needs this because MSL uses Metal-specific texture access patterns. |
+| 10 | `undoParameterCopy` | [slang-ir-undo-param-copy.cpp](../../../../source/slang/slang-ir-undo-param-copy.cpp) | (CPU / CUDA / Metal arm at line ~2142) | |
+| 11 | `transformParamsToConstRef` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/slang-ir-transform-params-to-constref.cpp) | `isCPUTarget || isCUDATarget || isMetalTarget` (line ~2147) | |
+| 12 | `moveGlobalVarInitializationToEntryPoints` | [slang-ir-explicit-global-init.cpp](../../../../source/slang/slang-ir-explicit-global-init.cpp) | (via `[[fallthrough]]` from Metal arm into ShaderLLVMIR arm at line ~2154) | |
 | 13 | `introduceExplicitGlobalContext` | [slang-ir-explicit-global-context.cpp](../../../../source/slang/slang-ir-explicit-global-context.cpp) | (same fallthrough) | `target = Metal`. |
 | 14 | `stripLegalizationOnlyInstructions` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/slang-ir-strip-legalization-insts.cpp) | (always) | |
 | 15 | `validateVectorsAndMatrices` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | (always) | |
@@ -543,24 +556,24 @@ flowchart TD
 | 19 | `lowerBindingQueries` | [slang-ir-lower-binding-query.cpp](../../../../source/slang/slang-ir-lower-binding-query.cpp) | `reqSet.bindingQuery` | |
 | 20 | `legalizeMeshOutputTypes` | [slang-ir-legalize-mesh-outputs.cpp](../../../../source/slang/slang-ir-legalize-mesh-outputs.cpp) | `reqSet.meshOutput` | |
 | 21 | `lowerBitCast` | [slang-ir-lower-bit-cast.cpp](../../../../source/slang/slang-ir-lower-bit-cast.cpp) | `reqSet.bitcast` | |
-| 22 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | (always) | `loweringPolicyKind = Default` for Metal (Metal is not WGPU or Khronos). |
-| 23 | `specializeAddressSpaceForMetal` | [slang-ir-specialize-address-space.cpp](../../../../source/slang/slang-ir-specialize-address-space.cpp) | `isMetalTarget` (line ~2242) | |
+| 22 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | `isMetalTarget` selects the `Metal` policy (line ~2264) | `loweringPolicyKind = Metal` (the `MetalBufferElementTypeLoweringPolicy`); lowers matrices in `device` buffers to arrays of `packed_T<N>` (`MetalPackedVectorType`) using Metal's natural scalar-aligned layout. Previously used the generic `Default` policy. |
+| 23 | `specializeAddressSpaceForMetal` | [slang-ir-specialize-address-space.cpp](../../../../source/slang/slang-ir-specialize-address-space.cpp) | `isMetalTarget` (line ~2281) | |
 | 24 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | |
 | 25 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../../source/slang/slang-ir-eliminate-multilevel-break.cpp) | (always) | |
 | 26 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | With `removeTrivialSingleIterationLoops = true`. |
-| 27 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | (always; for AD 2.0) | Second invocation; first ran in Phase B. |
-| 28 | `LivenessUtil::addVariableRangeStarts` | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` | Inserts `IRLiveRangeStart` markers immediately before `eliminatePhis` ([slang-emit.cpp lines 2315-2327](../../../../source/slang/slang-emit.cpp)). |
+| 27 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | (always; for AD 2.0) | Second invocation (line ~2332); first ran in Phase B. |
+| 28 | `LivenessUtil::addVariableRangeStarts` | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` | Inserts `IRLiveRangeStart` markers immediately before `eliminatePhis` ([slang-emit.cpp line ~2356](../../../../source/slang/slang-emit.cpp)). |
 | 29 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../../source/slang/slang-ir-eliminate-phis.cpp) | (always) | **Default options** (contrast with SPIR-V). |
 | 30 | `LivenessUtil::addRangeEnds` | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | `codeGenContext->shouldTrackLiveness()` | Inserts `IRLiveRangeEnd` markers after phi elimination. |
 | 31 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
-| 32 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | `isMetalTarget` (line ~2402) | **Metal-only late block.** `loweringPolicyKind = MetalPointerLowering`; converts pointer fields to `UIntPtr`. |
-| 33 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | `isMetalTarget` (line ~2415) | Materializes the `[ForceInline]` pack/unpack helpers created by row 32. |
-| 34 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../../source/slang/slang-ir-eliminate-phis.cpp) | `isMetalTarget` (line ~2428) | Second invocation; `LivenessMode::Disabled`, default options; removes phis introduced by the array pack/unpack loops. |
-| 35 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `isMetalTarget` (line ~2437) | Second invocation; `fastIRSimplificationOptions`; leaves IR non-SSA for emit. |
+| 32 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | `isMetalTarget` (line ~2446) | **Metal-only late block.** `loweringPolicyKind = MetalPointerLowering`; converts pointer fields to `UIntPtr`. |
+| 33 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | `isMetalTarget` | Materializes the `[ForceInline]` pack/unpack helpers created by row 32. |
+| 34 | `eliminatePhis` | [slang-ir-eliminate-phis.cpp](../../../../source/slang/slang-ir-eliminate-phis.cpp) | `isMetalTarget` (line ~2467) | Second invocation; `LivenessMode::Disabled`, default options; removes phis introduced by the array pack/unpack loops. |
+| 35 | `simplifyNonSSAIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `isMetalTarget` (line ~2476) | Second invocation; `fastIRSimplificationOptions`; leaves IR non-SSA for emit. |
 | 36 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../../source/slang/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` | |
 | 37 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | |
 | 38 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `EmbedDownstreamIR` | |
-| 39 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | |
+| 39 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | Now takes `targetProgram` (line ~2530). When `targetCaps` implies `descriptor_handle`, `linkAndOptimizeIR` first forces `targetProgram->getOrCreateLayout(sink)` so the layout exists before metadata collection. |
 | 40 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | |
 
 Filtered out for Metal in this phase: `lowerCPUResourceTypes`
@@ -588,7 +601,7 @@ only); `applyGLSLLiveness` (Khronos only);
 
 Phase D begins immediately after `linkAndOptimizeIR` returns to
 `emitEntryPointsSourceFromIR`. The `MetalSourceEmitter`
-(constructed at line ~2587 of `slang-emit.cpp`) walks the IR and
+(constructed at line ~2626 of `slang-emit.cpp`) walks the IR and
 produces Metal text. `MetalSourceEmitter::emitFuncParamLayoutImpl`
 (line ~135 of
 [slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp))
@@ -603,13 +616,23 @@ For an unlayout-decorated parameter that carries a
 through to `maybeEmitSystemSemantic`, which is what emits the
 `[[color(N)]]` attribute for the fragment parameters
 synthesized by `legalizeSubpassInputsForMetal`.
+`MetalSourceEmitter::emitSimpleTypeImpl` renders the
+`kIROp_MetalPackedVectorType` introduced by the Phase-C `Metal`
+buffer-element policy as MSL `packed_T<N>` (e.g. `packed_float3`).
 `tryEmitInstStmtImpl` rejects any surviving `kIROp_SubpassLoad`
 with `SLANG_DIAGNOSE_UNEXPECTED("SubpassLoad should have been
 lowered before Metal emission")` — by the time emit runs, every
 `SubpassLoad` should already have been replaced by the lowering
-pass above. For `MetalLib` and `MetalLibAssembly` the text is then
-handed to Apple's `metal` command-line compiler to produce a
-`.metallib` (or its disassembly).
+pass above. The bare `Metal` target stops at this text artifact.
+For `MetalLib`, the text is handed to Apple's `metal` command-line
+compiler (the `Metal` → `MetalLib` `MetalC` transition) to produce
+a `.metallib`. For `MetalLibAssembly`, Slang first produces an
+intermediate `MetalLib` and then disassembles it with
+`metal-objdump --disassemble` (the `MetalLib` → `MetalLibAssembly`
+transition); see `_emitEntryPoints` in
+[slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp)
+and the disassembler in
+[slang-metal-compiler.cpp](../../../../source/compiler-core/slang-metal-compiler.cpp).
 
 ```mermaid
 flowchart TD
@@ -620,28 +643,34 @@ flowchart TD
   emitModule[sourceEmitter->emitModule]
   textOut[Metal text]
   artifact[createArtifactFromIR]
-  libGate{target is MetalLib or MetalLibAssembly}
-  metalCC["(downstream) Apple metal compiler"]
+  libGate{"target?"}
+  metalCC["(downstream) Apple metal compiler (MetalC)"]
+  objdump["(downstream) metal-objdump --disassemble"]
+  lib[".metallib"]
   done[final artifact]
 
   ent --> newEmit --> linkOpt2 --> simpForEmit --> emitModule --> textOut --> artifact --> libGate
-  libGate -->|yes| metalCC --> done
-  libGate -->|no| done
+  libGate -->|Metal| done
+  libGate -->|MetalLib| metalCC --> done
+  libGate -->|MetalLibAssembly| metalCC --> lib --> objdump --> done
 ```
 
 | # | Pass / step | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
 | 1 | `emitEntryPointsSourceFromIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (entry point) | |
-| 2 | `new MetalSourceEmitter` | [slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp) | `case SourceLanguage::Metal` | Constructed at line ~2587. |
+| 2 | `new MetalSourceEmitter` | [slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp) | `case SourceLanguage::Metal` | Constructed at line ~2626. |
 | 3 | `sourceEmitter->init` | [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) | (always) | |
 | 4 | `linkAndOptimizeIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Runs Phases A-C. |
 | 5 | `simplifyForEmit` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
 | 6 | `sourceEmitter->emitModule` | [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) (+ overrides in `slang-emit-metal.cpp`) | (always) | Walks IR and writes Metal text; Metal prelude comes from `slang-emit-metal-prelude.cpp`. |
 | 7 | `createArtifactFromIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Wraps the Metal text as an `IArtifact`. |
-| 8 | `compile` (Apple `metal`) | (downstream) | `target == MetalLib || target == MetalLibAssembly` | Downstream-compile path invokes Apple's `metal` command-line compiler. |
+| 8 | `compile` (Apple `metal`, `MetalC`) | (downstream) | `target == MetalLib || target == MetalLibAssembly` | `Metal` → `MetalLib` transition; compiles the Metal text into a `.metallib`. |
+| 9 | `metal-objdump --disassemble` | [slang-metal-compiler.cpp](../../../../source/compiler-core/slang-metal-compiler.cpp) | `target == MetalLibAssembly` | `MetalLib` → `MetalLibAssembly` transition; disassembles the intermediate `.metallib`. |
 
-The bare `Metal` target stops at the text artifact; the downstream
-compiler is required only for `MetalLib*`.
+The bare `Metal` target stops at the text artifact; `MetalLib`
+adds the Apple `metal` compile step, and `MetalLibAssembly` adds a
+further `metal-objdump --disassemble` step on the intermediate
+`.metallib`.
 
 ## Conditional gates
 
@@ -704,10 +733,10 @@ Flags that exist but **never gate a Metal pass**:
 
 | Gate | Where evaluated | Effect |
 | --- | --- | --- |
-| `isMetalTarget(targetRequest)` | Multiple sites (line 1594, 2038, 2108, 2242) | Selects Metal-specific arms: `lowerBufferElementTypeToStorageType` with `MetalParameterBlock` policy in Phase B, `legalizeLogicalAndOr`, `transformParamsToConstRef`, `specializeAddressSpaceForMetal`. |
-| `target == Metal / MetalLib` (line ~1772) | `wrapCBufferElementsForMetal` switch | Only `Metal` and `MetalLib` fire this pass; `MetalLibAssembly` skips. |
-| `target == Metal / MetalLib / MetalLibAssembly` (line ~1676) | `legalizeEmptyTypes` Metal arm inside existential/resource block | Distinct from the unconditional `legalizeEmptyTypes` later. |
-| `target == MetalLib / MetalLibAssembly` | Downstream compile | Triggers Apple `metal` compiler invocation. |
+| `isMetalTarget(targetRequest)` | Multiple sites (lines ~1646, ~2079, ~2147, ~2281) | Selects Metal-specific arms: `lowerBufferElementTypeToStorageType` with `MetalParameterBlock` policy in Phase B, `legalizeLogicalAndOr`, `transformParamsToConstRef`, `specializeAddressSpaceForMetal`. |
+| `target == Metal / MetalLib` (line ~1815) | `wrapCBufferElementsForMetal` switch | Fires for every Metal output: `MetalLibAssembly` is produced from an intermediate `MetalLib`, which compiles intermediate `Metal` source, so `linkAndOptimizeIR` always sees `CodeGenTarget::Metal`. |
+| `target == Metal / MetalLib / MetalLibAssembly` (line ~1718) | `legalizeEmptyTypes` Metal arm inside existential/resource block | Distinct from the unconditional `legalizeEmptyTypes` later. |
+| `target == MetalLib / MetalLibAssembly` | Downstream compile | Triggers the Apple `metal` (`MetalC`) compile to `.metallib`; `MetalLibAssembly` additionally runs `metal-objdump --disassemble` on that intermediate. |
 
 ## Loops in the pipeline
 
@@ -745,6 +774,17 @@ It walks the module once and performs:
 - Entry-point varying-param legalization via
   `legalizeEntryPointVaryingParamsForMetal` (defined in
   [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp)).
+  For a struct-returning vertex shader,
+  `legalizeVertexShaderOutputParamsForMetal` builds a wrapper that
+  becomes the new entry point. Because global `uniform` params
+  hoisted in Phase A carry an `IREntryPointParamDecoration` naming
+  the *original* function, the wrapper-swap calls
+  `retargetEntryPointParamDecorations(oldFunc, newFunc)` to
+  re-point those decorations at the wrapper. Without this,
+  `introduceExplicitGlobalContext` (which binds a global uniform
+  to an entry point only when the decoration names it) silently
+  drops the uniform, so a `uniform T*` parameter would receive no
+  `[[buffer(N)]]` argument and read uninitialized memory.
 - Restructuring of `[[buffer(N)]]`, `[[texture(N)]]`,
   `[[sampler(N)]]`, and `[[stage_in]]` annotations to match
   MSL conventions.
@@ -755,23 +795,55 @@ It walks the module once and performs:
 
 ### `specializeAddressSpaceForMetal`
 
-Runs at line ~2242 of `slang-emit.cpp`. Metal has explicit
+Runs at line ~2281 of `slang-emit.cpp`. Metal has explicit
 address spaces (`device`, `constant`, `threadgroup`, `thread`)
 that must annotate IR pointers before emit. Like WGSL, Metal does
 this in `linkAndOptimizeIR`, whereas SPIR-V defers it to
-`legalizeIRForSPIRV`.
+`legalizeIRForSPIRV`. The driver is `MetalAddressSpaceAssigner` in
+[slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp);
+its `getAddressSpaceFromVarType` maps the abstract
+`AddressSpace::StorageBuffer` (carried by buffer-element pointers
+created by `lowerBufferElementTypeToStorageType`) to
+`AddressSpace::Global`, because Metal has no distinct
+storage-buffer address space — such pointers live in `device`
+memory, which the emitter renders as `device*`.
 
-### Metal-specific `lowerBufferElementTypeToStorageType`
+### Metal's three `lowerBufferElementTypeToStorageType` invocations
 
-Inside the `shouldLegalizeExistentialAndResourceTypes` block at
-line ~1606, Metal alone runs an extra
-`lowerBufferElementTypeToStorageType` invocation with
-`MetalParameterBlock` policy **before** the general
-`legalizeResourceTypes`. This pre-translates resource-typed
-fields inside parameter blocks into descriptor handles so the
-subsequent resource legalization does not disturb them. Metal is
-modeled as "bindful for constant buffers, bindless for parameter
-blocks", and this two-step lowering implements that hybrid.
+Metal buffer-element-type lowering is split across **three**
+`lowerBufferElementTypeToStorageType` calls, each with a distinct
+`BufferElementTypeLoweringPolicyKind`
+([slang-ir-lower-buffer-element-type.h](../../../../source/slang/slang-ir-lower-buffer-element-type.h)).
+They target orthogonal field kinds within the same buffer-element
+struct types and so compose without conflict:
+
+1. **`MetalParameterBlock`** — inside the
+   `shouldLegalizeExistentialAndResourceTypes` block at
+   line ~1646 (Phase B), Metal alone runs this **before** the
+   general `legalizeResourceTypes`. It pre-translates
+   resource-typed fields inside parameter blocks into descriptor
+   handles so the subsequent resource legalization does not
+   disturb them. Metal is modeled as "bindful for constant
+   buffers, bindless for parameter blocks", and this implements
+   the bindless half (`MetalParameterBlockElementTypeLoweringPolicy`).
+2. **`Metal`** — the main invocation at line ~2270 (Phase C).
+   This is the `else if (isMetalTarget(targetRequest))` arm that
+   selects `BufferElementTypeLoweringPolicyKind::Metal` (the
+   policy a non-Metal target gets as plain `Default`). The
+   `MetalBufferElementTypeLoweringPolicy` lowers matrices stored
+   in `device` buffers into arrays of *packed* vectors —
+   `IRMetalPackedVectorType`, emitted as MSL `packed_T<N>` (e.g.
+   `packed_float3`, 12 bytes / 4-byte alignment) — and inserts
+   pack/unpack conversion helpers so loads and stores convert
+   between the native `float3` working form and the tightly
+   packed storage form. This realizes Metal's natural
+   (scalar-aligned) device-buffer layout, which the generic
+   `Default` policy did not produce.
+3. **`MetalPointerLowering`** — the late Metal-only block at
+   line ~2448 (Phase C). It converts pointer fields inside buffer
+   pointee types to `UIntPtr`, because Metal rejects
+   pointer-to-pointer (`device T* device*`) in buffer element
+   types.
 
 ### `wrapCBufferElementsForMetal`
 
@@ -780,23 +852,24 @@ Metal disallows
 (among other restrictions on constant-buffer element types).
 This pass wraps such elements into a separate `struct` so that
 the emitted MSL is valid.
-**Note**: the case list at line 1772-1776 includes `Metal` and
-`MetalLib` but **omits** `MetalLibAssembly`. As a practical
-matter, `MetalLibAssembly` is the disassembled form of
-`MetalLib`, so the binary path always produces the wrapper; but
-a direct request for `MetalLibAssembly` would not get the wrap.
+**Note**: the case list at line ~1815 includes `Metal` and
+`MetalLib` but not `MetalLibAssembly`. This is not a gap on the
+public path: `MetalLibAssembly` is produced by disassembling an
+intermediate `MetalLib`, which is itself emitted from intermediate
+`Metal` source, so `linkAndOptimizeIR` always runs with
+`CodeGenTarget::Metal` and the wrapper is always applied.
 
 ### `legalizeEmptyTypes` runs twice
 
-Once at line ~1679 inside the
+Once at line ~1718 inside the
 `shouldLegalizeExistentialAndResourceTypes` block (Metal-only
-arm), and again at line ~2293 unconditionally (added for AD 2.0
+arm), and again at line ~2332 unconditionally (added for AD 2.0
 empty types). Both invocations are real; the second is a
 safety-net for empty types introduced by Phase-C passes.
 
 ### `undoParameterCopy` + `transformParamsToConstRef`
 
-Metal is in the CPU / CUDA / Metal arm at line ~2096 because the
+Metal is in the CPU / CUDA / Metal arm at line ~2142 because the
 downstream Apple `metal` compiler benefits from pass-by-pointer
 patterns familiar to C++. `undoParameterCopy` removes the
 explicit copy-in/copy-out wrappers Slang introduced for `inout`
@@ -805,7 +878,7 @@ converts struct parameters to const-references for performance.
 
 ### `legalizeImageSubscript`
 
-Runs at line ~2056 in the Metal / GLSL / SPIR-V arm. MSL uses
+Runs at line ~2095 in the Metal / GLSL / SPIR-V arm. MSL uses
 `texture2d<T>::read(uint2)` rather than a generic subscript
 operator; this pass rewrites IR-level `imageSubscript` into the
 target-appropriate texture-access form before emit.
@@ -835,11 +908,14 @@ identical to their bindful equivalents in the emitted MSL.
 
 ### Downstream Apple `metal` compiler
 
-For `MetalLib` and `MetalLibAssembly`, Slang's downstream compile
-path invokes Apple's `metal` command-line tool to translate the
-emitted Metal text into a `.metallib`. Slang does not validate
-the Metal source it emits; all MSL grammar checking and
-optimization is delegated to the Apple tool.
+For `MetalLib`, Slang's downstream compile path invokes Apple's
+`metal` command-line tool (`PassThroughMode::MetalC`) to translate
+the emitted Metal text into a `.metallib`. For `MetalLibAssembly`,
+that `.metallib` is produced first and then disassembled with
+`metal-objdump --disassemble` (implemented in
+[slang-metal-compiler.cpp](../../../../source/compiler-core/slang-metal-compiler.cpp)).
+Slang does not validate the Metal source it emits; all MSL grammar
+checking and optimization is delegated to the Apple tool.
 
 ## See also
 

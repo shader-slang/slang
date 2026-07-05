@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T15:06:28+00:00
+reviewed_at: 2026-06-30T13:34:52+00:00
 target_doc: ir-reference/structure.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -16,26 +16,31 @@ checklist:
 finding_count: 2
 severity_breakdown:
   critical: 0
-  major: 2
-  minor: 0
+  major: 1
+  minor: 1
   nit: 0
 ---
 
 # Review report for ir-reference/structure.md
 
 ## Summary
-The page has valid front matter, required top-level sections, and all relative links resolve at the recorded source commit. Two major findings remain: the `## Source` section cites several lowering symbols that are not present under those names, and the witness-table row omits the concrete-type operand while not providing the prompt-required `witness_table` callout.
+The page has the required IR-reference structure and its front matter and links look valid, but the checked source sample found two issues. The main factual problem is the `generic` callout: the document says a generic ends with `yield`, while the source comment and helper code use an `IRReturn` terminator for generic results.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show ir-reference/structure.md` and verified the prompt, dependency list, watched paths, target source commit, and digest against the document front matter.
-- Read the target doc, `_common.md`, `ir-reference-structure.md`, and the dependency docs `cross-cutting/ir-instructions.md`, `pipeline/04-ast-to-ir.md`, and `ast-reference/declarations.md`.
-- Resolved all 24 relative links in the target document against `52339028a2aa703271533454c6b9528a534bac31`.
-- Checked all required IR-reference sections, the `GlobalValueWithCode` hierarchy, and 22 opcode table rows against `source/slang/slang-ir-insts.lua`.
-- Spot-checked more than 10 factual claims, including `module`, `func`, `generic`, `param`, `call`, `global_var`, `global_param`, `globalConstant`, `StructKey`, `InterfaceRequirementEntry`, `WitnessTableEntry`, `thisTypeWitness`, `TypeEqualityWitness`, `SymbolAlias`, and the named lowering helpers.
+- Ran `regenerate.py show ir-reference/structure.md` and reviewed the target document, the common contract, its per-document prompt, and the resolved watched-file set (`source/slang/slang-ir-insts.h`, `source/slang/slang-ir-insts.lua`, `source/slang/slang-ir.cpp`, `source/slang/slang-ir.h`, `source/slang/slang-lower-to-ir.cpp`).
+- Checked front matter for all required keys, the recorded source commit, the warning string, and a 64-character hex watched-path digest.
+- Inspected the 27 relative markdown links in the document body and verified they point at workspace files or generated peer documents.
+- Verified required IR-reference sections: `## Source`, `## Family hierarchy`, `## Opcodes`, `## Notable opcodes`, and `## See also`.
+- Spot-checked more than 10 source-backed claims and named symbols against the watched files, including `GlobalValueWithCode`, `GlobalValueWithParams`, `func`, `generic`, `global_var`, `global_param`, `globalConstant`, `key`, `builtinRequirementKey`, `witness_table`, `indexedFieldKey`, `thisTypeWitness`, `TypeEqualityWitness`, `global_hashed_string_literals`, `module`, `call`, `witness_table_entry`, `interface_req_entry`, and `field`.
+- Checked the prose line-number ranges in `## Source` against the Lua opcode clusters around structural global values and the later `call` / `witness_table_entry` / `interface_req_entry` / `param` / `field` cluster.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Source`, lines 41-47 | The source paragraph cites `lowerProgram`, `lowerCallableDecl`, `lowerGenericDecl`, `lowerStructDecl`, `lowerInterfaceDecl`, and `lowerInheritanceDecl`, but the watched implementation does not define those symbols under those names. Related implemented entry points are named differently, such as `lowerFuncDecl`, `visitGenericDecl`, `visitInterfaceDecl`, and `visitInheritanceDecl`. | `source/slang/slang-lower-to-ir.cpp:10671` defines `visitInheritanceDecl`, `source/slang/slang-lower-to-ir.cpp:11520` defines `visitInterfaceDecl`, and `source/slang/slang-lower-to-ir.cpp:14089` defines `lowerFuncDecl`. Struct lowering is handled by aggregate logic that calls `createStructType` at `source/slang/slang-lower-to-ir.cpp:11991`. | Replace the nonexistent helper names with the actual visitor or helper names, or phrase this as declaration lowering handled by the lowering visitor and cite the concrete functions that exist. |
-| F-002 | major | `## Opcodes` and `## Notable opcodes`, lines 134-139 and 147-214 | The `witness_table` row describes only child entries, while source creation records the concrete conforming type as operand 0 and the conformance interface in the result type. The prompt also requires a notable `witness_table` callout, but the notable section only discusses `witness_table_entry` versus `interface_req_entry`. | `source/slang/slang-ir.cpp:4992-4998` creates `kIROp_WitnessTable` with `getWitnessTableType(baseType)` and `subType`; `source/slang/slang-ir-insts.h:2211-2216` exposes `getConformanceType()` and `getConcreteType()`; `source/slang/slang-ir.cpp:5003-5017` inserts `witness_table_entry` children into the table. | Update the row to mention the concrete-type operand and result-type conformance, then add a `### witness_table` notable callout that explains those two pieces plus its owned entries. |
+| F-001 | major | `### generic`, lines 173-183 | The callout says each `generic` block `ends with a \`yield\``, but generic results are represented with `return_val` / `IRReturn` in this source revision. The `yield` opcode exists, but the lowering use found in the watched source is for `ExpandExpr`, not the generic body result path. | `source/slang/slang-ir-insts.lua:809`-`811` says a generic "ends with a `return` instruction"; `source/slang/slang-ir.cpp:9743`-`9754` implements `findGenericReturnVal` by casting the last block terminator to `IRReturn`; `source/slang/slang-lower-to-ir.cpp:6447` shows `emitYield` used for `ExpandExpr` lowering, not generic termination. | Change the callout to say a `generic` has a single block that ends with `return_val` / `IRReturn`, and avoid naming `yield` as the generic terminator. |
+| F-002 | minor | `## Opcodes`, C++ wrapper column | Several rows use `—` in the C++ wrapper column even though the watched header declares wrapper structs for those opcodes. This makes the mandatory wrapper column incomplete for global and witness-table structure rows. | `source/slang/slang-ir-insts.h:2188` declares `IRGlobalParam`, `source/slang/slang-ir-insts.h:2202` declares `IRGlobalConstant`, `source/slang/slang-ir-insts.h:2212` declares `IRWitnessTableEntry`, and `source/slang/slang-ir-insts.h:2228` declares `IRWitnessTable`; the corresponding table rows currently show `—`. | Fill the wrapper cells for at least `global_param`, `globalConstant`, `witness_table`, and `witness_table_entry` with the declared wrapper names. |
+
+## No-issues notes
+- The document keeps generated-doc links workspace-relative and avoids absolute source paths.
+- The page stays within the documented scope for its family and does not copy handwritten documentation prose.
+- The source citations are concentrated in the watched paths listed by the manifest entry.

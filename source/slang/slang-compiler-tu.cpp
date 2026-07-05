@@ -51,45 +51,42 @@ static bool attemptPrecompiledExport(IRInst* inst)
     return true;
 }
 
-/*
- * Precompile the module for the given target.
- *
- * This function creates a target program and emits the precompiled blob as
- * an embedded blob in the module IR, e.g. DXIL, SPIR-V.
- * Because the IR for the Slang Module may violate the restrictions of the
- * target language, the emitted target blob may not be able to include the
- * full module, but rather only the subset that can be precompiled. For
- * example, DXIL libraries do not allow resources like structured buffers
- * to appear in the library interface. Also, no target languages allow
- * generics to be precompiled.
- *
- * Some restrictions can be enforced up front before linking, but some are
- * done during target generation in between IR linking+legalization and
- * target source emission.
- *
- * Functions which can be rejected up front:
- * - Functions with no body
- * - Functions marked with unsafeForceInlineDecoration
- * - Functions that define or use generics
- *
- * The functions not rejected up front are marked with
- * DownstreamModuleExportDecoration which indicates functions we're trying to
- * export for precompilation, and this also helps to identify the functions
- * in the linked IR which survived the additional pruning.
- *
- * Functions that are rejected after linking+legalization (inside
- * emitPrecompiledDownstreamIR):
- * - (DXIL) Functions that return or take a HLSLStructuredBufferType
- * - (DXIL) Functions that return or take a Matrix type
- *
- * emitPrecompiled* produces the output artifact containing target language
- * blob, and as metadata, the list of functions which survived the second
- * phase of filtering.
- *
- * The original module IR functions matching those are then marked with
- * "AvailableInDownstreamIRDecoration" to indicate to future
- * module users which functions are present in the precompiled blob.
- */
+// Precompile the module for the given target.
+//
+// This function is experimental and not thread-safe. It mutates the module by adding precompiled
+// target IR and temporary export metadata. Mutating an existing module is not a well-supported
+// operation, and the mutation must invalidate the module linker cache so later linking observes the
+// updated module state.
+//
+// This function creates a target program and emits the precompiled blob as an embedded blob in the
+// module IR, e.g. DXIL, SPIR-V. Because the IR for the Slang Module may violate the restrictions of
+// the target language, the emitted target blob may not be able to include the full module, but
+// rather only the subset that can be precompiled. For example, DXIL libraries do not allow
+// resources like structured buffers to appear in the library interface. Also, no target languages
+// allow generics to be precompiled.
+//
+// Some restrictions can be enforced up front before linking, but some are done during target
+// generation in between IR linking+legalization and target source emission.
+//
+// Functions which can be rejected up front:
+// - Functions with no body
+// - Functions marked with unsafeForceInlineDecoration
+// - Functions that define or use generics
+//
+// The functions not rejected up front are marked with DownstreamModuleExportDecoration which
+// indicates functions we're trying to export for precompilation, and this also helps to identify
+// the functions in the linked IR which survived the additional pruning.
+//
+// Functions that are rejected after linking+legalization (inside emitPrecompiledDownstreamIR):
+// - (DXIL) Functions that return or take a HLSLStructuredBufferType
+// - (DXIL) Functions that return or take a Matrix type
+//
+// emitPrecompiled* produces the output artifact containing target language blob, and as metadata,
+// the list of functions which survived the second phase of filtering.
+//
+// The original module IR functions matching those are then marked with
+// "AvailableInDownstreamIRDecoration" to indicate to future module users which functions are
+// present in the precompiled blob.
 SLANG_NO_THROW SlangResult SLANG_MCALL
 Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnostics)
 {
@@ -178,6 +175,13 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
         return SLANG_OK;
     }
 
+    // Module::precompileForTarget is experimental and not thread-safe. It mutates the module
+    // by adding transient DownstreamModuleExport decorations, and mutating an existing module is
+    // not a well-supported operation. In particular, the linker acceleration cache snapshots
+    // module-scope export decorations, so force the embedded downstream IR compile to rebuild the
+    // cache and see those exports.
+    module->_invalidateLinkingInfo();
+
     ComPtr<IArtifact> outArtifact;
     SlangResult res = codeGenContext.emitPrecompiledDownstreamIR(outArtifact);
 
@@ -224,6 +228,7 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
     builder.setInsertInto(module);
 
     builder.emitEmbeddedDownstreamIR(targetReq->getTarget(), blob);
+    module->_invalidateLinkingInfo();
     return SLANG_OK;
 }
 

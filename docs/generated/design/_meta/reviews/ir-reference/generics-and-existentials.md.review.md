@@ -1,40 +1,44 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T15:05:36+00:00
+reviewed_at: 2026-06-30T13:25:38+00:00
 target_doc: ir-reference/generics-and-existentials.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
   factual_accuracy: partial
   cross_references: pass
   completeness: partial
   style_consistency: pass
-  source_alignment: pass
+  source_alignment: partial
   front_matter_validity: pass
-finding_count: 2
+finding_count: 5
 severity_breakdown:
   critical: 0
-  major: 1
-  minor: 1
+  major: 2
+  minor: 3
   nit: 0
 ---
 
 # Review report for ir-reference/generics-and-existentials.md
 
 ## Summary
-The page covers the main generic, existential, RTTI, type-flow, and AnyValue rows, and all relative links resolved. Two issues remain: witness-table and witness-fact opcodes are summarized as bullets instead of required opcode-table rows, and the source section omits the later Lua range that owns the type-flow rows.
+The page covers the main scattered opcode groups and its links/front matter look sound, but several table rows do not match the source operand shapes. The most important remediation is to restore prompt-required notable coverage for existential projections and `TypeEqualityWitness`, then fix the opcode-shape rows that would mislead someone reading IR.
 
 ## Items checked
-- Ran `regenerate.py show ir-reference/generics-and-existentials.md` and checked the resolved watched files and dependencies.
-- Verified front matter keys, target source commit, watched-path digest shape, 11 relative links, required IR-reference sections, and table columns.
-- Checked 52 opcode table rows against `slang-ir-insts.lua`, including generic application, witness lookup, existential construction and projection, RTTI, type-flow sets, tag operations, dispatchers, specialization keys, and AnyValue marshalling.
-- Spot-checked more than 10 factual claims about operand counts, hoistable and global flags, wrappers, AST origins, and notable opcode behavior against `slang-ir-insts.lua`, `slang-ir-insts.h`, `slang-ir.h`, `slang-ir.cpp`, and `slang-lower-to-ir.cpp`.
+- Ran `regenerate.py show ir-reference/generics-and-existentials.md` and reviewed the target document, common contract, per-document prompt, dependency docs, and the resolved watched files.
+- Checked front matter for all required generated-doc keys, the recorded source commit, warning string, and 64-character hex watched-path digest.
+- Resolved the document's relative links to generated peer pages, watched source files, and the two `docs/design/` rationale pages.
+- Verified the required IR-reference sections: Source, Family hierarchy, Opcodes, Notable opcodes, and See also.
+- Spot-checked source claims for `specialize`, `lookupWitness`, `GetSequentialID`, `bind_global_generic_param`, `globalValueRef`, `rtti_object`, `packAnyValue`, `unpackAnyValue`, `witness_table_entry`, `interface_req_entry`, `makeExistential`, `makeExistentialWithRTTI`, `createExistentialObject`, `wrapExistential`, `extractExistentialValue`, `extractExistentialType`, `extractExistentialWitnessTable`, `TypeSet`, `GetDispatcher`, `WeakUse`, `FuncTypeOf`, `getInterfaceRequirementKey`, `emitSpecializeInst`, `emitLookupInterfaceMethodInst`, and `emitMakeExistential`.
+- Checked the prose line-number claims around the Lua ranges for structural, existential, RTTI, set, dispatcher, and specialization-key entries.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `### Witness tables and witness facts`, lines 126-141 | The witness-table and witness-fact opcodes are summarized as bullets instead of rows in an opcode table with the required columns. | `source/slang/slang-ir-insts.lua:816-824` defines `key`, `global_generic_param`, `witness_table`, `indexedFieldKey`, `thisTypeWitness`, and `TypeEqualityWitness`; `source/slang/slang-ir-insts.lua:1042-1048` defines `witness_table_entry` and `interface_req_entry`. | Replace the bullet list with a sub-table covering the concrete witness and witness-fact opcodes, using the standard Opcode, C++ wrapper, Operands, Flags, AST origin, and Summary columns. |
-| F-002 | minor | `## Source`, lines 24-41 | The source range list omits the later type-flow specialization range even though the page documents `TypeSet`, dispatcher, tagged-union, tag, and specialization-key opcodes from that range. | `source/slang/slang-ir-insts.lua:2926-2929` defines the set opcodes, `source/slang/slang-ir-insts.lua:2979-2991` defines `GetDispatcher`, and `source/slang/slang-ir-insts.lua:3033-3162` defines tagged-union and specialization-key opcodes. | Add the type-flow specialization range around lines 2916-3162 to the `## Source` range list. |
+| F-001 | major | `## Notable opcodes`, lines 229-338 | The per-document prompt requires notable coverage for `ExtractExistentialValue` / `ExtractExistentialType` / `ExtractExistentialWitnessTable` and `TypeEqualityWitness`, but the notable section has no callout for either group. | `docs/generated/design/_meta/prompts/ir-reference-generics-and-existentials.md:58` requires the three extract projections, and `docs/generated/design/_meta/prompts/ir-reference-generics-and-existentials.md:64` requires `TypeEqualityWitness`. The source declares `TypeEqualityWitness` with `subType, superType` operands at `source/slang/slang-ir-insts.lua:853`. | Add short notable callouts for the three existential projections and for `TypeEqualityWitness`, or explicitly explain any source-backed reason a required item is not applicable. |
+| F-002 | major | `## Opcodes` / Witness tables and witness facts table, line 146 | The `witness_table` row lists only children in the Operands column, but a witness table has operand 0 as the concrete conforming type; the conformance interface is carried by the result `WitnessTableType`. This omission contradicts both the source and the dependency page's structure reference. | `source/slang/slang-ir-insts.h:2241` exposes `IRWitnessTable::getConcreteType()` as `getOperand(0)`, and `source/slang/slang-ir.cpp:5142` creates a witness table with `subType` as the operand and `getWitnessTableType(baseType)` as the result type. | Change the Operands cell to include `concreteType` plus children, matching `structure.md`, and keep the explanation that entries are child instructions. |
+| F-003 | minor | `## Opcodes` / Generic application table, line 95 | The `specialize` row says the AST origin is `GenericAppExpr`, but that visitor is explicitly unimplemented during lowering. The source emits `specialize` while lowering a `GenericAppDeclRef` substitution inside `emitDeclRef`. | `source/slang/slang-lower-to-ir.cpp:7386` has `visitGenericAppExpr` call `SLANG_UNIMPLEMENTED_X`, while `source/slang/slang-lower-to-ir.cpp:14738` handles `GenericAppDeclRef` and emits `emitSpecializeInst` at `source/slang/slang-lower-to-ir.cpp:14796`. | Change the AST-origin cell to reference `GenericAppDeclRef` / generic-substitution lowering in `emitDeclRef`, not `GenericAppExpr`. |
+| F-004 | minor | `## Opcodes` / Runtime type information table, line 159 | The `rtti_object` row says its operands are `(variadic)`, but the C++ wrapper documents one operand: the type the RTTI object describes. | `source/slang/slang-ir-insts.h:2244` says `IRRTTIObject` has 1 operand specifying the type, and the Lua entry at `source/slang/slang-ir-insts.lua:1063` names `rtti_object` with the `RTTIObject` wrapper. | Change the Operands cell from `(variadic)` to a single type operand, for example `type`, and keep the summary focused on the RTTI record. |
+| F-005 | minor | `## Opcodes` / Dispatchers and existential specialization table, lines 214-215 | The `WeakUse` and `FuncTypeOf` rows list no operands, but both are constructed with one operand in the watched source: `WeakUse` wraps the weakly referenced inst, and `FuncTypeOf` is emitted from the lowered function-as-type operand. | `source/slang/slang-ir-insts.h:3526` implements `IRBuilder::getWeakUse(IRInst* inst)` with one operand, and `source/slang/slang-lower-to-ir.cpp:2432` emits `kIROp_FuncTypeOf` with one `irType` operand. | Update the Operands cells to `inst` for `WeakUse` and `value` or `func` for `FuncTypeOf`; if the Lua schema lacks explicit names, note that these are source-usage names. |

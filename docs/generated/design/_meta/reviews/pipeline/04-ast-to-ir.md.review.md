@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:56:27+00:00
+reviewed_at: 2026-06-30T13:32:43+00:00
 target_doc: pipeline/04-ast-to-ir.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 9ab5063bb78269f0497d90eee21d470b180a0ade8c090e36af38aa4c444758ed
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: 8a4f880d8b981d67ad88abf7aa75a535d3a572cbe530098477dde31879574746
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -15,8 +15,8 @@ checklist:
   front_matter_validity: pass
 finding_count: 1
 severity_breakdown:
-  critical: 0
-  major: 1
+  critical: 1
+  major: 0
   minor: 0
   nit: 0
 ---
@@ -24,15 +24,26 @@ severity_breakdown:
 # Review report for pipeline/04-ast-to-ir.md
 
 ## Summary
-The page is structurally complete and most sampled lowering claims match the recorded source commit. One major source-alignment issue remains: the adjacent-pipelines description says the layout IR module is not fed into `linkAndOptimizeIR`, but `linkIR` explicitly considers an existing layout module when linking a target program.
+
+The document satisfies the requested structure, front matter, link shape, and most sampled source claims. The single issue is a factual mismatch in the `IRBuilder` section: it groups `Global` opcodes with hoistable opcodes as deduplicated values, but the source explicitly says global opcodes are hoisted and never deduplicated.
 
 ## Items checked
-- Ran `regenerate.py show pipeline/04-ast-to-ir.md` and reviewed the manifest entry, prompt, resolved watched files, and dependencies on `pipeline/03-semantic-check.md` and `cross-cutting/ir-instructions.md`.
-- Verified front matter fields and resolved all 19 relative links.
-- Checked the required sections against `pipeline-04-ast-to-ir.md` and `_common.md`.
-- Spot-checked 18 source-alignment claims, including `generateIRForTranslationUnit`, `generateIRForSpecializedComponentType`, `generateIRForTypeConformance`, `IRBuilder`, `kIROpFlag_Hoistable`, `kIROpFlag_Global`, `IRModule::create`, `IRModule::buildMangledNameToGlobalInstMap`, entry-point lowering, the decl walk, hashed string literals, NVAPI decorations, block parameters, generics, witness tables, and adjacent `04b` / `04c` pipeline descriptions.
+
+- Read the target document, `_common.md`, the per-doc prompt, and dependency docs `pipeline/03-semantic-check.md` and `cross-cutting/ir-instructions.md`.
+- Resolved the manifest data with `regenerate.py show pipeline/04-ast-to-ir.md` and sampled claims against the watched files `slang-lower-to-ir.h`, `slang-lower-to-ir.cpp`, `slang-ir.h`, `slang-ir.cpp`, `slang-ir-insts.h`, and `slang-ir-insts.lua`.
+- Verified 14 concrete source claims, including the three public lowering entry points, `generateIRForTranslationUnit` entry-point/member lowering, `lowerBuiltinOperatorExpr`, `visitBuiltinOperationIntVal`, `getInterfaceRequirementKey`, pack-count witness lowering, unsupported-assignment diagnostics, synthesized-constructor debug-info gating, `IRModule::create`, `IRBuilder`, and the IR opcode enum include.
+- Checked that the required sections from `pipeline-04-ast-to-ir.md` are present and that the front matter contains the mandatory generated-doc keys.
+- Checked the relative links used by this document to dependency docs, peer generated docs, source files, and handwritten design docs.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Adjacent pipelines`, lines 170-174 | The page says the layout IR module `is not fed into linkAndOptimizeIR`. The source contradicts that absolute wording: `linkIR` adds an existing layout module to the list of IR modules so layout-decorated global symbols are considered during linking. | `source/slang/slang-ir-link.cpp:2120-2127` says `We will also consider the IR global symbols from the IR module attached to the TargetProgram` and then adds `irModuleForLayout` when present. | Replace the absolute statement with a narrower one: the layout IR module is not the executable per-translation-unit module and does not run the mandatory pre-link passes, but an existing layout module is considered by `linkIR` for layout-decorated symbols. |
+| F-001 | critical | `## IRBuilder and instruction creation`, lines 64-69 | The document says `IRBuilder` hash-conses both `hoistable` and `global` values and that `kIROpFlag_Global` opcodes "take part in this deduplication." The source distinguishes the two: hoistable instructions are deduplicated, while global instructions are hoisted but not deduplicated. | `source/slang/slang-ir.h:53-56` says `kIROpFlag_Hoistable` is "a hoistable inst that needs to be deduplicated" and `kIROpFlag_Global` "should always be hoisted but should never be deduplicated." | Revise this bullet to say that `IRBuilder` deduplicates hoistable instructions, while global instructions are always hoisted to module scope but are not deduplicated. Do not list `kIROpFlag_Global` as a deduplication flag. |
+
+## No-issues notes
+
+- The lowering-driver section matches the public signatures and header comments in `source/slang/slang-lower-to-ir.h`.
+- The built-in operator section matches `lowerBuiltinOperatorExpr`, including `%` selecting `FRem` versus `IRem` and the `?:` / `&&` / `||` unexpected cases.
+- The built-in requirement-key discussion matches `getInterfaceRequirementKey`, including the `IRInst*` cache, `BuiltinRequirementModifier`, hoistable `IRBuiltinRequirementKey`, and `IRBuiltinRequirementDecoration`.
+- The pack-count witness section matches the hidden `WitnessTableType(void)` parameter and module-level proof-only witness table implementation.

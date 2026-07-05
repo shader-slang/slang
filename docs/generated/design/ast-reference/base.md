@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-12T09:27:46+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 888b3ebf12ef38e6bb0fc5df559baf57ab8779e5db0363605462869416316fca
+model: claude-opus-4.8
+generated_at: 2026-06-29T13:53:07Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: e0ca12ff3e02ab39e4f5cee7d1fb7b6641e6e7a1df3a23e44d1cceced99127a3
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -29,8 +29,11 @@ The abstract root hierarchy is declared in
 supporting headers belong to this layer:
 
 - [slang-ast-forward-declarations.h](../../../../source/slang/slang-ast-forward-declarations.h)
-  is FIDDLE-generated and defines the `ASTNodeType` enum that gives
-  every concrete `NodeBase` subclass a stable integer tag used by the
+  is a checked-in header that declares the `ASTNodeType` enum and the
+  per-subclass forward `class` declarations, filling in their members
+  from FIDDLE-generated output it `#include`s (the
+  `slang-ast-forward-declarations.h.fiddle` block). The enum gives every
+  concrete `NodeBase` subclass a stable integer tag used by the
   `as<T>()` / `dynamicCast<T>()` infrastructure.
 - [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
   defines the non-node helper types that the AST API exposes
@@ -92,55 +95,21 @@ Fields declared at this level:
 
 Family page: (no dedicated family page)
 
-### SyntaxNodeBase (NodeBase)
-
-The abstract base for nodes that correspond to actual source text and
-therefore carry a `SourceLoc`. It is the common ancestor of every
-parsed AST node.
-
-Fields declared at this level:
-
-- `loc: SourceLoc` — primary source location for the node.
-
-Family page: (no dedicated family page)
-
 ### SyntaxNode (SyntaxNodeBase)
 
 A second-level abstract base used to group syntax nodes that are *not*
 modifiable by modifiers (the main split is below at
-`ModifiableSyntaxNode`). `Expr` and `Modifier` derive directly from
+`ModifiableSyntaxNode`). Its parent `SyntaxNodeBase` (also declared in
+[slang-ast-base.h](../../../../source/slang/slang-ast-base.h)) is the
+abstract base for nodes that correspond to actual source text and so
+carry a `loc: SourceLoc`; `SyntaxNodeBase` is the common ancestor of
+every parsed AST node. `Expr` and `Modifier` derive directly from
 `SyntaxNode`; `ModifiableSyntaxNode` adds modifier storage on top.
 
 Fields declared at this level:
 
-- (no additional state)
-
-Family page: (no dedicated family page)
-
-### Modifier (SyntaxNode)
-
-The abstract base for every modifier and attribute node. Modifiers
-form an intrusive linked list attached to a `ModifiableSyntaxNode`.
-
-Fields declared at this level:
-
-- `next: Modifier*` — next modifier in the linked list on the same
-  piece of syntax.
-- `keywordName: Name*` — the keyword (or attribute name) that
-  introduced this modifier.
-
-Family page: [modifiers.md](modifiers.md)
-
-### ModifiableSyntaxNode (SyntaxNode)
-
-The abstract base for syntax nodes that can carry modifiers (`Stmt`
-and `DeclBase`). Owns a `Modifiers` list and exposes
-`findModifier<T>()` / `hasModifier<T>()` filters.
-
-Fields declared at this level:
-
-- `modifiers: Modifiers` — the linked list of modifiers attached to
-  this node.
+- (no additional state; `loc: SourceLoc` is inherited from
+  `SyntaxNodeBase`)
 
 Family page: (no dedicated family page)
 
@@ -174,6 +143,19 @@ Fields declared at this level:
 
 Family page: [declarations.md](declarations.md)
 
+### ModifiableSyntaxNode (SyntaxNode)
+
+The abstract base for syntax nodes that can carry modifiers (`Stmt`
+and `DeclBase`). Owns a `Modifiers` list and exposes
+`findModifier<T>()` / `hasModifier<T>()` filters.
+
+Fields declared at this level:
+
+- `modifiers: Modifiers` — the linked list of modifiers attached to
+  this node.
+
+Family page: (no dedicated family page)
+
 ### Stmt (ModifiableSyntaxNode)
 
 The abstract base for every statement node.
@@ -198,13 +180,35 @@ Fields declared at this level:
 
 Family page: [expressions.md](expressions.md)
 
+### Modifier (SyntaxNode)
+
+The abstract base for every modifier and attribute node. Modifiers
+form an intrusive linked list attached to a `ModifiableSyntaxNode`.
+
+Fields declared at this level:
+
+- `next: Modifier*` — next modifier in the linked list on the same
+  piece of syntax.
+- `keywordName: Name*` — the keyword (or attribute name) that
+  introduced this modifier.
+
+Family page: [modifiers.md](modifiers.md)
+
 ### Val (NodeBase)
 
 The abstract base for compile-time *values*. `Val`s are deduplicated
 (hash-consed) by the `ASTBuilder`, are not syntax nodes (no
 `SourceLoc`), and use a generic operand list (`m_operands`) rather
 than per-class fields. `Val` subclasses include `Type`, `DeclRefBase`,
-the `IntVal` family, and the `Witness` family.
+the `IntVal` family, and the `Witness` family. `DeclRefBase` (declared
+in [slang-ast-base.h](../../../../source/slang/slang-ast-base.h)) is a
+reference to a declaration with optional generic substitutions; it is
+itself a `Val` so that decl-refs can be hash-consed, and the
+user-facing template `DeclRef<T>` (in
+[slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h))
+is a thin typed wrapper around a `DeclRefBase*`. The non-Type `Val`
+subhierarchy, including `DeclRefBase`, is documented in
+[values.md](values.md).
 
 Fields declared at this level:
 
@@ -226,22 +230,6 @@ Fields declared at this level:
 
 Family page: [types.md](types.md)
 
-### DeclRefBase (Val)
-
-A reference to a declaration, possibly with generic substitutions.
-`DeclRefBase` is itself a `Val` so that decl-refs can be hash-consed.
-The user-facing template `DeclRef<T>` (declared in
-[slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h))
-is a thin typed wrapper around a `DeclRefBase*`.
-
-Fields declared at this level:
-
-- (operands carry the referenced `Decl` and any substitutions; see
-  `Val::m_operands`)
-
-Family page: (no dedicated family page; covered alongside the
-witness and IntVal families in [values.md](values.md))
-
 ## Support types
 
 These non-node types are declared in
@@ -256,9 +244,12 @@ subclasses; they are helpers that wrap or describe nodes.
 | `QualType` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A `Type*` together with l-value/r-value and qualifier information; the type carried by `Expr`. |
 | `SubstitutionSet` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | The set of generic / existential substitutions used to specialize a `Val`. |
 | `LookupResult`, `LookupResultItem` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Result of a name lookup; can hold zero, one, or several decl-refs together with how each was reached. |
+| `NameLoc` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Pairs a `Name*` with the `SourceLoc` where it appeared; used directly by `Decl::nameAndLoc`. |
 | `TypeExp` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A type expression as written by the user (an `Expr` plus the resolved `Type*`). |
 | `WitnessTable` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | A compile-time table of interface-requirement-to-implementation mappings; see the entry in [../glossary.md](../glossary.md). |
 | `SyntaxClass<T>` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Reflection-style handle to a concrete AST class, used by the visitor and `as<T>()` infrastructure. |
+| `BuiltinOperationKind` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Enum tagging a builtin operator (`Add`, `Sub`, `Less`, ...) recognized by the operator fast path. Stored on the synthesized `BuiltinOperatorExpr` and its constant form `BuiltinOperationIntVal`; mapped from operator-name + `OperatorArity` by `getBuiltinOperationKindFromString`. Integer values are part of the serialized/mangled form (append-only). |
+| `printDiagnosticArg` / `getDiagnosticPos` | [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h) | Free-function diagnostic helpers: `printDiagnosticArg` overloads format a `Decl` / `Type` / `TypeExp` / `QualType` / `Val` / `DeclRefBase` into a diagnostic message, and `getDiagnosticPos` overloads recover the `SourceLoc` to anchor a diagnostic at. |
 | `Scope` | [slang-ast-base.h](../../../../source/slang/slang-ast-base.h) | Runtime data structure for name lookup; technically a `NodeBase` but used as a helper, not parsed. |
 
 ## See also

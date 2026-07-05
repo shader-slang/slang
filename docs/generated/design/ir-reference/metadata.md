@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-05T10:25:25+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 156c66694255ff678fb0eaa18abd2bb50bfa9979d070210c7bb229025fcd0b6b
+generated_at: 2026-06-29T16:34:36Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 1f43055876c44da0b02f3e913b22e16142720f3f452022bd3fdfcf1687346392
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -25,9 +25,9 @@ IR pass.
 
 The four families live in distinct Lua entry groups in
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua):
-`Layout` at line ~2652, `Attr` at line ~2685, the `Debug*` opcodes
-between lines ~2747 and ~2785, and `SPIRVAsmOperand` (with the
-parent `SPIRVAsm` block) starting at line ~2786. C++ wrappers (where
+`Layout` at line ~2702, `Attr` at line ~2735, the `Debug*` opcodes
+between lines ~2797 and ~2834, and `SPIRVAsmOperand` (with the
+parent `SPIRVAsm` block at line ~2836) starting at line ~2839. C++ wrappers (where
 they exist) are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). The
 infrastructure used by these opcodes (op flags, `IRBuilder` helpers)
@@ -261,6 +261,10 @@ adapt to the actual image / sampler types in scope.
 - [decorations.md](decorations.md) — the much larger sibling family
   of metadata; `LayoutDecoration` in decorations points back to the
   `Layout` opcodes here.
+- [../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md) — the
+  AST-to-IR lowering stage that introduces the few metadata opcodes
+  with a direct lowering origin (e.g. inline-asm and debug-info
+  emission).
 - [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md) — the
   layout pass and the debug-info insertion pass that introduce most
   of these opcodes.
