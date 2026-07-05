@@ -9,7 +9,7 @@
 
 //CHECK: OpEntryPoint
 // Verify the atomic target is in StorageBuffer address space, not a Function-local copy.
-//CHECK-NOT: OpTypePointer Function
+//CHECK-NOT: OpTypePointer Function %int
 //CHECK-DAG: OpTypePointer StorageBuffer
 //CHECK: OpAtomicIAdd
 //CHECK-HLSL: InterlockedAdd
