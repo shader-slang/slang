@@ -88,6 +88,27 @@ typealias Half<T> = Pair2<T, int>;
 typealias FnAlias<T> = functype(T) -> int;
 int callFn(FnAlias<int> f, int x) { return f(x); }
 
+// --- Case 6: nested-generic body ---
+// The body is Outer<Inner<T>>; the substituted sub type of the optional constraint is
+// Inner<T>, which is a compound DeclRefType whose decl's parentDecl is NOT the alias's
+// own GenericDecl. propagateOptionalConstraintsThroughTypealias must leave the NoneWitness
+// intact so the result is always 0, regardless of whether T satisfies IFoo.
+struct Outer<T> where optional T : IFoo
+{
+    int test() { if (T is IFoo) return 1; return 0; }
+}
+struct Inner<T> {}
+typealias OuterInnerAlias<T> = Outer<Inner<T>>;
+
+// --- Case 7: value-pack param ---
+// ordinaryParamCount must count GenericValuePackParamDecl (let each N : int)
+// so that the constraint slot for T is offset correctly past both T and the value pack.
+struct WithValuePack<T, let each N : int> where optional T : IFoo
+{
+    int test() { if (T is IFoo) return 1; return 0; }
+}
+typealias WithValuePackAlias<T, let each N : int> = WithValuePack<T, N>;
+
 void main()
 {
     // Original: both constraints satisfied.
@@ -122,7 +143,16 @@ void main()
     // Case 5: functype alias is callable.
     int k = callFn((int x) => x + 1, 5);  // 6
 
-    printf("%d %d %d %d %d %d %d %d %d %d %d %d %d\n", a, b, c, d, m, e, f, g, h, i, j, k, l);
+    // Case 6: nested-generic body — sub type is Inner<T>, not a bare type variable.
+    // Propagation is skipped; NoneWitness is left intact so test() always returns 0.
+    int n = OuterInnerAlias<MyFoo>().test();  // 0 — Inner<MyFoo> is not IFoo
+    int o = OuterInnerAlias<int>().test();    // 0
+
+    // Case 7: value-pack alias with zero pack elements (empty N).
+    int p = WithValuePackAlias<MyFoo>().test();  // 1 — MyFoo satisfies IFoo
+    int q = WithValuePackAlias<int>().test();    // 0
+
+    printf("%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n", a, b, c, d, m, e, f, g, h, i, j, k, l, n, o, p, q);
 }
 
-// CHECK: 3 1 0 0 1 5 0 1 0 0 0 6 99
+// CHECK: 3 1 0 0 1 5 0 1 0 0 0 6 99 0 0 1 0

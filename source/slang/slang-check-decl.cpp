@@ -12519,18 +12519,15 @@ void SemanticsDeclHeaderVisitor::propagateOptionalConstraintsThroughTypealias(Ty
     if (!genericAppDeclRef)
         return;
 
-    // Count the ordinary (non-constraint) params in the body generic so we can
-    // identify which args correspond to constraints.
+    // Use getGenericParams to enumerate the body generic's params and constraints in
+    // the same order used by DeclaredSubtypeWitness::_substituteImplOverride so that
+    // constraint-slot indices map directly to arg-vector positions.
     auto bodyGenericDecl = genericAppDeclRef->getGenericDecl();
-    Index ordinaryParamCount = 0;
-    for (auto mm : bodyGenericDecl->getDirectMemberDecls())
-    {
-        if (mm == bodyGenericDecl->inner)
-            continue;
-        if (as<GenericTypeParamDeclBase>(mm) || as<GenericValueParamDecl>(mm) ||
-            as<GenericValuePackParamDecl>(mm))
-            ordinaryParamCount++;
-    }
+    List<Decl*> bodyParams;
+    List<Decl*> bodyConstraints;
+    getGenericParams(bodyGenericDecl, bodyParams, bodyConstraints);
+
+    Index ordinaryParamCount = bodyParams.getCount();
 
     // Build a replacement args list, substituting NoneWitness entries with
     // DeclaredSubtypeWitnesses backed by new optional constraints on parentGenericDecl.
@@ -12539,99 +12536,77 @@ void SemanticsDeclHeaderVisitor::propagateOptionalConstraintsThroughTypealias(Ty
         newArgs.add(genericAppDeclRef->getArg(i));
 
     bool modified = false;
-    Index argIdx = ordinaryParamCount;
-
     auto bodyGenericDeclRef = DeclRef<GenericDecl>(genericAppDeclRef->getGenericDeclRef());
 
-    for (auto mm : bodyGenericDecl->getDirectMemberDecls())
+    for (Index constraintIdx = 0; constraintIdx < bodyConstraints.getCount(); constraintIdx++)
     {
-        // Skip the inner decl (the typedef/struct that the GenericDecl wraps) — it is
-        // not a param or constraint and must not advance argIdx.
-        if (mm == bodyGenericDecl->inner)
-            continue;
-
-        // Skip ordinary (type/value) params — they don't occupy constraint arg slots.
-        if (as<GenericTypeParamDeclBase>(mm) || as<GenericValueParamDecl>(mm) ||
-            as<GenericValuePackParamDecl>(mm))
-            continue;
-
-        // All constraint-slot members advance argIdx regardless of their concrete type.
         // Only GenericTypeConstraintDecl with an optional modifier needs the NoneWitness
-        // replacement; other constraint types (TypeCoercionConstraintDecl, etc.) are left as-is.
-        if (auto constraintDecl = as<GenericTypeConstraintDecl>(mm))
-        {
-            if (argIdx < newArgs.getCount() && as<NoneWitness>(newArgs[argIdx]) &&
-                constraintDecl->hasModifier<OptionalConstraintModifier>())
-            {
-                // Compute the substituted sub/sup types for this constraint by applying
-                // the body type's generic substitution to the constraint's declaration.
-                auto substConstraintDeclRef = m_astBuilder
-                                                  ->getGenericAppDeclRef(
-                                                      bodyGenericDeclRef,
-                                                      genericAppDeclRef->getArgs(),
-                                                      constraintDecl)
-                                                  .as<GenericTypeConstraintDecl>();
-                auto subType = getSub(m_astBuilder, substConstraintDeclRef);
-                auto supType = getSup(m_astBuilder, substConstraintDeclRef);
+        // replacement; other constraint types (TypeCoercionConstraintDecl, pack-count, etc.)
+        // are left as-is.  NoneWitness is only ever produced for GenericTypeConstraintDecl
+        // optional slots (see slang-check-overload.cpp TryCheckOverloadCandidateConstraints).
+        auto constraintDecl = as<GenericTypeConstraintDecl>(bodyConstraints[constraintIdx]);
+        if (!constraintDecl || !constraintDecl->hasModifier<OptionalConstraintModifier>())
+            continue;
 
-                // getSub/getSup should always succeed on a fully-checked optional constraint.
-                SLANG_ASSERT(subType && supType);
-                if (subType && supType)
-                {
-                    // Only propagate when the substituted sub type is a type variable
-                    // that belongs directly to the alias's own generic.  If it is a
-                    // concrete type (e.g. `int` in `typealias Half<T> = Pair<T, int>`)
-                    // the constraint cannot be satisfied through the alias's type params
-                    // and the NoneWitness is the correct permanent result.
-                    auto subTypeDeclRefType = as<DeclRefType>(subType);
-                    if (!subTypeDeclRefType ||
-                        subTypeDeclRefType->getDeclRef().getDecl()->parentDecl != parentGenericDecl)
-                    {
-                        // Leave the NoneWitness intact; advance argIdx below.
-                        argIdx++;
-                        continue;
-                    }
+        Index argIdx = ordinaryParamCount + constraintIdx;
+        if (argIdx >= newArgs.getCount() || !as<NoneWitness>(newArgs[argIdx]))
+            continue;
 
-                    // Add an equivalent optional constraint to the alias's own generic
-                    // so that `Baz<float>` can resolve it against float's conformances.
-                    auto synConstraintDecl = m_astBuilder->create<GenericTypeConstraintDecl>();
-                    synConstraintDecl->nameAndLoc = constraintDecl->getNameAndLoc();
-                    synConstraintDecl->loc = constraintDecl->loc;
-                    synConstraintDecl->parentDecl = parentGenericDecl;
-                    synConstraintDecl->isEqualityConstraint = constraintDecl->isEqualityConstraint;
-                    synConstraintDecl->sub = TypeExp(subType);
-                    synConstraintDecl->sup = TypeExp(supType);
-                    addModifier(
-                        synConstraintDecl,
-                        m_astBuilder->create<OptionalConstraintModifier>());
-                    parentGenericDecl->addDirectMemberDecl(synConstraintDecl);
+        // Compute the substituted sub/sup types for this constraint by applying
+        // the body type's generic substitution to the constraint's declaration.
+        auto substConstraintDeclRef = m_astBuilder
+                                          ->getGenericAppDeclRef(
+                                              bodyGenericDeclRef,
+                                              genericAppDeclRef->getArgs(),
+                                              constraintDecl)
+                                          .as<GenericTypeConstraintDecl>();
+        auto subType = getSub(m_astBuilder, substConstraintDeclRef);
+        auto supType = getSup(m_astBuilder, substConstraintDeclRef);
 
-                    // Pre-check the constraint now, while sub.type/sup.type are known-good.
-                    // Without this, getDefaultSubstitutionArgs would drive it through
-                    // visitGenericTypeConstraintDecl in an uncontrolled context, which could
-                    // trigger AndType flattening on the sup type.
-                    ensureDecl(synConstraintDecl, DeclCheckState::SignatureChecked);
+        // getSub/getSup must always succeed on a fully-checked optional constraint.
+        SLANG_RELEASE_ASSERT(subType && supType);
 
-                    // Invalidate cached default substitution args since we just added a member.
-                    m_astBuilder->m_cachedGenericDefaultArgs.remove(parentGenericDecl);
-                    parentGenericDecl->_cachedArgsForDefaultSubstitution.clear();
+        // Only propagate when the substituted sub type is a bare type variable that belongs
+        // directly to the alias's own generic.  If it is a concrete type (e.g. `int` in
+        // `typealias Half<T> = Pair<T, int>`) or a compound type (e.g. `Bar<T>` in
+        // `typealias Baz<T> = Foo<Bar<T>>`), the constraint cannot be satisfied through
+        // the alias's type params and the NoneWitness is the correct permanent result.
+        auto subTypeDeclRefType = as<DeclRefType>(subType);
+        if (!subTypeDeclRefType ||
+            subTypeDeclRefType->getDeclRef().getDecl()->parentDecl != parentGenericDecl)
+            continue;
 
-                    // Replace the NoneWitness with a DeclaredSubtypeWitness that references
-                    // the new constraint.  DeclaredSubtypeWitness::_substituteImplOverride
-                    // will exchange this for the real witness when Baz is specialized.
-                    auto newWitness = m_astBuilder->getDeclaredSubtypeWitness(
-                        subType,
-                        supType,
-                        m_astBuilder->getDirectDeclRef(synConstraintDecl));
-                    newArgs[argIdx] = newWitness;
-                    modified = true;
-                }
-            }
-        }
+        // Add an equivalent optional constraint to the alias's own generic
+        // so that `Baz<float>` can resolve it against float's conformances.
+        auto synConstraintDecl = m_astBuilder->create<GenericTypeConstraintDecl>();
+        synConstraintDecl->nameAndLoc = constraintDecl->getNameAndLoc();
+        synConstraintDecl->loc = constraintDecl->loc;
+        synConstraintDecl->parentDecl = parentGenericDecl;
+        synConstraintDecl->isEqualityConstraint = constraintDecl->isEqualityConstraint;
+        synConstraintDecl->sub = TypeExp(subType);
+        synConstraintDecl->sup = TypeExp(supType);
+        addModifier(synConstraintDecl, m_astBuilder->create<OptionalConstraintModifier>());
+        parentGenericDecl->addDirectMemberDecl(synConstraintDecl);
 
-        // Every member that reaches this point is a constraint slot (we skipped inner,
-        // ordinary type/value/pack params, and the early-continue paths above).
-        argIdx++;
+        // Pre-check the constraint now, while sub.type/sup.type are known-good.
+        // Without this, getDefaultSubstitutionArgs would drive it through
+        // visitGenericTypeConstraintDecl in an uncontrolled context, which could
+        // trigger AndType flattening on the sup type.
+        ensureDecl(synConstraintDecl, DeclCheckState::SignatureChecked);
+
+        // Invalidate cached default substitution args since we just added a member.
+        m_astBuilder->m_cachedGenericDefaultArgs.remove(parentGenericDecl);
+        parentGenericDecl->_cachedArgsForDefaultSubstitution.clear();
+
+        // Replace the NoneWitness with a DeclaredSubtypeWitness that references
+        // the new constraint.  DeclaredSubtypeWitness::_substituteImplOverride
+        // will exchange this for the real witness when Baz is specialized.
+        auto newWitness = m_astBuilder->getDeclaredSubtypeWitness(
+            subType,
+            supType,
+            m_astBuilder->getDirectDeclRef(synConstraintDecl));
+        newArgs[argIdx] = newWitness;
+        modified = true;
     }
 
     if (modified)
