@@ -2159,6 +2159,16 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     return typeLayout;
 }
 
+/// Return true if `varLayout` records the `SV_Target` system-value semantic (case-insensitive).
+/// This inspects only the stored semantic string, which keeps whatever casing the user wrote (see
+/// the assignment in `processSimpleEntryPointParameter`), hence the case-insensitive compare.
+/// Callers additionally gate on stage / target / resource kind to conclude it is a fragment color
+/// (render-target) output.
+static bool isSVTargetSemantic(VarLayout* varLayout)
+{
+    return varLayout && varLayout->systemValueSemantic.toLower() == "sv_target";
+}
+
 /// Compute layout information for an entry-point parameter `decl`.
 ///
 /// This function should be used for a top-level entry point varying
@@ -2331,6 +2341,31 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
         {
             getSink(context)->diagnose(
                 Diagnostics::VkIndexWithoutVkLocation{.location = indexAttr->loc});
+        }
+        else if (
+            isKhronosTarget(context->getTargetRequest()) && context->stage == Stage::Fragment &&
+            isSVTargetSemantic(varLayout))
+        {
+            // A fragment-shader color output declared with `SV_Target<N>` is, for GLSL/SPIR-V
+            // purposes, an ordinary varying output that belongs at `layout(location = N)`. When no
+            // explicit `[[vk::location]]` is present we would otherwise let the completion pass
+            // auto-assign locations in declaration order, which silently mismatches HLSL (and the
+            // render-target index N) whenever the outputs are declared out of numeric order.
+            // Presetting the `VaryingOutput` location from the `SV_Target<N>` semantic index keeps
+            // GLSL/SPIR-V in agreement with what the user wrote, mirroring the explicit
+            // `[[vk::location(N)]]` path above. WGSL/Metal derive this in the IR-legalization pass
+            // (`fixFieldSemanticsOfFlatStruct`) instead, so this only applies to Khronos targets.
+            //
+            // The `VaryingOutput` guard restricts this to the real fragment-color-output case: a
+            // (degenerate) `SV_Target` used as an input has no `VaryingOutput` resource, so it is
+            // skipped and left to the default system-value handling.
+            if (auto typeResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::VaryingOutput);
+                typeResInfo)
+            {
+                auto varResInfo =
+                    varLayout->findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
+                varResInfo->index = (UInt)varLayout->systemValueSemanticIndex;
+            }
         }
     }
 
@@ -3563,8 +3598,33 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
             for (auto rr : resultTypeLayout->resourceInfos)
             {
                 auto entryPointRes = paramsStructLayout->findOrAddResourceInfo(rr.kind);
-                resultLayout->findOrAddResourceInfo(rr.kind)->index =
-                    entryPointRes->count.getFiniteValue();
+                auto resultRes = resultLayout->findOrAddResourceInfo(rr.kind);
+
+                // Normally the result's resource index is rebased to the entry point's running
+                // count so multiple top-level varying outputs get distinct, packed locations.
+                //
+                // The exception is a *direct* (non-aggregate) fragment return declared with
+                // `SV_Target<N>`, e.g. `float4 pmain() : SV_Target1`. In that case the result IS
+                // the leaf, and `processEntryPointVaryingParameterDecl` has already set its
+                // `VaryingOutput` index to the render-target index N. Rebasing here would clobber
+                // that N with the running count (0), so `SV_Target1` would wrongly land at
+                // location 0. We therefore preserve the preset index for that one case, matching
+                // the struct-field case (where the field index survives as an offset under the
+                // container's base of 0). Only the `SV_Target` semantic can reach a fragment
+                // return's `VaryingOutput` here — `[[vk::location]]` is not permitted on a return.
+                //
+                // Gated on `isKhronosTarget` so this exactly matches the preset above: only Khronos
+                // targets get the preset index, so only they skip the rebase. WGSL/Metal never get
+                // a preset here, so their result layout is rebased exactly as before.
+                bool preservePresetSvTargetLocation =
+                    isKhronosTarget(context->getTargetRequest()) &&
+                    context->stage == Stage::Fragment &&
+                    rr.kind == LayoutResourceKind::VaryingOutput &&
+                    isSVTargetSemantic(resultLayout);
+                if (!preservePresetSvTargetLocation)
+                {
+                    resultRes->index = entryPointRes->count.getFiniteValue();
+                }
                 entryPointRes->count += rr.count;
             }
 
