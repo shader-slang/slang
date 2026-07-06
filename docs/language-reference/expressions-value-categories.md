@@ -8,7 +8,7 @@ Slang has two primary value categories:
   is adequate. It cannot be used as an argument to an `out`/`inout` function parameter. An R-value is
   typically a result of a computation, a value passed as a copy, or a result of a function invocation.
 
-The following are the L-value expressions:
+The following expressions are L-values:
 
 1. Access to a mutable variable
 2. Access to an `out`/`inout`/`__ref` parameter
@@ -19,8 +19,7 @@ The following are the L-value expressions:
 6. Access to a property when it has a setter accessor and the base is an L-value
 7. Applying a subscript operator when both:
    - The base is an L-value
-   - The subscript operator is a built-in operator OR the subscript operator is user-defined with a setter
-     accessor
+   - The subscript operator is built-in, OR it is user-defined with a setter accessor
 8. Access to `this` in a mutating context
 9. Return value for a non-copyable return type
 10. Access to a member when the base is an L-value
@@ -29,7 +28,7 @@ The following are the L-value expressions:
     - The swizzle expression has no duplicate components
 12. Cast of an L-value object to a conforming type
 13. Access to an interface-typed mutable object (dynamic dispatch)
-14. Implicit casts that preserve L-value (`inout`/`out` parameters)
+14. Implicit casts that preserve the L-value category (e.g. for `inout`/`out` parameters)
 
 Other expressions are R-value expressions.
 
@@ -47,7 +46,7 @@ Slang expressions are also categorized as addressable and non-addressable:
 L-values are required in the following places:
 
 - Argument to an `out`/`inout`/`__ref` parameter
-- Left-side-operand of an assignment operator, including compound assignment operators
+- Left-hand-side operand of an assignment operator, including compound assignment operators
 - Operand to pre-increment, pre-decrement, post-increment, and post-decrement operators
 - Object receiving a `[mutating]` or `[ref]` member function call
 - Object receiving a property setter call or a user-defined subscript operator setter call, unless the setter
