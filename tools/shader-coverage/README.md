@@ -189,8 +189,9 @@ for (uint32_t i = 0; i < entryCount; ++i) {
 ```
 
 The host allocates a `counterCount`-element counter buffer at the width
-reported by `CoverageBufferInfo::elementByteWidth` (`uint64` by default,
-`uint32` under `-trace-coverage-counter-width 32`), binds it
+reported by `CoverageBufferInfo::elementByteWidth` (`uint64` by default;
+`uint32` under `-trace-coverage-counter-width 32` or on Metal targets,
+where the width is capped automatically), binds it
 using the hidden binding information reported through
 `ISyntheticResourceMetadata`, dispatches the shader, reads the
 counters back, and consumes the source entries however it likes —
@@ -357,7 +358,7 @@ declares the slot in its own pipeline layout / root signature.
 
 ### Compiler instrumentation
 
-| Backend                                   | Default `-trace-coverage`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `-trace-coverage-binding=N:0`          | `-trace-coverage-binding=N:M` (M ≠ 0) |
+| Backend                                   | Default `-trace-coverage`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `-trace-coverage-binding N 0`          | `-trace-coverage-binding N M` (M ≠ 0) |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------- |
 | CPU source                                | Supported                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | (no-op — backend uses uniform offsets) | (no-op)                               |
 | Vulkan / SPIR-V (incl. MoltenVK on macOS) | Supported. Auto-allocation uses the descriptor set after the highest shader-visible or host-reserved set at binding 0.                                                                                                                                                                                                                                                                                                                                                                                                                                     | Supported                              | Compiler-side decoration correct      |

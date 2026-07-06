@@ -148,8 +148,9 @@ counters are inserted, with examples, see
    `GlobalParams` struct. The pass:
    - **Synthesizes the coverage buffer** as a fresh `IRGlobalParam`
      of type `RWStructuredBuffer<uint64_t>` by default, or
-     `RWStructuredBuffer<uint>` when the user passes
-     `-trace-coverage-counter-width 32`. See the "Counter element
+     `RWStructuredBuffer<uint>` when the effective width is 32 —
+     requested via `-trace-coverage-counter-width 32`, or capped
+     automatically on Metal targets. See the "Counter element
      width" section below for the tradeoff. The buffer carries a
      target-aware layout:
      `UnorderedAccess` for D3D-style targets, `MetalBuffer` for
