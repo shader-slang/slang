@@ -4039,10 +4039,11 @@ static Expr* _peelCastsAndParens(Expr* expr)
 }
 
 // Check whether two expressions refer to the same storage location by
-// comparing their structure in lockstep. Handles bare variable
-// references, member accesses (s.x == s.x, but not s.x == s.y), and
-// subscripts with matching constant indices (arr[0] == arr[0], but not
-// arr[0] == arr[1]). Returns false for anything it can't prove equal.
+// comparing their structure in lockstep. Handles the implicit object
+// (`this` == `this`), bare variable / static-member references, member
+// accesses (s.x == s.x, but not s.x == s.y), and subscripts with matching
+// constant indices (arr[0] == arr[0], but not arr[0] == arr[1]). Returns
+// false for anything it can't prove equal.
 static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
 {
     a = _peelCastsAndParens(a);
@@ -4081,8 +4082,10 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
     if (auto aDeclRef = as<DeclRefExpr>(a))
     {
         auto bDeclRef = as<DeclRefExpr>(b);
-        bool bIsStaticMemberExpr = bDeclRef && !as<MemberExpr>(b);
-        return bIsStaticMemberExpr && aDeclRef->declRef.getDecl() == bDeclRef->declRef.getDecl();
+        // A bare DeclRefExpr is a VarExpr or StaticMemberExpr — any DeclRefExpr
+        // that is not a (non-static) MemberExpr, which was already handled above.
+        bool bIsBareDeclRef = bDeclRef && !as<MemberExpr>(b);
+        return bIsBareDeclRef && aDeclRef->declRef.getDecl() == bDeclRef->declRef.getDecl();
     }
 
     // Same element of the same base: arr[0] vs arr[0].

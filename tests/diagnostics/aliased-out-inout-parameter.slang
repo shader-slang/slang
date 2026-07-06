@@ -85,6 +85,19 @@ void expandBoundingBox(uint index, BoundingBox bbox)
     InterlockedMin(boundingBoxes[index].minBounds[0], bbox.minBounds[0], unused);
 }
 
+struct WithStatic { static int counter; }
+
+// Regression for #11878: a static member is a StaticMemberExpr, which derives
+// from DeclRefExpr but is not a MemberExpr, so it goes through the bare-DeclRef
+// branch (guarded by `!as<MemberExpr>(b)`). Passing the same static to both
+// inout params refers to the same storage and must still be flagged.
+void staticMemberAlias()
+{
+    twoInoutInt(WithStatic.counter, WithStatic.counter);
+//CHECK:                   ^^^^^^^ potentially aliased argument to 'out'/'inout'/'ref' parameter
+//CHECK:                   ^^^^^^^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing the same value to both may produce unexpected results
+}
+
 [numthreads(1,1,1)]
 void computeMain()
 {
