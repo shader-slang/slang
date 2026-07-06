@@ -813,9 +813,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half1 make___half1(__half x)
 #if SLANG_CUDA_ENABLE_BF16
 SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_bfloat16)
 #if !SLANG_CUDA_RTC
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16 make___nv_bfloat161(__nv_bfloat16 x)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat161 make___nv_bfloat161(__nv_bfloat16 x)
 {
-    return __nv_bfloat16{x};
+    return __nv_bfloat161{x};
 }
 #endif
 #endif
@@ -824,13 +824,13 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16 make___nv_bfloat161(__nv_bfloat
 SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_fp8_e4m3)
 SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_fp8_e5m2)
 #if !SLANG_CUDA_RTC
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e4m3 make___nv_fp8_e4m31(__nv_fp8_e4m3 x)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e4m31 make___nv_fp8_e4m31(__nv_fp8_e4m3 x)
 {
-    return __nv_fp8_e4m3{x};
+    return __nv_fp8_e4m31{x};
 }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e5m2 make___nv_fp8_e5m21(__nv_fp8_e5m2 x)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e5m21 make___nv_fp8_e5m21(__nv_fp8_e5m2 x)
 {
-    return __nv_fp8_e5m2{x};
+    return __nv_fp8_e5m21{x};
 }
 #endif
 #endif
