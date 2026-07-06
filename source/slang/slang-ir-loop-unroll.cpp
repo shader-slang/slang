@@ -544,9 +544,6 @@ bool unrollLoopsInFunc(
     if (loops.getCount() == 0)
         return true;
 
-    if (outChanged)
-        *outChanged = true;
-
     for (auto loop : loops)
     {
         if (!loop->parent)
@@ -563,6 +560,13 @@ bool unrollLoopsInFunc(
                 sink->diagnose(Diagnostics::CannotUnrollLoop{.location = loopLoc});
             return false;
         }
+
+        // Only report a change once a loop has actually been rewritten:
+        // callers (the specialize fixpoint) take another full simplification
+        // round when this fires, and a collected-but-orphaned loop that the
+        // guard above skips must not trigger that.
+        if (outChanged)
+            *outChanged = true;
 
         // Make sure we simplify things as much as possible before
         // attempting to potentially unroll outer loop.
