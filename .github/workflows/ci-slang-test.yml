@@ -71,11 +71,18 @@ jobs:
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
 
-      - name: Compile offline CUDA prelude test
-        if: inputs.os == 'windows'
+      # Compiles the offline (non-NVRTC) branch of the CUDA prelude, which
+      # slang-test cannot reach: its CUDA pass-through compiles through NVRTC,
+      # which takes the other SLANG_CUDA_RTC branch of the prelude. Compiling
+      # is the whole test — the guarded regressions are type errors.
+      # Requires nvcc, which the full-gpu-tests Windows runners provide as
+      # part of the CUDA toolkit. -std pins a fixed language mode so a
+      # toolkit-default change cannot silently alter what this step tests.
+      - name: Compile offline (non-NVRTC) CUDA prelude test
+        if: inputs.os == 'windows' && inputs.full-gpu-tests
         run: >-
           nvcc -std=c++17 -c tests/cuda/cuda-prelude-vec1-make.cu
-          -I prelude -o cuda-prelude-vec1-make.obj
+          -I prelude -o "${{ runner.temp }}/cuda-prelude-vec1-make.obj"
 
       - name: Test Slang
         run: |
