@@ -381,7 +381,7 @@ declares the slot in its own pipeline layout / root signature.
 - **Column position is dropped.** Only `(file, line)` reaches LCOV.
 - **Counter width is selectable.** `uint64` by default (effectively
   never wraps); `-trace-coverage-counter-width 32` opts down to `uint32`,
-  which saturates at ~4 × 10⁹ hits per slot. Multiple ops on the same
+  which wraps silently at 2^32 hits per slot. Multiple ops on the same
   source line accumulate independently before LCOV-emit-time aggregation.
 
 ## Current limitations
