@@ -235,6 +235,11 @@ enum class AnnotationKind
     DifferentialPtrPairType = 13,
     DifferentialZero = 14,
     DifferentialAdd = 15,
+
+    // Sentinel — keep last. `cloneAnnotations` in slang-ir-link.cpp
+    // static_asserts against this value so that adding a kind forces a visit
+    // to the pruning gate (see the note above this enum).
+    CountOf = 16,
 };
 
 

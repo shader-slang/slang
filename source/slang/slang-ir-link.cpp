@@ -237,6 +237,14 @@ static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRI
     // of distinguishing kinds. This restores the pre-PR-#9808 behavior where
     // derivative info was never linked into non-differentiating programs (see
     // `canPruneAutodiffLinkArtifacts` for the full safety argument).
+    //
+    // If this static_assert fires, a new `AnnotationKind` was added: confirm it
+    // is auto-diff-related and bump the count, or teach this gate to
+    // distinguish kinds — otherwise the new annotations are silently dropped
+    // from every non-differentiating program.
+    static_assert(
+        int(AnnotationKind::CountOf) == 16,
+        "AnnotationKind changed: revisit cloneAnnotations' wholesale-skip gate");
     if (context->getShared()->canPruneAutodiffLinkArtifacts())
         return;
 
@@ -2100,13 +2108,14 @@ static bool containsTranslateInst(IRInst* inst)
 // completeness load-bearing: a false negative does not just skip extra link
 // work, it strips annotations and defers witness entries that auto-diff
 // processing would later need. The scan is therefore a full recursive walk,
-// not just a walk of module-scope insts: a translation request on a concrete
-// callee hoists to module scope (`IRTranslateBase` is hoistable), but a
-// request whose callee depends on a generic parameter hoists only into the
-// enclosing generic — e.g. `__fwd_diff(genericFn)` lowers to a generic
-// wrapper whose inner value is `ForwardDifferentiate(specialize(genericFn,
-// T, ...))` (see tests/autodiff/no-diff-interface-subscript.slang, which
-// miscompiled with an ICE in DiffPair lowering when the scan missed it).
+// not just a walk of module-scope insts: although `IRTranslateBase` is
+// hoistable, translation requests routinely sit inside function and generic
+// bodies rather than as direct module-scope insts (a request whose callee
+// depends on a generic parameter cannot hoist past the generic that owns it,
+// e.g. tests/autodiff/fwd-diff-nested-in-generic.slang). This is empirically
+// load-bearing: replacing this walk with a module-scope-children-only scan
+// fails ~240 tests under tests/autodiff/, including an ICE in DiffPair
+// lowering on tests/autodiff/no-diff-interface-subscript.slang.
 bool doesModuleUseAutodiff(IRModule* module)
 {
     return containsTranslateInst(module->getModuleInst());
