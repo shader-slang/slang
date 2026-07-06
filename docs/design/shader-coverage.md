@@ -213,7 +213,9 @@ Relaxed)` in the default counting mode, or as a plain non-atomic
    the synthesized buffer. The exact spelling shifts with the chosen
    counter width (see "Counter element width" below); both 32-bit
    and 64-bit forms reduce to the backend's native atomic-add
-   intrinsic:
+   intrinsic. (The corresponding _host-side_ obligations — device
+   features to enable per backend before dispatch — are documented in
+   [`shader-coverage-host-interface.md`](shader-coverage-host-interface.md).)
    - HLSL/DXIL → `InterlockedAdd` (DXC SM6.6 has a `uint64_t`
      overload; SM5.x / SM6.0–6.5 require uint32).
    - SPIR-V → `OpAtomicIAdd`. The emitter auto-declares
@@ -247,42 +249,23 @@ controlled by `-trace-coverage-counter-width <bits>`:
   does not support 64-bit shader atomic add.
 
 The compiler cannot see the runtime driver and therefore cannot
-auto-pick the width on the customer's behalf. Two cases where 32-bit
-is the right choice:
+auto-pick the width on the customer's behalf — the choice is the
+caller's, informed by what the runtime driver supports. The chosen
+width is recorded on `CoverageBufferInfo::elementByteWidth` and the
+manifest so hosts never have to guess it back.
 
-- **MoltenVK on Apple Silicon** (as of MoltenVK 1.4) reports
-  `shaderBufferInt64Atomics = false` and does not expose
-  `VK_KHR_shader_atomic_int64`. SPIR-V compiled at the 64-bit
-  default fails at `vkCreateShaderModule` / pipeline-create.
-- **HLSL targeting Shader Model 5.x / 6.0–6.5**. DXC's
-  `InterlockedAdd(uint64_t, ...)` overload requires SM6.6 and the
-  `Int64BufferAtomics` shader feature. The Slang front-end does not
-  reject the 64-bit width when the requested HLSL profile is older
-  than SM6.6 — it emits the `uint64_t` `InterlockedAdd` call against
-  the chosen profile, and DXC rejects the resulting HLSL at downstream
-  compile time. Callers targeting older profiles must pass
-  `-trace-coverage-counter-width 32` themselves.
+Invalid widths are rejected loudly on both entry paths (CLI:
+`E45113`; API: `E45114`) rather than silently coerced to uint32 —
+silent coercion would hide a caller's misconfiguration, most
+realistically forwarding the bit width to the byte-width API option
+without dividing by 8.
 
-The chosen width is recorded on the manifest's
-`buffer.element_type` (`"uint32"` or `"uint64"`) and
-`buffer.element_stride` (`4` or `8`) fields, and on the public
-`CoverageBufferInfo::elementByteWidth`. Host code reading back the
-counter buffer must allocate `getCounterCount() * elementByteWidth`
-bytes and interpret each slot as a little-endian unsigned integer
-of that width. The bundled LCOV converter
-(`tools/shader-coverage/slang-coverage-to-lcov.py`) and the
-shader-coverage demos both follow this contract.
-
-Invalid values are rejected on both entry paths. On the CLI,
-`-trace-coverage-counter-width` accepts only the bit values `32` or
-`64`; anything else (`16`, `128`, etc.) produces a clear
-`E45113 coverage-counter-width-invalid` front-end diagnostic. The
-public API option `CompilerOptionName::TraceCoverageCounterByteWidth`
-accepts only `4` or `8`; a host that sets some other
-value — most realistically by forwarding the bit width `32`/`64`
-without dividing by 8 — fails codegen with
-`E45114 coverage-counter-width-bytes-invalid` rather than silently
-falling back to uint32.
+The host-facing side of this contract — per-backend device
+requirements for the 64-bit default, the cases where 32-bit is the
+only executable choice, the exact accepted option values, and the
+readback stride rules — is documented in
+[`shader-coverage-host-interface.md`](shader-coverage-host-interface.md)
+under "Counter element width and device requirements".
 
 Coverage marker ops are side-effectful by default in DCE analysis, so
 they survive optimizations untouched until the coverage pass rewrites
@@ -413,53 +396,15 @@ dashboards, any non-Slang-linked tool) to embed a Slang process to
 query the metadata, defeating the point of shipping precompiled
 shaders without the toolchain.
 
-## Host integration workflows
+## Host integration
 
-Two equally-supported workflows, each suited to a different host
-architecture. In-process hosts query `ICoverageTracingMetadata` for
-counter attribution and `ISyntheticResourceMetadata` for binding;
-offline hosts consume the serialized sidecar produced from those same
-metadata interfaces.
-
-### A. In-process compile (Slang C++ API)
-
-Audience: applications that compile shaders at runtime via Slang's
-C++ API — production engines, custom shader runtimes, content-
-creation applications, compute applications.
-
-The host queries metadata directly from the compiled artifact, reads
-the hidden resource binding from `ISyntheticResourceMetadata` and
-source-entry attribution from `ICoverageTracingMetadata`,
-and declares the slot in its own pipeline-layout / root-signature code.
-No file I/O is involved; the
-`.coverage-manifest.json` sidecar is not produced or read.
-
-The host is free to consume the source-entry attribution in whatever
-shape suits it — write its own LCOV, feed an internal dashboard,
-log directly to telemetry, etc.
-
-### B. Precompiled with sidecar (slangc CLI)
-
-Audience: workflows that compile shaders offline (typically via
-`slangc`) and dispatch them later, possibly on a different machine
-or in a process where Slang isn't linked. Game engines shipping
-with prebuilt shaders, vendor runtimes, CI pipelines.
-
-`slangc` writes `<output>.coverage-manifest.json` next to each compiled
-artifact when any coverage mode emits source entries. The sidecar is
-the on-disk serialization of the coverage attribution plus synthetic
-resource binding metadata. The dispatching host reads the sidecar,
-declares the slot in its pipeline layout, and proceeds as in workflow
-A. The Python LCOV converter under `tools/shader-coverage/` consumes
-the same sidecar later when converting readback counters to LCOV.
-
-### Convenience layers (planned follow-up)
-
-A helper library could provide a C ABI that handles
-`.coverage-manifest.json` parsing, counter accumulation across
-dispatches, and LCOV serialization for hosts that want LCOV output
-without implementing the format themselves. It would not be required
-for either workflow above.
+The practical workflow walkthroughs for both channels — the
+in-process compile-API path and the precompiled-with-sidecar path,
+with diagrams and code — live in
+[`tools/shader-coverage/README.md`](../../tools/shader-coverage/README.md)
+under "Integration workflows". The per-target binding mechanics
+(descriptor sets, `[[buffer(N)]]`, uniform marshaling) live in
+[`shader-coverage-host-interface.md`](shader-coverage-host-interface.md).
 
 ## Roadmap
 
