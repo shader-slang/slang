@@ -3653,9 +3653,13 @@ static bool typeContainsNonCopyableImpl(Type* type, ASTBuilder* astBuilder, Hash
         return true;
     if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
     {
-        // Guard against cycles (e.g. recursive struct definitions).
+        // Guard against cycles (mutual struct references on the current recursion path).
+        // We remove structDecl on exit so that sibling instantiations of the same generic
+        // struct decl are not skipped — e.g. `Wrapper<int>` and `Wrapper<Atomic<int>>`
+        // share the same StructDecl* but must be traversed independently.
         if (!visited.add(structDecl))
             return false;
+        SLANG_DEFER(visited.remove(structDecl));
         auto substs = SubstitutionSet(declRefType->getDeclRef());
         for (auto field : structDecl->getFields())
         {
