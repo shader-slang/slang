@@ -56,6 +56,18 @@ directly or convert the snapshot to LCOV `.info` via
 [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py). LCOV is
 consumable by `genhtml`, Codecov, VS Code Coverage Gutters, etc.
 
+Two complete, runnable example programs demonstrate the whole
+workflow — compile with coverage, bind the counter buffer, dispatch,
+read back, and render a report:
+
+- [`examples/shader-coverage-image-pipeline`](../../examples/shader-coverage-image-pipeline/) —
+  a multi-stage image-processing pipeline (denoise → tone map →
+  gamma) showing how branch and function coverage surface
+  unexercised code paths.
+- [`examples/shader-coverage-bvh-traversal`](../../examples/shader-coverage-bvh-traversal/) —
+  a software BVH ray-traversal kernel showing how coverage exposes
+  input-shape gaps in test data (rare-case paths that never run).
+
 For the pipeline architecture, design rationale, and alternatives
 weighed, see
 [`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md)
@@ -305,8 +317,8 @@ Flat little-endian array of `N` counters, no header. Element width is
 reported by `manifest.buffer.element_stride` /
 `CoverageBufferInfo::elementByteWidth`. Indexed by
 `CoverageEntryInfo::counterIndex` / manifest `counter`. uint64 slots
-effectively never wrap; uint32 slots saturate at ~4 × 10⁹ hits per slot
-(see [Current limitations](#current-limitations)).
+effectively never wrap; uint32 slots wrap silently at 2^32 hits per
+slot.
 
 ---
 
@@ -376,21 +388,31 @@ declares the slot in its own pipeline layout / root signature.
 
 ## Current limitations
 
-- **`-trace-coverage-binding=N:M` with `M != 0`** — the compiler
-  emits the correct `(set, register)` decoration on every backend.
-  Whether the host's binding code routes that correctly depends on
-  the host. A pre-existing slang-rhi limitation around multi-
-  descriptor-set support is tracked at
-  [shader-slang/slang#10959](https://github.com/shader-slang/slang/issues/10959);
-  hosts using their own pipeline-layout code are unaffected.
-- **Metal end-to-end dispatch** — a pre-existing slang-rhi Metal
-  binding/initialization quirk causes atomic writes to land in the
-  wrong buffer. Not a coverage-feature defect; tracked at
+- **Metal requires 32-bit counters.** MSL provides no 64-bit atomic
+  fetch-add, so counting-mode coverage on Metal targets must compile
+  with `-trace-coverage-counter-width 32`; the default 64-bit width
+  fails in the Metal compiler. Direct Metal hosts work end-to-end at
+  32-bit (see the binding recipe in
+  `docs/design/shader-coverage-host-interface.md`); the `slang-rhi`
+  Metal backend separately returns garbage counter values due to a
+  binding quirk tracked at
   [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724).
-  On Apple silicon, use Vulkan via MoltenVK.
 - **Auto-allocation can add a descriptor set on Vulkan / SPIR-V.**
   Direct hosts must include the reported coverage `(set, binding)` in
   their pipeline layout and bind the counter buffer there. Hosts that
   require a fixed existing set can use `-trace-coverage-binding`.
   Hosts that reserve descriptor sets outside the shader IR can use
   `-trace-coverage-reserved-space`.
+- **`-trace-coverage-reserved-space` is Khronos-only.** D3D
+  register-space reservation (and the D3D12 runtime binding policy in
+  general) is a follow-up, tracked at
+  [shader-slang/slang#11169](https://github.com/shader-slang/slang/issues/11169);
+  D3D hosts pin a slot with `-trace-coverage-binding` instead.
+- **Branch coverage is statement-level.** `-trace-branch-coverage`
+  instruments `if` / `else` arms, loop-condition outcomes, and
+  `switch` dispatch arms; expression-level short-circuit (`&&` /
+  `||`) and ternary (`?:`) branches are not instrumented yet.
+- **WGSL and LLVM-emitted CPU targets are not instrumented.**
+  Coverage tracing emits warning E45102 and skips instrumentation on
+  these targets (see the support matrix above for details and
+  workarounds).
