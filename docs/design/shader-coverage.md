@@ -224,10 +224,11 @@ Relaxed)` in the default counting mode, or as a plain non-atomic
    - GLSL → `atomicAdd`
    - Metal → `atomic_fetch_add_explicit` on `atomic_uint` only. MSL
      provides no 64-bit fetch-add (its `_valid_fetch_add_type`
-     constraint rejects `atomic_ulong`), so Metal coverage requires
-     32-bit counters via `-trace-coverage-counter-width 32`; emitting
-     the default 64-bit counters fails in the Metal compiler with
-     "no matching function for call to 'atomic_fetch_add_explicit'".
+     constraint rejects `atomic_ulong`), so the pipeline automatically
+     caps counting-mode counters to 32-bit for Metal targets before
+     instrumentation; an explicitly requested 64-bit width is capped
+     with warning W45115. Boolean mode is exempt from the cap — its
+     plain non-atomic stores compile at either width.
    - WGSL / LLVM-emitted CPU targets → not reached today; coverage
      instrumentation is skipped before rewrite for these targets
    - CUDA → `atomicAdd((unsigned long long*)..., 1ULL)` for uint64

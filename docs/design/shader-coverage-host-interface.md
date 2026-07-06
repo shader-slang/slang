@@ -198,10 +198,12 @@ buffer indices used by reflected shader parameters (or pinned with
    is the expected sentinel on Metal (no descriptor-space dimension),
    and the CPU/CUDA marshaling fields stay at their unavailable
    sentinels (`uniformOffset == -1`, `uniformStride == 0`),
-2. compiles with `-trace-coverage-counter-width 32` (API:
-   `CompilerOptionName::TraceCoverageCounterByteWidth` = `4`) — MSL
-   provides `atomic_fetch_add_explicit` only for 32-bit `atomic_uint`,
-   so 32-bit is the only executable counter width on Metal,
+2. allocates uint32 counter slots — MSL provides
+   `atomic_fetch_add_explicit` only for 32-bit `atomic_uint`, so the
+   compiler automatically caps counting-mode counters to 32-bit on
+   Metal targets (an explicitly requested 64-bit width is capped with
+   warning W45115); `CoverageBufferInfo::elementByteWidth` reports the
+   effective width as usual,
 3. allocates a zero-initialized `MTLBuffer` of
    `getCounterCount() * 4` bytes and sets it on the compute encoder at
    index `binding` (`setBuffer(counterBuffer, 0, binding)`),
@@ -314,9 +316,10 @@ creation is rejected and no counters are written:
   it emits the `uint64_t` `InterlockedAdd` call, and DXC then rejects
   the resulting HLSL at downstream compile. Callers targeting SM 5.x
   or SM 6.0–6.5 must pass `-trace-coverage-counter-width 32`.
-- **Metal** — MSL provides no 64-bit atomic fetch-add at all;
-  counting-mode coverage on Metal targets requires
-  `-trace-coverage-counter-width 32`.
+- **Metal** — MSL provides no 64-bit atomic fetch-add at all; the
+  compiler automatically caps counting-mode counters to 32-bit on
+  Metal targets (an explicitly requested 64-bit width is capped with
+  warning W45115), so no device opt-in exists or is needed.
 - **CUDA / CPU** — no device opt-in; the backend selects the 64-bit
   atomic-add form directly.
 

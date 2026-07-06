@@ -386,15 +386,19 @@ declares the slot in its own pipeline layout / root signature.
 
 ## Current limitations
 
-- **Metal requires 32-bit counters.** MSL provides no 64-bit atomic
-  fetch-add, so counting-mode coverage on Metal targets must compile
-  with `-trace-coverage-counter-width 32`; the default 64-bit width
-  fails in the Metal compiler. Direct Metal hosts work end-to-end at
-  32-bit (see the binding recipe in
-  `docs/design/shader-coverage-host-interface.md`); the `slang-rhi`
-  Metal backend separately returns garbage counter values due to a
-  binding quirk tracked at
+- **Metal counters are always 32-bit.** MSL provides no 64-bit atomic
+  fetch-add, so the compiler automatically caps counting-mode counters
+  to uint32 on Metal targets; an explicitly requested 64-bit width is
+  capped with warning W45115. The practical effect is silent
+  wraparound past 2^32 hits per counter slot (boolean mode is
+  unaffected). Metal is otherwise fully supported for direct hosts —
+  see the binding recipe in
+  `docs/design/shader-coverage-host-interface.md`.
+- **The `slang-rhi` Metal backend returns garbage counter values** due
+  to a binding quirk tracked at
   [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724).
+  This affects only hosts that dispatch through `slang-rhi` on Metal;
+  direct Metal hosts are unaffected.
 - **Auto-allocation can add a descriptor set on Vulkan / SPIR-V.**
   Direct hosts must include the reported coverage `(set, binding)` in
   their pipeline layout and bind the counter buffer there. Hosts that
