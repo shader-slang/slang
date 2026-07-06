@@ -517,26 +517,20 @@ Tracked outside this repository:
   unaffected.
   [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724).
 
-### GPU-specific differentiators (optional)
+### Possible extensions
 
-Capabilities that don't exist elsewhere in the shader coverage /
-profiling ecosystem.
+Directions that have come up but have no design or commitment behind
+them; none gates any of the work above.
 
 - **Hot-line profiling.** Sample the same counters over time for
-  per-line heatmaps. No external profiler install required;
-  cross-vendor.
+  per-line heatmaps.
 - **Per-lane attribution.** Divergence-oriented reporting would need
   dedicated metadata and storage semantics when implemented; it is not
   part of the current source-coverage API.
 - **Native vendor-tool exports.** Nsight, RenderDoc, PIX — so
   graphics engineers see coverage in tools they already use.
-
-### Tooling (optional)
-
-Adoption-helping additions, not gating any feature work:
-
-- Codecov / Coveralls upload shim — one-liner CI recipe for
+- **Codecov / Coveralls upload shim.** One-liner CI recipe for
   pushing per-PR coverage to SaaS dashboards.
-- Python bindings for `ICoverageTracingMetadata` + pytest plugin
+- **Python bindings for `ICoverageTracingMetadata` + pytest plugin**
   for slangpy users (unified Python + shader coverage in one
   report).
