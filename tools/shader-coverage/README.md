@@ -56,9 +56,9 @@ directly or convert the snapshot to LCOV `.info` via
 [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py). LCOV is
 consumable by `genhtml`, Codecov, VS Code Coverage Gutters, etc.
 
-Two complete, runnable example programs demonstrate the whole
-workflow — compile with coverage, bind the counter buffer, dispatch,
-read back, and render a report:
+Two runnable example programs demonstrate the workflow — compile
+with coverage, bind the counter buffer, dispatch, read back, and
+render a report:
 
 - [`examples/shader-coverage-image-pipeline`](../../examples/shader-coverage-image-pipeline/) —
   a multi-stage image-processing pipeline (denoise → tone map →
