@@ -1667,14 +1667,9 @@ void forEachAssociatedCallee(IRInst* callee, TFunc callback)
         });
 }
 
-bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache)
+// Computes the uncached answer for `doesCalleeHaveSideEffect`.
+static bool computeCalleeSideEffect(IRInst* callee)
 {
-    if (cache)
-    {
-        if (auto cached = cache->tryGetValue(callee))
-            return *cached;
-    }
-
     bool sideEffect = !isNoSideEffectCallee(callee);
 
     // If the callee has no side effect, check if any of its associated functions have side
@@ -1697,6 +1692,32 @@ bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache)
                 return;
             });
     }
+
+    return sideEffect;
+}
+
+bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache)
+{
+    if (cache)
+    {
+        if (auto cached = cache->tryGetValue(callee))
+        {
+#ifdef _DEBUG
+            // Verify the memoization contract: within a cache's lifetime the
+            // fresh answer may only move from true to false (passes remove
+            // annotations and add purity decorations, never the reverse), so a
+            // cached answer must equal the fresh one or err conservatively. A
+            // failure here means a pass ran under a shared cache while creating
+            // an IRAnnotation or removing a no-side-effect decoration — see
+            // IRDeadCodeEliminationOptions::calleeSideEffectCache.
+            const bool fresh = computeCalleeSideEffect(callee);
+            SLANG_ASSERT(*cached == fresh || (*cached && !fresh));
+#endif
+            return *cached;
+        }
+    }
+
+    bool sideEffect = computeCalleeSideEffect(callee);
 
     if (cache)
         cache->add(callee, sideEffect);

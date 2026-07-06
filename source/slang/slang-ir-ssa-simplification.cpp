@@ -61,10 +61,16 @@ void simplifyIR(
     // the per-function fixpoint below runs eliminateDeadCode O(functions x
     // iterations) times, and each uncached invocation re-walks shared callees'
     // use lists (see IRDeadCodeEliminationOptions::calleeSideEffectCache) —
-    // quadratic in the call-site count of builtins like `sin`. Sharing one
-    // memo across the whole pass is sound because the passes driven here never
-    // create `IRAnnotation`s, so a cached answer can only go conservatively
-    // stale (an inst stays alive one extra round).
+    // quadratic in the call-site count of builtins like `sin`.
+    //
+    // Sharing one memo across the whole pass is sound because the fixpoint's
+    // passes keep the answer monotone: none of them creates an `IRAnnotation`
+    // or removes a no-side-effect/read-none decoration (they only remove
+    // annotations and add purity decorations), so a cached answer can only go
+    // conservatively stale (an inst stays alive one extra round). A pass added
+    // to this fixpoint must preserve that contract or must not share the
+    // cache; a debug-mode check in `doesCalleeHaveSideEffect` verifies it on
+    // every cache hit.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
