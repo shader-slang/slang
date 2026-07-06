@@ -12,7 +12,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "commit SHA or branch to build (blank = master HEAD)"
+        # actions/checkout resolves branches, tags, and full 40-char SHAs
+        # only; a short SHA fails with "branch or tag not found".
+        description: "full commit SHA or branch to build (blank = master HEAD)"
         default: ""
       samples:
         description: "timed samples per run"
