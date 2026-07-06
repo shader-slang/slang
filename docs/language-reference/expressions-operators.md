@@ -3,7 +3,7 @@
 Expressions are sequences of operators and operands. This page lists all operators and their canonical
 semantics. Operators in an expression are evaluated in an order according to [operator
 precedence](expressions-operator-precedence.md). Slang applications can declare custom implementations for
-most operators (see [operator overload declarations](declarations-operators.md).
+most operators (see [operator overload declarations](declarations-operators.md)).
 
 Operands are inputs for an operator. Operands are either atomic [expressions](expressions.md) or
 subexpressions, possibly with parentheses to indicate subexpression grouping.
@@ -27,14 +27,14 @@ Slang operators come in the following forms:
 
 ### Arithmetic Operators (scalar)
 
-| Operator 	| Operator function                       | Description                                       |
+| Operator  | Operator function                       | Description                                       |
 |-----------|-----------------------------------------|---------------------------------------------------|
-| `+`		| `__prefix T operator + (T val)`         | identity (unary plus)                             |
-| `-`		| `__prefix T operator - (T val)`         | arithmetic negation (unary minus)                 |
-| `++`		| `__prefix T operator ++ (inout T val)`  | increment in place, return incremented value      |
-| `++`		| `__postfix T operator ++ (inout T val)` | increment in place, return value before increment |
-| `--`		| `__prefix T operator -- (inout T val)`  | decrement in place, return decremented value      |
-| `--`		| `__postfix T operator -- (inout T val)` | decrement in place, return value before decrement |
+| `+`       | `__prefix T operator + (T val)`         | identity (unary plus)                             |
+| `-`       | `__prefix T operator - (T val)`         | arithmetic negation (unary minus)                 |
+| `++`      | `__prefix T operator ++ (inout T val)`  | increment in place, return incremented value      |
+| `++`      | `__postfix T operator ++ (inout T val)` | increment in place, return value before increment |
+| `--`      | `__prefix T operator -- (inout T val)`  | decrement in place, return decremented value      |
+| `--`      | `__postfix T operator -- (inout T val)` | decrement in place, return value before decrement |
 | `*`       | `T operator * (T lhs, T rhs)`           | multiplication                                    |
 | `/`       | `T operator / (T lhs, T rhs)`           | division                                          |
 | `%`       | `T operator % (T lhs, T rhs)`           | remainder                                         |
@@ -69,15 +69,15 @@ Description:
 
 ### Logical Operators (scalar)
 
-| Operator 	| Operator function                   | Description                                  |
+| Operator  | Operator function               | Description                                  |
 |-----------|-------------------------------------|----------------------------------------------|
-| `!`		| `__prefix T operator ! (T val)`     | logical NOT                                  |
+| `!`       | `__prefix T operator ! (T val)` | logical NOT                                  |
 | `&&`      | `T operator && (T lhs, T rhs)`      | logical AND                                  |
-| `||`      | `T operator || (T lhs, T rhs)`      | logical OR                                   |
-| `~` 		| `__prefix T operator ~ (T val)`     | bitwise NOT                                  |
+| `\|\|`    | `T operator \|\| (T lhs, T rhs)`    | logical OR                                   |
+| `~`       | `__prefix T operator ~ (T val)` | bitwise NOT                                  |
 | `&`       | `T operator & (T lhs, T rhs)`       | bitwise AND                                  |
 | `^`       | `T operator ^ (T lhs, T rhs)`       | bitwise XOR                                  |
-| `|`       | `T operator | (T lhs, T rhs)`       | bitwise OR                                   |
+| `\|`      | `T operator \| (T lhs, T rhs)`      | bitwise OR                                   |
 | `<<`      | `T operator << (T lhs, int amount)` | bitwise left shift                           |
 | `>>`      | `T operator >> (T lhs, int amount)` | bitwise right shift                          |
 
@@ -89,24 +89,24 @@ Description:
 
 - The **logical NOT** operator interprets `val` as a Boolean value and returns the opposite Boolean value.
   See [ILogical.not](../../../core-module-reference/interfaces/ilogical-01/not.html) for details.
-- The **logical AND** operator interprets `lhs` and `rhs` as a Boolean values and returns the `true` if both
+- The **logical AND** operator interprets `lhs` and `rhs` as Boolean values and returns `true` if both
   operands are `true`. Otherwise, it returns `false`.
   See [ILogical.and](../../../core-module-reference/interfaces/ilogical-01/and.html) for details.
-- The **logical OR** operator interprets `lhs` and `rhs` as a Boolean values and returns the `true` if either
+- The **logical OR** operator interprets `lhs` and `rhs` as Boolean values and returns `true` if either
   operand is `true`. Otherwise, it returns `false`.
   See [ILogical.or](../../../core-module-reference/interfaces/ilogical-01/or.html) for details.
 - The **bitwise NOT** operator flips all bits in `val` and returns the value. That is, bit value 0 becomes 1,
   and bit value 1 becomes 0.
-  See [ILogical.bitNot](../../../core-module-reference/interfaces/ilogical-01/bitNot.html) for details.
-- The **bitwise AND** operator performs the logical AND operation for between every corresponding bit in `lhs`
+  See [ILogical.bitNot](../../../core-module-reference/interfaces/ilogical-01/bitnot-3.html) for details.
+- The **bitwise AND** operator performs the logical AND operation between every corresponding bit in `lhs`
   and `rhs` and returns the value.
-  See [ILogical.bitAnd](../../../core-module-reference/interfaces/ilogical-01/bitAnd.html) for details.
-- The **bitwise OR** operator performs the logical OR operation for between every corresponding bit in `lhs`
+  See [ILogical.bitAnd](../../../core-module-reference/interfaces/ilogical-01/bitand-3.html) for details.
+- The **bitwise OR** operator performs the logical OR operation between every corresponding bit in `lhs`
   and `rhs` and returns the value.
-  See [ILogical.bitOr](../../../core-module-reference/interfaces/ilogical-01/bitOr.html) for details.
+  See [ILogical.bitOr](../../../core-module-reference/interfaces/ilogical-01/bitor-3.html) for details.
 - The **bitwise XOR** operator performs the logical XOR (exclusive or) operation between every corresponding
   bit in `lhs` and `rhs` and returns the value.
-  See [ILogical.bitXor](../../../core-module-reference/interfaces/ilogical-01/bitXor.html) for details.
+  See [ILogical.bitXor](../../../core-module-reference/interfaces/ilogical-01/bitxor-3.html) for details.
 - The **bitwise left shift** operator shifts all bits in `lhs` left by `amount`.
   See [ILogical.shl](../../../core-module-reference/interfaces/ilogical-01/shl.html) for details.
 - The **bitwise right shift** operator shifts all bits in `lhs` right by `amount`.
@@ -126,7 +126,7 @@ Description:
 
 The comparison operators are defined for
 [IComparable](../../../core-module-reference/interfaces/icomparable-01/index.html) types. This includes
-built-in integer and Boolean scalar types.
+built-in integer, Boolean, and floating-point scalar types.
 
 Description:
 
@@ -149,19 +149,19 @@ Description:
 
 ### Assignment Operators (scalar)
 
-| Operator 	| Operator function                      | Description                                  |
-|-----------|----------------------------------------|----------------------------------------------|
-| `=`       | `T operator = (inout T lhs, T rhs)`    | assignment (non-overloadable built-in type)  |
-| `+=`      | `T operator += (inout T lhs, T rhs)`   | compound addition and assignment             |
-| `-=`      | `T operator -= (inout T lhs, T rhs)`   | compound subtraction and assignment          |
-| `*=`      | `T operator *= (inout T lhs, T rhs)`   | compound multiplication and assignment       |
-| `/=`      | `T operator /= (inout T lhs, T rhs)`   | compound division and assignment             |
-| `%=`      | `T operator %= (inout T lhs, T rhs)`   | compound remainder and assignment            |
-| `&=`      | `T operator &= (inout T lhs, T rhs)`   | compound bitwise AND shift and assignment    |
-| `|=`      | `T operator |= (inout T lhs, T rhs)`   | compound bitwise OR and assignment           |
-| `^=`      | `T operator ^= (inout T lhs, T rhs)`   | compound bitwise XOR and assignment          |
-| `<<=`     | `T operator <<= (inout T, int amount)` | compound bitwise left shift and assignment   |
-| `>>=`     | `T operator >>= (inout T, int amount)` | compound bitwise right shift and assignment  |
+| Operator  | Operator function                          | Description                                  |
+|-----------|--------------------------------------------|----------------------------------------------|
+| `=`       | `T operator = (inout T lhs, T rhs)`        | assignment (non-overloadable built-in type)  |
+| `+=`      | `T operator += (inout T lhs, T rhs)`       | compound addition and assignment             |
+| `-=`      | `T operator -= (inout T lhs, T rhs)`       | compound subtraction and assignment          |
+| `*=`      | `T operator *= (inout T lhs, T rhs)`       | compound multiplication and assignment       |
+| `/=`      | `T operator /= (inout T lhs, T rhs)`       | compound division and assignment             |
+| `%=`      | `T operator %= (inout T lhs, T rhs)`       | compound remainder and assignment            |
+| `&=`      | `T operator &= (inout T lhs, T rhs)`       | compound bitwise AND and assignment          |
+| `\|=`     | `T operator \|= (inout T lhs, T rhs)`      | compound bitwise OR and assignment           |
+| `^=`      | `T operator ^= (inout T lhs, T rhs)`       | compound bitwise XOR and assignment          |
+| `<<=`     | `T operator <<= (inout T lhs, int amount)` | compound bitwise left shift and assignment   |
+| `>>=`     | `T operator >>= (inout T lhs, int amount)` | compound bitwise right shift and assignment  |
 
 The assignment operator is a built-in definition available for all copyable types. The assignment operator is
 not overloadable. See [Special Types](types-special.md) for a discussion on non-copyable types.
@@ -177,7 +177,7 @@ L operator COMPOUND_ASSIGN_OP (inout L left, R right)
 }
 ```
 
-where `COMPOUND_ASSIGN_OP` is the combined assignment and operator and `OP` is the operator without
+where `COMPOUND_ASSIGN_OP` is the operator combined with assignment and `OP` is the operator without
 assignment.
 
 The compound assignment operator is defined for the same types as `OP`. For example, `+=` is defined for
@@ -190,15 +190,17 @@ The compound assignment operator is defined for the same types as `OP`. For exam
 
 ### Miscellaneous Operators (scalar)
 
-| Operator 	| Operator function                                                                 | Description                             |
-|-----------|-----------------------------------------------------------------------------------|-----------------------------------------|
-| `*`		| `__prefix Ref<T, a, s> operator * (Ptr<T, a, s, L)`                               | pointer dereference (experimental)      |
-| `&`		| `__prefix Ptr<T, Access::ReadWrite, AddressSpace::Device> operator & (__ref T v)` | address of (experimental)               |
-| `,`       | `T2 operator , (T1 lhs, T2 rhs)`                                                  | comma operator (Slang 2025 and earlier) |
+| Operator  | Operator function                                                                 | Description                             |
+|---------------|-----------------------------------------------------------------------------------|-----------------------------------------|
+| `*`           | `__prefix Ref<T, a, s> operator * (Ptr<T, a, s, L>)`                              | pointer dereference (experimental)      |
+| `&`           | `__prefix Ptr<T, Access::ReadWrite, AddressSpace::Device> operator & (__ref T v)` | address of (experimental)               |
+| `,`           | `T2 operator , (T1 lhs, T2 rhs)`                                                  | comma operator (Slang 2025 and earlier) |
 
 Canonical semantics:
 
 - The **pointer dereference** operator returns the pointed value (L-value). The operand type is a pointer.
+  Note that the layout parameter `L` is not captured by the returned reference. See also
+  [Ptr](../../../core-module-reference/types/ptr-0/index.html).
 - The **address of** operator returns a pointer to the operand. The operand must be
   [addressable](expressions-value-categories.md).
 - The **comma operator** (Slang 2025 and earlier) returns the right-hand-side parameter. Starting from Slang
@@ -211,22 +213,21 @@ Canonical semantics:
 ### Ternary Conditional Operator
 
 | Operator | Operator function                                  | Description           |
-|          |                                                    |                       |
 |----------|----------------------------------------------------|-----------------------|
 | `?:`     | `T operator ?: (bool cond, T trueVal, T falseVal)` | Conditional selection |
 
 Description:
 
-The conditional operator `?:` is used to select between two values based on the condition (`cond`). If the condition is true,
-`trueVal` is returned. Otherwise, `falseVal` is returned.
+The conditional operator `?:` is used to select between two values based on the condition (`cond`). If the
+condition is `true`, `trueVal` is returned. Otherwise, `falseVal` is returned.
 
 The default ternary conditional operator is provided for all copyable types.
 
 > ⚠️ **Warning:** Unlike C, C++, GLSL, and most other C-family languages, Slang currently follows the precedent
 > of HLSL where `?:` does not short-circuit. That is, both `trueVal` and `falseVal` are evaluated before
 > either is selected. This is subject to change in future Slang language versions. It is recommended to write
-> write code that does not depend on whether `?:` short-circuits or not. When short-circuiting is required,
-> use `if`/`else` construct, instead.
+> code that does not depend on whether `?:` short-circuits or not. When short-circuiting is required,
+> use an `if`/`else` construct instead.
 
 ### Call Expression
 
@@ -265,7 +266,7 @@ static, then the object is passed as the argument to the implicit `this` paramet
 
 **Grammar:**
 
-> *`base-expr`* **`'('`** [ *`arg-expr`* (**`','`** *`arg-expr`*)\* ] **`')'`**
+> *`base-expr`* **`'['`** [ *`arg-expr`* (**`','`** *`arg-expr`*)\* ] **`']'`**
 
 A _subscript expression_ consists of a base expression and a list of argument expressions.
 
@@ -297,7 +298,7 @@ accessor call. The arguments are passed as is. In case there are multiple `__sub
 >
 > *`value-expr`* **`'.'`** *`member-identifier`*
 
-A _member access expression_ selects a member of a namespace, type, or a value expression.
+A _member access expression_ selects a member of a namespace, a type, or a value expression.
 
 For namespace base expressions, *`member-identifier`* is an identifier within the namespace. For type
 expressions, *`member-identifier`* is a member identifier.
@@ -306,14 +307,14 @@ For value expressions, *`member-identifier`* is a member of the value, such as a
 function, or a property. For scalars, vectors, matrices, and tuples, the *`member-identifier`* may also be a
 sequence of components, resulting in a _swizzle expression_.
 
-Member expressions are discussed in more details in [Member Expression](expressions-member-access.md).
+Member expressions are discussed in more detail in [Member Expression](expressions-member-access.md).
 
 
 ### Cast Expression
 
 **Grammar:**
 
-> **`'('`** *`type-expr`* **`')'`**) *`base-expr`*
+> **`'('`** *`type-expr`* **`')'`** *`base-expr`*
 
 A _cast expression_ converts a value (*`base-expr`*) to the desired type (*`type-expr`*). This is also known
 as an explicit type conversion. See [Expression Type Conversions](expressions-conversions.md) for details.
@@ -330,7 +331,7 @@ For binary operators with vector/scalar and matrix/scalar mixed operands, the op
 vector or matrix element with the scalar operator.
 
 The matrix/matrix and matrix/vector multiplication are special, and they follow the matrix multiplication
-rules. See [Vector and Matrix Types](types-vectors-and-matrix.md) for details.
+rules. See [Vector and Matrix Types](types-vector-and-matrix.md) for details.
 
 
 ## Non-Overloadable Operators
@@ -346,7 +347,7 @@ subexpressions.
 
 **Grammar:**
 
-> *`gen-expr`* **`'<'`** [*`gen-arg-expr`* (**`','`** *`gen-arg-expr`*)* ] **`'>'`**
+> *`gen-expr`* **`'<'`** [*`gen-arg-expr`* (**`','`** *`gen-arg-expr`*)\* ] **`'>'`**
 >
 > *`gen-arg-expr`* = *`type-expr`* | *`value-expr`*
 
