@@ -15925,7 +15925,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     {
         auto arg = astBuilder->create<VarExpr>();
         arg->declRef = makeDeclRef(param);
-        auto paramMode = getParamPassingMode(param);
+        auto paramMode = getParamPassingMode(makeDeclRef(param), m_astBuilder);
         arg->type.isLeftValue = paramMode == ParamPassingMode::Out ||
                                 paramMode == ParamPassingMode::BorrowInOut ||
                                 paramMode == ParamPassingMode::Ref;
