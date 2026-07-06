@@ -6,14 +6,20 @@ counter at runtime; the counter buffer is read back by the host and
 converted to LCOV `.info` for rendering by `genhtml`, Codecov, VS
 Code Coverage Gutters, or any other LCOV consumer.
 
-For the maintainer-facing architectural rationale behind the current
-design, including why IR-time buffer synthesis is paired with post-
-emit coverage metadata for binding-info propagation, see
-[`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md).
+Related documentation and examples:
 
-For the host-facing binding contract used by `slang-rhi` and direct
-hosts, see
-[`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md).
+- [`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md) —
+  architectural rationale: why IR-time buffer synthesis is paired
+  with post-emit coverage metadata, the pipeline stages, the two
+  reporting channels, and the roadmap.
+- [`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md) —
+  the host-facing binding contract, with per-target binding recipes.
+- [`docs/design/shader-coverage-counter-placement.md`](../../docs/design/shader-coverage-counter-placement.md) —
+  where each coverage mode inserts counters, with examples.
+- [`examples/shader-coverage-image-pipeline`](../../examples/shader-coverage-image-pipeline/)
+  and
+  [`examples/shader-coverage-bvh-traversal`](../../examples/shader-coverage-bvh-traversal/) —
+  runnable end-to-end example programs (see Quick start below).
 
 Not to be confused with `tools/coverage/`, which measures C++ coverage
 of the Slang compiler itself.
@@ -67,14 +73,6 @@ render a report:
 - [`examples/shader-coverage-bvh-traversal`](../../examples/shader-coverage-bvh-traversal/) —
   a software BVH ray-traversal kernel showing how coverage exposes
   input-shape gaps in test data (rare-case paths that never run).
-
-For the pipeline architecture, design rationale, and alternatives
-weighed, see
-[`docs/design/shader-coverage.md`](../../docs/design/shader-coverage.md)
-and
-[`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md).
-For examples showing where each coverage mode inserts counters, see
-[`docs/design/shader-coverage-counter-placement.md`](../../docs/design/shader-coverage-counter-placement.md).
 
 ## Pinning the coverage buffer at an explicit slot
 

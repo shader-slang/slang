@@ -179,7 +179,9 @@ counters are inserted, with examples, see
      shader-visible or host-reserved set and binds coverage at binding
      0 so the compiler does not mutate or fill holes in a user-owned
      set layout. D3D register-space reservation is left to a follow-up
-     design so this PR does not freeze D3D allocation policy.
+     design (tracked at
+     [shader-slang/slang#11169](https://github.com/shader-slang/slang/issues/11169))
+     rather than freezing D3D allocation policy prematurely.
    - **Extends the program-scope var layout** to include the new
      buffer as a struct field so `collectGlobalUniformParameters`
      packs it alongside user globals on targets that pack ordinary
@@ -191,8 +193,10 @@ counters are inserted, with examples, see
      on the same source line get distinct slots and are aggregated by
      the LCOV exporter. Function and branch markers produce their own
      `CoverageEntryInfo::kind` values and use the same counter buffer.
-   - **Rewrites each op as `AtomicAdd(__slang_coverage[slot], 1,
-Relaxed)`**.
+   - **Rewrites each op** as `AtomicAdd(__slang_coverage[slot], 1,
+Relaxed)` in the default counting mode, or as a plain non-atomic
+     store of `1` under `-trace-coverage-boolean` (hit/not-hit; see
+     `CoverageCounterMode` in the roadmap section).
    - **Records source entries on the artifact's
      `ICoverageTracingMetadata` and the synthesized buffer binding on
      `ISyntheticResourceMetadata`.** A source entry is unattributable when its
@@ -286,20 +290,23 @@ them.
 
 ## Where each stage lives
 
-| Path                                                                         | Role                                                                                                                             |
-| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `source/slang/slang-ir-coverage-instrument.{h,cpp}`                          | IR pass — synthesizes the buffer, extends program-scope layout, rewrites marker ops, writes metadata                             |
-| `source/slang/slang-ir-insts.lua`                                            | Declares the line/function/branch coverage marker IR ops                                                                         |
-| `source/slang/slang-lower-to-ir.cpp`                                         | Emits marker ops during AST lowering; filters structural statements for line coverage                                            |
-| `source/slang/slang-emit.cpp`                                                | Integrates the pass into the pipeline + allocates metadata + plumbs `-trace-coverage-binding` / `-trace-coverage-reserved-space` |
-| `source/slang/slang-options.cpp`                                             | Registers the coverage tracing CLI flags                                                                                         |
-| `source/slang/slang-end-to-end-request.cpp`                                  | Writes the `.coverage-manifest.json` sidecar from slangc                                                                         |
-| `include/slang.h`                                                            | `slang::ICoverageTracingMetadata` public interface                                                                               |
-| `source/compiler-core/slang-artifact-associated-impl.{h,cpp}`                | `ArtifactPostEmitMetadata` implements the interface                                                                              |
-| `prelude/slang-cpp-prelude.h`                                                | CPU-target atomic helpers (`_slang_atomic_add_u32/i32`)                                                                          |
-| `source/slang/slang-emit-cpp.cpp`                                            | CPU emitter's `kIROp_AtomicAdd` handling                                                                                         |
-| `tests/language-feature/coverage/`                                           | End-to-end tests                                                                                                                 |
-| `tools/slang-unit-test/unit-test-descriptor-set-space-offset-reflection.cpp` | Reflection unit test for `DescriptorSetInfo::spaceOffset` (regression-watch for the non-zero space mis-binding bug)              |
+| Path                                                                                  | Role                                                                                                                             |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `source/slang/slang-ir-coverage-instrument.{h,cpp}`                                   | IR pass — synthesizes the buffer, extends program-scope layout, rewrites marker ops, writes metadata                             |
+| `source/slang/slang-ir-insts.lua`                                                     | Declares the line/function/branch coverage marker IR ops                                                                         |
+| `source/slang/slang-lower-to-ir.cpp`                                                  | Emits marker ops during AST lowering; filters structural statements for line coverage                                            |
+| `source/slang/slang-emit.cpp`                                                         | Integrates the pass into the pipeline + allocates metadata + plumbs `-trace-coverage-binding` / `-trace-coverage-reserved-space` |
+| `source/slang/slang-options.cpp`                                                      | Registers the coverage tracing CLI flags                                                                                         |
+| `source/slang/slang-end-to-end-request.cpp`                                           | Writes the `.coverage-manifest.json` sidecar from slangc                                                                         |
+| `include/slang.h`                                                                     | `slang::ICoverageTracingMetadata` public interface                                                                               |
+| `source/compiler-core/slang-artifact-associated-impl.{h,cpp}`                         | `ArtifactPostEmitMetadata` implements the interface                                                                              |
+| `prelude/slang-cpp-prelude.h`                                                         | CPU-target atomic helpers (`_slang_atomic_add_u32/u64`)                                                                          |
+| `source/slang/slang-emit-cpp.cpp`                                                     | CPU emitter's `kIROp_AtomicAdd` handling                                                                                         |
+| `source/slang/slang-emit-metal.cpp`                                                   | Metal emitter's atomic handling (`atomic_fetch_add_explicit`, 32-bit `atomic_uint` only)                                         |
+| `tests/language-feature/coverage/`                                                    | End-to-end tests                                                                                                                 |
+| `tools/slang-unit-test/unit-test-coverage-metal-runtime.cpp`                          | GPU execution test — validates the Metal binding contract and exact line/function/branch counter values on a real dispatch       |
+| `examples/shader-coverage-image-pipeline/`, `examples/shader-coverage-bvh-traversal/` | Runnable raw-Vulkan reference hosts — compile with coverage, bind via metadata, dispatch, read back, render LCOV reports         |
+| `tools/slang-unit-test/unit-test-descriptor-set-space-offset-reflection.cpp`          | Reflection unit test for `DescriptorSetInfo::spaceOffset` (regression-watch for the non-zero space mis-binding bug)              |
 
 ## Two reporting channels
 
@@ -334,7 +341,7 @@ Hosts that want the sidecar bytes without going through disk (to feed
 the Python LCOV converter or a network channel) call it directly;
 hosts that consume the typed accessors don't need it.
 
-Today the in-tree consumer is:
+Today the in-tree consumers are:
 
 - **`slangc` itself** — its `_maybeWriteCoverageManifest` calls
   `slang_writeCoverageManifestJson` and writes the bytes to disk,
@@ -342,10 +349,12 @@ Today the in-tree consumer is:
   or at the explicit `-coverage-manifest-output <path>`. This is what
   makes the metadata API + manifest shape _one_ contract, not two:
   `slangc` is its own first consumer of the public serializer.
-
-A reference end-to-end host integration that uses both the typed
-metadata path and `slang_writeCoverageManifestJson` is planned as a
-follow-up.
+- **The example programs** (`examples/shader-coverage-image-pipeline`,
+  `examples/shader-coverage-bvh-traversal`) — reference end-to-end
+  host integrations that compile in-process, bind the counter buffer
+  from `ISyntheticResourceMetadata`, dispatch on raw Vulkan, and
+  serialize the manifest via `slang_writeCoverageManifestJson` for
+  the LCOV conversion step.
 
 The intended longer-term audience is in-process integrators that
 don't exist in-tree today: slangpy bindings, in-engine compile
@@ -480,21 +489,16 @@ extensions. LCOV remains a
 compatibility export (`DA:`, `FN/FNDA:`, `BRDA:`), not the only
 internal coverage model.
 
-### LCOV record expansion
+### Attribution expansion
 
-Capabilities the LCOV format names beyond line `DA:` records.
+Line, function (`FN:` / `FNDA:`), and branch (`BRDA:`) coverage have
+shipped; the remaining attribution work extends _how_ counters group,
+not what gets counted:
 
-- **Branch coverage** (`BRDA:` records). Initial support covers
-  `if`/`else`, loop-condition true/false arms, and source `switch`
-  case/default dispatch arms, including the implicit no-match default
-  path when no `default` label exists.
-- **Function coverage** (`FN:` / `FNH:` records). Per-function-entry
-  counters with function names and source ranges.
-- **Per-test attribution** (`TN:` groupings). Extends
-  `slang_coverage_accumulate` with an optional test name. Turns
-  coverage from a flat aggregate into a test-quality signal —
-  often the highest-leverage next feature for teams running
-  coverage in CI.
+- **Per-test attribution** (`TN:` groupings). Group accumulated
+  counters by an optional test name. Turns coverage from a flat
+  aggregate into a test-quality signal — often the highest-leverage
+  next feature for teams running coverage in CI.
 - **Specialization-aware metadata.** Per-specialization counter
   attribution for codebases with heavy generic / template use —
   matters most for neural-slang.
@@ -503,10 +507,15 @@ Capabilities the LCOV format names beyond line `DA:` records.
 
 Tracked outside this repository:
 
-- **slang-rhi multi-descriptor-set support.** Required for hosts
-  that dispatch via slang-rhi to use non-zero `space` values.
-  Hosts using their own pipeline-layout code are unaffected.
-  [shader-slang/slang#10959](https://github.com/shader-slang/slang/issues/10959).
+- **slang-rhi synthetic-resource binding.** Lets hosts that dispatch
+  via slang-rhi bind the hidden coverage buffer through
+  `bindSyntheticResource(...)` instead of their own pipeline-layout
+  code.
+  [shader-slang/slang-rhi#739](https://github.com/shader-slang/slang-rhi/pull/739).
+- **slang-rhi Metal backend binding quirk.** The slang-rhi Metal
+  backend returns garbage counter values; direct Metal hosts are
+  unaffected.
+  [shader-slang/slang-rhi#724](https://github.com/shader-slang/slang-rhi/issues/724).
 
 ### GPU-specific differentiators (optional)
 
