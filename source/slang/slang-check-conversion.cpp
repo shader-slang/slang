@@ -2395,8 +2395,10 @@ bool SemanticsVisitor::_coerce(
     // path: explicit casts, vector/matrix/aggregate targets, and `DeclRefType`
     // scalars such as `BFloat16`/FP8 (which do declare generic initializers).
     // Pack elements never reach this test (`each T` has type `EachType`, not
-    // a decl-ref). The boundaries are pinned by
-    // tests/language-feature/generics/generic-arithmetic-coerce*.slang.
+    // a decl-ref); a bare pack-parameter decl-ref, should a checker path ever
+    // form one at a coercion, is intentionally rejected under the same
+    // argument (no scalar builtin accepts a pack). The boundaries are pinned
+    // by tests/language-feature/generics/generic-arithmetic-coerce*.slang.
     const auto toTypeBasic = as<BasicExpressionType>(toType);
     const bool toTypeIsScalarBuiltin = toTypeBasic && toTypeBasic->getBaseType() != BaseType::Bool;
     const auto fromTypeGenericParamDeclRef =
