@@ -216,6 +216,51 @@ D3D12 / HLSL hosts are expected to use the same `space` / `binding`
 metadata shape in a follow-up, but this PR does not define D3D register-space
 auto-allocation or reservation policy.
 
+### Direct CPU host binding recipe
+
+On the CPU target the synthesized `__slang_coverage` buffer is packed
+into the same `GlobalParams` struct as user-declared global shader
+parameters, and the generated kernel keeps the standard three-argument
+ABI from `prelude/slang-cpp-types.h`:
+
+```cpp
+typedef void (*ComputeFunc)(
+    ComputeVaryingInput* varyingInput,
+    void* uniformEntryPointParams,
+    void* uniformState); // <- the GlobalParams payload
+```
+
+A structured-buffer parameter is represented in that payload as a
+`(data pointer, element count)` pair — the CPU prelude's
+`RWStructuredBuffer<T>` layout:
+
+```cpp
+struct BufferView
+{
+    void* data;   // counter storage, counterCount elements
+    size_t count; // counterCount
+};
+```
+
+To bind the coverage buffer, a direct CPU host:
+
+1. reads `uniformOffset` / `uniformStride` from the coverage entry in
+   `ISyntheticResourceMetadata` (`uniformStride` equals
+   `sizeof(BufferView)`; the synthesized field is appended after the
+   user-declared globals, so `uniformOffset` never collides with them),
+2. allocates `getCounterCount()` zero-initialized counter slots at the
+   element width reported by `CoverageBufferInfo::elementByteWidth`,
+3. writes a `BufferView` describing that storage into the
+   `GlobalParams` payload at byte offset `uniformOffset`,
+4. invokes the kernel and reads the counts back directly from the
+   host-owned storage — no device readback step exists on CPU.
+
+The executable reference for this recipe is the
+`coverageCpuRuntimeDispatch` unit test
+(`tools/slang-unit-test/unit-test-coverage-cpu-runtime.cpp`), which
+binds through exactly this contract and validates exact per-line
+execution counts for both counter widths.
+
 ### Direct Metal host binding recipe
 
 Metal has no descriptor-space dimension: the synthesized
