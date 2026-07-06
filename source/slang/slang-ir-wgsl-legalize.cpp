@@ -290,7 +290,11 @@ static void legalizeAtomicCounterBuffersForWGSL(IRModule* module)
         promoteAtomicStructuredBuffer(buffer);
 }
 
-void legalizeIRForWGSL(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
+void legalizeIRForWGSL(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink,
+    bool hasAppendConsumeStructuredBuffer)
 {
     List<EntryPointInfo> entryPoints;
     for (auto inst : module->getGlobalInsts())
@@ -313,8 +317,8 @@ void legalizeIRForWGSL(IRModule* module, TargetProgram* targetProgram, Diagnosti
     // Go through every instruction in the module and legalize them as needed.
     processInst(module->getModuleInst(), targetProgram, sink);
 
-    // Buffers accessed by atomics must use an atomic element type in WGSL.
-    legalizeAtomicCounterBuffersForWGSL(module);
+    if (hasAppendConsumeStructuredBuffer)
+        legalizeAtomicCounterBuffersForWGSL(module);
 
     // Some global insts are illegal, e.g. function calls.
     // We need to inline and remove those.
