@@ -37,11 +37,14 @@ permissions:
 
 jobs:
   release-sweep:
-    # NVIDIA RGFX perf pool (runner group nvrgfx) — same machines as the nightly
-    # + PR-gate jobs, so release-history timings stay comparable.
+    # NVIDIA RGFX perf pool via the VM-based GitHub bridge (rtrci github-bridge
+    # target shader-slang/slang:windows-x64-perf) — same pool as the nightly
+    # job, so release-history timings stay comparable. The pre-VM pool (runner
+    # group nvrgfx, label nvrgfx-perf) was retired 2026-07; a re-sweep on this
+    # pool is needed to rebuild a baseline comparable with post-migration
+    # nightly points.
     runs-on:
-      group: nvrgfx
-      labels: [Windows, X64, nvrgfx-perf]
+      labels: [Windows, X64, nvrgfx-perf-kernelvm-bridge]
     steps:
       - name: Add bash to PATH (Windows)
         shell: pwsh
