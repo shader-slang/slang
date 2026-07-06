@@ -2374,64 +2374,29 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
-    // Before entering the initializer-based conversion search that makes up the
-    // rest of this function, fast-reject the one shape that is both provably
-    // doomed and hot: at an implicit coercion site, an opaque generic type
-    // parameter can never convert to a concrete *scalar* builtin type. This
-    // matters because ranking an operator call on a constrained generic `T`
-    // against the many concrete builtin scalar overloads
-    // (`operator*(float,float)`, ...) drives one full recursive conversion
+    // Fast path: at an implicit coercion site, an opaque generic type parameter
+    // cannot convert to a concrete scalar builtin, so skip the initializer-based
+    // conversion search that makes up the rest of this function. Ranking an
+    // operator call on a constrained generic `T` against the many concrete
+    // scalar overloads otherwise runs one full (always-failing) conversion
     // search per rejected candidate — the dominant semantic-checking cost in
-    // generic-heavy code (issue #11897).
+    // generic-heavy code (issue #11897). The `ImplicitCastMethodKey` failure
+    // cache below cannot absorb this: its key includes the `Type*`, and every
+    // generic declaration has a distinct `T` type object.
     //
-    // Soundness: `_coerce` accepts a generic type parameter through three
-    // earlier paths — exact match (`toType == fromType`), the subtype-witness
-    // path (a declared constraint supertype), and the type-equality-witness
-    // path (`where T == X` constraints). Once those have failed, the only
-    // remaining route is the initializer search below, and at an implicit site
-    // nested conversions are disallowed (`disallowNestedConversions` below), so
-    // an initializer candidate could only apply if its parameter type exactly
-    // matched the opaque `T` itself. No scalar builtin declares such an
-    // initializer — with one exception: `bool` declares
-    // `__init<T : __EnumType>(T)` marked `__implicit_conversion`
-    // (`extension bool : IRangedValue` in core.meta.slang), through which an
-    // enum-constrained generic parameter legitimately converts to `bool`, so
-    // `bool` targets are excluded from the rejection below. Note that the
-    // remaining scalar set is a contingent property of the core module, not a
-    // theorem: a user extension like
-    // `extension float { __init<U : IFoo>(U x); }` would break it, and if that
-    // ever needs supporting this rejection must instead be gated on a cached
-    // per-`toType` "has a generic initializer" check. It is also specifically a
-    // property of `BasicExpressionType`: `FloatE4M3`/`FloatE5M2`/`BFloat16`
-    // *do* declare generic initializers, and stay on the search path only
-    // because they are `DeclRefType`s, not `BasicExpressionType`s. (Those
-    // initializers are not `__implicit_conversion`-marked, so at an implicit
-    // site the search's observable effect for them is the "explicit conversion
-    // is possible" note on the failure diagnostic — still worth preserving.)
-    //
-    // Explicit coercion sites must not take this shortcut: there nested
-    // conversions are allowed, so the search below can legitimately succeed —
-    // e.g. `float(t)` under `where T == int` applies `float.__init(int)`
-    // through the cost-0 equality-witness conversion `T -> int`.
-    //
-    // The target-type test is deliberately narrow: only a *scalar* `toType` is
-    // rejected. `vector<T,N>` / `matrix<T,N,M>` must still take the search
-    // because a scalar generic `T` legitimately broadcasts into them via their
-    // element constructor, and an aggregate/struct `toType` may expose a
-    // generic initializer that accepts `T`. The source-type test is equally
-    // narrow: it fires only when `fromType` is directly a decl-ref to a
-    // `GenericTypeParamDeclBase` — in practice an ordinary generic parameter.
-    // A pack parameter declaration is a `GenericTypeParamDeclBase` too, so a
-    // bare decl-ref to one would be rejected on the same reasoning, but
-    // surface code never produces that shape at a coercion: a pack element
-    // written as `each T` carries an `EachType` (see `visitEachExpr`), which
-    // this test does not match, so pack elements continue into the search
-    // below unchanged.
-    //
-    // (The `ImplicitCastMethodKey` failure cache below cannot absorb this cost
-    // instead: its key includes the `Type*`, and every generic declaration has
-    // a distinct `T` type object, so each declaration pays the doomed search
-    // once per scalar target before its failure is cached.)
+    // Soundness: by this point the exact-match, subtype-witness, and
+    // type-equality-witness paths have all failed, and at an implicit site
+    // nested conversions are disallowed, so an initializer could only match
+    // `T` exactly — and no scalar builtin declares an implicit initializer
+    // with an opaque generic parameter type (a contingent core-module
+    // property, pinned by generic-arithmetic-coerce-diag.slang). The one
+    // exception is `bool` (`__init<T : __EnumType>(T)` in core.meta.slang),
+    // so `bool` targets are excluded. Everything else stays on the search
+    // path: explicit casts, vector/matrix/aggregate targets, and `DeclRefType`
+    // scalars such as `BFloat16`/FP8 (which do declare generic initializers).
+    // Pack elements never reach this test (`each T` has type `EachType`, not
+    // a decl-ref). The boundaries are pinned by
+    // tests/language-feature/generics/generic-arithmetic-coerce*.slang.
     const auto toTypeBasic = as<BasicExpressionType>(toType);
     const bool toTypeIsScalarBuiltin = toTypeBasic && toTypeBasic->getBaseType() != BaseType::Bool;
     const auto fromTypeGenericParamDeclRef =
