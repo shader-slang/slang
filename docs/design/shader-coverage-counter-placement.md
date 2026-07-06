@@ -125,7 +125,11 @@ void someFunction()
 ```
 
 The coverage metadata records both display and mangled function names
-when available. Reports can aggregate multiple runtime counters that
+when available. Generic specializations share one source-level
+function entry: specializing `helper<T>` for three different `T`s
+still produces a single `helper` entry in the metadata, so reports
+stay source-oriented instead of fanning out per specialization.
+Reports can aggregate multiple runtime counters that
 attribute to the same source function, but hosts must use the metadata
 rather than assuming counter-slot identity across compiles or shader
 permutations. Lambda and constructor entries can have compiler-facing
