@@ -780,7 +780,19 @@ struct LoadContext
             // `new SourceFile` paired with only `addSourceFile` below would be
             // indexed for lookup but never deleted, since the manager's
             // destructor only frees the files it created.
-            dstFile = m_sourceManager->createSourceFileWithBlob(pathInfo, blob);
+            //
+            // A repro can record a file entry whose contents were never
+            // captured (the original read failed), leaving no blob; fall back
+            // to an empty file so lookups still resolve instead of
+            // dereferencing null.
+            if (blob)
+            {
+                dstFile = m_sourceManager->createSourceFileWithBlob(pathInfo, blob);
+            }
+            else
+            {
+                dstFile = m_sourceManager->createSourceFileWithString(pathInfo, String());
+            }
 
             // Add to map
             m_sourceFileMap.add(sourceFile, dstFile);
