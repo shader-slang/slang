@@ -166,7 +166,7 @@ Description:
 The assignment operator is a built-in definition available for all copyable types. The assignment operator is
 not overloadable. See [Special Types](types-special.md) for a discussion on non-copyable types.
 
-The compound assignment default operators are defined using the following template:
+The default compound assignment operators behave as if implemented with the following template:
 
 ```hlsl
 __generic<L: ..., R: ...>
