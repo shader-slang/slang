@@ -3634,20 +3634,33 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 }
 
 
-/// Implementation of typeContainsNonCopyable with cycle detection via a visited set.
-/// `visited` tracks StructDecl pointers currently on the active recursion path.
-/// Each entry is removed on return (via SLANG_DEFER) so the set is a call-path guard,
-/// not a memoization cache — sibling instantiations of the same generic StructDecl*
-/// are therefore traversed independently.
-static bool typeContainsNonCopyableImpl(Type* type, ASTBuilder* astBuilder, HashSet<Decl*>& visited)
+/// Implementation of typeContainsNonCopyable. `depth` limits recursion to guard against
+/// malformed programs that produce pathologically deep or cyclic type graphs during semantic
+/// recovery. The limit is `kMaxTypeNestingDepth`, matching other recursive type walkers
+/// (slang-type-layout.cpp, slang-check-decl.cpp).
+///
+/// A StructDecl*-keyed visited set cannot be used here because a generic struct can appear
+/// at multiple depths with different type arguments — e.g. `Wrapper<Wrapper<Atomic<int>>>`
+/// visits the same StructDecl(Wrapper) twice, once with T=Wrapper<Atomic<int>> and once
+/// with T=Atomic<int>. Keying on StructDecl* would short-circuit the inner visit and miss
+/// the Atomic<int> field. A depth limit avoids this while still bounding stack use on any
+/// finite-depth type graph. Valid programs cannot have by-value struct cycles (the type
+/// checker rejects infinite-size types), so the depth limit is only a safety guard.
+static bool typeContainsNonCopyableImpl(Type* type, ASTBuilder* astBuilder, int depth)
 {
+    // Guard against malformed programs that produce deeply nested or cyclic type graphs.
+    // kMaxTypeNestingDepth matches the limit used by other recursive type walkers in this
+    // codebase (slang-type-layout.cpp, slang-check-decl.cpp). Valid programs have
+    // finite-depth struct layouts, so this limit is only a safety guard.
+    if (depth >= (int)kMaxTypeNestingDepth)
+        return false;
     // Unwrap modifier wrappers (e.g. NoDiffType applied to `this` by autodiff)
     // so the underlying type is visible.
     type = unwrapModifiedType(type);
     // Recurse into array element types (ArrayExpressionType is a DeclRefType,
     // but its decl is not a StructDecl, so the struct branch below would miss it).
     if (auto arrayType = as<ArrayExpressionType>(type))
-        return typeContainsNonCopyableImpl(arrayType->getElementType(), astBuilder, visited);
+        return typeContainsNonCopyableImpl(arrayType->getElementType(), astBuilder, depth + 1);
     auto declRefType = as<DeclRefType>(type);
     if (!declRefType)
         return false;
@@ -3655,13 +3668,6 @@ static bool typeContainsNonCopyableImpl(Type* type, ASTBuilder* astBuilder, Hash
         return true;
     if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
     {
-        // Guard against cycles (mutual struct references on the current recursion path).
-        // We remove structDecl on exit so that sibling instantiations of the same generic
-        // struct decl are not skipped — e.g. `Wrapper<int>` and `Wrapper<Atomic<int>>`
-        // share the same StructDecl* but must be traversed independently.
-        if (!visited.add(structDecl))
-            return false;
-        SLANG_DEFER(visited.remove(structDecl));
         auto substs = SubstitutionSet(declRefType->getDeclRef());
         for (auto field : structDecl->getFields())
         {
@@ -3669,7 +3675,7 @@ static bool typeContainsNonCopyableImpl(Type* type, ASTBuilder* astBuilder, Hash
                 continue;
             Type* fieldType = astBuilder ? substituteType(substs, astBuilder, field->type.type)
                                          : field->type.type;
-            if (typeContainsNonCopyableImpl(fieldType, astBuilder, visited))
+            if (typeContainsNonCopyableImpl(fieldType, astBuilder, depth + 1))
                 return true;
         }
         for (auto inh : structDecl->getMembersOfType<InheritanceDecl>())
@@ -3684,7 +3690,7 @@ static bool typeContainsNonCopyableImpl(Type* type, ASTBuilder* astBuilder, Hash
             auto baseDeclRefType = as<DeclRefType>(baseType);
             if (!baseDeclRefType || !baseDeclRefType->getDeclRef().as<StructDecl>())
                 continue;
-            if (typeContainsNonCopyableImpl(baseType, astBuilder, visited))
+            if (typeContainsNonCopyableImpl(baseType, astBuilder, depth + 1))
                 return true;
         }
     }
@@ -3697,8 +3703,7 @@ static bool typeContainsNonCopyableImpl(Type* type, ASTBuilder* astBuilder, Hash
 /// if null, substitutions are skipped (generic cases may be missed).
 static bool typeContainsNonCopyable(Type* type, ASTBuilder* astBuilder)
 {
-    HashSet<Decl*> visited;
-    return typeContainsNonCopyableImpl(type, astBuilder, visited);
+    return typeContainsNonCopyableImpl(type, astBuilder, 0);
 }
 
 ParamPassingMode adjustParamPassingModeBasedOnParamType(

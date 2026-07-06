@@ -1,23 +1,24 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+// non-exhaustive: `Test t;` also produces "use of uninitialized variable" warnings;
+// those are irrelevant to this regression guard and are allowed but not required.
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv
 
-// Regression guard: creating a local variable of a struct that contains Atomic<T>
-// is now an error, because Atomic<T> is [__NonCopyableType] and therefore cannot
-// be placed in Function address space.
+// Regression guard: performing an atomic operation on a local variable of a struct
+// containing Atomic<T> is an error (E41403). The local variable lands in Function
+// address space, which is an invalid atomic destination — neither groupshared nor
+// a device buffer.
 //
-// This was previously silently accepted (before gh-7262) and produced invalid SPIR-V
-// (atomic operation on a Function-address-space variable).
+// Before gh-7262, this was silently accepted and produced invalid SPIR-V (an atomic
+// op targeting a Function-address-space pointer).
 
 struct Test {
     Atomic<int> test;
-//CHECK:        ^^^^ invalid atomic destination
-//CHECK:        ^^^^ cannot perform atomic operation because destination is neither groupshared nor from a device buffer.
 }
-
-RWStructuredBuffer<Test> data;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 public void main() {
-    Test t = Test(1);
-    data[0].test.increment();
+    Test t;
+    t.test.increment();
+//CHECK: invalid atomic destination
+//CHECK: cannot perform atomic operation because destination is neither groupshared nor from a device buffer
 }

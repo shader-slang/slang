@@ -932,11 +932,12 @@ class NamedExpressionType : public Type
 ///
 /// The `paramType` should be the plain declared type of the parameter — the result of
 /// `getType(astBuilder, paramDeclRef)`, not `getParamValueType`. `getParamValueType`
-/// wraps `no_diff` parameters in `ModifiedType(NoDiffModifierVal,...)`, which breaks
-/// the `MeshOutputType` and `isCopyableType` checks here because those do not unwrap
-/// `ModifiedType`. The transitive non-copyable traversal (`typeContainsNonCopyable`)
-/// does strip modifier wrappers internally, but the top-level checks require the plain
-/// type.
+/// wraps `no_diff` parameters in `ModifiedType(NoDiffModifierVal,...)`. The top-level
+/// `MeshOutputType` check and the `isCopyableType` call in this function inspect
+/// `paramType` directly and do not unwrap `ModifiedType`. Only the transitive non-copyable
+/// check (`typeContainsNonCopyable`) strips modifier wrappers internally. Passing a
+/// `ModifiedType`-wrapped value would therefore cause the `MeshOutputType` and copyability
+/// branches to silently miss their target types.
 ///
 /// This function adjusts the mode to account for non-copyable types and for
 /// types that transitively contain non-copyable fields (e.g. a struct whose
