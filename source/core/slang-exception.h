@@ -25,9 +25,11 @@ namespace Slang
 // fails to match there (libstdc++ and MSVC match by type name and are
 // unaffected). Marking the classes with default type visibility exports the
 // typeinfo and vtable so the dynamic linker coalesces every image's copy into
-// one canonical definition. MSVC needs no annotation, and `__declspec` export
-// semantics do not apply to this problem on Windows.
-#ifdef _MSC_VER
+// one canonical definition. The gate is the platform, not the compiler: every
+// non-Windows target uses the Itanium ABI and needs the annotation, while
+// PE/COFF does not have the problem regardless of compiler (this matches the
+// sibling SLANG_REPLAY_EXCEPTION_API in replay-context.h).
+#if SLANG_WINDOWS_FAMILY
 #define SLANG_EXCEPTION_TYPE_VISIBLE
 #else
 #define SLANG_EXCEPTION_TYPE_VISIBLE __attribute__((visibility("default")))

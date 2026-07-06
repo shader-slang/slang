@@ -50,9 +50,3 @@ slang-unit-test-tool/SlangcCoverageManifestOutput.internal
 # Remove these once the exception classes in source/core/slang-exception.h
 # are given default visibility (one canonical typeinfo per process), which
 # makes cross-dylib typed catches work on macOS.
-slang-unit-test-tool/replayStreamRejectsNullDataWithNonzeroSize.internal
-slang-unit-test-tool/replayStreamRejectsWritePositionOverflow.internal
-slang-unit-test-tool/replayStreamRejectsWritePastListIndexLimit.internal
-slang-unit-test-tool/replayStreamRejectsNullWriteWithNonzeroSize.internal
-slang-unit-test-tool/replayStreamRejectsReadSizeOverflow.internal
-slang-unit-test-tool/replayStreamRejectsNullReadWithNonzeroSize.internal
