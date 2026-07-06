@@ -2,6 +2,9 @@
 // differentiable, so `__fwd_diff(df)` where `df` calls `__bwd_diff(outerF)` must be diagnosed
 // rather than crash. See https://github.com/shader-slang/slang/issues/10745.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -stage compute -entry computeMain
+// The second run skips the front-end check via -disable-non-essential-validations, exercising the
+// backstop inside maybeTranslateForwardDerivative (the forward-diff translation path).
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -stage compute -entry computeMain -disable-non-essential-validations
 
 RWStructuredBuffer<float> outputBuffer;
 
