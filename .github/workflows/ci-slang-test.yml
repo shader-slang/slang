@@ -71,6 +71,12 @@ jobs:
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
 
+      - name: Compile offline CUDA prelude test
+        if: inputs.os == 'windows'
+        run: >-
+          nvcc -std=c++17 -c tests/cuda/cuda-prelude-vec1-make.cu
+          -I prelude -o cuda-prelude-vec1-make.obj
+
       - name: Test Slang
         run: |
           # Fail fast on mutually exclusive inputs — both would accumulate
