@@ -297,6 +297,8 @@ accessor call. The arguments are passed as is. In case there are multiple `__sub
 > *`type-expr`* (**`'.'`** | **`'::'`**) *`member-identifier`*
 >
 > *`value-expr`* **`'.'`** *`member-identifier`*
+>
+> *`pointer-value-expr`* (**`'.'`** | **`'->'`**) *`member-identifier`*
 
 A _member access expression_ selects a member of a namespace, a type, or a value expression.
 
@@ -307,8 +309,14 @@ For value expressions, *`member-identifier`* is a member of the value, such as a
 function, or a property. For scalars, vectors, matrices, and tuples, the *`member-identifier`* may also be a
 sequence of components, resulting in a _swizzle expression_.
 
+For pointer-typed and pointer-like values, members can be selected using either the `.` or `->` operator. When
+the `.` operator is used, the pointer is implicitly dereferenced as necessary. The arrow operator `->`
+selects a member through a pointer with an explicit dereference.
+
 Member expressions are discussed in more detail in [Member Expression](expressions-member-access.md).
 
+> ⚠️ **Warning:** The arrow operator `->` is currently experimental in Slang. The details are subject to
+> change.
 
 ### Cast Expression
 

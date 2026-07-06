@@ -1,4 +1,4 @@
-> TODO
+> TODO - THIS PAGE HAS NOT YET BEEN SCRUTINIZED
 
 Member Expression
 -----------------
@@ -10,6 +10,8 @@ Member Expression
 > *`type-expr`* (**`'.'`** | **`'::'`**) *`member-identifier`*
 >
 > *`value-expr`* **`'.'`** *`member-identifier`*
+>
+> *`pointer-value-expr`* **`'->'`** *`member-identifier`*
 
 A _member access expression_ selects a member of a namespace, type, or a value expression.
 
@@ -35,11 +37,11 @@ If the left-hand-side is a value, then:
       accessor of that property, depending on whether the expression reads or assigns that property.
 
 
-TODO
-
 ### Implicit Dereference
 
 If the base expression of a member reference is a _pointer-like type_ such as `ConstantBuffer<T>`, then a member reference expression will implicitly dereference the base expression to refer to the pointed-to value (e.g., in the case of `ConstantBuffer<T>` this is the buffer contents of type `T`).
+
+For an explicit pointer, the arrow operator `->` dereferences the pointer and then selects a member: `x->m` is equivalent to `(*x).m`. Because it operates on a pointer, `->` is subject to the same experimental status as the pointer dereference operator `*`.
 
 ### Vector Swizzles
 
