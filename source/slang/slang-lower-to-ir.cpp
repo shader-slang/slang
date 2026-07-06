@@ -3635,8 +3635,10 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 
 
 /// Implementation of typeContainsNonCopyable with cycle detection via a visited set.
-/// `visited` tracks StructDecl pointers already on the recursion stack to break cycles
-/// introduced by recursive struct definitions or mutual references.
+/// `visited` tracks StructDecl pointers currently on the active recursion path.
+/// Each entry is removed on return (via SLANG_DEFER) so the set is a call-path guard,
+/// not a memoization cache — sibling instantiations of the same generic StructDecl*
+/// are therefore traversed independently.
 static bool typeContainsNonCopyableImpl(Type* type, ASTBuilder* astBuilder, HashSet<Decl*>& visited)
 {
     // Unwrap modifier wrappers (e.g. NoDiffType applied to `this` by autodiff)
@@ -3716,6 +3718,14 @@ ParamPassingMode adjustParamPassingModeBasedOnParamType(
     // which is invalid for non-copyable types. Promote to true reference (`Ref`) so
     // the caller passes a pointer to the original storage rather than a local copy.
     //
+    // BorrowInOut is the mode for explicit `inout` parameters (via
+    // getExplicitlyDeclaredParamPassingMode) and for `[mutating] this` parameters
+    // (via getActualParamPassingModeForImplicitThisParam). Both reach this function,
+    // so the promotion applies to both.
+    // Plain `In` and `Out` parameters on types that transitively contain non-copyable
+    // fields are not promoted here; the E41403 diagnostic fires downstream if such a
+    // parameter is used as an atomic destination.
+    //
     // This check is done before the isCopyableType guard below because a struct
     // containing non-copyable fields is not itself marked [__NonCopyableType]
     // (isNonCopyableType is not transitive), yet BorrowInOut semantics are still
@@ -3752,9 +3762,15 @@ ParamPassingMode getParamPassingMode(DeclRef<ParamDecl> paramDeclRef, ASTBuilder
 {
     auto paramDecl = paramDeclRef.getDecl();
     auto declaredMode = getExplicitlyDeclaredParamPassingMode(paramDecl);
+    // Use getType (substituted declared type) rather than getParamValueType here.
+    // getParamValueType wraps no_diff parameters in ModifiedType(NoDiffModifierVal, ...),
+    // but isCopyableType and isNonCopyableType do not unwrap ModifiedType. Without this,
+    // a `no_diff Atomic<int>` parameter would be misidentified as copyable: its
+    // In-mode would not be promoted to BorrowIn, and a BorrowInOut parameter on a
+    // struct containing `no_diff Atomic<int>` fields would not be promoted to Ref.
     auto actualMode = adjustParamPassingModeBasedOnParamType(
         declaredMode,
-        getParamValueType(astBuilder, paramDeclRef),
+        getType(astBuilder, paramDeclRef),
         astBuilder);
     return actualMode;
 }
@@ -4175,12 +4191,17 @@ IRLoweringParameterInfo getParameterInfo(
     DeclRef<ParamDecl> const& paramDeclRef)
 {
     auto paramDecl = paramDeclRef.getDecl();
+    // getParamValueType wraps no_diff params in ModifiedType(NoDiffModifierVal,...);
+    // that wrapper is needed for autodiff lowering (info.type below) but must not
+    // be passed to adjustParamPassingModeBasedOnParamType, because isCopyableType /
+    // isNonCopyableType do not unwrap ModifiedType. Use getType for mode adjustment.
     auto paramType = getParamValueType(context->astBuilder, paramDeclRef);
+    auto paramTypeForMode = getType(context->astBuilder, paramDeclRef);
 
     auto declaredParamPassingMode = getExplicitlyDeclaredParamPassingMode(paramDecl);
     auto adjustedParamPassingMode = adjustParamPassingModeBasedOnParamType(
         declaredParamPassingMode,
-        paramType,
+        paramTypeForMode,
         context->astBuilder);
 
     IRLoweringParameterInfo info;

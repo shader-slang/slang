@@ -2,6 +2,8 @@
 //TEST:SIMPLE(filecheck=CHECK-HLSL): -target hlsl
 //TEST:SIMPLE(filecheck=CHECK-GLSL): -target glsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK-CUDA): -target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK-METAL): -target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK-WGSL): -target wgsl -entry main -stage compute
 
 // Regression test: a struct containing Atomic<T> that conforms to an interface
 // with a [mutating] method must not be rejected by witness-signature matching.
@@ -21,6 +23,8 @@
 //CHECK-HLSL: InterlockedAdd
 //CHECK-GLSL: atomicAdd
 //CHECK-CUDA: atomicAdd
+//CHECK-METAL: atomic_fetch_add_explicit
+//CHECK-WGSL: atomicAdd
 
 interface ICounter {
     [mutating] void add(int delta);

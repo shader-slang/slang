@@ -930,9 +930,13 @@ class NamedExpressionType : public Type
 /// usually this is a mode returned by `getExplicitlyDeclaredParamPassingMode()`
 /// or something similar.
 ///
-/// The `paramType` should be the declared type of the parameter, not including
-/// any of the wrapper types that are used to represent parameter-passing modes.
-/// Modifier wrappers (e.g. from autodiff) are stripped internally.
+/// The `paramType` should be the plain declared type of the parameter — the result of
+/// `getType(astBuilder, paramDeclRef)`, not `getParamValueType`. `getParamValueType`
+/// wraps `no_diff` parameters in `ModifiedType(NoDiffModifierVal,...)`, which breaks
+/// the `MeshOutputType` and `isCopyableType` checks here because those do not unwrap
+/// `ModifiedType`. The transitive non-copyable traversal (`typeContainsNonCopyable`)
+/// does strip modifier wrappers internally, but the top-level checks require the plain
+/// type.
 ///
 /// This function adjusts the mode to account for non-copyable types and for
 /// types that transitively contain non-copyable fields (e.g. a struct whose
