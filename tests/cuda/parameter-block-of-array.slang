@@ -16,6 +16,7 @@
 // On CPP targets entry-point uniforms are collected into a params struct passed
 // via void*; the block still renders as a FixedArray pointer field there.
 // CPPCHECK: FixedArray<float, 4>* arr_0;
+// CPPCHECK: ->arr_0)[
 // CBCHECK: __global__ void cbMain(FixedArray<float, 4>* arr_0, RWStructuredBuffer<float> output_0)
 // CBCHECK: (*arr_0)[
 
