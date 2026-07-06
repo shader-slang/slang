@@ -5,7 +5,7 @@ Generics in Slang enable parameterization of [structures](types-struct.md),
 [subscript operators](types-struct.md#subscript-op), and
 [constructors](types-struct.md#constructor). A generic parameter can be a type, a [Boolean](types-fundamental.md#boolean)
 value, an [integer](types-fundamental.md#integer) value, or an [enumeration (TODO)](TODO.md) value.
-In addition, Slang supports [generic extension](types-extension.md#generic-struct), covered
+In addition, Slang supports [generic extension](types-extension.md#generic), covered
 in [type extensions](types-extension.md).
 
 When the generic parameters are bound, a generic type or function is specialized. A specialized generic is a
@@ -17,7 +17,7 @@ function, but this does not specialize the generic.
 
 > 📝 **Remark 1:** Slang does not support explicit specialization of generics where a Slang program
 > would provide a definition for a specific combination of arguments. However,
-> [generic extension](types-extension.md#generic-struct) can be used to extend generic structures to
+> [generic extension](types-extension.md#generic) can be used to extend generic structures to
 > similar effect.
 
 > 📝 **Remark 2:** Slang does not currently support using interface-typed variables that require dynamic dispatch as
@@ -172,7 +172,7 @@ Generic parameter constraint clause:
   type expression to be equal to the right-hand-side type expression.
 - _`generic-type-constraint-coercion-decl`_ declares a generic type coercion constraint, requiring the type
   expression in parentheses to be coercible to the type expression outside the parentheses.
-  This constraint may be used only in [generic extensions](types-extension.md#generic-struct).
+  This constraint may be used only in [generic extensions](types-extension.md#generic).
   See GitHub issue [#10087](https://github.com/shader-slang/slang/issues/10087).
 - _`identifier`_: see the respective syntax for a description.
 - _`bases-clause`_: see the respective syntax for a description.

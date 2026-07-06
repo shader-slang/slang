@@ -47,7 +47,6 @@ Contents
   * [Casts and Conversions](expressions-conversions.md)
   * [Overload Resolution](expressions-overload-resolution.md)
 * [Lambda expressions](expressions-lambda.md)
-* [Tuple expressions](expressions-tuple.md)
 * [Initializer Expressions](expressions-initializer.md)
 * [Value Categories](expressions-value-categories.md)
 * [Evaluation of Expressions](expressions-evaluation-classes.md)
