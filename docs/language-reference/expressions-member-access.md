@@ -3,16 +3,39 @@
 Member Expression
 -----------------
 
-A _member expression_ consists of a base expression followed by a dot (`.`) and an identifier naming a member to be accessed:
+**Grammar:**
 
-```hlsl
-base.m
-```
+> *`namespace-identifier`* (**`'.'`** | **`'::'`**) *`member-identifier`*
+>
+> *`type-expr`* (**`'.'`** | **`'::'`**) *`member-identifier`*
+>
+> *`value-expr`* **`'.'`** *`member-identifier`*
 
-When `base` is a structure type, this expression looks up the field or other member named by `m`.
-Just as for an identifier expression, the result of a member expression may be overloaded, and might be disambiguated based on how it is used.
+A _member access expression_ selects a member of a namespace, type, or a value expression.
 
-A member expression is an l-value if the base expression is an l-value and the member it refers to is mutable.
+If the left-hand-side is a namespace identifier, the member access expression is a qualified lookup in that
+namespace. The expression type may be an arbitrary namespace member including a value, a type, or a
+namespace. See [name lookup](basics-name-lookup.md) for details.
+
+If the left-hand-side is a type expression, the member access expression is a static member lookup within that
+type. See [enumerations](types-enum.md), [structs](types-struct.md), and [name lookup](basics-name-lookup.md)
+for details.
+
+If the left-hand-side is a value, then:
+
+1. If the value is a scalar, vector, matrix, or tuple value, the member access expression is a swizzle
+   expression. See *Swizzle Expressions* below.
+
+2. If the value type is a [struct](types-struct.md), then the:
+
+   1. If *`member-identifier`* names a member (a field or a function), then the expression is a value
+      expression for that member, matching the value category.
+
+   2. If *`member-identifier`* names a property, then the expression is translated as a `get` or `set`
+      accessor of that property, depending on whether the expression reads or assigns that property.
+
+
+TODO
 
 ### Implicit Dereference
 

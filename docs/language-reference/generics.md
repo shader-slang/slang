@@ -25,14 +25,14 @@ function, but this does not specialize the generic.
 
 ## Syntax
 
-Generic [structure](types-struct.md) syntax:
+Generic [structure](types-struct.md) declaration syntax:
 
 > **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\*<br>
 > **`'{'`** _`member-list`_ **`'}'`**
 
-Generic [interface](types-interface.md) syntax:
+Generic [interface](types-interface.md) declaration syntax:
 
 > **`'interface'`** _`identifier`_ [*`generic-params-decl`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>

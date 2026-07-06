@@ -269,39 +269,54 @@ static, then the object is passed as the argument to the implicit `this` paramet
 
 A _subscript expression_ consists of a base expression and a list of argument expressions.
 
-TODO
+The base expression type must be an [array](types-array.md), a [vector](types-vector-and-matrix.md), a
+[matrix](types-vector-and-matrix.md), or a [struct](types-struct.md) with the subscript operator defined as a
+member.
 
-A subscript expression invokes one of the subscript declarations in the type of the base expression. Which subscript declaration is invoked is resolved based on the number and types of the arguments.
+For array, vector, and matrix types, the built-in subscript operator semantics are defined by
+[IArray](../../../core-module-reference/interfaces/iarray-01/subscript.html) (for R-value base expressions)
+and [IRWArray](../../../core-module-reference/interfaces/irwarray-0123/subscript.html) (for L-value base
+expressions). The subscript operator has a single argument, which returns the element of an array or a vector,
+or the column vector of a matrix. The returned value is an L-value if *`base-expr`* is an L-value. Otherwise,
+it is an R-value.
 
-A subscript expression is an l-value if the base expression is an l-value and if the subscript declaration it refers to has a setter or by-reference accessor.
+For [struct types](types-struct.md), the subscript expression is translated to a call to the subscript member
+operator. If the subscript expression is an assignment or assignment-like expression, the call is translated
+to the `set` accessor call of the subscript declaration. Otherwise, the call is translated to the `get`
+accessor call. The arguments are passed as is. In case there are multiple `__subscript` declarations,
+[overload resolution](expressions-overload-resolution.md) selects the most appropriate one.
 
-Subscripts may be formed on the built-in vector, matrix, and array types.
+
+### Member Expression
+
+**Grammar:**
+
+> *`namespace-identifier`* (**`'.'`** | **`'::'`**) *`member-identifier`*
+>
+> *`type-expr`* (**`'.'`** | **`'::'`**) *`member-identifier`*
+>
+> *`value-expr`* **`'.'`** *`member-identifier`*
+
+A _member access expression_ selects a member of a namespace, type, or a value expression.
+
+For namespace base expressions, *`member-identifier`* is an identifier within the namespace. For type
+expressions, *`member-identifier`* is a member identifier.
+
+For value expressions, *`member-identifier`* is a member of the value, such as a component, field, member
+function, or a property. For scalars, vectors, matrices, and tuples, the *`member-identifier`* may also be a
+sequence of components, resulting in a _swizzle expression_.
+
+Member expressions are discussed in more details in [Member Expression](expressions-member-access.md).
 
 
-Cast Expression
----------------
+### Cast Expression
 
-A _cast expression_ attempt to coerce a single value (the base expression) to a desired type (the target type):
+**Grammar:**
 
-```hlsl
-(int) 1.0f
-```
+> **`'('`** *`type-expr`* **`')'`**) *`base-expr`*
 
-A cast expression can perform both built-in type conversions and invoke any single-argument initializers of the target type.
-
-### Compatibility Feature
-
-As a compatibility feature for older code, Slang supports using a cast where the base expression is an integer literal zero and the target type is a user-defined structure type:
-
-```hlsl
-MyStruct s = (MyStruct) 0;
-```
-
-The semantics of such a cast are equivalent to initialization from an empty initializer list:
-
-```hlsl
-MyStruct s = {};
-```
+A _cast expression_ converts a value (*`base-expr`*) to the desired type (*`type-expr`*). This is also known
+as an explicit type conversion. See [Expression Type Conversions](expressions-conversions.md) for details.
 
 
 ### Operators with Vector and Matrix Operands
@@ -318,27 +333,28 @@ The matrix/matrix and matrix/vector multiplication are special, and they follow 
 rules. See [Vector and Matrix Types](types-vectors-and-matrix.md) for details.
 
 
-
-
-
-
-
-
-
 ## Non-Overloadable Operators
 
 ### Parenthesized Expression
 
-An expression wrapped in parentheses `()` is a _parenthesized expression_ and evaluates to the same value as
-the wrapped expression.
+An expression wrapped in parentheses `()` is a _parenthesized expression_. It evaluates to the same value as
+the wrapped expression. Parenthesized expressions can be used to control the evaluation order of
+subexpressions.
 
 
 ### Generic Specialization
 
+**Grammar:**
 
-TODO: `<...>`
+> *`gen-expr`* **`'<'`** [*`gen-arg-expr`* (**`','`** *`gen-arg-expr`*)* ] **`'>'`**
+>
+> *`gen-arg-expr`* = *`type-expr`* | *`value-expr`*
 
-### Disambiguation between Generic Specialization and Less-Than Operator
+A generic type or an invocable (e.g., function) can be explicitly specialized by supplying the arguments to
+the generic parameters. When the arguments are not supplied, they are inferred as required. For details, see
+_Parameter Binding_ in [Generics](generics.md).
+
+#### Disambiguation between Generic Specialization and Less-Than Operator
 
 Generic specialization is context-sensitive. When token `<` is encountered in an expression and the
 left-hand-side operand is:
