@@ -278,8 +278,8 @@ For array, vector, and matrix types, the built-in subscript operator semantics a
 [IArray](../../../core-module-reference/interfaces/iarray-01/subscript.html) (for R-value base expressions)
 and [IRWArray](../../../core-module-reference/interfaces/irwarray-0123/subscript.html) (for L-value base
 expressions). The subscript operator has a single argument, which returns the element of an array or a vector,
-or the column vector of a matrix. The returned value is an L-value if *`base-expr`* is an L-value. Otherwise,
-it is an R-value.
+or the row vector of a matrix. The returned value is an L-value if *`base-expr`* is an L-value. Otherwise, it
+is an R-value.
 
 For [struct types](types-struct.md), the subscript expression is translated to a call to the subscript member
 operator. If the subscript expression is an assignment or assignment-like expression, the call is translated
