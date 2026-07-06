@@ -3,16 +3,16 @@
 // Contract under test
 // -------------------
 // `DiagnosticSink` supports clang/gcc-style warning groups. Each `DiagnosticInfo`
-// carries a `WarningLevel`; the always-on `Default` group is emitted unconditionally,
-// while the `All`/`Extra`/`Pedantic` groups are opt-in via `enableWarningLevel`.
-// Group gating is applied during `diagnose`, after per-id overrides and before the
-// treat-warnings-as-errors flag.
+// carries a `WarningLevel`; the always-on `Default` group is emitted unconditionally.
+// The other groups are independent (not nested): `Extra` is on by default, while `All`
+// and `Pedantic` are off by default and opt-in via `enableWarningLevel`. Group gating is
+// applied during `diagnose`, after per-id overrides and before the treat-warnings-as-errors
+// flag.
 //
 // These tests drive the public `diagnose` API and observe the result via its return
 // value (false when a diagnostic is suppressed) and `getErrorCount` (for the
-// warnings-as-errors interaction). They exercise the off-by-default groups that no
-// production warning is tagged with yet, so a regression that ignored
-// `DiagnosticInfo::level` would be caught here.
+// warnings-as-errors interaction), so a regression that ignored `DiagnosticInfo::level`
+// would be caught here.
 
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "unit-test/slang-unit-test.h"
@@ -36,29 +36,30 @@ bool emitted(DiagnosticSink& sink, const DiagnosticInfo& info)
 }
 } // namespace
 
-// Default state: Default and Pedantic groups are emitted; All and Extra are suppressed.
+// Default state: Default and Extra groups are emitted; All and Pedantic are suppressed.
 SLANG_UNIT_TEST(warningLevelDefaultGating)
 {
     DiagnosticSink sink;
 
     SLANG_CHECK(emitted(sink, makeWarning(1, WarningLevel::Default)) == true);
-    SLANG_CHECK(emitted(sink, makeWarning(2, WarningLevel::Pedantic)) == true);
+    SLANG_CHECK(emitted(sink, makeWarning(2, WarningLevel::Extra)) == true);
     SLANG_CHECK(emitted(sink, makeWarning(3, WarningLevel::All)) == false);
-    SLANG_CHECK(emitted(sink, makeWarning(4, WarningLevel::Extra)) == false);
+    SLANG_CHECK(emitted(sink, makeWarning(4, WarningLevel::Pedantic)) == false);
 }
 
-// Enabling a group is additive and affects only that group.
+// Enabling a group is additive and affects only that group. Both groups exercised here are
+// off by default (All and Pedantic), so enabling one must not enable the other.
 SLANG_UNIT_TEST(warningLevelEnableIsAdditive)
 {
     DiagnosticSink sink;
     sink.enableWarningLevel(WarningLevel::All);
 
     SLANG_CHECK(emitted(sink, makeWarning(3, WarningLevel::All)) == true);
-    // Extra was not enabled, so it stays suppressed.
-    SLANG_CHECK(emitted(sink, makeWarning(4, WarningLevel::Extra)) == false);
+    // Pedantic was not enabled, so it stays suppressed.
+    SLANG_CHECK(emitted(sink, makeWarning(4, WarningLevel::Pedantic)) == false);
 
-    sink.enableWarningLevel(WarningLevel::Extra);
-    SLANG_CHECK(emitted(sink, makeWarning(4, WarningLevel::Extra)) == true);
+    sink.enableWarningLevel(WarningLevel::Pedantic);
+    SLANG_CHECK(emitted(sink, makeWarning(4, WarningLevel::Pedantic)) == true);
 }
 
 // An explicit per-id enable (e.g. -W<name>) force-enables a grouped warning even when its
@@ -73,10 +74,10 @@ SLANG_UNIT_TEST(warningLevelPerIdOverrideWins)
     sink.overrideDiagnosticSeverity(allWarning.id, Severity::Warning, &allWarning);
     SLANG_CHECK(emitted(sink, allWarning) == true);
 
-    // -Wno-<name> on an on-by-default pedantic warning: suppressed despite the group being on.
-    auto pedanticWarning = makeWarning(2, WarningLevel::Pedantic);
-    sink.overrideDiagnosticSeverity(pedanticWarning.id, Severity::Disable, &pedanticWarning);
-    SLANG_CHECK(emitted(sink, pedanticWarning) == false);
+    // -Wno-<name> on an on-by-default extra warning: suppressed despite the group being on.
+    auto extraWarning = makeWarning(2, WarningLevel::Extra);
+    sink.overrideDiagnosticSeverity(extraWarning.id, Severity::Disable, &extraWarning);
+    SLANG_CHECK(emitted(sink, extraWarning) == false);
 }
 
 // Treat-warnings-as-errors runs after group gating: a suppressed grouped warning stays
@@ -115,9 +116,10 @@ SLANG_UNIT_TEST(warningLevelInheritedFromParentSink)
 
     SLANG_CHECK(child.isWarningLevelEnabled(WarningLevel::All) == true);
     SLANG_CHECK(emitted(child, makeWarning(3, WarningLevel::All)) == true);
-    // A group the parent did not enable is not inherited either.
-    SLANG_CHECK(child.isWarningLevelEnabled(WarningLevel::Extra) == false);
-    SLANG_CHECK(emitted(child, makeWarning(4, WarningLevel::Extra)) == false);
+    // An off-by-default group the parent did not enable stays off in the child (Pedantic is off
+    // by default; Extra would be a poor probe here since it is on by default).
+    SLANG_CHECK(child.isWarningLevelEnabled(WarningLevel::Pedantic) == false);
+    SLANG_CHECK(emitted(child, makeWarning(4, WarningLevel::Pedantic)) == false);
 }
 
 // Out-of-range group values (only reachable via a bogus int cast through the public
