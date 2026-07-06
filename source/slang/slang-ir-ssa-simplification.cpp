@@ -56,6 +56,19 @@ void simplifyIR(
     DiagnosticSink* sink)
 {
     SLANG_PROFILE;
+
+    // One callee-side-effect memo shared by every DCE invocation in this pass:
+    // the per-function fixpoint below runs eliminateDeadCode O(functions x
+    // iterations) times, and each uncached invocation re-walks shared callees'
+    // use lists (see IRDeadCodeEliminationOptions::calleeSideEffectCache) —
+    // quadratic in the call-site count of builtins like `sin`. Sharing one
+    // memo across the whole pass is sound because the passes driven here never
+    // create `IRAnnotation`s, so a cached answer can only go conservatively
+    // stale (an inst stays alive one extra round).
+    Dictionary<IRInst*, bool> calleeSideEffectCache;
+    if (!options.deadCodeElimOptions.calleeSideEffectCache)
+        options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
+
     bool changed = true;
     const int kMaxIterations = 8;
     const int kMaxFuncIterations = 16;
@@ -116,6 +129,11 @@ void simplifyNonSSAIR(
     IRSimplificationOptions options,
     DiagnosticSink* sink)
 {
+    // See the matching memo in simplifyIR for why and when this is sound.
+    Dictionary<IRInst*, bool> calleeSideEffectCache;
+    if (!options.deadCodeElimOptions.calleeSideEffectCache)
+        options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
+
     bool changed = true;
     const int kMaxIterations = 8;
     int iterationCounter = 0;
@@ -146,6 +164,11 @@ void simplifyFunc(
     IRSimplificationOptions options,
     DiagnosticSink* sink)
 {
+    // See the matching memo in simplifyIR for why and when this is sound.
+    Dictionary<IRInst*, bool> calleeSideEffectCache;
+    if (!options.deadCodeElimOptions.calleeSideEffectCache)
+        options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
+
     bool changed = true;
     const int kMaxIterations = 8;
     int iterationCounter = 0;

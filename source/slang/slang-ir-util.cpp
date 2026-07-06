@@ -1640,9 +1640,12 @@ bool isPureFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
     return false;
 }
 
-bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
+bool isSideEffectFreeFunctionalCall(
+    IRCall* call,
+    SideEffectAnalysisOptions options,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
-    if (!doesCalleeHaveSideEffect(call->getCallee()))
+    if (!doesCalleeHaveSideEffect(call->getCallee(), calleeSideEffectCache))
     {
         return areCallArgumentsSideEffectFree(call, options);
     }
@@ -1664,8 +1667,14 @@ void forEachAssociatedCallee(IRInst* callee, TFunc callback)
         });
 }
 
-bool doesCalleeHaveSideEffect(IRInst* callee)
+bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache)
 {
+    if (cache)
+    {
+        if (auto cached = cache->tryGetValue(callee))
+            return *cached;
+    }
+
     bool sideEffect = !isNoSideEffectCallee(callee);
 
     // If the callee has no side effect, check if any of its associated functions have side
@@ -1688,6 +1697,9 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
                 return;
             });
     }
+
+    if (cache)
+        cache->add(callee, sideEffect);
 
     return sideEffect;
 }

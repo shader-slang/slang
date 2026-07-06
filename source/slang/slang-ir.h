@@ -775,7 +775,14 @@ struct IRInst
     /// It is possible that this instruction has side effects?
     ///
     /// This is a conservative test, and will return `true` if an exact answer can't be determined.
-    bool mightHaveSideEffects(SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None);
+    ///
+    /// `calleeSideEffectCache`, when provided, memoizes the per-callee part of
+    /// the answer for call insts across queries — see `doesCalleeHaveSideEffect`
+    /// in slang-ir-util.h for the cost being amortized and the staleness
+    /// contract.
+    bool mightHaveSideEffects(
+        SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None,
+        Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr);
 
     // RTTI support
     static bool isaImpl(IROp) { return true; }
