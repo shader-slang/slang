@@ -125,8 +125,9 @@ local fatal = helpers.fatal
 -- Warning-level (group) sentinel: pass one positionally to warning() to make that warning
 -- opt-in behind a -W group flag, e.g.
 --   warning("my-warning", 123, "message", span{...}, pedantic)
--- Only `pedantic` is used today; `helpers.all` and `helpers.extra` exist for the other groups
--- and can be bound here when a diagnostic needs them.
+-- `extra` is on by default and `pedantic` is off by default (see DiagnosticSink); `helpers.all`
+-- exists for the third group and can be bound here when a diagnostic needs it.
+local extra = helpers.extra
 local pedantic = helpers.pedantic
 
 --
@@ -946,9 +947,11 @@ warning(
     20103,
     "keyword used as a name",
     span { loc = "location", message = "'~name:Name' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts" },
-    -- Pedantic: using a type keyword as a name is legal and usually works; this is a
-    -- style/portability hint rather than a likely bug, so it belongs in the pedantic group.
-    pedantic
+    -- Extra: using a type keyword as a name is legal and usually works, so this is a
+    -- style/portability hint rather than a likely bug. It lives in the `extra` group (on by
+    -- default) rather than `pedantic` because the diagnostic still points at a real, if benign,
+    -- footgun in the user's own code.
+    extra
 )
 
 err(
@@ -4444,7 +4447,12 @@ warning(
     "vertex-shader-missing-sv-position",
     38052,
     "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic",
-    span { loc = "location", message = "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic; the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output, or suppress with -warnings-disable 38052)" }
+    span { loc = "location", message = "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic; if it feeds the rasterizer directly, the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output)" },
+    -- Pedantic (off by default): a vertex shader may legitimately omit SV_Position when its output
+    -- feeds a geometry/tessellation/mesh stage that supplies the position itself (see #11884), and
+    -- at VS-compile time we cannot tell that case apart from a real missing-position bug. The check
+    -- is a false positive too often to run by default, so it is opt-in via -Wpedantic.
+    pedantic
 )
 
 --
@@ -4470,6 +4478,13 @@ err(
     38201,
     "'glsl' module not available",
     span { loc = "location", message = "'glsl' module is not available from the current global session. To enable GLSL compatibility mode, specify 'SlangGlobalSessionDesc::enableGLSL' when creating the global session." }
+)
+
+err(
+    "module-already-loaded-with-different-source",
+    38202,
+    "module already loaded with different source",
+    span { loc = "location", message = "a module named '~moduleName:Name' is already loaded from different source contents in this session. Use a different module name or drop references to the previous module before reloading." }
 )
 
 -- Note: compilationCeased is a fatal diagnostic that is locationless
@@ -5134,6 +5149,12 @@ err(
     "coverage-counter-width-bytes-invalid",
     45114,
     "coverage counter width API option value is invalid: the `CompilerOptionName::TraceCoverageCounterByteWidth` API option accepts only `4` (uint32) or `8` (uint64), but got `~byteWidth:Int`. This is the API-path counterpart to `E45113` (the CLI parser, which validates bits 32/64 before storing the byte width here); a host setting the API option directly must pass the byte width (divide bits by 8), not the bit width."
+)
+
+warning(
+    "coverage-counter-width-capped-for-metal",
+    45115,
+    "the explicitly requested 64-bit coverage counter width is not executable on Metal targets (`metal`, `metallib`, `metallib-asm`): MSL provides no 64-bit atomic fetch-add, so counting-mode coverage counters are capped to uint32 for this compile. Pass `-trace-coverage-counter-width 32` to make the effective width explicit; uint32 counters wrap silently at 2^32 hits per slot."
 )
 
 -- 41xxx - Semantic checking (continued)

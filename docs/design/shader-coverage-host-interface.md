@@ -205,11 +205,12 @@ through `ISyntheticResourceMetadata`.
 
 ## Backend usage
 
-| Backend / host style                            | Query path                                                                  | Binding action                                                                                                                             |
-| ----------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Vulkan / Metal / direct descriptor-backed hosts | `getResourceInfo(...)`                                                      | read `space` / `binding` and bind the coverage buffer using the host's descriptor-layout model                                             |
-| CUDA / CPU-style marshaling hosts               | `getResourceInfo(...)`                                                      | read `uniformOffset` / `uniformStride` from `SyntheticResourceInfo`                                                                        |
-| `slang-rhi` Vulkan / CUDA backends              | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` after `ISyntheticShaderProgram` resolves the location; provided by companion `slang-rhi` PR #739, not this PR |
+| Backend / host style                    | Query path                                                                  | Binding action                                                                                                                             |
+| --------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Vulkan / direct descriptor-backed hosts | `getResourceInfo(...)`                                                      | read `space` / `binding` and bind the coverage buffer using the host's descriptor-layout model                                             |
+| Direct Metal hosts                      | `getResourceInfo(...)`                                                      | read `binding` as the `[[buffer(N)]]` index; `space == -1` is the expected sentinel (see "Direct Metal host binding recipe" below)         |
+| CUDA / CPU-style marshaling hosts       | `getResourceInfo(...)`                                                      | read `uniformOffset` / `uniformStride` from `SyntheticResourceInfo`                                                                        |
+| `slang-rhi` Vulkan / CUDA backends      | `getResourceInfo(...)` while building `ShaderProgramSyntheticResourcesDesc` | `bindSyntheticResource(...)` after `ISyntheticShaderProgram` resolves the location; provided by companion `slang-rhi` PR #739, not this PR |
 
 D3D12 / HLSL hosts are expected to use the same `space` / `binding`
 metadata shape in a follow-up, but this PR does not define D3D register-space
@@ -259,6 +260,36 @@ The executable reference for this recipe is the
 (`tools/slang-unit-test/unit-test-coverage-cpu-runtime.cpp`), which
 binds through exactly this contract and validates exact per-line
 execution counts for both counter widths.
+
+### Direct Metal host binding recipe
+
+Metal has no descriptor-space dimension: the synthesized
+`__slang_coverage` buffer is an ordinary `[[buffer(N)]]` argument of the
+kernel, where `N` is chosen by coverage auto-allocation to avoid the
+buffer indices used by reflected shader parameters (or pinned with
+`-trace-coverage-binding`). To bind it, a direct Metal host:
+
+1. reads the coverage entry from `ISyntheticResourceMetadata` and uses
+   `SyntheticResourceInfo::binding` as the buffer index; `space == -1`
+   is the expected sentinel on Metal (no descriptor-space dimension),
+   and the CPU/CUDA marshaling fields stay at their unavailable
+   sentinels (`uniformOffset == -1`, `uniformStride == 0`),
+2. compiles with `-trace-coverage-counter-width 32` (API:
+   `CompilerOptionName::TraceCoverageCounterByteWidth` = `4`) — MSL
+   provides `atomic_fetch_add_explicit` only for 32-bit `atomic_uint`,
+   so 32-bit is the only executable counter width on Metal,
+3. allocates a zero-initialized `MTLBuffer` of
+   `getCounterCount() * 4` bytes and sets it on the compute encoder at
+   index `binding` (`setBuffer(counterBuffer, 0, binding)`),
+4. dispatches, then reads the `uint32` counters back (directly from a
+   shared-storage buffer, or via a blit for private storage).
+
+The executable reference for this recipe is the
+`coverageMetalRuntimeDispatch` unit test
+(`tools/slang-unit-test/unit-test-coverage-metal-runtime.cpp`), which
+compiles the emitted MSL with the Metal framework's runtime compiler,
+binds through exactly this contract, and validates exact per-line
+execution counts on a GPU.
 
 ## Counter element width and device requirements
 

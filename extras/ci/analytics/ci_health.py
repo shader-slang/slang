@@ -843,7 +843,9 @@ def build_history_chart(snapshots):
             "hostedRunnerHistory",
             "GitHub-Hosted Runner Usage vs. Cap",
             "Hosted runners in use (stacked by label) and queued hosted-runner jobs, "
-            "sampled every 15 minutes. Dashed line shows the per-org concurrency cap.",
+            "sampled every 15 minutes. Amber/red background bands mark 80%/100% of the "
+            "per-org concurrency cap (auto-detected from the org plan); no bands are "
+            "shown when the cap can't be detected.",
         )
 
     return f"""
