@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:19:25Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
+generated_at: 2026-06-29T18:20:38Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -92,7 +92,7 @@ flowchart TD
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `specialize` | — | `base, arg, ...` | H | `GenericAppExpr` in `slang-lower-to-ir.cpp` | Applies generic arguments to a generic value (function, type, or witness); hoistable so identical specializations dedupe. |
+| `specialize` | — | `base, arg, ...` | H | `GenericAppDeclRef` substitution lowering in `emitDeclRef`, `slang-lower-to-ir.cpp` | Applies generic arguments to a generic value (function, type, or witness); hoistable so identical specializations dedupe. |
 | `bind_global_generic_param` | — | `param: IRGlobalGenericParam, val: IRInst` | | (synthesized) | Binds a global generic parameter to a concrete value at link time. |
 | `globalValueRef` | — | `value` | | (synthesized) | Wraps a reference to another global IR value so it can be carried across an IR-pass boundary that would otherwise rewrite the use. |
 | `global_generic_param` | — | — | G | `GenericTypeParamDecl` (at module scope) | Declares a generic parameter at module level. |
@@ -143,7 +143,7 @@ consumes.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `witness_table` | — | (children: `witness_table_entry`) | H | `InheritanceDecl` lowering in `slang-lower-to-ir.cpp` | Maps each interface requirement key to its concrete implementation; `lookupWitness` walks it. |
+| `witness_table` | — | `concreteType` (plus children: `witness_table_entry`) | H | `InheritanceDecl` lowering in `slang-lower-to-ir.cpp` | Operand 0 is the conforming concrete type (the conformed interface is carried by the result `WitnessTableType`); entries are child `witness_table_entry` insts that `lookupWitness` walks. |
 | `witness_table_entry` | — | `requirementKey, satisfyingVal` | | (synthesized) | One row of a `witness_table`. |
 | `interface_req_entry` | `InterfaceRequirementEntry` | `requirementKey, requirementVal` | G | (synthesized in `InterfaceDecl` lowering) | One requirement slot on the interface side; `requirementKey` is a `StructKey` or a hoistable `BuiltinRequirementKey`. |
 | `thisTypeWitness` | — | `type` | | (synthesized inside `InterfaceDecl` lowering) | Placeholder witness that `ThisType` conforms to the enclosing interface. |
@@ -156,7 +156,7 @@ consumes.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `rtti_object` | `RTTIObject` | (variadic) | | (synthesized) | Materialized RTTI record for a type; produced by the RTTI-object pass. |
+| `rtti_object` | `RTTIObject` | `type` | | (synthesized) | Materialized RTTI record for the type given by its single operand; produced by the RTTI-object pass. |
 | `GetSequentialID` | — | `RTTIOperand` | H | (synthesized) | Returns a stable integer ID for an RTTI operand; used by dynamic-dispatch tables. |
 | `GetDynamicResourceHeap` | — | — | H | (synthesized) | Returns the current dynamic-resource-heap value used for descriptor-handle decoding. |
 
@@ -211,8 +211,8 @@ across passes.
 | `GetSpecializedDispatcher` | — | `witnessTableSet, lookupKey, specializationArgs...` | H | (synthesized) | Returns a specialized dispatcher when the key points at a generic. |
 | `SpecializeExistentialsInFunc` | — | `func, bindings...` | H | (synthesized) | Reference to a function with specific existential-parameter bindings; each binding is `VoidLit` for "any" or a type-flow info value. |
 | `SpecializeExistentialsInType` | — | (variadic) | H | (synthesized) | Cache key for specialized `BindExistentialsType` results. |
-| `WeakUse` | — | — | H | (synthesized) | Marker for a weak use that should not pin its operand; used by the type-flow pass. |
-| `FuncTypeOf` | — | — | H | (synthesized) | Compile-time helper that returns the function type of its operand. |
+| `WeakUse` | — | `inst` | H | (synthesized) | Marker for a weak use that should not pin its operand; used by the type-flow pass. (The Lua schema omits the operand name; `IRBuilder::getWeakUse` passes the weakly referenced inst.) |
+| `FuncTypeOf` | — | `func` | H | (synthesized) | Compile-time helper that returns the function type of its operand. (The Lua schema omits the operand name; lowering emits it from the lowered function-as-type operand.) |
 
 ### AnyValue marshalling
 
@@ -270,6 +270,30 @@ produces a value of type `T` so that a generic callee that
 expects `T` can be invoked. The pass that lowers
 `BindExistentialsType` (see [types.md](types.md)) inserts
 `wrapExistential` calls at the corresponding crossings.
+
+### `extractExistentialValue` / `extractExistentialType` / `extractExistentialWitnessTable`
+
+These are the three projections that reverse `makeExistential`.
+Given an existential value built from a concrete value `C`, a type,
+and a witness, `extractExistentialValue(existential)` recovers the
+packed concrete-typed value, `extractExistentialType(existential)`
+recovers the packed concrete type, and
+`extractExistentialWitnessTable(existential)` recovers the witness
+table proving conformance. The type and witness-table projections are
+hoistable (their result is determined purely by the existential
+operand), whereas the value projection is not. The
+existential-elimination pass uses the trio to peel an existential
+apart once its concrete contents are statically known.
+
+### `TypeEqualityWitness`
+
+`TypeEqualityWitness(subType, superType)` is a placeholder witness
+certifying that two types are equal. It is the witness form used when
+a conformance constraint is satisfied not by an interface
+implementation but by a type-equality fact (for example, when generic
+argument substitution makes an associated type identical to a
+concrete type). The opcode is hoistable, so a given `subType` /
+`superType` pair resolves to a single witness inst.
 
 ### `witness_table` and `witness_table_entry`
 

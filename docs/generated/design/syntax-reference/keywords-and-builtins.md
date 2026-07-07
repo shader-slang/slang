@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:11:28Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 12225714da6281dfb4ac737612c99f7829fb0cf890341684715ac2d919b445cb
+generated_at: 2026-06-29T13:28:54Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: f75116b2323ea549005589e147bdc7c2b79a63ace127358d8904fccc95cf2272
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -70,20 +70,24 @@ Cited line numbers refer to
 
 | Keyword | Where parsed |
 | --- | --- |
-| `if` | line 6534 (`LookAheadToken("if")`); `else` handled in `parseIfStatement` (line 6986) at line 6995 |
-| `for` | line 6545 (statement entry); compile-time `for` at lines 6516, 6518 (`parseCompileTimeForStmt`, line 6467) |
-| `while` | line 6547 |
-| `do` | line 6549 |
-| `break` | line 6551 |
-| `continue` | line 6553 |
-| `return` | line 6555 |
-| `switch` | line 6564 |
-| `case` | line 6572 (and in the switch body at lines 6233, 6263) |
-| `default` | line 6574 (and in the switch body at lines 6239, 6263) |
-| `discard` | line 6557 |
-| `defer` | line 6582 |
-| `throw` | line 6590 |
-| `catch` | lines 7121, 7140 (the `do ... catch` handler form; `catch` does **not** pair with `try` at statement level) |
+| `if` | line 6909 (`LookAheadToken("if")`); `else` handled in `parseIfStatement` (line 7361) at line 7370 |
+| `for` | line 6920 (statement entry); compile-time `for` at lines 6891, 6893 (`parseCompileTimeForStmt`, line 6842) |
+| `while` | line 6922 |
+| `do` | line 6924 |
+| `break` | line 6926 |
+| `continue` | line 6928 |
+| `return` | line 6930 |
+| `switch` | line 6939 |
+| `__target_switch` | line 6941 (`parseTargetSwitchStmt`); compiler-internal |
+| `__stage_switch` | line 6943 (`parseStageSwitchStmt`); compiler-internal |
+| `__intrinsic_asm` | line 6945 (`parseIntrinsicAsmStmt`); compiler-internal |
+| `case` | line 6947 (and in the switch body at lines 6607, 6637) |
+| `default` | line 6949 (and in the switch body at lines 6613, 6637) |
+| `__GPU_FOREACH` | line 6951 (`ParseGpuForeachStmt`); compiler-internal |
+| `discard` | line 6932 |
+| `defer` | line 6957 |
+| `throw` | line 6965 |
+| `catch` | lines 7479, 7515 (the `do ... catch` handler form; `catch` does **not** pair with `try` at statement level) |
 
 These keywords are not in the syntax-decl table because Slang treats
 control-flow as a closed grammar; they cannot be redefined by user
@@ -91,13 +95,13 @@ code. Note that `try` is an *expression* keyword (see
 `## Expression keywords` below); the statement-level exception
 handler is `do { ... } catch ( ... ) { ... }`, parsed at
 [slang-parser.cpp lines
-7121-7140](../../../../source/slang/slang-parser.cpp).
+7479-7515](../../../../source/slang/slang-parser.cpp).
 
 ### Decl keywords
 
 Registered in `g_parseSyntaxEntries[]` at
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line 10461
-through `_makeParseDecl(...)` (defined at line 10432). Identifiers that begin with double
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line 10900
+through `_makeParseDecl(...)` (defined at line 10871). Identifiers that begin with double
 underscore (`__`) are intentionally namespaced as compiler-internal /
 non-stable.
 
@@ -105,8 +109,8 @@ non-stable.
 | --- | --- |
 | `typedef` | C-style type alias (`parseTypeDef`) |
 | `typealias` | Slang-style type alias (`parseTypeAliasDecl`) |
-| `associatedtype` | Interface associated type (`parseAssocType`, line 4019) |
-| `__constraint` | Interface-level constraint requirement (`parseInterfaceConstraintDecl`, line 4061) |
+| `associatedtype` | Interface associated type (`parseAssocType`, line 4280) |
+| `__constraint` | Interface-level constraint requirement (`parseInterfaceConstraintDecl`, line 4322) |
 | `__associatedfunc` | Interface associated function (`parseAssocFunc`) |
 | `type_param` | Module-level generic type parameter (`parseGlobalGenericTypeParamDecl`) |
 | `__generic` | Generic-parameter list head (`parseGenericDecl`) |
@@ -141,13 +145,22 @@ non-stable.
 `_makeParseDecl`. Instead the parser dispatches on them via direct
 identifier lookahead in the type-specifier parser
 ([slang-parser.cpp lines
-3153-3169](../../../../source/slang/slang-parser.cpp)), reached from
+3414-3428](../../../../source/slang/slang-parser.cpp)), reached from
 `ParseDeclWithModifiers`
 ([slang-parser.cpp line
-5506](../../../../source/slang/slang-parser.cpp)). The dedicated
-parse routines (`ParseStruct` at line 5976, `ParseClass`
-at line 6047, `parseEnumDecl` at line 6096) construct the
+5793](../../../../source/slang/slang-parser.cpp)). The dedicated
+parse routines (`ParseStruct` at line 6350, `ParseClass`
+at line 6421, `parseEnumDecl` at line 6470) construct the
 corresponding AST nodes directly.
+
+The same type-specifier parser also recognizes the variadic-pack type
+forms `expand` and `each` by direct identifier lookahead
+([slang-parser.cpp lines
+3435-3441](../../../../source/slang/slang-parser.cpp)), alongside the
+`__first` / `__last` / `__trimFirst` / `__trimLast` / `__shapeConcat`
+/ `__shapePermute` / `__shapeSwap` / `__shapeReduce` / `__packBranch`
+shape utilities (listed under `## Expression keywords`); none of these
+are in `g_parseSyntaxEntries[]` either.
 
 ### Modifier keywords
 
@@ -232,7 +245,7 @@ Registered through `_makeParseExpr` in
 | `__fwd_diff`, `fwd_diff` | Forward-mode differentiation (`parseForwardDifferentiate`) |
 | `__bwd_diff`, `bwd_diff` | Reverse-mode differentiation (`parseBackwardDifferentiate`) |
 | `__apply` | Apply-for-backward higher-order expression (`parseApplyForBwd`); used inside `__func_extension` to expose the primal-with-context companion to a custom `bwd_diff`; experimental |
-| `new` | Heap-style allocation expression; parsed specially by the `AdvanceIf(parser, "new")` branch of `parsePrefixExpr` at [slang-parser.cpp line 9449](../../../../source/slang/slang-parser.cpp) (`parsePrefixExpr` defined at line 9441; not via `_makeParseExpr`) |
+| `new` | Heap-style allocation expression; parsed specially by the `AdvanceIf(parser, "new")` branch of `parsePrefixExpr` at [slang-parser.cpp line 9888](../../../../source/slang/slang-parser.cpp) (`parsePrefixExpr` defined at line 9880; not via `_makeParseExpr`) |
 | `__return_val` | Compiler-internal return-value reference |
 | `__func_as_type` | Function-as-type reflection |
 | `__dispatch_kernel` | Kernel-dispatch primitive |

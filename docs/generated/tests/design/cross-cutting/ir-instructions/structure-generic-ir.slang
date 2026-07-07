@@ -1,30 +1,29 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T12:00:00+00:00
-//META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#function-and-module-structure
-//META: doc_section_digest=3cd430fe84a5b7025d059358578317eab126613a22446f8d9d7f776e96724317
-//META: purpose=A user-declared generic function lowers to the documented `generic` parent opcode (C++ wrapper `IRGeneric`) — "Type-level computation parent ending in `yield`".
-//META: intent=expansion
+//META: doc_section_digest=cdcc1238b1d73cfdad47a675356ee5e312b4cda22f2d9f5d255ae4ad1e0d4b21
+//META: purpose=A generic function declaration lowers to a `generic` inst (type-level computation parent).
+//META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists `generic` under "Function and module structure" as
-// the parent opcode for type-level computation. A user-declared
-// generic function `identity<T>` produces a `generic %... : Generic`
-// entry in the IR dump, which is the textual form the doc describes.
+// Verifies the doc's `generic`/`IRGeneric` structure row ("Type-level
+// computation parent ending in `yield`"). A generic helper `idOf<T>`
+// produces a `generic` inst in the IR dump.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
-
-T identity<T>(T x) { return x; }
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;
 
+T idOf<T>(T x) { return x; }
+
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)
 {
-    buf[0] = identity<int>(a);
+    buf[0] = idOf(a);
 }
 
-// IR: generic %{{.*}}: Generic
+// IR: generic

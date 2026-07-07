@@ -74,7 +74,11 @@ jobs:
         with:
           platform: linux
 
+      # sccache is a build accelerator, not a correctness input: a cache miss
+      # or a transient cache-service error must degrade to a slower (cold)
+      # build, never fail the job.
       - name: Restore sccache cache
+        continue-on-error: true
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache
@@ -194,6 +198,10 @@ jobs:
 
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+          # Sanitizer tests exercise the LLVM JIT on GCP runners that can
+          # mis-report AVX-512 support and emit instructions the host cannot
+          # execute (#11831).
+          export SLANG_DISABLE_AVX512=1
 
           echo "=== Pre-flight checks ==="
           echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
