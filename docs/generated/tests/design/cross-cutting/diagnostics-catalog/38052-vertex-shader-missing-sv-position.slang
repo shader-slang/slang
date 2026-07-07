@@ -13,7 +13,7 @@
 
 // A vertex shader with no SV_Position output triggers W38052.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry main -stage vertex -profile sm_5_0
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-Wpedantic -target hlsl -entry main -stage vertex -profile sm_5_0
 
 [shader("vertex")]
 float4 main() : COLOR
