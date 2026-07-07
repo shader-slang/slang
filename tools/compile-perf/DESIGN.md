@@ -158,3 +158,82 @@ secret already covers pushes to that repo.
 Benchmarking the whole suite is ~1.5–2.5 min per build; building `slangc` (minutes)
 dominates wall-clock, so the real constraints are timing noise and runner
 contention, not the bench runtime.
+
+## Planned workloads — known coverage gaps (2026-07-07)
+
+The suite emits SPIR-V (direct), Metal, and WGSL only. Regressions in any other
+emitter/backend are currently invisible (e.g. a change to the shared C-like
+emitter gets no HLSL/CUDA/GLSL perf signal at all). Planned additions, cheapest
+first:
+
+| Planned workload | Exercises | Cost to add |
+| --- | --- | --- |
+| `emit_hlsl` | HLSL legalization + emitter (the D3D source path — a major backend with zero coverage today) | Trivial: same shader as `codegen_spirv`, `-target hlsl`; no downstream compiler |
+| `emit_cuda` | CUDA lowering + C++-family emitter | Trivial: `-target cuda` emits source, no nvcc |
+| `emit_glsl` | GLSL legalization (distinct path from WGSL/Metal) | Trivial |
+| `codegen_dxil` | Full D3D pipeline incl. dxc downstream | Moderate: needs `dxcompiler.dll` (already shipped on the Windows runner) |
+| `codegen_ptx` | CUDA downstream via nvrtc | Heavier; the perf runner does have a 5090 + driver |
+| host/C++ (`-target cpp`, LLVM) | Host-callable / slang-llvm path | Blocked: nightly builds with `SLANG_SLANG_LLVM_FLAVOR=DISABLE` (prebuilt slang-llvm MSVC CRT link issue); fix that first |
+
+Non-target gaps (no workload covers these at all):
+
+- preprocessor/macro-heavy compile (expansion cost has no dedicated signal)
+- `createGlobalSession` / session-setup cost (recurring community complaint —
+  see shader-slang/slang discussion #6579)
+- capability-checking overhead
+
+Related tooling follow-ups tracked alongside these (from the 2026-07 VM runner
+migration measurements): per-run/unit-aware calibration in the trend check
+(stamp the host unit into `meta.json`; fixed per-unit offsets span ~3%),
+repeat-on-anomaly for the rare 5-8% single-workload spikes, parallel dispatch
+support (per-ref concurrency group + push retry), and report label
+disambiguation when multiple same-date daily points exist.
+
+## API-path workloads — covering the application-integration dimension (2026-07-07)
+
+An internal real-application compilation benchmark (pytest-driven, compiling a
+renderer's shader library through the compilation API via slangpy) catches
+regressions this suite structurally cannot, because the suite drives `slangc`
+one-shot CLI compiles of single programs. Its 2026-07 data showed two signals:
+a ~+32% overall / +60%-on-small-programs Slang-compile jump at the 2026.5.2 →
+2026.12 release boundary, and a further +6% overall / +10–14%-on-small-programs
+step between 2026.12.2 and master `f4975a7` (2026-07-03) — the latter matching
+this suite's own `module_link` +5.6–7.3% finding, but amplified. The relative
+regression being largest on ~100–130 ms programs is a fixed per-compile-overhead
+signature: session setup, module loading, and link cost paid once per generated
+kernel. The plan below builds a public equivalent that covers those dimensions.
+
+**Phase 1 — API-driver workloads (no new dependencies).** A single-file C++
+tool, `tools/compile-perf/native/api-driver.cpp`, that `dlopen`s a given
+release's `libslang` (so one host-built binary measures every release in the
+ladder — the COM ABI is append-only by contract) and emits timers in the same
+`[*] name  count  N.NNms` format `bench.py` already parses. Three workloads:
+
+| Workload | Exercises | Shape |
+| --- | --- | --- |
+| `api_session_create` | `createGlobalSession` + `createSession` (core-module deserialization; the #6579 complaint) | N create/destroy iterations, no sources |
+| `api_many_kernels` | per-compile fixed overhead: N small distinct kernels through loadModule → composite → link → getEntryPointCode in one session | the dimension that amplified the 2026-07 regressions |
+| `api_module_graph` | import resolution + checking + link over a deep, realistic module DAG (interfaces/generics/conformances), loaded through the API | replaces `module_link`'s flat-import shape with a renderer-library-like graph |
+
+`bench.py` gains an `api` mode (timed command = driver + libslang path derived
+from `--slangc`) and a build-once step for the driver; everything downstream
+(results.json, track/trend/report) is unchanged.
+
+**Phase 2 — public real-shader RT corpus.** The internal corpus cannot be
+published; instead, follow the exact `mdl_dxr` precedent (fork under
+shader-slang, adapt shaders to compile standalone, pin the SHA, fetch at CI
+time — never vendored): a curated subset of the public Falcor shader library
+(NVIDIAGameWorks/Falcor — same domain and shape: material system + BSDFs + a
+path-tracer pass, raygen/closesthit/miss entry points), compiled through the
+Phase-1 API driver with link-time specialization. Keep original copyright
+headers in the fork; name the workload generically (e.g. `rt_renderer`).
+
+**Phase 3 (deferred) — slangpy-in-CI.** Nightly slangpy kernel generation
+against the local slang build (the `SGL_LOCAL_SLANG` hooks). Closest
+replication of the customer path but needs a Python env + slangpy build on the
+perf runner; only pursue if Phases 1–2 prove insufficient.
+
+**Acceptance criterion.** Sweep the Phase-1 workloads over the same variant
+ladder as the internal benchmark's data (2026.5.2, 2026.12, 2026.12.2,
+`f4975a7`) and confirm they reproduce both signals (the release-boundary jump
+and the 2026-07-03 step). If they do, the dimension is captured.

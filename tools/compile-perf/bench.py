@@ -75,12 +75,73 @@ def stats(values):
 # window; the detailed flag was added mid-window and only adds finer sub-timers.
 PERF_FLAG = "-report-perf-benchmark"
 
+HERE = os.path.dirname(os.path.abspath(__file__))
 
-def build_commands(slangc, spec, gen_dir, files):
+
+def find_libslang(slangc):
+    """Locate the slang shared library belonging to a slangc binary, trying the
+    layouts of release packages (bin/ + ../lib/) and build trees (same dir).
+    Returns None when not found — api workloads then fail with a clear error
+    while slangc workloads run normally."""
+    d = os.path.dirname(slangc)
+    for cand in (
+        os.path.join(d, "slang.dll"),
+        os.path.join(d, "libslang.dylib"),
+        os.path.join(d, "libslang.so"),
+        os.path.join(d, "..", "lib", "libslang.dylib"),
+        os.path.join(d, "..", "lib", "libslang.so"),
+    ):
+        if os.path.exists(cand):
+            return os.path.abspath(cand)
+    return None
+
+
+def build_api_driver(out_dir):
+    """Compile native/api-driver.cpp once per bench invocation with the host
+    compiler. The driver dlopens whatever libslang it is pointed at, so one
+    host build measures every release in a sweep. Returns the binary path, or
+    None (with a message) when no host compiler is available."""
+    src = os.path.join(HERE, "native", "api-driver.cpp")
+    inc = os.path.join(HERE, "..", "..", "include")
+    if not os.path.exists(os.path.join(inc, "slang.h")):
+        sys.stderr.write(f"compile-perf: include/slang.h not found near {inc}\n")
+        return None
+    is_win = sys.platform == "win32"
+    out = os.path.join(out_dir, "api-driver.exe" if is_win else "api-driver")
+    if is_win:
+        cmd = ["cl", "/nologo", "/O2", "/std:c++17", "/EHsc", f"/I{inc}", src,
+               f"/Fe:{out}"]
+    else:
+        cmd = ["c++", "-O2", "-std=c++17", "-I", inc, src, "-o", out]
+    try:
+        r = subprocess.run(cmd, cwd=out_dir, stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT, timeout=300)
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        sys.stderr.write(f"compile-perf: cannot build api-driver: {e}\n")
+        return None
+    if r.returncode != 0:
+        sys.stderr.write("compile-perf: api-driver build failed:\n"
+                         + r.stdout.decode("utf-8", "replace") + "\n")
+        return None
+    return out
+
+
+def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
     """Return (commands, primary_outfile_for_parsing_index).
 
     For "link" mode the timed command is the final main compile (last element);
-    module precompiles are setup and run once (not timed)."""
+    module precompiles are setup and run once (not timed).
+    For "api" mode the timed command is the api-driver (api = {"driver", "libslang"});
+    the driver emits [*] timer lines in the slangc report format."""
+    if spec.mode == "api":
+        timed = [api["driver"], api["libslang"], spec.api_cmd]
+        if spec.api_cmd == "session-create":
+            timed += ["--iters", str(size)]
+        else:
+            timed += ["--dir", gen_dir]
+        if spec.api_root:
+            timed += ["--root", spec.api_root]
+        return {"setup": [], "timed": timed}
     main = next((f for f in files if "main" in f), None)
     if spec.mode == "module":
         f = list(files)[0]
@@ -180,7 +241,7 @@ def real_error(text):
     return None
 
 
-def run_spec(slangc, spec, size, samples, warmup, gen_root):
+def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
     gen_dir = os.path.join(gen_root, spec.name + f"_n{size}")
     if os.path.exists(gen_dir):
         shutil.rmtree(gen_dir)
@@ -190,7 +251,21 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
         with open(os.path.join(gen_dir, fn), "w") as fh:
             fh.write(src)
 
-    cmds = build_commands(slangc, spec, gen_dir, files)
+    # An api workload without a driver+libslang must fail loudly (not silently
+    # skip): a missing host compiler or unrecognized package layout would
+    # otherwise drop the workload from the series with no visible signal.
+    if spec.mode == "api" and api is None:
+        return {
+            "workload": spec.name, "bucket": spec.bucket, "size": size,
+            "mode": spec.mode, "ok": False, "setup_ok": False,
+            "got_timers": False, "samples": samples, "warmup": warmup,
+            "wall_ms": None, "rss_kb": None, "timers": {},
+            "primary_timers": spec.primary_timers, "cmd": "",
+            "error": "api-driver or libslang unavailable (see stderr)",
+            "crash_codes": None,
+        }
+
+    cmds = build_commands(slangc, spec, gen_dir, files, size=size, api=api)
     # A failed setup step (e.g. a module that didn't precompile in link mode) must
     # fail the workload — otherwise the timed compile runs against missing inputs.
     setup_ok = True
@@ -279,6 +354,18 @@ def main():
                          "(default: a tempdir, auto-removed — keeps the results dir, which "
                          "is committed to the perf-results repo, free of build scratch). "
                          "Pass a path to keep them for inspection.")
+    ap.add_argument("--api-driver", default=None,
+                    help="prebuilt api-driver binary (default: build it from "
+                         "native/api-driver.cpp with the host compiler)")
+    ap.add_argument("--libslang", default=None,
+                    help="slang shared library for api workloads (default: "
+                         "derived from --slangc's package layout)")
+    ap.add_argument("--api", action="store_true",
+                    help="include the api workloads in the default set. Until "
+                         "this is passed (or api workloads are named in --only) "
+                         "they are excluded, so existing CI series and published "
+                         "reports don't change shape before the history is "
+                         "resynced with them (see DESIGN.md 'API-path workloads').")
     args = ap.parse_args()
 
     slangc = os.path.abspath(args.slangc)
@@ -286,6 +373,8 @@ def main():
         sys.exit(f"slangc not found: {slangc}")
 
     specs = manifest.WORKLOADS
+    if not args.api and not args.only:
+        specs = [s for s in specs if s.mode != "api"]
     if args.only:
         want = set(args.only.split(","))
         specs = [s for s in specs if s.name in want]
@@ -301,12 +390,23 @@ def main():
     gen_root = os.path.abspath(args.gen_dir) if args.gen_dir else tempfile.mkdtemp(prefix="perfsuite_gen_")
     os.makedirs(gen_root, exist_ok=True)
 
+    # Resolve the api-driver + libslang once when any api workload is selected.
+    api = None
+    if any(s.mode == "api" for s in specs):
+        libslang = os.path.abspath(args.libslang) if args.libslang else find_libslang(slangc)
+        driver = os.path.abspath(args.api_driver) if args.api_driver else build_api_driver(gen_root)
+        if libslang and driver:
+            api = {"driver": driver, "libslang": libslang}
+        else:
+            sys.stderr.write("compile-perf: api workloads will FAIL "
+                             f"(libslang={libslang}, driver={driver})\n")
+
     records = []
     for spec in specs:
         sizes = [spec.default_size]
         for size in sizes:
             print(f"[run] {spec.name:18s} n={size:<5d} ", end="", flush=True)
-            rec = run_spec(slangc, spec, size, args.samples, args.warmup, gen_root)
+            rec = run_spec(slangc, spec, size, args.samples, args.warmup, gen_root, api=api)
             rec["label"] = args.label
             rec["slangc"] = slangc
             records.append(rec)

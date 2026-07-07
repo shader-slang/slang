@@ -14,6 +14,10 @@ Compile modes:
 - "link"    : multi-file. Precompile every non-main file to .slang-module, then
               compile the main file (the one whose name contains "main") to a
               target against them. Stresses module read + linkIR.
+- "api"     : driven by native/api-driver.cpp against libslang instead of by
+              slangc. Measures the compilation-API dimension (session setup,
+              module loading, per-compile fixed overhead) that a one-shot CLI
+              invocation cannot separate. api_cmd selects the driver mode.
 """
 
 from dataclasses import dataclass, field
@@ -40,6 +44,11 @@ class WorkloadSpec:
     # contains "main", or the first file if none does. If set, used directly
     # as the compile entry point.
     main_file: str = None
+    # for mode="api": the api-driver subcommand ("session-create",
+    # "many-kernels", "module-graph") and, for module-graph, the root module
+    # name the driver loads by name.
+    api_cmd: str = None
+    api_root: str = None
 
 
 # Standard target invocation avoids GPU drivers and stays comparable across
@@ -287,6 +296,40 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["simplifyIR", "frontEndExecute", "compileInner"],
+    ),
+    # ---- API-path workloads (application-integration dimension) -----------
+    # Driven by native/api-driver.cpp against libslang (see DESIGN.md
+    # "API-path workloads"). These cover the costs a one-shot slangc run pays
+    # exactly once and cannot separate: session creation (core-module load),
+    # per-compile fixed overhead across many small kernels, and import
+    # resolution over a deep module graph.
+    WorkloadSpec(
+        name="api_session_create",
+        bucket="api_overhead",
+        gen=workloads.gen_api_none,
+        default_size=10,  # createGlobalSession+createSession iterations
+        mode="api",
+        api_cmd="session-create",
+        primary_timers=["apiCreateGlobalSession", "apiCreateSession", "apiTotal"],
+    ),
+    WorkloadSpec(
+        name="api_many_kernels",
+        bucket="api_overhead",
+        gen=workloads.gen_api_kernels,
+        default_size=100,
+        mode="api",
+        api_cmd="many-kernels",
+        primary_timers=["apiTotal", "apiLoadModule", "apiGetCode"],
+    ),
+    WorkloadSpec(
+        name="api_module_graph",
+        bucket="api_overhead",
+        gen=workloads.gen_api_module_graph,
+        default_size=150,
+        mode="api",
+        api_cmd="module-graph",
+        api_root="graph_main",
+        primary_timers=["apiTotal", "apiLoadModule", "apiGetCode"],
     ),
     # ---- real-shader corpus ----------------------------------------------
     WorkloadSpec(

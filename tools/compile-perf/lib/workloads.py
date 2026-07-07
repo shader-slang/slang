@@ -573,6 +573,101 @@ def gen_module_link(n):
 
 
 # --------------------------------------------------------------------------- #
+# API-path workloads (driven by native/api-driver.cpp, not slangc).
+# These measure the compilation-API dimension — session setup, module loading,
+# per-compile fixed overhead — where application-integration regressions
+# amplify (see DESIGN.md "API-path workloads").
+# --------------------------------------------------------------------------- #
+
+def gen_api_none(n):
+    """The session-create workload needs no sources; the driver only creates
+    and destroys sessions (`--iters n` is passed by bench.py)."""
+    return {}
+
+
+def gen_api_kernels(n):
+    """n small, mutually independent compute kernels, one file each, the way
+    application middleware (e.g. slangpy) generates one kernel per call
+    signature. Each kernel is deliberately tiny so per-compile fixed overhead
+    (module setup, link, codegen floor) dominates — the dimension where
+    small-program regressions amplify."""
+    files = {}
+    for i in range(n):
+        c1 = 1.0 + (i % 89) / 100.0
+        c2 = (i % 31) / 10.0
+        files[f"kernel_{i:03d}.slang"] = (
+            _HEADER
+            + f"RWStructuredBuffer<float> buf_{i};\n\n"
+            + f"float helper_{i}(float x) {{ return sin(x * {c1}) + x * {c2}; }}\n\n"
+            + '[shader("compute")]\n[numthreads(32,1,1)]\n'
+            + "void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n"
+            + f"    float v = buf_{i}[tid.x];\n"
+            + f"    v = helper_{i}(v) + helper_{i}(v * 2.0);\n"
+            + f"    buf_{i}[tid.x] = v;\n}}\n"
+        )
+    return files
+
+
+def gen_api_module_graph(n):
+    """n modules in a layered import DAG (width 8, each module importing up to
+    3 from the previous layer) plus a shared interface base and a root that the
+    driver loads by name. Unlike module_link's flat one-function modules, each
+    module carries an interface conformance, a generic call, and cross-module
+    calls — the shape of a real renderer shader library, loaded through the
+    API's import-resolution path rather than precompiled .slang-module files."""
+    width = 8
+    files = {}
+    files["gmod_base.slang"] = (
+        _HEADER
+        + "module gmod_base;\n\n"
+        + "public interface IXform { float apply(float x); }\n\n"
+        + "public float applyTwice<T : IXform>(T t, float x) { return t.apply(t.apply(x)); }\n"
+    )
+    for i in range(n):
+        layer = i // width
+        imports = ["import gmod_base;"]
+        calls = []
+        if layer > 0:
+            prev = [p for p in range(n) if p // width == layer - 1]
+            for k in range(min(3, len(prev))):
+                p = prev[(i + k) % len(prev)]
+                imports.append(f"import gmod_{p};")
+                # Call the imported module's non-recursive leaf, NOT its chain:
+                # chains calling chains multiplies inlined code by fan-in^depth
+                # and the compile explodes (observed as OOM-kill at n=150).
+                # Leaf calls keep codegen linear in n while the import DAG —
+                # the load/check cost this workload exists to measure — stays
+                # just as deep.
+                calls.append(f"    r += leaf_{p}(r * 0.99{k});\n")
+        body = (
+            _HEADER
+            + f"module gmod_{i};\n"
+            + "\n".join(imports) + "\n\n"
+            + f"public struct Xf_{i} : IXform\n{{\n"
+            + f"    public float apply(float x) {{ return x * 1.00{i % 97} + 0.0{i % 13}; }}\n}}\n\n"
+            + f"public float leaf_{i}(float x) {{ return sin(x * 1.0{i % 7}) + x * 0.5{i % 11}; }}\n\n"
+            + f"public float chain_{i}(float x)\n{{\n"
+            + f"    Xf_{i} xf;\n"
+            + f"    float r = applyTwice(xf, x);\n"
+            + "".join(calls)
+            + "    return r;\n}\n"
+        )
+        files[f"gmod_{i}.slang"] = body
+    top = [i for i in range(n) if i // width == (n - 1) // width]
+    main = [_HEADER, "module graph_main;\n"]
+    for i in top:
+        main.append(f"import gmod_{i};\n")
+    main.append("\n" + _buf())
+    main.append('[shader("compute")]\n[numthreads(1,1,1)]\n')
+    main.append("void computeMain()\n{\n    float acc = outBuf[0];\n")
+    for i in top:
+        main.append(f"    acc = chain_{i}(acc);\n")
+    main.append("    outBuf[0] = acc;\n}\n")
+    files["graph_main.slang"] = "".join(main)
+    return files
+
+
+# --------------------------------------------------------------------------- #
 # Real-shader corpus (not generated). Copy corpus files into corpus/<name>/
 # before running the suite (CI does this via actions/checkout of MDL-SDK).
 # --------------------------------------------------------------------------- #
