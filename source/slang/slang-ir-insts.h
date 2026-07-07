@@ -498,6 +498,12 @@ struct IREntryPointParamDecoration : IRDecoration
 };
 
 FIDDLE()
+struct IRSynthesizedParameterGroupDecoration : IRDecoration
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
 struct IRFormatDecoration : IRDecoration
 {
     FIDDLE(leafInst())
@@ -5320,6 +5326,11 @@ $(type_info.return_type) $(type_info.method_name)(
     void addEntryPointParamDecoration(IRInst* inst, IRFunc* entryPointFunc)
     {
         addDecoration(inst, kIROp_EntryPointParamDecoration, entryPointFunc);
+    }
+
+    void addSynthesizedParameterGroupDecoration(IRInst* inst)
+    {
+        addDecoration(inst, kIROp_SynthesizedParameterGroupDecoration);
     }
 
     void addRayPayloadDecoration(IRType* inst) { addDecoration(inst, kIROp_RayPayloadDecoration); }
