@@ -39,6 +39,29 @@
       }
     },
     {
+      "name": "wasi",
+      "description": "WASI reactor build via wasi-sdk; produces slang-wasm-wasi.wasm",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build.wasi",
+      "toolchainFile": "$env{WASI_SDK_PATH}/share/cmake/wasi-sdk.cmake",
+      "cacheVariables": {
+        "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
+        "SLANG_LIB_TYPE": "STATIC",
+        "SLANG_ENABLE_AFTERMATH": "OFF",
+        "SLANG_ENABLE_CUDA": "OFF",
+        "SLANG_ENABLE_GFX": "OFF",
+        "SLANG_ENABLE_OPTIX": "OFF",
+        "SLANG_ENABLE_REPLAYER": "OFF",
+        "SLANG_ENABLE_SLANG_RHI": "OFF",
+        "SLANG_ENABLE_SPLIT_DEBUG_INFO": "OFF",
+        "SLANG_ENABLE_TESTS": "OFF",
+        "SLANG_EMBED_CORE_MODULE": "ON",
+        "SLANG_EMBED_CORE_MODULE_SOURCE": "OFF",
+        "CMAKE_C_FLAGS_INIT": "-fwasm-exceptions -Xclang -mllvm -Xclang -wasm-use-legacy-eh=false -Os",
+        "CMAKE_CXX_FLAGS_INIT": "-fwasm-exceptions -Xclang -mllvm -Xclang -wasm-use-legacy-eh=false -Os"
+      }
+    },
+    {
       "name": "msvc-base",
       "hidden": true,
       "inherits": "default",
@@ -237,6 +260,12 @@
       "configurePreset": "emscripten",
       "configuration": "Release",
       "targets": ["slang-wasm"]
+    },
+    {
+      "name": "slang-wasm-wasi",
+      "configurePreset": "wasi",
+      "configuration": "Release",
+      "targets": ["slang-wasm-wasi"]
     },
     {
       "name": "generators",

@@ -124,6 +124,17 @@ namespace Slang
     outFileName = tempFileName;
     return SLANG_OK;
 }
+#elif SLANG_WASI
+/* static */ SlangResult File::generateTemporary(
+    const UnownedStringSlice& /* inPrefix */,
+    Slang::String& /* outFileName */)
+{
+    // WASI does not provide mkstemp, so this platform cannot implement
+    // File::generateTemporary. This is SLANG_WASI specifically, not the
+    // broader SLANG_WASM, because Emscripten's MEMFS supports mkstemp("/tmp/...")
+    // and can use the generic POSIX branch below.
+    return SLANG_E_NOT_IMPLEMENTED;
+}
 #else
 /* static */ SlangResult File::generateTemporary(
     const UnownedStringSlice& inPrefix,

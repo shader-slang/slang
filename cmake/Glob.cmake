@@ -37,6 +37,10 @@ function(slang_glob_sources var dir)
         list(FILTER files EXCLUDE REGEX "(^|/)unix/.*")
     endif()
 
+    if(NOT CMAKE_SYSTEM_NAME STREQUAL "WASI")
+        list(FILTER files EXCLUDE REGEX "(^|/)wasi/.*")
+    endif()
+
     if(NOT CMAKE_SYSTEM_NAME MATCHES "Windows" AND NOT SLANG_ENABLE_DX_ON_VK)
         list(FILTER files EXCLUDE REGEX "(^|/)d3d.*/.*")
     endif()

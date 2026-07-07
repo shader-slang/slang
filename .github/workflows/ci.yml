@@ -201,6 +201,27 @@ jobs:
       config: release
       runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
 
+  # WASI build (slang-wasm-wasi): the same rationale and runner selection as the
+  # Emscripten build above, but wasi-sdk is downloaded directly (curl+tar)
+  # instead of via emsdk.
+  build-linux-release-gcc-wasi:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
+    with:
+      os: linux
+      compiler: gcc
+      platform: wasi
+      config: release
+      runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
+
   # Sanitizer build+test (blocking via check-ci, runs on every PR). Runs in the
   # clang CI container as `--user root`, so there is no container-user concern
   # and no runner-UID coupling — only the runner label switches.
@@ -646,6 +667,7 @@ jobs:
         build-linux-debug-gcc-x86_64,
         build-linux-release-gcc-x86_64,
         build-linux-release-gcc-wasm,
+        build-linux-release-gcc-wasi,
         build-linux-debug-gcc-aarch64,
         build-linux-release-gcc-aarch64,
         build-macos-debug-clang-aarch64,

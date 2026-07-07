@@ -178,6 +178,29 @@ jobs:
             [ -f "slang-wasm.wasm" ]
             [ -f "slang-wasm.js" ]
             node smoke/smoke-test.js smoke/rand_float.slang computeMain
+          elif [[ "${{ inputs.platform }}" == "wasi" ]]; then
+            # Unit-test the enum-metadata generator.
+            python3 source/slang-wasm-wasi/tools/test_generate_slang_bindings.py -v
+            # Pin wasi-sdk to a known-good version, matching docs/building.md's
+            # WASI-SDK Build section, for the same reason the emsdk install
+            # above is pinned: an unpinned "latest" could silently break this
+            # build on an unrelated wasi-sdk release.
+            curl -L -o /tmp/wasi-sdk.tar.gz \
+              https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-33/wasi-sdk-33.0-x86_64-linux.tar.gz
+            tar xf /tmp/wasi-sdk.tar.gz -C /tmp
+            export WASI_SDK_PATH=/tmp/wasi-sdk-33.0-x86_64-linux
+            cmake --workflow --preset generators --fresh
+            mkdir generators
+            cmake --install build --config Release --component generators --prefix generators
+            cmake -DSLANG_GENERATORS_PATH=generators/bin --preset wasi
+            cmake --build --preset slang-wasm-wasi --config "$cmake_config"
+            [ -f "build.wasi/$cmake_config/bin/slang-wasm-wasi.wasm" ]
+            # Pin wasmtime to a known-good version.
+            python3 -m pip install --quiet "wasmtime==46.0.1"
+            mkdir "build.wasi/$cmake_config/bin/smoke"
+            cp tests/wasm-wasi/smoke/* "build.wasi/$cmake_config/bin/smoke/"
+            cd "build.wasi/$cmake_config/bin"
+            python3 smoke/smoke-test.py slang-wasm-wasi.wasm smoke/rand_float.slang computeMain
           else
             # Prepare cache launcher arguments (prefer sccache, fall back to ccache)
             cmake_launcher_defines=()
@@ -322,6 +345,7 @@ jobs:
           path: |
             build/dist-${{inputs.config}}/**/ZIP/slang/*
             build.em/Release
+            build.wasi/Release
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:

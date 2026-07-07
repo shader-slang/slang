@@ -345,7 +345,8 @@ working on repro handling. Inputs are validated before use.
 - `source/slang/`: Main compiler implementation (frontend, IR, backend)
 - `source/slangc/`: Command-line compiler tool
 - `source/slang-core-module/`, `source/slang-glsl-module/`, `source/standard-modules/`: Standard library modules
-- `source/slang-wasm/`: WebAssembly bindings
+- `source/slang-wasm/`: WebAssembly bindings (Emscripten/embind)
+- `source/slang-wasm-wasi/`: WASI-target flat C ABI bindings
 - `source/slang-record-replay/`: API call record/replay
 - `source/slang-rt/`: Runtime library
 - `tools/`: Development and testing tools
