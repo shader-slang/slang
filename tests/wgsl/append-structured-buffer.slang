@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -wgpu -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -output-using-type
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain
 
 //TEST_INPUT:set inBuffer = ubuffer(data=[1 2 3 4], stride=4)

@@ -8,7 +8,11 @@ RWStructuredBuffer<int> inBuffer;
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4, counter=0):out,name=outputBuffer
 AppendStructuredBuffer<int> outputBuffer;
 
-// METAL: atomic_fetch_add_explicit(((atomic_int device*)
+// The append counter is synthesized with an `Atomic<int>` element type, so Metal
+// declares it directly as `atomic<int> device*` (no reinterpret cast) and appends
+// with atomic_fetch_add.
+// METAL: atomic<int> device*
+// METAL: atomic_fetch_add_explicit
 // METAL: AppendStructuredBuffer_Append_0(outputBuffer_elements{{.*}}, outputBuffer_counter
 
 // METALLIB: define void @computeMain
