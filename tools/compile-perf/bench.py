@@ -228,8 +228,9 @@ def run_once(cmd):
 # hosts that lack it. Release tarballs bundle these, so they usually don't fire.
 _BENIGN = ("E00100", "E52002", "spirv-opt", "spirv-dis", "slang-glslang",
            "failed to load downstream", "pass-through compiler not found")
-# Matches both the modern "error[E30015]:" and the legacy "error 30015:" formats.
-_ERR_RE = re.compile(r"error\[|: error:|\berror \d+:")
+# Matches the modern "error[E30015]:" and legacy "error 30015:" slangc formats,
+# plus the api-driver's bare "error: ..." lines.
+_ERR_RE = re.compile(r"error\[|: error:|\berror \d+:|^error: ")
 
 
 def real_error(text):
@@ -316,6 +317,12 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
 
     err = real_error(last_text)
     got_timers = bool(per_timer)
+    # A run that produced no timers and no recognizable diagnostic would report
+    # a bare "no timers" with the actual output lost — surface the first output
+    # line (e.g. a loader failure or crash banner) so remote CI runs are
+    # debuggable from results.json alone.
+    if err is None and not got_timers:
+        err = next((ln.strip()[:200] for ln in last_text.splitlines() if ln.strip()), None)
     ok = setup_ok and got_timers and all(sample_ok) and not crash_codes
 
     return {
