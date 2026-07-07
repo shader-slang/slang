@@ -172,7 +172,11 @@ struct OptionalTypeLoweringContext
             // Synthesize a default-constructed placeholder for the payload.
             // The payload is semantically irrelevant when hasValue == false,
             // but we need a well-formed value to satisfy the struct layout.
+            // Carry the `none`'s source location onto the placeholder so that a
+            // later diagnostic (e.g. rejecting a default-constructed opaque
+            // handle on Khronos targets, issue #7878) points at the user's code.
             auto defaultVal = builder->emitDefaultConstruct(info->valueType);
+            defaultVal->sourceLoc = inst->sourceLoc;
             List<IRInst*> operands;
             operands.add(defaultVal);
             operands.add(builder->getBoolValue(false));
