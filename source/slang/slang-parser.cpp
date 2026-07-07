@@ -1320,7 +1320,7 @@ static void parseFileReferenceDeclBase(Parser* parser, FileReferenceDeclBase* de
     if (peekTokenType(parser) == TokenType::StringLiteral)
     {
         auto nameToken = parser->ReadToken(TokenType::StringLiteral);
-        auto nameString = getStringLiteralTokenValue(nameToken, parser->sink);
+        auto nameString = getFileNameTokenValue(nameToken);
         auto moduleName = getName(parser, nameString);
 
         decl->moduleNameAndLoc = NameLoc(moduleName, nameToken.loc);
@@ -1387,8 +1387,7 @@ static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
     else if (parser->LookAheadToken(TokenType::StringLiteral))
     {
         auto nameToken = parser->ReadToken(TokenType::StringLiteral);
-        decl->nameAndLoc.name =
-            parser->getNamePool()->getName(getStringLiteralTokenValue(nameToken, parser->sink));
+        decl->nameAndLoc.name = parser->getNamePool()->getName(getFileNameTokenValue(nameToken));
         decl->nameAndLoc.loc = nameToken.loc;
         if (moduleDecl)
             moduleDecl->nameAndLoc = decl->nameAndLoc;

@@ -229,6 +229,56 @@ local insts = {
 			},
 			{ Atomic = { struct_name = "AtomicType", operands = { { "elementType", "IRType" } }, hoistable = true } },
 			{
+				WorkGraphRecordTypeBase = {
+					hoistable = true,
+					{
+						DispatchNodeInputRecord = {
+							struct_name = "DispatchNodeInputRecordType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						ThreadNodeInputRecord = {
+							struct_name = "ThreadNodeInputRecordType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						GroupNodeInputRecords = {
+							struct_name = "GroupNodeInputRecordsType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{ EmptyNodeInput = { struct_name = "EmptyNodeInputType" } },
+					{
+						ThreadNodeOutputRecords = {
+							struct_name = "ThreadNodeOutputRecordsType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						GroupNodeOutputRecords = {
+							struct_name = "GroupNodeOutputRecordsType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						NodeOutput = {
+							struct_name = "NodeOutputType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						NodeOutputArray = {
+							struct_name = "NodeOutputArrayType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{ EmptyNodeOutput = { struct_name = "EmptyNodeOutputType" } },
+					{ EmptyNodeOutputArray = { struct_name = "EmptyNodeOutputArrayType" } },
+				},
+			},
+			{
 				BindExistentialsTypeBase = {
 					hoistable = true,
 					{
@@ -1276,6 +1326,7 @@ local insts = {
 	{ nonUniformResourceIndex = { operands = { { "index" } } } },
 	{ getNaturalStride = { operands = { { "type" } } } },
 	{ meshOutputRef = { operands = { { "base" }, { "index" } } } },
+	{ nodeOutputRecordGetElementPtr = { operands = { { "base" }, { "index" } } } },
 	{ meshOutputSet = { operands = { { "base" }, { "index" }, { "elementValue" } } } },
 	-- only two parameters as they are effectively static
 	-- TODO: make them reference the _slang_mesh object directly
@@ -1834,6 +1885,7 @@ local insts = {
 			-- SPIR-V execution mode.
 			{ glslFragDepthGreater = { struct_name = "GLSLFragDepthGreaterDecoration" } },
 			{ glslFragDepthLess = { struct_name = "GLSLFragDepthLessDecoration" } },
+			{ shader64BitIndexing = { struct_name = "Shader64BitIndexingDecoration" } },
 			{ precise = { struct_name = "PreciseDecoration" } },
 			{ public = { struct_name = "PublicDecoration" } },
 			{ hlslExport = { struct_name = "HLSLExportDecoration" } },
@@ -1893,6 +1945,65 @@ local insts = {
 				waveSize = {
 					struct_name = "WaveSizeDecoration",
 					operands = { { "numLanes", "IRIntLit" } },
+				},
+			},
+			{
+				nodeLaunch = {
+					struct_name = "NodeLaunchDecoration",
+					operands = { { "mode", "IRStringLit" } },
+				},
+			},
+			{
+				nodeMaxDispatchGrid = {
+					struct_name = "NodeMaxDispatchGridDecoration",
+					operands = { { "x", "IRIntLit" }, { "y", "IRIntLit" }, { "z", "IRIntLit" } },
+				},
+			},
+			{
+				nodeDispatchGrid = {
+					struct_name = "NodeDispatchGridDecoration",
+					operands = { { "x", "IRIntLit" }, { "y", "IRIntLit" }, { "z", "IRIntLit" } },
+				},
+			},
+			{
+				maxRecords = {
+					struct_name = "MaxRecordsDecoration",
+					operands = { { "count", "IRIntLit" } },
+				},
+			},
+			{
+				nodeID = {
+					struct_name = "NodeIDDecoration",
+					operands = { { "name", "IRStringLit" }, { "arrayIndex", "IRIntLit" } },
+				},
+			},
+			{
+				nodeIsProgramEntry = {
+					struct_name = "NodeIsProgramEntryDecoration",
+				},
+			},
+			{
+				nodeArraySize = {
+					struct_name = "NodeArraySizeDecoration",
+					operands = { { "count", "IRIntLit" } },
+				},
+			},
+			{
+				allowSparseNodes = {
+					struct_name = "AllowSparseNodesDecoration",
+				},
+			},
+			{
+				-- Keep these decoration names reserved for stable IR serialization; new
+				-- workgraph records use dedicated Type.WorkGraphRecordTypeBase ops.
+				workGraphRecordType = {
+					struct_name = "WorkGraphRecordTypeDecoration",
+				},
+			},
+			{
+				workGraphRecordElementType = {
+					struct_name = "WorkGraphRecordElementTypeDecoration",
+					operands = { { "elementType", "IRType" } },
 				},
 			},
 			{
@@ -3257,7 +3368,11 @@ local insts = {
 	{ constexprFloatCast = { operands = { { "value" } }, hoistable = true } },
 	{ constexprCastIntToEnum = { operands = { { "value" } }, hoistable = true } },
 	{ constexprCastEnumToInt = { operands = { { "value" } }, hoistable = true } },
-	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } }
+	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } },
+	-- Work-graph Barrier flag intrinsics: convert a compile-time BarrierMemoryTypeFlags/BarrierSemanticFlags
+	-- integer value to the corresponding target named-constant expression (e.g. "(UAV_MEMORY)").
+	{ getEnumBarrierMemoryTypeFlags = { operands = { { "flags" } }, hoistable = true } },
+	{ getEnumBarrierSemanticFlags = { operands = { { "flags" } }, hoistable = true } }
 }
 
 -- A function to calculate some useful properties and put it in the table,

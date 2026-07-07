@@ -1006,7 +1006,13 @@ SlangResult JSONStringEscapeHandler::appendUnescaped(
                     uint32_t value = 0;
                     cur++;
 
-                    if (cur + 4 > end)
+                    // Test the remaining length with pointer subtraction rather than
+                    // forming `cur + 4`: if fewer than four hex digits remain, `cur + 4`
+                    // would point past one-past-the-end, which is undefined behavior per
+                    // [expr.add]. Subtraction of two pointers into the same buffer is
+                    // always well-defined (same idiom as `end - cur < digitCount` in
+                    // CppStringEscapeHandler::appendUnescaped above).
+                    if (end - cur < 4)
                     {
                         return SLANG_FAIL;
                     }
@@ -1023,7 +1029,11 @@ SlangResult JSONStringEscapeHandler::appendUnescaped(
                     // (0xDC00-0xDFFF), combine them back into the single code point
                     // before encoding to UTF-8. Without this each surrogate half
                     // would be encoded on its own, corrupting the character.
-                    if (value >= 0xD800 && value <= 0xDBFF && cur + 6 <= end && cur[0] == '\\' &&
+                    // As above, the look-ahead room for a second `\uXXXX` escape is
+                    // tested with `end - cur >= 6` rather than `cur + 6 <= end`, so we
+                    // never form a pointer past one-past-the-end (undefined per [expr.add])
+                    // when the high surrogate is the last thing in the buffer.
+                    if (value >= 0xD800 && value <= 0xDBFF && end - cur >= 6 && cur[0] == '\\' &&
                         cur[1] == 'u')
                     {
                         uint32_t low = 0;

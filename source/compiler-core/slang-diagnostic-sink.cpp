@@ -745,6 +745,13 @@ Severity DiagnosticSink::getEffectiveMessageSeverity(
         if (effectiveSeverity < Severity::Error || *pSeverityOverride >= effectiveSeverity)
             effectiveSeverity = *pSeverityOverride;
     }
+    else if (effectiveSeverity == Severity::Warning && !isWarningLevelEnabled(info.level))
+    {
+        // The warning belongs to an opt-in group (-Wall/-Wextra/-Wpedantic) that has not been
+        // enabled, so it is suppressed. An explicit per-id override (-W<name>/-Wno-<name>) takes
+        // precedence over this group gating, which is why it lives in the `else` branch.
+        effectiveSeverity = Severity::Disable;
+    }
 
     if (isFlagSet(Flag::TreatWarningsAsErrors) && effectiveSeverity == Severity::Warning)
         effectiveSeverity = Severity::Error;
@@ -828,8 +835,12 @@ void DiagnosticSink::overrideDiagnosticSeverity(
     {
         SLANG_ASSERT(info->id == diagnosticId);
 
-        // If the override is the same as the default, we can just remove the override
-        if (info->severity == overrideSeverity)
+        // If the override is the same as the default, we can just remove the override -- but only
+        // for the always-on Default group. For a warning in an opt-in group (-Wall/-Wextra/
+        // -Wpedantic), an explicit override back to its nominal Warning severity is meaningful: it
+        // force-enables the warning even though its group is not enabled, so the override must be
+        // kept (an absent override would let group gating suppress it).
+        if (info->severity == overrideSeverity && info->level == WarningLevel::Default)
         {
             m_severityOverrides.remove(diagnosticId);
             return;

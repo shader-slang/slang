@@ -106,6 +106,45 @@ Deprecated test types (do not create new tests of these kinds, and we need to sl
 - `HLSL_COMPUTE`: Runs render-test with "-hlsl-rewrite -compute" options and compares text file outputs
 - `CROSS_COMPILE`: Compiles using GLSL pass-through and through Slang, then compares the outputs
 
+## Compiler Optimization in Tests
+
+`slang-test` adds `-O0` when it builds a Slang compiler command line and the
+test directive does not already specify an optimization option. This keeps
+ordinary test runs fast and avoids expected-output churn from optimizer changes.
+
+Compiler-backed tests, such as `SIMPLE`, `CROSS_COMPILE`, and diagnostic tests,
+can opt in to optimized output with a normal slangc option:
+
+```text
+//TEST:SIMPLE: -target spirv -O3
+```
+
+Render-test-backed tests, such as `COMPARE_COMPUTE_EX`, must forward the
+optimization option to slangc:
+
+```text
+//TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -Xslang -O3
+```
+
+Besides `-Xslang <option>`, the forwarding forms `-compile-arg <option>`,
+`-xslang <option>`, and a `-Xslang... <options...> -X.` block are also
+recognized. Prefer the `-Xslang <option>` form shown above for new tests.
+
+Metal render tests are the one exception to the `-O0` default: they receive
+`-Xslang -O1` instead, because the downstream `metal` toolchain that produces
+the metallib is unstable at `-O0` on macOS CI. The generated MSL source is
+identical at every level, so this only affects the downstream compilation.
+
+The recognized optimization spellings are `-O`, `-O0`, `-Onone`, `-O1`,
+`-Odefault`, `-O2`, `-Ohigh`, `-O3`, and `-Omaximal`. Prefer the lowest level
+that preserves the test's expected output.
+
+`slang-test` inserts its default at the front of the argument list for both
+compiler-backed and render-test-backed commands, so directive arguments keep
+their meaning — in particular, a directive that leaves a trailing option
+without its required argument (intentionally in a diagnostic test, or by
+mistake) cannot consume the inserted default.
+
 ## Unit Tests
 In addition to the above test tools, there are also `slang-unit-test-tool` and `gfx-unit-test-tool`, which are invoked as in the following examples; but note that the unit tests do get run as part of `slang-test` as well.
 
