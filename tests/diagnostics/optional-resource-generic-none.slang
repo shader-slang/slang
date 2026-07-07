@@ -5,8 +5,12 @@
 // (E30902) does not fire here because `T` is only known to be `Texture2D` after
 // specialization. The compiler must reject this with a diagnostic rather than
 // crash: there is no default/zero value for an opaque handle on Khronos targets.
+//
+// The caret pins the diagnostic to the user's `none`, exercising the
+// `defaultVal->sourceLoc = inst->sourceLoc` propagation in the Optional lowering;
+// without it the location would fall back to a synthesized inst's use.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
 
 struct TextureArray<T>
 {
@@ -14,8 +18,9 @@ struct TextureArray<T>
 
     __subscript() -> Optional<T>
     {
-        // CHECK: error[E56004]
         get { return none; }
+//CHECK:             ^^^^ opaque type in local variable is not supported for Khronos targets
+//CHECK:             ^^^^ a resource or other opaque-typed value ('Texture2D') cannot be placed in a function-local variable for Khronos targets (SPIR-V/GLSL) or WGSL; this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function
     }
 }
 
