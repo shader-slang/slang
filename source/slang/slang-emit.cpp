@@ -2127,11 +2127,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::WGSLSPIRV:
     case CodeGenTarget::WGSLSPIRVAssembly:
         {
-            SLANG_PASS(
-                legalizeIRForWGSL,
-                targetProgram,
-                sink,
-                requiredLoweringPassSet);
+            SLANG_PASS(legalizeIRForWGSL, targetProgram, sink, requiredLoweringPassSet);
         }
         break;
 
