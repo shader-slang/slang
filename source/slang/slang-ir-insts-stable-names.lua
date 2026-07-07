@@ -862,5 +862,6 @@ return {
 	["Type.WorkGraphRecordTypeBase.NodeOutput"] = 886,
 	["Type.WorkGraphRecordTypeBase.NodeOutputArray"] = 887,
 	["Type.WorkGraphRecordTypeBase.EmptyNodeOutput"] = 888,
-	["Type.WorkGraphRecordTypeBase.EmptyNodeOutputArray"] = 889
+	["Type.WorkGraphRecordTypeBase.EmptyNodeOutputArray"] = 889,
+	["Decoration.shader64BitIndexing"] = 890
 }
