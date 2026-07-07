@@ -52,7 +52,7 @@ bool Test_ScalarType()
     genIType outGenIType, outGenIType2;
     genUType outGenUType, outGenUType2;
 
-    constexpr const float epsilon = 0.000001;
+    const float epsilon = 0.000001;
     const mat2 identity2x2 = mat2(vec2(1,0),vec2(0,1));
     const mat3 identity3x3 = mat3(vec3(1,0,0),vec3(0,1,0),vec3(0,0,1));
     const mat4 identity4x4 = mat4(vec4(1,0,0,0),vec4(0,1,0,0),vec4(0,0,1,0),vec4(0,0,0,1));
