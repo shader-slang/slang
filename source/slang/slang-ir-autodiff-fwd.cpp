@@ -675,9 +675,9 @@ struct ForwardDiffTranslationContext
                     if (diffInst->getOp() != kIROp_VoidLit)
                         allVoid = false;
                 }
-                else if (auto operandDiffType = differentiateType(builder, operand->getDataType()))
+                else if (auto operandDiffType = differentiateType(builder, operand->getDataType());
+                         operandDiffType)
                 {
-                    SLANG_UNUSED(operandDiffType);
                     // Missing differentials for differentiable operands are constants with zero
                     // tangent, matching the generic construct fallback behavior.
                     auto operandDataType =
@@ -3557,6 +3557,13 @@ IRInst* maybeTranslateForwardDerivative(
         return inst;
 
     IRFunc* targetFunc = cast<IRFunc>(base);
+
+    // Backstop for when the front-end `checkAutoDiffUsages` validation is disabled: forward-
+    // differentiating a function that calls a `bwd_diff` result is unsupported (the result of
+    // `bwd_diff` is not differentiable) and would otherwise fail with an internal error downstream.
+    // Diagnose and leave the translate inst in place rather than producing a malformed derivative.
+    if (diagnoseDifferentiatingBackwardDiffResult(sink, targetFunc))
+        return inst;
 
     IRInst* fwdDiffFunc;
     IRBuilder builder(sharedContext->moduleInst);

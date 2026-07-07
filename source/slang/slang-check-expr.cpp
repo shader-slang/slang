@@ -4039,10 +4039,11 @@ static Expr* _peelCastsAndParens(Expr* expr)
 }
 
 // Check whether two expressions refer to the same storage location by
-// comparing their structure in lockstep. Handles bare variable
-// references, member accesses (s.x == s.x, but not s.x == s.y), and
-// subscripts with matching constant indices (arr[0] == arr[0], but not
-// arr[0] == arr[1]). Returns false for anything it can't prove equal.
+// comparing their structure in lockstep. Handles the implicit object
+// (`this` == `this`), bare variable / static-member references, member
+// accesses (s.x == s.x, but not s.x == s.y), and subscripts with matching
+// constant indices (arr[0] == arr[0], but not arr[0] == arr[1]). Returns
+// false for anything it can't prove equal.
 static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
 {
     a = _peelCastsAndParens(a);
@@ -4050,14 +4051,22 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
     if (!a || !b)
         return false;
 
-    // Same declaration reference.
-    if (auto aDeclRef = as<DeclRefExpr>(a))
-    {
-        auto bDeclRef = as<DeclRefExpr>(b);
-        return bDeclRef && aDeclRef->declRef.getDecl() == bDeclRef->declRef.getDecl();
-    }
+    // Same implicit object: `this` vs `this`. There is exactly one `this` in a
+    // given method body, so any two `ThisExpr` nodes necessarily refer to the
+    // same object; that is why this returns true without comparing them further
+    // (there is no per-`this` identity to compare, unlike a named variable).
+    // Inside a method an unqualified member `x` is rewritten to
+    // `MemberExpr(base=ThisExpr, decl=x)`, so the MemberExpr recursion below
+    // bottoms out here on the two `this` bases; this is what still diagnoses
+    // `twoInoutInt(x, x)` (i.e. `this.x` aliasing itself). ThisExpr does not
+    // derive from DeclRefExpr, so it needs its own case.
+    if (as<ThisExpr>(a))
+        return as<ThisExpr>(b) != nullptr;
 
-    // Same member of the same base: s.x vs s.x.
+    // Same member of the same base: s.x vs s.x, but not s.x vs t.x. Checked
+    // before the bare-DeclRefExpr case below because MemberExpr derives from
+    // DeclRefExpr, and that branch would ignore the base object. (DerefMemberExpr
+    // for buffer-element member access derives from MemberExpr, so it lands here.)
     if (auto aMember = as<MemberExpr>(a))
     {
         auto bMember = as<MemberExpr>(b);
@@ -4066,6 +4075,17 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
         if (aMember->declRef.getDecl() != bMember->declRef.getDecl())
             return false;
         return _exprsDefinitelyAlias(aMember->baseExpression, bMember->baseExpression);
+    }
+
+    // Same bare declaration reference: a bare variable (VarExpr) or static
+    // member (StaticMemberExpr), which have no base object to compare.
+    if (auto aDeclRef = as<DeclRefExpr>(a))
+    {
+        auto bDeclRef = as<DeclRefExpr>(b);
+        // A bare DeclRefExpr is a VarExpr or StaticMemberExpr — any DeclRefExpr
+        // that is not a (non-static) MemberExpr, which was already handled above.
+        bool bIsBareDeclRef = bDeclRef && !as<MemberExpr>(b);
+        return bIsBareDeclRef && aDeclRef->declRef.getDecl() == bDeclRef->declRef.getDecl();
     }
 
     // Same element of the same base: arr[0] vs arr[0].
