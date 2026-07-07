@@ -109,8 +109,10 @@ def build_api_driver(out_dir):
     is_win = sys.platform == "win32"
     out = os.path.join(out_dir, "api-driver.exe" if is_win else "api-driver")
     if is_win:
-        cmd = ["cl", "/nologo", "/O2", "/std:c++17", "/EHsc", f"/I{inc}", src,
-               f"/Fe:{out}"]
+        # Dash-style flags: identical to /flags for cl, but immune to MSYS/Git-
+        # Bash path mangling if this command ever runs through a POSIX shell.
+        cmd = ["cl", "-nologo", "-O2", "-std:c++17", "-EHsc", f"-I{inc}", src,
+               f"-Fe:{out}"]
     else:
         cmd = ["c++", "-O2", "-std=c++17", "-I", inc, src, "-o", out]
     try:
