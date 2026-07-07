@@ -9,6 +9,35 @@
 namespace Slang
 {
 
+// Return true if `targetProgram`'s target ever lowers matrix types at all — i.e.
+// `legalizeMatrixTypes` can do work on it. CPU-via-LLVM lowers all matrices (LLVM has no built-in
+// matrix type); the SPIR-V / GLSL / WGSL / Metal family lowers bool/int/uint-element matrices;
+// every other target (HLSL, DXIL, CUDA, C++/host, ...) lowers none, so the whole pass is a
+// guaranteed no-op there. This is the single source of truth for the target-family decision, shared
+// by `shouldLowerMatrixType` (which refines it per element type) and the whole-pass early-out
+// below.
+static bool targetLegalizesMatrixTypes(TargetProgram* targetProgram)
+{
+    if (isCPUTargetViaLLVM(targetProgram->getTargetReq()))
+        return true;
+
+    switch (targetProgram->getTargetReq()->getTarget())
+    {
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+    case CodeGenTarget::GLSL:
+    case CodeGenTarget::WGSL:
+    case CodeGenTarget::WGSLSPIRV:
+    case CodeGenTarget::WGSLSPIRVAssembly:
+    case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalLib:
+    case CodeGenTarget::MetalLibAssembly:
+        return true;
+    default:
+        return false;
+    }
+}
+
 struct MatrixTypeLoweringContext
 {
     TargetProgram* targetProgram;
@@ -42,6 +71,9 @@ struct MatrixTypeLoweringContext
 
     bool shouldLowerMatrixType(IRMatrixType* matrixType)
     {
+        if (!targetLegalizesMatrixTypes(targetProgram))
+            return false;
+
         if (isCPUTargetViaLLVM(targetProgram->getTargetReq()))
         {
             // Always lower all matrices on LLVM; we'd need to break them up
@@ -49,26 +81,11 @@ struct MatrixTypeLoweringContext
             return true;
         }
 
-        auto target = targetProgram->getTargetReq()->getTarget();
-        switch (target)
-        {
-        case CodeGenTarget::SPIRV:
-        case CodeGenTarget::SPIRVAssembly:
-        case CodeGenTarget::GLSL:
-        case CodeGenTarget::WGSL:
-        case CodeGenTarget::WGSLSPIRV:
-        case CodeGenTarget::WGSLSPIRVAssembly:
-        case CodeGenTarget::Metal:
-        case CodeGenTarget::MetalLib:
-        case CodeGenTarget::MetalLibAssembly:
-            {
-                auto elementType = matrixType->getElementType();
-                return as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
-                       as<IRIntType>(elementType);
-            }
-        default:
-            return false;
-        }
+        // On the SPIR-V / GLSL / WGSL / Metal family, only bool/int/uint-element matrices are
+        // lowered; float-element matrices are emitted as native matrix types.
+        auto elementType = matrixType->getElementType();
+        return as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
+               as<IRIntType>(elementType);
     }
 
     IRInst* legalizeMatrixTypeDeclaration(IRInst* inst)
@@ -635,6 +652,75 @@ struct MatrixTypeLoweringContext
         return newInst;
     }
 
+    // Return true if `inst` is one of the shapes `getReplacement` would actually rewrite: a matrix
+    // type declaration that needs lowering, or an inst whose result-or-first-operand matrix type
+    // needs lowering. This mirrors `getReplacement`'s conditions exactly (same
+    // `shouldLowerMatrixType` predicate), so a module-wide scan for it is a sound superset of the
+    // pass's own work: if no inst satisfies it, every `getReplacement` call would be a no-op and
+    // the pass changes nothing.
+    bool instNeedsMatrixLowering(IRInst* inst)
+    {
+        if (auto matrixType = as<IRMatrixType>(inst))
+        {
+            if (shouldLowerMatrixType(matrixType))
+                return true;
+        }
+
+        if (auto resultMatrixType = as<IRMatrixType>(inst->getDataType()))
+        {
+            if (shouldLowerMatrixType(resultMatrixType))
+                return true;
+
+            // A matrix result type that does not itself need lowering can still be produced by a
+            // cast from an operand matrix that does (e.g. `float4x4` cast from `uint4x4`), so the
+            // operand path must be checked too — matching `getReplacement`.
+            if (inst->getOperandCount() > 0)
+            {
+                if (auto operand = inst->getOperand(0))
+                {
+                    if (auto operandMatrixType = as<IRMatrixType>(operand->getDataType()))
+                    {
+                        if (shouldLowerMatrixType(operandMatrixType))
+                            return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // Read-only walk of the whole module that returns true on the first inst `getReplacement` would
+    // rewrite. Used as an early-out: when no such inst exists the pass is a pure no-op, so we can
+    // skip building and running the (mutating) worklist entirely. Because this is placed at the
+    // pass entry it observes the exact module state the pass would process — it cannot be a stale
+    // false-negative.
+    bool hasAnyMatrixToLegalize()
+    {
+        InstWorkList scanList(module);
+        InstHashSet scanSet(module);
+        scanList.add(module->getModuleInst());
+        scanSet.add(module->getModuleInst());
+
+        while (scanList.getCount() != 0)
+        {
+            IRInst* inst = scanList.getLast();
+            scanList.removeLast();
+
+            if (instNeedsMatrixLowering(inst))
+                return true;
+
+            for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+            {
+                if (scanSet.contains(child))
+                    continue;
+                scanList.add(child);
+                scanSet.add(child);
+            }
+        }
+        return false;
+    }
+
     void processModule()
     {
         addToWorkList(module->getModuleInst());
@@ -669,8 +755,20 @@ struct MatrixTypeLoweringContext
 
 void legalizeMatrixTypes(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
+    // Early-out #1 (O(1)): targets that never lower matrices (HLSL, DXIL, CUDA, C++/host, ...) make
+    // this whole pass a guaranteed no-op — skip without walking the module.
+    if (!targetLegalizesMatrixTypes(targetProgram))
+        return;
+
     MatrixTypeLoweringContext context(targetProgram, module);
     context.sink = sink;
+
+    // Early-out #2: on a lowering target, if the module contains no matrix that actually needs
+    // legalizing, the mutating worklist walk would be a no-op — skip it after a single read-only
+    // scan.
+    if (!context.hasAnyMatrixToLegalize())
+        return;
+
     context.processModule();
 }
 
