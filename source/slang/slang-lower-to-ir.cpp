@@ -3582,6 +3582,23 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 
         return ParamPassingMode::BorrowIn;
     }
+    // A `groupshared` parameter names one thread-group-shared storage location, so it is always
+    // passed *by reference*, never copied per-invocation. A per-thread copy would defeat the
+    // sharing and, on D3D/DXIL, emit no thread-group-shared (`addrspace(3)`) storage at all
+    // (issue #10641). Mutability is the only knob: read-write by default (here), read-only via
+    // `__constref`. The read-only/strict spellings are decided by the branches above --
+    // `__constref groupshared` -> `BorrowIn`, `__ref groupshared` -> `Ref` -- and the
+    // copy-direction modifiers `in`/`out`/`inout` are not applicable to a reference: they are
+    // rejected on a `groupshared` parameter during semantic checking. So a `groupshared`
+    // parameter that reaches this point carries no explicit direction modifier and is a
+    // read-write reference.
+    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
+    {
+        SLANG_ASSERT(
+            !paramDecl->hasModifier<InModifier>() && !paramDecl->hasModifier<OutModifier>() &&
+            !paramDecl->hasModifier<InOutModifier>());
+        return ParamPassingMode::BorrowInOut;
+    }
     if (paramDecl->hasModifier<InOutModifier>())
     {
         // The AST specified `inout`:
@@ -3599,26 +3616,6 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
     else
     {
         // No direction modifier, or just `in`:
-
-        if (paramDecl->hasModifier<HLSLGroupSharedModifier>() &&
-            !paramDecl->hasModifier<InModifier>())
-        {
-            // A *bare* `groupshared` parameter -- one with no direction modifier at all -- names
-            // thread-group-shared memory: a single storage location shared by every invocation
-            // in the group. The default `in` mode would copy it by value, giving each invocation
-            // its own per-thread copy -- defeating the sharing and emitting no thread-group-shared
-            // storage at all. So a bare `groupshared` parameter is passed by reference instead.
-            //
-            // We use the mutable `borrow inout` mode because such scratch buffers are typically
-            // written as well as read. The scope is deliberately narrow: an *explicit* direction
-            // modifier takes precedence and is left unchanged -- `__ref`/`__constref`/`inout`/`out`
-            // are decided by the checks above, and an explicit `in groupshared` is excluded here so
-            // it keeps its by-value copy semantics (the user asked for a private per-thread copy).
-            // This mirrors the by-reference treatment of `HLSLPayloadModifier` above (which is
-            // read-only and so uses `borrow in`).
-            return ParamPassingMode::BorrowInOut;
-        }
-
         return ParamPassingMode::In;
     }
 }

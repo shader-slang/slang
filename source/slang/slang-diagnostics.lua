@@ -3553,6 +3553,13 @@ err(
     span { loc = "param:Decl" }
 )
 
+err(
+    "groupshared-parameter-cannot-have-direction-modifier",
+    30705,
+    "a 'groupshared' parameter is passed by reference; 'in'/'out'/'inout' cannot be used with 'groupshared' -- use bare 'groupshared' for a read-write reference or '__constref groupshared' for a read-only reference",
+    span { loc = "modifier:Modifier" }
+)
+
 --
 -- 308xx: inheritance
 --
