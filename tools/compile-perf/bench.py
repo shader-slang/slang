@@ -81,14 +81,23 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 def find_libslang(slangc):
     """Locate the slang shared library belonging to a slangc binary, trying the
     layouts of release packages (bin/ + ../lib/) and build trees (same dir).
-    Returns None when not found — api workloads then fail with a clear error
-    while slangc workloads run normally."""
+    The renamed slang-compiler library is preferred: on Windows the legacy
+    slang.dll is only a forwarding proxy whose generated .def does not expose
+    slang_createGlobalSession to GetProcAddress; the legacy names remain as
+    fallback for pre-rename releases. Returns None when not found — api
+    workloads then fail with a clear error while slangc workloads run
+    normally."""
     d = os.path.dirname(slangc)
     for cand in (
+        os.path.join(d, "slang-compiler.dll"),
         os.path.join(d, "slang.dll"),
+        os.path.join(d, "libslang-compiler.dylib"),
         os.path.join(d, "libslang.dylib"),
+        os.path.join(d, "libslang-compiler.so"),
         os.path.join(d, "libslang.so"),
+        os.path.join(d, "..", "lib", "libslang-compiler.dylib"),
         os.path.join(d, "..", "lib", "libslang.dylib"),
+        os.path.join(d, "..", "lib", "libslang-compiler.so"),
         os.path.join(d, "..", "lib", "libslang.so"),
     ):
         if os.path.exists(cand):
