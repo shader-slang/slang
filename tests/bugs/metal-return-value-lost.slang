@@ -8,12 +8,12 @@
 //TEST:SIMPLE(filecheck=CPP):   -target cpp -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):  -target wgsl -entry computeMain -stage compute
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-d3d12 -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cpu -compute -shaderobj -output-using-type
-//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-metal -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-wgsl -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-d3d12 -compute -shaderobj -output-using-type -Xslang -O3
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type -Xslang -O3
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -Xslang -O3
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cpu -compute -shaderobj -output-using-type -Xslang -O3
+//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-metal -compute -shaderobj -output-using-type -Xslang -O3
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-wgsl -compute -shaderobj -output-using-type -Xslang -O3
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

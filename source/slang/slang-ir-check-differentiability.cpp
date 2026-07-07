@@ -390,6 +390,14 @@ public:
         if (!funcInst->getFirstBlock())
             return;
 
+        // A function that is being differentiated cannot itself contain a `bwd_diff` operation,
+        // because the result of `bwd_diff` is not further differentiable. Diagnose and stop before
+        // the downstream data-flow analysis (and the auto-diff passes) trip over the un-splittable
+        // differential of that non-differentiable value. (The auto-diff translation carries the
+        // same check as a backstop for when this non-essential validation is disabled.)
+        if (diagnoseDifferentiatingBackwardDiffResult(sink, funcInst))
+            return;
+
         DifferentiableTypeConformanceContext diffTypeContext(&sharedContext);
 
         // We compute and track three different set of insts to complete our

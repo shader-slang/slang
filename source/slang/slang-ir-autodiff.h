@@ -598,6 +598,15 @@ void stripTempDecorations(IRInst* inst);
 bool isNoDiffType(IRType* paramType);
 bool isNeverDiffFuncType(IRFuncType* funcType);
 
+// True if `inst` is the value produced by a `bwd_diff(...)` operation, i.e. a callable
+// backward-derivative function. Unwraps `Specialize`/generic layers on the way in.
+bool isBackwardDerivativeValue(IRInst* inst);
+
+// Diagnose an attempt to differentiate a function whose body itself calls a `bwd_diff(...)` result,
+// which is not supported (the code produced by `bwd_diff` is not further differentiable) and would
+// otherwise crash the auto-diff passes. Returns true if such a call was found (and diagnosed).
+bool diagnoseDifferentiatingBackwardDiffResult(DiagnosticSink* sink, IRGlobalValueWithCode* func);
+
 IRInst* _lookupWitness(
     IRBuilder* builder,
     IRInst* witness,
