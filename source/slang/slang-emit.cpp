@@ -2131,7 +2131,7 @@ Result linkAndOptimizeIR(
                 legalizeIRForWGSL,
                 targetProgram,
                 sink,
-                requiredLoweringPassSet.appendConsumeStructuredBuffer);
+                requiredLoweringPassSet);
         }
         break;
 

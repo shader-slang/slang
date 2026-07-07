@@ -1,5 +1,6 @@
 #include "slang-ir-wgsl-legalize.h"
 
+#include "slang-code-gen.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-legalize-binary-operator.h"
 #include "slang-ir-legalize-global-values.h"
@@ -294,7 +295,7 @@ void legalizeIRForWGSL(
     IRModule* module,
     TargetProgram* targetProgram,
     DiagnosticSink* sink,
-    bool hasAppendConsumeStructuredBuffer)
+    const RequiredLoweringPassSet& requiredLoweringPassSet)
 {
     List<EntryPointInfo> entryPoints;
     for (auto inst : module->getGlobalInsts())
@@ -317,7 +318,7 @@ void legalizeIRForWGSL(
     // Go through every instruction in the module and legalize them as needed.
     processInst(module->getModuleInst(), targetProgram, sink);
 
-    if (hasAppendConsumeStructuredBuffer)
+    if (requiredLoweringPassSet.appendConsumeStructuredBuffer)
         legalizeAtomicCounterBuffersForWGSL(module);
 
     // Some global insts are illegal, e.g. function calls.

@@ -6,12 +6,13 @@ namespace Slang
 {
 class DiagnosticSink;
 class TargetProgram;
+struct RequiredLoweringPassSet;
 
 void legalizeIRForWGSL(
     IRModule* module,
     TargetProgram* targetProgram,
     DiagnosticSink* sink,
-    bool hasAppendConsumeStructuredBuffer);
+    const RequiredLoweringPassSet& requiredLoweringPassSet);
 
 void specializeAddressSpaceForWGSL(IRModule* module);
 
