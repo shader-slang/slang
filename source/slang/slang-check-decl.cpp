@@ -19737,7 +19737,31 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
             backingMember->nameAndLoc.name =
                 getName(String("$bit_field_backing_") + String(backing_nonce));
             backing_nonce++;
-            backingMember->initExpr = nullptr;
+            // Give the synthesized backing storage an explicit zero initializer.
+            // The backing field is synthesized after the constructor signature has been
+            // collected, so it is never a constructor parameter (not in
+            // `m_membersVisibleInCtor`); with a null `initExpr`,
+            // `synthesizeCtorBodyForMemberVar` early-outs for non-parameter members and
+            // never writes it, so `Foo f = {}` on a struct that mixes bitfields with a
+            // normal field would leave the bitfield members reading uninitialized memory
+            // (issue #11844).
+            // The general per-member default-init loop in
+            // `SemanticsDeclBodyVisitor::visitAggTypeDecl` does not cover this: it is gated
+            // on the struct conforming to `IDefaultInitializable`, which these bitfield
+            // structs do not, so it never fires here. Initializing the backing word at the
+            // point of synthesis is therefore the single, uniform source of its zero
+            // default across every synthesized-constructor path.
+            // A raw `IntegerLiteralExpr(0)` (rather than `constructDefaultInitExprForType`)
+            // is deliberate: the backing type is always a builtin unsigned integer
+            // (selected just above), so a typed zero literal is the simplest provably
+            // correct form, and it lowers to an explicit `store 0` on every target —
+            // whereas a `DefaultConstructExpr` emits `= {}` only for CPP/CUDA and would not
+            // zero the scalar on HLSL-class backends.
+            auto zeroBackingInit = m_astBuilder->create<IntegerLiteralExpr>();
+            zeroBackingInit->type = QualType(backingMember->type.type);
+            zeroBackingInit->value = 0;
+            zeroBackingInit->loc = structDecl->loc;
+            backingMember->initExpr = zeroBackingInit;
             backingMember->parentDecl = structDecl;
             const auto backingMemberDeclRef = DeclRef<VarDecl>(backingMember->getDefaultDeclRef());
 
