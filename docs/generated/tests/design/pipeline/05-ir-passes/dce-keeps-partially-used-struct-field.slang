@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=d245d3be9942f0847c45c138b4c2780e7df19ecb
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#ssa-construction-and-basic-cleanup
-//META: doc_section_digest=bf314e51995b5a2b76e1104cf5f719db98f30e41b3a1ec2cddb5792a8ffcdf27
+//META: doc_section_digest=908553c64f782960d2c5717a98c49179101f5061838a971f9566e0daf48453d4
 //META: purpose=Boundary: a local struct whose `.dead` field is written but never read has the dead store collapsed by the SPIR-V cleanup pipeline — the literal initializer 4242 does not survive into SPIR-V.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

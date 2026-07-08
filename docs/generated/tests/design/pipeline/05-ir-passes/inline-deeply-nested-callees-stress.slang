@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#inlining-and-call-graph
-//META: doc_section_digest=5916f676576778a4bdb5917c7cf917a7fca962142a97cb9c75be16910e0e08a2
+//META: doc_section_digest=d53bcc40d9eaa7a3ac784fc9773eb4780b72aa50e5c0ba67ff2ca45acd271030
 //META: purpose=Stress: a five-deep `[ForceInline]` call chain (h0 -> h1 -> h2 -> h3 -> h4) inlines fully — no helper name appears in the HLSL emit.
 //META: intent=stress
 //META: pipeline_stage=ir-pass
