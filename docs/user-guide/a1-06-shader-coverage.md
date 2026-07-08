@@ -4,33 +4,26 @@ layout: user-guide
 
 # Shader Execution Coverage
 
-Slang can instrument your shaders so that each executed statement increments a counter at
-runtime — the same idea as gcov-style coverage for CPU code, applied to GPU (and CPU) kernels.
-After a dispatch, you read the counters back and convert them into an LCOV report that tools
-like `genhtml`, Codecov, or VS Code Coverage Gutters can render, showing exactly which lines,
-functions, and branch outcomes your test content actually exercised.
+Slang can instrument shaders so that each executed statement increments a counter at runtime,
+like gcov does for CPU code. After a dispatch, read the counters back and convert them into
+an LCOV report for `genhtml`, Codecov, or VS Code Coverage Gutters.
 
-This tutorial walks through the whole pipeline hands-on: compiling with coverage, reading the
-generated metadata, binding the counter buffer and dispatching from a small C++ host program,
-and producing a report — plus the pitfalls you are most likely to hit along the way. The
-whole tour uses the _offline_ workflow: `slangc` precompiles the shader, a sidecar manifest
-file describes the counters, and the host program consumes both without linking Slang at all.
-Every step, including the real dispatch, runs on any machine with a Slang release, a C++
-compiler, and Python 3: the dispatched kernel is compiled for Slang's CPU target, and later
-sections show what changes on GPU targets and in hosts that compile shaders at runtime
-through the C++ API. The tutorial's files — together with `run-tutorial.sh` and
-`run-tutorial.ps1` scripts that execute every step in order — are available under
+This chapter walks through the pipeline: compile with coverage, read the generated manifest,
+dispatch from a small C++ host program, and produce a report. All steps use the offline
+workflow (`slangc` plus a sidecar manifest file) and run without a GPU; the dispatched kernel
+is compiled for Slang's CPU target. The files, together with `run-tutorial.sh` and
+`run-tutorial.ps1` scripts that execute every step, are in
 [`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial).
 
-This chapter is a guided tour, not the reference. The reference material lives in
+Reference material:
 [`tools/shader-coverage/README.md`](https://github.com/shader-slang/slang/blob/master/tools/shader-coverage/README.md)
-(workflow and support matrix) and
+(workflow, support matrix) and
 [`docs/design/shader-coverage-host-interface.md`](https://github.com/shader-slang/slang/blob/master/docs/design/shader-coverage-host-interface.md)
-(the host binding contract, with per-target recipes).
+(host binding contract, per-target recipes).
 
-## Your first coverage build
+## Compiling with coverage
 
-Create a file named `hello-coverage.slang`:
+Create `hello-coverage.slang`:
 
 ```hlsl
 // hello-coverage.slang
@@ -56,34 +49,29 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
 }
 ```
 
-Compile it with line coverage enabled by adding one flag, `-trace-coverage`:
+Compile with `-trace-coverage`:
 
 ```bash
 slangc hello-coverage.slang -target spirv -stage compute -entry computeMain \
     -trace-coverage -o hello-coverage.spv
 ```
 
-Two files appear:
+This produces two files:
 
 ```
 hello-coverage.spv
 hello-coverage.spv.coverage-manifest.json
 ```
 
-The `.spv` is your shader, now containing a hidden counter buffer and an atomic increment
-before each executable statement. The `.coverage-manifest.json` _sidecar_ is the map that
-makes the counters meaningful: it records which counter slot corresponds to which source
-location, and where the hidden buffer expects to be bound.
+The `.spv` contains a hidden counter buffer and an atomic increment before each executable
+statement. The `.coverage-manifest.json` sidecar records which counter slot corresponds to
+which source location, and where the buffer expects to be bound.
 
-> #### Note
->
-> Coverage works the same way on other targets — swap `-target spirv` for `hlsl`, `metal`,
-> `cuda`, or `cpp`. Two targets are the exception: WGSL and LLVM-emitted CPU are skipped
-> with warning E45102 (see Troubleshooting below).
+Other targets work the same way; replace `-target spirv` with `hlsl`, `metal`, `cuda`, or
+`cpp`. Exceptions: WGSL and LLVM-emitted CPU are skipped with warning E45102 (see
+Troubleshooting).
 
 ## Reading the manifest
-
-Open the sidecar (or pretty-print it with `python3 -m json.tool`). The important parts:
 
 ```json
 {
@@ -111,40 +99,30 @@ Open the sidecar (or pretty-print it with `python3 -m json.tool`). The important
 }
 ```
 
-Three things to take away:
+- `counter_count`: number of counter slots. Allocate a zero-initialized buffer of
+  `counter_count * element_stride` bytes.
+- `buffer`: where to bind it. On SPIR-V, a descriptor `(set, binding)`; here set 1,
+  binding 0. Auto-allocation places the buffer in a new descriptor set after the shader's
+  own sets, so enabling coverage can add one descriptor set to your pipeline layout (see
+  Troubleshooting).
+- `entries`: counter-to-source mapping. Slot 0 counts executions of line 7, and so on.
 
-1. **`counter_count` tells you how much storage to allocate**: 8 slots here, each
-   `element_stride` bytes wide (8 bytes — `uint64` is the default counter width). Your host
-   allocates a zero-initialized buffer of `counter_count * element_stride` bytes.
-2. **`buffer` tells you where to bind it**. On SPIR-V that is a descriptor `(set, binding)` —
-   here set 1, binding 0. Note that auto-allocation placed it in a _fresh_ descriptor set
-   after your shader's own sets, so enabling coverage can add one descriptor set to your
-   pipeline layout (see Troubleshooting).
-3. **`entries` map counters back to source**: counter slot 0 counts executions of line 7
-   (the `if (gain > 1.0)` statement), and so on. This attribution is what turns raw numbers
-   into a report.
+## Dispatching the precompiled kernel
 
-## Running for real: dispatching the precompiled kernel
+A host must bind storage for the counter buffer, dispatch, and read the counters back. The
+buffer is not visible to ordinary reflection; the manifest is how a host finds it.
 
-To get real counter values, a host must do the three things the manifest describes: bind
-storage for the hidden buffer, dispatch, and read the counters back. The buffer is
-deliberately _invisible to ordinary reflection_ — reflection-driven binding code will not see
-it; the manifest is how a host discovers it.
-
-A dispatch you can run on any machine — no GPU, no graphics API — comes from compiling the
-same shader once more, this time to a directly callable CPU shared library:
+To dispatch without a GPU, compile the same shader to a CPU shared library:
 
 ```bash
 slangc hello-coverage.slang -target shader-sharedlib -stage compute -entry computeMain \
     -trace-coverage -o hello-coverage-kernel.so     # use .dll on Windows
 ```
 
-Same flag, different target: `slangc` drives your system C++ compiler and produces a library
-that exports `computeMain`, plus its own sidecar,
-`hello-coverage-kernel.so.coverage-manifest.json`. That manifest differs from the SPIR-V one
-in exactly one place — the `buffer` block. The CPU target has no descriptor sets; the kernel
-receives its global parameters as one in-memory payload, and the manifest instead reports the
-byte offset where the coverage buffer's `(pointer, count)` pair belongs:
+`slangc` invokes the system C++ compiler and produces a library that exports `computeMain`,
+plus a sidecar manifest. The only difference from the SPIR-V manifest is the `buffer` block:
+the CPU target has no descriptor sets, so the manifest reports a byte offset into the
+kernel's parameter payload instead:
 
 ```json
     "buffer": {
@@ -160,19 +138,16 @@ byte offset where the coverage buffer's `(pointer, count)` pair belongs:
 
 The host program,
 [`hello-coverage-host.cpp`](https://github.com/shader-slang/slang/blob/master/examples/shader-coverage-tutorial/hello-coverage-host.cpp),
-is the whole integration: it loads the precompiled kernel, binds the three buffers (the
-shader's two, plus one for coverage) by writing `(pointer, count)` pairs into the payload,
-dispatches one thread group, prints the raw counter slots, and saves them for the report
-step. The full file is about 140 lines and needs no Slang headers or library at all — the
-kernel is already compiled, and three constants near its top (`kCounterCount`,
-`kElementStride`, `kUniformOffset`) are the numbers you just read in the manifest, which a
-production host would parse out of the JSON.
+loads the kernel, binds the three buffers (the shader's two, plus coverage), dispatches one
+thread group, prints the counter slots, and writes them to a file. It is about 140 lines and
+uses no Slang headers or library. The constants `kCounterCount`, `kElementStride`, and
+`kUniformOffset` are the manifest values above; a production host would parse them from the
+JSON.
 
-The heart of the program is the binding. `BufferView` is its 16-byte
-`{ void* data; size_t count; }` mirror of how the CPU target lays out a
-`(RW)StructuredBuffer` parameter; the shader's own buffers occupy the payload's leading
-fields in declaration order, and the coverage buffer — which must start zeroed — goes at the
-manifest-reported `uniform_offset`:
+The binding: `BufferView` is the 16-byte `{ void* data; size_t count; }` layout of a
+`(RW)StructuredBuffer` parameter on the CPU target. The shader's own buffers occupy the
+payload's leading fields in declaration order. The coverage buffer, zero-initialized, goes
+at `uniform_offset`:
 
 ```cpp
     float inputs[4] = {1.0f, 2.0f, 3.0f, 4.0f};
@@ -190,22 +165,21 @@ manifest-reported `uniform_offset`:
     std::memcpy(payload.data() + kUniformOffset, &coverageView, sizeof(coverageView));
 ```
 
-Everything else is bookkeeping: `dlopen`/`LoadLibrary` the kernel, call the exported
-`computeMain` with a one-thread-group dispatch range, print the counter slots, and write
+The rest of the program loads the library (`dlopen`/`LoadLibrary`), calls `computeMain` with
+a one-thread-group dispatch range, prints the slots, and writes
 `hello-coverage.counters.bin`.
 
-Copy the program (together with the shader and the `run-tutorial` scripts) from
-[`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial)
-and build it — an ordinary C++ compile, with no SDK include or library paths:
+Copy the program from
+[`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial),
+build, and run:
 
 ```bash
 c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host
 ./hello-coverage-host
 ```
 
-All four inputs are positive and the gain is always `2.0`, so every statement runs 4 times
-except the two lines those inputs never reach — `value = 0.0` and the `return value`
-fallthrough in `applyGain`:
+All four inputs are positive and the gain is 2.0, so every statement runs 4 times except
+`value = 0.0` and the `return value` fallthrough in `applyGain`:
 
 ```
 counter[0] = 4
@@ -218,12 +192,12 @@ counter[6] = 0
 counter[7] = 4
 ```
 
-Which source line each slot counts is the manifest's `entries` job — slot 2 is line 9 and
-slot 6 is line 19 — and the report step next attributes every slot automatically.
+The manifest's `entries` array maps slots to lines: slot 2 is line 9, slot 6 is line 19.
+The report step below does this attribution automatically.
 
-## From counters to a report
+## Generating a report
 
-Feed the kernel's manifest and the raw counters to the LCOV converter:
+Pass the kernel's manifest and the counters to the LCOV converter:
 
 ```bash
 python3 tools/shader-coverage/slang-coverage-to-lcov.py \
@@ -231,7 +205,7 @@ python3 tools/shader-coverage/slang-coverage-to-lcov.py \
     --counters hello-coverage.counters.bin --output hello-coverage.lcov
 ```
 
-The resulting LCOV file is plain text:
+The LCOV output is plain text:
 
 ```
 TN:slang_coverage
@@ -247,25 +221,23 @@ DA:20,4
 end_of_record
 ```
 
-Each `DA:line,count` record says how often a source line executed — and the two zeros point
-straight at the code your inputs never exercised. Render it as HTML with the standard LCOV
-tool:
+Each `DA:line,count` record gives the execution count of one source line; the two zero
+lines were never exercised. Render HTML with:
 
 ```bash
 genhtml hello-coverage.lcov --output-directory coverage-html
 ```
 
-Open `coverage-html/index.html` and you will see `hello-coverage.slang` with executed lines
-in green and the two unexercised lines in red.
+`coverage-html/index.html` shows the source with executed lines in green and unexecuted
+lines in red.
 
-The converter treats the counters file as `counter_count` little-endian unsigned integers of
-`element_stride` bytes each — which is precisely the memory a dispatch fills, on any target.
-(For experiments without a counters file, `--counters-text` accepts whitespace-separated
-decimal values instead.)
+The counters file format is `counter_count` little-endian unsigned integers of
+`element_stride` bytes each — the raw buffer contents, on any target. `--counters-text`
+accepts whitespace-separated decimal values instead.
 
 ## Function and branch coverage
 
-Line coverage answers "did this statement run". Two more modes sharpen the picture:
+Two more modes can be enabled independently of line coverage:
 
 ```bash
 slangc hello-coverage.slang -target spirv -stage compute -entry computeMain \
@@ -273,36 +245,31 @@ slangc hello-coverage.slang -target spirv -stage compute -entry computeMain \
     -o hello-coverage.spv
 ```
 
-The manifest now contains 14 entries of three kinds: 8 `line` entries as before, 2 `function`
-entries (one per user-authored function — `applyGain` and `computeMain`), and 4 `branch`
-entries — one per _branch arm_, carrying `branch_site` and arm identity so a report can say
-"the `if (gain > 1.0)` condition was true 4 times and false 0 times". Branch coverage covers
-`if`/`else` arms, loop-condition outcomes, and `switch` dispatch arms; expression-level
-branches (`&&`, `||`, `?:`) are not instrumented. The LCOV converter turns these into
-`FN:`/`FNDA:` and `BRDA:` records automatically.
+The manifest then contains 14 entries: 8 `line`, 2 `function` (`applyGain` and
+`computeMain`), and 4 `branch` — one per branch arm, with `branch_site` and arm identity, so
+a report can show that `if (gain > 1.0)` was true 4 times and false 0 times. Branch coverage
+instruments `if`/`else` arms, loop-condition outcomes, and `switch` arms; `&&`, `||`, and
+`?:` are not instrumented. The converter emits `FN:`/`FNDA:` and `BRDA:` records for these.
 
-The modes are independent — you can enable any subset. There is also a cheaper fourth option:
-`-trace-coverage-boolean` replaces the atomic counting with a plain store of `1`, giving
-hit/not-hit data with no atomic contention when you don't need exact counts.
+`-trace-coverage-boolean` replaces atomic counting with a plain store of 1. Use it when
+hit/not-hit is enough and atomic contention matters.
 
-For a precise statement of where each mode places its counters (with worked examples), see
+Counter placement rules are specified in
 [`docs/design/shader-coverage-counter-placement.md`](https://github.com/shader-slang/slang/blob/master/docs/design/shader-coverage-counter-placement.md).
 
-## The same on GPU targets
+## GPU targets
 
-Everything the host program did carries over to GPU targets unchanged except one step: where
-the CPU program wrote a `(pointer, count)` pair into a payload, a GPU host binds an ordinary
-zero-initialized storage buffer through its graphics API — on Vulkan at the `(set, binding)`
-you saw in the first manifest — and reads it back after the dispatch completes.
+On a GPU target, bind an ordinary zero-initialized storage buffer at the manifest-reported
+location — on Vulkan, the `(set, binding)` from the first manifest — and read it back after
+the dispatch completes. Everything else works as above.
 
-GPU engines also often compile shaders at runtime through the Slang C++ API rather than
-shipping `slangc` output. That _in-process_ workflow gets the same information without any
+Hosts that compile shaders at runtime through the C++ API get the same information without a
 sidecar file: `castAs` the entry point's `IMetadata` to `slang::ISyntheticResourceMetadata`
-for the binding location and to `slang::ICoverageTracingMetadata` for counter counts and
-source attribution, and call `slang_writeCoverageManifestJson` to produce the manifest JSON
-for the report step.
+(binding location) and `slang::ICoverageTracingMetadata` (counter count, source
+attribution). `slang_writeCoverageManifestJson` produces the manifest JSON for the report
+step.
 
-What varies per target is only the shape of the binding location:
+Binding location per target:
 
 | Target               | Where the buffer binds                                                                  |
 | -------------------- | --------------------------------------------------------------------------------------- |
@@ -310,83 +277,69 @@ What varies per target is only the shape of the binding location:
 | Metal                | a plain `[[buffer(N)]]` index (`binding`; `space` is `-1`)                              |
 | CPU, CUDA            | a `(pointer, count)` pair written into the kernel parameter payload at `uniform_offset` |
 
-Step-by-step recipes for Vulkan, Metal, CPU, and CUDA hosts — each with an executable
-in-tree reference — live in the
+Per-target recipes are in the
 [host interface document](https://github.com/shader-slang/slang/blob/master/docs/design/shader-coverage-host-interface.md).
-For complete runnable programs, see
+For complete Vulkan programs using the in-process workflow, see
 [`examples/shader-coverage-image-pipeline`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-image-pipeline)
 and
-[`examples/shader-coverage-bvh-traversal`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-bvh-traversal),
-which compile with coverage, dispatch on Vulkan, read counters back, and render LCOV reports.
-Both use the in-process workflow described above — compile through the C++ API, discover the
-buffer via the metadata interfaces — with Vulkan descriptor binding in place of the payload
-`memcpy`. The offline workflow's example is this chapter itself; its files live in
-[`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial).
+[`examples/shader-coverage-bvh-traversal`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-bvh-traversal).
 
-## Options you will eventually want
+## Options
 
-- **`-trace-coverage-counter-width 32`** — use `uint32` counters instead of the default
-  `uint64`. Required when the runtime cannot do 64-bit shader atomics (see Troubleshooting); the
-  cost is silent wraparound past 2^32 hits per slot. The chosen width is recorded in the
-  manifest (`element_type` / `element_stride`) and on
-  `CoverageBufferInfo::elementByteWidth` — always read it from there rather than assuming.
-- **`-trace-coverage-binding <index> <space>`** — pin the buffer at an explicit location
-  instead of auto-allocation, for hosts that need the slot fixed at compile time.
-- **`-trace-coverage-reserved-space <space>`** — tell auto-allocation about descriptor sets
-  your runtime pipeline layout owns but the shader never references, so the coverage buffer
-  stays out of them. Khronos descriptor-set targets only; repeatable.
-- **`-coverage-manifest-output <path>`** — write the sidecar to an explicit path instead of
-  `<output>.coverage-manifest.json`, e.g. when the compiled output goes to stdout.
+- `-trace-coverage-counter-width 32` — use `uint32` counters instead of the default
+  `uint64`. Required when the runtime cannot do 64-bit shader atomics (see Troubleshooting).
+  `uint32` counters wrap past 2^32 hits. The chosen width is recorded in the manifest
+  (`element_type`, `element_stride`) and in `CoverageBufferInfo::elementByteWidth`.
+- `-trace-coverage-binding <index> <space>` — bind the buffer at an explicit location
+  instead of auto-allocation.
+- `-trace-coverage-reserved-space <space>` — declare descriptor sets that the runtime
+  pipeline layout owns but the shader never references, so auto-allocation avoids them.
+  Khronos descriptor-set targets only; repeatable.
+- `-coverage-manifest-output <path>` — write the sidecar to an explicit path instead of
+  `<output>.coverage-manifest.json`.
 
 ## Troubleshooting
 
-Each of these is a real failure mode with a specific symptom — worth scanning before your
-first integration.
-
 1. **64-bit atomics are not available everywhere.** The default `uint64` counters require
-   64-bit shader atomic support at runtime: on Vulkan, the `shaderBufferInt64Atomics`
-   feature (notably absent on MoltenVK on Apple Silicon — shader module or pipeline creation
-   fails); on D3D, Shader Model 6.6 (DXC rejects the generated HLSL on older profiles). The
-   fix is `-trace-coverage-counter-width 32`. Metal is handled for you: MSL has no 64-bit
-   atomic fetch-add at all, so the compiler automatically caps Metal counters to 32-bit
-   (requesting 64 explicitly produces warning W45115).
-2. **`uint32` counters wrap silently at 2^32.** They do not saturate — a counter that wraps
-   reads back as a _small_ number, which can badly mislead hot-loop analysis. Use the default
-   64-bit width where the runtime allows it.
+   64-bit shader atomics at runtime: on Vulkan the `shaderBufferInt64Atomics` feature
+   (absent on MoltenVK on Apple Silicon; shader module or pipeline creation fails), on D3D
+   Shader Model 6.6 (DXC rejects the generated HLSL on older profiles). Use
+   `-trace-coverage-counter-width 32`. Metal is capped to 32-bit automatically; requesting
+   64 produces warning W45115.
+2. **`uint32` counters wrap silently at 2^32.** They do not saturate; a wrapped counter
+   reads back as a small number. Use the default 64-bit width where the runtime allows it.
 3. **Enabling coverage can add a descriptor set on Vulkan.** Auto-allocation places the
-   buffer in the set after your highest shader-visible (or reserved) set. If your pipeline
-   layout is built purely from your own reflection data, it will be one set too short — read
-   the reported `(set, binding)` and include it, or pin the location with
-   `-trace-coverage-binding`.
-4. **The name `__slang_coverage` is reserved.** Declaring your own global parameter with
-   that name while any coverage mode is enabled fails with error E45100.
-5. **WGSL and LLVM-emitted CPU targets are skipped**, with warning E45102 — the shader
-   compiles uninstrumented rather than failing. If you expected counters and got none,
-   check for that warning. (For Vulkan-based WebGPU workflows, compile for `-target spirv`.)
+   buffer in the set after the highest shader-visible (or reserved) set. A pipeline layout
+   built only from your own reflection data will be one set too short. Read the reported
+   `(set, binding)` and include it, or use `-trace-coverage-binding`.
+4. **The name `__slang_coverage` is reserved.** Declaring a global parameter with that name
+   while coverage is enabled fails with error E45100.
+5. **WGSL and LLVM-emitted CPU targets are skipped** with warning E45102; the shader
+   compiles uninstrumented. If you expected counters and got none, check for that warning.
+   For Vulkan-based WebGPU, compile for `-target spirv`.
 6. **Read the counter width from the metadata, not from your compile flags.** Readback code
-   that hardcodes 4- or 8-byte slots breaks the moment someone changes the width (or targets
-   Metal, where the cap is automatic). `element_stride` in the manifest and
-   `elementByteWidth` in `CoverageBufferInfo` always tell the truth.
-7. **Some entries have no source location.** Code synthesized by the compiler (generic
-   specialization, autodiff, constructor synthesis) can produce counters whose entries carry
-   no file/line. The LCOV converter skips them; if you consume the metadata directly, expect
-   `file == nullptr` / `line == 0` and handle it.
-8. **Counter slots are per-compile.** Slot `K` does not mean the same source location across
-   two compiles or shader variants. Always aggregate by the source attribution in the
+   that hardcodes 4- or 8-byte slots breaks when the width changes or the target is Metal.
+   Use `element_stride` from the manifest or `elementByteWidth` from `CoverageBufferInfo`.
+7. **Some entries have no source location.** Compiler-synthesized code (generic
+   specialization, autodiff, constructor synthesis) can produce entries without file/line.
+   The LCOV converter skips them. When consuming the metadata directly, handle
+   `file == nullptr` / `line == 0`.
+8. **Counter slots are per-compile.** Slot `K` does not mean the same source location
+   across two compiles or shader variants. Aggregate by the source attribution in the
    manifest or metadata, never by slot index.
-9. **In the C++ API, fetch the compiled code before the metadata.** When using the
-   in-process workflow, an entry point compiles once and caches the artifact. If
-   `getEntryPointMetadata` runs first, the cache holds a form that a later
-   `getEntryPointHostCallable` cannot use, and it fails with `E_INVALIDARG`. Call
-   `getEntryPointCode` / `getEntryPointHostCallable` first, then query metadata.
+9. **In the C++ API, fetch the compiled code before the metadata.** An entry point compiles
+   once and caches the artifact. If `getEntryPointMetadata` runs first, a later
+   `getEntryPointHostCallable` fails with `E_INVALIDARG`. Call `getEntryPointCode` /
+   `getEntryPointHostCallable` first, then query metadata.
 
 ## Further reading
 
 - [`tools/shader-coverage/README.md`](https://github.com/shader-slang/slang/blob/master/tools/shader-coverage/README.md) —
-  the workflow reference: integration patterns, the target support matrix, LCOV format
-  scope, and current limitations.
+  workflow reference: integration patterns, target support matrix, LCOV format scope,
+  current limitations.
 - [`docs/design/shader-coverage-host-interface.md`](https://github.com/shader-slang/slang/blob/master/docs/design/shader-coverage-host-interface.md) —
-  the binding contract and per-target host recipes.
-- The two runnable examples named above, which demonstrate coverage-driven workflows on
-  realistic kernels: finding unexercised code paths in an image pipeline, and exposing
-  input-shape gaps in BVH traversal test data.
+  binding contract and per-target host recipes.
+- [`examples/shader-coverage-image-pipeline`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-image-pipeline)
+  and
+  [`examples/shader-coverage-bvh-traversal`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-bvh-traversal) —
+  coverage-driven Vulkan workflows on realistic kernels.
