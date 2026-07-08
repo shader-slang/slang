@@ -2965,14 +2965,29 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
     }
 
     // Discover top-level vector buffer elements for lowering; the base class's
-    // set (struct/matrix/array/bool) does not include bare vectors. The actual
-    // decision is `needsPackedVectorStorage`, shared with vector fields found
-    // inside lowered composites.
+    // set (struct/matrix/array/bool) does not include bare vectors nor bindless
+    // descriptor handles. The actual lowering decisions are made (with a
+    // TypeLoweringConfig in hand) in lowerLeafLogicalType; here we only widen
+    // the discovery filter so those elements are visited at all.
+    //
+    // Consider `StructuredBuffer<DescriptorHandle<StructuredBuffer<uint>>>`
+    // (equivalently `StructuredBuffer<R.Handle>`) on Metal: the element is a
+    // bare `IRDescriptorHandleType`, which the base filter does not match, so
+    // without this clause the element is never visited and emits as an illegal
+    // `device T* device*` buffer parameter (see lowerLeafLogicalType). We match
+    // any descriptor handle here and gate the actual wrapping on the storage
+    // address space in lowerLeafLogicalType, where the config is available;
+    // false positives are safe (processModule compares lowered==original and
+    // skips when nothing changed).
     bool needsElementLowering(IRType* elementType) override
     {
         if (auto vectorType = as<IRVectorType>(elementType))
         {
             return needsPackedVectorStorage(vectorType);
+        }
+        if (as<IRDescriptorHandleType>(elementType))
+        {
+            return true;
         }
         return DefaultBufferElementTypeLoweringPolicy::needsElementLowering(elementType);
     }
@@ -3066,6 +3081,121 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
         return func;
     }
 
+    // Build a 1-member struct `{ DescriptorHandle<R> f; }` to wrap a bindless
+    // descriptor-handle buffer element (see lowerDescriptorHandleElement for
+    // why). `fieldKeyOut` receives the field's struct key so the caller can
+    // build matching pack/unpack conversion functions.
+    IRStructType* createDescriptorHandleWrapperStruct(
+        IRDescriptorHandleType* handleType,
+        TypeLoweringConfig config,
+        IRStructKey** fieldKeyOut)
+    {
+        IRBuilder builder(handleType);
+        builder.setInsertAfter(handleType);
+        auto loweredType = builder.createStructType();
+        maybeAddPhysicalTypeDecoration(builder, loweredType, config);
+
+        StringBuilder nameSB;
+        nameSB << "_DescriptorHandleStorage_";
+        getTypeNameHint(nameSB, handleType->getResourceType());
+        builder.addNameHintDecoration(loweredType, nameSB.produceString().getUnownedSlice());
+
+        auto fieldKey = builder.createStructKey();
+        builder.addNameHintDecoration(fieldKey, UnownedStringSlice("handle"));
+        builder.createStructField(loweredType, fieldKey, handleType);
+
+        *fieldKeyOut = fieldKey;
+        return loweredType;
+    }
+
+    // Return a [ForceInline] function that reads the wrapped descriptor handle
+    // back out of its storage struct (by address):
+    // `DescriptorHandle<R> unpack(ref Wrapper w) { return w.handle; }`
+    IRFunc* createDescriptorHandleUnpackFunc(
+        IRDescriptorHandleType* handleType,
+        IRStructType* structType,
+        IRStructKey* fieldKey)
+    {
+        IRBuilder builder(structType);
+        builder.setInsertAfter(structType);
+        auto func = builder.createFunc();
+        auto refStructType = builder.getRefParamType(structType, AddressSpace::Generic);
+        auto funcType = builder.getFuncType(1, (IRType**)&refStructType, handleType);
+        func->setFullType(funcType);
+        builder.addNameHintDecoration(func, UnownedStringSlice("__unpackDescriptorHandle"));
+        builder.addForceInlineDecoration(func);
+        builder.setInsertInto(func);
+        builder.emitBlock();
+
+        auto structParamRef = builder.emitParam(refStructType);
+        auto structParam = builder.emitLoad(structParamRef);
+        auto handle = builder.emitFieldExtract(handleType, structParam, fieldKey);
+        builder.emitReturn(handle);
+        return func;
+    }
+
+    // Return a [ForceInline] function that writes a descriptor handle into its
+    // storage struct (through the out parameter):
+    // `void pack(out Wrapper w, DescriptorHandle<R> h) { w = { h }; }`
+    IRFunc* createDescriptorHandlePackFunc(
+        IRDescriptorHandleType* handleType,
+        IRStructType* structType)
+    {
+        IRBuilder builder(structType);
+        builder.setInsertAfter(structType);
+        auto func = builder.createFunc();
+        auto outStructType = builder.getRefParamType(structType, AddressSpace::Generic);
+        IRType* paramTypes[] = {outStructType, handleType};
+        auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
+        func->setFullType(funcType);
+        builder.addNameHintDecoration(func, UnownedStringSlice("__packDescriptorHandle"));
+        builder.addForceInlineDecoration(func);
+        builder.setInsertInto(func);
+        builder.emitBlock();
+
+        auto outParam = builder.emitParam(outStructType);
+        IRInst* handleParam = builder.emitParam(handleType);
+        auto structVal = builder.emitMakeStruct(structType, 1, &handleParam);
+        builder.emitStore(outParam, structVal);
+        builder.emitReturn();
+        return func;
+    }
+
+    // Wrap a bindless descriptor-handle buffer element in a 1-member struct so
+    // the outer buffer emits `const device Wrapper*` instead of the illegal
+    // `device T* device*` / bare `texture2d<...> device*` parameter.
+    //
+    // Consider `StructuredBuffer<DescriptorHandle<StructuredBuffer<uint>>>` on
+    // Metal. `StructuredBuffer<E>` emits `emitType(E) + " device*"`
+    // (slang-emit-metal.cpp), and a bindless `DescriptorHandle<R>` emits `R`
+    // directly (Metal's isResourceTypeBindless is always true), so the element
+    // `R = StructuredBuffer<uint>` emits `uint device*` and the outer buffer
+    // appends another `device*` — `uint device* device*`, which Metal's
+    // compiler rejects for `[[buffer]]`. The texture sibling is the equally
+    // illegal `texture2d<...> device*`.
+    //
+    // Keeping the DescriptorHandle *inside* a wrapper struct preserves its
+    // bindless emission at the member (`uint device* handle;` /
+    // `texture2d<...> handle;`, both legal as struct members inside a
+    // `const device Wrapper*` binding) while collapsing the buffer to one legal
+    // level of indirection. This is exactly the spvDescriptor<T> /
+    // argument-buffer-tier-2 layout and is ABI byte-identical: a single-field
+    // struct has the size and alignment of its field.
+    LoweredElementTypeInfo lowerDescriptorHandleElement(
+        IRDescriptorHandleType* handleType,
+        TypeLoweringConfig config)
+    {
+        LoweredElementTypeInfo info = {};
+        info.originalType = handleType;
+        IRStructKey* fieldKey = nullptr;
+        auto loweredType = createDescriptorHandleWrapperStruct(handleType, config, &fieldKey);
+        info.loweredType = loweredType;
+        info.convertLoweredToOriginal =
+            createDescriptorHandleUnpackFunc(handleType, loweredType, fieldKey);
+        info.convertOriginalToLowered = createDescriptorHandlePackFunc(handleType, loweredType);
+        return info;
+    }
+
     IRFunc* createMatrixPackFuncForPackedRows(
         IRMatrixType* matrixType,
         IRStructType* structType,
@@ -3125,6 +3255,19 @@ struct MetalBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPo
 
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
     {
+        // A bindless descriptor handle stored directly in a device-memory
+        // buffer (StorageBuffer) would emit an illegal `device T* device*`
+        // parameter; wrap it in a 1-member struct so the buffer becomes
+        // `const device Wrapper*`. Constant/argument buffers (Uniform) reflect
+        // the native layout and are unaffected, so gate on StorageBuffer.
+        if (config.addressSpace == AddressSpace::StorageBuffer)
+        {
+            if (auto handleType = as<IRDescriptorHandleType>(type))
+            {
+                return lowerDescriptorHandleElement(handleType, config);
+            }
+        }
+
         if (usesPackedVectorStorage(config))
         {
             bool needExplicitLayout = config.lowerToPhysicalType;
