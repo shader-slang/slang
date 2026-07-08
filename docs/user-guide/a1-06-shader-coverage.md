@@ -12,10 +12,12 @@ functions, and branch outcomes your test content actually exercised.
 
 This tutorial walks through the whole pipeline hands-on: compiling with coverage, reading the
 generated metadata, binding the counter buffer and dispatching from a small C++ host program,
-and producing a report — plus the pitfalls you are most likely to hit along the way. Every
-step, including the real dispatch, runs on any machine with a Slang release, a C++ compiler,
-and Python 3: the host program uses Slang's CPU target, and a later section shows what changes
-on GPU targets.
+and producing a report — plus the pitfalls you are most likely to hit along the way. It
+covers both ways of consuming coverage: the _offline_ workflow (`slangc` plus a sidecar
+manifest file, for hosts that dispatch precompiled shaders) and the _in-process_ workflow
+(the C++ API plus metadata queries, which the host program uses). Every step, including the
+real dispatch, runs on any machine with a Slang release, a C++ compiler, and Python 3: the
+host program uses Slang's CPU target, and a later section shows what changes on GPU targets.
 
 This chapter is a guided tour, not the reference. The reference material lives in
 [`tools/shader-coverage/README.md`](https://github.com/shader-slang/slang/blob/master/tools/shader-coverage/README.md)
@@ -122,17 +124,26 @@ Three things to take away:
 ## Running for real: a minimal host program
 
 To get real counter values, an application must do three things the manifest describes: bind
-storage for the hidden buffer, dispatch, and read the counters back. The buffer is
-deliberately _invisible to ordinary reflection_ — your reflection-driven binding code will not
-see it. In-process hosts discover it by querying the compiled artifact's `IMetadata` and
-`castAs`-ing two interfaces: `slang::ISyntheticResourceMetadata` answers _where the buffer
-binds_, and `slang::ICoverageTracingMetadata` answers _what the counters mean_.
+storage for the hidden buffer, dispatch, and read the counters back.
 
-The program below does the whole round trip using Slang's CPU target, so it runs on any
-machine with no GPU or graphics API involved. The CPU target compiles the kernel into a
-directly callable function, and "binding" a buffer means writing a `(pointer, count)` pair
-into a parameter payload at a byte offset the metadata reports — the same discovery contract
-as on GPU targets, with `memcpy` standing in for descriptor sets.
+So far everything came from the _offline_ workflow: `slangc` compiled the shader and wrote
+the manifest as a sidecar file — the shape that suits engines that precompile shaders and
+consult the sidecar at dispatch time. For the dispatch itself this tutorial switches to
+Slang's other workflow: compiling _in-process_ through the C++ API. The switch is not
+incidental. The program below uses the CPU target, whose compiled kernel is a function the
+host calls directly, so compilation and dispatch naturally live in one process — and that is
+what lets a real dispatch run on any machine, with no GPU or graphics API involved.
+
+Coverage itself works identically in both workflows. `CompilerOptionName::TraceCoverage` is
+the API spelling of `-trace-coverage`, and in place of the sidecar file the compiled artifact
+answers metadata queries: `castAs` the entry point's `IMetadata` to
+`slang::ISyntheticResourceMetadata` for _where the buffer binds_ and to
+`slang::ICoverageTracingMetadata` for _what the counters mean_ — the same information you
+just read in the JSON, minus the file. (The buffer is deliberately _invisible to ordinary
+reflection_, so one of these two channels is how any host discovers it.) On the CPU target,
+"binding" the buffer means writing a `(pointer, count)` pair into a parameter payload at a
+byte offset the metadata reports — the same discovery contract as on GPU targets, with
+`memcpy` standing in for descriptor sets.
 
 Save this as `hello-coverage-host.cpp` next to `hello-coverage.slang`:
 
@@ -442,10 +453,10 @@ For a precise statement of where each mode places its counters (with worked exam
 Everything the host program did carries over to GPU targets unchanged except one step: where
 the CPU program `memcpy`-ed a `(pointer, count)` pair into a payload, a GPU host binds an
 ordinary zero-initialized storage buffer through its graphics API, and reads it back after
-the dispatch completes. Discovery also comes through the same two equivalent channels:
-the in-process metadata interfaces the program used, or — for hosts that dispatch precompiled
-shaders, possibly on machines without Slang installed — the `.coverage-manifest.json` sidecar
-you read earlier.
+the dispatch completes. Both consumption workflows apply as well: the in-process metadata
+interfaces the program used, or the offline `.coverage-manifest.json` sidecar you read
+earlier — the latter for hosts that dispatch precompiled shaders, possibly on machines
+without Slang installed.
 
 What varies per target is only the shape of the binding location:
 
