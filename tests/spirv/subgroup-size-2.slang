@@ -1,8 +1,8 @@
 // Test that using workgroup size from more than one entrypoint result in
 // correct lowering into global variable.
 
-//TEST:SIMPLE(filecheck=CHECK_EXPERIMENTAL): -target spirv -emit-spirv-directly -fvk-use-entrypoint-name -O0 -enable-experimental-passes
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -fvk-use-entrypoint-name -O0
+//TEST:SIMPLE(filecheck=CHECK_EXPERIMENTAL): -target spirv -emit-spirv-directly -fvk-use-entrypoint-name -enable-experimental-passes
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -fvk-use-entrypoint-name
 
 
 
