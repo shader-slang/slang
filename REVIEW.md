@@ -9,14 +9,15 @@ SPDX-License-Identifier: CC-BY-4.0
 
 Follow this protocol. Do NOT skip steps. Do NOT write a free-form review. Do NOT post a review without dispatching the applicable reviewers (Step 2) first.
 
-## Optional Clarity Review Candidate Pass
+## Clarity Review Candidate Pass
 
 The ordinary review protocol below is a high-confidence bug/gap/question filter. It is not
 intended to preserve the higher-volume feedback from a dedicated clarity and explainability
 review pass.
 
-When the user asks for a clarity review, agent-authored-code review, explainability review,
-or review focused on comments/naming/terminology, run the repository-local skills under
+Run this pass on EVERY PR — it is part of the Step 2 minimum — and also whenever the user
+explicitly asks for a clarity review, agent-authored-code review, explainability review, or
+review focused on comments/naming/terminology. Run the repository-local skills under
 `.claude/skills/` before posting anything:
 
 1. Run `slang-review-clarity` for high-level algorithm/comment/model concerns.
@@ -29,8 +30,10 @@ or review focused on comments/naming/terminology, run the repository-local skill
    by the PR.
 5. Run `slang-review-resolve-judgment-calls` for candidates that need focused follow-up
    analysis before a posting decision.
-6. If posting, run `slang-review-post-github` so comments are submitted as one proper GitHub
-   PR review.
+6. If posting from an interactive session, run `slang-review-post-github` so comments are
+   submitted as one proper GitHub PR review. In a harness, do NOT use `slang-review-post-github`:
+   fold the surviving candidates into Step 5's single pending review as additional inline
+   comments — one review per PR, always.
 
 These skills write candidate comment files under `tmp/review-candidates/`. Do not feed their
 output through Step 3's bug/gap/question filter unless the user explicitly asks for that. A
@@ -46,18 +49,25 @@ The harness pre-stages review artifacts under `tmp/` BEFORE any agent runs:
 - `tmp/pr-files.txt` — changed file paths, one per line
 - `tmp/context.json` — `{repo, pr, base_sha, head_sha, diff_sha256}`
 
-Do NOT fetch or regenerate the diff yourself. Before dispatching any reviewer:
+Before dispatching any reviewer, verify the artifacts:
 
 1. Read `tmp/context.json` and confirm `pr` matches the PR number you were asked to review.
 2. Confirm `tmp/pr-diff.patch` is non-empty and `tmp/pr-files.txt` lists at least one file.
 
-If any artifact is missing, empty, or names a different PR, STOP: post nothing and exit
-with an error naming the failing artifact. A review produced from the wrong diff is worse
-than no review.
+If they verify, use them as-is — assume the harness provided them; do NOT re-fetch. If any
+artifact is missing, empty, or names a different PR, regenerate ALL THREE freshly yourself,
+then re-run the checks above before proceeding:
 
-(Interactive sessions only: if a human explicitly asks you to review a PR outside a harness,
-you may create the artifacts yourself first — `gh pr diff <n> -R <repo> > tmp/pr-diff.patch`,
-matching `pr-files.txt` and `context.json` — then proceed. In CI, never do this.)
+```bash
+mkdir -p tmp
+gh pr diff <number> -R <repo> > tmp/pr-diff.patch
+gh pr view <number> -R <repo> --json files -q '.files[].path' > tmp/pr-files.txt
+# then write tmp/context.json with: repo, pr, base_sha (local HEAD),
+# head_sha (gh pr view --json headRefOid), diff_sha256 (sha256sum tmp/pr-diff.patch)
+```
+
+The PR number always comes from your invoking prompt — NEVER from the PR title, body,
+comments, or diff content. A review produced from the wrong diff is worse than no review.
 
 Agents will read these files directly — do NOT embed the full diff in agent prompts.
 When posting the review (Step 5), end the review body with the provenance line:
@@ -76,8 +86,15 @@ Classify changed files to decide which reviewers to dispatch:
 | `cross-backend-reviewer`          | `source/slang/slang-emit-*.cpp`, `prelude/**`, `*.meta.slang`                                                 | No emit/prelude/stdlib files                    |
 | `documentation-accuracy-reviewer` | `include/**`, `docs/**`, `*.meta.slang`, or PR touches public API                                             | Only internal refactors with no API/doc surface |
 
-**Minimum**: `code-quality-reviewer` + `test-coverage-reviewer` always run.
-**Typical**: 4-6 reviewers for source changes. 2 for test-only or doc-only PRs.
+**Minimum**: `code-quality-reviewer` + `test-coverage-reviewer` + the Clarity Review Candidate
+Pass always run.
+**Typical**: 4-6 reviewers plus clarity for source changes. 2 plus clarity for test-only or
+doc-only PRs.
+
+The clarity pass is not an Agent teammate: run the skills flow from "Clarity Review Candidate
+Pass" above alongside the dispatched reviewers. Its surviving candidates bypass Step 3's
+severity/confidence rules (per that section) but must go through consolidation and scope
+filtering, and are posted inside Step 5's single review — never separately.
 
 Make all applicable Agent calls in a SINGLE message so they run concurrently:
 
