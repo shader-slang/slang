@@ -81,7 +81,7 @@ default: ... }` dispatches by value, the body slices into per-case
 - **BreakStmt / ContinueStmt** (`#nodes`) — `break` exits the
   innermost enclosing `BreakableStmt`; `continue` skips to the next
   iteration of the innermost `LoopStmt`.
-- **LabelStmt + labeled break** (`#labelstmt-and-breakstmttargetlabel`)
+- **LabelStmt + labeled break** (`#labelstmt-breakstmt-continuestmt-and-discardstmt`)
   — `label: for (...) { break label; }` breaks out of a non-innermost
   loop. The observable is the iteration count.
 - **ReturnStmt** (`#nodes`) — `return e` halts the function and yields
@@ -100,10 +100,10 @@ default: ... }` dispatches by value, the body slices into per-case
   declared `throws E` may `throw e;` and the caller's `do { try f();
 } catch (e: E) { ... }` runs the handler. A null `errorVar` is a
   catch-all.
-- **DeclStmt** (`#declstmt-and-expressionstmt`) — a `DeclBase` (local
+- **DeclStmt** (`#declstmt-expressionstmt-and-emptystmt`) — a `DeclBase` (local
   variable) appears in statement position; the name is visible to
   later statements.
-- **ExpressionStmt** (`#declstmt-and-expressionstmt`) — an arbitrary
+- **ExpressionStmt** (`#declstmt-expressionstmt-and-emptystmt`) — an arbitrary
   `Expr` is used for its side effects. The canonical observation is
   a function call whose return value is unused.
 - **EmptyStmt** (`#nodes`) — a bare `;` is accepted.
