@@ -647,8 +647,9 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
                 const char* name = m->getName();
                 if (!name || !*name)
                 {
-                    printf("error: loaded module #%d has no name; cannot write a binary for it\n",
-                           (int)i);
+                    printf(
+                        "error: loaded module #%d has no name; cannot write a binary for it\n",
+                        (int)i);
                     return 1;
                 }
                 std::string path = dir + "/" + name + ".slang-module";
