@@ -661,22 +661,26 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
             return 1;
     }
     // The workload exists to measure the binary-module path: fail loudly if
-    // import resolution silently fell back to the .slang sources.
+    // import resolution fell back to a .slang source for ANY module — a
+    // partial fallback would silently time a mixed source/binary graph.
     {
         SlangInt count = session->getLoadedModuleCount();
-        int binary = 0;
+        bool allBinary = count > 0;
         for (SlangInt i = 0; i < count; i++)
         {
             const char* path = session->getLoadedModule(i)->getFilePath();
             std::string p = path ? path : "";
-            if (p.size() > 13 && p.compare(p.size() - 13, 13, ".slang-module") == 0)
-                binary++;
+            if (p.size() <= 13 || p.compare(p.size() - 13, 13, ".slang-module") != 0)
+            {
+                printf(
+                    "error: module '%s' resolved to '%s', not a .slang-module binary\n",
+                    session->getLoadedModule(i)->getName(),
+                    p.c_str());
+                allBinary = false;
+            }
         }
-        if (binary == 0)
-        {
-            printf("error: no module resolved to a .slang-module binary (%d loaded)\n", (int)count);
+        if (!allBinary)
             return 1;
-        }
     }
     if (!compileEntryPoint(session, module, timers))
         return 1;

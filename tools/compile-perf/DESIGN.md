@@ -208,7 +208,7 @@ kernel. The plan below builds a public equivalent that covers those dimensions.
 tool, `tools/compile-perf/native/api-driver.cpp`, that `dlopen`s a given
 release's `libslang` (so one host-built binary measures every release in the
 ladder — the COM ABI is append-only by contract) and emits timers in the same
-`[*] name  count  N.NNms` format `bench.py` already parses. Three workloads:
+`[*] name  count  N.NNms` format `bench.py` already parses. The workloads:
 
 | Workload | Exercises | Shape |
 | --- | --- | --- |
