@@ -267,57 +267,16 @@ jobs:
             echo "::warning::slangc tests exited with code $slangc_test_exit"
           fi
 
-      - name: Package ASan-instrumented binaries
-        # Deliberately gated on build success only, not on test or summary
-        # outcome: sanitizer findings must not block publishing, because the
-        # instrumented binaries are how downstream users reproduce those
-        # findings. Nightly artifacts are a debugging aid, not a release
-        # channel.
-        if: inputs.upload-binaries && steps.build.outcome == 'success'
-        run: |
-          # Bundle the instrumented build for downstream ASan users. Binaries
-          # are built with -shared-libsan, so ship the matching dynamic ASan
-          # runtime alongside them; consumers must put both lib/ and
-          # asan-runtime/ on LD_LIBRARY_PATH.
-          #
-          # Copies are strict on purpose: a missing binary or ASan runtime
-          # must fail this step loudly rather than upload an artifact that is
-          # silently unusable (MANIFEST.txt alone would defeat the upload
-          # step's if-no-files-found check).
-          staging=/tmp/sanitizer-binaries
-          mkdir -p "$staging/bin" "$staging/asan-runtime"
-          cp -a "$lib_dir" "$staging/lib"
-          cp -a "$bin_dir/slangc" "$bin_dir/slangd" "$staging/bin/"
-          cp -a include "$staging/include"
-          CLANG_RUNTIME_DIR=$(clang-18 -print-runtime-dir)
-          cp -a "$CLANG_RUNTIME_DIR"/libclang_rt.asan*.so* "$staging/asan-runtime/"
-          {
-            echo "commit: $GITHUB_SHA"
-            echo "clang: $(clang-18 --version | head -1)"
-            echo "config: releaseWithDebugInfo, SLANG_ENABLE_ASAN=ON (-shared-libsan)"
-            echo "usage: add lib/ and asan-runtime/ to LD_LIBRARY_PATH of an"
-            echo "       ASan-instrumented consumer application"
-          } > "$staging/MANIFEST.txt"
-          tar -C /tmp -czf sanitizer-binaries.tar.gz sanitizer-binaries
-          ls -lh sanitizer-binaries.tar.gz
-
-      - name: Upload ASan-instrumented binaries
-        if: inputs.upload-binaries && steps.build.outcome == 'success'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: sanitizer-binaries
-          path: sanitizer-binaries.tar.gz
-          # The tarball is ~226 MB and each nightly supersedes the previous
-          # one; 3 days bounds the rolling footprint to ~0.7 GB while still
-          # covering a failed nightly or two.
-          retention-days: 3
-          if-no-files-found: error
-
       - name: Sanitizer Summary
+        id: summary
         if: always()
         env:
           BUILD_OUTCOME: ${{ steps.build.outcome }}
         run: |
+          # Default: no violation. Overwritten below when unexpected findings
+          # fail the job; a later write of the same output key wins.
+          echo "has_violation=false" >> "$GITHUB_OUTPUT"
+
           echo ""
           echo "========================================"
           echo "       SANITIZER REPORT"
@@ -653,6 +612,7 @@ jobs:
 
             # Only fail the job for unexpected PR-related findings
             if [ "$pr_count" -gt 0 ]; then
+              echo "has_violation=true" >> "$GITHUB_OUTPUT"
               echo "Failing: $pr_count unexpected sanitizer finding(s) in PR-changed files."
               exit 1
             else
@@ -686,6 +646,53 @@ jobs:
               echo "No sanitizer issues detected." >> "$GITHUB_STEP_SUMMARY"
             fi
           fi
+
+      - name: Package ASan-instrumented binaries
+        # Runs after the summary and only when it found a violation
+        # (unexpected findings, the kind that fails the job): the
+        # instrumented binaries are how downstream users reproduce those
+        # findings, and a clean run has nothing to reproduce, so skipping
+        # the ~226 MB upload keeps clean nightlies cheap. always() is
+        # needed because the summary step exits non-zero on violation.
+        if: always() && inputs.upload-binaries && steps.build.outcome == 'success' && steps.summary.outputs.has_violation == 'true'
+        run: |
+          # Bundle the instrumented build for downstream ASan users. Binaries
+          # are built with -shared-libsan, so ship the matching dynamic ASan
+          # runtime alongside them; consumers must put both lib/ and
+          # asan-runtime/ on LD_LIBRARY_PATH.
+          #
+          # Copies are strict on purpose: a missing binary or ASan runtime
+          # must fail this step loudly rather than upload an artifact that is
+          # silently unusable (MANIFEST.txt alone would defeat the upload
+          # step's if-no-files-found check).
+          staging=/tmp/sanitizer-binaries
+          mkdir -p "$staging/bin" "$staging/asan-runtime"
+          cp -a "$lib_dir" "$staging/lib"
+          cp -a "$bin_dir/slangc" "$bin_dir/slangd" "$staging/bin/"
+          cp -a include "$staging/include"
+          CLANG_RUNTIME_DIR=$(clang-18 -print-runtime-dir)
+          cp -a "$CLANG_RUNTIME_DIR"/libclang_rt.asan*.so* "$staging/asan-runtime/"
+          {
+            echo "commit: $GITHUB_SHA"
+            echo "clang: $(clang-18 --version | head -1)"
+            echo "config: releaseWithDebugInfo, SLANG_ENABLE_ASAN=ON (-shared-libsan)"
+            echo "usage: add lib/ and asan-runtime/ to LD_LIBRARY_PATH of an"
+            echo "       ASan-instrumented consumer application"
+          } > "$staging/MANIFEST.txt"
+          tar -C /tmp -czf sanitizer-binaries.tar.gz sanitizer-binaries
+          ls -lh sanitizer-binaries.tar.gz
+
+      - name: Upload ASan-instrumented binaries
+        if: always() && inputs.upload-binaries && steps.build.outcome == 'success' && steps.summary.outputs.has_violation == 'true'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: sanitizer-binaries
+          path: sanitizer-binaries.tar.gz
+          # The tarball is ~226 MB and each violating nightly supersedes the
+          # previous one; 3 days covers picking up a finding for repro while
+          # bounding the rolling footprint.
+          retention-days: 3
+          if-no-files-found: error
 
       - name: Upload Sanitizer Logs
         if: always()
