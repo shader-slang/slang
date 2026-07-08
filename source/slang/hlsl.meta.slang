@@ -27360,13 +27360,7 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
         return getDescriptorFromHandle(bindless);
     }
 
-    // Family 1: recover the concrete texture type from `ResourceDescriptorHeap[i]`.
-    // The untyped handle carries only the heap index; `This` supplies the type, so we
-    // rebuild a `DescriptorHandle<This>` and reuse the existing `getDescriptorFromHandle`
-    // path (whose per-target `__target_switch` body is the one place that decides how a
-    // descriptor handle materializes per backend). Only `UntypedResourceHandle` is accepted
-    // here because a texture is always a resource-heap descriptor. Target availability is
-    // gated at the `ResourceDescriptorHeap`/`SamplerDescriptorHeap` subscript, not here.
+    // Convert a `ResourceDescriptorHeap[i]` handle to this texture type.
     __implicit_conversion($(kConversionCost_ImplicitDereference))
     [ForceInline]
     __init(UntypedResourceHandle h)
@@ -27405,13 +27399,6 @@ for (auto type : kDynamicResourceCastableTypes) {
     auto kind = type.kind;
     auto typeName = type.name;
     auto access = type.access;
-    // Pick the matching untyped descriptor-heap handle for Family-1 conversion:
-    // sampler-kind types come from `SamplerDescriptorHeap`, everything else from
-    // `ResourceDescriptorHeap`. We key off `dynamicKind` (the `__DynamicResourceKind` written
-    // into `__IDynamicResourceCastable<...>` below) rather than `kind` (the `DescriptorKind`):
-    // `dynamicKind` is the resource-vs-sampler family used by the dynamic-resource cast and by
-    // the Family-2 extensions, so it is the single source of truth for heap family. (For these
-    // types the two agree, but `kind` carries finer detail like UniformTexelBuffer.)
     bool isSampler = (strcmp(dynamicKind, "Sampler") == 0);
     auto untypedHandleType = isSampler ? "UntypedSamplerHandle" : "UntypedResourceHandle";
     auto untypedHandleIndexFn = isSampler ? "__getUntypedSamplerHandleIndex" : "__getUntypedResourceHandleIndex";
@@ -27439,13 +27426,7 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
         return getDescriptorFromHandle(bindless);
     }
 
-    // Family 1: recover the concrete type from `ResourceDescriptorHeap[i]` /
-    // `SamplerDescriptorHeap[j]`. `$(typeName)` supplies the type that the untyped handle
-    // lacks; we rebuild the typed handle and reuse the shared `getDescriptorFromHandle`.
-    // Target availability is gated at the heap subscript (see the `_Texture` site above);
-    // this conversion's own capability set is left to inference because `getDescriptorFromHandle`
-    // spans many per-type backend requirements (e.g. byte-address buffers pull `GLSL_150`) that
-    // a single fixed `[require]` here could not enumerate.
+    // Convert a `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` handle to this type.
     __implicit_conversion($(kConversionCost_ImplicitDereference))
     [ForceInline]
     __init($(untypedHandleType) h)
@@ -27554,27 +27535,15 @@ __prefix T operator*(DescriptorHandle<T> value)
     return getDescriptorFromHandle(value);
 }
 
-// HLSL SM6.6 descriptor-heap source-compatibility surface.
-//
-// `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` produce an opaque, untyped
-// handle that wraps the `uint` heap index. A naive generic subscript returning
-// `DescriptorHandle<T>` cannot type-check (T appears only in return position, so it can
-// never be inferred -> E39999). Instead the subscript returns a non-generic untyped handle,
-// and the concrete resource/sampler type is recovered from the *conversion target* via the
-// implicit conversions defined below. An untyped handle that no conversion consumes is
-// emitted directly as its underlying `uint` heap index (there is no separate pre-emit
-// lowering pass: the backends print the type as `uint`/`OpTypeInt 32 0` and the wrap/unwrap
-// casts forward their single operand).
+// HLSL SM6.6 `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]`. Indexing a heap yields an
+// untyped handle wrapping the `uint` heap index; the concrete resource/sampler type is recovered
+// from the conversion target by the implicit conversions defined above and below. Availability is
+// gated on the untyped-handle constructor (and repeated on the heap subscript so the diagnostic
+// lands at the indexing site).
 __magic_type(UntypedResourceHandleType)
 __intrinsic_type($(kIROp_UntypedResourceHandleType))
 struct UntypedResourceHandle
 {
-    // Constructing a heap handle from a raw `uint` is the moment a plain index commits to being a
-    // descriptor-heap index, which is only meaningful where a `uint2` descriptor handle lowers.
-    // The subscript below is not the only way to reach this constructor (the type is nameable, so
-    // `UntypedResourceHandle(i)` is also a construction site), so the availability gate lives here
-    // on the constructor itself, matching `DescriptorHandle<T>.__init(uint2)`. The body is a plain
-    // `uint` wrap, so the gate carries no per-type backend capability of its own.
     [require(glsl_hlsl_spirv_wgsl, descriptor_handle)]
     __intrinsic_op($(kIROp_CastUIntToUntypedResourceHandle))
     __init(uint index);
@@ -27596,21 +27565,8 @@ uint __getUntypedResourceHandleIndex(UntypedResourceHandle h);
 __intrinsic_op($(kIROp_CastUntypedSamplerHandleToUInt))
 uint __getUntypedSamplerHandleIndex(UntypedSamplerHandle h);
 
-// The subscript carries the same availability gate as the `UntypedResourceHandle` /
-// `UntypedSamplerHandle` constructor it calls, so `ResourceDescriptorHeap[i]` /
-// `SamplerDescriptorHeap[j]` is diagnosed *at the indexing site* (the most useful location) on
-// targets that cannot lower a `uint2` descriptor handle. The real gate is on the untyped-handle
-// constructor above — construction is where a raw index commits to being a heap handle — and
-// repeating it here keeps the diagnostic at the indexing site rather than deep in the accessor
-// body.
-//
-// The gate deliberately lives on construction rather than on the per-type/per-kind conversions
-// below: `getDescriptorFromHandle` is available on every target through its `default:`
-// `__castDescriptorHandleToResource` arm, so inference does NOT reliably gate unsupported targets
-// per conversion (a texture conversion would otherwise compile to a raw `uint2` and emit
-// `.read`/`.sample` on it on Metal), and a single fixed `[require]` on the Family-1 templated loop
-// cannot span its heterogeneous per-type backend capabilities (e.g. byte-address buffers pull
-// `GLSL_150`). Gating construction is uniform and free of both problems.
+// The subscript repeats the constructor's availability gate so unsupported targets are diagnosed
+// at the indexing site.
 struct __ResourceDescriptorHeapType
 {
     [require(glsl_hlsl_spirv_wgsl, descriptor_handle)]
@@ -27632,25 +27588,10 @@ struct __SamplerDescriptorHeapType
 static const __ResourceDescriptorHeapType ResourceDescriptorHeap = {};
 static const __SamplerDescriptorHeapType SamplerDescriptorHeap = {};
 
-// Family 2: convert an untyped handle to a `DescriptorHandle<T>` / `.Handle`. The target T
-// is known from the conversion target here, so we rebuild the typed handle directly.
-//
-// The two conversions are split across two per-kind extensions so that the heap family is
-// enforced at compile time, exactly as the Family-1 per-type conversions do via `isSampler`:
-// a resource-heap handle (`UntypedResourceHandle`) converts only to a `DescriptorHandle<T>`
-// whose `T` is a General (CBV_SRV_UAV) descriptor, and a sampler-heap handle only to a
-// sampler-family `T`. So `DescriptorHandle<Texture2D> th = SamplerDescriptorHeap[j];` (and the
-// reverse) is a compile error rather than a silent runtime mismatch. The discrimination uses
-// the same `__IDynamicResourceCastable<kind>` interface that drives `__DynamicResource.as` and
-// Family-1, keeping one source of truth for resource-vs-sampler family. (Two separate
-// extensions are used rather than a single `where`-clause so the conversion search is not
-// affected by parameter-group target-type guard ordering in `_coerce`.)
-//
-// The rebuilt handle value is `uint2(index, 0)`: component 0 is the heap index and component 1
-// is the descriptor-space/sub-index slot of the existing `DescriptorHandle` representation,
-// which is unused for descriptor-heap handles (mirrors the `_Texture` Family-1 site above).
-// Target availability is gated where the untyped handle is constructed (its `__init(uint)` and
-// the heap subscript), so these conversions need no `[require]`.
+// Convert an untyped heap handle to a `DescriptorHandle<T>` / `.Handle`. Split across two per-kind
+// extensions so the resource-vs-sampler distinction is enforced at compile time: a resource-heap
+// handle converts only to a General (CBV_SRV_UAV) `DescriptorHandle<T>` and a sampler-heap handle
+// only to a sampler `T`, so a mismatched assignment is a compile error, not a silent runtime bug.
 __generic<T : __IDynamicResourceCastable<__DynamicResourceKind.General> >
 extension DescriptorHandle<T>
 {
