@@ -1,0 +1,59 @@
+schema_version: 1
+id: slangi-vm-optional-none-arg-wrong-value
+bundle: design/name-resolution/scopes
+suspected_kind: wrong-codegen
+title: "[slangi] Optional<T> argument passed as `none` arrives with garbage hasValue in callee"
+observed_at: 2026-07-08T00:00:00+00:00
+scope: cpp
+evidence:
+  command: ./build/Release/bin/slangi <repro.slang>
+  source_slang: docs/generated/tests/design/name-resolution/scopes/if-let-unwrapped-visible-in-positive-branch.slang
+  observed_summary: |
+    A function `int unwrapOrNegative(Optional<int> opt)` called as
+    `unwrapOrNegative(none)` returns `0` (the unwrapped-value path with a
+    zero value) instead of `-1` (the no-value fallback). Printing
+    `int(opt.hasValue)` inside the callee shows a garbage value
+    (e.g. `1680162146`), i.e. the Optional argument's hasValue slot is
+    uninitialized rather than false, so it tests truthy and the positive
+    branch runs with `value == 0`. The bug is independent of `if (let ...)`:
+    a plain `opt.hasValue ? opt.value : -1` callee misbehaves identically,
+    both for a literal `none` argument and for a local
+    `Optional<int> o = none;` passed by value. A direct
+    `if (let v = o)` on a local in the same function (no call boundary)
+    takes the negative branch correctly, so the corruption happens at the
+    VM's argument-passing boundary. The same function compiled and executed
+    via `//TEST:COMPARE_COMPUTE(...):-cpu` returns the correct `-1`, so the
+    frontend lowering is fine and the bug is in the slangi bytecode VM.
+  exit_code: 0
+  minimized_repro: |
+    //TEST:INTERPRET(filecheck=CHECK):
+    int probe(Optional<int> opt)
+    {
+        return opt.hasValue ? opt.value : -1;
+    }
+    void main()
+    {
+        //CHECK: p=-1
+        printf("p=%d\n", probe(none));
+        // Actual: p=0 (and printing opt.hasValue in the callee shows garbage)
+    }
+expected:
+  claim: |
+    Passing `none` as an `Optional<T>` argument must give the callee an
+    Optional with `hasValue == false`. The user guide's `Optional<T>`
+    section shows exactly this pattern (`useVal(none)` reaching a
+    `p == none` test that must succeed), and the discovering test's doc
+    claim (if-let unwraps only in the positive branch) requires the
+    `none` case to take the fallback path and return -1.
+  citation_kind: doc
+  citation: docs/user-guide/03-convenience-features.md
+provenance:
+  agent_model: claude-fable-5
+  source_commit: 6b490bc8cb3cf11b356ddf70168c5609efa46341
+  doc_anchor: docs/generated/design/name-resolution/scopes.md#implicit-scopes
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — the discovering test's if-let is not required to reproduce; a minimal callee reading only opt.hasValue misbehaves the same way, and hasValue prints as uninitialized garbage inside the callee."
+    - "Frontend bug: ruled out by running the identical unwrapOrNegative function under COMPARE_COMPUTE -cpu, which returns the documented -1 for none."
+    - "Related to the existing slangi VM argument-passing finding (filed/slangi-vm-bool-false-arg-evaluates-as-true.yaml, issue #11402): same shape — a by-value argument's payload is wrong only inside the callee, only under the VM. May share a root cause in VM call lowering."
