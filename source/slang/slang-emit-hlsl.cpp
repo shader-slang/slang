@@ -1970,14 +1970,19 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             // case, so the emitted type agrees with how the operations lower. The user selects a
             // SER path via capabilities (e.g. `ser_nvapi` vs a native SM 6.9 DXR profile).
             auto targetCaps = getTargetReq()->getTargetCaps();
-            if (targetCaps.impliesAtLeastOneSet(CapabilitySet(CapabilityName::hlsl_nvapi)))
+            auto impliesCap = [&](CapabilityName atom)
+            {
+                return targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(atom)) ==
+                       CapabilitySet::ImpliesReturnFlags::Implied;
+            };
+            if (impliesCap(CapabilityName::hlsl_nvapi))
             {
                 // NVAPI extension: use NvHitObject (matches `case hlsl_nvapi:` op calls).
                 m_writer->emit("NvHitObject");
                 // Ensure NVAPI header is included when using NvHitObject type.
                 m_extensionTracker->m_requiresNVAPI = true;
             }
-            else if (targetCaps.impliesAtLeastOneSet(CapabilitySet(CapabilityName::_sm_6_9)))
+            else if (impliesCap(CapabilityName::_sm_6_9))
             {
                 // DXR 1.3 native: use the dx::HitObject namespace type.
                 m_writer->emit("dx::HitObject");

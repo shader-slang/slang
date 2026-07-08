@@ -227,12 +227,6 @@ public:
     bool implies(CapabilitySet const& other) const;
     /// Does this capability set imply at least 1 set in other.
     ImpliesReturnFlags atLeastOneSetImpliedInOther(CapabilitySet const& other) const;
-    /// Convenience boolean form of `atLeastOneSetImpliedInOther`: true when `this` implies at
-    /// least one capability set in `other`. This is the single-set imply test used to decide
-    /// whether a target satisfies a capability, matching how `specializeTargetSwitch` selects a
-    /// `__target_switch` case; prefer it over spelling out
-    /// `atLeastOneSetImpliedInOther(x) == ImpliesReturnFlags::Implied` at call sites.
-    bool impliesAtLeastOneSet(CapabilitySet const& other) const;
     /// Will a `join` with `other` change `this`?
     bool joinWithOtherWillChangeThis(CapabilitySet const& other) const;
 

@@ -5,7 +5,6 @@
 // unchanged.
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry rayGenerationMain -stage raygeneration -profile sm_6_9
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-d3d12 -output-using-type -profile sm_6_9 -render-feature ray-tracing
 
 //TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
