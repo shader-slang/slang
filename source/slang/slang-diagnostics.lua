@@ -4970,6 +4970,22 @@ err(
     span { loc = "location", message = "accessing .value on an Optional<~type:IRInst> that is always 'none'" }
 )
 
+-- IR-layer manifestation of the AST rule E30902 (optional-cannot-wrap-resource-type).
+-- The AST check gates on the concrete payload type, which is invisible when the
+-- payload is an unspecialized generic parameter (e.g. a generic member accessor
+-- returning `Optional<T>` `none`). The concrete `Optional<Texture2D>` only appears
+-- during IR generic specialization, so this IR-native variant re-checks it there,
+-- before optional lowering synthesizes an unlowerable `defaultConstruct` of the
+-- opaque payload (which would otherwise reach the backend as an internal error).
+-- Same summary text as E30902 so users see one consistent rule; distinct code so
+-- the by-id diagnostic lookup stays unambiguous with the AST-typed E30902.
+err(
+    "optional-cannot-wrap-resource-type-ir",
+    41037,
+    "'Optional<T>' cannot wrap a resource or opaque type",
+    span { loc = "location", message = "'Optional<~type:IRInst>' cannot wrap a resource or opaque type because '~type:IRInst' is a resource or opaque type" }
+)
+
 
 -- Load semantic checking diagnostics (part 13) - AnyValue, Autodiff, Static assertions, Atomics, etc.
 -- (inlined from slang-diagnostics-semantic-checking-13.lua)
