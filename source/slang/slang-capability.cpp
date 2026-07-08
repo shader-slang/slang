@@ -645,6 +645,11 @@ CapabilitySet::ImpliesReturnFlags CapabilitySet::atLeastOneSetImpliedInOther(
     return _implies(other, ImpliesFlags::OnlyRequireASingleValidImply);
 }
 
+bool CapabilitySet::impliesAtLeastOneSet(CapabilitySet const& other) const
+{
+    return ((int)atLeastOneSetImpliedInOther(other) & (int)ImpliesReturnFlags::Implied) != 0;
+}
+
 bool CapabilitySet::joinWithOtherWillChangeThis(CapabilitySet const& other) const
 {
     return !(
