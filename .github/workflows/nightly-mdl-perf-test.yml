@@ -12,7 +12,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "commit SHA or branch to build (blank = master HEAD)"
+        # actions/checkout resolves branches, tags, and full 40-char SHAs
+        # only; a short SHA fails with "branch or tag not found".
+        description: "full commit SHA or branch to build (blank = master HEAD)"
         default: ""
       samples:
         description: "timed samples per run"
@@ -35,11 +37,14 @@ permissions:
 
 jobs:
   nightly:
-    # The quiesced NVIDIA RGFX perf pool (runner group nvrgfx) — the SAME runner
-    # the release history is swept on, so absolute timings stay comparable.
+    # The NVIDIA RGFX perf pool, reached through the VM-based GitHub bridge
+    # (rtrci github-bridge target shader-slang/slang:windows-x64-perf) — the
+    # SAME pool the release history sweep targets, so absolute timings stay
+    # comparable. The pre-VM pool (runner group nvrgfx, label nvrgfx-perf)
+    # was retired 2026-07; timings recorded before the migration may show a
+    # step at the boundary.
     runs-on:
-      group: nvrgfx
-      labels: [Windows, X64, nvrgfx-perf]
+      labels: [Windows, X64, nvrgfx-perf-kernelvm-bridge]
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -70,7 +75,7 @@ jobs:
           # at the release->daily boundary rather than a real regression.
           # SLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF also matches release.yml.
           # LLVM is disabled: the prebuilt slang-llvm artifact links against a newer
-          # MSVC CRT than is available on the nvrgfx-perf runner, causing LNK2001
+          # MSVC CRT than is available on the perf runner, causing LNK2001
           # linker errors. The perf suite only uses SPIRV/Metal/WGSL targets which
           # do not need the LLVM backend.
           cmake --preset default --fresh `
@@ -215,6 +220,11 @@ jobs:
           mv report_per_workload.html index.html
           # _combined_index.json is a derived intermediate — no need to serve it
           rm -f _combined_index.json
+          # Serve files verbatim: without this marker GitHub Pages runs the
+          # generated report through legacy Jekyll, whose builds have failed
+          # or hung on this content. Must be re-created on every deploy
+          # because the `git rm -rf .` above removes it.
+          touch .nojekyll
 
           git add -A
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
