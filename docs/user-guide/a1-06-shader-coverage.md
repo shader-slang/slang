@@ -284,14 +284,6 @@ For complete Vulkan programs using the in-process workflow, see
 and
 [`examples/shader-coverage-bvh-traversal`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-bvh-traversal).
 
-## Options
-
-The remaining `-trace-coverage*` options — counter width, explicit binding, reserved
-descriptor sets, and the manifest output path — are documented in the
-[slangc command line reference](https://github.com/shader-slang/slang/blob/master/docs/command-line-slangc-reference.md#trace-coverage)
-and, with usage examples, in
-[`tools/shader-coverage/README.md`](https://github.com/shader-slang/slang/blob/master/tools/shader-coverage/README.md).
-
 ## Troubleshooting
 
 1. **64-bit atomics are not available everywhere.** The default `uint64` counters require
@@ -328,9 +320,12 @@ and, with usage examples, in
 
 ## Further reading
 
+- [slangc command line reference](https://github.com/shader-slang/slang/blob/master/docs/command-line-slangc-reference.md#trace-coverage) —
+  the `-trace-coverage*` options: counter width, explicit binding, reserved descriptor
+  sets, manifest output path.
 - [`tools/shader-coverage/README.md`](https://github.com/shader-slang/slang/blob/master/tools/shader-coverage/README.md) —
-  workflow reference: integration patterns, target support matrix, LCOV format scope,
-  current limitations.
+  workflow reference: integration patterns, option usage examples, target support matrix,
+  LCOV format scope, current limitations.
 - [`docs/design/shader-coverage-host-interface.md`](https://github.com/shader-slang/slang/blob/master/docs/design/shader-coverage-host-interface.md) —
   binding contract and per-target host recipes.
 - [`examples/shader-coverage-image-pipeline`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-image-pipeline)
