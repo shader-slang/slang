@@ -8,7 +8,10 @@ name: PR Board Sync (reusable)
 #     on the event-driven happy path,
 #   - backfills the assignee + reviewers (an Internal PR's author; otherwise a
 #     linked-issue owner, else the top committer-signal owner, else the
-#     maintainer) and requests reviewers, and
+#     maintainer) and requests reviewers,
+#   - when a PR has an owner, assigns any still-unassigned linked (closing)
+#     issues to that same owner (the PR's primary assignee, not the co-assigned
+#     community author), and
 #   - unrequests auto-assigned reviewers that cannot approve (e.g. bmillsNV).
 #
 # Status state machine (two variants that differ ONLY on a CI failure):
@@ -840,7 +843,7 @@ jobs:
                       author { login __typename }
                       assignees(first: 10) { nodes { login } }
                       reviewRequests(first: 20) { nodes { requestedReviewer { __typename ... on User { login } } } }
-                      closingIssuesReferences(first: 10) { nodes { assignees(first: 20) { nodes { login } } } }
+                      closingIssuesReferences(first: 10) { nodes { number assignees(first: 20) { nodes { login } } } }
                       files(first: 100) { nodes { path additions deletions } }
                       mergeQueueEntry { id }
                       latestOpinionatedReviews(first: 100) { nodes { state commit { oid } } }
@@ -894,11 +897,16 @@ jobs:
                 .map(n => n.requestedReviewer)
                 .filter(r => r && r.__typename === "User" && r.login)
                 .map(r => r.login);
+              const linkedIssues = [];
               const issueAssignees = [];
               for (const iss of (pr.closingIssuesReferences?.nodes || [])) {
-                for (const a of (iss.assignees?.nodes || [])) {
-                  if (a.login && !issueAssignees.includes(a.login))
-                    issueAssignees.push(a.login);
+                const issAssignees = (iss.assignees?.nodes || [])
+                  .map(a => a.login).filter(Boolean);
+                if (iss.number) {
+                  linkedIssues.push({ number: iss.number, assignees: issAssignees });
+                }
+                for (const login of issAssignees) {
+                  if (!issueAssignees.includes(login)) issueAssignees.push(login);
                 }
               }
               // PR's own changed-file LOC (path -> max(add, del)) for the
@@ -913,7 +921,7 @@ jobs:
                 ci: summarizeCi(runs), approved, changeRequested,
                 inMergeQueue: pr.mergeQueueEntry != null,
                 authorLogin, assignees, requestedReviewers, issueAssignees,
-                changedFiles,
+                linkedIssues, changedFiles,
               };
             }
 
@@ -1010,15 +1018,53 @@ jobs:
               return _maintainer;
             }
 
+            // The PR's primary owner assignee when it is already assigned. For a
+            // Community PR the owner is the assignee who is not the author (the
+            // co-assigned contributor); for Internal/Bot PRs it is the sole owner.
+            function primaryOwnerAssignee(info, source) {
+              if (!info.assignees.length) return null;
+              if (source === SOURCE_COMMUNITY && info.authorLogin) {
+                const owner = info.assignees.find(
+                  a => a.toLowerCase() !== info.authorLogin.toLowerCase());
+                if (owner) return owner;
+              }
+              return info.assignees[0];
+            }
+
+            // Assign each still-unassigned linked (closing) issue to the PR's owner.
+            // Idempotent: issues that already have an assignee are left alone.
+            async function syncLinkedIssueAssignees(ownerLogin, linkedIssues) {
+              if (!ownerLogin || !linkedIssues?.length) return;
+              for (const iss of linkedIssues) {
+                if (iss.assignees?.length) continue;
+                try {
+                  await github.rest.issues.addAssignees({
+                    owner: context.repo.owner, repo: context.repo.repo,
+                    issue_number: iss.number, assignees: [ownerLogin],
+                  });
+                  console.log(`assigned issue #${iss.number} -> ${ownerLogin}`);
+                } catch (error) {
+                  core.warning(
+                    `could not assign issue #${iss.number} (${error.status})`);
+                }
+              }
+            }
+
             // Backfill a PR's assignee + reviewers, replicating pr_sweep.py's
             // select_assignee_and_reviewers in full (issue-owner -> committer-signal
             // owner -> maintainer; reviewers = assignee + top dev-not-owner unless a
             // real reviewer is already requested). Internal PRs go to the author with
-            // no requested reviewer. Idempotent: only ever touches an UNASSIGNED PR,
-            // so re-running on any event is a no-op once an owner is set.
+            // no requested reviewer. PR assignment is idempotent: only ever touches an
+            // UNASSIGNED PR. Linked-issue assignment is also idempotent: only unassigned
+            // issues are updated, including when the PR was assigned earlier or the
+            // issue was linked later.
             async function reconcileAssignment(info, source, number) {
               if (!source) return;                     // Source unknown -> leave to sweep
-              if (info.assignees.length) return;        // already assigned
+              if (info.assignees.length) {
+                await syncLinkedIssueAssignees(
+                  primaryOwnerAssignee(info, source), info.linkedIssues);
+                return;                                  // PR already assigned
+              }
               if (info.inMergeQueue) return;            // far enough along
               if (info.isDraft && !info.isBot) return;  // human draft: author's "not ready"
 
@@ -1113,6 +1159,8 @@ jobs:
                     `could not request reviewers ${toRequest.join(", ")} (${error.status})`);
                 }
               }
+
+              await syncLinkedIssueAssignees(assignee, info.linkedIssues);
             }
 
             // Classify a PR's Source from observed state, mirroring the
