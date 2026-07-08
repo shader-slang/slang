@@ -153,32 +153,34 @@ static bool loadLibSlang(const char* libPath, LibSlang& out)
         return false;
     }
 #endif
-    out.createGlobalSession =
-        (CreateGlobalSessionFn)loadSymbol(lib, "slang_createGlobalSession");
+    out.createGlobalSession = (CreateGlobalSessionFn)loadSymbol(lib, "slang_createGlobalSession");
     if (!out.createGlobalSession)
     {
         printf("error: slang_createGlobalSession not found in %s\n", libPath);
         return false;
     }
-    out.reflGetParameterCount =
-        (decltype(&spReflection_GetParameterCount))loadSymbol(lib, "spReflection_GetParameterCount");
+    out.reflGetParameterCount = (decltype(&spReflection_GetParameterCount))loadSymbol(
+        lib,
+        "spReflection_GetParameterCount");
     out.reflGetParameterByIndex = (decltype(&spReflection_GetParameterByIndex))loadSymbol(
-        lib, "spReflection_GetParameterByIndex");
+        lib,
+        "spReflection_GetParameterByIndex");
     out.reflFindTypeByName =
         (decltype(&spReflection_FindTypeByName))loadSymbol(lib, "spReflection_FindTypeByName");
-    out.reflVarLayoutGetTypeLayout =
-        (decltype(&spReflectionVariableLayout_GetTypeLayout))loadSymbol(
-            lib, "spReflectionVariableLayout_GetTypeLayout");
+    out.reflVarLayoutGetTypeLayout = (decltype(&spReflectionVariableLayout_GetTypeLayout))
+        loadSymbol(lib, "spReflectionVariableLayout_GetTypeLayout");
     out.reflTypeLayoutGetFieldCount = (decltype(&spReflectionTypeLayout_GetFieldCount))loadSymbol(
-        lib, "spReflectionTypeLayout_GetFieldCount");
-    out.reflTypeLayoutGetFieldByIndex =
-        (decltype(&spReflectionTypeLayout_GetFieldByIndex))loadSymbol(
-            lib, "spReflectionTypeLayout_GetFieldByIndex");
+        lib,
+        "spReflectionTypeLayout_GetFieldCount");
+    out.reflTypeLayoutGetFieldByIndex = (decltype(&spReflectionTypeLayout_GetFieldByIndex))
+        loadSymbol(lib, "spReflectionTypeLayout_GetFieldByIndex");
     out.reflTypeLayoutGetElementTypeLayout =
         (decltype(&spReflectionTypeLayout_GetElementTypeLayout))loadSymbol(
-            lib, "spReflectionTypeLayout_GetElementTypeLayout");
-    out.reflTypeLayoutGetSize =
-        (decltype(&spReflectionTypeLayout_GetSize))loadSymbol(lib, "spReflectionTypeLayout_GetSize");
+            lib,
+            "spReflectionTypeLayout_GetElementTypeLayout");
+    out.reflTypeLayoutGetSize = (decltype(&spReflectionTypeLayout_GetSize))loadSymbol(
+        lib,
+        "spReflectionTypeLayout_GetSize");
     return true;
 }
 
@@ -580,10 +582,7 @@ static int runModuleGraph(
 // timed under its own names): load the graph from source once and write every
 // loaded module out with IModule::writeToFile; then a FRESH session re-loads
 // the root, letting import resolution pick the binaries.
-static int runModuleGraphBin(
-    const LibSlang& lib,
-    const std::string& dir,
-    const std::string& root)
+static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const std::string& root)
 {
     Timers timers;
 
@@ -669,8 +668,7 @@ static int runModuleGraphBin(
         }
         if (binary == 0)
         {
-            printf("error: no module resolved to a .slang-module binary (%d loaded)\n",
-                   (int)count);
+            printf("error: no module resolved to a .slang-module binary (%d loaded)\n", (int)count);
             return 1;
         }
     }
@@ -752,7 +750,8 @@ static int runSpecialize(const LibSlang& lib, const std::string& dir, const std:
         char implName[32];
         snprintf(implName, sizeof(implName), "Impl_%d", i);
         auto type = (slang::TypeReflection*)lib.reflFindTypeByName(
-            (SlangReflection*)moduleLayout, implName);
+            (SlangReflection*)moduleLayout,
+            implName);
         if (!type)
         {
             if (i == 0)
