@@ -415,9 +415,7 @@ static bool compileEntryPoint(
             diagnostics->release();
         if (SLANG_FAILED(res) || !code || !code->getBufferSize())
         {
-            printf(
-                "error: getEntryPointCode produced no code for %s\n",
-                moduleDisplayName(module));
+            printf("error: getEntryPointCode produced no code for %s\n", moduleDisplayName(module));
             return false;
         }
     }
