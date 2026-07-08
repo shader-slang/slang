@@ -173,7 +173,8 @@ jobs:
            --os "${{ inputs.os }}" \
            --platform "${{ inputs.platform }}" \
            --config "${{ inputs.config }}" \
-           --skip-file tests/expected-example-failure-github.txt
+           --skip-file tests/expected-example-failure-github.txt \
+           --allow-file tests/expected-example-diagnostics-allowlist.txt
       - name: Run slangc tests
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh

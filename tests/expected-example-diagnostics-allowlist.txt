@@ -1,0 +1,36 @@
+# Diagnostics that CI examples are currently expected to print.
+#
+# ci-examples.sh fails an example when it prints a Slang compiler diagnostic
+# (warning[...], error[...] or fatal error[...]), even at exit 0. The entries
+# below list the diagnostics we knowingly tolerate today, so the runner does
+# not flag them. Each entry uses the same pattern format as the skip file, with
+# an optional trailing diagnostic code:
+#   <os>:<platform>:<config>:<sample>[:<code>] # Reason
+# An entry with no <code> allowlists every diagnostic from that sample.
+#
+# Prefer fixing the underlying cause over adding entries here; each entry
+# should reference a tracking issue explaining why it cannot yet be removed.
+
+# cpu-com-example emits E41017 ("use of uninitialized global variable") for
+# 'globalDoThings', declared `export __global __extern_cpp IDoThings
+# globalDoThings;` in shader.slang. It is a host-provided extern global with no
+# in-module initializer by design (resolved at runtime via
+# findSymbolAddressByName), so the "uninitialized" warning is arguably a false
+# positive. A compiler-side follow-up to suppress E41017 for __extern_cpp /
+# export __global externally-provided globals is pending maintainer decision on
+# issue #11989; once fixed, remove this entry.
+linux:x86_64:(debug|release):cpu-com-example:E41017 # False positive on host-provided extern global; see #11989
+macos:aarch64:(debug|release):cpu-com-example:E41017 # False positive on host-provided extern global; see #11989
+
+# reflection-api emits E36108 ("dependencies not compatible on target") plus a
+# follow-on E39999 (import failed) and fatal error[E40003] (compilation ceased)
+# while reflecting raster-simple.slang. These fire at loadModule because 'llvm'
+# is auto-available as a capability-target atom whenever slang-llvm is linked,
+# independent of the example's DXIL/SPIRV targets, and Texture2D.Sample is
+# GPU-only. The example targets only DXIL/SPIRV, so this is arguably a spurious
+# llvm-target check during reflection-only module loading. A compiler-side
+# follow-up is pending maintainer decision on issue #11989; once fixed, remove
+# these entries. Allowlisted at sample scope because the diagnostics arrive as a
+# cascade of related codes from the same root cause.
+linux:x86_64:(debug|release):reflection-api # llvm-target capability check during reflection-only loadModule; see #11989
+macos:aarch64:(debug|release):reflection-api # llvm-target capability check during reflection-only loadModule; see #11989
