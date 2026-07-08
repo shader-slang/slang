@@ -303,7 +303,10 @@ jobs:
         with:
           name: sanitizer-binaries
           path: sanitizer-binaries.tar.gz
-          retention-days: 14
+          # The tarball is ~226 MB and each nightly supersedes the previous
+          # one; 3 days bounds the rolling footprint to ~0.7 GB while still
+          # covering a failed nightly or two.
+          retention-days: 3
           if-no-files-found: error
 
       - name: Sanitizer Summary
