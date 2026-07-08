@@ -6,15 +6,13 @@
 
 #if defined(GENERIC_MEMBER)
 
-// --- generic member accessor returning `none` (regression for #7878) ---
-// The `Optional<T>` return type is checked once with T abstract, so the
-// front-end opaque-handle guard passes; the concrete `Optional<Texture2D>`
-// only materializes during IR generic specialization. The diagnostic must
-// fire there (E41037, the IR-layer variant of E30902), otherwise SPIR-V emit
-// hits an unhandled `defaultConstruct` (E99997 internal error). This shape
-// must reach IR lowering, so it lives in its own compilation unit with no
-// front-end errors that would halt the compiler first. The `--> ...:line:col`
-// checks pin each error to the exact `none` it is reported against.
+// A generic member accessor's `none` escapes the front-end guard (T is abstract there), so the
+// concrete opaque payload must be caught during IR specialization or SPIR-V emit ICEs on E99997.
+
+struct StructWithOptionalTexture<T>
+{
+    Optional<T> maybeItem;
+}
 
 struct TextureHolder<T>
 {
@@ -23,35 +21,32 @@ struct TextureHolder<T>
     __subscript()->Optional<T> { get { return none; } }
     // CHECK_GEN-DAG: {{.*}}optional-resource-type.slang:[[# @LINE+1]]
     Optional<T> getNone() { return none; }
-    // A nested `Optional<Optional<T>>` payload is also opaque: `isOpaqueType`
-    // does not recurse through `IROptionalType`, so the check must peel the
-    // Optional layers before testing the leaf, or this `none` slips through to
-    // the same `defaultConstruct` ICE.
+    // Nested `Optional<Optional<T>>`: the opaque check must recurse through Optional layers.
     // CHECK_GEN-DAG: {{.*}}optional-resource-type.slang:[[# @LINE+1]]
     Optional<Optional<T>> getNestedNone() { return none; }
+    // Opaque check must recurse through both a struct and its inner `Optional` to the opaque leaf.
+    // CHECK_GEN-DAG: {{.*}}optional-resource-type.slang:[[# @LINE+1]]
+    Optional<StructWithOptionalTexture<T>> getStructNone() { return none; }
 }
 
 [vk::binding(0, 1)] TextureHolder<Texture2D> gHolderSubscript;
 [vk::binding(1, 1)] TextureHolder<Texture2D> gHolderMethod;
 [vk::binding(2, 1)] TextureHolder<Texture2D> gHolderNested;
+[vk::binding(3, 1)] TextureHolder<Texture2D> gHolderStruct;
 
 [shader("fragment")]
 float4 fs_main() : SV_Target
 {
-    // Force specialization of all three accessors of TextureHolder<Texture2D>
-    // and use the payload, so the specialized `MakeOptionalNone` survives to
-    // the post-specialization check (mirrors the original repro, which loaded
-    // through the optional's payload). Each E41037 is pinned to its source
-    // `none` by the `-->` locator checks above; the three header checks here
-    // are order-independent (`-DAG`) and require three distinct occurrences,
-    // asserting exactly the three expected errors regardless of emit order.
+    // Use each accessor's payload so every `MakeOptionalNone` survives to the post-specialization check.
+    // CHECK_GEN-DAG: error[E41037]
     // CHECK_GEN-DAG: error[E41037]
     // CHECK_GEN-DAG: error[E41037]
     // CHECK_GEN-DAG: error[E41037]
     float4 a = gHolderSubscript[].value.Load(int3(0));
     float4 b = gHolderMethod.getNone().value.Load(int3(0));
     float4 c = gHolderNested.getNestedNone().value.value.Load(int3(0));
-    return a + b + c;
+    float4 d = gHolderStruct.getStructNone().value.maybeItem.value.Load(int3(0));
+    return a + b + c + d;
 }
 
 #elif !defined(NEGATIVE)
@@ -104,9 +99,7 @@ float withStructResource(Optional<WithResource> s) { return 0.0; }
 // CHECK: error[E30902]
 Optional<WithResource> gStructResource;
 
-// --- generic specialization ---
-// process<T> is valid at declaration; the error fires at the call site when
-// T is specialized to an opaque type.
+// --- generic specialization: valid at declaration, error fires at the opaque call site ---
 
 void process<T>(Optional<T> value) {}
 
@@ -122,8 +115,7 @@ void main(RWStructuredBuffer<float> buffer)
 
 #else
 
-// Negative: Optional<T> with non-resource types must not produce a diagnostic,
-// from either the front-end (E30902) or the post-specialization IR check (E41037).
+// Negative: non-resource payloads must produce no diagnostic from either layer.
 // CHECK_NEG-NOT: error[E30902]
 // CHECK_NEG-NOT: error[E41037]
 
@@ -133,9 +125,7 @@ float withInt(Optional<int> x) { return x.hasValue ? float(x.value) : 0.0; }
 struct MyStruct { float v; };
 float withStruct(Optional<MyStruct> x) { return x.hasValue ? x.value.v : 0.0; }
 
-// A generic member accessor returning `none` for a NON-opaque payload must reach
-// IR specialization and lowering without firing E41037 (guards against the IR
-// opaque test being broader than the language rule).
+// A generic member accessor with a non-opaque payload must specialize and lower without E41037.
 struct NonOpaqueHolder<T>
 {
     T item;

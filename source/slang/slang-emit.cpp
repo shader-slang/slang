@@ -1375,9 +1375,16 @@ Result linkAndOptimizeIR(
     // Check for invalid Optional usage (accessing .value on an always-none Optional, and
     // `none` of an opaque-payload Optional). This must run after simplifyIR (which eliminates
     // dead branches that might access a none value) but before lowerOptionalType (which removes
-    // IRMakeOptionalNone instructions).
-    if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())
-        SLANG_PASS(checkForInvalidOptionalUsage, sink);
+    // IRMakeOptionalNone instructions). It runs unconditionally: the opaque-payload check
+    // prevents an unlowerable `defaultConstruct` from reaching the backend as an internal error,
+    // so on a diagnostic we must stop before lowerOptionalType synthesizes it. Only the
+    // always-none `.value` check is gated by the non-essential-validation option.
+    SLANG_PASS(
+        checkForInvalidOptionalUsage,
+        sink,
+        targetProgram->getOptionSet().shouldRunNonEssentialValidation());
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
     if (requiredLoweringPassSet.optionalType)
         SLANG_PASS(lowerOptionalType, sink);

@@ -251,6 +251,16 @@ bool isOpaqueTypeImpl(IRType* type, HashSet<IRType*>& visited, IRType** outLeafO
         }
     }
 
+    // An `Optional<T>` is opaque when its (transitively) contained value type is,
+    // since lowering must synthesize a placeholder value of that type for `none`.
+    if (auto optionalType = as<IROptionalType>(type))
+    {
+        if (isOpaqueTypeImpl(optionalType->getValueType(), visited, outLeafOpaqueHandleType))
+        {
+            return true;
+        }
+    }
+
     return false;
 }
 

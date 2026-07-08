@@ -8,13 +8,16 @@
 namespace Slang
 {
 
-static void checkForInvalidOptionalUsage(IRFunc* func, DiagnosticSink* sink)
+static void checkForInvalidOptionalUsage(
+    IRFunc* func,
+    DiagnosticSink* sink,
+    bool runNonEssentialValidation)
 {
     for (auto block : func->getBlocks())
     {
         for (auto inst : block->getChildren())
         {
-            if (inst->getOp() == kIROp_GetOptionalValue &&
+            if (runNonEssentialValidation && inst->getOp() == kIROp_GetOptionalValue &&
                 inst->getOperand(0)->getOp() == kIROp_MakeOptionalNone)
             {
                 sink->diagnose(Diagnostics::AccessingValueOfNoneOptional{
@@ -24,18 +27,17 @@ static void checkForInvalidOptionalUsage(IRFunc* func, DiagnosticSink* sink)
             }
             else if (auto noneInst = as<IRMakeOptionalNone>(inst))
             {
-                // A `none` whose (possibly nested) Optional payload is opaque cannot be
-                // lowered; the front-end guard E30902 misses it when the payload is a
-                // still-abstract generic parameter, so diagnose here post-specialization.
+                // A `none` of an opaque-payload Optional cannot be lowered (E30902's
+                // front-end guard misses it when the payload is a still-abstract generic
+                // parameter). This runs unconditionally to prevent an unlowerable
+                // `defaultConstruct` from reaching the backend as an internal error.
                 if (auto optType = as<IROptionalType>(noneInst->getDataType()))
                 {
-                    IRType* valueType = optType->getValueType();
-                    while (auto innerOptional = as<IROptionalType>(valueType))
-                        valueType = innerOptional->getValueType();
-                    if (isOpaqueType(valueType, nullptr))
+                    IRType* opaqueLeaf = nullptr;
+                    if (isOpaqueType(optType->getValueType(), &opaqueLeaf))
                     {
                         sink->diagnose(Diagnostics::OptionalCannotWrapResourceTypeIr{
-                            .type = valueType,
+                            .type = opaqueLeaf,
                             .location = noneInst->sourceLoc,
                         });
                     }
@@ -45,21 +47,24 @@ static void checkForInvalidOptionalUsage(IRFunc* func, DiagnosticSink* sink)
     }
 }
 
-void checkForInvalidOptionalUsage(IRModule* module, DiagnosticSink* sink)
+void checkForInvalidOptionalUsage(
+    IRModule* module,
+    DiagnosticSink* sink,
+    bool runNonEssentialValidation)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
         switch (globalInst->getOp())
         {
         case kIROp_Func:
-            checkForInvalidOptionalUsage(as<IRFunc>(globalInst), sink);
+            checkForInvalidOptionalUsage(as<IRFunc>(globalInst), sink, runNonEssentialValidation);
             break;
         case kIROp_Generic:
             {
                 auto generic = as<IRGeneric>(globalInst);
                 auto innerFunc = as<IRFunc>(findGenericReturnVal(generic));
                 if (innerFunc)
-                    checkForInvalidOptionalUsage(innerFunc, sink);
+                    checkForInvalidOptionalUsage(innerFunc, sink, runNonEssentialValidation);
                 break;
             }
         default:

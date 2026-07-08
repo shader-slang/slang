@@ -4970,7 +4970,6 @@ err(
     span { loc = "location", message = "accessing .value on an Optional<~type:IRInst> that is always 'none'" }
 )
 
--- IR-layer variant of E30902, for opaque payloads that reach IR only after generic specialization.
 err(
     "optional-cannot-wrap-resource-type-ir",
     41037,
