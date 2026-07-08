@@ -182,15 +182,22 @@ def run_once(cmd):
 # hosts that lack it. Release tarballs bundle these, so they usually don't fire.
 _BENIGN = ("E00100", "E52002", "spirv-opt", "spirv-dis", "slang-glslang",
            "failed to load downstream", "pass-through compiler not found")
+# For downstream_required workloads a missing downstream compiler is THE
+# failure being guarded against, not noise: slangc can emit its internal
+# timers before the downstream handoff, so without this the run would record
+# timers and report OK with no DXIL/PTX ever produced. Only genuinely
+# irrelevant tool noise stays benign.
+_BENIGN_DOWNSTREAM_REQUIRED = ("E52002", "spirv-opt", "spirv-dis", "slang-glslang")
 # Matches both the modern "error[E30015]:" and the legacy "error 30015:" formats.
 _ERR_RE = re.compile(r"error\[|: error:|\berror \d+:")
 
 
-def real_error(text):
+def real_error(text, benign=_BENIGN):
     """A genuine compile error in either the modern or legacy slangc format,
-    ignoring benign missing-downstream-tool diagnostics."""
+    ignoring the given benign diagnostics (by default, missing-downstream-tool
+    noise; downstream_required workloads pass a stricter set)."""
     for line in text.splitlines():
-        if _ERR_RE.search(line) and not any(b in line for b in _BENIGN):
+        if _ERR_RE.search(line) and not any(b in line for b in benign):
             return line.strip()
     return None
 
@@ -217,6 +224,9 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
             rc = 1
         if rc != 0:
             setup_ok = False
+
+    benign = (_BENIGN_DOWNSTREAM_REQUIRED
+              if getattr(spec, "downstream_required", False) else _BENIGN)
 
     timed = cmds["timed"]
     for _ in range(warmup):
@@ -249,12 +259,12 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
         walls.append(wall)
         if rss is not None:
             rsses.append(rss)
-        err = real_error(text)
+        err = real_error(text, benign)
         sample_ok.append(err is None)  # ok when no compile error
         for name, ms in parse_timers(text).items():
             per_timer.setdefault(name, []).append(ms)
 
-    err = real_error(last_text)
+    err = real_error(last_text, benign)
     got_timers = bool(per_timer)
     ok = setup_ok and got_timers and all(sample_ok) and not crash_codes
 

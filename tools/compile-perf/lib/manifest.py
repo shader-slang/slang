@@ -44,8 +44,13 @@ class WorkloadSpec:
     # needing a platform-bound downstream toolchain (dxc, nvrtc) set this;
     # bench.py excludes them from the DEFAULT set elsewhere but still runs
     # them when named explicitly in --only, failing loudly if the tool is
-    # genuinely absent.
+    # genuinely absent (downstream_required below is what enforces that).
     platforms: list = None
+    # The workload's number is meaningless without its downstream compiler:
+    # missing-downstream diagnostics (E00100 etc.), which bench.py normally
+    # treats as benign, fail this workload instead — otherwise a host without
+    # the toolchain would record Slang-internal timers and report OK.
+    downstream_required: bool = False
 
 
 # Standard target invocation avoids GPU drivers and stays comparable across
@@ -293,6 +298,7 @@ WORKLOADS = [
         extra_flags=["-target", "dxil", "-profile", "sm_6_6"],
         primary_timers=["generateOutput", "compileInner"],
         platforms=["win32"],
+        downstream_required=True,
     ),
     WorkloadSpec(
         name="codegen_ptx",
@@ -303,6 +309,7 @@ WORKLOADS = [
         extra_flags=["-target", "ptx"],
         primary_timers=["generateOutput", "compileInner"],
         platforms=["win32"],
+        downstream_required=True,
     ),
     # ---- complexity ladder: realistic mixed shader, simple -> complex ------
     # Sweep this to see the holistic compile-time curve as a representative
