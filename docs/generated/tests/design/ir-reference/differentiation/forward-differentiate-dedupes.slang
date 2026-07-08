@@ -35,9 +35,10 @@ void main()
 }
 
 // Two __fwd_diff(f) source references dedupe: both call sites in
-// `func %main` route through the same hoistable `%fwdx5Fdiff`
+// `func %main` route through the same hoistable `%fx5Ffwdx5Fdiff`
 // callee, which is the single `ForwardDifferentiate(%f)` binding.
-// CHECK: ForwardDifferentiate(%f)
+// CHECK: %fx5Ffwdx5Fdiff
+// CHECK-SAME: ForwardDifferentiate(%f)
 // CHECK: func %main
-// CHECK: call %fwdx5Fdiff
-// CHECK: call %fwdx5Fdiff
+// CHECK: call %fx5Ffwdx5Fdiff
+// CHECK: call %fx5Ffwdx5Fdiff

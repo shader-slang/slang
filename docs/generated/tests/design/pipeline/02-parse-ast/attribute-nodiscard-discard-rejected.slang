@@ -25,7 +25,6 @@ int produce()
 void main()
 {
     produce();
-//CHECK: E30059
-//CHECK: result of '[NoDiscard]' function is discarded
-//CHECK: the result of calling 'produce' is discarded; this function is marked '[NoDiscard]'.
+//CHECK:   ^ error E30059
+//CHECK:   ^ the result of calling 'produce' is discarded; this function is marked '[NoDiscard]'.
 }

@@ -16,7 +16,8 @@
 // nesting in the serialized IR — a struct containing fields and a
 // member function, and a generic whose inner function sits under the
 // generic container. Dumping the reloaded module and finding all the
-// nested symbols' name hints shows each child landed under a parent
+// nested symbols' name hints (the member function's hint is the
+// qualified "Pair.sum") shows each child landed under a parent
 // rather than being lost or flattened.
 
 //TEST:COMPILE: docs/generated/tests/design/cross-cutting/serialization/module-roundtrip-rebuilds-nested-children.slang -o docs/generated/tests/design/cross-cutting/serialization/module-roundtrip-rebuilds-nested-children.slang-module
@@ -45,5 +46,5 @@ public T pickFirst<T>(T x, T y, bool takeFirst)
 // CHECK-DAG: [nameHint("Pair")]
 // CHECK-DAG: [nameHint("first")]
 // CHECK-DAG: [nameHint("second")]
-// CHECK-DAG: [nameHint("sum")]
+// CHECK-DAG: [nameHint("Pair.sum")]
 // CHECK-DAG: [nameHint("pickFirst")]

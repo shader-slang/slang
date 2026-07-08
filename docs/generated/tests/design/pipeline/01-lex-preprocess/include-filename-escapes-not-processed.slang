@@ -18,6 +18,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 #include "no-such-dir\x41-missing.slang.h"
+//CHECK: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ include file not found
+//CHECK: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ failed to find include file 'no-such-dir\x41-missing.slang.h'
 // CHECK: E15300
 // CHECK: no-such-dir\x41-missing.slang.h
 

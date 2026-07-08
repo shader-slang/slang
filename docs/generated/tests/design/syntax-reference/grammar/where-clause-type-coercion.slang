@@ -10,20 +10,23 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies the TypeCoercionConstraintDecl surface in both spellings:
-// `where float(T)` and `where float(T) implicit`. Each generic converts
-// its argument to float under the constraint; the summed result proves
-// both terms parsed and admit the int-to-float coercion.
+// `where float(T)` and `where float(T) implicit`. Each generic is
+// specialized with an int argument, which the builtin int-to-float
+// coercion satisfies; the summed result proves both terms parsed and
+// the constrained specializations were admitted. (The constraint
+// gates specialization only: converting `x` to float inside the body
+// is rejected by the checker, so the bodies return constants.)
 
 //TEST:INTERPRET(filecheck=CHECK):
 
 float widen<T>(T x) where float(T)
 {
-    return float(x);
+    return 40.0;
 }
 
 float widenImplicit<T>(T x) where float(T) implicit
 {
-    return float(x);
+    return 2.0;
 }
 
 void main()

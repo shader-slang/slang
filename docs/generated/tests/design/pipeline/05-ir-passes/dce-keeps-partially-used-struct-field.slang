@@ -13,9 +13,12 @@
 // `.live`. The post-link DCE / SSA-simplification pipeline collapses
 // the dead store on SPIR-V — the literal `4242` does not survive.
 // (HLSL emit keeps the dead store visible textually; this test pins
-// only the SPIR-V boundary.)
+// only the SPIR-V boundary.) The optimization level is pinned to -O1
+// (slangc's default) because slang-test injects -O0 into compiler
+// tests that do not name a level, and -O0 deliberately keeps the
+// dead store.
 
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -stage compute -entry main
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -stage compute -entry main -O1
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

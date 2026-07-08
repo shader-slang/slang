@@ -24,6 +24,8 @@ internal struct Hidden : IDifferentiable
 }
 
 public Hidden.Differential expose(Hidden.Differential d)
+//CHECK:                   ^^^^^^ references less visible type
+//CHECK:                   ^^^^^^ 'expose' references less visible type 'Hidden'.
 // CHECK: E30604
 {
     return d;

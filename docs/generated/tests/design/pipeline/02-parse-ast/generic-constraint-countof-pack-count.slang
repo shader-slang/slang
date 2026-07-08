@@ -20,7 +20,7 @@
 int sumExactly<let N : int, each T>(expand each T args) where countof(T) == N where T == int
 {
     int total = 0;
-    expand(total += each args);
+    expand(total = total + (each args));
     return total;
 }
 

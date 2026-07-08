@@ -14,7 +14,7 @@
 // `continue` must trigger the parser's unexpected-token diagnostic
 // E20001 where a `;` was required.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 void main()
 {

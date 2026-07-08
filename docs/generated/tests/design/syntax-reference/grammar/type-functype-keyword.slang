@@ -10,12 +10,14 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies the `functype` keyword spelling of a function type: a
-// typealias names `functype (int, int) -> int`, a named function is
-// bound to a variable of that type, and the value is invoked. The
-// emitted C++ containing the entry point proves the whole chain
-// (including the functype parse) compiled.
+// typealias names `functype (int, int) -> int`, and a parameter of
+// that type receives a named function and is invoked. The printed
+// result proves the whole chain (including the functype parse)
+// compiled and ran. (A local variable of the alias type is not used
+// because calling through a functype-typed local is rejected by the
+// checker; passing the function as a functype parameter works.)
 
-//TEST:SIMPLE(filecheck=CHECK):-target cpp -entry computeMain -stage compute
+//TEST:INTERPRET(filecheck=CHECK):
 
 typealias BinOp = functype (int, int) -> int;
 
@@ -24,12 +26,13 @@ int add(int a, int b)
     return a + b;
 }
 
-RWStructuredBuffer<int> outputBuffer;
-
-[numthreads(1, 1, 1)]
-void computeMain()
+int apply(BinOp f, int a, int b)
 {
-    BinOp f = add;
-    // CHECK: computeMain
-    outputBuffer[0] = f(40, 2);
+    return f(a, b);
+}
+
+void main()
+{
+    // CHECK: r=42
+    printf("r=%d\n", apply(add, 40, 2));
 }

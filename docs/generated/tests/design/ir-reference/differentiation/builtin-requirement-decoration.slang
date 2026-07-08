@@ -14,9 +14,9 @@
 // helper scans, instead of relying on entry position). The dump prints
 // decorations bracketed above the decorated inst, so an ordered CHECK
 // pins a `[BuiltinRequirement...]` decoration line followed by the
-// `= BuiltinRequirementKey(` definition it decorates; the bracket
-// prefix keeps the first pattern from matching the definition line
-// itself.
+// `= builtinRequirementKey(` definition it decorates (the opcode's
+// dump name); the bracket prefix keeps the first pattern from
+// matching the definition line itself.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
@@ -38,4 +38,4 @@ void main()
 // The decoration line precedes the key definition it marks, so plain
 // ordered CHECKs are the property under test here (not CHECK-DAG).
 // CHECK: [BuiltinRequirement
-// CHECK: = BuiltinRequirementKey(
+// CHECK: = builtinRequirementKey(

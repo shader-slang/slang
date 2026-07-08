@@ -19,7 +19,7 @@
 int sumAll<each T>(expand each T args) where nonempty(T) where T == int
 {
     int total = 0;
-    expand(total += each args);
+    expand(total = total + (each args));
     return total;
 }
 

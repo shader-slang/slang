@@ -12,9 +12,11 @@
 // Verifies the restructured C++ host table row: `SLANG_HOST_CPP_SOURCE` is
 // the one host target that still flows through the C++ emit backend as
 // text (the binary/host-callable siblings moved to a separate row and are
-// downstream-compiled). Compiling a module with an `__extern_cpp` function
-// under `-target host-cpp` must therefore yield C++ source; the CHECK
-// asserts the function's unmangled name appears in the emitted text.
+// downstream-compiled). Compiling under `-target host-cpp` must therefore
+// yield C++ source text; an entry point referencing an `__extern_cpp`
+// function gives codegen a live program to emit, and the CHECK asserts
+// the function's unmangled name appears (with a C++ parameter list) in
+// the emitted text.
 
 //TEST:SIMPLE(filecheck=CHECK):-target host-cpp
 
@@ -23,4 +25,14 @@ __extern_cpp int hostAccumulate(int a, int b)
     return a + b;
 }
 
-// CHECK: hostAccumulate
+RWStructuredBuffer<int> buf;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main()
+{
+    buf[0] = hostAccumulate(1, 2);
+}
+
+// CHECK: hostAccumulate(int32_t
+// CHECK: hostAccumulate(int(1), int(2))

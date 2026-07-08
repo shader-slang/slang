@@ -17,8 +17,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 void reversed<let N : int, each T>() where N == countof(T)
-//CHECK: E30437
-//CHECK: pack-count constraint must be written with `countof(...)` on the left side
-//CHECK: write this constraint as `countof(Pack) == IntExpr`
+//CHECK:                                        ^^^^^^^ error E30437
+//CHECK:                                        ^^^^^^^ write this constraint as `countof(Pack) == IntExpr`
 {
 }

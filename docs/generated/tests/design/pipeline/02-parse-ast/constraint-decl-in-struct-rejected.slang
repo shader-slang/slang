@@ -24,7 +24,6 @@ interface IFoo
 struct Bad
 {
     __constraint int : IFoo;
-//CHECK: E30102
-//CHECK: declaration not allowed
-//CHECK: GenericTypeConstraintDecl is not allowed here.
+//CHECK:             ^ error E30102
+//CHECK:             ^ GenericTypeConstraintDecl is not allowed here.
 }

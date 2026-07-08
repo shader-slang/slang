@@ -12,9 +12,9 @@
 // Verifies that an accessor block rejects a name outside the
 // documented get/set/ref set. `modify` is used as the probe (it is
 // not in the current AccessorName production), and the parser must
-// emit its unexpected-token diagnostic E20001 on it.
+// emit its unexpected-token diagnostic E20003 on it.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 struct S
 {
@@ -23,8 +23,8 @@ struct S
     property val : int
     {
         modify { return v; }
-        //CHECK: error
-        //CHECK: E20001
+//CHECK:^^^^^^ error E20003
+//CHECK:^^^^^^ unexpected identifier
     }
 }
 

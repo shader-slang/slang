@@ -15,10 +15,15 @@
 // the rendered code E30202 and the span message with the call-site-supplied
 // ~decl name and ~newReturnType/~prevReturnType typed parameters filled in
 // as quoted type names, proving the declaration form reaches the user.
+// The companion "see previous declaration" note on the first declaration
+// is annotated in place so the exhaustive diagnostic check stays intact.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 int getValue(int x);
+/*CHECK:
+    ^^^^^^^^ see previous declaration of 'getValue'
+*/
 
 float getValue(int x);
 //CHECK: E30202

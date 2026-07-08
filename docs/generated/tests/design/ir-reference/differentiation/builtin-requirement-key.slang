@@ -14,8 +14,9 @@
 // (AST origin "(lowering)", not an autodiff-pass product). A
 // `[ForwardDifferentiable]` function pulls the IDifferentiable
 // machinery into the module; CHECK matches the key inst's definition
-// spelling `= BuiltinRequirementKey(`, which only a lowering-assigned
-// built-in key produces (an ordinary requirement key dumps as `key`).
+// spelling `= builtinRequirementKey(` (the opcode's dump name), which
+// only a lowering-assigned built-in key produces (an ordinary
+// requirement key dumps as `key`).
 // The bare opcode substring cannot false-positive elsewhere in the
 // large autodiff preamble.
 
@@ -36,4 +37,4 @@ void main()
     buf[0] = __fwd_diff(g)(DifferentialPair<float>(a, 1.0)).d;
 }
 
-// CHECK: = BuiltinRequirementKey(
+// CHECK: = builtinRequirementKey(

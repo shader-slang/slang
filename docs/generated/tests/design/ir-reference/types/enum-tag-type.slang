@@ -9,11 +9,12 @@
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies EnumDecl lowering produces the Enum parent opcode carrying the
+// Verifies EnumDecl lowering produces the Enum opcode carrying the
 // underlying integer tag type as its operand. A two-case enum is selected
 // at runtime and its value stored through an int cast so the type is used;
-// IR asserts the dump contains the named `Enum %Color` inst with the
-// default Int tag type on its inst line.
+// the Enum type is hoistable, so the dump prints it inline as `Enum(Int)`
+// at each use site (e.g. in the synthesized members' signatures), which
+// pins both the opcode and its single default-Int tag-type operand.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 
@@ -33,5 +34,4 @@ void main()
     buf[0] = int(c);
 }
 
-// IR: Enum %Color
-// IR-SAME: Int
+// IR: Enum(Int)

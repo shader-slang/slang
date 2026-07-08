@@ -13,8 +13,9 @@
 // character: writing a second `"` immediately after the `R"` opener
 // (so the would-be delimiter begins with `"`) must be diagnosed
 // instead of being folded into the delimiter text. The CHECK pins
-// code E10010 so the failure mode is the documented rejection, not
-// some downstream unterminated-literal error.
+// code E10010 so the failure mode is the documented rejection; the
+// rejected literal then runs to end of file, so the follow-on
+// end-of-file-in-literal diagnostic is annotated too.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
@@ -22,4 +23,5 @@ void main()
 {
     let s = R""(x)";
 //CHECK: E10010
+//CHECK: end of file in literal
 }

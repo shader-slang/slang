@@ -21,4 +21,5 @@
 // CHECK: newline in literal
 
 String s = "unterminated
+//CHECK:                ^ newline in literal
 ;

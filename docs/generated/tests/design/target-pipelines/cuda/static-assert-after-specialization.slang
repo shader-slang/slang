@@ -13,10 +13,10 @@
 // row 63): the assertion condition `N > 0` names a generic value
 // parameter, so it can only be evaluated once specializeModule has
 // substituted the concrete argument. Instantiating with N=4 satisfies
-// the condition; the CHECK asserts the kernel emits (with the folded
-// literal reaching the store), which is only possible if the
-// static_assert was checked against the specialized value rather than
-// rejected pre-specialization.
+// the condition; the CHECKs assert the specialized function body holds
+// the folded literal `int(4)` and that the kernel definition follows,
+// which is only possible if the static_assert was checked against the
+// specialized value rather than rejected pre-specialization.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cuda -entry main -stage compute
 
@@ -35,5 +35,7 @@ void main(uint3 tid : SV_DispatchThreadID)
     outBuf[tid.x] = pickPositive<4>() + int(tid.x);
 }
 
-// CHECK: extern "C" __global__ void main
+// The specialized function (carrying the folded literal) is emitted
+// before the kernel in the CUDA output, so the CHECKs follow that order.
 // CHECK: int(4)
+// CHECK: extern "C" __global__ void main

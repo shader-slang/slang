@@ -10,7 +10,8 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies the `throws` clause position in a `func` header:
-// `func half(x : int) throws HalfErr -> int`. The success path is
+// `func halveIt(x : int) throws HalfErr -> int` (named to avoid the
+// builtin `half` type, which would shadow the call). The success path is
 // exercised through `try` inside a `do ... catch`, so the observed 42
 // proves both the header parsed and the callable is usable.
 // (Exception semantics are unreliable under INTERPRET, so this runs
@@ -24,7 +25,7 @@ enum HalfErr
     Odd
 }
 
-func half(x : int) throws HalfErr -> int
+func halveIt(x : int) throws HalfErr -> int
 {
     if ((x & 1) != 0)
     {
@@ -41,7 +42,7 @@ void computeMain()
     int r;
     do
     {
-        r = try half(84);
+        r = try halveIt(84);
     }
     catch (e : HalfErr)
     {
