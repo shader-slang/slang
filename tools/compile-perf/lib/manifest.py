@@ -372,6 +372,33 @@ WORKLOADS = [
         api_root="spec_root",
         primary_timers=["apiSpecialize", "apiLink", "apiGetCode", "apiTotal"],
     ),
+    # ---- rt_renderer: generated renderer-shaped corpus (DESIGN.md Phase 2) --
+    # Few×HEAVY programs over a ~100-module utility/scene/material library
+    # behind IMaterial/IBSDF interfaces — the real-application shape where each
+    # program pays the whole library's import cost. n = material count.
+    WorkloadSpec(
+        name="rt_renderer",
+        bucket="rt_renderer",
+        gen=workloads.gen_rt_renderer,
+        default_size=24,
+        mode="api",
+        api_cmd="rt-composite",
+        api_root="rt_kernels",
+        primary_timers=["apiTotal", "apiLoadModule", "apiGetCode"],
+    ),
+    # One compute-kernel variant per material via IEntryPoint::specialize —
+    # link-time specialization against interface-heavy cross-module code.
+    WorkloadSpec(
+        name="rt_renderer_specialize",
+        bucket="rt_renderer",
+        gen=workloads.gen_rt_renderer,
+        default_size=24,
+        mode="api",
+        api_cmd="specialize",
+        api_root="rt_compute",
+        api_flags=["--impl-prefix", "Material_"],
+        primary_timers=["apiTotal", "apiGetCode", "apiSpecialize"],
+    ),
     # ---- real-shader corpus ----------------------------------------------
     WorkloadSpec(
         name="mdl_dxr",

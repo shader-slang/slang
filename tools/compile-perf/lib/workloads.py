@@ -717,9 +717,216 @@ def gen_api_specialize(n):
 
 
 # --------------------------------------------------------------------------- #
-# Real-shader corpus (not generated). Copy corpus files into corpus/<name>/
-# before running the suite (CI does this via actions/checkout of MDL-SDK).
+# rt_renderer: a generated renderer-shaped corpus (DESIGN.md Phase 2).
+#
+# Replicates the shape of a real application's shader library — the internal
+# benchmark whose regression sensitivity motivated the api workloads compiles
+# ~10-25 programs per test, each importing a ~160-module / ~28k-line renderer
+# library (utility/scene/material layers, interface-driven materials), which
+# makes every program a few-hundred-ms compile: few×HEAVY, where
+# api_many_kernels is many×tiny. Being generated, the corpus is deterministic
+# (same n -> identical bytes): no external checkout, no license surface, no
+# pinning, and no corpus-drift resyncs.
 # --------------------------------------------------------------------------- #
+
+# Library shape constants: ~48 utility + 24 scene + n material modules + base +
+# entry-point roots. With the default n=24 that is ~100 modules and around the
+# internal library's line count once each module's body is realistic.
+_RT_UTILS = 48
+_RT_SCENE = 24
+
+
+def _rt_util_module(i):
+    """One utility-layer module: original math/sampling helpers with a couple
+    of imports from earlier utility modules so the layer forms a DAG."""
+    imports = []
+    calls = []
+    if i > 0:
+        a = (i * 7 + 1) % i
+        imports.append(f"import rutil_{a};\n")
+        calls.append(f"    r += util_hash_{a}(r.x + {i}.0) * 0.125;\n")
+    if i > 1:
+        b = (i * 13 + 5) % i
+        if f"import rutil_{b};\n" not in imports:
+            imports.append(f"import rutil_{b};\n")
+            calls.append(f"    r = util_warp_{b}(r * 0.99{i % 10});\n")
+    c1, c2, c3 = 1.0 + (i % 89) / 100.0, (i % 31) / 10.0, 1.0 + (i % 7) / 8.0
+    return (
+        _HEADER
+        + f"module rutil_{i};\nimport rutil_base;\n" + "".join(imports) + "\n"
+        + f"public float3 util_hash_{i}(float x)\n{{\n"
+        + f"    float3 v = float3(x * {c1}, x + {c2}, x - {c3});\n"
+        + "    v = frac(sin(v * 127.1) * 43758.5453);\n"
+        + "    return v;\n}\n\n"
+        + f"public float3 util_warp_{i}(float3 s)\n{{\n"
+        + f"    float a = s.x * {c1} + s.y * {c2};\n"
+        + "    float b = sqrt(max(1.0 - a * a, 0.0));\n"
+        + f"    float3 r = float3(b * cos(s.z * {c3}), b * sin(s.z * {c3}), a);\n"
+        + "".join(calls)
+        + "    return normalize(r + 1e-5);\n}\n\n"
+        + f"public float util_lum_{i}(float3 c)\n{{\n"
+        + f"    return dot(c, float3(0.2126, 0.7152, 0.0722)) * {c3};\n}}\n"
+    )
+
+
+def _rt_scene_module(i, n_utils):
+    """One scene-layer module (lights/camera/intersection helpers) importing a
+    handful of utility modules and, above layer 0, earlier scene modules."""
+    us = sorted({(i * 5 + k * 11) % n_utils for k in range(3)})
+    imports = "".join(f"import rutil_{u};\n" for u in us)
+    prev = f"import rscene_{i - 1};\n" if i > 0 else ""
+    prev_call = f"    l += scene_light_{i - 1}(p * 0.97, n);\n" if i > 0 else ""
+    c = 1.0 + (i % 13) / 16.0
+    return (
+        _HEADER
+        + f"module rscene_{i};\nimport rutil_base;\n" + imports + prev + "\n"
+        + f"public struct Light_{i}\n{{\n"
+        + "    public float3 position;\n    public float3 intensity;\n"
+        + "    public float radius;\n}\n\n"
+        + f"public float3 scene_light_{i}(float3 p, float3 n)\n{{\n"
+        + f"    Light_{i} light;\n"
+        + f"    light.position = util_hash_{us[0]}(p.x) * 10.0;\n"
+        + f"    light.intensity = float3({c}, {c} * 0.9, {c} * 0.8);\n"
+        + "    light.radius = 0.5;\n"
+        + "    float3 toL = light.position - p;\n"
+        + "    float d2 = max(dot(toL, toL), 1e-4);\n"
+        + "    float3 l = light.intensity * max(dot(n, normalize(toL)), 0.0) / d2;\n"
+        + prev_call
+        + "    return l;\n}\n\n"
+        + f"public float scene_shadow_{i}(float3 p)\n{{\n"
+        + f"    return saturate(util_lum_{us[1]}(util_warp_{us[2]}(p)));\n}}\n"
+    )
+
+
+def _rt_material_module(i, n_utils, n_scene):
+    """One material module: a BSDF and a material conforming to the shared
+    interfaces, with texture/sampler/parameter state and eval/sample methods
+    that lean on the utility and scene layers."""
+    us = sorted({(i * 17 + k * 7) % n_utils for k in range(4)})
+    sc = (i * 3) % n_scene
+    imports = "".join(f"import rutil_{u};\n" for u in us) + f"import rscene_{sc};\n"
+    r = 0.1 + (i % 9) / 10.0
+    return (
+        _HEADER
+        + f"module rmat_{i};\nimport rutil_base;\nimport rmat_base;\n" + imports + "\n"
+        + f"public struct BSDF_{i} : IBSDF\n{{\n"
+        + "    public float3 albedo;\n    public float roughness;\n\n"
+        + "    public float3 eval(float3 wi, float3 wo, float3 n)\n    {\n"
+        + "        float3 h = normalize(wi + wo);\n"
+        + f"        float d = pow(max(dot(n, h), 0.0), 1.0 / max(roughness * {r}, 1e-3));\n"
+        + f"        float3 f = albedo + (1.0 - albedo) * pow(1.0 - max(dot(wi, h), 0.0), 5.0);\n"
+        + "        return f * d * max(dot(n, wo), 0.0);\n    }\n\n"
+        + "    public float3 sample(float3 wi, float3 n, float2 u)\n    {\n"
+        + f"        return util_warp_{us[0]}(float3(u, roughness));\n    }}\n\n"
+        + "    public float pdf(float3 wi, float3 wo, float3 n)\n    {\n"
+        + f"        return max(util_lum_{us[1]}(eval(wi, wo, n)), 1e-4);\n    }}\n}}\n\n"
+        + f"public struct Material_{i} : IMaterial\n{{\n"
+        + f"    public Texture2D albedoMap;\n    public SamplerState samp;\n"
+        + f"    public float4 tint;\n\n"
+        + "    public float3 shade(float3 p, float3 n, float3 wi, float3 wo, float2 uv)\n"
+        + "    {\n"
+        + f"        BSDF_{i} bsdf;\n"
+        + "        bsdf.albedo = albedoMap.SampleLevel(samp, uv, 0).rgb * tint.rgb;\n"
+        + f"        bsdf.roughness = tint.a * {r};\n"
+        + f"        float3 li = scene_light_{sc}(p, n) * scene_shadow_{sc}(p);\n"
+        + "        return bsdf.eval(wi, wo, n) * li;\n    }\n\n"
+        + "    public static float3 evalStatic(float3 p, float3 n, float2 uv)\n    {\n"
+        + f"        BSDF_{i} bsdf;\n"
+        + f"        bsdf.albedo = util_hash_{us[2]}(uv.x);\n"
+        + f"        bsdf.roughness = {r};\n"
+        + f"        float3 wi = util_warp_{us[3]}(float3(uv, 0.5));\n"
+        + "        return bsdf.eval(wi, n, n) + scene_light_" + str(sc) + "(p, n);\n    }\n}\n"
+    )
+
+
+def gen_rt_renderer(n):
+    """A renderer-shaped generated corpus: utility + scene + material layers
+    behind IMaterial/IBSDF interfaces (n = material count), a raygen/
+    closesthit/miss entry-point root importing the whole library, and a
+    generic compute root for per-material specialization. Programs here are
+    few×HEAVY — each imports the full library — complementing
+    api_many_kernels' many×tiny per-compile-overhead probes."""
+    files = {}
+    files["rutil_base.slang"] = (
+        _HEADER + "module rutil_base;\n\n"
+        + "public float3 frac3(float3 v) { return frac(v); }\n"
+        + "public static const float kPi = 3.14159265358979;\n"
+    )
+    files["rmat_base.slang"] = (
+        _HEADER + "module rmat_base;\n\n"
+        + "public interface IBSDF\n{\n"
+        + "    float3 eval(float3 wi, float3 wo, float3 n);\n"
+        + "    float3 sample(float3 wi, float3 n, float2 u);\n"
+        + "    float pdf(float3 wi, float3 wo, float3 n);\n}\n\n"
+        + "public interface IMaterial\n{\n"
+        + "    static float3 evalStatic(float3 p, float3 n, float2 uv);\n}\n"
+    )
+    for i in range(_RT_UTILS):
+        files[f"rutil_{i}.slang"] = _rt_util_module(i)
+    for i in range(_RT_SCENE):
+        files[f"rscene_{i}.slang"] = _rt_scene_module(i, _RT_UTILS)
+    for i in range(n):
+        files[f"rmat_{i}.slang"] = _rt_material_module(i, _RT_UTILS, _RT_SCENE)
+
+    lib = [_HEADER, "module rlib;\n"]
+    for i in range(_RT_UTILS):
+        lib.append(f"__exported import rutil_{i};\n")
+    for i in range(_RT_SCENE):
+        lib.append(f"__exported import rscene_{i};\n")
+    lib.append("__exported import rmat_base;\n")
+    for i in range(n):
+        lib.append(f"__exported import rmat_{i};\n")
+    files["rlib.slang"] = "".join(lib)
+
+    # RT entry-point root: raygen + closesthit + miss over the whole library,
+    # composed into one program by the driver's rt-composite mode.
+    rt = [_HEADER, "module rt_kernels;\nimport rlib;\n\n"]
+    rt.append("RaytracingAccelerationStructure gScene;\n")
+    rt.append("RWTexture2D<float4> gOutput;\n\n")
+    rt.append("struct RayPayload\n{\n    float3 color;\n    uint depth;\n}\n\n")
+    w = 1.0 / max(n, 1)
+    shade = "".join(
+        f"    c += Material_{i}.evalStatic(p, n, uv) * {w:.4f};\n" for i in range(n)
+    )
+    rt.append(
+        '[shader("raygen")]\nvoid rayGenMain()\n{\n'
+        "    uint2 idx = DispatchRaysIndex().xy;\n"
+        "    RayDesc ray;\n"
+        "    ray.Origin = float3(idx.x * 0.001, idx.y * 0.001, -1.0);\n"
+        "    ray.Direction = float3(0, 0, 1);\n"
+        "    ray.TMin = 0.0;\n    ray.TMax = 1e30;\n"
+        "    RayPayload payload = { float3(0, 0, 0), 0 };\n"
+        "    TraceRay(gScene, RAY_FLAG_NONE, 0xff, 0, 0, 0, ray, payload);\n"
+        "    gOutput[idx] = float4(payload.color, 1.0);\n}\n\n"
+    )
+    rt.append(
+        '[shader("miss")]\nvoid missMain(inout RayPayload payload)\n{\n'
+        "    payload.color = float3(0.1, 0.2, 0.4);\n}\n\n"
+    )
+    rt.append(
+        '[shader("closesthit")]\nvoid closestHitMain(\n'
+        "    inout RayPayload payload,\n"
+        "    in BuiltInTriangleIntersectionAttributes attribs)\n{\n"
+        "    float3 p = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();\n"
+        "    float3 n = float3(0, 1, 0);\n"
+        "    float2 uv = attribs.barycentrics;\n"
+        "    float3 c = float3(0, 0, 0);\n"
+        + shade
+        + "    payload.color = c;\n    payload.depth += 1;\n}\n"
+    )
+    files["rt_kernels.slang"] = "".join(rt)
+
+    # Generic compute root: one kernel specialized per material by the
+    # driver's specialize mode (--impl-prefix Material_).
+    files["rt_compute.slang"] = (
+        _HEADER + "module rt_compute;\nimport rlib;\n\n" + _buf()
+        + '[shader("compute")]\n[numthreads(8,8,1)]\n'
+        + "void computeMain<T : IMaterial>(uint3 tid : SV_DispatchThreadID)\n{\n"
+        + "    float2 uv = float2(tid.xy) * 0.001;\n"
+        + "    float3 c = T.evalStatic(float3(uv, 0.0), float3(0, 1, 0), uv);\n"
+        + "    outBuf[tid.x] = c.x + c.y + c.z;\n}\n"
+    )
+    return files
 
 def _read_corpus(name):
     d = os.path.join(_CORPUS, name)
