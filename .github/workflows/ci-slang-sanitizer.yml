@@ -689,9 +689,9 @@ jobs:
           name: sanitizer-binaries
           path: sanitizer-binaries.tar.gz
           # The tarball is ~226 MB and each violating nightly supersedes the
-          # previous one; 3 days covers picking up a finding for repro while
+          # previous one; 2 days covers picking up a finding for repro while
           # bounding the rolling footprint.
-          retention-days: 3
+          retention-days: 2
           if-no-files-found: error
 
       - name: Upload Sanitizer Logs
