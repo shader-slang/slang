@@ -3105,6 +3105,13 @@ err(
     span { loc = "decl:Decl", message = "initializer of static const global '~decl' does not evaluate to a compile-time constant" }
 )
 
+warning(
+    "constexpr-unsupported",
+    31227,
+    "constexpr on variable declarations is not a supported Slang feature; treating as const",
+    span { loc = "modifier:Modifier", message = "constexpr is treated as const" }
+)
+
 -- 3123x - Modifiers and Deprecation (part 2)
 
 err(
@@ -4367,6 +4374,13 @@ err(
     38035,
     "cannot propagate through non-differentiable function",
     span { loc = "location", message = "encountered non-differentiable function '~func' during higher-order differentiation" }
+)
+
+err(
+    "cannot-differentiate-result-of-backward-differentiation",
+    38037,
+    "cannot differentiate the result of a backward-derivative call",
+    span { loc = "location", message = "the code produced by 'bwd_diff' is not itself differentiable, so a function that calls 'bwd_diff' cannot be differentiated; for higher-order derivatives, nest 'fwd_diff' calls or apply a single 'bwd_diff' to a function that uses 'fwd_diff'." }
 )
 
 --
