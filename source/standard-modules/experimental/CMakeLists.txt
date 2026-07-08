@@ -33,25 +33,23 @@ if(SLANG_GENERATORS_PATH)
         "${SLANG_GENERATORS_PATH}/slang-bootstrap${CMAKE_HOST_EXECUTABLE_SUFFIX}"
     )
     set(SLANG_COMPILER_DEPENDENCY)
-    set(SLANG_COMPILER_EXTRA_DEPS)
 elseif(NOT SLANG_EMBED_CORE_MODULE)
     set(SLANG_COMPILER slang-bootstrap)
     set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
-    set(SLANG_COMPILER_EXTRA_DEPS generate_core_module_headers)
 elseif(SLANG_ENABLE_SLANGC)
     set(SLANG_COMPILER "$<TARGET_FILE:slangc>")
     set(SLANG_COMPILER_DEPENDENCY slangc slang)
-    set(SLANG_COMPILER_EXTRA_DEPS)
 else()
     set(SLANG_COMPILER slang-bootstrap)
     set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
-    set(SLANG_COMPILER_EXTRA_DEPS generate_core_module_headers)
 endif()
+set(SLANG_COMPILER_CORE_MODULE_ARGS -load-core-module ${core_module_archive})
+set(SLANG_COMPILER_EXTRA_DEPS generate_core_module)
 
 add_custom_command(
     OUTPUT ${workgraph_module_file}
     COMMAND
-        ${SLANG_COMPILER} -I ${CMAKE_CURRENT_SOURCE_DIR}
+        ${SLANG_COMPILER} ${SLANG_COMPILER_CORE_MODULE_ARGS} -I ${CMAKE_CURRENT_SOURCE_DIR}
         workgraph.slang -o ${SLANG_WORKGRAPH_MODULE_FILE_NAME}
     DEPENDS
         ${workgraph_copied_files}
