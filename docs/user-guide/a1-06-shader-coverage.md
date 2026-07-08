@@ -11,7 +11,8 @@ an LCOV report for `genhtml`, Codecov, or VS Code Coverage Gutters.
 This chapter walks through the pipeline: compile with coverage, read the generated manifest,
 dispatch from a small C++ host program, and produce a report. All steps use the offline
 workflow (`slangc` plus a sidecar manifest file) and run without a GPU; the dispatched kernel
-is compiled for Slang's CPU target. The files, together with `run-tutorial.sh` and
+is compiled for Slang's CPU target. The closing section summarizes GPU targets and the
+in-process C++ API. The files, together with `run-tutorial.sh` and
 `run-tutorial.ps1` scripts that execute every step, are in
 [`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial).
 
@@ -234,66 +235,36 @@ The counters file format is `counter_count` little-endian unsigned integers of
 `element_stride` bytes each — the raw buffer contents, on any target. `--counters-text`
 accepts whitespace-separated decimal values instead.
 
-## Function and branch coverage
-
-Two more modes can be enabled independently of line coverage:
-
-```bash
-slangc hello-coverage.slang -target spirv -stage compute -entry computeMain \
-    -trace-coverage -trace-function-coverage -trace-branch-coverage \
-    -o hello-coverage.spv
-```
-
-The manifest then contains 14 entries: 8 `line`, 2 `function` (`applyGain` and
-`computeMain`), and 4 `branch` — one per branch arm, with `branch_site` and arm identity, so
-a report can show that `if (gain > 1.0)` was true 4 times and false 0 times. Branch coverage
-instruments `if`/`else` arms, loop-condition outcomes, and `switch` arms; `&&`, `||`, and
-`?:` are not instrumented. The converter emits `FN:`/`FNDA:` and `BRDA:` records for these.
-
-`-trace-coverage-boolean` replaces atomic counting with a plain store of 1. Use it when
-hit/not-hit is enough and atomic contention matters.
-
-Counter placement rules are specified in
-[`docs/design/shader-coverage-counter-placement.md`](https://github.com/shader-slang/slang/blob/master/docs/design/shader-coverage-counter-placement.md).
-
-## GPU targets
-
-On a GPU target, bind an ordinary zero-initialized storage buffer at the manifest-reported
-location — on Vulkan, the `(set, binding)` from the first manifest — and read it back after
-the dispatch completes. Everything else works as above.
-
-Hosts that compile shaders at runtime through the C++ API get the same information without a
-sidecar file: `castAs` the entry point's `IMetadata` to `slang::ISyntheticResourceMetadata`
-(binding location) and `slang::ICoverageTracingMetadata` (counter count, source
-attribution). `slang_writeCoverageManifestJson` produces the manifest JSON for the report
-step.
-
-Binding location per target:
-
-| Target               | Where the buffer binds                                                                  |
-| -------------------- | --------------------------------------------------------------------------------------- |
-| Vulkan / SPIR-V, D3D | descriptor `(space, binding)` from the manifest / metadata                              |
-| Metal                | a plain `[[buffer(N)]]` index (`binding`; `space` is `-1`)                              |
-| CPU, CUDA            | a `(pointer, count)` pair written into the kernel parameter payload at `uniform_offset` |
-
-Per-target recipes are in the
-[host interface document](https://github.com/shader-slang/slang/blob/master/docs/design/shader-coverage-host-interface.md).
-For complete Vulkan programs using the in-process workflow, see
-[`examples/shader-coverage-image-pipeline`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-image-pipeline)
-and
-[`examples/shader-coverage-bvh-traversal`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-bvh-traversal).
-
 ## Further reading
 
+Line coverage is one of three modes. `-trace-function-coverage` adds one entry per
+function. `-trace-branch-coverage` adds one entry per branch arm — `if`/`else` arms,
+loop-condition outcomes, and `switch` arms; `&&`, `||`, and `?:` are not instrumented — so a
+report can give true/false counts per condition. The modes are independent. The converter
+emits `FN:`/`FNDA:` and `BRDA:` records for them. `-trace-coverage-boolean` replaces atomic
+counting with a plain store of 1; use it when hit/not-hit is enough.
+
+On GPU targets the workflow is the same; only the binding location changes: a descriptor
+`(set, binding)` on Vulkan/D3D, a `[[buffer(N)]]` index on Metal, a payload offset on
+CPU/CUDA. Bind a zero-initialized storage buffer there and read it back after the dispatch.
+Hosts that compile shaders at runtime through the C++ API read the same information from the
+entry point metadata (`slang::ISyntheticResourceMetadata`: binding location;
+`slang::ICoverageTracingMetadata`: counters and source attribution) instead of a sidecar
+file.
+
+For details:
+
 - [slangc command line reference](https://github.com/shader-slang/slang/blob/master/docs/command-line-slangc-reference.md#trace-coverage) —
-  the `-trace-coverage*` options: counter width, explicit binding, reserved descriptor
-  sets, manifest output path.
+  the `-trace-coverage*` options: coverage modes, counter width, explicit binding, reserved
+  descriptor sets, manifest output path.
 - [`tools/shader-coverage/README.md`](https://github.com/shader-slang/slang/blob/master/tools/shader-coverage/README.md) —
   workflow reference: integration patterns, option usage examples, target support matrix,
   LCOV format scope, current limitations.
 - [`docs/design/shader-coverage-host-interface.md`](https://github.com/shader-slang/slang/blob/master/docs/design/shader-coverage-host-interface.md) —
   binding contract and per-target host recipes.
+- [`docs/design/shader-coverage-counter-placement.md`](https://github.com/shader-slang/slang/blob/master/docs/design/shader-coverage-counter-placement.md) —
+  where each mode places its counters, with worked examples.
 - [`examples/shader-coverage-image-pipeline`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-image-pipeline)
   and
   [`examples/shader-coverage-bvh-traversal`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-bvh-traversal) —
-  coverage-driven Vulkan workflows on realistic kernels.
+  coverage-driven Vulkan workflows on realistic kernels, using the in-process API.
