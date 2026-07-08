@@ -1,7 +1,7 @@
 schema_version: 1
 id: slangi-vm-get-string-hash-bytecode-unimplemented
 bundle: design/ir-reference/misc
-suspected_kind: unimplemented
+suspected_kind: regression
 title: "[slangi] getStringHash aborts: VM bytecode gen unimplemented"
 observed_at: "2026-07-08T00:00:00+00:00"
 scope: cpp

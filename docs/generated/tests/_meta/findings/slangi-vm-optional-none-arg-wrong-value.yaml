@@ -2,7 +2,7 @@ schema_version: 1
 id: slangi-vm-optional-none-arg-wrong-value
 bundle: design/name-resolution/scopes
 suspected_kind: wrong-codegen
-title: "[slangi] Optional<T> argument passed as `none` arrives with garbage hasValue in callee"
+title: "[slangi] Optional<T> none argument arrives with garbage hasValue in callee"
 observed_at: 2026-07-08T00:00:00+00:00
 scope: cpp
 evidence:
