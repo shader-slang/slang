@@ -78,7 +78,7 @@ location, and where the hidden buffer expects to be bound.
 >
 > Coverage works the same way on other targets — swap `-target spirv` for `hlsl`, `metal`,
 > `cuda`, or `cpp`. Two targets are the exception: WGSL and LLVM-emitted CPU are skipped
-> with warning E45102 (see Pitfalls below).
+> with warning E45102 (see Troubleshooting below).
 
 ## Reading the manifest
 
@@ -118,7 +118,7 @@ Three things to take away:
 2. **`buffer` tells you where to bind it**. On SPIR-V that is a descriptor `(set, binding)` —
    here set 1, binding 0. Note that auto-allocation placed it in a _fresh_ descriptor set
    after your shader's own sets, so enabling coverage can add one descriptor set to your
-   pipeline layout (see Pitfalls).
+   pipeline layout (see Troubleshooting).
 3. **`entries` map counters back to source**: counter slot 0 counts executions of line 7
    (the `if (gain > 1.0)` statement), and so on. This attribution is what turns raw numbers
    into a report.
@@ -407,7 +407,7 @@ buffer via the metadata interfaces — with Vulkan descriptor binding in place o
 ## Options you will eventually want
 
 - **`-trace-coverage-counter-width 32`** — use `uint32` counters instead of the default
-  `uint64`. Required when the runtime cannot do 64-bit shader atomics (see Pitfalls); the
+  `uint64`. Required when the runtime cannot do 64-bit shader atomics (see Troubleshooting); the
   cost is silent wraparound past 2^32 hits per slot. The chosen width is recorded in the
   manifest (`element_type` / `element_stride`) and on
   `CoverageBufferInfo::elementByteWidth` — always read it from there rather than assuming.
@@ -419,7 +419,7 @@ buffer via the metadata interfaces — with Vulkan descriptor binding in place o
 - **`-coverage-manifest-output <path>`** — write the sidecar to an explicit path instead of
   `<output>.coverage-manifest.json`, e.g. when the compiled output goes to stdout.
 
-## Pitfalls
+## Troubleshooting
 
 Each of these is a real failure mode with a specific symptom — worth scanning before your
 first integration.
@@ -461,7 +461,7 @@ first integration.
    `getEntryPointHostCallable` cannot use, and it fails with `E_INVALIDARG`. Call
    `getEntryPointCode` / `getEntryPointHostCallable` first, then query metadata.
 
-## Where to go next
+## Further reading
 
 - [`tools/shader-coverage/README.md`](https://github.com/shader-slang/slang/blob/master/tools/shader-coverage/README.md) —
   the workflow reference: integration patterns, the target support matrix, LCOV format
