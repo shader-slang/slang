@@ -48,7 +48,38 @@ class WorkloadSpec:
 SPIRV = ["-target", "spirv", "-emit-spirv-directly"]
 
 WORKLOADS = [
-    # ---- per-compile floor (core-module load + link) ---------------------
+    # ---- real-world / holistic (whole pipeline) ------------------------
+    # This list order is CANONICAL: bench.py runs workloads in it and the
+    # HTML report renders panels in it (manifest.display_order), so the page
+    # layout stays constant: real-world first, then (once added) the api
+    # workloads, then the pipeline stages front end -> back end.
+    # Real MDL/DXR path-tracing shader corpus: the holistic end-to-end signal.
+    WorkloadSpec(
+        name="mdl_dxr",
+        bucket="real_world",
+        gen=workloads.gen_mdl_dxr,
+        default_size=0,  # fixed corpus; size ignored
+        mode="target",
+        extra_flags=SPIRV,
+        main_file="hit.slang",
+        primary_timers=["compileInner", "frontEndExecute", "linkAndOptimizeIR"],
+    ),
+    # Realistic mixed shader, simple -> complex: control flow + generics +
+    # dispatch + resources + call depth all scale together — the holistic
+    # compile-time curve, vs the single-axis stressors below.
+    WorkloadSpec(
+        name="complexity_ladder",
+        bucket="realistic_scaling",
+        gen=workloads.gen_complexity_ladder,
+        default_size=160,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["compileInner", "frontEndExecute", "linkAndOptimizeIR",
+                        "simplifyIR"],
+    ),
+    # ---- compiler pipeline, front end -> back end ----------------------
+    # (api workloads slot in between the holistic and pipeline sections
+    # when they are added)
     WorkloadSpec(
         name="minimal",
         bucket="core_link",
@@ -61,7 +92,67 @@ WORKLOADS = [
         primary_timers=["compileInner", "linkIR", "readSerializedModuleIR",
                         "loadBuiltinModule"],
     ),
-    # ---- shared-infrastructure / scaling stressors -----------------------
+    WorkloadSpec(
+        name="parse",
+        bucket="parse",
+        gen=workloads.gen_parse,
+        default_size=2000,
+        mode="module",
+        primary_timers=["parseTranslationUnit", "frontEndExecute"],
+    ),
+    WorkloadSpec(
+        name="diagnostics_clean",
+        bucket="diagnostics",
+        gen=workloads.gen_diagnostics_clean,
+        default_size=400,
+        mode="target",
+        extra_flags=SPIRV,
+        primary_timers=["frontEndExecute", "SemanticChecking", "compileInner"],
+    ),
+    WorkloadSpec(
+        name="sema_generics",
+        bucket="sema",
+        gen=workloads.gen_sema_generics,
+        default_size=1000,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+    ),
+    WorkloadSpec(
+        name="conformance",
+        bucket="sema",
+        gen=workloads.gen_conformance,
+        default_size=600,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+    ),
+    # Typecheck trio: front-end-only stressors for the quietly expensive part
+    # of semantic checking — every binary operator and cross-type assignment
+    # runs overload resolution + conversion-cost ranking. parse/sema_generics
+    # don't isolate this.
+    WorkloadSpec(
+        name="operator_typecheck",
+        bucket="typecheck",
+        gen=workloads.gen_operator_typecheck,
+        default_size=800,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+    ),
+    WorkloadSpec(
+        name="implicit_conversion",
+        bucket="typecheck",
+        gen=workloads.gen_implicit_conversion,
+        default_size=600,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+    ),
+    WorkloadSpec(
+        name="overload_resolution",
+        bucket="typecheck",
+        gen=workloads.gen_overload_resolution,
+        default_size=600,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+    ),
     WorkloadSpec(
         name="ir_builder",
         bucket="ir_infra",
@@ -80,31 +171,22 @@ WORKLOADS = [
         primary_timers=["writeSerializedModuleAST", "writeSerializedModuleIR", "compileInner"],
     ),
     WorkloadSpec(
-        name="conformance",
-        bucket="sema",
-        gen=workloads.gen_conformance,
-        default_size=600,
-        mode="module",
-        primary_timers=["SemanticChecking", "frontEndExecute"],
+        name="module_link",
+        bucket="module_link",
+        gen=workloads.gen_module_link,
+        default_size=100,
+        mode="link",
+        extra_flags=SPIRV,
+        primary_timers=["linkIR", "compileInner"],
     ),
     WorkloadSpec(
-        name="loop_unroll",
-        bucket="loop_unroll",
-        gen=workloads.gen_loop_unroll,
+        name="specialization",
+        bucket="specialization",
+        gen=workloads.gen_specialization,
         default_size=300,
         mode="target",
         extra_flags=SPIRV,
-        primary_timers=["unrollLoopsInModule", "simplifyIR", "compileInner"],
-    ),
-    # ---- suspected-regression features -----------------------------------
-    WorkloadSpec(
-        name="autodiff",
-        bucket="autodiff",
-        gen=workloads.gen_autodiff,
-        default_size=200,
-        mode="target",
-        extra_flags=SPIRV,
-        primary_timers=["compileInner", "linkAndOptimizeIR", "frontEndExecute"],
+        primary_timers=["specializeModule", "linkAndOptimizeIR", "compileInner"],
     ),
     WorkloadSpec(
         name="dynamic_dispatch",
@@ -132,68 +214,13 @@ WORKLOADS = [
                         "legalizeExistentialTypeLayout", "simplifyIR"],
     ),
     WorkloadSpec(
-        name="diagnostics_clean",
-        bucket="diagnostics",
-        gen=workloads.gen_diagnostics_clean,
-        default_size=400,
+        name="autodiff",
+        bucket="autodiff",
+        gen=workloads.gen_autodiff,
+        default_size=200,
         mode="target",
         extra_flags=SPIRV,
-        primary_timers=["frontEndExecute", "SemanticChecking", "compileInner"],
-    ),
-    # ---- core compiler-stage buckets --------------------------------------
-    WorkloadSpec(
-        name="parse",
-        bucket="parse",
-        gen=workloads.gen_parse,
-        default_size=2000,
-        mode="module",
-        primary_timers=["parseTranslationUnit", "frontEndExecute"],
-    ),
-    WorkloadSpec(
-        name="sema_generics",
-        bucket="sema",
-        gen=workloads.gen_sema_generics,
-        default_size=1000,
-        mode="module",
-        primary_timers=["SemanticChecking", "frontEndExecute"],
-    ),
-    # ---- type checking: operator overload resolution + implicit conversion -
-    # Front-end-only (module mode) stressors for the quietly expensive part of
-    # semantic checking: every binary operator and cross-type assignment runs
-    # overload resolution + conversion-cost ranking. parse/sema_generics don't
-    # isolate this (uniform types / generic-constraint cost dominate there).
-    WorkloadSpec(
-        name="operator_typecheck",
-        bucket="typecheck",
-        gen=workloads.gen_operator_typecheck,
-        default_size=800,
-        mode="module",
-        primary_timers=["SemanticChecking", "frontEndExecute"],
-    ),
-    WorkloadSpec(
-        name="implicit_conversion",
-        bucket="typecheck",
-        gen=workloads.gen_implicit_conversion,
-        default_size=600,
-        mode="module",
-        primary_timers=["SemanticChecking", "frontEndExecute"],
-    ),
-    WorkloadSpec(
-        name="overload_resolution",
-        bucket="typecheck",
-        gen=workloads.gen_overload_resolution,
-        default_size=600,
-        mode="module",
-        primary_timers=["SemanticChecking", "frontEndExecute"],
-    ),
-    WorkloadSpec(
-        name="specialization",
-        bucket="specialization",
-        gen=workloads.gen_specialization,
-        default_size=300,
-        mode="target",
-        extra_flags=SPIRV,
-        primary_timers=["specializeModule", "linkAndOptimizeIR", "compileInner"],
+        primary_timers=["compileInner", "linkAndOptimizeIR", "frontEndExecute"],
     ),
     WorkloadSpec(
         name="inlining",
@@ -205,61 +232,23 @@ WORKLOADS = [
         primary_timers=["simplifyIR", "linkAndOptimizeIR", "compileInner"],
     ),
     WorkloadSpec(
-        name="codegen_spirv",
-        bucket="codegen",
-        gen=workloads.gen_codegen,
-        default_size=400,
+        name="loop_unroll",
+        bucket="loop_unroll",
+        gen=workloads.gen_loop_unroll,
+        default_size=300,
         mode="target",
         extra_flags=SPIRV,
-        primary_timers=["generateOutput", "compileInner"],
+        primary_timers=["unrollLoopsInModule", "simplifyIR", "compileInner"],
     ),
     WorkloadSpec(
-        name="module_link",
-        bucket="module_link",
-        gen=workloads.gen_module_link,
-        default_size=100,
-        mode="link",
-        extra_flags=SPIRV,
-        primary_timers=["linkIR", "compileInner"],
-    ),
-    # ---- source-target emission (the text backends spirv-directly skips) --
-    # Same shader as codegen_spirv, but emitted to a textual GPU language so the
-    # whole emitEntryPointsSourceFromIR path + target legalization (legalizeIRForMetal /
-    # legalizeIRForWGSL) is exercised — entirely bypassed by -emit-spirv-directly,
-    # so no other workload covers it. Metal/WGSL emit text with no external toolchain.
-    WorkloadSpec(
-        name="emit_metal",
-        bucket="codegen_source",
-        gen=workloads.gen_codegen,
-        default_size=400,
-        mode="target",
-        extra_flags=["-target", "metal"],
-        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
-    ),
-    WorkloadSpec(
-        name="emit_wgsl",
-        bucket="codegen_source",
-        gen=workloads.gen_codegen,
-        default_size=400,
-        mode="target",
-        extra_flags=["-target", "wgsl"],
-        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
-    ),
-    # ---- complexity ladder: realistic mixed shader, simple -> complex ------
-    # Sweep this to see the holistic compile-time curve as a representative
-    # shader grows in complexity (control flow + generics + dispatch + resources
-    # + call depth all scale together), vs the single-axis stressors above.
-    WorkloadSpec(
-        name="complexity_ladder",
-        bucket="realistic_scaling",
-        gen=workloads.gen_complexity_ladder,
-        default_size=160,
+        name="control_flow_ssa",
+        bucket="control_flow",
+        gen=workloads.gen_control_flow_ssa,
+        default_size=120,
         mode="target",
         extra_flags=SPIRV,
-        primary_timers=["compileInner", "frontEndExecute", "linkAndOptimizeIR",
-                        "simplifyIR"],
+        primary_timers=["simplifyIR", "frontEndExecute", "compileInner"],
     ),
-    # ---- coverage-gap stressors (passes / paths no other workload hits) ---
     WorkloadSpec(
         name="resource_aggregate",
         bucket="resource_legalize",
@@ -280,25 +269,46 @@ WORKLOADS = [
         primary_timers=["compileInner", "frontEndExecute", "generateOutput"],
     ),
     WorkloadSpec(
-        name="control_flow_ssa",
-        bucket="control_flow",
-        gen=workloads.gen_control_flow_ssa,
-        default_size=120,
+        name="codegen_spirv",
+        bucket="codegen",
+        gen=workloads.gen_codegen,
+        default_size=400,
         mode="target",
         extra_flags=SPIRV,
-        primary_timers=["simplifyIR", "frontEndExecute", "compileInner"],
+        primary_timers=["generateOutput", "compileInner"],
     ),
-    # ---- real-shader corpus ----------------------------------------------
+    # Source-target emission (the text backends -emit-spirv-directly skips):
+    # same shader as codegen_spirv but emitted to a textual GPU language, so
+    # emitEntryPointsSourceFromIR + target legalization are exercised.
     WorkloadSpec(
-        name="mdl_dxr",
-        bucket="real_world",
-        gen=workloads.gen_mdl_dxr,
-        default_size=0,  # fixed corpus; size ignored
+        name="emit_metal",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
         mode="target",
-        extra_flags=SPIRV,
-        main_file="hit.slang",
-        primary_timers=["compileInner", "frontEndExecute", "linkAndOptimizeIR"],
+        extra_flags=["-target", "metal"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+    ),
+    WorkloadSpec(
+        name="emit_wgsl",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "wgsl"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
     ),
 ]
 
 BY_NAME = {w.name: w for w in WORKLOADS}
+
+
+def display_order(names):
+    """Return `names` sorted into the canonical manifest order (the WORKLOADS
+    list above), which is also the order report panels render in. Names not in
+    the manifest (e.g. retired workloads still present in stored results) sort
+    after all known ones, alphabetically, so nothing silently disappears from
+    the report."""
+    pos = {w.name: i for i, w in enumerate(WORKLOADS)}
+    return sorted(names, key=lambda n: (pos.get(n, len(pos)), n))
+

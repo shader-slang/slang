@@ -119,7 +119,11 @@ data branch). The deploy step pushes that output to the `gh-pages` branch of
 `shader-slang/slang-compile-perf`, which GitHub Pages serves at
 `https://shader-slang.org/slang-compile-perf/`. `report_per_workload.html` is
 renamed to `index.html` so that URL is the landing page. Per-workload detail
-pages live under `workloads/<name>.html`.
+pages live under `workloads/<name>.html`. Panels render in the CANONICAL order —
+the `manifest.WORKLOADS` list order (real-world first, then pipeline stages
+front end → back end; see `manifest.display_order`) — so the page layout stays
+constant instead of reshuffling with cost drift; workloads present in stored
+results but absent from the manifest render at the end rather than vanishing.
 
 Both steps use `continue-on-error: true` — a report failure never blocks the
 trend check (nightly) or marks the release sweep red.

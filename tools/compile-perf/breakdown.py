@@ -353,11 +353,12 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
     order, per = _series(results_dir, index_path, metric, bucket_fn)
     nrel = len(order)
 
-    def last_ci(wl):
-        return next((sum(bd.values()) for bd in reversed(per[wl]) if bd), 0) or 0
-
     if names is None:
-        names = sorted(per, key=lambda w: -last_ci(w))
+        # Canonical, CONSTANT panel order (manifest.WORKLOADS order): real-world
+        # first, then api workloads, then pipeline stages front end -> back end.
+        # A cost-based order was used before, but it reshuffled the page every
+        # time timings drifted, so panels were not stable anchors.
+        names = manifest.display_order(per.keys())
     n = len(names)
     rows = (n + cols - 1) // cols
     pw, ph = panel
