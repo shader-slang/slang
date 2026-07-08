@@ -42,9 +42,17 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   `workflow_dispatch` only right now — the daily `schedule` is commented out;**
   enable it once the suite is validated on the runner and the history is seeded.
   Inputs: `ref` (commit SHA or branch to build; blank = master HEAD, useful for
-  backfilling historical daily points), `samples`, `only`. The run label
-  and `meta.json` date are derived from the checked-out commit's author date, so
-  backfill points sort correctly in the tracking series.
+  backfilling historical daily points), `samples`, `only`, and `publish`
+  (default `true`). With `publish=false` the run measures only: results are
+  uploaded as a run artifact and the results repo, tracking series, pages, and
+  trend check are untouched — the mode for one-off measurements (bisect points,
+  suspect commits) that must not pollute the series. Because daily labels are
+  keyed by the swept commit's date, several points can share a date; the
+  workflow therefore passes the label it registered to `trend.py --label` so
+  the trend check judges exactly this run's point rather than a same-date
+  sibling. The run label and `meta.json` date are derived from the checked-out
+  commit's author date, so backfill points sort correctly in the tracking
+  series.
 - **`compile-perf-release-sweep.yml`** (`workflow_dispatch`) — downloads prebuilt
   release `slangc` for the runner's platform, sweeps each into `releases/<tag>/`,
   writes `index.json`, stamps `runner.json`, rebuilds, and pushes. **Run with
