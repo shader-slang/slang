@@ -64,6 +64,7 @@
 #include "slang-ir-legalize-array-return-type.h"
 #include "slang-ir-legalize-binary-operator.h"
 #include "slang-ir-legalize-composite-select.h"
+#include "slang-ir-legalize-cuda-param-dynamic-index.h"
 #include "slang-ir-legalize-empty-array.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-image-subscript.h"
@@ -2543,6 +2544,17 @@ Result linkAndOptimizeIR(
         // eliminatePhis just took the IR out of SSA form — the emitter
         // expects non-SSA IR at this point.
         SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
+    }
+
+    // CUDA kernel parameters live in `.param` space, which ptxas cannot address
+    // dynamically; rewrite runtime-indexed accesses to go through a function-local
+    // copy of the parameter (see slang-ir-legalize-cuda-param-dynamic-index.h).
+    // This must run after the last simplification pass: the local copy is a
+    // once-stored variable, which SSA construction / store forwarding would
+    // otherwise fold right back into a direct dynamic index on the parameter.
+    if (isCUDATarget(targetRequest))
+    {
+        SLANG_PASS(legalizeCUDAKernelParamDynamicIndex);
     }
 
     // We include one final step to (optionally) dump the IR and validate
