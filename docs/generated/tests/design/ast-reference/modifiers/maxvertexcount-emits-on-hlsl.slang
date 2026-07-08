@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#stage-specific-entry-point-attributes
-//META: doc_section_digest=c70214a3d38c8f47b31dbc3940b51ba5fcdeb6d61435076d7a051fbb6e018f86
+//META: doc_section_digest=da9e653cd029326374ac4195e36ff4e7273720baf82d3bdab25956dff2aaf58e
 //META: purpose=`MaxVertexCountAttribute` (`[maxvertexcount(N)]`) on a geometry entry point appears in emitted HLSL with the documented count.
 //META: intent=functional
 //META: pipeline_stage=emit
