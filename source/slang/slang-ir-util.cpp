@@ -530,9 +530,17 @@ String dumpIRToString(IRInst* root, IRDumpOptions options)
 
 void copyNameHintAndDebugDecorations(IRInst* dest, IRInst* src)
 {
+    // Copy the "identity" decorations that must survive on both `src` and `dest` when an
+    // inst is split during legalization. Type legalization uses `transferDecorationsTo` to
+    // move an original struct's decorations onto a new ordinary struct, then calls this to
+    // clone the identity decorations back onto the original so it stays recognizable on
+    // later passes. `SynthesizedParameterGroupDecoration` is one such marker: the
+    // parameter-group leak diagnostic (E31106/E31107) reads it off the original struct on
+    // every legalization pass, so it must persist across the transfer (issue #11825).
     IRDecoration* nameHintDecoration = nullptr;
     IRDecoration* linkageDecoration = nullptr;
     IRDecoration* debugLocationDecoration = nullptr;
+    IRDecoration* synthesizedParameterGroupDecoration = nullptr;
     for (auto decor = src->getFirstDecoration(); decor; decor = decor->getNextDecoration())
     {
         switch (decor->getOp())
@@ -547,6 +555,9 @@ void copyNameHintAndDebugDecorations(IRInst* dest, IRInst* src)
         case kIROp_DebugLocationDecoration:
             debugLocationDecoration = decor;
             break;
+        case kIROp_SynthesizedParameterGroupDecoration:
+            synthesizedParameterGroupDecoration = decor;
+            break;
         }
     }
     if (nameHintDecoration)
@@ -560,6 +571,10 @@ void copyNameHintAndDebugDecorations(IRInst* dest, IRInst* src)
     if (debugLocationDecoration)
     {
         cloneDecoration(debugLocationDecoration, dest);
+    }
+    if (synthesizedParameterGroupDecoration)
+    {
+        cloneDecoration(synthesizedParameterGroupDecoration, dest);
     }
 }
 

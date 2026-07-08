@@ -248,6 +248,14 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass
             paramStructType,
             UnownedTerminatedStringSlice("ShaderRecordParams"));
 
+        // This struct is synthesized by the compiler to gather the OptiX ray-tracing
+        // entry point's shader-record (SBT) parameters; the user wrote a flat parameter
+        // list, not a parameter group. Mark it so that type legalization does not warn
+        // (E31106/E31107) when a resource "leaks" out of the constant buffer we wrap it in
+        // below — that regrouping is inherent to how we lower these parameters, not
+        // something the user can restructure (issue #11825).
+        builder.addSynthesizedParameterGroupDecoration(paramStructType);
+
         // If we need a constant buffer, then the global
         // shader parameter will be a `ConstantBuffer<paramStructType>`
         // TODO: reconcile this with OptiX, as the current logic works, but is still focused on

@@ -526,23 +526,15 @@ struct TupleTypeBuilder
             IRBuilder* builder = context->getBuilder();
             IRStructType* ordinaryStructType = builder->createStructType();
             ordinaryStructType->sourceLoc = originalStructType->sourceLoc;
-
-            // Remember whether the original struct was a compiler-synthesized parameter
-            // group before `transferDecorationsTo` moves its decorations away. Type
-            // legalization can re-visit the original struct on a later pass (it is left in
-            // place as a husk), and the parameter-group leak diagnostic in
-            // `legalizeTypeImpl` needs to still recognize it as synthesized so it stays
-            // suppressed (issue #11825). We therefore re-add the marker to the original
-            // after the transfer, so both the original and the new ordinary struct carry it.
-            bool wasSynthesizedGroup =
-                originalStructType->findDecoration<IRSynthesizedParameterGroupDecoration>() !=
-                nullptr;
-
             originalStructType->transferDecorationsTo(ordinaryStructType);
-            copyNameHintAndDebugDecorations(originalStructType, ordinaryStructType);
 
-            if (wasSynthesizedGroup)
-                builder->addSynthesizedParameterGroupDecoration(originalStructType);
+            // This moves the original struct's decorations onto the new ordinary struct and
+            // then clones the "identity" decorations (name hint, debug, linkage, and the
+            // synthesized-parameter-group marker) back onto the original, so the original
+            // stays recognizable when it is re-legalized on a later pass. In particular the
+            // parameter-group leak diagnostic in `legalizeTypeImpl` reads the marker off the
+            // original struct (issue #11825).
+            copyNameHintAndDebugDecorations(originalStructType, ordinaryStructType);
 
             // The new struct type will appear right after the original in the IR,
             // so that we can be sure any instruction that could reference the
