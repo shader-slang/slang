@@ -1002,7 +1002,8 @@ int main(int argc, char** argv)
                "       api-driver <libslang> many-kernels      --dir DIR [--reflect]\n"
                "       api-driver <libslang> module-graph      --dir DIR --root NAME [--reflect]\n"
                "       api-driver <libslang> module-graph-bin  --dir DIR --root NAME\n"
-               "       api-driver <libslang> specialize        --dir DIR --root NAME [--impl-prefix P]\n"
+               "       api-driver <libslang> specialize        --dir DIR --root NAME "
+               "[--impl-prefix P]\n"
                "       api-driver <libslang> rt-composite      --dir DIR --root NAME\n");
         return 2;
     }
