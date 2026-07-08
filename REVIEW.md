@@ -7,7 +7,7 @@ SPDX-License-Identifier: CC-BY-4.0
 
 > For AI review agents (Claude GitHub Actions + CodeRabbit), not humans.
 
-Follow this protocol. Do NOT skip steps. Do NOT write a free-form review. Do NOT post a review without dispatching all 6 teammates first.
+Follow this protocol. Do NOT skip steps. Do NOT write a free-form review. Do NOT post a review without dispatching the applicable reviewers (Step 2) first.
 
 ## Optional Clarity Review Candidate Pass
 
@@ -38,17 +38,30 @@ clarity candidate may be worth posting even when it does not prove a concrete bu
 review claim is that the changed code is unclear, internally inconsistent, or insufficiently
 explained.
 
-## Step 1: Fetch the PR diff and save to file
+## Step 1: Verify the pre-staged PR diff
 
-Save the diff and file list to `tmp/` so agents can read them without bloating prompts:
+The harness pre-stages review artifacts under `tmp/` BEFORE any agent runs:
 
-```bash
-mkdir -p tmp
-gh.exe pr diff <number> -R <repo> > tmp/pr-diff.patch
-gh.exe pr view <number> -R <repo> --json files -q '.files[].path' > tmp/pr-files.txt
-```
+- `tmp/pr-diff.patch` — the full PR diff
+- `tmp/pr-files.txt` — changed file paths, one per line
+- `tmp/context.json` — `{repo, pr, base_sha, head_sha, diff_sha256}`
+
+Do NOT fetch or regenerate the diff yourself. Before dispatching any reviewer:
+
+1. Read `tmp/context.json` and confirm `pr` matches the PR number you were asked to review.
+2. Confirm `tmp/pr-diff.patch` is non-empty and `tmp/pr-files.txt` lists at least one file.
+
+If any artifact is missing, empty, or names a different PR, STOP: post nothing and exit
+with an error naming the failing artifact. A review produced from the wrong diff is worse
+than no review.
+
+(Interactive sessions only: if a human explicitly asks you to review a PR outside a harness,
+you may create the artifacts yourself first — `gh pr diff <n> -R <repo> > tmp/pr-diff.patch`,
+matching `pr-files.txt` and `context.json` — then proceed. In CI, never do this.)
 
 Agents will read these files directly — do NOT embed the full diff in agent prompts.
+When posting the review (Step 5), end the review body with the provenance line:
+`<sub>reviewed: <head_sha> · diff sha256 <first 12 chars of diff_sha256></sub>`
 
 ## Step 2: Determine applicable reviewers and dispatch
 
@@ -81,11 +94,14 @@ Each agent's prompt MUST include:
 - "For large files (>1000 lines), use Grep first then Read with offset/limit"
 - "The Slang language spec has been cloned to `external/spec/` (if it exists). Check `external/spec/proposals/` when the PR implements or references a spec proposal"
 
-## Step 3: Wait for all 6 agents, then editorially filter
+## Step 3: Wait for all dispatched agents, then editorially filter
 
-Wait for all 6 background agents to complete. You will be automatically notified as each one finishes.
+Wait for ALL dispatched background agents to complete. You will be automatically notified as each one finishes.
 
-Once ALL 6 have returned findings, build the editorial table below, **fill every column for every Keep row**, and post only Keep rows.
+If any dispatched reviewer fails or returns nothing, treat the review as incomplete: post
+nothing and exit with an error naming the failed reviewer. Do not post a partial review.
+
+Once ALL dispatched reviewers have returned findings, build the editorial table below, **fill every column for every Keep row**, and post only Keep rows.
 
 | Source agent | file:line | Severity | Confidence | Evidence / verification quote | User-visible impact | Keep / Drop |
 
