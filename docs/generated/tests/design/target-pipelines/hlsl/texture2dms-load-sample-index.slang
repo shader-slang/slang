@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=1106750632bd5fb062ea9e50319f7763d34f78d5
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools
-//META: doc_section_digest=03d6fe7b8f4502160d35cd7e0f89a3145a7dfe7a6680c44cb1092265f9fe4de7
+//META: doc_section_digest=619da2387b17d1b514e8cb1b82a03f336653b7502413b2205a6fc4753c4eeacd
 //META: purpose=Boundary: Texture2DMS `.Load(int2(0,0), N-1)` with the largest legal sample index for a 4-sample MSAA texture preserves both the int2 coord and the sample-index argument.
 //META: intent=boundary
 //META: pipeline_stage=emit
