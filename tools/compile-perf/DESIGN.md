@@ -30,9 +30,10 @@ on Windows). See `README.md` Quickstart for copy-paste commands.
 
 ## CI workflows
 
-Both run on the dedicated, quiesced NVIDIA RGFX perf pool (runner group `nvrgfx`,
-labels `[Windows, X64, nvrgfx-perf]`) — a quiesced machine is what makes the
-timing trustworthy. They store results in a separate repo,
+Both run on the dedicated, quiesced NVIDIA RGFX perf pool, reached through the
+VM-based GitHub bridge (labels `[Windows, X64, nvrgfx-perf-kernelvm-bridge]`;
+the pre-VM `nvrgfx` runner group + `nvrgfx-perf` label pair was retired
+2026-07) — a quiesced machine is what makes the timing trustworthy. They store results in a separate repo,
 `shader-slang/slang-compile-perf`, authenticated with the `SLANG_COMPILE_PERF_PAT`
 secret (the `PERF_RESULTS_REPO` env overrides the target).
 

@@ -123,10 +123,13 @@ def build_api_driver(out_dir):
     if is_win:
         # Dash-style flags: identical to /flags for cl, but immune to MSYS/Git-
         # Bash path mangling if this command ever runs through a POSIX shell.
-        cmd = ["cl", "-nologo", "-O2", "-std:c++17", "-EHsc", f"-I{inc}", src,
+        cmd = ["cl.exe", "-nologo", "-O2", "-std:c++17", "-EHsc", f"-I{inc}", src,
                f"-Fe:{out}"]
     else:
         cmd = ["c++", "-O2", "-std=c++17", "-I", inc, src, "-o", out]
+        # dlopen/dlsym live in libdl on pre-2.34 glibc; harmless elsewhere.
+        if sys.platform.startswith("linux"):
+            cmd.append("-ldl")
     try:
         r = subprocess.run(cmd, cwd=out_dir, stdout=subprocess.PIPE,
                            stderr=subprocess.STDOUT, timeout=300)

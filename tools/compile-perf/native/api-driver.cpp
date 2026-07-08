@@ -212,6 +212,12 @@ static bool readFile(const std::string& path, std::string& out)
     }
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
+    if (size < 0)
+    {
+        printf("error: cannot determine size of %s\n", path.c_str());
+        fclose(f);
+        return false;
+    }
     fseek(f, 0, SEEK_SET);
     out.resize((size_t)size);
     size_t got = fread(&out[0], 1, (size_t)size, f);
@@ -862,8 +868,21 @@ int main(int argc, char** argv)
     bool reflect = hasFlag(argc, argv, "--reflect");
     if (mode == "session-create")
     {
-        const char* iters = argValue(argc, argv, "--iters");
-        return runSessionCreate(lib.createGlobalSession, iters ? atoi(iters) : 10);
+        // Fail loudly on malformed --iters: atoi would silently turn garbage
+        // into 0 and "benchmark" zero sessions.
+        int iters = 10;
+        if (const char* itersArg = argValue(argc, argv, "--iters"))
+        {
+            char* end = nullptr;
+            long parsed = strtol(itersArg, &end, 10);
+            if (!end || *end != '\0' || parsed <= 0 || parsed > 1000000)
+            {
+                printf("error: --iters must be a positive integer, got '%s'\n", itersArg);
+                return 2;
+            }
+            iters = (int)parsed;
+        }
+        return runSessionCreate(lib.createGlobalSession, iters);
     }
     const char* dir = argValue(argc, argv, "--dir");
     const char* root = argValue(argc, argv, "--root");
