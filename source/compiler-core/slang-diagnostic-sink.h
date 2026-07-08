@@ -88,10 +88,12 @@ struct DiagnosticInfo
     char const* messageFormat;
 
     /// The warning group this diagnostic belongs to. Only meaningful for warnings; the default of
-    /// `WarningLevel::Default` means "always emitted". Tagging a warning with another group makes
-    /// it opt-in via the corresponding -Wall/-Wextra/-Wpedantic flag (or the WarningLevel API
-    /// option). Has a default so the many aggregate initializers that predate this field (and the
-    /// `DIAGNOSTIC(...)` macro catalogs) keep compiling unchanged.
+    /// `WarningLevel::Default` means "always emitted". Tagging a warning with another group gates
+    /// it on whether that group is currently enabled (see the enabled-groups bitmask below):
+    /// `Extra` is on by default, `All`/`Pedantic` are off by default, and each is toggled by the
+    /// corresponding -Wall/-Wextra/-Wpedantic flag (or the WarningLevel API option). Has a default
+    /// so the many aggregate initializers that predate this field (and the `DIAGNOSTIC(...)` macro
+    /// catalogs) keep compiling unchanged.
     WarningLevel level = WarningLevel::Default;
 };
 
@@ -490,11 +492,13 @@ protected:
     // Bitmask of enabled warning groups, indexed by `WarningLevel`. The `Default` group is always
     // on and is not represented here; other groups are opt-in (see enableWarningLevel).
     //
-    // The `Pedantic` group is enabled by default for now, so tagging a warning `pedantic` does not
-    // yet change its visibility -- it only records the group. A follow-up will flip pedantic to
-    // off-by-default (and decide which existing warnings belong in each group); this staging lets
-    // the grouping land without silently dropping any warning from today's output.
-    uint32_t m_enabledWarningLevels = (uint32_t(1) << uint32_t(WarningLevel::Pedantic));
+    // The groups are independent (not nested): a warning is gated on exactly the one group it is
+    // tagged with. By default the `Extra` group is on and the `Pedantic` group is off, so a
+    // `pedantic` warning is an advisory hint that fires only under `-Wpedantic`. A warning that
+    // should stay silent unless the user opts in belongs in `pedantic` (e.g.
+    // `vertex-shader-missing-sv-position`, which is a false positive whenever the vertex shader
+    // feeds a geometry/tessellation/mesh stage rather than the rasterizer).
+    uint32_t m_enabledWarningLevels = (uint32_t(1) << uint32_t(WarningLevel::Extra));
 
     RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
 

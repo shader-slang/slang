@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage compute -entry computeMain -target glsl
 //TEST:SIMPLE(filecheck=CHECK_GLSL_SPIRV): -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-via-glsl
-//TEST:SIMPLE(filecheck=CHECK_SPIR): -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK_SPIR): -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly -O1
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -allow-glsl -stage compute -entry computeMain -target hlsl
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -output-using-type -emit-spirv-via-glsl
@@ -47,7 +47,7 @@ bool Test_VectorType()
     genIType outGenIType, outGenIType2;
     genUType outGenUType, outGenUType2;
 
-    constexpr const float epsilon = 0.000001;
+    const float epsilon = 0.000001;
 
     // CHECK_SPIR-LABEL: Op{{.*}}AccessChain {{.*}} %inputBuffer
     const int zero = inputBuffer.data[0];
