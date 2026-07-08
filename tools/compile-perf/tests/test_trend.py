@@ -70,12 +70,24 @@ class TrendLabelTest(unittest.TestCase):
         self.assertIn("module_link", r.stdout)
 
     def test_label_baseline_is_strictly_earlier_points(self):
-        """Judging a mid-series clean point must not compare it against the
-        regressed point that comes AFTER it (a backfill must not be judged
-        against its own future)."""
-        r = run_trend(self.tmp.name, "--label", "2026-07-05-aaaaaaaaa")
-        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn("current=2026-07-05-aaaaaaaaa", r.stdout)
+        """The baseline for a judged point must be drawn only from points
+        strictly BEFORE it in series order. The fixture is built so the wrong
+        slice changes the verdict: judged mid-series point 140 vs earlier
+        median 100 flags (1.40x); a baseline that wrongly includes the later
+        200s has median 120, and 140/120 = 1.17x would stay silent."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        os.makedirs(os.path.join(tmp.name, "tracking"))
+        points = [make_point(f"2026-07-0{i}-aaaaaaaaa", 100.0) for i in range(1, 4)]
+        points.append(make_point("2026-07-04-judged", 140.0))
+        points += [make_point(f"2026-07-0{i}-later", 200.0) for i in range(5, 9)]
+        with open(os.path.join(tmp.name, "tracking", "tracking.json"), "w") as fh:
+            json.dump({"runner": "test-runner", "points": points}, fh)
+
+        r = run_trend(tmp.name, "--label", "2026-07-04-judged")
+        self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("current=2026-07-04-judged", r.stdout)
+        self.assertIn("module_link", r.stdout)
 
     def test_unknown_label_fails_loudly(self):
         r = run_trend(self.tmp.name, "--label", "no-such-point")

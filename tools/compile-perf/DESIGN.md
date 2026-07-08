@@ -82,14 +82,21 @@ via `analyze.canonical_runs`, so history and daily points compare like-with-like
 
 ### Drift alert — `trend.py`
 
-After each nightly rebuild, `trend.py` compares the latest point's primary timers
-(per workload, always including `compileInner`) against the trailing-N-point
-median (default 7), restricted to the **same runner fingerprint**. A metric past
-both a relative (`--rel`, default 1.25×) and absolute (`--abs`, default 2 ms)
-threshold is flagged — printed, emitted as a GitHub `::error::` annotation +
-step-summary row, and the job exits non-zero (after the push, so the data is still
-stored). If the latest point's runner differs from the history's, it warns and
-compares only same-runner points.
+After each nightly rebuild, `trend.py` judges one point's primary timers (per
+workload, always including `compileInner`) against the trailing-N-point median
+(default 7) of same-runner points strictly before it in series order. The
+nightly passes `--label` with the label it just registered, so the judged point
+is pinned to this run's registration — daily labels are keyed by the swept
+commit's date, so several points can share a date and "the latest point" can be
+a same-date sibling. Without `--label` (ad-hoc CLI use) the last point is
+judged. A metric past both a relative (`--rel`, default 1.25×) and absolute
+(`--abs`, default 2 ms) threshold is flagged — printed, emitted as a GitHub
+`::error::` annotation + step-summary row, and the job exits non-zero (after
+the push, so the data is still stored). If the judged point's runner differs
+from the history's, it warns and compares only same-runner points. The
+selection logic is covered by `tests/test_trend.py` (run via
+`python3 -m unittest discover -s tools/compile-perf/tests`, and in CI by
+`compile-perf-tests.yml` on any tooling change).
 
 ### Runner-change procedure
 

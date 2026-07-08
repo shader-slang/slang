@@ -1,0 +1,30 @@
+name: Compile-Perf Tool Tests
+
+# Unit tests for the compile-perf tooling (tools/compile-perf/tests/). Pure
+# stdlib Python, no build — runs in seconds on a hosted runner, only when the
+# tooling changes.
+
+on:
+  pull_request:
+    paths:
+      - "tools/compile-perf/**"
+      - ".github/workflows/compile-perf-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.x"
+
+      - name: Run compile-perf tool tests
+        run: python3 -m unittest discover -s tools/compile-perf/tests -v
