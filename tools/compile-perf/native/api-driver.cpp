@@ -192,6 +192,15 @@ static bool hasReflectionApi(const LibSlang& lib)
            lib.reflTypeLayoutGetSize;
 }
 
+// IModule::getName() may return null (an unnamed module); printf("%s", null)
+// and std::string concatenation of null are both UB, so every display use goes
+// through this.
+static const char* moduleDisplayName(slang::IModule* module)
+{
+    const char* name = module->getName();
+    return (name && *name) ? name : "<unnamed>";
+}
+
 static void printDiagnostics(slang::IBlob* diagnostics)
 {
     if (diagnostics && diagnostics->getBufferSize())
@@ -363,7 +372,9 @@ static bool compileEntryPoint(
         Scope s(timers, "apiFindEntryPoint");
         if (SLANG_FAILED(module->findEntryPointByName("computeMain", &entryPoint)))
         {
-            printf("error: findEntryPointByName(computeMain) failed for %s\n", module->getName());
+            printf(
+                "error: findEntryPointByName(computeMain) failed for %s\n",
+                moduleDisplayName(module));
             return false;
         }
     }
@@ -404,7 +415,9 @@ static bool compileEntryPoint(
             diagnostics->release();
         if (SLANG_FAILED(res) || !code || !code->getBufferSize())
         {
-            printf("error: getEntryPointCode produced no code for %s\n", module->getName());
+            printf(
+                "error: getEntryPointCode produced no code for %s\n",
+                moduleDisplayName(module));
             return false;
         }
     }
@@ -627,7 +640,18 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
             for (SlangInt i = 0; i < count; i++)
             {
                 slang::IModule* m = setupSession->getLoadedModule(i);
-                std::string path = dir + "/" + m->getName() + ".slang-module";
+                // The binary's filename comes from the module name, so an
+                // unnamed module can't take part in this workload — and the
+                // generators always name their modules. Fail loudly rather
+                // than concatenate a null name (UB).
+                const char* name = m->getName();
+                if (!name || !*name)
+                {
+                    printf("error: loaded module #%d has no name; cannot write a binary for it\n",
+                           (int)i);
+                    return 1;
+                }
+                std::string path = dir + "/" + name + ".slang-module";
                 if (SLANG_FAILED(m->writeToFile(path.c_str())))
                 {
                     printf("error: writeToFile failed for %s\n", path.c_str());
@@ -674,7 +698,7 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
             {
                 printf(
                     "error: module '%s' resolved to '%s', not a .slang-module binary\n",
-                    session->getLoadedModule(i)->getName(),
+                    moduleDisplayName(session->getLoadedModule(i)),
                     p.c_str());
                 allBinary = false;
             }

@@ -139,9 +139,8 @@ jobs:
       # Exercise the api-driver + api workloads every night WITHOUT publishing:
       # they are opt-in for the tracked series until the history is resynced
       # with them, but unexercised code bit-rots — this builds the driver with
-      # the host cl and runs three api workloads (including the binary-module
-      # path) against the just-built slang, writing to a scratch dir the job
-      # discards. Failures fail the job before results are pushed.
+      # the host cl and runs all six api workloads against the just-built
+      # slang, writing to a scratch dir the job discards. Failures fail the job before results are pushed.
       - name: API workload smoke (non-publishing)
         shell: bash
         run: |
@@ -150,7 +149,7 @@ jobs:
           python3 bench.py --slangc "$GITHUB_WORKSPACE/build/Release/bin/slangc.exe" \
             --label api-smoke --out "$GITHUB_WORKSPACE/api-smoke-results" \
             --samples 1 --warmup 0 \
-            --only api_session_create,api_many_kernels,api_module_graph_bin
+            --only api_session_create,api_many_kernels,api_module_graph,api_module_graph_bin,api_reflection,api_specialize
 
       - name: Push results
         shell: bash
