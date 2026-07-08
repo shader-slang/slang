@@ -63,14 +63,21 @@ void simplifyIR(
     // use lists (see IRDeadCodeEliminationOptions::calleeSideEffectCache) —
     // quadratic in the call-site count of builtins like `sin`.
     //
-    // Sharing one memo across the whole pass is sound because the fixpoint's
-    // passes keep the answer monotone: none of them creates an `IRAnnotation`
-    // or removes a no-side-effect/read-none decoration (they only remove
-    // annotations and add purity decorations), so a cached answer can only go
-    // conservatively stale (an inst stays alive one extra round). A pass added
-    // to this fixpoint must preserve that contract or must not share the
-    // cache; a debug-mode check in `doesCalleeHaveSideEffect` verifies it on
-    // every cache hit.
+    // Sharing the memo is sound because the fixpoint's passes keep the answer
+    // monotone: none of them creates an `IRAnnotation` or removes a
+    // no-side-effect/read-none decoration (they only remove annotations and
+    // add purity decorations), so a cached answer can only go conservatively
+    // stale (a call stays alive that could be eliminated). To bound that
+    // staleness the memo is cleared at the top of every outer iteration:
+    // `propagateFuncProperties` runs before the inner loop, so each
+    // iteration's DCE queries see the purity facts proven that iteration, and
+    // the terminal module-scope DCE below runs after an iteration that
+    // changed nothing, so it never sees a stale entry. The amortization is
+    // unaffected — the quadratic cost this memo fixes sits in the inner
+    // per-function loop within one iteration. A pass added to this fixpoint
+    // must preserve the monotonicity contract or must not share the cache; a
+    // debug-mode check in `doesCalleeHaveSideEffect` verifies it on every
+    // cache hit.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
@@ -86,6 +93,7 @@ void simplifyIR(
             break;
 
         changed = false;
+        options.deadCodeElimOptions.calleeSideEffectCache->clear();
 
         changed |= deduplicateGenericChildren(module);
         changed |= propagateFuncProperties(module);
@@ -136,6 +144,9 @@ void simplifyNonSSAIR(
     DiagnosticSink* sink)
 {
     // See the matching memo in simplifyIR for why and when this is sound.
+    // Unlike simplifyIR, no per-iteration clear is needed here: this fixpoint
+    // does not run propagateFuncProperties, so no pass proves new callees
+    // pure while the cache is live.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
@@ -171,6 +182,9 @@ void simplifyFunc(
     DiagnosticSink* sink)
 {
     // See the matching memo in simplifyIR for why and when this is sound.
+    // Unlike simplifyIR, no per-iteration clear is needed here: this fixpoint
+    // does not run propagateFuncProperties, so no pass proves new callees
+    // pure while the cache is live.
     Dictionary<IRInst*, bool> calleeSideEffectCache;
     if (!options.deadCodeElimOptions.calleeSideEffectCache)
         options.deadCodeElimOptions.calleeSideEffectCache = &calleeSideEffectCache;
