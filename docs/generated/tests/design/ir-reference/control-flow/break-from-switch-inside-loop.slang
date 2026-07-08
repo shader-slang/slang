@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T21:00:00+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-unconditional-branches
-//META: doc_section_digest=14af4d2a3a4636636d6099f23a462c390fb80ef7faa8966bf7a220163783dc45
+//META: doc_section_digest=563b78aadce87b91aef5ce139690f111186f2e0b9b1747c80e149bf3ead75206
 //META: purpose=Boundary: a `break;` inside a switch nested in a loop targets the switch's breakLabel — it leaves the switch, not the enclosing loop. Both a switch terminator and a loop terminator coexist with distinct break labels.
 //META: intent=boundary
 //META: pipeline_stage=lower
