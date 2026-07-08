@@ -1439,9 +1439,16 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     switch (type->getOp())
                     {
                     case kIROp_HalfType:
+                        // The `HF` literal suffix is gated behind
+                        // GL_EXT_shader_explicit_arithmetic_types, so register the requirement
+                        // here just as the integer-literal cases above do for their suffixes.
+                        _requireBaseType(BaseType::Half);
                         m_writer->emit("HF");
                         break;
                     case kIROp_DoubleType:
+                        // No `_requireBaseType` here: double is gated by GLSL `#version`, not by an
+                        // extension, and `ShaderExtensionTracker` has no `BaseType::Double`
+                        // mapping, so registering it would be a no-op.
                         m_writer->emit("LF");
                         break;
                     default:
@@ -2860,6 +2867,100 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
 
             maybeCloseParens(needClose);
+            return true;
+        }
+    case kIROp_MakeArray:
+    case kIROp_MakeArrayFromElement:
+        {
+            // Emit an array value using GLSL array-constructor syntax
+            // `elementType[]( e0, e1, ... )` rather than the base emitter's C-style
+            // `{ ... }`. Brace/aggregate initializers are only valid in GLSL 4.20+
+            // (GL_ARB_shading_language_420pack), so they break on earlier profiles such
+            // as glsl_330; the constructor form is the portable spelling that is valid
+            // across GLSL versions. Mirrors the WGSL emitter, which overrides the same
+            // ops for the same reason.
+            //
+            // GLSL splits array brackets around the (here absent) declarator, so a
+            // nested array writes its outermost dimension unsized and inner dimensions
+            // sized: `ivec2[]` for `ivec2[2]`, `int[][3]` for `int[2][3]`. The C-like
+            // base emitter spells array types via its declarator machinery, but a
+            // constructor prefix has no declarator name to thread through it, so the
+            // bracket sequence is emitted directly here.
+            //
+            // The outermost dimension is left unsized, so the emitted array length is
+            // fixed entirely by the number of constructor arguments below. That is
+            // correct because a MakeArray carries exactly one operand per declared
+            // element (array-literal lowering pads any missing trailing elements with
+            // the default value before building the inst); a short operand list would
+            // otherwise emit an array of the wrong length.
+            auto arrayType = cast<IRArrayType>(inst->getDataType());
+
+            IRType* elementType = arrayType->getElementType();
+            List<IRInst*> innerDimSizes;
+            while (auto innerArrayType = as<IRArrayType>(elementType))
+            {
+                innerDimSizes.add(innerArrayType->getElementCount());
+                elementType = innerArrayType->getElementType();
+            }
+
+            emitType(elementType);
+            m_writer->emit("[]");
+            for (auto innerDimSize : innerDimSizes)
+            {
+                m_writer->emit("[");
+                emitVal(innerDimSize, getInfo(EmitOp::General));
+                m_writer->emit("]");
+            }
+
+            m_writer->emit("(");
+            if (inst->getOp() == kIROp_MakeArrayFromElement)
+            {
+                // A single element value is broadcast across the outermost dimension.
+                UInt argCount = (UInt)cast<IRIntLit>(arrayType->getElementCount())->getValue();
+                for (UInt aa = 0; aa < argCount; ++aa)
+                {
+                    if (aa != 0)
+                        m_writer->emit(", ");
+                    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                }
+            }
+            else
+            {
+                UInt argCount = inst->getOperandCount();
+                for (UInt aa = 0; aa < argCount; ++aa)
+                {
+                    if (aa != 0)
+                        m_writer->emit(", ");
+                    emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
+                }
+            }
+            m_writer->emit(")");
+
+            return true;
+        }
+    case kIROp_MakeStruct:
+        {
+            // Emit a struct value with GLSL's struct-constructor syntax
+            // `StructType( f0, f1, ... )` instead of the base emitter's C-style
+            // `{ ... }`. Aggregate/brace initializers are only valid in GLSL 4.20+
+            // (GL_ARB_shading_language_420pack) and break on earlier profiles such as
+            // glsl_330, whereas struct constructors are portable (core since GLSL 1.10).
+            //
+            // This is a separate case from the array case above rather than folded into
+            // it: an array uses GLSL's bracket-split spelling `elementType[]( ... )`,
+            // which is invalid for a struct. A MakeStruct carries one operand per field
+            // in declaration order, matching GLSL constructor argument order.
+            emitType(inst->getDataType());
+            m_writer->emit("(");
+            UInt argCount = inst->getOperandCount();
+            for (UInt aa = 0; aa < argCount; ++aa)
+            {
+                if (aa != 0)
+                    m_writer->emit(", ");
+                emitOperand(inst->getOperand(aa), getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
+
             return true;
         }
     default:

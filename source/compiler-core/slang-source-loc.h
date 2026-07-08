@@ -142,10 +142,11 @@ public:
     {
     }
 
-    SourceLoc(SourceLoc const& loc)
-        : raw(loc.raw)
-    {
-    }
+    // Copying must stay defaulted (not user-provided) so SourceLoc remains
+    // trivially copyable: aggregates that embed a SourceLoc in a union rely on
+    // that to get trivial whole-object copies (see
+    // `GenericArgumentInferenceFailure` in slang-check-impl.h).
+    SourceLoc(SourceLoc const& loc) = default;
 
     SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return raw == rhs.raw; }
     SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(raw == rhs.raw); }

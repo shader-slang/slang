@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#requirementdecl-style-nodes-inside-interfacedecl
-//META: doc_section_digest=d2ddd242ca9bb660cb1ae0f8e2b2e49371d56501836a7e6ac082e8f7f550fbfd
+//META: doc_section_digest=4c37f9dfe6cf12e08ecfd91cb5b14070a8232c0e86d4bcb998f12ec60adc6aed
 //META: purpose=An interface requirement is whatever Decl is written inside the interface body; a conforming type that omits a required member is diagnosed.
 //META: intent=negative
 //META: pipeline_stage=check

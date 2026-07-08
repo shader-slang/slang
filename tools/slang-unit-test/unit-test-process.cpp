@@ -127,6 +127,20 @@ static SlangResult _httpCrashTest(UnitTestContext* context)
     return SLANG_OK;
 }
 
+static void _checkHTTPHeaderContentLengthValidation()
+{
+    HTTPHeader header;
+
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        HTTPHeader::parse(UnownedStringSlice("Content-Length: 4\r\n\r\n"), header)));
+    SLANG_CHECK(header.m_contentLength == 4);
+
+    SLANG_CHECK(
+        SLANG_FAILED(HTTPHeader::parse(UnownedStringSlice("Content-Length: -1\r\n\r\n"), header)));
+    SLANG_CHECK(SLANG_FAILED(
+        HTTPHeader::parse(UnownedStringSlice("Content-Length: not-a-number\r\n\r\n"), header)));
+}
+
 #if defined(_WIN32)
 struct ScopedWinHandle
 {
@@ -648,6 +662,11 @@ SLANG_UNIT_TEST(CommandLineProcess)
 #if defined(_WIN32)
     SLANG_CHECK(SLANG_SUCCEEDED(_parentMonitorTest(unitTestContext)));
 #endif
+}
+
+SLANG_UNIT_TEST(HTTPHeaderContentLengthValidation)
+{
+    _checkHTTPHeaderContentLengthValidation();
 }
 
 #if defined(_WIN32)

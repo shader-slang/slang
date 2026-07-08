@@ -23,7 +23,7 @@ can be inspected and modified. */
 struct ReproUtil
 {
     // ReproUtil is an internal compiler helper declared under source/, not part of the public
-    // include/slang.h API. Selected loader members carry SLANG_API only as binary link points for
+    // include/slang.h API. The SLANG_API members are grouped below as binary link points for
     // companion modules such as slang-unit-test-tool; external consumers should use the public C
     // APIs for repro loading and extraction.
     enum
@@ -40,7 +40,6 @@ struct ReproUtil
         SLANG_FOUR_CC('d', 'a', 't', 'a'); ///< Holds the actual binary data.
 
     static const SemanticVersion g_semanticVersion;
-    SLANG_API static StableHashCode32 getTypeHash();
 
     struct Header
     {
@@ -177,23 +176,12 @@ struct ReproUtil
         SlangMatrixLayoutMode defaultMatrixLayoutMode;
     };
 
-    static SlangResult store(
-        EndToEndCompileRequest* request,
-        OffsetContainer& inOutContainer,
-        Offset32Ptr<RequestState>& outRequest);
-
-    static SlangResult saveState(EndToEndCompileRequest* request, const String& filename);
-
-    static SlangResult saveState(EndToEndCompileRequest* request, Stream* stream);
-
-    /// Create a cache file system that uses contents of a validated request state.
-    /// The passed in fileSystem is used for accessing any file accesses not found in the cache.
-    /// Returns SLANG_FAIL if requestState is null.
-    static SlangResult loadFileSystem(
-        OffsetBase& base,
-        RequestState* requestState,
-        ISlangFileSystem* fileSystem,
-        ComPtr<ISlangFileSystemExt>& outFileSystem);
+    // Cross-DLL entry points.
+    //
+    // Keep SLANG_API methods grouped here so ownership boundaries stay visible during review.
+    // These functions must not expose mutable owning containers such as List<T>. Use blobs or
+    // caller-owned raw byte spans for any data that crosses a binary module boundary.
+    SLANG_API static StableHashCode32 getTypeHash();
 
     /// Load a validated requestState into request.
     /// requestState must come from a buffer accepted by loadState() or isReproStateValid().
@@ -206,32 +194,28 @@ struct ReproUtil
         ISlangFileSystem* overrideFileSystem,
         EndToEndCompileRequest* request);
 
-    /// Load, unwrap, version-check, and validate a serialized repro state payload.
-    /// On invalid repro-state payloads, clears outBuffer, emits Diagnostics::InvalidReproState
-    /// through sink, and returns SLANG_FAIL.
-    SLANG_API static SlangResult loadState(
-        const String& filename,
-        DiagnosticSink* sink,
-        List<uint8_t>& outBuffer);
-    /// Load, unwrap, version-check, and validate a serialized repro state payload.
-    /// On invalid repro-state payloads, clears outBuffer, emits Diagnostics::InvalidReproState
-    /// through sink, and returns SLANG_FAIL.
-    SLANG_API static SlangResult loadState(
-        Stream* stream,
-        DiagnosticSink* sink,
-        List<uint8_t>& outBuffer);
-    /// Load, unwrap, version-check, and validate a serialized repro state payload.
-    /// On invalid repro-state payloads, clears outBuffer, emits Diagnostics::InvalidReproState
+    /// Create a cache file system that uses contents of a validated request state.
+    /// The passed in fileSystem is used for accessing any file accesses not found in the cache.
+    /// Returns SLANG_FAIL if requestState is null.
+    SLANG_API static SlangResult loadFileSystem(
+        OffsetBase& base,
+        RequestState* requestState,
+        ISlangFileSystem* fileSystem,
+        ComPtr<ISlangFileSystemExt>& outFileSystem);
+
+    /// Load, unwrap, version-check, and validate a serialized repro state payload into a COM blob.
+    /// On invalid repro-state payloads, clears *outBlob, emits Diagnostics::InvalidReproState
     /// through sink, and returns SLANG_FAIL.
     SLANG_API static SlangResult loadState(
         const uint8_t* data,
         size_t size,
         DiagnosticSink* sink,
-        List<uint8_t>& outBuffer);
+        ISlangBlob** outBlob);
 
-    /// Return the RequestState root for a validated repro state payload.
-    /// Returns nullptr when inBuffer is too small to contain the root object.
-    SLANG_API static RequestState* getRequest(const List<uint8_t>& inBuffer);
+    /// Return the RequestState root for a validated repro state payload stored in raw bytes.
+    /// data must point to bytes accepted by loadState() or isReproStateValid().
+    /// Returns nullptr when data is null or size is too small to contain the root object.
+    SLANG_API static const RequestState* getRequest(const void* data, size_t size);
 
     SLANG_API static SlangResult extractFilesToDirectory(const String& file, DiagnosticSink* sink);
 
@@ -247,7 +231,19 @@ struct ReproUtil
         const String& filename,
         String& outPath);
 
-    /// Given a request trys to determine a suitable dump file name, that is unique.
+private:
+    friend class EndToEndCompileRequest;
+
+    static SlangResult store(
+        EndToEndCompileRequest* request,
+        OffsetContainer& inOutContainer,
+        Offset32Ptr<RequestState>& outRequest);
+
+    static SlangResult saveState(EndToEndCompileRequest* request, const String& filename);
+
+    static SlangResult saveState(EndToEndCompileRequest* request, Stream* stream);
+
+    /// Given a request tries to determine a suitable dump file name that is unique.
     static SlangResult findUniqueReproDumpStream(
         EndToEndCompileRequest* request,
         String& outFileName,
