@@ -264,7 +264,15 @@ For details:
   binding contract and per-target host recipes.
 - [`docs/design/shader-coverage-counter-placement.md`](https://github.com/shader-slang/slang/blob/master/docs/design/shader-coverage-counter-placement.md) —
   where each mode places its counters, with worked examples.
-- [`examples/shader-coverage-image-pipeline`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-image-pipeline)
-  and
-  [`examples/shader-coverage-bvh-traversal`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-bvh-traversal) —
-  coverage-driven Vulkan workflows on realistic kernels, using the in-process API.
+- [`examples/shader-coverage-image-pipeline`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-image-pipeline) —
+  Vulkan, in-process API, auto-allocated binding: the compiler picks the coverage slot and
+  the host reads it back from the metadata after compilation. Multi-stage image kernels
+  (denoise, tone map, gamma) with many-armed switches; a smoke-vs-full run shows branch and
+  function coverage catching switch arms that line coverage alone marks covered. Also
+  demonstrates count vs boolean recording modes and counter-width selection.
+- [`examples/shader-coverage-bvh-traversal`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-bvh-traversal) —
+  Vulkan, in-process API, explicit binding: the host pins the coverage slot up front with
+  `TraceCoverageBinding` so the pipeline layout is fixed before compilation. BVH ray
+  traversal where branch coverage surfaces input-shape gaps in the test scene: degenerate
+  triangles, the traversal-stack-overflow fallback, and material-dispatch arms the default
+  mesh never fires.
