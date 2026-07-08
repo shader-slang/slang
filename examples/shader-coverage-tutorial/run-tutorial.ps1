@@ -59,7 +59,7 @@ Write-Host "using slangc: $Slangc"
 $kernel = if ($IsWindows -or $env:OS -eq "Windows_NT") { "hello-coverage-kernel.dll" }
 else { "hello-coverage-kernel.so" }
 
-# --- Step 1: "Your first coverage build" ------------------------------------
+# --- Step 1: "Compiling with coverage" ------------------------------------
 # One flag, -trace-coverage, turns on line coverage. Two files appear:
 # the compiled shader and the .coverage-manifest.json sidecar that maps
 # counter slots back to source locations.
@@ -73,7 +73,7 @@ Write-Host "wrote hello-coverage.spv and hello-coverage.spv.coverage-manifest.js
 # counter buffer binds at a descriptor (set, binding).
 python -m json.tool hello-coverage.spv.coverage-manifest.json | Select-Object -First 14
 
-# --- Step 3: "Running for real: dispatching the precompiled kernel" ---------
+# --- Step 3: "Dispatching the precompiled kernel" ---------
 # Compile the same shader once more, to a directly callable CPU shared
 # library. slangc drives the system C++ compiler; the new sidecar
 # reports uniform_offset instead of a descriptor location.
@@ -109,7 +109,7 @@ else
 # hello-coverage.counters.bin.
 Invoke-Step "./hello-coverage-host.exe"
 
-# --- Step 4: "From counters to a report" ------------------------------------
+# --- Step 4: "Generating a report" ------------------------------------
 # The LCOV converter joins the raw counters with the manifest's source
 # attribution. Expect two zero-count lines: the negative-input clamp
 # and the applyGain fallthrough, which these inputs never reach.
