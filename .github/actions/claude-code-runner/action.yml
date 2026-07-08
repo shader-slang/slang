@@ -60,7 +60,7 @@ inputs:
     required: false
     default: ""
   custom-instructions:
-    description: "Custom instructions for Claude"
+    description: "Custom instructions appended to Claude Code's default system prompt (via --append-system-prompt; must not contain unbalanced double quotes)"
     required: true
   mcp-config:
     description: "MCP server configuration JSON"
@@ -479,11 +479,27 @@ runs:
 
         echo "model=$MODEL" >> $GITHUB_OUTPUT
 
+    # custom-instructions is interpolated into claude_args inside double quotes and
+    # parsed by shell-quote, not a real shell. An unbalanced double quote flips quote
+    # parity and silently swallows the flags that follow (--model, --allowedTools),
+    # disabling the tool allowlist. Fail closed instead. (Balanced embedded quotes
+    # are tolerated but get stripped by the parser.)
+    - name: Validate custom-instructions quoting
+      shell: bash
+      env:
+        CUSTOM_INSTRUCTIONS: ${{ inputs.custom-instructions }}
+      run: |
+        QUOTE_COUNT=$(printf '%s' "$CUSTOM_INSTRUCTIONS" | tr -cd '"' | wc -c)
+        if [ $((QUOTE_COUNT % 2)) -ne 0 ]; then
+          echo "::error::custom-instructions contains an unbalanced double quote; this corrupts claude_args parsing and drops the tool allowlist. Remove or balance the quote."
+          exit 1
+        fi
+
     # Execute Claude Code Action (v1) - NVIDIA Inference Portal
     - name: Execute Claude Code Action (NV Inference)
       id: claude-action-nv
       if: steps.auth-token.outputs.auth-provider == 'nv-inference'
-      uses: anthropics/claude-code-action@0f97b95b6536c26e5f6bd90faec370d41695beca # v1.0.144
+      uses: anthropics/claude-code-action@f87768c6d25f92ae6efa7175e223ef77d4cbf97f # v1.0.166
       env:
         # NV Inference Portal uses custom base URL - SDK redirects API calls there
         ANTHROPIC_BASE_URL: ${{ inputs.nv-inference-url }}
@@ -509,7 +525,7 @@ runs:
         branch_prefix: ${{ inputs.branch-prefix }}
         show_full_output: ${{ inputs.show-debug-output }}
         claude_args: |
-          --system-prompt "${{ inputs.custom-instructions }}"
+          --append-system-prompt "${{ inputs.custom-instructions }}"
           --model ${{ steps.determine-model.outputs.model }}
           --max-turns ${{ inputs.max-turns }}
           --allowedTools "${{ inputs.allowed-tools }}"
@@ -532,7 +548,7 @@ runs:
     - name: Execute Claude Code Action (LLMGW)
       id: claude-action-llmgw
       if: steps.auth-token.outputs.auth-provider == 'llmgw'
-      uses: anthropics/claude-code-action@0f97b95b6536c26e5f6bd90faec370d41695beca # v1.0.144
+      uses: anthropics/claude-code-action@f87768c6d25f92ae6efa7175e223ef77d4cbf97f # v1.0.166
       env:
         # Use Bedrock with bearer token auth (not AWS SigV4)
         ANTHROPIC_BEDROCK_BASE_URL: ${{ inputs.bedrock-base-url || 'https://prod.api.nvidia.com/llm/v1/aws' }}
@@ -557,7 +573,7 @@ runs:
         branch_prefix: ${{ inputs.branch-prefix }}
         show_full_output: ${{ inputs.show-debug-output }}
         claude_args: |
-          --system-prompt "${{ inputs.custom-instructions }}"
+          --append-system-prompt "${{ inputs.custom-instructions }}"
           --model ${{ steps.determine-model.outputs.model }}
           --max-turns ${{ inputs.max-turns }}
           --allowedTools "${{ inputs.allowed-tools }}"
