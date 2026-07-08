@@ -158,97 +158,23 @@ byte offset where the coverage buffer's `(pointer, count)` pair belongs:
     },
 ```
 
-The host program below is the whole integration: it loads the precompiled kernel, binds the
-three buffers (the shader's two, plus one for coverage) by writing `(pointer, count)` pairs
-into the payload, dispatches one thread group, prints the raw counter slots, and saves them
-for the report step. It needs no Slang headers or library at all — the kernel is already
-compiled, and the three constants near the top are the numbers you just read in the manifest
-(a production host would parse them out of the JSON).
+The host program,
+[`hello-coverage-host.cpp`](https://github.com/shader-slang/slang/blob/master/examples/shader-coverage-tutorial/hello-coverage-host.cpp),
+is the whole integration: it loads the precompiled kernel, binds the three buffers (the
+shader's two, plus one for coverage) by writing `(pointer, count)` pairs into the payload,
+dispatches one thread group, prints the raw counter slots, and saves them for the report
+step. The full file is about 140 lines and needs no Slang headers or library at all — the
+kernel is already compiled, and three constants near its top (`kCounterCount`,
+`kElementStride`, `kUniformOffset`) are the numbers you just read in the manifest, which a
+production host would parse out of the JSON.
 
-Save this as `hello-coverage-host.cpp` next to the shader:
+The heart of the program is the binding. `BufferView` is its 16-byte
+`{ void* data; size_t count; }` mirror of how the CPU target lays out a
+`(RW)StructuredBuffer` parameter; the shader's own buffers occupy the payload's leading
+fields in declaration order, and the coverage buffer — which must start zeroed — goes at the
+manifest-reported `uniform_offset`:
 
 ```cpp
-// hello-coverage-host.cpp: load the kernel slangc precompiled into
-// hello-coverage-kernel.so, bind the hidden counter buffer where the
-// sidecar manifest says, dispatch one thread group, and write the raw
-// counters for the LCOV converter. Uses no Slang headers or library —
-// the manifest is the whole contract.
-
-#include <cstdint>
-#include <cstdio>
-#include <cstring>
-#include <fstream>
-#include <vector>
-
-#ifdef _WIN32
-#include <windows.h>
-static void* loadKernel(const char* path)
-{
-    return (void*)LoadLibraryA(path);
-}
-static void* findFunc(void* lib, const char* name)
-{
-    return (void*)GetProcAddress((HMODULE)lib, name);
-}
-#else
-#include <dlfcn.h>
-static void* loadKernel(const char* path)
-{
-    return dlopen(path, RTLD_NOW);
-}
-static void* findFunc(void* lib, const char* name)
-{
-    return dlsym(lib, name);
-}
-#endif
-
-// The CPU compute-kernel ABI (see prelude/slang-cpp-types.h): group-ID
-// range, entry-point uniforms, and the global-parameter payload.
-struct UInt3
-{
-    uint32_t x, y, z;
-};
-struct ComputeVaryingInput
-{
-    UInt3 startGroupID;
-    UInt3 endGroupID;
-};
-typedef void (*ComputeFunc)(ComputeVaryingInput*, void*, void*);
-
-// How a (RW)StructuredBuffer<T> parameter is laid out in the payload.
-struct BufferView
-{
-    void* data;
-    size_t count;
-};
-
-// Values from hello-coverage-kernel.so.coverage-manifest.json. A real
-// integration parses them out of the JSON; they are inlined here to
-// keep the listing dependency-free.
-constexpr uint32_t kCounterCount = 8;   // "counter_count"
-constexpr uint32_t kElementStride = 8;  // "buffer": "element_stride"
-constexpr uint32_t kUniformOffset = 32; // "buffer": "uniform_offset"
-
-#ifdef _WIN32
-constexpr const char* kKernelPath = "hello-coverage-kernel.dll";
-#else
-constexpr const char* kKernelPath = "./hello-coverage-kernel.so";
-#endif
-
-int main()
-{
-    void* library = loadKernel(kKernelPath);
-    auto computeMain = library ? (ComputeFunc)findFunc(library, "computeMain") : nullptr;
-    if (!computeMain)
-    {
-        std::fprintf(stderr, "cannot load %s\n", kKernelPath);
-        return 1;
-    }
-
-    // Bind. On CPU, "binding" means writing a (pointer, count) pair
-    // into the parameter payload. The shader's own buffers occupy the
-    // leading fields in declaration order; the coverage buffer goes at
-    // the manifest-reported uniform_offset. Counters must start zeroed.
     float inputs[4] = {1.0f, 2.0f, 3.0f, 4.0f};
     float outputs[4] = {};
     static_assert(kElementStride == 8, "manifest says uint64 counters");
@@ -262,23 +188,15 @@ int main()
     std::memcpy(payload.data(), &inputView, sizeof(inputView));
     std::memcpy(payload.data() + sizeof(BufferView), &outputView, sizeof(outputView));
     std::memcpy(payload.data() + kUniformOffset, &coverageView, sizeof(coverageView));
-
-    // Dispatch one thread group, then dump the counter slots. Which
-    // source line each slot counts is the manifest's "entries" job —
-    // the LCOV converter does that attribution for us.
-    ComputeVaryingInput varying = {{0, 0, 0}, {1, 1, 1}};
-    computeMain(&varying, nullptr, payload.data());
-
-    for (uint32_t i = 0; i < kCounterCount; ++i)
-        std::printf("counter[%u] = %llu\n", i, (unsigned long long)counters[i]);
-
-    std::ofstream("hello-coverage.counters.bin", std::ios::binary)
-        .write((const char*)counters.data(), kCounterCount * kElementStride);
-    return 0;
-}
 ```
 
-Build and run it — an ordinary C++ compile, with no SDK include or library paths:
+Everything else is bookkeeping: `dlopen`/`LoadLibrary` the kernel, call the exported
+`computeMain` with a one-thread-group dispatch range, print the counter slots, and write
+`hello-coverage.counters.bin`.
+
+Copy the program (together with the shader and the `run-tutorial` scripts) from
+[`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial)
+and build it — an ordinary C++ compile, with no SDK include or library paths:
 
 ```bash
 c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host
