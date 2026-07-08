@@ -68,8 +68,7 @@ statement. The `.coverage-manifest.json` sidecar records which counter slot corr
 which source location, and where the buffer expects to be bound.
 
 Other targets work the same way; replace `-target spirv` with `hlsl`, `metal`, `cuda`, or
-`cpp`. Exceptions: WGSL and LLVM-emitted CPU are skipped with warning E45102 (see
-Troubleshooting).
+`cpp`. Exceptions: WGSL and LLVM-emitted CPU are skipped with warning E45102.
 
 ## Reading the manifest
 
@@ -104,7 +103,7 @@ Troubleshooting).
 - `buffer`: where to bind it. On SPIR-V, a descriptor `(set, binding)`; here set 1,
   binding 0. Auto-allocation places the buffer in a new descriptor set after the shader's
   own sets, so enabling coverage can add one descriptor set to your pipeline layout (see
-  Troubleshooting).
+  [Current limitations](https://github.com/shader-slang/slang/blob/master/tools/shader-coverage/README.md#current-limitations)).
 - `entries`: counter-to-source mapping. Slot 0 counts executions of line 7, and so on.
 
 ## Dispatching the precompiled kernel
@@ -283,40 +282,6 @@ For complete Vulkan programs using the in-process workflow, see
 [`examples/shader-coverage-image-pipeline`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-image-pipeline)
 and
 [`examples/shader-coverage-bvh-traversal`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-bvh-traversal).
-
-## Troubleshooting
-
-1. **64-bit atomics are not available everywhere.** The default `uint64` counters require
-   64-bit shader atomics at runtime: on Vulkan the `shaderBufferInt64Atomics` feature
-   (absent on MoltenVK on Apple Silicon; shader module or pipeline creation fails), on D3D
-   Shader Model 6.6 (DXC rejects the generated HLSL on older profiles). Use
-   `-trace-coverage-counter-width 32`. Metal is capped to 32-bit automatically; requesting
-   64 produces warning W45115.
-2. **`uint32` counters wrap silently at 2^32.** They do not saturate; a wrapped counter
-   reads back as a small number. Use the default 64-bit width where the runtime allows it.
-3. **Enabling coverage can add a descriptor set on Vulkan.** Auto-allocation places the
-   buffer in the set after the highest shader-visible (or reserved) set. A pipeline layout
-   built only from your own reflection data will be one set too short. Read the reported
-   `(set, binding)` and include it, or use `-trace-coverage-binding`.
-4. **The name `__slang_coverage` is reserved.** Declaring a global parameter with that name
-   while coverage is enabled fails with error E45100.
-5. **WGSL and LLVM-emitted CPU targets are skipped** with warning E45102; the shader
-   compiles uninstrumented. If you expected counters and got none, check for that warning.
-   For Vulkan-based WebGPU, compile for `-target spirv`.
-6. **Read the counter width from the metadata, not from your compile flags.** Readback code
-   that hardcodes 4- or 8-byte slots breaks when the width changes or the target is Metal.
-   Use `element_stride` from the manifest or `elementByteWidth` from `CoverageBufferInfo`.
-7. **Some entries have no source location.** Compiler-synthesized code (generic
-   specialization, autodiff, constructor synthesis) can produce entries without file/line.
-   The LCOV converter skips them. When consuming the metadata directly, handle
-   `file == nullptr` / `line == 0`.
-8. **Counter slots are per-compile.** Slot `K` does not mean the same source location
-   across two compiles or shader variants. Aggregate by the source attribution in the
-   manifest or metadata, never by slot index.
-9. **In the C++ API, fetch the compiled code before the metadata.** An entry point compiles
-   once and caches the artifact. If `getEntryPointMetadata` runs first, a later
-   `getEntryPointHostCallable` fails with `E_INVALIDARG`. Call `getEntryPointCode` /
-   `getEntryPointHostCallable` first, then query metadata.
 
 ## Further reading
 

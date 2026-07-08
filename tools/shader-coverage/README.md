@@ -139,6 +139,12 @@ sidecar file is created or read, and no extra runtime library is
 needed — the public metadata interface is everything you need to
 allocate, bind, and attribute counters.
 
+Request the compiled code (`getEntryPointCode` or
+`getEntryPointHostCallable`) before `getEntryPointMetadata`: an entry
+point compiles once and caches the resulting artifact, and if the
+metadata query runs first the cache holds a form that a later
+host-callable request cannot use, failing with `E_INVALIDARG`.
+
 ```cpp
 ComPtr<slang::IMetadata> metadata;
 linked->getEntryPointMetadata(0, 0, metadata.writeRef(), ...);
@@ -305,8 +311,14 @@ Flat little-endian array of `N` counters, no header. Element width is
 reported by `manifest.buffer.element_stride` /
 `CoverageBufferInfo::elementByteWidth`. Indexed by
 `CoverageEntryInfo::counterIndex` / manifest `counter`. uint64 slots
-effectively never wrap; uint32 slots saturate at ~4 × 10⁹ hits per slot
-(see [Current limitations](#current-limitations)).
+effectively never wrap; uint32 slots wrap silently past 2^32 hits per
+slot and read back as small numbers (see
+[Current limitations](#current-limitations)).
+
+Counter slot indices are per-compile: slot `K` does not identify the
+same source location across two compiles or shader variants. Aggregate
+by the source attribution in the manifest or metadata, never by slot
+index.
 
 ---
 
@@ -371,7 +383,7 @@ declares the slot in its own pipeline layout / root signature.
 - **Column position is dropped.** Only `(file, line)` reaches LCOV.
 - **Counter width is selectable.** `uint64` by default (effectively
   never wraps); `-trace-coverage-counter-width 32` opts down to `uint32`,
-  which saturates at ~4 × 10⁹ hits per slot. Multiple ops on the same
+  which wraps silently past 2^32 hits per slot. Multiple ops on the same
   source line accumulate independently before LCOV-emit-time aggregation.
 
 ## Current limitations
