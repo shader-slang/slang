@@ -42,9 +42,17 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   `workflow_dispatch` only right now — the daily `schedule` is commented out;**
   enable it once the suite is validated on the runner and the history is seeded.
   Inputs: `ref` (commit SHA or branch to build; blank = master HEAD, useful for
-  backfilling historical daily points), `samples`, `only`. The run label
-  and `meta.json` date are derived from the checked-out commit's author date, so
-  backfill points sort correctly in the tracking series.
+  backfilling historical daily points), `samples`, `only`, and `publish`
+  (default `true`). With `publish=false` the run measures only: results are
+  uploaded as a run artifact and the results repo, tracking series, pages, and
+  trend check are untouched — the mode for one-off measurements (bisect points,
+  suspect commits) that must not pollute the series. Because daily labels are
+  keyed by the swept commit's date, several points can share a date; the
+  workflow therefore passes the label it registered to `trend.py --label` so
+  the trend check judges exactly this run's point rather than a same-date
+  sibling. The run label and `meta.json` date are derived from the checked-out
+  commit's author date, so backfill points sort correctly in the tracking
+  series.
 - **`compile-perf-release-sweep.yml`** (`workflow_dispatch`) — downloads prebuilt
   release `slangc` for the runner's platform, sweeps each into `releases/<tag>/`,
   writes `index.json`, stamps `runner.json`, rebuilds, and pushes. **Run with
@@ -72,16 +80,28 @@ Absolute compile times are runner-specific, so the series is assembled per machi
 built on), `runner-id`, `summary`. Points reduce to per-`(workload, timer)` median
 via `analyze.canonical_runs`, so history and daily points compare like-with-like.
 
+Points sort by `(date, commit_time, label)`. The full committer timestamp
+matters because daily labels carry only the commit's DATE, and same-date
+siblings are common (master's HEAD is usually committed the previous day;
+backfills re-measure old dates) — without it, within-date order would fall to
+the short SHA's hex spelling, which is unrelated to code order. The label
+remains the deterministic fallback for points registered before `commit_time`
+existed.
+
 ### Drift alert — `trend.py`
 
-After each nightly rebuild, `trend.py` compares the latest point's primary timers
-(per workload, always including `compileInner`) against the trailing-N-point
-median (default 7), restricted to the **same runner fingerprint**. A metric past
-both a relative (`--rel`, default 1.25×) and absolute (`--abs`, default 2 ms)
-threshold is flagged — printed, emitted as a GitHub `::error::` annotation +
-step-summary row, and the job exits non-zero (after the push, so the data is still
-stored). If the latest point's runner differs from the history's, it warns and
-compares only same-runner points.
+After each nightly rebuild, `trend.py` judges one point's primary timers (per
+workload, always including `compileInner`) against the trailing-N-point median
+(default 7) of same-runner points strictly before it in series order. The
+nightly passes `--label` with the label it just registered, so the judged point
+is pinned to this run's registration — daily labels are keyed by the swept
+commit's date, so several points can share a date and "the latest point" can be
+a same-date sibling. Without `--label` (ad-hoc CLI use) the last point is
+judged. A metric past both a relative (`--rel`, default 1.25×) and absolute
+(`--abs`, default 2 ms) threshold is flagged — printed, emitted as a GitHub
+`::error::` annotation + step-summary row, and the job exits non-zero (after
+the push, so the data is still stored). If the judged point's runner differs
+from the history's, it warns and compares only same-runner points.
 
 ### Runner-change procedure
 
@@ -95,7 +115,7 @@ with `force=true` to re-measure every release on the new machine and re-stamp
     index.json                       release manifest {tag, date, version}
     releases/<tag>/results.json      per-release sweep — the history baseline (source of truth)
     daily/<date>-<sha>/results.json  one tip-of-tree sweep per night
-    daily/<date>-<sha>/meta.json     {date, commit, runner, kind}
+    daily/<date>-<sha>/meta.json     {date, commit, commit_time, runner, kind}
     runner.json                      {fingerprint, label} the history was built on
     tracking/tracking.json          derived series consumed by trend.py / plots
 
