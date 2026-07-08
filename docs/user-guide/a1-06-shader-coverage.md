@@ -474,6 +474,11 @@ For complete runnable programs, see
 and
 [`examples/shader-coverage-bvh-traversal`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-bvh-traversal),
 which compile with coverage, dispatch on Vulkan, read counters back, and render LCOV reports.
+Both use the same in-process workflow as this chapter's host program — compile through the
+C++ API, discover the buffer via the metadata interfaces — with Vulkan descriptor binding in
+place of the payload `memcpy`. The offline workflow needs no separate example: compile with
+`slangc` as in the first section, bind at the location the sidecar manifest reports, and
+feed the readback bytes plus that sidecar to the converter exactly as done above.
 
 ## Options you will eventually want
 
