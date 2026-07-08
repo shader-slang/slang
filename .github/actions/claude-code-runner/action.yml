@@ -499,7 +499,7 @@ runs:
     - name: Execute Claude Code Action (NV Inference)
       id: claude-action-nv
       if: steps.auth-token.outputs.auth-provider == 'nv-inference'
-      uses: anthropics/claude-code-action@f87768c6d25f92ae6efa7175e223ef77d4cbf97f # v1.0.166
+      uses: anthropics/claude-code-action@v1
       env:
         # NV Inference Portal uses custom base URL - SDK redirects API calls there
         ANTHROPIC_BASE_URL: ${{ inputs.nv-inference-url }}
@@ -548,7 +548,7 @@ runs:
     - name: Execute Claude Code Action (LLMGW)
       id: claude-action-llmgw
       if: steps.auth-token.outputs.auth-provider == 'llmgw'
-      uses: anthropics/claude-code-action@f87768c6d25f92ae6efa7175e223ef77d4cbf97f # v1.0.166
+      uses: anthropics/claude-code-action@v1
       env:
         # Use Bedrock with bearer token auth (not AWS SigV4)
         ANTHROPIC_BEDROCK_BASE_URL: ${{ inputs.bedrock-base-url || 'https://prod.api.nvidia.com/llm/v1/aws' }}
