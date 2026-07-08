@@ -8,37 +8,50 @@
 
 // --- generic member accessor returning `none` (regression for #7878) ---
 // The `Optional<T>` return type is checked once with T abstract, so the
-// front-end opaque-handle guard passes. The concrete `Optional<Texture2D>`
-// only materializes during IR generic specialization; the diagnostic must
-// fire there, otherwise SPIR-V emit hits an unhandled `defaultConstruct`
-// (E99997 internal error). This shape must reach IR lowering, so it lives in
-// its own compilation unit with no front-end errors that would halt the
-// compiler first. The diagnostic is E41037 — the IR-layer variant of the AST
-// rule E30902 (same summary, IR-typed span).
+// front-end opaque-handle guard passes; the concrete `Optional<Texture2D>`
+// only materializes during IR generic specialization. The diagnostic must
+// fire there (E41037, the IR-layer variant of E30902), otherwise SPIR-V emit
+// hits an unhandled `defaultConstruct` (E99997 internal error). This shape
+// must reach IR lowering, so it lives in its own compilation unit with no
+// front-end errors that would halt the compiler first. The `--> ...:line:col`
+// checks pin each error to the exact `none` it is reported against.
 
 struct TextureHolder<T>
 {
     T item;
+    // CHECK_GEN-DAG: {{.*}}optional-resource-type.slang:[[# @LINE+1]]
     __subscript()->Optional<T> { get { return none; } }
+    // CHECK_GEN-DAG: {{.*}}optional-resource-type.slang:[[# @LINE+1]]
     Optional<T> getNone() { return none; }
+    // A nested `Optional<Optional<T>>` payload is also opaque: `isOpaqueType`
+    // does not recurse through `IROptionalType`, so the check must peel the
+    // Optional layers before testing the leaf, or this `none` slips through to
+    // the same `defaultConstruct` ICE.
+    // CHECK_GEN-DAG: {{.*}}optional-resource-type.slang:[[# @LINE+1]]
+    Optional<Optional<T>> getNestedNone() { return none; }
 }
 
 [vk::binding(0, 1)] TextureHolder<Texture2D> gHolderSubscript;
 [vk::binding(1, 1)] TextureHolder<Texture2D> gHolderMethod;
+[vk::binding(2, 1)] TextureHolder<Texture2D> gHolderNested;
 
 [shader("fragment")]
 float4 fs_main() : SV_Target
 {
-    // Force specialization of both accessors of TextureHolder<Texture2D> and
-    // use the payload, so the specialized `MakeOptionalNone` survives to the
-    // post-specialization check (mirrors the original repro, which loaded
-    // through the optional's payload). The -DAG suffix is used because the two
-    // IR-emitted diagnostics need not appear in a fixed order.
+    // Force specialization of all three accessors of TextureHolder<Texture2D>
+    // and use the payload, so the specialized `MakeOptionalNone` survives to
+    // the post-specialization check (mirrors the original repro, which loaded
+    // through the optional's payload). Each E41037 is pinned to its source
+    // `none` by the `-->` locator checks above; the three header checks here
+    // are order-independent (`-DAG`) and require three distinct occurrences,
+    // asserting exactly the three expected errors regardless of emit order.
+    // CHECK_GEN-DAG: error[E41037]
     // CHECK_GEN-DAG: error[E41037]
     // CHECK_GEN-DAG: error[E41037]
     float4 a = gHolderSubscript[].value.Load(int3(0));
     float4 b = gHolderMethod.getNone().value.Load(int3(0));
-    return a + b;
+    float4 c = gHolderNested.getNestedNone().value.value.Load(int3(0));
+    return a + b + c;
 }
 
 #elif !defined(NEGATIVE)
