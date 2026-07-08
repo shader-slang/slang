@@ -1,11 +1,11 @@
 {
   "bundles": {
     "conformance/generics": {
-      "generated_at": "2026-07-02T10:13:15+00:00",
-      "model": "claude-opus-4-8",
-      "source_commit": "8e2a63cbf22c85332796702fd02a875466486a23",
+      "generated_at": "2026-07-08T15:08:47+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "8ac9e49a5b7020af6a8040544b9f76f0fbf40898",
       "source_doc_digest": "b0c5e1d5ca87b9ca5bb42dc8ae9e6903730d17bbdfe4e2d476ec8c4508dd3533",
-      "watched_paths_digest": "ad6660d3f4a1bc7aff674633e08a1a323b5dcee5172803c940c5f796f8cde066"
+      "watched_paths_digest": "0562c6b219f71cccfe2292b995a887d6b1fca1434b23dc47dec81b86acfd8abe"
     },
     "design/ast-reference/base": {
       "generated_at": "2026-07-02T10:13:14+00:00",
@@ -82,7 +82,7 @@
       "model": "claude-opus-4-8",
       "source_commit": "8e2a63cbf22c85332796702fd02a875466486a23",
       "source_doc_digest": "6d95051b87c06dc35373e8bea70f37f8883df3086f06535f1e3cedc75e1d0bda",
-      "watched_paths_digest": "d706db8099a56fe3a824f3e46953e73df9fb84b6b42d989737f1d08526f29e97"
+      "watched_paths_digest": "d751033463c899e79fa28872743e407c2b94549f8a38f7fbee46b22f76d02010"
     },
     "design/cross-cutting/serialization": {
       "generated_at": "2026-05-20T17:27:32+00:00",
@@ -166,7 +166,7 @@
       "model": "claude-opus-4-8",
       "source_commit": "8e2a63cbf22c85332796702fd02a875466486a23",
       "source_doc_digest": "bcd01df5ef096d7d6c123437dc729f53c1be624d5e9012d9aa5f9f7b3834e594",
-      "watched_paths_digest": "30df3ab14721e6810414cf520b08a492b1309f17c10679a6cc8bbb25a9738b55"
+      "watched_paths_digest": "37d40d6faa1f92d8e35b6cc828752b61f477cec57399105ffa0243bf29abd8ce"
     },
     "design/name-resolution/lookup": {
       "generated_at": "2026-05-20T14:24:32+00:00",
@@ -211,11 +211,11 @@
       "watched_paths_digest": "c63c2e2a6c047e07e15fd58c17dea75360525ffc39a2b8c7d064a5b3f616c173"
     },
     "design/pipeline/03-semantic-check": {
-      "generated_at": "2026-07-02T10:13:15+00:00",
-      "model": "claude-opus-4-8",
-      "source_commit": "8e2a63cbf22c85332796702fd02a875466486a23",
+      "generated_at": "2026-07-08T15:08:47+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "8ac9e49a5b7020af6a8040544b9f76f0fbf40898",
       "source_doc_digest": "6d8666ce84da327589c421d02bf9ec5b19ae43b68ed61932a0ba48045a900b99",
-      "watched_paths_digest": "46d02a2bd8b7c35ba5960c3109455d40e100dd1525ab1a1e912e382d83b9943c"
+      "watched_paths_digest": "d4079a0fc0173dbe0c595344a2b20bc9f5959b4d624db4fbc5a628619d120628"
     },
     "design/pipeline/04-ast-to-ir": {
       "generated_at": "2026-05-21T09:32:19+00:00",
