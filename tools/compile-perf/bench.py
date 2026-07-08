@@ -76,6 +76,21 @@ def stats(values):
 PERF_FLAG = "-report-perf-benchmark"
 
 
+
+# slangc infers the requested artifact from the -o extension for some targets
+# (and per-entry-point output binding for the text targets), so the output name
+# must match the -target rather than always being out.spv.
+_TARGET_EXT = {"spirv": "spv", "dxil": "dxil", "ptx": "ptx", "metal": "metal",
+               "wgsl": "wgsl", "hlsl": "hlsl", "glsl": "glsl", "cuda": "cu"}
+
+
+def _target_ext(extra_flags):
+    for i, flag in enumerate(extra_flags):
+        if flag == "-target" and i + 1 < len(extra_flags):
+            return _TARGET_EXT.get(extra_flags[i + 1], "out")
+    return "spv"
+
+
 def build_commands(slangc, spec, gen_dir, files):
     """Return (commands, primary_outfile_for_parsing_index).
 
@@ -108,7 +123,7 @@ def build_commands(slangc, spec, gen_dir, files):
     # per-run output path so the layout/reflection serializer is exercised without
     # polluting the results directory.
     f = spec.main_file or main or list(files)[0]
-    out = os.path.join(gen_dir, "out.spv")
+    out = os.path.join(gen_dir, "out." + _target_ext(spec.extra_flags))
     extra = list(spec.extra_flags)
     # reflection JSON needs a writable path; gen_dir is per-run and writable.
     if getattr(spec, "reflection_json", False):
@@ -286,6 +301,17 @@ def main():
         sys.exit(f"slangc not found: {slangc}")
 
     specs = manifest.WORKLOADS
+    # Platform-bound workloads (downstream toolchains like dxc/nvrtc) leave the
+    # default set on other platforms; naming one in --only runs it regardless —
+    # explicit intent fails loudly if the tool is genuinely absent.
+    if not args.only:
+        skipped = [s2.name for s2 in specs
+                   if s2.platforms and sys.platform not in s2.platforms]
+        if skipped:
+            print(f"[skip] platform-bound workloads not on {sys.platform}: "
+                  + ", ".join(skipped))
+        specs = [s2 for s2 in specs
+                 if not s2.platforms or sys.platform in s2.platforms]
     if args.only:
         want = set(args.only.split(","))
         specs = [s for s in specs if s.name in want]

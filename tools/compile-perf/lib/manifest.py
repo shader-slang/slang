@@ -40,6 +40,12 @@ class WorkloadSpec:
     # contains "main", or the first file if none does. If set, used directly
     # as the compile entry point.
     main_file: str = None
+    # sys.platform values this workload can run on (None = all). Workloads
+    # needing a platform-bound downstream toolchain (dxc, nvrtc) set this;
+    # bench.py excludes them from the DEFAULT set elsewhere but still runs
+    # them when named explicitly in --only, failing loudly if the tool is
+    # genuinely absent.
+    platforms: list = None
 
 
 # Standard target invocation avoids GPU drivers and stays comparable across
@@ -244,6 +250,59 @@ WORKLOADS = [
         mode="target",
         extra_flags=["-target", "wgsl"],
         primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+    ),
+    WorkloadSpec(
+        name="emit_hlsl",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "hlsl", "-entry", "computeMain"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+    ),
+    WorkloadSpec(
+        name="emit_glsl",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "glsl", "-entry", "computeMain"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+    ),
+    WorkloadSpec(
+        name="emit_cuda",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "cuda"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+    ),
+    # ---- downstream compilers (Windows perf runner only) -------------------
+    # These measure the full pipeline INCLUDING the downstream compiler (dxc
+    # for DXIL, nvrtc for PTX) — an internal application benchmark showed
+    # downstream time is ~60% of a real app's combined compile time, and the
+    # suite had no signal for it. generateOutput spans slang emit + the
+    # downstream invocation; wall_ms is the end-to-end number.
+    WorkloadSpec(
+        name="codegen_dxil",
+        bucket="codegen_downstream",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "dxil", "-profile", "sm_6_6"],
+        primary_timers=["generateOutput", "compileInner"],
+        platforms=["win32"],
+    ),
+    WorkloadSpec(
+        name="codegen_ptx",
+        bucket="codegen_downstream",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "ptx"],
+        primary_timers=["generateOutput", "compileInner"],
+        platforms=["win32"],
     ),
     # ---- complexity ladder: realistic mixed shader, simple -> complex ------
     # Sweep this to see the holistic compile-time curve as a representative
