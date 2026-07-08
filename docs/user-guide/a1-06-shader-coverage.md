@@ -18,7 +18,8 @@ file describes the counters, and the host program consumes both without linking 
 Every step, including the real dispatch, runs on any machine with a Slang release, a C++
 compiler, and Python 3: the dispatched kernel is compiled for Slang's CPU target, and later
 sections show what changes on GPU targets and in hosts that compile shaders at runtime
-through the C++ API. The tutorial's files are also available under
+through the C++ API. The tutorial's files — together with `run-tutorial.sh` and
+`run-tutorial.ps1` scripts that execute every step in order — are available under
 [`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial).
 
 This chapter is a guided tour, not the reference. The reference material lives in

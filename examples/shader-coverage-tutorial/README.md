@@ -9,10 +9,21 @@ entirely from the command line — there is no CMake target to build.
 | --- | --- |
 | `hello-coverage.slang` | The compute shader the chapter instruments. |
 | `hello-coverage-host.cpp` | A minimal host program that loads the `slangc`-precompiled CPU kernel, binds the coverage buffer where the sidecar manifest says, dispatches, and writes the raw counters. It uses no Slang headers or library. |
+| `run-tutorial.sh` / `run-tutorial.ps1` | Commented scripts that execute every tutorial step in order — each step is labeled with the chapter section it comes from. |
 
 ## Quick run
 
-With `slangc` on your `PATH` (any Slang release) and Python 3:
+Run all the steps at once (`slangc` is found on `PATH`, or pass it explicitly):
+
+```bash
+./run-tutorial.sh                            # Linux / macOS
+SLANGC=/path/to/slangc ./run-tutorial.sh     # explicit compiler
+
+./run-tutorial.ps1                           # Windows (PowerShell)
+./run-tutorial.ps1 -Slangc C:/path/to/slangc.exe
+```
+
+Or step by step, with `slangc` on your `PATH` (any Slang release) and Python 3:
 
 ```bash
 # 1. Precompile the shader to a directly callable CPU kernel, with coverage.
