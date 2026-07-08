@@ -12,14 +12,22 @@ struct IRModule;
 struct IRBlock;
 class TargetProgram;
 
-// Return true if successfull, false if errors occurred.
+// Unroll every `[ForceUnroll]` loop in `func`. Returns true if successful,
+// false if a loop could not be unrolled (an error is diagnosed to `sink`).
+// When `outChanged` is non-null, it is set to true if any loop was unrolled
+// (it is never reset to false, so one flag can accumulate across calls).
 bool unrollLoopsInFunc(
     TargetProgram* target,
     IRModule* module,
     IRGlobalValueWithCode* func,
-    DiagnosticSink* sink);
+    DiagnosticSink* sink,
+    bool* outChanged = nullptr);
 
-bool unrollLoopsInModule(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
+bool unrollLoopsInModule(
+    IRModule* module,
+    TargetProgram* target,
+    DiagnosticSink* sink,
+    bool* outChanged = nullptr);
 
 // Turn a loop with continue block into a loop with only back jumps and breaks.
 // Each iteration will be wrapped in a breakable region, where everything before `continue`
