@@ -286,17 +286,11 @@ and
 
 ## Options
 
-- `-trace-coverage-counter-width 32` — use `uint32` counters instead of the default
-  `uint64`. Required when the runtime cannot do 64-bit shader atomics (see Troubleshooting).
-  `uint32` counters wrap past 2^32 hits. The chosen width is recorded in the manifest
-  (`element_type`, `element_stride`) and in `CoverageBufferInfo::elementByteWidth`.
-- `-trace-coverage-binding <index> <space>` — bind the buffer at an explicit location
-  instead of auto-allocation.
-- `-trace-coverage-reserved-space <space>` — declare descriptor sets that the runtime
-  pipeline layout owns but the shader never references, so auto-allocation avoids them.
-  Khronos descriptor-set targets only; repeatable.
-- `-coverage-manifest-output <path>` — write the sidecar to an explicit path instead of
-  `<output>.coverage-manifest.json`.
+The remaining `-trace-coverage*` options — counter width, explicit binding, reserved
+descriptor sets, and the manifest output path — are documented in the
+[slangc command line reference](https://github.com/shader-slang/slang/blob/master/docs/command-line-slangc-reference.md#trace-coverage)
+and, with usage examples, in
+[`tools/shader-coverage/README.md`](https://github.com/shader-slang/slang/blob/master/tools/shader-coverage/README.md).
 
 ## Troubleshooting
 
