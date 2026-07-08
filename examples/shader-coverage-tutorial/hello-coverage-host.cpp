@@ -45,7 +45,9 @@ struct ComputeVaryingInput
 };
 typedef void (*ComputeFunc)(ComputeVaryingInput*, void*, void*);
 
-// How a (RW)StructuredBuffer<T> parameter is laid out in the payload.
+// How a (RW)StructuredBuffer<T> parameter is laid out in the payload:
+// 16 bytes on a 64-bit host. The manifest offsets used below assume
+// this; a different host word size reports different offsets.
 struct BufferView
 {
     void* data;

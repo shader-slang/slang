@@ -174,7 +174,7 @@ Copy the program from
 build, and run:
 
 ```bash
-c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host
+c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host -ldl
 ./hello-coverage-host
 ```
 

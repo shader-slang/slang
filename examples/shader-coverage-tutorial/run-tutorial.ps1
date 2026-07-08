@@ -55,9 +55,11 @@ if (-not $Slangc)
 Write-Host "using slangc: $Slangc"
 
 # The kernel is a shared library; the host program loads
-# hello-coverage-kernel.dll on Windows and .so elsewhere.
-$kernel = if ($IsWindows -or $env:OS -eq "Windows_NT") { "hello-coverage-kernel.dll" }
-else { "hello-coverage-kernel.so" }
+# hello-coverage-kernel.dll on Windows and .so elsewhere. Non-Windows
+# hosts use dlopen, which needs -ldl on older glibc.
+$isWindowsHost = $IsWindows -or $env:OS -eq "Windows_NT"
+$kernel = if ($isWindowsHost) { "hello-coverage-kernel.dll" } else { "hello-coverage-kernel.so" }
+$dlLib = if ($isWindowsHost) { @() } else { @("-ldl") }
 
 # --- Step 1: "Compiling with coverage" ------------------------------------
 # One flag, -trace-coverage, turns on line coverage. Two files appear:
@@ -71,7 +73,7 @@ Write-Host "wrote hello-coverage.spv and hello-coverage.spv.coverage-manifest.js
 # --- Step 2: "Reading the manifest" -----------------------------------------
 # Pretty-print the sidecar. Note the buffer block: on SPIR-V the hidden
 # counter buffer binds at a descriptor (set, binding).
-python -m json.tool hello-coverage.spv.coverage-manifest.json | Select-Object -First 14
+(python -m json.tool hello-coverage.spv.coverage-manifest.json) | Select-Object -First 14
 
 # --- Step 3: "Dispatching the precompiled kernel" ---------
 # Compile the same shader once more, to a directly callable CPU shared
@@ -92,11 +94,11 @@ if (Get-Command cl -ErrorAction SilentlyContinue)
 }
 elseif (Get-Command clang++ -ErrorAction SilentlyContinue)
 {
-    Invoke-Step "clang++" @("-std=c++17", "hello-coverage-host.cpp", "-o", "hello-coverage-host.exe")
+    Invoke-Step "clang++" (@("-std=c++17", "hello-coverage-host.cpp", "-o", "hello-coverage-host.exe") + $dlLib)
 }
 elseif (Get-Command g++ -ErrorAction SilentlyContinue)
 {
-    Invoke-Step "g++" @("-std=c++17", "hello-coverage-host.cpp", "-o", "hello-coverage-host.exe")
+    Invoke-Step "g++" (@("-std=c++17", "hello-coverage-host.cpp", "-o", "hello-coverage-host.exe") + $dlLib)
 }
 else
 {

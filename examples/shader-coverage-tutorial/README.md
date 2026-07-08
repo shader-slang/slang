@@ -31,7 +31,7 @@ slangc hello-coverage.slang -target shader-sharedlib -stage compute -entry compu
     -trace-coverage -o hello-coverage-kernel.so     # use .dll on Windows
 
 # 2. Build and run the host program (an ordinary C++ compile, no SDK paths).
-c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host
+c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host -ldl
 ./hello-coverage-host
 
 # 3. Turn the counters into an LCOV report.

@@ -44,7 +44,7 @@ echo "wrote hello-coverage.spv and hello-coverage.spv.coverage-manifest.json"
 # --- Step 2: "Reading the manifest" -----------------------------------------
 # Pretty-print the sidecar. Note the buffer block: on SPIR-V the hidden
 # counter buffer binds at a descriptor (set, binding).
-python3 -m json.tool hello-coverage.spv.coverage-manifest.json | head -14
+python3 -m json.tool hello-coverage.spv.coverage-manifest.json | sed -n '1,14p'
 
 # --- Step 3: "Dispatching the precompiled kernel" ---------
 # Compile the same shader once more, to a directly callable CPU shared
@@ -59,7 +59,7 @@ echo "wrote hello-coverage-kernel.so and its sidecar manifest"
 # coverage buffer at the manifest-reported uniform_offset, runs one
 # thread group, prints the raw counter slots, and writes
 # hello-coverage.counters.bin.
-c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host
+c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host -ldl
 ./hello-coverage-host
 
 # --- Step 4: "Generating a report" ------------------------------------
