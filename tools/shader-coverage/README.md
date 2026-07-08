@@ -312,8 +312,7 @@ reported by `manifest.buffer.element_stride` /
 `CoverageBufferInfo::elementByteWidth`. Indexed by
 `CoverageEntryInfo::counterIndex` / manifest `counter`. uint64 slots
 effectively never wrap; uint32 slots wrap silently past 2^32 hits per
-slot and read back as small numbers (see
-[Current limitations](#current-limitations)).
+slot and read back as small numbers.
 
 Counter slot indices are per-compile: slot `K` does not identify the
 same source location across two compiles or shader variants. Aggregate
