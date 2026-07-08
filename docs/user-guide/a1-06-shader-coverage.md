@@ -11,9 +11,11 @@ like `genhtml`, Codecov, or VS Code Coverage Gutters can render, showing exactly
 functions, and branch outcomes your test content actually exercised.
 
 This tutorial walks through the whole pipeline hands-on: compiling with coverage, reading the
-generated metadata, producing a report, and wiring up a real dispatch — plus the pitfalls you
-are most likely to hit along the way. Every step up to the real dispatch runs on any machine
-with a Slang release and Python 3; no GPU is required until the end.
+generated metadata, binding the counter buffer and dispatching from a small C++ host program,
+and producing a report — plus the pitfalls you are most likely to hit along the way. Every
+step, including the real dispatch, runs on any machine with a Slang release, a C++ compiler,
+and Python 3: the host program uses Slang's CPU target, and a later section shows what changes
+on GPU targets.
 
 This chapter is a guided tour, not the reference. The reference material lives in
 [`tools/shader-coverage/README.md`](https://github.com/shader-slang/slang/blob/master/tools/shader-coverage/README.md)
@@ -117,18 +119,265 @@ Three things to take away:
    (the `if (gain > 1.0)` statement), and so on. This attribution is what turns raw numbers
    into a report.
 
-## From counters to a report — no GPU required
+## Running for real: a minimal host program
 
-After a real dispatch you would read the counter buffer back from the GPU. To see the
-reporting pipeline work right now, we can feed the converter hand-written counter values with
-`--counters-text` instead. Imagine a dispatch of one thread group (4 threads) where every
-input is positive: every statement runs 4 times, except `value = 0.0` (inputs were never
-negative) and the `return value` fallthrough in `applyGain` (the gain is always 2.0).
+To get real counter values, an application must do three things the manifest describes: bind
+storage for the hidden buffer, dispatch, and read the counters back. The buffer is
+deliberately _invisible to ordinary reflection_ — your reflection-driven binding code will not
+see it. In-process hosts discover it by querying the compiled artifact's `IMetadata` and
+`castAs`-ing two interfaces: `slang::ISyntheticResourceMetadata` answers _where the buffer
+binds_, and `slang::ICoverageTracingMetadata` answers _what the counters mean_.
+
+The program below does the whole round trip using Slang's CPU target, so it runs on any
+machine with no GPU or graphics API involved. The CPU target compiles the kernel into a
+directly callable function, and "binding" a buffer means writing a `(pointer, count)` pair
+into a parameter payload at a byte offset the metadata reports — the same discovery contract
+as on GPU targets, with `memcpy` standing in for descriptor sets.
+
+Save this as `hello-coverage-host.cpp` next to `hello-coverage.slang`:
+
+```cpp
+// hello-coverage-host.cpp: compile hello-coverage.slang for the CPU
+// with coverage enabled, bind the hidden counter buffer, dispatch one
+// thread group, and print per-line execution counts.
+
+#include "slang-com-ptr.h"
+#include "slang.h"
+
+#include <cstdint>
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <vector>
+
+using Slang::ComPtr;
+
+// The CPU compute-kernel ABI (see prelude/slang-cpp-types.h): group-ID
+// range, entry-point uniforms, and the global-parameter payload.
+struct UInt3
+{
+    uint32_t x, y, z;
+};
+struct ComputeVaryingInput
+{
+    UInt3 startGroupID;
+    UInt3 endGroupID;
+};
+typedef void (*ComputeFunc)(ComputeVaryingInput*, void*, void*);
+
+// How a (RW)StructuredBuffer<T> parameter is laid out in the payload.
+struct BufferView
+{
+    void* data;
+    size_t count;
+};
+
+static void check(SlangResult result, const char* what)
+{
+    if (SLANG_FAILED(result))
+    {
+        std::cerr << what << " failed\n";
+        std::exit(1);
+    }
+}
+
+int main()
+{
+    // 1. Compile hello-coverage.slang for the CPU with line coverage.
+    ComPtr<slang::IGlobalSession> globalSession;
+    check(slang::createGlobalSession(globalSession.writeRef()), "createGlobalSession");
+
+    // Coverage skips the LLVM-emitted CPU path (warning E45102), so pin
+    // a real C++ compiler for the host-callable route.
+    const SlangPassThrough cppCompilers[] = {
+        SLANG_PASS_THROUGH_VISUAL_STUDIO,
+        SLANG_PASS_THROUGH_GCC,
+        SLANG_PASS_THROUGH_CLANG,
+    };
+    SlangPassThrough cppCompiler = SLANG_PASS_THROUGH_NONE;
+    for (auto candidate : cppCompilers)
+        if (SLANG_SUCCEEDED(globalSession->checkPassThroughSupport(candidate)))
+        {
+            cppCompiler = candidate;
+            break;
+        }
+    if (cppCompiler == SLANG_PASS_THROUGH_NONE)
+    {
+        std::cerr << "no C++ compiler found for the CPU target\n";
+        return 1;
+    }
+    globalSession->setDefaultDownstreamCompiler(SLANG_SOURCE_LANGUAGE_CPP, cppCompiler);
+    globalSession->setDownstreamCompilerForTransition(
+        SLANG_CPP_SOURCE,
+        SLANG_SHADER_HOST_CALLABLE,
+        cppCompiler);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SHADER_HOST_CALLABLE;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+
+    slang::CompilerOptionEntry coverageOption = {};
+    coverageOption.name = slang::CompilerOptionName::TraceCoverage;
+    coverageOption.value.kind = slang::CompilerOptionValueKind::Int;
+    coverageOption.value.intValue0 = 1;
+
+    const char* searchPaths[] = {"."};
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.searchPaths = searchPaths;
+    sessionDesc.searchPathCount = 1;
+    sessionDesc.compilerOptionEntries = &coverageOption;
+    sessionDesc.compilerOptionEntryCount = 1;
+
+    ComPtr<slang::ISession> session;
+    check(globalSession->createSession(sessionDesc, session.writeRef()), "createSession");
+
+    ComPtr<slang::IBlob> diagnostics;
+    slang::IModule* module = session->loadModule("hello-coverage", diagnostics.writeRef());
+    if (!module)
+    {
+        std::cerr << "run this from the directory containing hello-coverage.slang\n";
+        return 1;
+    }
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    module->findEntryPointByName("computeMain", entryPoint.writeRef());
+    slang::IComponentType* components[] = {module, entryPoint};
+    ComPtr<slang::IComponentType> program;
+    check(
+        session->createCompositeComponentType(components, 2, program.writeRef(), nullptr),
+        "composite");
+    ComPtr<slang::IComponentType> linked;
+    check(program->link(linked.writeRef(), nullptr), "link");
+
+    // 2. Fetch the compiled kernel. Do this BEFORE the metadata query:
+    // the entry point compiles once and caches its result, and the
+    // cache must hold the executable form.
+    ComPtr<ISlangSharedLibrary> library;
+    check(
+        linked->getEntryPointHostCallable(0, 0, library.writeRef(), diagnostics.writeRef()),
+        "getEntryPointHostCallable");
+    auto computeMain = (ComputeFunc)library->findFuncByName("computeMain");
+
+    // 3. Discover the hidden coverage buffer. ISyntheticResourceMetadata
+    // reports where it lives; ICoverageTracingMetadata reports what the
+    // counters mean.
+    ComPtr<slang::IMetadata> metadata;
+    check(linked->getEntryPointMetadata(0, 0, metadata.writeRef(), nullptr), "metadata");
+    auto* coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
+        slang::ICoverageTracingMetadata::getTypeGuid());
+    auto* synthetic = (slang::ISyntheticResourceMetadata*)metadata->castAs(
+        slang::ISyntheticResourceMetadata::getTypeGuid());
+
+    slang::SyntheticResourceInfo bufferLocation = {};
+    check(synthetic->getResourceInfo(0, &bufferLocation), "getResourceInfo");
+
+    slang::CoverageBufferInfo bufferInfo = {};
+    check(coverage->getBufferInfo(&bufferInfo), "getBufferInfo");
+    const uint32_t counterCount = coverage->getCounterCount();
+
+    // 4. Allocate and bind. On CPU, "binding" means writing a
+    // (pointer, count) pair into the parameter payload at the byte
+    // offset the metadata reports. The user's two buffers occupy the
+    // leading fields in declaration order; the coverage buffer goes at
+    // `uniformOffset`. Counter storage is sized from the *reported*
+    // element width — never assume it.
+    float inputs[4] = {1.0f, 2.0f, 3.0f, 4.0f};
+    float outputs[4] = {};
+    std::vector<uint8_t> counters(size_t(counterCount) * bufferInfo.elementByteWidth, 0);
+
+    BufferView inputView = {inputs, 4};
+    BufferView outputView = {outputs, 4};
+    BufferView coverageView = {counters.data(), counterCount};
+
+    std::vector<uint8_t> payload(bufferLocation.uniformOffset + sizeof(BufferView), 0);
+    std::memcpy(payload.data(), &inputView, sizeof(inputView));
+    std::memcpy(payload.data() + sizeof(BufferView), &outputView, sizeof(outputView));
+    std::memcpy(payload.data() + bufferLocation.uniformOffset, &coverageView, sizeof(coverageView));
+
+    // 5. Dispatch one thread group and attribute the counters.
+    ComputeVaryingInput varying = {{0, 0, 0}, {1, 1, 1}};
+    computeMain(&varying, nullptr, payload.data());
+
+    std::map<uint32_t, uint64_t> hitsByLine;
+    for (uint32_t i = 0; i < coverage->getEntryCount(); ++i)
+    {
+        slang::CoverageEntryInfo entry;
+        check(coverage->getEntryInfo(i, &entry), "getEntryInfo");
+        if (entry.kind != slang::CoverageEntryKind::Line || !entry.file)
+            continue;
+        uint64_t hits = bufferInfo.elementByteWidth == 8
+                            ? ((const uint64_t*)counters.data())[entry.counterIndex]
+                            : ((const uint32_t*)counters.data())[entry.counterIndex];
+        hitsByLine[entry.line] += hits;
+    }
+    for (auto& [line, hits] : hitsByLine)
+        std::cout << "line " << line << ": " << hits << "\n";
+
+    // 6. Write the manifest + counters for the LCOV converter.
+    ComPtr<ISlangBlob> manifest;
+    check(slang_writeCoverageManifestJson(coverage, manifest.writeRef()), "manifest");
+    std::ofstream("hello-coverage.coverage-manifest.json", std::ios::binary)
+        .write((const char*)manifest->getBufferPointer(), manifest->getBufferSize());
+    std::ofstream("hello-coverage.counters.bin", std::ios::binary)
+        .write((const char*)counters.data(), counters.size());
+    return 0;
+}
+```
+
+Build it against the `include/` headers and `slang` library of a Slang release (or your own
+build):
 
 ```bash
-echo "4 4 0 4 4 4 0 4" | python3 tools/shader-coverage/slang-coverage-to-lcov.py \
-    --manifest hello-coverage.spv.coverage-manifest.json \
-    --counters-text - --output hello-coverage.lcov
+# Linux / macOS
+c++ -std=c++17 hello-coverage-host.cpp -I$SLANG/include \
+    -L$SLANG/lib -lslang -Wl,-rpath,$SLANG/lib -o hello-coverage-host
+
+# Windows (from a Visual Studio developer prompt)
+cl /std:c++17 /EHsc /I%SLANG%\include hello-coverage-host.cpp \
+    /link /LIBPATH:%SLANG%\lib slang.lib
+```
+
+Run it. All four inputs are positive and the gain is always `2.0`, so every statement runs
+4 times except the two lines those inputs never reach — `value = 0.0` and the `return value`
+fallthrough in `applyGain`:
+
+```
+$ ./hello-coverage-host
+line 7: 4
+line 8: 4
+line 9: 0
+line 16: 4
+line 17: 4
+line 18: 4
+line 19: 0
+line 20: 4
+```
+
+It also wrote two files — `hello-coverage.coverage-manifest.json` (a manifest like the one
+you read earlier, obtained in-process via `slang_writeCoverageManifestJson`; on the CPU
+target its `buffer` block reports the payload's `uniform_offset` instead of a meaningful
+descriptor location) and `hello-coverage.counters.bin` (the raw counter memory) — which is
+exactly what the reporting step consumes.
+
+Two details in the program deserve a second look, because both bite in real integrations:
+
+- **Step 2 runs before step 3 on purpose.** An entry point compiles once and caches the
+  resulting artifact; querying metadata first would cache a form that cannot later be
+  turned into a callable library, and `getEntryPointHostCallable` would fail.
+- **The counter allocation reads `elementByteWidth` from the metadata** instead of assuming
+  8 bytes — the same rule as Pitfall 6 below.
+
+## From counters to a report
+
+Feed the manifest and the raw counters to the LCOV converter:
+
+```bash
+python3 tools/shader-coverage/slang-coverage-to-lcov.py \
+    --manifest hello-coverage.coverage-manifest.json \
+    --counters hello-coverage.counters.bin --output hello-coverage.lcov
 ```
 
 The resulting LCOV file is plain text:
@@ -158,9 +407,10 @@ genhtml hello-coverage.lcov --output-directory coverage-html
 Open `coverage-html/index.html` and you will see `hello-coverage.slang` with executed lines
 in green and the two unexercised lines in red.
 
-With a real dispatch, the only difference is where the numbers come from: you pass the raw
-readback bytes with `--counters` instead of `--counters-text` (each slot is a little-endian
-unsigned integer of `element_stride` bytes).
+The converter treats the counters file as `counter_count` little-endian unsigned integers of
+`element_stride` bytes each — which is precisely the memory a dispatch fills, on any target.
+(For experiments without a counters file, `--counters-text` accepts whitespace-separated
+decimal values instead.)
 
 ## Function and branch coverage
 
@@ -187,23 +437,17 @@ hit/not-hit data with no atomic contention when you don't need exact counts.
 For a precise statement of where each mode places its counters (with worked examples), see
 [`docs/design/shader-coverage-counter-placement.md`](https://github.com/shader-slang/slang/blob/master/docs/design/shader-coverage-counter-placement.md).
 
-## Running for real: binding the counter buffer
+## The same on GPU targets
 
-To get real numbers, your application must bind storage for the hidden buffer, dispatch, and
-read the counters back. The buffer is deliberately _invisible to ordinary reflection_ — your
-reflection-driven binding code will not see it. Instead, hosts discover it through one of two
-equivalent channels:
+Everything the host program did carries over to GPU targets unchanged except one step: where
+the CPU program `memcpy`-ed a `(pointer, count)` pair into a payload, a GPU host binds an
+ordinary zero-initialized storage buffer through its graphics API, and reads it back after
+the dispatch completes. Discovery also comes through the same two equivalent channels:
+the in-process metadata interfaces the program used, or — for hosts that dispatch precompiled
+shaders, possibly on machines without Slang installed — the `.coverage-manifest.json` sidecar
+you read earlier.
 
-- **In-process (C++ API)**: query the compiled artifact's `IMetadata` and `castAs` two
-  interfaces — `slang::ISyntheticResourceMetadata` for the binding location and
-  `slang::ICoverageTracingMetadata` for counter counts and source attribution. No sidecar
-  file is involved.
-- **Offline (slangc + sidecar)**: the `.coverage-manifest.json` you have already seen carries
-  the same information for hosts that dispatch precompiled shaders, possibly on machines
-  without Slang installed.
-
-The binding step itself is ordinary resource binding in your API of choice; what varies per
-target is the location's shape:
+What varies per target is only the shape of the binding location:
 
 | Target               | Where the buffer binds                                                                  |
 | -------------------- | --------------------------------------------------------------------------------------- |
@@ -271,6 +515,11 @@ first integration.
 8. **Counter slots are per-compile.** Slot `K` does not mean the same source location across
    two compiles or shader variants. Always aggregate by the source attribution in the
    manifest or metadata, never by slot index.
+9. **In the C++ API, fetch the compiled code before the metadata.** An entry point compiles
+   once and caches the artifact. If `getEntryPointMetadata` runs first, the cache holds a
+   form that a later `getEntryPointHostCallable` cannot use, and it fails with
+   `E_INVALIDARG`. Call `getEntryPointCode` / `getEntryPointHostCallable` first, then query
+   metadata — as the host program above does.
 
 ## Where to go next
 
