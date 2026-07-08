@@ -126,9 +126,8 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
                                                                   ->resolve())
                                           : nullptr;
 
-    if (auto rawFwdDiffFuncType = as<FwdDiffFuncType>(rawDirectFuncType))
+    if (auto rawFwdDiffFuncType = as<FwdDiffFuncType>(rawDirectFuncType); rawFwdDiffFuncType)
     {
-        SLANG_UNUSED(rawFwdDiffFuncType);
         if (auto substFwdDiffFuncType = as<FwdDiffFuncType>(substitutedDirectFuncType))
         {
             auto diffTypeWitness =

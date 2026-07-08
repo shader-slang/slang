@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_SPV):-target spirv -entry main -stage compute
-//TEST:SIMPLE(filecheck=CHECK_GLSL_SPV):-target spirv -entry main -stage compute -emit-spirv-via-glsl
+//TEST:SIMPLE(filecheck=CHECK_SPV):-target spirv -entry main -stage compute -O1
+//TEST:SIMPLE(filecheck=CHECK_GLSL_SPV):-target spirv -entry main -stage compute -emit-spirv-via-glsl -O1
 //TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry main -stage compute

@@ -1249,6 +1249,13 @@ class EarlyDepthStencilAttribute : public Attribute
 };
 // `[earlydepthstencil]`
 
+FIDDLE()
+class Shader64BitIndexingAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+// `[Shader64BitIndexing]`
+
 // An HLSL `[numthreads(x,y,z)]` attribute
 FIDDLE()
 class NumThreadsAttribute : public Attribute
