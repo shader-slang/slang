@@ -667,6 +667,55 @@ def gen_api_module_graph(n):
     return files
 
 
+def gen_api_reflect_kernels(n):
+    """n kernels with deliberately parameter-rich signatures (nested constant
+    buffers, arrays, textures, samplers) so that walking each compiled
+    program's layout — the reflection query pattern every API client uses to
+    build binding tables — has realistic work per program. Used with the
+    driver's --reflect option, which walks the layout after each compile."""
+    files = {}
+    for i in range(n):
+        files[f"kernel_{i:03d}.slang"] = (
+            _HEADER
+            + f"struct Inner_{i}\n{{\n    float4 a;\n    float3 b;\n    int2 c[4];\n}}\n\n"
+            + f"struct Params_{i}\n{{\n    Inner_{i} inner[3];\n    float4x4 xf;\n"
+            + f"    uint flags;\n    float blend[{2 + i % 5}];\n}}\n\n"
+            + f"ConstantBuffer<Params_{i}> cb_{i};\n"
+            + f"StructuredBuffer<float4> inBuf_{i};\n"
+            + f"RWStructuredBuffer<float4> outBuf_{i};\n"
+            + f"Texture2D tex_{i};\nSamplerState samp_{i};\n\n"
+            + '[shader("compute")]\n[numthreads(8,8,1)]\n'
+            + "void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n"
+            + f"    float4 v = inBuf_{i}[tid.x];\n"
+            + f"    v += tex_{i}.SampleLevel(samp_{i}, v.xy, 0);\n"
+            + f"    v *= mul(cb_{i}.xf, v);\n"
+            + f"    v.x += cb_{i}.inner[tid.x % 3].a.x + cb_{i}.blend[0];\n"
+            + f"    outBuf_{i}[tid.x] = v;\n}}\n"
+        )
+    return files
+
+
+def gen_api_specialize(n):
+    """One module with an interface, n conforming impl structs, and a generic
+    computeMain<T : IOp>. The driver's specialize mode compiles one variant
+    per impl through IEntryPoint::specialize — the application pattern where
+    one kernel is stamped out per material/config type, stressing
+    specialization + link cost per variant."""
+    src = [_HEADER, "module spec_root;\n\n"]
+    src.append("public interface IOp\n{\n    static float eval(float x);\n}\n\n")
+    for i in range(n):
+        c1 = 1.0 + (i % 89) / 100.0
+        c2 = (i % 31) / 10.0
+        src.append(
+            f"public struct Impl_{i} : IOp\n{{\n"
+            f"    public static float eval(float x) {{ return sin(x * {c1}) + x * {c2}; }}\n}}\n\n"
+        )
+    src.append(_buf())
+    src.append('[shader("compute")]\n[numthreads(1,1,1)]\n')
+    src.append("void computeMain<T : IOp>()\n{\n    outBuf[0] = T.eval(outBuf[0]);\n}\n")
+    return {"spec_root.slang": "".join(src)}
+
+
 # --------------------------------------------------------------------------- #
 # Real-shader corpus (not generated). Copy corpus files into corpus/<name>/
 # before running the suite (CI does this via actions/checkout of MDL-SDK).

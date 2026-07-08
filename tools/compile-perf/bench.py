@@ -82,9 +82,12 @@ def find_libslang(slangc):
     """Locate the slang shared library belonging to a slangc binary, trying the
     layouts of release packages (bin/ + ../lib/) and build trees (same dir).
     The renamed slang-compiler library is preferred: on Windows the legacy
-    slang.dll is only a forwarding proxy whose generated .def does not expose
-    slang_createGlobalSession to GetProcAddress; the legacy names remain as
-    fallback for pre-rename releases. Returns None when not found — api
+    slang.dll is only a forwarding proxy, and resolving a forwarded export
+    requires the loader to find slang-compiler.dll through the normal DLL
+    search order — which does not include the proxy's own directory when the
+    driver loads it by absolute path from elsewhere. Loading the real library
+    directly avoids that; the legacy names remain as fallback for pre-rename
+    releases. Returns None when not found — api
     workloads then fail with a clear error while slangc workloads run
     normally."""
     d = os.path.dirname(slangc)
@@ -152,6 +155,7 @@ def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
             timed += ["--dir", gen_dir]
         if spec.api_root:
             timed += ["--root", spec.api_root]
+        timed += spec.api_flags
         return {"setup": [], "timed": timed}
     main = next((f for f in files if "main" in f), None)
     if spec.mode == "module":

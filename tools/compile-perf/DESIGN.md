@@ -214,10 +214,38 @@ ladder — the COM ABI is append-only by contract) and emits timers in the same
 | `api_session_create` | `createGlobalSession` + `createSession` (core-module deserialization; the #6579 complaint) | N create/destroy iterations, no sources |
 | `api_many_kernels` | per-compile fixed overhead: N small distinct kernels through loadModule → composite → link → getEntryPointCode in one session | the dimension that amplified the 2026-07 regressions |
 | `api_module_graph` | import resolution + checking + link over a deep, realistic module DAG (interfaces/generics/conformances), loaded through the API | replaces `module_link`'s flat-import shape with a renderer-library-like graph |
+| `api_module_graph_bin` | the same DAG resolved from serialized `.slang-module` binaries — the import path where the 2026-07-03 regression (#11952) lives; source loads were flat across it | source-load + `writeToFile` setup, then a fresh session re-loads via binaries (guarded: fails loudly if resolution falls back to source) |
+| `api_reflection` | `getLayout` + full parameter/type-layout walks (50 per program) over parameter-rich kernels — the binding-table query pattern | driver resolves the `spReflection_*` C API via dlsym (the slang.h accessors are inline wrappers over imports a dlopen tool must resolve itself) |
+| `api_specialize` | `IEntryPoint::specialize` per impl type + link + codegen per variant — the one-kernel-per-material pattern | one module: interface + N conforming structs + generic `computeMain<T>` |
 
 `bench.py` gains an `api` mode (timed command = driver + libslang path derived
 from `--slangc`) and a build-once step for the driver; everything downstream
 (results.json, track/trend/report) is unchanged.
+
+**Planned API-path extensions (not yet implemented):**
+
+- **RT multi-entry-point composites** — raygen/closesthit/miss entry points
+  composed into one program via `createCompositeComponentType` and compiled
+  per-target. Arrives naturally with the Phase-2 public RT corpus below
+  (synthetic RT entry points are possible earlier if the corpus lags).
+- **Concurrent compilation** — a thread pool issuing `getEntryPointCode` for
+  many kernels concurrently (the documented experimental threading surface).
+  Engines compile in parallel; a contention/locking regression is invisible to
+  every current workload. Needs care: wall-clock per kernel is no longer the
+  metric — throughput (kernels/s at k threads vs 1 thread) is.
+
+**Per-PR light / nightly heavy split (planned):**
+
+- All api workloads scale linearly in `n` and are cheap (whole api set ≈ 25 s
+  at nightly sizes), so the split is a knob, not a redesign: add a
+  `--profile light|heavy` to `bench.py` mapping to per-workload sizes and
+  sample counts (light ≈ n/4, 3 samples, ~10 s, resolves ≥5–10% steps; heavy =
+  current defaults or larger with per-unit calibration, resolves 2–3%).
+- The per-PR gate (deferred above) is bottlenecked by the two builds, not the
+  bench: drop LTO for the gate (relative A/B stays valid, ~halves build time)
+  and lean on sccache. Capacity on the quiesced pool is the real constraint —
+  gate must be opt-in (a `perf-check` label or a path filter on compiler
+  sources), never unconditional per-PR.
 
 **Phase 2 — public real-shader RT corpus.** The internal corpus cannot be
 published; instead, follow the exact `mdl_dxr` precedent (fork under
