@@ -1645,7 +1645,12 @@ bool isSideEffectFreeFunctionalCall(
     SideEffectAnalysisOptions options,
     Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
-    if (!doesCalleeHaveSideEffect(call->getCallee(), calleeSideEffectCache))
+    // The only point that deals with cache optionality: pick the memoized or
+    // plain overload; both contain no further cache plumbing.
+    const bool calleeHasSideEffect =
+        calleeSideEffectCache ? doesCalleeHaveSideEffect(call->getCallee(), *calleeSideEffectCache)
+                              : doesCalleeHaveSideEffect(call->getCallee());
+    if (!calleeHasSideEffect)
     {
         return areCallArgumentsSideEffectFree(call, options);
     }
@@ -1667,8 +1672,7 @@ void forEachAssociatedCallee(IRInst* callee, TFunc callback)
         });
 }
 
-// Computes the uncached answer for `doesCalleeHaveSideEffect`.
-static bool computeCalleeSideEffect(IRInst* callee)
+bool doesCalleeHaveSideEffect(IRInst* callee)
 {
     bool sideEffect = !isNoSideEffectCallee(callee);
 
@@ -1696,32 +1700,26 @@ static bool computeCalleeSideEffect(IRInst* callee)
     return sideEffect;
 }
 
-bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache)
+bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>& cache)
 {
-    if (cache)
+    if (auto cached = cache.tryGetValue(callee))
     {
-        if (auto cached = cache->tryGetValue(callee))
-        {
 #ifdef _DEBUG
-            // Verify the memoization contract: within a cache's lifetime the
-            // fresh answer may only move from true to false (passes remove
-            // annotations and add purity decorations, never the reverse), so a
-            // cached answer must equal the fresh one or err conservatively. A
-            // failure here means a pass ran under a shared cache while creating
-            // an IRAnnotation or removing a no-side-effect decoration — see
-            // IRDeadCodeEliminationOptions::calleeSideEffectCache.
-            const bool fresh = computeCalleeSideEffect(callee);
-            SLANG_ASSERT(*cached == fresh || (*cached && !fresh));
+        // Verify the memoization contract: within a cache's lifetime the
+        // fresh answer may only move from true to false (passes remove
+        // annotations and add purity decorations, never the reverse), so a
+        // cached answer must equal the fresh one or err conservatively. A
+        // failure here means a pass ran under a shared cache while creating
+        // an IRAnnotation or removing a no-side-effect decoration — see
+        // IRDeadCodeEliminationOptions::calleeSideEffectCache.
+        const bool fresh = doesCalleeHaveSideEffect(callee);
+        SLANG_ASSERT(*cached == fresh || (*cached && !fresh));
 #endif
-            return *cached;
-        }
+        return *cached;
     }
 
-    bool sideEffect = computeCalleeSideEffect(callee);
-
-    if (cache)
-        cache->add(callee, sideEffect);
-
+    const bool sideEffect = doesCalleeHaveSideEffect(callee);
+    cache.add(callee, sideEffect);
     return sideEffect;
 }
 
