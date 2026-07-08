@@ -13,7 +13,8 @@ entirely from the command line — there is no CMake target to build.
 
 ## Quick run
 
-Run all the steps at once (`slangc` is found on `PATH`, or pass it explicitly):
+Run all the steps at once. The scripts pick the first `slangc` with coverage support
+from `PATH` or a sibling repo build (`../../build`), or take one explicitly:
 
 ```bash
 ./run-tutorial.sh                            # Linux / macOS

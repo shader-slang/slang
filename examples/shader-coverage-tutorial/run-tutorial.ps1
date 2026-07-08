@@ -33,24 +33,34 @@ function Invoke-Step
 
 # --- Step 0: find the tools -------------------------------------------------
 # slangc is taken from -Slangc, then PATH, then a sibling repo build
-# (convenient when running from a shader-slang/slang checkout).
-if (-not $Slangc)
+# (convenient when running from a shader-slang/slang checkout). An old
+# slangc without coverage support is skipped: releases that predate the
+# feature reject -trace-coverage.
+function Test-CoverageSupport
 {
-    if (Get-Command slangc -ErrorAction SilentlyContinue)
+    param([string]$Exe)
+    try { return ((& $Exe -h 2>&1 | Out-String) -match "trace-coverage") }
+    catch { return $false }
+}
+
+if ($Slangc)
+{
+    if (-not (Test-CoverageSupport $Slangc))
     {
-        $Slangc = "slangc"
+        throw "$Slangc does not support -trace-coverage; use a newer Slang release"
     }
-    else
+}
+else
+{
+    foreach ($candidate in "slangc", "../../build/Release/bin/slangc.exe", "../../build/Debug/bin/slangc.exe")
     {
-        foreach ($candidate in "../../build/Release/bin/slangc.exe", "../../build/Debug/bin/slangc.exe")
-        {
-            if (Test-Path $candidate) { $Slangc = $candidate; break }
-        }
+        if (-not (Get-Command $candidate -ErrorAction SilentlyContinue)) { continue }
+        if (Test-CoverageSupport $candidate) { $Slangc = $candidate; break }
     }
 }
 if (-not $Slangc)
 {
-    throw "slangc not found; put it on PATH or pass -Slangc"
+    throw "no slangc with -trace-coverage support found on PATH or in ../../build; install a recent Slang release or pass -Slangc"
 }
 Write-Host "using slangc: $Slangc"
 

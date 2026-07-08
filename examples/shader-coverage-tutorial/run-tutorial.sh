@@ -17,18 +17,29 @@ cd "$(dirname "$0")"
 
 # --- Step 0: find the tools -------------------------------------------------
 # slangc is taken from $SLANGC, then PATH, then a sibling repo build
-# (convenient when running from a shader-slang/slang checkout).
-if [[ -z "${SLANGC:-}" ]]; then
-  if command -v slangc >/dev/null; then
-    SLANGC=slangc
-  else
-    for candidate in ../../build/Release/bin/slangc ../../build/Debug/bin/slangc; do
-      [[ -x "$candidate" ]] && SLANGC=$candidate && break
-    done
-  fi
+# (convenient when running from a shader-slang/slang checkout). An old
+# slangc without coverage support is skipped: releases that predate the
+# feature reject -trace-coverage.
+supports_coverage() {
+  local help_text
+  help_text=$("$1" -h 2>&1) || true
+  [[ $help_text == *trace-coverage* ]]
+}
+
+if [[ -n "${SLANGC:-}" ]]; then
+  supports_coverage "$SLANGC" || {
+    echo "error: $SLANGC does not support -trace-coverage; use a newer Slang release" >&2
+    exit 1
+  }
+else
+  for candidate in slangc ../../build/Release/bin/slangc ../../build/Debug/bin/slangc; do
+    command -v "$candidate" >/dev/null || continue
+    supports_coverage "$candidate" && SLANGC=$candidate && break
+  done
 fi
 [[ -n "${SLANGC:-}" ]] || {
-  echo "error: slangc not found; put it on PATH or set SLANGC" >&2
+  echo "error: no slangc with -trace-coverage support found on PATH or in ../../build;" >&2
+  echo "install a recent Slang release or set SLANGC" >&2
   exit 1
 }
 echo "using slangc: $SLANGC"
