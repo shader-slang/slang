@@ -248,14 +248,27 @@ from `--slangc`) and a build-once step for the driver; everything downstream
   gate must be opt-in (a `perf-check` label or a path filter on compiler
   sources), never unconditional per-PR.
 
-**Phase 2 — public real-shader RT corpus.** The internal corpus cannot be
-published; instead, follow the exact `mdl_dxr` precedent (fork under
-shader-slang, adapt shaders to compile standalone, pin the SHA, fetch at CI
-time — never vendored): a curated subset of the public Falcor shader library
-(NVIDIAGameWorks/Falcor — same domain and shape: material system + BSDFs + a
-path-tracer pass, raygen/closesthit/miss entry points), compiled through the
-Phase-1 API driver with link-time specialization. Keep original copyright
-headers in the fork; name the workload generically (e.g. `rt_renderer`).
+**Phase 2 — renderer-shaped generated corpus (`rt_renderer`).** The internal
+corpus cannot be published, and forking an external shader library (even a
+public one) was rejected too: it adds license/attribution surface, fork
+maintenance, and corpus-drift risk for no benefit over a generator. Instead, a
+close-enough ORIGINAL test case, generated like every other workload
+(deterministic: same n → identical bytes, so no pinning or resync-on-drift):
+
+- a renderer-shaped module library at the internal benchmark's scale
+  (~150 modules / ~25k lines): a utility layer (math/sampling/color), a scene
+  layer (lights, camera, intersection), and a material system — `IMaterial` /
+  `IBSDF` interfaces with N conforming material modules carrying
+  texture/sampler/cbuffer parameters and eval/sample methods;
+- kernels that import the WHOLE library per program (the few×heavy shape that
+  dominated the internal data — each of its programs paid 100–700 ms of Slang
+  compile because of library imports, unlike `api_many_kernels`' many×tiny);
+- raygen/closesthit/miss entry points composed into one program through
+  `createCompositeComponentType` (the planned RT multi-entry-point extension
+  lands here), plus compute variants so the workload also runs GPU-less;
+- one kernel variant per material through `IEntryPoint::specialize` — the
+  link-time-specialization pattern against interface-heavy code, which
+  `api_specialize`'s single-module version only approximates.
 
 **Phase 3 (deferred) — slangpy-in-CI.** Nightly slangpy kernel generation
 against the local slang build (the `SGL_LOCAL_SLANG` hooks). Closest
