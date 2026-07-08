@@ -28,7 +28,10 @@ name: PR Board Sync (reusable)
 #   - Approved   - not a draft, already has an approving review, and is still
 #                  waiting on something automated: CI is pending, or it is sitting
 #                  in the merge queue.
-#   - Done       - the PR is closed (merged or otherwise); terminal.
+#   - Done       - the PR is closed (merged or otherwise); terminal. Once the
+#                  board Status is Done, this workflow never changes it again,
+#                  so a late event (CI completion, review relay, etc.) cannot
+#                  overwrite Done set earlier by merge automation.
 # Bot vs. human: on a CI failure a Bot PR goes to Revising (the bot fixes it
 # itself); a human PR (Internal/Community) goes to Snagged. The merge-queue drop
 # is Snagged for both, since a human assignee always resolves that.
@@ -816,6 +819,13 @@ jobs:
               return data?.node?.fieldValueByName?.name || null;
             }
 
+            // Done is terminal on the board: once set (by this workflow's closed
+            // handler or other merge automation), never move the card back into
+            // the live state machine on a late-arriving event.
+            async function isBoardStatusDone(itemId) {
+              return (await itemSingleSelect(itemId, STATUS.field)) === STATUS.done;
+            }
+
             // --- CI rollup (mirror summarize_ci / ci_state_from_rollup) -------
             function summarizeCi(runs) {
               if (!runs.length) return "none";
@@ -1218,6 +1228,10 @@ jobs:
               if (!info) return;
               itemId = itemId || await ensureItem(nodeId || info.nodeId);
               if (!itemId) return;
+              if (await isBoardStatusDone(itemId)) {
+                console.log(`#${number} already Done; skipping reconcile`);
+                return;
+              }
               // Resolve Source like pr_sweep.py: the board value when set
               // (authoritative; honors a manual override), else the freshly-
               // classified value (opened/reopened), else classify now (the sweep, or
@@ -1301,7 +1315,11 @@ jobs:
               if (action === "closed") {
                 // Closed (merged or otherwise) -> Done; terminal, and the only
                 // state not derived from computeTarget (a closed PR is not open).
-                await setSingleSelect(itemId, STATUS.field, STATUS.done);
+                // Skip when already Done so merge automation's earlier write is
+                // not duplicated on the timeline.
+                if (!(await isBoardStatusDone(itemId))) {
+                  await setSingleSelect(itemId, STATUS.field, STATUS.done);
+                }
               } else if (action === "dequeued") {
                 // Fell out of the merge queue -> Snagged (a human re-queues/merges).
                 // The cadence sweep agrees: a dequeue does not change the head
@@ -1309,7 +1327,9 @@ jobs:
                 // dropped PR reads approved + green + un-queued, which computeTarget
                 // also maps to Snagged. (A new commit is the one thing that makes
                 // head CI pending, but that dequeues via `synchronize` -> In Review.)
-                await setSingleSelect(itemId, STATUS.field, STATUS.snagged);
+                if (!(await isBoardStatusDone(itemId))) {
+                  await setSingleSelect(itemId, STATUS.field, STATUS.snagged);
+                }
               } else {
                 // opened / reopened / edited / synchronize / enqueued /
                 // ready_for_review / converted_to_draft: recompute the whole target
