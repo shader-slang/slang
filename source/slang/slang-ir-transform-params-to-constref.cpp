@@ -7,6 +7,136 @@
 namespace Slang
 {
 
+void rewriteValueUsesToAddrUses(IRBuilder& builder, IRInst* newAddrInst)
+{
+    // The overall strategy here is as follows:
+    //
+    // - First, insert IRLoad() in front of all uses of newAddrInst. This
+    //   is a value parameter turned into pointer to value. Add all IRLoad()
+    //   instructions in the working set
+    // - Then, for every inserted IRLoad() instruction, search for
+    //   IRFieldExtract(IRLoad(ptr), ...) and IRGetElement(IRLoad(ptr), ...) patterns,
+    //   and transform these to IRLoad(IRFieldAddress(ptr, ...)) and
+    //   IRLoad(IRGetElementPtr(ptr, ...)), and insert the new IRLoad()
+    //   instructions in the working set
+    //   - Remove also stores to write-once temporary variables that are
+    //     immediately passed into a constref location in a call (see below)
+    //   - If all uses of the inserted IRLoad() were translated, remove the
+    //     IRLoad() to keep this pass clean
+
+    List<IRLoad*> workList;
+
+    traverseUses(
+        newAddrInst,
+        [&](IRUse* use)
+        {
+            auto user = use->getUser();
+            builder.setInsertBefore(user);
+            IRLoad* loadInst = as<IRLoad>(builder.emitLoad(newAddrInst));
+            use->set(loadInst);
+
+            workList.add(loadInst);
+        });
+
+    for (Index i = 0; i < workList.getCount(); i++)
+    {
+        IRLoad* loadInst = workList[i];
+        bool allUsesTranslated = true;
+
+        traverseUses(
+            loadInst,
+            [&](IRUse* use)
+            {
+                IRInst* userInst = use->getUser();
+                bool useTranslated = false;
+
+                switch (userInst->getOp())
+                {
+                case kIROp_FieldExtract:
+                    {
+                        if (isUseBaseAddrOperand(use, userInst))
+                        {
+                            // Transform IRFieldExtract(IRLoad(ptr), x)
+                            //           ==>
+                            //           IRLoad(IRFieldAddr(ptr), x)
+
+                            auto fieldExtract = as<IRFieldExtract>(userInst);
+                            builder.setInsertBefore(fieldExtract);
+                            auto fieldAddr = builder.emitFieldAddress(
+                                builder.getPtrType(userInst->getDataType()),
+                                loadInst->getPtr(),
+                                fieldExtract->getField());
+                            auto loadFieldAddr = as<IRLoad>(builder.emitLoad(fieldAddr));
+                            fieldExtract->replaceUsesWith(loadFieldAddr);
+                            fieldExtract->removeAndDeallocate();
+
+                            workList.add(loadFieldAddr);
+                            useTranslated = true;
+                        }
+                        break;
+                    }
+
+                case kIROp_GetElement:
+                    {
+                        if (isUseBaseAddrOperand(use, userInst))
+                        {
+                            // Transform IRGetElement(IRLoad(ptr), x)
+                            //           ==>
+                            //           IRLoad(IRGetElementPtr(ptr), x)
+
+                            auto getElement = as<IRGetElement>(userInst);
+                            builder.setInsertBefore(getElement);
+                            auto getElementPtr = builder.emitElementAddress(
+                                builder.getPtrType(userInst->getDataType()),
+                                loadInst->getPtr(),
+                                getElement->getIndex());
+                            auto loadElementPtr = as<IRLoad>(builder.emitLoad(getElementPtr));
+                            getElement->replaceUsesWith(loadElementPtr);
+                            getElement->removeAndDeallocate();
+
+                            workList.add(loadElementPtr);
+                            useTranslated = true;
+                        }
+                        break;
+                    }
+
+                case kIROp_Store:
+                    {
+                        // If the current value is being stored into a write-once temp var that
+                        // is immediately passed into a constref location in a call, we can get
+                        // rid of the temp var and replace it with `inst` directly.
+                        // (such temp var can be introduced during `updateCallSites` when we
+                        // were processing the callee.)
+
+                        // Transform IRStore(storeDest, load(ptr)) where storeDest has attribute
+                        //                                     TempCallArgImmutableVarDecoration
+                        //           IRInst(storeDest)
+                        //           ==>
+                        //           IRInst(ptr)
+
+                        auto storeInst = as<IRStore>(userInst);
+                        auto storeDest = storeInst->getPtr();
+
+                        if (storeInst->getValUse() == use &&
+                            storeDest->findDecorationImpl(kIROp_TempCallArgImmutableVarDecoration))
+                        {
+                            storeDest->replaceUsesWith(loadInst->getPtr());
+                            userInst->removeAndDeallocate();
+                            storeDest->removeAndDeallocate();
+                            useTranslated = true;
+                        }
+                        break;
+                    }
+                }
+
+                allUsesTranslated = allUsesTranslated && useTranslated;
+            });
+
+        if (allUsesTranslated)
+            loadInst->removeAndDeallocate();
+    }
+}
+
 struct TransformParamsToConstRefContext
 {
     IRModule* module;
@@ -43,133 +173,7 @@ struct TransformParamsToConstRefContext
 
     void rewriteValueUsesToAddrUses(IRInst* newAddrInst)
     {
-        // The overall strategy here is as follows:
-        //
-        // - First, insert IRLoad() in front of all uses of newAddrInst. This
-        //   is a value parameter turned into pointer to value. Add all IRLoad()
-        //   instructions in the working set
-        // - Then, for every inserted IRLoad() instruction, search for
-        //   IRFieldExtract(IRLoad(ptr), ...) and IRGetElement(IRLoad(ptr), ...) patterns,
-        //   and transform these to IRLoad(IRFieldAddress(ptr, ...)) and
-        //   IRLoad(IRGetElementPtr(ptr, ...)), and insert the new IRLoad()
-        //   instructions in the working set
-        //   - Remove also stores to write-once temporary variables that are
-        //     immediately passed into a constref location in a call (see below)
-        //   - If all uses of the inserted IRLoad() were translated, remove the
-        //     IRLoad() to keep this pass clean
-
-        List<IRLoad*> workList;
-
-        traverseUses(
-            newAddrInst,
-            [&](IRUse* use)
-            {
-                auto user = use->getUser();
-                builder.setInsertBefore(user);
-                IRLoad* loadInst = as<IRLoad>(builder.emitLoad(newAddrInst));
-                use->set(loadInst);
-
-                workList.add(loadInst);
-            });
-
-        for (Index i = 0; i < workList.getCount(); i++)
-        {
-            IRLoad* loadInst = workList[i];
-            bool allUsesTranslated = true;
-
-            traverseUses(
-                loadInst,
-                [&](IRUse* use)
-                {
-                    IRInst* userInst = use->getUser();
-                    bool useTranslated = false;
-
-                    switch (userInst->getOp())
-                    {
-                    case kIROp_FieldExtract:
-                        {
-                            if (isUseBaseAddrOperand(use, userInst))
-                            {
-                                // Transform IRFieldExtract(IRLoad(ptr), x)
-                                //           ==>
-                                //           IRLoad(IRFieldAddr(ptr), x)
-
-                                auto fieldExtract = as<IRFieldExtract>(userInst);
-                                builder.setInsertBefore(fieldExtract);
-                                auto fieldAddr = builder.emitFieldAddress(
-                                    builder.getPtrType(userInst->getDataType()),
-                                    loadInst->getPtr(),
-                                    fieldExtract->getField());
-                                auto loadFieldAddr = as<IRLoad>(builder.emitLoad(fieldAddr));
-                                fieldExtract->replaceUsesWith(loadFieldAddr);
-                                fieldExtract->removeAndDeallocate();
-
-                                workList.add(loadFieldAddr);
-                                useTranslated = true;
-                            }
-                            break;
-                        }
-
-                    case kIROp_GetElement:
-                        {
-                            if (isUseBaseAddrOperand(use, userInst))
-                            {
-                                // Transform IRGetElement(IRLoad(ptr), x)
-                                //           ==>
-                                //           IRLoad(IRGetElementPtr(ptr), x)
-
-                                auto getElement = as<IRGetElement>(userInst);
-                                builder.setInsertBefore(getElement);
-                                auto getElementPtr = builder.emitElementAddress(
-                                    builder.getPtrType(userInst->getDataType()),
-                                    loadInst->getPtr(),
-                                    getElement->getIndex());
-                                auto loadElementPtr = as<IRLoad>(builder.emitLoad(getElementPtr));
-                                getElement->replaceUsesWith(loadElementPtr);
-                                getElement->removeAndDeallocate();
-
-                                workList.add(loadElementPtr);
-                                useTranslated = true;
-                            }
-                            break;
-                        }
-
-                    case kIROp_Store:
-                        {
-                            // If the current value is being stored into a write-once temp var that
-                            // is immediately passed into a constref location in a call, we can get
-                            // rid of the temp var and replace it with `inst` directly.
-                            // (such temp var can be introduced during `updateCallSites` when we
-                            // were processing the callee.)
-
-                            // Transform IRStore(storeDest, load(ptr)) where storeDest has attribute
-                            //                                     TempCallArgImmutableVarDecoration
-                            //           IRInst(storeDest)
-                            //           ==>
-                            //           IRInst(ptr)
-
-                            auto storeInst = as<IRStore>(userInst);
-                            auto storeDest = storeInst->getPtr();
-
-                            if (storeInst->getValUse() == use &&
-                                storeDest->findDecorationImpl(
-                                    kIROp_TempCallArgImmutableVarDecoration))
-                            {
-                                storeDest->replaceUsesWith(loadInst->getPtr());
-                                userInst->removeAndDeallocate();
-                                storeDest->removeAndDeallocate();
-                                useTranslated = true;
-                            }
-                            break;
-                        }
-                    }
-
-                    allUsesTranslated = allUsesTranslated && useTranslated;
-                });
-
-            if (allUsesTranslated)
-                loadInst->removeAndDeallocate();
-        }
+        Slang::rewriteValueUsesToAddrUses(builder, newAddrInst);
     }
 
     void rewriteParamUseSitesToSupportConstRefUsage(HashSet<IRParam*>& updatedParams)

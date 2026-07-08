@@ -387,6 +387,10 @@ Second, each loaded module of GPU code may contain pre-allocated "constant memor
 Because types like blocks or textures are not special in CUDA, either of these mechanisms can be utilized to pass any kind of data including references to pointer-based data structures stored in the GPU virtual address space.
 The use of "slots" or "blocks" or "root constants" is a matter of application policy instead of API mechanism.
 
+Slang maps global-scope shader parameters to a single struct held in the module's constant memory (`SLANG_globalParams`), and entry-point `uniform` parameters to by-value kernel arguments (root constants).
+One exception: because kernel-argument memory cannot be dynamically indexed efficiently, a compute entry-point `uniform` parameter of struct type that contains a fixed-size array of resources or pointer-backed structs (a descriptor table) is instead passed by reference — laid out and reflected as an implicit `ParameterBlock`, with the kernel receiving one device pointer to the payload in global memory.
+The `-cuda-entry-point-params-by-value` compiler option restores the legacy all-by-value ABI.
+
 OptiX supports use of constant memory storage for ray tracing pipelines, where all the stages in a ray tracing pipeline share that storage.
 OptiX uses a shader table for managing kernels and hit groups, and allows kernels to access the bytes of their shader table entry via a pointer.
 Similar to the compute pipeline, application code can layer many different policies on top of these mechanisms.

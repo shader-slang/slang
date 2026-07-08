@@ -1193,6 +1193,12 @@ void initCommandOptions(CommandOptions& options)
          "-enable-experimental-passes",
          nullptr,
          "Enable experimental compiler passes"},
+        {OptionKind::CudaEntryPointParamsByValue,
+         "-cuda-entry-point-params-by-value",
+         nullptr,
+         "Pass CUDA entry-point uniform parameters containing fixed-size descriptor arrays by "
+         "value in kernel-argument space (the legacy ABI), instead of by reference as an "
+         "implicit ParameterBlock"},
         {OptionKind::EnableExperimentalDynamicDispatch,
          "-enable-experimental-dynamic-dispatch",
          nullptr,
@@ -2799,6 +2805,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::PreserveParameters:
         case OptionKind::UseMSVCStyleBitfieldPacking:
         case OptionKind::ExperimentalFeature:
+        case OptionKind::CudaEntryPointParamsByValue:
             linkage->m_optionSet.set(optionKind, true);
             break;
         case OptionKind::EnableRichDiagnostics:

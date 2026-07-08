@@ -967,6 +967,11 @@ Enable GLSL as an input language.
 Enable experimental compiler passes 
 
 
+<a id="cuda-entry-point-params-by-value"></a>
+### -cuda-entry-point-params-by-value
+Pass CUDA entry-point uniform parameters containing fixed-size descriptor arrays by value in kernel-argument space (the legacy ABI), instead of by reference as an implicit ParameterBlock 
+
+
 <a id="enable-experimental-dynamic-dispatch"></a>
 ### -enable-experimental-dynamic-dispatch
 Enable experimental dynamic dispatch features 

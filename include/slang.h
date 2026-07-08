@@ -1236,6 +1236,15 @@ typedef uint32_t SlangSizeT;
         // combine on the command line. CLI spellings: -Wall, -Wextra, -Wpedantic.
         WarningLevel = 155,
 
+        CudaEntryPointParamsByValue =
+            156, // bool: restore the legacy CUDA ABI where an entry-point `uniform`
+                 //   parameter containing a fixed-size array of descriptors (resources
+                 //   or pointer-backed structs) is passed by value in kernel-argument
+                 //   space. By default such parameters are passed by reference — laid
+                 //   out and reflected as an implicit `ParameterBlock` whose payload
+                 //   lives in device global memory — because kernel-argument space
+                 //   cannot be dynamically indexed efficiently.
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
