@@ -80,6 +80,14 @@ Absolute compile times are runner-specific, so the series is assembled per machi
 built on), `runner-id`, `summary`. Points reduce to per-`(workload, timer)` median
 via `analyze.canonical_runs`, so history and daily points compare like-with-like.
 
+Points sort by `(date, commit_time, label)`. The full committer timestamp
+matters because daily labels carry only the commit's DATE, and same-date
+siblings are common (master's HEAD is usually committed the previous day;
+backfills re-measure old dates) — without it, within-date order would fall to
+the short SHA's hex spelling, which is unrelated to code order. The label
+remains the deterministic fallback for points registered before `commit_time`
+existed.
+
 ### Drift alert — `trend.py`
 
 After each nightly rebuild, `trend.py` judges one point's primary timers (per
@@ -107,7 +115,7 @@ with `force=true` to re-measure every release on the new machine and re-stamp
     index.json                       release manifest {tag, date, version}
     releases/<tag>/results.json      per-release sweep — the history baseline (source of truth)
     daily/<date>-<sha>/results.json  one tip-of-tree sweep per night
-    daily/<date>-<sha>/meta.json     {date, commit, runner, kind}
+    daily/<date>-<sha>/meta.json     {date, commit, commit_time, runner, kind}
     runner.json                      {fingerprint, label} the history was built on
     tracking/tracking.json          derived series consumed by trend.py / plots
 

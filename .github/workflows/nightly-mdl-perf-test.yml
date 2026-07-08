@@ -127,6 +127,9 @@ jobs:
           SLANGC="$GITHUB_WORKSPACE/build/Release/bin/slangc.exe"
           LABEL="$(git log -1 --format=%cs HEAD)-$(git rev-parse --short HEAD)"
           COMMIT="$(git rev-parse HEAD)"
+          # Full committer timestamp: same-date sibling points (labels carry
+          # only the commit's DATE) sort by true code order in the series.
+          COMMIT_TIME="$(git log -1 --format=%cI HEAD)"
           CORPUS_SHA="$(git -C "$GITHUB_WORKSPACE/external/MDL-SDK" rev-parse HEAD)"
           # The trend step below judges exactly the point this run registers
           # (daily labels share the swept commit's DATE, so several points can
@@ -151,7 +154,8 @@ jobs:
           if [ "$PUBLISH" = "true" ]; then
             # Stamp meta + rebuild perf-results/tracking/tracking.json
             python3 track.py register --results "$RESULTS" --index "$RESULTS/index.json" \
-              --label "$LABEL" --commit "$COMMIT" --corpus-sha "$CORPUS_SHA"
+              --label "$LABEL" --commit "$COMMIT" --corpus-sha "$CORPUS_SHA" \
+              --commit-time "$COMMIT_TIME"
           fi
 
       - name: Upload results artifact (publish=false)
