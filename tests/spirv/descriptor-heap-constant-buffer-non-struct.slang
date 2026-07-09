@@ -5,7 +5,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry main1 -stage compute -capability spvDescriptorHeapEXT
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry main2 -stage compute -capability spvDescriptorHeapEXT
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry main3 -stage compute -capability spvDescriptorHeapEXT
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry main4 -stage compute -capability spvDescriptorHeapEXT
+//TEST:SIMPLE(filecheck=CHECK_ARRAY): -target spirv-asm -entry main4 -stage compute -capability spvDescriptorHeapEXT
 //TEST:SIMPLE(filecheck=SHARED): -target spirv-asm -entry mainShared -stage compute -capability spvDescriptorHeapEXT
 //TEST:SIMPLE(filecheck=HANDLE_ARRAY): -target spirv-asm -entry mainHandleArray -stage compute -capability spvDescriptorHeapEXT
 
@@ -68,8 +68,13 @@ void mainHandleArray(
     output[0] = getDescriptorFromHandle(inputs[index]);
 }
 
+// main1/main2/main3 — scalar, vector, and matrix elements stay in the Uniform storage
+// class (they have no nested-array addressing through the buffer pointer, so the missing
+// pointer-type ArrayStride of #11483 does not affect them). The array element type
+// (main4) is handled separately by the CHECK_ARRAY prefix below.
+//
 // The synthesized wrapper must carry Block decoration (required for Uniform storage class).
-// CHECK: OpName %[[CB:(cbuffer_[A-Za-z0-9_]+_t|_Array_std140_float4)]]
+// CHECK: OpName %[[CB:cbuffer_[A-Za-z0-9_]+_t]]
 // CHECK-NOT: %_ptr_Function_[[CB]]
 // CHECK: OpDecorate %[[CB]] Block
 
@@ -87,6 +92,16 @@ void mainHandleArray(
 // Access to the wrapped element must use Uniform storage class, not Function.
 // CHECK: OpAccessChain %_ptr_Uniform
 // CHECK-NOT: %_ptr_Function_[[CB]]
+
+// main4 — ConstantBuffer<float[4]> via heap: the array element is wrapped into a block
+// struct, and the descriptor-heap buffer pointer must be StorageBuffer so the nested
+// array pointer type carries a pointer-type ArrayStride (#11483); a Uniform pointer would
+// leave the nested `input[2]` read undefined.
+// CHECK_ARRAY: OpName %[[CBA:_Array_std140_float4]] "_Array_std140_float4"
+// CHECK_ARRAY-DAG: OpDecorate %[[CBA]] Block
+// CHECK_ARRAY-DAG: OpDecorate %_ptr_StorageBuffer__arr_float_int_4 ArrayStride 16
+// CHECK_ARRAY: %[[CBA_PTR:_ptr_StorageBuffer__Array_std140_float4]] = OpTypePointer StorageBuffer %[[CBA]]
+// CHECK_ARRAY: OpBufferPointerEXT %[[CBA_PTR]]
 
 // SHARED: OpName %[[CB:cbuffer_float_t]] "cbuffer_float_t"
 // SHARED-NOT: cbuffer_float_t_

@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:50:00+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#stage-specific-entry-point-attributes
-//META: doc_section_digest=5332741d22bd1f66cc006924c76c4414130d880c08abe1915fb243255799a71b
+//META: doc_section_digest=da9e653cd029326374ac4195e36ff4e7273720baf82d3bdab25956dff2aaf58e
 //META: purpose=`[numthreads(x,y,z)]` workgroup dimensions appear in emitted HLSL.
 //META: intent=functional
 //META: pipeline_stage=emit

@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00Z
 //META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#wrapcbufferelementsformetal
-//META: doc_section_digest=2a4fe67f3530d551446e5a52ff530daaceb47c541972fbd77fc4832e5e0aa6a6
+//META: doc_section_digest=7c7d795ac586fc9a43d8f516471cbb51d13125d3966e4bace07617573baf24f0
 //META: purpose=Boundary: a `column_major float4x4` inside a cbuffer triggers the `_MatrixStorage_float4x4_ColMajornatural_<N>` wrapper inside `SLANG_ParameterGroup_M_natural_<M>`.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

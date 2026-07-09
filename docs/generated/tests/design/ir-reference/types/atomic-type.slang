@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/ir-reference/types.md#vectors-matrices-and-composite
-//META: doc_section_digest=a2958c27179f43de9a6c91173654a84b9300b21241a75525e0ed05ed4d9bc705
+//META: doc_section_digest=a86cbda4849cf43ca676c38db72fbd5fa8f4cb2bf87a66f6e3971d66c5026c9f
 //META: purpose=An Atomic<T> field surfaces the Atomic opcode parameterised by its element type in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower

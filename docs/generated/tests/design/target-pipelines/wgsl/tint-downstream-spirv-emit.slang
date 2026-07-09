@@ -1,19 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
+//META: model=claude-fable-5
+//META: generated_at=2026-07-08T15:43:19Z
+//META: source_commit=b15b8060d2525b8cd123f2268fafbcd82e837fb3
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#downstream-tint
-//META: doc_section_digest=d3546f7669ed5e1ba58590ad4e253593e18e5d04c72f8e2aa620eb12247e3d7a
-//META: purpose=The wgsl-spirv target hands the emitted WGSL text to Tint which produces a SPIR-V module whose OpEntryPoint names main
+//META: doc_section_digest=860f913f0d9a957b746931c036f15ca420d7ad048e6e12e9ce2ce6ffd62bf18a
+//META: purpose=The wgsl-spirv-asm target compiles the WGSL text through Tint to a SPIR-V module and then disassembles it via glslang into assembly whose OpEntryPoint names main
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The "Downstream Tint" section states that for WGSLSPIRV /
-// WGSLSPIRVAssembly the Slang downstream-compile path invokes Tint
-// with sourceLanguage=WGSL, targetType=SPIRV. We exercise that path
-// via -target wgsl-spirv-asm and pin observable SPIR-V tokens that
-// only appear when Tint actually produces a module.
+// Verifies the two-step downstream chain behind the assembly target:
+// WGSLSPIRVAssembly first reduces to the WGSLSPIRV intermediate (Tint
+// consumes the emitted WGSL and produces a SPIR-V module), then
+// glslang disassembles that module to SPIR-V assembly text. The
+// CHECKed OpEntryPoint / OpExecutionMode tokens exist only in that
+// disassembly, so matching them proves both downstream transitions
+// ran.
 
 //TEST:SIMPLE(filecheck=CHECK):-target wgsl-spirv-asm -entry main -stage compute
 

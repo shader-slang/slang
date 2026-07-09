@@ -1715,13 +1715,31 @@ struct SpecializationContext
                 break;
 
             if (iterChanged)
-            {
                 this->changed = true;
-                eliminateDeadCode(module->getModuleInst());
-                peepholeOptimizeGlobalScope(targetProgram, this->module);
-                performMandatoryEarlyInlining(module);
-                applySparseConditionalConstantPropagation(this->module, targetProgram, this->sink);
-                unrollLoopsInModule(module, targetProgram, sink);
+
+            // This cleanup group must run on every round, not only after a round
+            // that performed specialization. `unrollLoopsInModule` in particular
+            // is semantics-bearing, not an optimization: it implements
+            // `[ForceUnroll]`/`[unroll]` and diagnoses loops that cannot be
+            // unrolled, and this is its only call site in the pipeline. Gating it
+            // on `iterChanged` used to be masked by every linked module containing
+            // auto-diff IR to specialize on the first round; with auto-diff
+            // link-time pruning a program with no specialization work would
+            // otherwise never have its loops unrolled.
+            eliminateDeadCode(module->getModuleInst());
+            peepholeOptimizeGlobalScope(targetProgram, this->module);
+            performMandatoryEarlyInlining(module);
+            applySparseConditionalConstantPropagation(this->module, targetProgram, this->sink);
+            bool unrolledAnyLoop = false;
+            unrollLoopsInModule(module, targetProgram, sink, &unrolledAnyLoop);
+            if (unrolledAnyLoop)
+            {
+                // Unrolling can expose new specialization opportunities (e.g. a
+                // `specialize` whose argument becomes a constant inside an
+                // unrolled body), so treat it as a change and take another
+                // round.
+                this->changed = true;
+                iterChanged = true;
             }
 
             if (sink && sink->getErrorCount() != 0)

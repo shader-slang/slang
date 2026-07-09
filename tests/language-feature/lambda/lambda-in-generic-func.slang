@@ -1,5 +1,5 @@
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute -specialize F -validate-ir -O0
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute -specialize F -validate-ir
 
 // Test: lambda capture of outer-scope variables when the lambda body contains
 // a generic method call. The two-phase parsing's generic disambiguation

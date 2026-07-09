@@ -286,7 +286,6 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
 
 void ReplayContext::recordBlobByHash(RecordFlag flags, ISlangBlob*& blob)
 {
-    SLANG_UNUSED(flags);
     if (m_mode == Mode::Idle)
         return;
 
@@ -332,6 +331,21 @@ void ReplayContext::recordBlobByHash(RecordFlag flags, ISlangBlob*& blob)
     {
         // Playback: read hash and load blob from disk
         expectTypeId(TypeId::Blob);
+
+        // On the replay path an output blob slot may already hold an owning
+        // reference the real implementation wrote during playback (e.g.
+        // GlobalSessionProxy::getSessionDescDigest calls
+        // getActual()->getSessionDescDigest, which creates a RawBlob into the
+        // temporary). We are about to overwrite `blob` below, so release that
+        // prior object first or it is orphaned and leaked (issue #11936).
+        // Restrict this to outputs: an input blob's incoming pointer can be
+        // caller-owned state that must not be released.
+        if ((hasFlag(flags, RecordFlag::Output) || hasFlag(flags, RecordFlag::ReturnValue)) &&
+            blob != nullptr)
+        {
+            blob->release();
+            blob = nullptr;
+        }
 
         const char* hashCStr = nullptr;
         record(RecordFlag::None, hashCStr);

@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:48:55Z
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/cross-cutting/core-module.md#core-module
-//META: doc_section_digest=2bfd479afe0dc76144283c14d90b22a6ac0fd8d03be7907d3412c1e2f3944a4b
+//META: doc_section_digest=a1c3e1c21f5e7d5f5d6098ee8202f97eec56a5706e678fd2be1b3844ebe8539e
 //META: purpose=The diff meta-module declares `IDifferentiable`; a user struct conforming to it with `Differential = This` is accepted by the front-end without explicit import.
 //META: intent=functional
 //META: pipeline_stage=check
