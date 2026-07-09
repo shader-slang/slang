@@ -25,10 +25,24 @@ namespace Slang
 // fails to match there (libstdc++ and MSVC match by type name and are
 // unaffected). Marking the classes with default type visibility exports the
 // typeinfo and vtable so the dynamic linker coalesces every image's copy into
-// one canonical definition. The gate is the platform, not the compiler: every
-// non-Windows target uses the Itanium ABI and needs the annotation, while
-// PE/COFF does not have the problem regardless of compiler (this matches the
-// sibling SLANG_REPLAY_EXCEPTION_API in replay-context.h).
+// one canonical definition.
+//
+// The gate is the platform, not the compiler: every non-Windows target uses
+// the Itanium ABI and needs the annotation, while PE/COFF does not have the
+// problem regardless of compiler. The expansion is a raw visibility attribute
+// rather than SLANG_API because core is a static library folded into several
+// dynamic libraries, and SLANG_API expands to nothing unless SLANG_DYNAMIC is
+// defined — whether the RTTI is coalescible must not depend on how the
+// enclosing image is built.
+//
+// The macro deliberately stays defined instead of being #undef'd after the
+// classes below: every subclass of Exception, wherever it is declared, must
+// carry the same annotation — see TextFormatException in slang-token-reader.h
+// and the replay exceptions in source/slang-record-replay/replay-context.h.
+// Only the Exception/InternalError path is regression-gated by a genuine
+// cross-dylib typed catch (the replayStream* unit tests on the macOS coverage
+// nightly); the annotations on the remaining subclasses are the same fix
+// applied uniformly rather than separately test-covered.
 #if SLANG_WINDOWS_FAMILY
 #define SLANG_EXCEPTION_TYPE_VISIBLE
 #else
