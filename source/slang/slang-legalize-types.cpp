@@ -1244,11 +1244,13 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
         else
         {
             // Whether this parameter group was synthesized by the compiler rather than
-            // written by the user. We check for the marker *before* legalizing the element
-            // type below: legalizing a struct with mixed resource/ordinary fields creates a
-            // new "ordinary" struct and calls `transferDecorationsTo` to move the original
-            // struct's decorations (including this marker) onto it, so after
-            // `legalizeType` the marker is no longer on `originalElementType`.
+            // written by the user. We read the marker *before* legalizing the element type:
+            // legalizing a struct with mixed resource/ordinary fields moves the original
+            // struct's decorations onto a new "ordinary" struct via `transferDecorationsTo`
+            // and then restores the identity decorations (including this marker) onto the
+            // original in `copyNameHintAndDebugDecorations`. Reading it here keeps this
+            // independent of that restore, so we don't depend on the ordering of the nested
+            // legalization that happens inside `legalizeType` below.
             bool isSynthesizedGroup =
                 originalElementType->findDecoration<IRSynthesizedParameterGroupDecoration>() !=
                 nullptr;
