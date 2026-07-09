@@ -29,9 +29,11 @@ void main(
 }
 
 // A successful compile (no E30019) emits an entry point and lowers the
-// ConstantBuffer descriptor-heap access to a buffer pointer in the Uniform
+// ConstantBuffer descriptor-heap access to a buffer pointer in the StorageBuffer
 // storage class -- identical to the explicit `getDescriptorFromHandle()` path
-// validated by tests/spirv/descriptor-heap-constant-buffer.slang.
+// validated by tests/spirv/descriptor-heap-constant-buffer.slang. (Since #11483
+// the descriptor-heap constant buffer is lowered to a StorageBuffer-class buffer
+// pointer rather than Uniform, so its nested-array pointer types get strides.)
 // CHECK: OpEntryPoint
-// CHECK: OpTypePointer Uniform %Uniforms_std140
-// CHECK: OpBufferPointerEXT %_ptr_Uniform_Uniforms_std140
+// CHECK: OpTypePointer StorageBuffer %Uniforms_std140
+// CHECK: OpBufferPointerEXT %_ptr_StorageBuffer_Uniforms_std140
