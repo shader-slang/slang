@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_EXPERIMENTAL):-target spirv -entry main -stage compute -emit-spirv-directly -O0 -enable-experimental-passes
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -emit-spirv-directly -O0
+//TEST:SIMPLE(filecheck=CHECK_EXPERIMENTAL):-target spirv -entry main -stage compute -emit-spirv-directly -enable-experimental-passes
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -emit-spirv-directly
 
 // Test that we can pass arguments in different address space to an `inout` parameter, and have
 // the callee specialized to the address space of the argument.
