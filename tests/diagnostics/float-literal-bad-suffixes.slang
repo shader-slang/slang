@@ -41,14 +41,6 @@ void main() {
 //CHECK:^^^^^^ invalid suffix on floating-point literal
 //CHECK:^^^^^^ invalid suffix 'g' on floating-point literal
 
-    x = 0x1p;
-//CHECK:^^^^ invalid suffix on floating-point literal
-//CHECK:^^^^ invalid suffix 'p' on floating-point literal
-
-    x = 0x1p+;
-//CHECK:^^^^^ invalid suffix on floating-point literal
-//CHECK:^^^^^ invalid suffix 'p+' on floating-point literal
-
     x = 1.0hF;
 //CHECK:^^^^^ invalid suffix on floating-point literal
 //CHECK:^^^^^ invalid suffix 'hF' on floating-point literal

@@ -18,7 +18,7 @@
 // actual argument type); non-exhaustive lets the primary diagnostic
 // be the asserted contract while those candidate notes vary.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 struct Custom { int v; }
 

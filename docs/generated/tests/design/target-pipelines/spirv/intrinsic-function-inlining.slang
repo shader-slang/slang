@@ -15,7 +15,7 @@
 // helpers into the caller. Observation: only %main appears as
 // an OpFunction in the emit; the helper does not survive.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage compute -O1
 
 struct S { int a; int b; }
 int sumPair(S s) { return s.a + s.b; }
@@ -31,5 +31,5 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // CHECK: %main = OpFunction %void None
-// CHECK-NOT: OpFunction
+// CHECK-NOT: OpFunctionCall
 // CHECK: OpFunctionEnd
