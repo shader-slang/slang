@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#target-specific-lowering
-//META: doc_section_digest=15ffe04c81dead304d9773538e8bca993b707b3393574380bcd38d0a23da4044
+//META: doc_section_digest=71044a2d3419fa798e104d5b77b4d7a78d1652bd8571bd4aa028984e8e95b794
 //META: purpose=The SPIR-V legalize pass ensures the emitted SPIR-V module carries `OpCapability Shader`, `OpEntryPoint`, and an `OpExecutionMode LocalSize` decoration.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

@@ -169,17 +169,24 @@ static mz_file_read_func _calcReadFunc()
     void* buf;
     size_t size;
     mz_zip_writer_finalize_heap_archive(&archive, &buf, &size);
-    ScopedAllocation alloc;
-    alloc.attach(buf, size);
+
+    // `buf` is owned by the archive's own allocator, so it must be released with the archive's
+    // matching free callback (`m_pFree`) rather than `::free`. Capture that callback (and its
+    // opaque argument) before `mz_zip_writer_end` tears the archive down. No `ScopedAllocation`
+    // copy is needed here: the buffer is only used to open a reader long enough to grab the
+    // read-function pointer, so the reader is initialized directly over it and it is freed below.
+    mz_free_func freeFunc = archive.m_pFree;
+    void* freeOpaque = archive.m_pAlloc_opaque;
     mz_zip_writer_end(&archive);
 
     // Read
     mz_zip_zero_struct(&archive);
-    mz_zip_reader_init_mem(&archive, alloc.getData(), alloc.getSizeInBytes(), 0);
+    mz_zip_reader_init_mem(&archive, buf, size, 0);
 
     auto readFunc = archive.m_pRead;
 
     mz_zip_end(&archive);
+    freeFunc(freeOpaque, buf);
     return readFunc;
 }
 
@@ -397,9 +404,22 @@ SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
                     void* buf;
                     size_t size;
                     mz_zip_writer_finalize_heap_archive(&m_archive, &buf, &size);
-                    m_data.attach(buf, size);
+                    // `buf` was allocated by the archive's own allocator (`m_pAlloc`); copy it
+                    // into the member allocation and release the original with the archive's
+                    // matching free callback (`m_pFree`) rather than `ScopedAllocation`'s
+                    // `::free`, so alloc/free stay paired even under custom allocator callbacks.
+                    // The callback must be read before `mz_zip_writer_end` below.
+                    const void* copied = m_data.set(buf, size);
+                    m_archive.m_pFree(m_archive.m_pAlloc_opaque, buf);
 
                     mz_zip_writer_end(&m_archive);
+
+                    // The copy above can fail under memory pressure; surface it as OOM (matching
+                    // `loadArchive`) rather than a generic reader-init failure below.
+                    if (!copied)
+                    {
+                        return SLANG_E_OUT_OF_MEMORY;
+                    }
 
                     // Read
                     mz_zip_zero_struct(&m_archive);

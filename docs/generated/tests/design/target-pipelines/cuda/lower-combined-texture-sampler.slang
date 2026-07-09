@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:30:46+00:00
 //META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=ff5496c69314ad29906a734c4d1b9e25bf4607f4a43b1f56af9601044c1031b4
+//META: doc_section_digest=0410773935d5331fbece0da3f2383f2a7478f2afa84b7d440d2490b07f25489f
 //META: purpose=lowerBuiltinTypesForKernelEntryPoints replaces Texture2D with the CUDA primitive CUtexObject in kernel-related signatures.
 //META: intent=functional
 //META: pipeline_stage=emit

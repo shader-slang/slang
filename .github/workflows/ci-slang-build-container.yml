@@ -74,7 +74,11 @@ jobs:
           min-disk-gb: "5"
 
       # Restore sccache local cache from master
+      # sccache is a build accelerator, not a correctness input: a cache miss
+      # or a transient cache-service error must degrade to a slower (cold)
+      # build, never fail the job.
       - name: Restore sccache cache
+        continue-on-error: true
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache
@@ -129,7 +133,6 @@ jobs:
             -DSLANG_ENABLE_CUDA=ON \
             -DSLANG_ENABLE_PCH=OFF \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
-            -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
             -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}"
 

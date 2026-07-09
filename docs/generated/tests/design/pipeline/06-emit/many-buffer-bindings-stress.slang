@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#backends
-//META: doc_section_digest=d646ec1bfe54ca64d7afa27f7a26e793849f961a190aeb5f3c004156a5cb2217
+//META: doc_section_digest=afa9da1872ac16bf6c1982347a2d10792a8dffe153564dac9ffdc097add1d689
 //META: purpose=Stress: four resource bindings get four distinct default indices in the emit — HLSL u0..u3, GLSL binding=0..3, WGSL @binding(0..3), SPIR-V Binding 0..3.
 //META: intent=stress
 //META: pipeline_stage=emit

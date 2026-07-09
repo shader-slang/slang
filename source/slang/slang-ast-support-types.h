@@ -244,6 +244,32 @@ FIDDLE() namespace Slang
     /// Convert string name to KnownBuiltinDeclName enum
     KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name);
 
+    /// Returns true if `name` identifies one of the differentiable builtin
+    /// interfaces (`IDifferentiable`, `IDifferentiablePtr`, and the
+    /// function-translation interfaces `IForwardDifferentiable`,
+    /// `IBackwardDifferentiable`, `IBwdCallable`).
+    ///
+    /// This is the authoritative definition of the "differentiable interface
+    /// family": the IR linker defers the witness-table entries of conformances
+    /// to these interfaces when linking a program that does not use auto-diff
+    /// (see `shouldDeepCloneWitnessTable` in slang-ir-link.cpp). A newly added
+    /// differentiable interface must be added here, or its witness tables will
+    /// be deep-cloned into every program regardless of auto-diff use.
+    inline bool isDifferentiableInterfaceBuiltin(KnownBuiltinDeclName name)
+    {
+        switch (name)
+        {
+        case KnownBuiltinDeclName::IDifferentiable:
+        case KnownBuiltinDeclName::IDifferentiablePtr:
+        case KnownBuiltinDeclName::IForwardDifferentiable:
+        case KnownBuiltinDeclName::IBackwardDifferentiable:
+        case KnownBuiltinDeclName::IBwdCallable:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     // TODO(tfoley): We should ditch this enumeration
     // and just use the IR opcodes that represent these
     // types directly. The one major complication there

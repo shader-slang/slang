@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#shared-c-like-base
-//META: doc_section_digest=9bd773e205e5aa520ee4875c2a6aebc4a9d9aabba8cfac9d3b66489e9488c043
+//META: doc_section_digest=9f3194ddc2631c231ae0863cc8c3961c0a5eef6db41560bb17b1114e6c0cf6aa
 //META: purpose=Boundary: the int32 minimum value (-2147483648) round-trips through emit as a negative literal on each target — HLSL/Metal/CUDA wrap it as `int(-2147483648)`; GLSL emits the bare literal; WGSL casts to i32; SPIR-V encodes it as an OpConstant on %int.
 //META: intent=boundary
 //META: pipeline_stage=emit
