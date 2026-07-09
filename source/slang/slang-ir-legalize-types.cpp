@@ -4065,32 +4065,11 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
             return false;
         }
 
-        // Empty struct types must always be legalized (removed) on C/CUDA targets.
-        // In C++, empty structs have sizeof==1, but Slang layout computes them as
-        // size 0. If an empty struct survives into emitted C/CUDA code, this
-        // mismatch causes incorrect field offsets and runtime crashes (e.g., in
-        // slangpy on CUDA).
-        if (isStructEmpty(type))
-            return false;
-
-        // Also check if a struct contains any empty struct fields.
-        // If so, the struct must be processed by legalization to replace
-        // those fields with void, regardless of public interface decorations.
-        if (auto structType = as<IRStructType>(type))
-        {
-            for (auto field : structType->getFields())
-            {
-                if (isStructEmpty(field->getFieldType()))
-                    return false;
-            }
-        }
-
         // If type is used as public interface, then treat it as simple.
         for (auto decor : type->getDecorations())
         {
             switch (decor->getOp())
             {
-            case kIROp_LayoutDecoration:
             case kIROp_PublicDecoration:
             case kIROp_ExternCppDecoration:
             case kIROp_DllImportDecoration:

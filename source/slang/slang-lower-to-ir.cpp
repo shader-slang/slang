@@ -1401,11 +1401,7 @@ static void addLinkageDecoration(
     }
     for (auto modifier : decl->modifiers)
     {
-        if (as<PublicModifier>(modifier))
-        {
-            builder->addPublicDecoration(inst);
-        }
-        else if (as<HLSLExportModifier>(modifier))
+        if (as<HLSLExportModifier>(modifier))
         {
             builder->addHLSLExportDecoration(inst);
             builder->addKeepAliveDecoration(inst);
