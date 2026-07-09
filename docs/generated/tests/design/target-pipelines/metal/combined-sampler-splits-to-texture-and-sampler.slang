@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:50:00Z
 //META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=a4ae0c2435c0e77be2b2eff75eb235733a799b1c91b73d70aa184d15c167c6d0
+//META: doc_section_digest=917bf080a9394af34b7de447539625595bb7bb0f0256de58d2502cec931c41aa
 //META: purpose=Sampler2D (combined texture+sampler) lowers to separate texture2d<T,sample>/sampler parameter pair with [[texture(N)]] and [[sampler(N)]].
 //META: intent=functional
 //META: pipeline_stage=ir-pass
