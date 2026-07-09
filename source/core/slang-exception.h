@@ -36,9 +36,12 @@ namespace Slang
 // enclosing image is built.
 //
 // The macro deliberately stays defined instead of being #undef'd after the
-// classes below: every subclass of Exception, wherever it is declared, must
-// carry the same annotation — see TextFormatException in slang-token-reader.h
-// and the replay exceptions in source/slang-record-replay/replay-context.h.
+// classes below: any subclass of Exception that can be thrown in one image
+// and caught by type in another must carry the same annotation, wherever it
+// is declared — see TextFormatException in slang-token-reader.h and the
+// replay exceptions in source/slang-record-replay/replay-context.h. A
+// subclass that is thrown and caught entirely within one binary (for example
+// ShaderInputLayoutFormatException in tools/render-test) does not need it.
 // Only the Exception/InternalError path is regression-gated by a genuine
 // cross-dylib typed catch (the replayStream* unit tests on the macOS coverage
 // nightly); the annotations on the remaining subclasses are the same fix

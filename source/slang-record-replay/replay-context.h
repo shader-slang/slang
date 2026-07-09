@@ -82,10 +82,10 @@ static_assert(
 
 // Replay exceptions can be thrown across the slang shared-library boundary
 // and caught by type in the test executable when slang-test runs in-process
-// (server-count=1). Like every subclass of Slang::Exception they carry
-// SLANG_EXCEPTION_TYPE_VISIBLE (core/slang-exception.h), which exports the
-// RTTI on Itanium-ABI (non-Windows) targets so the typed catch matches across
-// dynamic libraries; see that header for the full explanation.
+// (server-count=1). They therefore carry SLANG_EXCEPTION_TYPE_VISIBLE
+// (core/slang-exception.h), which exports the RTTI on Itanium-ABI
+// (non-Windows) targets so the typed catch matches across dynamic libraries;
+// see that header for the full explanation.
 
 /// Exception thrown when trying to record an untracked interface.
 class SLANG_EXCEPTION_TYPE_VISIBLE UntrackedInterfaceException : public Slang::Exception
