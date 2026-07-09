@@ -274,6 +274,8 @@ def main():
     ap.add_argument("--warmup", type=int, default=1)
     ap.add_argument("--only", default=None,
                     help="comma-separated workload names to run (default all)")
+    ap.add_argument("--sweep", action="store_true",
+                    help="run each workload's sweep_sizes instead of default_size")
     ap.add_argument("--gen-dir", default=None,
                     help="scratch dir for generated sources + compiled outputs "
                          "(default: a tempdir, auto-removed — keeps the results dir, which "
@@ -303,7 +305,7 @@ def main():
 
     records = []
     for spec in specs:
-        sizes = [spec.default_size]
+        sizes = spec.sweep_sizes if (args.sweep and spec.sweep_sizes) else [spec.default_size]
         for size in sizes:
             print(f"[run] {spec.name:18s} n={size:<5d} ", end="", flush=True)
             rec = run_spec(slangc, spec, size, args.samples, args.warmup, gen_root)

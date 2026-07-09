@@ -22,6 +22,9 @@ on:
       only:
         description: "comma-separated workload subset (blank = full suite)"
         default: ""
+      sweep:
+        description: "run each workload's sweep_sizes for scaling curves (~4x runtime; tracking still compares the default-size point)"
+        default: "false"
       publish:
         description: "push results + update tracking + deploy pages (set false for one-off measurements: results are uploaded as a run artifact only)"
         default: "true"
@@ -120,6 +123,7 @@ jobs:
         env:
           SAMPLES: ${{ github.event.inputs.samples || '5' }}
           ONLY: ${{ github.event.inputs.only }}
+          SWEEP: ${{ github.event.inputs.sweep || 'false' }}
         run: |
           set -euo pipefail
           SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
@@ -149,6 +153,10 @@ jobs:
           cd "$SUITE"
           args=(--slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" --samples "$SAMPLES" --warmup 1)
           [ -n "$ONLY" ] && args+=(--only "$ONLY")
+          # Swept multi-size data is collapsed to default_size by
+          # analyze.canonical_runs when the tracking series is rebuilt, so a
+          # swept night still contributes a like-with-like tracking point.
+          [ "$SWEEP" = "true" ] && args+=(--sweep)
           # Daily ToT sweep -> perf-results/daily/<label>/results.json
           python3 bench.py "${args[@]}"
           if [ "$PUBLISH" = "true" ]; then

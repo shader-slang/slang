@@ -41,6 +41,10 @@ regression points at a specific release.
   take `--metric` to switch (default `median`).
 - **Memory:** when GNU `/usr/bin/time` is present, peak RSS per compile is also
   captured (`rss_kb`) — a heavier core module inflates memory, not just time.
+- **Floor + slope:** `ladder_scaling.py --label <label>` fits `time = floor + k·N`
+  from a `--sweep` (multi-size) run, separating a fixed-cost regression (heavier
+  stdlib) from a per-element one (a pass got slower) from a scaling one
+  (super-linear `k`).
 
 > **Reading the numbers:** the synthetic workloads are _stress tests built to
 > amplify_ one pass each. A "3.8×" is a sensitivity figure for that pass, **not**
@@ -126,8 +130,10 @@ The single-axis stressors above each isolate **one** pass. `complexity_ladder`
 instead ramps _several_ realistic dimensions together — branchy control flow,
 generic calls, bounded inner loops, resource reads, dynamic dispatch, and
 call-graph depth — so the size knob `N` models a real shader growing from
-**simple to highly complex**. Run it with `bench.py --only complexity_ladder`
-to measure the holistic compile-time curve at the default complexity.
+**simple to highly complex**. Sweep it (`bench.py --only complexity_ladder
+--sweep`) and fit with `ladder_scaling.py --label` to get the holistic
+complexity → compile-time curve, separating the fixed **floor** from the
+per-unit **slope** and surfacing super-linear bends at high complexity.
 
 | Test                  | What it generates                                                                                       | Targets                                                             | Primary timer                                             |
 | --------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------- |
@@ -168,7 +174,12 @@ python3 sweep.py --samples 5                                # -> results/release
 python3 report.py                           # per-workload history + phase breakdown HTML
 python3 breakdown.py --label <tag>          # phase attribution for one label (stdout table)
 
-# 5. (coming in follow-up) check a change for a compile-time regression:
+# 5. complexity sweep of one build (compile time vs size N), with HTML report
+python3 bench.py --slangc /path/to/slangc --label dev --sweep \
+    --only resource_aggregate,reflection_layout,control_flow_ssa
+python3 sweep_report.py --label dev         # -> results/dev/sweep/sweep_report.html
+
+# 6. (coming in follow-up) check a change for a compile-time regression:
 #    bench two slangc binaries, diff with compare.py
 ```
 
@@ -189,8 +200,10 @@ python3 breakdown.py --label <tag>          # phase attribution for one label (s
 | `track.py`            | maintains the CI **tracking series** (release history ++ post-release daily ToT points) + runner fingerprint                                                                                                                                                                                                          |
 | `trend.py`            | nightly **drift alert** — latest point vs trailing-median, same-runner; GitHub annotations + non-zero exit on regression                                                                                                                                                                                              |
 | `lib/analyze.py`      | per-`(workload,timer)` series helpers — used as a library by `report.py`, `track.py`, etc. (no standalone CLI yet)                                                                                                                                                                                                    |
-| `breakdown.py`        | **phase attribution** — splits `compileInner` into mutually-exclusive buckets (named leaves + `(self)` residuals); aggregate + per-workload tree; stacked-area **per-release history** (index + per-workload detail pages in `report_per_workload.html`); standalone CLI: `--label <tag>` prints aggregate + per-workload tables; `--html` writes SVG/HTML; `--workload <name>` prints the full indented timer tree |
+| `breakdown.py`        | **phase attribution** — splits `compileInner` into mutually-exclusive buckets (named leaves + `(self)` residuals); aggregate + per-workload tree; stacked-area **per-release history** (index + per-workload detail pages in `report_per_workload.html`) and **per-sweep** (stacked-area vs N in `sweep_report.html`); standalone CLI: `--label <tag>` prints aggregate + per-workload tables; `--html` writes SVG/HTML; `--workload <name>` prints the full indented timer tree |
 | `report.py`           | single self-contained **HTML report**, cross-release (charts inline + tables)                                                                                                                                                                                                                                         |
+| `ladder_scaling.py`   | cross-release `floor + slope·N` fit table for any swept workload                                                                                                                                                                                                                                                      |
+| `sweep_report.py`     | **complexity-sweep HTML report** for one build — compileInner scaling curves (index) linking to per-workload pages with the stacked sub-counter-vs-N chart, scaling analysis (floor/k/top-2×), and raw per-size numbers                                                                                               |
 
 ### Documents
 
@@ -222,6 +235,7 @@ via `--results <checkout-path>`.
 | -------------------------------------------- | --------------------------------------------------------------- |
 | `results/analysis/*.svg`                    | charts                                                          |
 | `results/analysis/report_per_workload.html` | per-workload stacked-area history + drill-down pages            |
+| `results/releases/<tag>/sweep/`             | complexity-sweep report for swept releases                      |
 | `releases/`                                  | cached prebuilt `slangc` per tag (large, gitignored)            |
 | `corpus/`                                    | fetched real-shader corpora, e.g. MDL (large, gitignored)       |
 

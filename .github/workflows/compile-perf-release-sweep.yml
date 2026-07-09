@@ -17,6 +17,9 @@ on:
       until:
         description: "latest release date (YYYY-MM-DD)"
         default: "2026-12-31"
+      sweep:
+        description: "also run each workload's sweep_sizes (scaling curves; ~4x runtime)"
+        default: "false"
       samples:
         description: "timed samples per run"
         default: "5"
@@ -96,6 +99,7 @@ jobs:
           UNTIL: ${{ github.event.inputs.until || '2026-12-31' }}
           SAMPLES: ${{ github.event.inputs.samples || '5' }}
           FORCE_ENABLED: ${{ github.event.inputs.force || 'false' }}
+          SWEEP: ${{ github.event.inputs.sweep || 'false' }}
         run: |
           set -euo pipefail
           SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
@@ -110,8 +114,10 @@ jobs:
           python3 fetch_releases.py --repo "$GITHUB_WORKSPACE" \
             --since "$SINCE" --until "$UNTIL" "${force[@]}"
           # Sweep every release into the results repo (history baseline).
+          sweepflag=()
+          [ "$SWEEP" = "true" ] && sweepflag=(--sweep)
           python3 sweep.py --index releases/index.json --results "$RESULTS" \
-            --samples "$SAMPLES" "${force[@]}"
+            --samples "$SAMPLES" "${force[@]}" "${sweepflag[@]}"
           # Merge newly swept releases into the full index (not overwrite) so
           # report.py uses all historical data, not just the swept window.
           python3 track.py merge-index --results "$RESULTS" --index releases/index.json
