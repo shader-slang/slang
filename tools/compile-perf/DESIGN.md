@@ -44,8 +44,8 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   enable it once the suite is validated on the runner and the history is seeded.
   Inputs: `ref` (commit SHA or branch to build; blank = master HEAD, useful for
   backfilling historical daily points), `samples`, `only`, `publish`
-  (default `true`), and `notify-slack` (default `false`: send the Slack
-  notification from a manual run too, to test the path end-to-end). With `publish=false` the run measures only: results are
+  (default `true`), and `notify-slack` (default `false`; set `true` to send
+  the Slack notification from a manual run too, to test the path end-to-end). With `publish=false` the run measures only: results are
   uploaded as a run artifact and the results repo, tracking series, pages, and
   trend check are untouched — the mode for one-off measurements (bisect points,
   suspect commits) that must not pollute the series. Because daily labels are

@@ -340,8 +340,11 @@ jobs:
             export ICON=":white_check_mark:"
             export STATUS="No regressions detected"
           else
+            # Covers every green-job case where the trend step did not run
+            # (publish=false today; also a cancelled/regated step) — phrased
+            # generically so it stays true if the trend step's gate changes.
             export ICON=":information_source:"
-            export STATUS="Trend check skipped (publish=false measurement-only run)"
+            export STATUS="Trend check did not run — see CI run for details"
           fi
           python3 -c "
           import json, os, urllib.request
