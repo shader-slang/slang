@@ -388,8 +388,11 @@ static bool compileEntryPoint(
     Slang::ComPtr<slang::IBlob> diagnostics;
     {
         Scope s(timers, "apiComposite");
-        SlangResult res =
-            session->createCompositeComponentType(components, 2, composite.writeRef(), diagnostics.writeRef());
+        SlangResult res = session->createCompositeComponentType(
+            components,
+            2,
+            composite.writeRef(),
+            diagnostics.writeRef());
         printDiagnostics(diagnostics);
         if (SLANG_FAILED(res))
             return false;
@@ -770,7 +773,8 @@ static int runSpecialize(const LibSlang& lib, const std::string& dir, const std:
         {
             Scope s(timers, "apiSpecialize");
             slang::SpecializationArg arg = slang::SpecializationArg::fromType(type);
-            SlangResult res = entryPoint->specialize(&arg, 1, specialized.writeRef(), diagnostics.writeRef());
+            SlangResult res =
+                entryPoint->specialize(&arg, 1, specialized.writeRef(), diagnostics.writeRef());
             printDiagnostics(diagnostics);
             if (SLANG_FAILED(res))
                 return 1;
@@ -780,8 +784,11 @@ static int runSpecialize(const LibSlang& lib, const std::string& dir, const std:
         Slang::ComPtr<slang::IComponentType> composite;
         {
             Scope s(timers, "apiComposite");
-            SlangResult res =
-                session->createCompositeComponentType(components, 2, composite.writeRef(), diagnostics.writeRef());
+            SlangResult res = session->createCompositeComponentType(
+                components,
+                2,
+                composite.writeRef(),
+                diagnostics.writeRef());
             printDiagnostics(diagnostics);
             if (SLANG_FAILED(res))
                 return 1;
@@ -797,7 +804,8 @@ static int runSpecialize(const LibSlang& lib, const std::string& dir, const std:
         Slang::ComPtr<slang::IBlob> code;
         {
             Scope s(timers, "apiGetCode");
-            SlangResult res = linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
+            SlangResult res =
+                linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
             printDiagnostics(diagnostics);
             if (SLANG_FAILED(res) || !code || !code->getBufferSize())
             {
