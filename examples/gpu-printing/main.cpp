@@ -136,7 +136,7 @@ struct ExampleProgram : public TestBase
         gDevice = getRHI()->createDevice(deviceDesc);
         if (!gDevice)
         {
-            reportError("error: failed to create device\n");
+            reportError("%s", "error: failed to create device\n");
             return SLANG_FAIL;
         }
 
@@ -153,7 +153,9 @@ struct ExampleProgram : public TestBase
         gProgram = loadComputeProgram(gSlangModule, "computeMain");
         if (!gProgram)
         {
-            reportError("error: failed to create shader program for entry point 'computeMain'\n");
+            reportError(
+                "%s",
+                "error: failed to create shader program for entry point 'computeMain'\n");
             return SLANG_FAIL;
         }
 
@@ -162,7 +164,7 @@ struct ExampleProgram : public TestBase
         auto pipelineState = gDevice->createComputePipeline(desc);
         if (!pipelineState)
         {
-            reportError("error: failed to create compute pipeline\n");
+            reportError("%s", "error: failed to create compute pipeline\n");
             return SLANG_FAIL;
         }
 
