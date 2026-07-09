@@ -22,6 +22,9 @@ on:
       only:
         description: "comma-separated workload subset (blank = full suite)"
         default: ""
+      publish:
+        description: "push results + update tracking + deploy pages (set false for one-off measurements: results are uploaded as a run artifact only)"
+        default: "true"
 
 concurrency:
   group: nightly-mdl-perf-test
@@ -31,6 +34,8 @@ env:
   # Dedicated results repo (mirrors the MDL slang-material-modules-benchmark
   # pattern). Requires a PAT secret SLANG_COMPILE_PERF_PAT with push access.
   PERF_RESULTS_REPO: shader-slang/slang-compile-perf
+  # Scheduled runs have no inputs; default to publishing.
+  PUBLISH: ${{ github.event.inputs.publish || 'true' }}
 
 permissions:
   contents: read # GITHUB_TOKEN read-only; writes use SLANG_COMPILE_PERF_PAT
@@ -101,6 +106,7 @@ jobs:
       # NB: persist-credentials stays on (default) here — the "Push results" step
       # below relies on the PAT credential this checkout persists in .git/config.
       - name: Checkout perf results repo
+        if: env.PUBLISH == 'true'
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: ${{ env.PERF_RESULTS_REPO }}
@@ -121,7 +127,20 @@ jobs:
           SLANGC="$GITHUB_WORKSPACE/build/Release/bin/slangc.exe"
           LABEL="$(git log -1 --format=%cs HEAD)-$(git rev-parse --short HEAD)"
           COMMIT="$(git rev-parse HEAD)"
+          # Full committer timestamp: same-date sibling points (labels carry
+          # only the commit's DATE) sort by true code order in the series.
+          COMMIT_TIME="$(git log -1 --format=%cI HEAD)"
           CORPUS_SHA="$(git -C "$GITHUB_WORKSPACE/external/MDL-SDK" rev-parse HEAD)"
+          # The trend step below judges exactly the point this run registers
+          # (daily labels share the swept commit's DATE, so several points can
+          # share a date and series order alone cannot identify this run's).
+          echo "PERF_LABEL=$LABEL" >> "$GITHUB_ENV"
+
+          # publish=false: measure only — write results to a workspace dir that
+          # the artifact step uploads; no tracking registration.
+          if [ "$PUBLISH" != "true" ]; then
+            RESULTS="$GITHUB_WORKSPACE/bench-results"
+          fi
 
           # MDL corpus for the mdl_dxr workload.
           mkdir -p "$SUITE/corpus/mdl"
@@ -132,9 +151,20 @@ jobs:
           [ -n "$ONLY" ] && args+=(--only "$ONLY")
           # Daily ToT sweep -> perf-results/daily/<label>/results.json
           python3 bench.py "${args[@]}"
-          # Stamp meta + rebuild perf-results/tracking/tracking.json
-          python3 track.py register --results "$RESULTS" --index "$RESULTS/index.json" \
-            --label "$LABEL" --commit "$COMMIT" --corpus-sha "$CORPUS_SHA"
+          if [ "$PUBLISH" = "true" ]; then
+            # Stamp meta + rebuild perf-results/tracking/tracking.json
+            python3 track.py register --results "$RESULTS" --index "$RESULTS/index.json" \
+              --label "$LABEL" --commit "$COMMIT" --corpus-sha "$CORPUS_SHA" \
+              --commit-time "$COMMIT_TIME"
+          fi
+
+      - name: Upload results artifact (publish=false)
+        if: always() && env.PUBLISH != 'true'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: bench-results-${{ github.sha }}
+          path: bench-results/
+          if-no-files-found: ignore
 
       # Exercise the api-driver + api workloads every night WITHOUT publishing:
       # they are opt-in for the tracked series until the history is resynced
@@ -155,6 +185,7 @@ jobs:
             --only "$API_WORKLOADS"
 
       - name: Push results
+        if: env.PUBLISH == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -170,7 +201,7 @@ jobs:
       # .git/config — on a persistent self-hosted runner this would otherwise
       # outlive the job and be readable by subsequent jobs.
       - name: Revoke PAT from perf-results git config
-        if: always()
+        if: always() && env.PUBLISH == 'true'
         shell: bash
         run: |
           git -C "$GITHUB_WORKSPACE/perf-results" config --unset \
@@ -181,6 +212,7 @@ jobs:
       # shader-slang.org/slang-compile-perf. continue-on-error so a report
       # failure never blocks the trend check below.
       - name: Generate HTML reports
+        if: env.PUBLISH == 'true'
         continue-on-error: true
         shell: bash
         run: |
@@ -195,6 +227,7 @@ jobs:
           python3 report.py --results "$RESULTS" --index "$RESULTS/index.json"
 
       - name: Checkout gh-pages branch
+        if: env.PUBLISH == 'true'
         continue-on-error: true
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -204,6 +237,7 @@ jobs:
           token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
 
       - name: Deploy HTML reports to GitHub Pages
+        if: env.PUBLISH == 'true'
         continue-on-error: true
         shell: bash
         env:
@@ -250,7 +284,7 @@ jobs:
           git push origin gh-pages
 
       - name: Revoke PAT from perf-pages git config
-        if: always()
+        if: always() && env.PUBLISH == 'true'
         shell: bash
         run: |
           git -C "$GITHUB_WORKSPACE/perf-pages" config --unset \
@@ -260,10 +294,14 @@ jobs:
 
       # Runs AFTER the push so the data is stored even when this step fails the
       # job. trend.py exits non-zero (job red + ::error:: annotations) when a
-      # primary timer drifts past threshold vs the trailing median.
+      # primary timer drifts past threshold vs the trailing median. --label
+      # pins the judgement to the point THIS run registered: daily labels are
+      # keyed by the swept commit's date, so several points can share a date
+      # and the series' last point may be a sibling, not this run's.
       - name: Check trend (fail on regression)
+        if: env.PUBLISH == 'true'
         shell: bash
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE/tools/compile-perf"
-          python3 trend.py --results "$GITHUB_WORKSPACE/perf-results"
+          python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" --label "${PERF_LABEL:?}"

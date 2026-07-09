@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:03:13Z
 //META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
 //META: doc_ref=docs/generated/design/ast-reference/values.md#modifier-values
-//META: doc_section_digest=4364bf363a9056edbfcf69ad936b2e8f4e1ebe8e3f8cb1be0e64a5bc9da138b1
+//META: doc_section_digest=fb1fb395edb88e728906a25866dec7713e98d0d924ca9a3fab4d579e80aa4748
 //META: purpose=UNormModifierVal is the type-level ModifierVal for an unorm resource-format modifier; a `Texture2D<unorm float4>` declaration preserves the unorm modifier through to the emitted HLSL surface.
 //META: intent=functional
 //META: pipeline_stage=emit

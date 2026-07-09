@@ -12,8 +12,9 @@
 // Verifies the doc's "Implicit parameter binding, ambiguous value argument"
 // example: `len<let N : uint>(int[N], int[N])` receives an int[7] and an int[6],
 // so N cannot be inferred consistently. The compiler rejects the call; CHECK
-// asserts E39999 "could not specialize generic" fires on the call site
-// (non-exhaustive skips the trailing "see declaration" note).
+// asserts E30442 "cannot deduce generic argument" fires on the call site with
+// the conflicting uint(7)/uint(6) requirements (non-exhaustive skips the
+// trailing "see declaration" note).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl
 
@@ -30,5 +31,6 @@ void computeMain()
     int arr1[7] = {};
     int arr2[6] = {};
     outputBuffer[0] = len(arr1, arr2);
-    //CHECK: E39999
+//CHECK:                 ^ cannot deduce generic argument for 'N': conflicting requirements 'uint(7)' and 'uint(6)'
+    //CHECK: E30442
 }

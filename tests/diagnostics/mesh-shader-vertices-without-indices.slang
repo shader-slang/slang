@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -O0
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv
 
 // Test for #9444: mesh shader has OutputVertices but no OutputIndices.
 
