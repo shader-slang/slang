@@ -258,6 +258,61 @@ jobs:
             exit 1
           fi
 
+          # Known-bad corpus entries: shaders whose upstream MaterialX slang
+          # codegen emits invalid Slang regardless of the compiler under test.
+          # All four were introduced upstream between the previous pin
+          # (3bd5fa9) and v1.39.5:
+          #   - flake_surfaceshader / test_flake2d / test_flake3d: the flake
+          #     noise implementation emits GLSL-style `m * p` matrix-vector
+          #     multiplication, which Slang rejects (matrix-vector products
+          #     are spelled mul()).
+          #   - LamaMixBSDFTest: the LamaMix BSDF codegen references an
+          #     undeclared identifier `mix` (GLSL's lerp).
+          # The exclusion is per generated shader, not per .mtlx document
+          # (cf. the blackbody.mtlx skip in the generation step), because a
+          # document can yield both good and bad shaders: LamaMixEDFTest
+          # comes from the same lama_mix.mtlx and compiles fine.
+          KNOWN_BAD_SHADERS=(
+            "pbrlib/surfaceshader/flake_surfaceshader.slang"
+            "pbrlib/surfaceshader/lama/LamaMixBSDFTest.slang"
+            "stdlib/procedural/test_flake2d.slang"
+            "stdlib/procedural/test_flake3d.slang"
+          )
+
+          # Partition the corpus into shaders to compile and known-bad skips.
+          # Warn (without failing) about stale exclusions that match nothing,
+          # so a future pin bump that fixes them prompts list cleanup.
+          COMPILE_FILES=()
+          SKIPPED_SHADERS=()
+          for shader_path in "${SHADER_FILES[@]}"; do
+            rel="${shader_path#generated-shaders/}"
+            skip=false
+            for bad in "${KNOWN_BAD_SHADERS[@]}"; do
+              if [ "$rel" = "$bad" ]; then skip=true; break; fi
+            done
+            if $skip; then
+              SKIPPED_SHADERS+=("$rel")
+            else
+              COMPILE_FILES+=("$shader_path")
+            fi
+          done
+          for bad in "${KNOWN_BAD_SHADERS[@]}"; do
+            found=false
+            for rel in "${SKIPPED_SHADERS[@]}"; do
+              if [ "$rel" = "$bad" ]; then found=true; break; fi
+            done
+            if ! $found; then
+              echo "::warning::Stale known-bad shader entry matched nothing in the corpus: $bad"
+            fi
+          done
+          SKIP_COUNT=${#SKIPPED_SHADERS[@]}
+          COMPILE_TOTAL=${#COMPILE_FILES[@]}
+
+          if [ "$COMPILE_TOTAL" -eq 0 ]; then
+            echo "ERROR: every generated shader is on the known-bad list; nothing left to test"
+            exit 1
+          fi
+
           # Compile the shaders in parallel. Each worker writes its verdict
           # (and, for failures, the compiler log) to a per-shader file under
           # RESULTS_DIR so that concurrent workers never interleave partial
@@ -287,8 +342,8 @@ jobs:
           export -f compile_one
 
           JOBS=$(nproc 2>/dev/null || echo 4)
-          echo "Compiling with $JOBS parallel jobs"
-          printf '%s\0' "${SHADER_FILES[@]}" | xargs -0 -n 1 -P "$JOBS" bash -c 'compile_one "$1"' _
+          echo "Compiling $COMPILE_TOTAL shaders ($SKIP_COUNT known-bad skipped) with $JOBS parallel jobs"
+          printf '%s\0' "${COMPILE_FILES[@]}" | xargs -0 -n 1 -P "$JOBS" bash -c 'compile_one "$1"' _
 
           PASS_COUNT=0
           FAIL_COUNT=0
@@ -303,8 +358,8 @@ jobs:
           # Every shader must produce exactly one verdict; a mismatch means
           # a worker died without reporting (or two shaders collided on one
           # result file), so fail loudly instead of undercounting.
-          if [ $((PASS_COUNT + FAIL_COUNT)) -ne "$TOTAL_SHADERS" ]; then
-            echo "ERROR: $TOTAL_SHADERS shaders submitted but only $((PASS_COUNT + FAIL_COUNT)) results recorded"
+          if [ $((PASS_COUNT + FAIL_COUNT)) -ne "$COMPILE_TOTAL" ]; then
+            echo "ERROR: $COMPILE_TOTAL shaders submitted but only $((PASS_COUNT + FAIL_COUNT)) results recorded"
             exit 1
           fi
 
@@ -314,7 +369,16 @@ jobs:
           echo "===================================================================="
           echo "  Total shaders: $TOTAL_SHADERS"
           echo "  Compiled:      $PASS_COUNT"
+          echo "  Skipped:       $SKIP_COUNT (known upstream MaterialX codegen issues)"
           echo "  Failed:        $FAIL_COUNT"
+
+          if [ $SKIP_COUNT -gt 0 ]; then
+            echo ""
+            echo "Skipped shaders (known upstream issues):"
+            for rel in "${SKIPPED_SHADERS[@]}"; do
+              echo "  - $rel"
+            done
+          fi
 
           if [ $FAIL_COUNT -gt 0 ]; then
             echo ""
