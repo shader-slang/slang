@@ -1,7 +1,9 @@
 # PR board-sync onboarding templates
 
 These are **copy-me** caller workflows for onboarding any `shader-slang` repo to
-the shared **"Slang PR Tracking"** ProjectsV2 board. They live here (outside
+the shared **"Slang PR Tracking"** ProjectsV2 board. For architecture, state
+machine, and assignment rules see
+[`../workflows/pr-board-sync.md`](../workflows/pr-board-sync.md). They live here (outside
 `.github/workflows/`, so GitHub does not execute them) next to the reusable
 workflow they call, [`../workflows/pr-board-sync.yml`](../workflows/pr-board-sync.yml),
 so the templates and the engine stay in sync.
@@ -43,9 +45,11 @@ the reference for what slang runs.
    secret; the reusable workflow uses it for every call, so callers should keep
    `permissions: {}` to drop the unused `GITHUB_TOKEN` scopes.
 
-The nightly sweep (`pr_sweep.py`, run on a cadence) remains the idempotent
-backstop for anything the per-event path cannot see (missed webhooks, fork-PR CI,
-repos not yet onboarded), and reconciles the whole board.
+The nightly sweep (`pr-sweep-nightly.yml`, `mode: sweep`) remains the idempotent
+backstop for anything the per-event path cannot see (missed webhooks, failed runs,
+post-hoc issue links, board drift). See
+[`../workflows/pr-board-sync.md`](../workflows/pr-board-sync.md) for the full
+architecture.
 
 ## Why `workflow_run`/`status` instead of `check_suite` for CI
 

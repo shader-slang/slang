@@ -5,8 +5,9 @@ name: PR Board Sweep (nightly)
 # It is the periodic backstop for what the per-event path (pr-maintenance.yml)
 # cannot see -- missed webhooks or failed runs, an issue assigned/linked after
 # the fact, board drift -- and shares all per-PR logic with it (only the
-# enumeration differs). See .github/workflows/pr-board-sync.yml for the board IDs
-# and required secret.
+# enumeration differs). See `.github/workflows/pr-board-sync.md` for the full
+# architecture and `.github/workflows/pr-board-sync.yml` for board IDs and the
+# required secret.
 
 on:
   schedule:

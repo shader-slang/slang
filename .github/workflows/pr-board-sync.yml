@@ -36,17 +36,13 @@ name: PR Board Sync (reusable)
 # itself); a human PR (Internal/Community) goes to Snagged. The merge-queue drop
 # is Snagged for both, since a human assignee always resolves that.
 #
-# This is the event-driven half of the slang-pr-maintenance state machine. It
-# replicates the sweep's full assignee/reviewer selection -- committer-signal
-# ranking + selection, faithful ports of scripts/pr_signal.py and pr_common.py
-# inlined into the Reconcile step (so this reusable workflow needs no checkout
-# when called from another repo). That inlined block is the single source of
-# truth; .github/scripts/{pr-signal,pr-assign}.test.js extract it from this YAML
-# (via extract-workflow-js.js) and unit-test it. A periodic sweep (run on a
-# cadence; see pr-sweep-nightly.yml / mode: sweep) remains the idempotent safety
-# net for what events cannot deliver -- missed webhooks or failed runs, a
-# manually linked issue or post-hoc issue assignment, board drift, repos not yet
-# onboarded -- and reconciles the whole board.
+# This is the event-driven half of the PR maintenance state machine; sweep mode
+# (pr-sweep-nightly.yml) runs the same per-PR engine over every open PR. Full
+# architecture, state machine, assignment rules, and caller map:
+#   .github/workflows/pr-board-sync.md
+#
+# The inlined committer-signal + assignee block is unit-tested by
+# .github/scripts/{pr-signal,pr-assign}.test.js (via extract-workflow-js.js).
 #
 # Cross-repo reuse: any shader-slang repo adds a thin caller workflow that
 # declares the PR event triggers and calls this one, mapping the single required
@@ -238,8 +234,7 @@ jobs:
               // Internal iff the author has write (push) access to this repo, i.e.
               // they can approve workflow runs and approve/merge PRs. Everyone else
               // -- org members without write here, and fork contributors -- is
-              // Community. Mirrors pr_sweep.py classify_source (collaborators with
-              // permissions.push == true). On any read error, fail safe to Community.
+              // Community. On any read error, fail safe to Community.
               let canWrite = false;
               try {
                 const resp = await github.rest.repos.getCollaboratorPermissionLevel({
@@ -311,12 +306,9 @@ jobs:
             // Committer-signal ranking + assignee/reviewer selection, inlined so
             // this reusable workflow needs NO checkout when called cross-repo
             // (a checkout in a reusable workflow lands the CALLER's repo, not this
-            // one). This block is a faithful copy of scripts/pr_signal.py and
-            // select_assignee_and_reviewers in pr_common.py. It is the single
-            // source of truth: the unit tests (.github/scripts/pr-signal.test.js,
-            // pr-assign.test.js) extract THIS block from the YAML at run time via
-            // extract-workflow-js.js, so a change here is what gets tested. Keep
-            // it behaviorally identical to the cadence sweep's Python.
+            // one). This block is the single source of truth; the unit tests
+            // (.github/scripts/pr-signal.test.js, pr-assign.test.js) extract THIS
+            // block from the YAML at run time via extract-workflow-js.js.
             // ----- extract-js:assignment:begin -----
             const DEFAULT_SIGNAL_FINALISTS = 6; // top candidates re-scored by true per-file LOC
             const DEFAULT_SIGNAL_CLEAR_MARGIN = 1.5; // skip the tiebreak when #1 leads #2 by this factor
@@ -371,8 +363,8 @@ jobs:
               return lastApprover;
             }
 
-            // Translate an fnmatch-style glob to an anchored RegExp (matches Python's
-            // fnmatch: `*` and `**` match any chars incl. '/'; `?` matches one char).
+            // Translate an fnmatch-style glob to an anchored RegExp (`*` and `**`
+            // match any chars incl. '/'; `?` matches one char).
             function _globToRegExp(glob) {
               let re = "";
               for (let i = 0; i < glob.length; i++) {
@@ -716,9 +708,8 @@ jobs:
             }
             // ----- extract-js:assignment:end -----
 
-            // Committer-signal weighting. MUST match pr_common.py's DEFAULT_*
-            // (file multipliers, top-files, commit sample, horizon) so the sweep
-            // and this workflow produce the same ranking.
+            // Committer-signal weighting defaults (file multipliers, top-files,
+            // commit sample, horizon). Event and sweep mode share these constants.
             const FILE_MULTIPLIERS = [
               ["source/slang/**", 3.0],
               ["source/**", 2.0],
@@ -734,8 +725,7 @@ jobs:
             const SIGNAL_CLEAR_MARGIN = 1.5;
             // Run-scoped signal caches (raw, PR-independent source data) so a sweep
             // fetches each file's history / commit stats once across all PRs, not
-            // once per PR. `since` is computed once for stable cache keys. Mirrors
-            // pr_sweep.py's SignalCache + signal_since.
+            // once per PR. `since` is computed once for stable cache keys.
             const SIGNAL_CACHE = makeCache();
             const SIGNAL_SINCE = horizonSince(SIGNAL_HORIZON_DAYS);
 
@@ -751,7 +741,7 @@ jobs:
               },
             };
 
-            // --- ProjectsV2 helpers (mirror Applier in pr_sweep.py) ----------
+            // --- ProjectsV2 helpers ------------------------------------------
             const fieldCache = {};
             async function field(name) {
               if (fieldCache[name]) return fieldCache[name];
@@ -936,9 +926,7 @@ jobs:
             }
 
             // The Status an OPEN PR should currently carry, from observed state.
-            // This is the single source of truth for the event machine and MUST
-            // stay identical to target_status() in scripts/pr_sweep.py so the
-            // cadence sweep never fights this workflow. Priority (first match wins):
+            // Shared by event mode and sweep mode. Priority (first match wins):
             //   1. A current changes-request -> Revising (must revise; ranked above
             //      the draft rule so even a Bot draft with a changes-request is
             //      Revising). "Current" = the review was made on the head commit;
@@ -969,8 +957,7 @@ jobs:
             }
 
             // Member logins of an org team given as "org/slug" (empty for a bare
-            // slug or on any read error -- callers then fall through, exactly like
-            // pr_common.list_team_members). Cached per run.
+            // slug or on any read error -- callers then fall through). Cached per run.
             const teamCache = {};
             async function listTeamMembers(teamSpec) {
               if (!teamSpec || !teamSpec.includes("/")) return new Set();
@@ -990,10 +977,10 @@ jobs:
               return members;
             }
 
-            // Logins with write+ access to this repo (the extra-reviewer pool),
-            // mirroring pr_common.collect_repo_collaborators. Empty on access error
-            // (listing collaborators needs repo admin/push), so the extra reviewer
-            // is simply skipped -- never a hard failure. Cached per run.
+            // Logins with write+ access to this repo (the extra-reviewer pool).
+            // Empty on access error (listing collaborators needs repo admin/push),
+            // so the extra reviewer is simply skipped -- never a hard failure.
+            // Cached per run.
             let _collabCache;
             async function repoCollaborators() {
               if (_collabCache) return _collabCache;
@@ -1060,8 +1047,7 @@ jobs:
               }
             }
 
-            // Backfill a PR's assignee + reviewers, replicating pr_sweep.py's
-            // select_assignee_and_reviewers in full (issue-owner -> committer-signal
+            // Backfill a PR's assignee + reviewers (issue-owner -> committer-signal
             // owner -> maintainer; reviewers = assignee + top dev-not-owner unless a
             // real reviewer is already requested). Internal PRs go to the author with
             // no requested reviewer. PR assignment is idempotent: only ever touches an
@@ -1181,12 +1167,11 @@ jobs:
               await syncLinkedIssueAssignees(assignee, info.linkedIssues);
             }
 
-            // Classify a PR's Source from observed state, mirroring the
-            // "Classify PR Source" step and pr_common.classify_source: Bot for a
-            // bot author, else Internal iff the author has repo write access, else
-            // Community. Used when the board has no Source yet and no freshly-
-            // classified value is available (i.e. the sweep, or a non-onboarding
-            // event). Fails safe to Community on a read error.
+            // Classify a PR's Source from observed state: Bot for a bot author,
+            // else Internal iff the author has repo write access, else Community.
+            // Used when the board has no Source yet and no freshly-classified value
+            // is available (sweep mode or a non-onboarding event). Fails safe to
+            // Community on a read error.
             async function classifySource(info) {
               if (info.isBot) return process.env.SOURCE_BOT;
               let canWrite = false;
@@ -1240,12 +1225,10 @@ jobs:
                 console.log(`#${number} already Done; skipping reconcile`);
                 return;
               }
-              // Resolve Source like pr_sweep.py: the board value when set
-              // (authoritative; honors a manual override), else the freshly-
-              // classified value (opened/reopened), else classify now (the sweep, or
-              // an event without the classify step). Backfill the board when it had
-              // none, so a PR first seen by the sweep gets its Source. is_bot is then
-              // "Source == Bot".
+              // Resolve Source: the board value when set (authoritative; honors a
+              // manual override), else the freshly-classified value (opened/reopened),
+              // else classify now (sweep mode or an event without the classify step).
+              // Backfill the board when it had none. is_bot is then "Source == Bot".
               let resolvedSource = await itemSingleSelect(itemId, SOURCE_FIELD);
               if (!resolvedSource) {
                 resolvedSource = process.env.SOURCE_VALUE || await classifySource(info);
@@ -1313,7 +1296,7 @@ jobs:
               if (action === "opened" || action === "reopened") {
                 // Set the classified Source only when the board has none yet, so
                 // an existing value (incl. a manual override, e.g. on reopen) is
-                // authoritative - matching pr_sweep.py, which only backfills Source.
+                // authoritative -- only backfill when the board has none yet.
                 const source = process.env.SOURCE_VALUE;
                 if (source && !(await itemSingleSelect(itemId, SOURCE_FIELD))) {
                   await setSingleSelect(itemId, SOURCE_FIELD, source);
@@ -1387,10 +1370,9 @@ jobs:
       # non-approver (e.g. bmillsNV) that repo automation requests on a new PR. It
       # deliberately does NOT run on review_requested, so a maintainer manually
       # requesting that reviewer is never undone. reconcileAssignment also unrequests
-      # these (coupled to assignment, like the sweep), but only when it assigns an
-      # owner; this onboarding step still covers the PRs assignment skips (Source
-      # not yet known, a human draft, merge-queued, or no maintainer resolved). The
-      # cadence sweep (scripts/pr_sweep.py) remains the backstop for both.
+      # these when it freshly assigns an owner; this onboarding step covers PRs
+      # assignment skips (Source not yet known, a human draft, merge-queued, or no
+      # maintainer resolved). Already-assigned PRs are not re-scanned on sweep.
       - name: Unrequest ignored reviewers
         if: >-
           env.HAS_TOKEN == 'true' &&
