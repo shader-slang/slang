@@ -6,8 +6,7 @@
 
 #if defined(GENERIC_MEMBER)
 
-// A generic member accessor's `none` escapes the front-end guard (T is abstract there), so the
-// concrete opaque payload must be caught during IR specialization or SPIR-V emit ICEs on E99997.
+// Exercise recursive Optional and aggregate payload classification.
 
 struct StructWithOptionalTexture<T>
 {
@@ -21,10 +20,8 @@ struct TextureHolder<T>
     __subscript()->Optional<T> { get { return none; } }
     // CHECK_GEN-DAG: {{.*}}optional-resource-type.slang:[[# @LINE+1]]
     Optional<T> getNone() { return none; }
-    // Nested `Optional<Optional<T>>`: the opaque check must recurse through Optional layers.
     // CHECK_GEN-DAG: {{.*}}optional-resource-type.slang:[[# @LINE+1]]
     Optional<Optional<T>> getNestedNone() { return none; }
-    // Opaque check must recurse through both a struct and its inner `Optional` to the opaque leaf.
     // CHECK_GEN-DAG: {{.*}}optional-resource-type.slang:[[# @LINE+1]]
     Optional<StructWithOptionalTexture<T>> getStructNone() { return none; }
 }
@@ -37,11 +34,13 @@ struct TextureHolder<T>
 [shader("fragment")]
 float4 fs_main() : SV_Target
 {
-    // Use each accessor's payload so every `MakeOptionalNone` survives to the post-specialization check.
+    // Keep all four none values live through specialization.
     // CHECK_GEN-DAG: error[E41037]
     // CHECK_GEN-DAG: error[E41037]
     // CHECK_GEN-DAG: error[E41037]
     // CHECK_GEN-DAG: error[E41037]
+    // The clean diagnostic must replace the pre-fix internal error.
+    // CHECK_GEN-NOT: error[E99997]
     float4 a = gHolderSubscript[].value.Load(int3(0));
     float4 b = gHolderMethod.getNone().value.Load(int3(0));
     float4 c = gHolderNested.getNestedNone().value.value.Load(int3(0));

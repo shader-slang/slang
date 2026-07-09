@@ -27,17 +27,17 @@ static void checkForInvalidOptionalUsage(
             }
             else if (auto noneInst = as<IRMakeOptionalNone>(inst))
             {
-                // A `none` of an opaque-payload Optional cannot be lowered (E30902's
-                // front-end guard misses it when the payload is a still-abstract generic
-                // parameter). This runs unconditionally to prevent an unlowerable
-                // `defaultConstruct` from reaching the backend as an internal error.
+                // A `none` whose Optional payload is (or transitively contains) an opaque type
+                // cannot be lowered: E30902's front-end guard misses it when the payload is a
+                // still-abstract generic parameter, so lowering would synthesize an unlowerable
+                // `defaultConstruct` and the backend would fail with an internal error. Report
+                // the payload value type, matching the front-end E30902 diagnostic.
                 if (auto optType = as<IROptionalType>(noneInst->getDataType()))
                 {
-                    IRType* opaqueLeaf = nullptr;
-                    if (isOpaqueType(optType->getValueType(), &opaqueLeaf))
+                    if (isOpaqueType(optType->getValueType(), nullptr))
                     {
                         sink->diagnose(Diagnostics::OptionalCannotWrapResourceTypeIr{
-                            .type = opaqueLeaf,
+                            .type = optType->getValueType(),
                             .location = noneInst->sourceLoc,
                         });
                     }

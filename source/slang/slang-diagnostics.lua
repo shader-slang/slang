@@ -4974,7 +4974,7 @@ err(
     "optional-cannot-wrap-resource-type-ir",
     41037,
     "'Optional<T>' cannot wrap a resource or opaque type",
-    span { loc = "location", message = "'Optional<~type:IRInst>' cannot wrap a resource or opaque type because '~type:IRInst' is a resource or opaque type" }
+    span { loc = "location", message = "'~type:IRInst' is a resource or opaque type and cannot be used as the value type of 'Optional<T>'." }
 )
 
 
