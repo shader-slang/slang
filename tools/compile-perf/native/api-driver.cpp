@@ -27,6 +27,12 @@
 
 #include "slang.h"
 
+// COM lifetimes are managed with Slang::ComPtr so early error-path returns
+// cannot leak acquired objects. IModule pointers from ISession::loadModule*
+// are session-owned BORROWED pointers (not add-ref'd for the caller) and stay
+// raw by design.
+#include "slang-com-ptr.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -328,11 +334,9 @@ static bool reflectProgram(
         return false;
     }
     Scope s(timers, "apiReflection");
-    slang::IBlob* diagnostics = nullptr;
-    slang::ProgramLayout* layout = linked->getLayout(0, &diagnostics);
+    Slang::ComPtr<slang::IBlob> diagnostics;
+    slang::ProgramLayout* layout = linked->getLayout(0, diagnostics.writeRef());
     printDiagnostics(diagnostics);
-    if (diagnostics)
-        diagnostics->release();
     if (!layout)
     {
         printf("error: getLayout returned no layout\n");
@@ -367,10 +371,10 @@ static bool compileEntryPoint(
     Timers& timers,
     const LibSlang* reflectWith = nullptr)
 {
-    slang::IEntryPoint* entryPoint = nullptr;
+    Slang::ComPtr<slang::IEntryPoint> entryPoint;
     {
         Scope s(timers, "apiFindEntryPoint");
-        if (SLANG_FAILED(module->findEntryPointByName("computeMain", &entryPoint)))
+        if (SLANG_FAILED(module->findEntryPointByName("computeMain", entryPoint.writeRef())))
         {
             printf(
                 "error: findEntryPointByName(computeMain) failed for %s\n",
@@ -380,39 +384,31 @@ static bool compileEntryPoint(
     }
 
     slang::IComponentType* components[] = {module, entryPoint};
-    slang::IComponentType* composite = nullptr;
-    slang::IBlob* diagnostics = nullptr;
+    Slang::ComPtr<slang::IComponentType> composite;
+    Slang::ComPtr<slang::IBlob> diagnostics;
     {
         Scope s(timers, "apiComposite");
         SlangResult res =
-            session->createCompositeComponentType(components, 2, &composite, &diagnostics);
+            session->createCompositeComponentType(components, 2, composite.writeRef(), diagnostics.writeRef());
         printDiagnostics(diagnostics);
-        if (diagnostics)
-            diagnostics->release();
         if (SLANG_FAILED(res))
             return false;
     }
 
-    slang::IComponentType* linked = nullptr;
-    diagnostics = nullptr;
+    Slang::ComPtr<slang::IComponentType> linked;
     {
         Scope s(timers, "apiLink");
-        SlangResult res = composite->link(&linked, &diagnostics);
+        SlangResult res = composite->link(linked.writeRef(), diagnostics.writeRef());
         printDiagnostics(diagnostics);
-        if (diagnostics)
-            diagnostics->release();
         if (SLANG_FAILED(res))
             return false;
     }
 
-    slang::IBlob* code = nullptr;
-    diagnostics = nullptr;
+    Slang::ComPtr<slang::IBlob> code;
     {
         Scope s(timers, "apiGetCode");
-        SlangResult res = linked->getEntryPointCode(0, 0, &code, &diagnostics);
+        SlangResult res = linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
         printDiagnostics(diagnostics);
-        if (diagnostics)
-            diagnostics->release();
         if (SLANG_FAILED(res) || !code || !code->getBufferSize())
         {
             printf("error: getEntryPointCode produced no code for %s\n", moduleDisplayName(module));
@@ -427,10 +423,6 @@ static bool compileEntryPoint(
             return false;
     }
 
-    code->release();
-    linked->release();
-    composite->release();
-    entryPoint->release();
     return true;
 }
 
@@ -443,26 +435,24 @@ static int runSessionCreate(CreateGlobalSessionFn createGlobalSession, int iters
     Scope total(timers, "apiTotal");
     for (int i = 0; i < iters; i++)
     {
-        slang::IGlobalSession* globalSession = nullptr;
+        Slang::ComPtr<slang::IGlobalSession> globalSession;
         {
             Scope s(timers, "apiCreateGlobalSession");
-            if (SLANG_FAILED(createGlobalSession(SLANG_API_VERSION, &globalSession)))
+            if (SLANG_FAILED(createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
             {
                 printf("error: slang_createGlobalSession failed\n");
                 return 1;
             }
         }
-        slang::ISession* session = nullptr;
+        Slang::ComPtr<slang::ISession> session;
         {
             Scope s(timers, "apiCreateSession");
-            if (SLANG_FAILED(createSession(globalSession, "", &session)))
+            if (SLANG_FAILED(createSession(globalSession, "", session.writeRef())))
             {
                 printf("error: createSession failed\n");
                 return 1;
             }
         }
-        session->release();
-        globalSession->release();
     }
     total.stop();
     timers.report();
@@ -479,19 +469,19 @@ static int runManyKernels(const LibSlang& lib, const std::string& dir, bool refl
     Timers timers;
     Scope total(timers, "apiTotal");
 
-    slang::IGlobalSession* globalSession = nullptr;
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
     {
         Scope s(timers, "apiCreateGlobalSession");
-        if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, &globalSession)))
+        if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
         {
             printf("error: slang_createGlobalSession failed\n");
             return 1;
         }
     }
-    slang::ISession* session = nullptr;
+    Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, &session)))
+        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -513,17 +503,15 @@ static int runManyKernels(const LibSlang& lib, const std::string& dir, bool refl
         std::string name = path.substr(base, path.size() - base - 6); // strip .slang
 
         slang::IModule* module = nullptr;
-        slang::IBlob* diagnostics = nullptr;
+        Slang::ComPtr<slang::IBlob> diagnostics;
         {
             Scope s(timers, "apiLoadModule");
             module = session->loadModuleFromSourceString(
                 name.c_str(),
                 path.c_str(),
                 source.c_str(),
-                &diagnostics);
+                diagnostics.writeRef());
             printDiagnostics(diagnostics);
-            if (diagnostics)
-                diagnostics->release();
             if (!module)
                 return 1;
         }
@@ -531,8 +519,6 @@ static int runManyKernels(const LibSlang& lib, const std::string& dir, bool refl
             return 1;
     }
 
-    session->release();
-    globalSession->release();
     total.stop();
     timers.report();
     return 0;
@@ -552,19 +538,19 @@ static int runModuleGraph(
     Timers timers;
     Scope total(timers, "apiTotal");
 
-    slang::IGlobalSession* globalSession = nullptr;
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
     {
         Scope s(timers, "apiCreateGlobalSession");
-        if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, &globalSession)))
+        if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
         {
             printf("error: slang_createGlobalSession failed\n");
             return 1;
         }
     }
-    slang::ISession* session = nullptr;
+    Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, &session)))
+        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -572,21 +558,17 @@ static int runModuleGraph(
     }
 
     slang::IModule* module = nullptr;
-    slang::IBlob* diagnostics = nullptr;
+    Slang::ComPtr<slang::IBlob> diagnostics;
     {
         Scope s(timers, "apiLoadModule");
-        module = session->loadModule(root.c_str(), &diagnostics);
+        module = session->loadModule(root.c_str(), diagnostics.writeRef());
         printDiagnostics(diagnostics);
-        if (diagnostics)
-            diagnostics->release();
         if (!module)
             return 1;
     }
     if (!compileEntryPoint(session, module, timers, reflect ? &lib : nullptr))
         return 1;
 
-    session->release();
-    globalSession->release();
     total.stop();
     timers.report();
     return 0;
@@ -603,10 +585,10 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
 {
     Timers timers;
 
-    slang::IGlobalSession* globalSession = nullptr;
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
     {
         Scope s(timers, "apiCreateGlobalSession");
-        if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, &globalSession)))
+        if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
         {
             printf("error: slang_createGlobalSession failed\n");
             return 1;
@@ -615,20 +597,18 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
 
     // Setup pass: source load + serialize every module in the graph.
     {
-        slang::ISession* setupSession = nullptr;
-        if (SLANG_FAILED(createSession(globalSession, dir, &setupSession)))
+        Slang::ComPtr<slang::ISession> setupSession;
+        if (SLANG_FAILED(createSession(globalSession, dir, setupSession.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
         }
-        slang::IBlob* diagnostics = nullptr;
+        Slang::ComPtr<slang::IBlob> diagnostics;
         slang::IModule* rootModule;
         {
             Scope s(timers, "apiLoadModuleSource");
-            rootModule = setupSession->loadModule(root.c_str(), &diagnostics);
+            rootModule = setupSession->loadModule(root.c_str(), diagnostics.writeRef());
             printDiagnostics(diagnostics);
-            if (diagnostics)
-                diagnostics->release();
             if (!rootModule)
                 return 1;
         }
@@ -658,28 +638,25 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
                 }
             }
         }
-        setupSession->release();
     }
 
     // Timed pass: fresh session; imports must now resolve to the binaries.
     Scope total(timers, "apiTotal");
-    slang::ISession* session = nullptr;
+    Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, &session)))
+        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
         }
     }
     slang::IModule* module = nullptr;
-    slang::IBlob* diagnostics = nullptr;
+    Slang::ComPtr<slang::IBlob> diagnostics;
     {
         Scope s(timers, "apiLoadModule");
-        module = session->loadModule(root.c_str(), &diagnostics);
+        module = session->loadModule(root.c_str(), diagnostics.writeRef());
         printDiagnostics(diagnostics);
-        if (diagnostics)
-            diagnostics->release();
         if (!module)
             return 1;
     }
@@ -708,8 +685,6 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
     if (!compileEntryPoint(session, module, timers))
         return 1;
 
-    session->release();
-    globalSession->release();
     total.stop();
     timers.report();
     return 0;
@@ -731,19 +706,19 @@ static int runSpecialize(const LibSlang& lib, const std::string& dir, const std:
     Timers timers;
     Scope total(timers, "apiTotal");
 
-    slang::IGlobalSession* globalSession = nullptr;
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
     {
         Scope s(timers, "apiCreateGlobalSession");
-        if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, &globalSession)))
+        if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
         {
             printf("error: slang_createGlobalSession failed\n");
             return 1;
         }
     }
-    slang::ISession* session = nullptr;
+    Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, &session)))
+        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -751,27 +726,23 @@ static int runSpecialize(const LibSlang& lib, const std::string& dir, const std:
     }
 
     slang::IModule* module = nullptr;
-    slang::IBlob* diagnostics = nullptr;
+    Slang::ComPtr<slang::IBlob> diagnostics;
     {
         Scope s(timers, "apiLoadModule");
-        module = session->loadModule(root.c_str(), &diagnostics);
+        module = session->loadModule(root.c_str(), diagnostics.writeRef());
         printDiagnostics(diagnostics);
-        if (diagnostics)
-            diagnostics->release();
         if (!module)
             return 1;
     }
 
-    slang::IEntryPoint* entryPoint = nullptr;
-    if (SLANG_FAILED(module->findEntryPointByName("computeMain", &entryPoint)))
+    Slang::ComPtr<slang::IEntryPoint> entryPoint;
+    if (SLANG_FAILED(module->findEntryPointByName("computeMain", entryPoint.writeRef())))
     {
         printf("error: findEntryPointByName(computeMain) failed\n");
         return 1;
     }
-    slang::ProgramLayout* moduleLayout = module->getLayout(0, &diagnostics);
+    slang::ProgramLayout* moduleLayout = module->getLayout(0, diagnostics.writeRef());
     printDiagnostics(diagnostics);
-    if (diagnostics)
-        diagnostics->release();
     if (!moduleLayout)
     {
         printf("error: module getLayout failed\n");
@@ -795,66 +766,47 @@ static int runSpecialize(const LibSlang& lib, const std::string& dir, const std:
             break; // ran past the last generated impl
         }
 
-        slang::IComponentType* specialized = nullptr;
-        diagnostics = nullptr;
+        Slang::ComPtr<slang::IComponentType> specialized;
         {
             Scope s(timers, "apiSpecialize");
             slang::SpecializationArg arg = slang::SpecializationArg::fromType(type);
-            SlangResult res = entryPoint->specialize(&arg, 1, &specialized, &diagnostics);
+            SlangResult res = entryPoint->specialize(&arg, 1, specialized.writeRef(), diagnostics.writeRef());
             printDiagnostics(diagnostics);
-            if (diagnostics)
-                diagnostics->release();
             if (SLANG_FAILED(res))
                 return 1;
         }
 
         slang::IComponentType* components[] = {module, specialized};
-        slang::IComponentType* composite = nullptr;
-        diagnostics = nullptr;
+        Slang::ComPtr<slang::IComponentType> composite;
         {
             Scope s(timers, "apiComposite");
             SlangResult res =
-                session->createCompositeComponentType(components, 2, &composite, &diagnostics);
+                session->createCompositeComponentType(components, 2, composite.writeRef(), diagnostics.writeRef());
             printDiagnostics(diagnostics);
-            if (diagnostics)
-                diagnostics->release();
             if (SLANG_FAILED(res))
                 return 1;
         }
-        slang::IComponentType* linked = nullptr;
-        diagnostics = nullptr;
+        Slang::ComPtr<slang::IComponentType> linked;
         {
             Scope s(timers, "apiLink");
-            SlangResult res = composite->link(&linked, &diagnostics);
+            SlangResult res = composite->link(linked.writeRef(), diagnostics.writeRef());
             printDiagnostics(diagnostics);
-            if (diagnostics)
-                diagnostics->release();
             if (SLANG_FAILED(res))
                 return 1;
         }
-        slang::IBlob* code = nullptr;
-        diagnostics = nullptr;
+        Slang::ComPtr<slang::IBlob> code;
         {
             Scope s(timers, "apiGetCode");
-            SlangResult res = linked->getEntryPointCode(0, 0, &code, &diagnostics);
+            SlangResult res = linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
             printDiagnostics(diagnostics);
-            if (diagnostics)
-                diagnostics->release();
             if (SLANG_FAILED(res) || !code || !code->getBufferSize())
             {
                 printf("error: getEntryPointCode produced no code for %s\n", implName);
                 return 1;
             }
         }
-        code->release();
-        linked->release();
-        composite->release();
-        specialized->release();
     }
 
-    entryPoint->release();
-    session->release();
-    globalSession->release();
     total.stop();
     timers.report();
     return 0;
