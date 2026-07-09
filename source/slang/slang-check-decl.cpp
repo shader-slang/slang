@@ -687,6 +687,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void visitGenericValuePackParamDecl(GenericValuePackParamDecl* decl);
 
+    bool diagnoseDefaultOnExtensionGenericParam(Decl* paramDecl, Expr* defaultValue);
+
     void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl);
 
     void checkGenericTypeEqualityConstraintSubType(GenericTypeConstraintDecl* decl);
@@ -709,6 +711,15 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void visitTypeDefDecl(TypeDefDecl* decl);
 
+    // Propagate optional generic constraints from the body of a generic typealias to its
+    // own GenericDecl. Consider `typealias Baz<T> = Foo<T>` where Foo has an optional
+    // constraint `T : IFoo?`. When the body is checked, T is unconstrained, so the
+    // constraint arg is resolved to NoneWitness. This helper adds an equivalent optional
+    // constraint on Baz's GenericDecl and replaces the NoneWitness with a
+    // DeclaredSubtypeWitness so that `Baz<float>` correctly resolves the constraint at
+    // instantiation time.
+    void propagateOptionalConstraintsThroughTypealias(TypeDefDecl* decl);
+
     void visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl);
 
     void visitAssocTypeDecl(AssocTypeDecl* decl);
@@ -718,6 +729,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkInterfaceRequirement(Decl* decl);
 
     void checkCallableDeclCommon(CallableDecl* decl);
+    void maybeInferPrefixModifierForOperator(CallableDecl* decl);
     void checkPublicCallableOperandVisibility(CallableDecl* decl);
 
     void checkCallableConstraints(CallableDecl* decl);
@@ -1422,7 +1434,19 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
 
     void visitFunctionDeclBase(FunctionDeclBase* funcDecl);
 
+    void visitExtensionDecl(ExtensionDecl* extensionDecl);
+
+    void visitSubscriptDecl(SubscriptDecl* subscriptDecl);
+
+    void visitPropertyDecl(PropertyDecl* propertyDecl);
+
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
+
+    // Check that a callable or property extension member's own [require(...)] attributes are
+    // compatible with the extension's target type capabilities. Shared by
+    // visitFunctionDeclBase (functions and constructors), visitSubscriptDecl, and
+    // visitPropertyDecl.
+    void _checkExtensionMemberCapConflict(Decl* memberDecl);
 
     enum class UndeclaredCapabilityDiagnosticKind
     {
@@ -1775,6 +1799,11 @@ QualType getTypeForDeclRef(
         // TODO: This code could break if we ever go down this path with
         // an identifier that doesn't have a name.
         //
+        // Note: unlike the `VarExpr` lookup path, we do not attach a "did you
+        // mean ...?" suggestion here. This site is reached for a name that
+        // already resolved to a contextual keyword (not an ordinary in-scope
+        // lookup), so a Levenshtein match against the lexical scope would be
+        // misleading.
         sink->diagnose(
             Diagnostics::UndefinedIdentifier{.name = declRef.getName(), .location = loc});
     }
@@ -4620,8 +4649,45 @@ void SemanticsDeclHeaderVisitor::checkGenericTypeEqualityConstraintSubType(
     }
 }
 
+// Returns true if `paramDecl` is a generic parameter of an `extension` or a
+// `__func_extension`. In both cases the generic parameters are always inferred
+// from the target (the target type, or the target function expression), so a
+// default value on one of them can never be selected and is meaningless.
+static bool isExtensionGenericParam(Decl* paramDecl)
+{
+    auto genericDecl = as<GenericDecl>(paramDecl->parentDecl);
+    if (!genericDecl)
+        return false;
+    return as<ExtensionDecl>(genericDecl->inner) || as<FuncExtensionDecl>(genericDecl->inner);
+}
+
+// If `paramDecl` is a generic parameter of an extension and `defaultValue` is a
+// (non-null) default for it, diagnose the meaningless default. Returns true if a
+// diagnostic was emitted, signalling that the caller should drop the default
+// instead of type-checking it (which would otherwise cascade unrelated errors
+// for an ill-formed default the compiler has just declared unused).
+bool SemanticsDeclHeaderVisitor::diagnoseDefaultOnExtensionGenericParam(
+    Decl* paramDecl,
+    Expr* defaultValue)
+{
+    if (!defaultValue || !isExtensionGenericParam(paramDecl))
+        return false;
+    getSink()->diagnose(Diagnostics::DefaultValueOnExtensionGenericParam{
+        .name = paramDecl->getName(),
+        .location = defaultValue->loc});
+    return true;
+}
+
 void SemanticsDeclHeaderVisitor::visitGenericTypeParamDecl(GenericTypeParamDecl* decl)
 {
+    // A default value on an extension's generic parameter is never used; reject it
+    // and drop the default so it is not type-checked below.
+    if (diagnoseDefaultOnExtensionGenericParam(decl, decl->initType.exp))
+    {
+        decl->initType = TypeExp();
+        return;
+    }
+
     // TODO: could probably push checking the default value
     // for a generic type parameter later.
     //
@@ -4644,6 +4710,14 @@ void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDec
                 .type = decl->type.type,
                 .decl = decl});
         }
+    }
+
+    // A default value on an extension's generic parameter is never used; reject it
+    // and drop the default so it is not type-checked below.
+    if (diagnoseDefaultOnExtensionGenericParam(decl, decl->initExpr))
+    {
+        decl->initExpr = nullptr;
+        return;
     }
 
     if (decl->initExpr)
@@ -11013,10 +11087,9 @@ bool SemanticsVisitor::checkConformance(
             if (superTypeDecl->findModifier<ComInterfaceAttribute>())
             {
                 auto subTypeDecl = declRef.getDecl();
-                if (auto classDecl = as<ClassDecl>(subTypeDecl))
+                if (auto classDecl = as<ClassDecl>(subTypeDecl); classDecl)
                 {
                     // Classes can implement COM interfaces.
-                    SLANG_UNUSED(classDecl);
                 }
                 else if (auto subInterfaceDecl = as<InterfaceDecl>(subTypeDecl))
                 {
@@ -12419,6 +12492,131 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
     SemanticsVisitor visitor(withDeclToExcludeFromLookup(decl));
     decl->type = visitor.CheckProperType(decl->type);
     checkVisibility(decl);
+    propagateOptionalConstraintsThroughTypealias(decl);
+}
+
+void SemanticsDeclHeaderVisitor::propagateOptionalConstraintsThroughTypealias(TypeDefDecl* decl)
+{
+    // If this is a generic typealias (e.g., `typealias Baz<T> = Foo<T>`), the body
+    // type may have optional-constraint args resolved to NoneWitness because the
+    // alias's type params are unconstrained at this point.
+    //
+    // Propagate such optional constraints to this generic's own param list so that
+    // instantiation with a concrete type (e.g., `Baz<float>`) can satisfy them.
+    // Also replace the NoneWitness entries in the body type's DeclRef with
+    // DeclaredSubtypeWitnesses referencing the newly added constraints, so that
+    // the IR generic for Baz correctly threads the witness through to Foo.
+    //
+    auto parentGenericDecl = as<GenericDecl>(decl->parentDecl);
+    if (!parentGenericDecl)
+        return;
+
+    auto bodyDeclRefType = as<DeclRefType>(decl->type.type);
+    if (!bodyDeclRefType)
+        return;
+
+    auto genericAppDeclRef = SubstitutionSet(bodyDeclRefType->getDeclRef()).findGenericAppDeclRef();
+    if (!genericAppDeclRef)
+        return;
+
+    // Use getGenericParams to enumerate the body generic's params and constraints in
+    // the same order used by DeclaredSubtypeWitness::_substituteImplOverride so that
+    // constraint-slot indices map directly to arg-vector positions.
+    auto bodyGenericDecl = genericAppDeclRef->getGenericDecl();
+    List<Decl*> bodyParams;
+    List<Decl*> bodyConstraints;
+    getGenericParams(bodyGenericDecl, bodyParams, bodyConstraints);
+
+    Index ordinaryParamCount = bodyParams.getCount();
+
+    // Build a replacement args list, substituting NoneWitness entries with
+    // DeclaredSubtypeWitnesses backed by new optional constraints on parentGenericDecl.
+    List<Val*> newArgs;
+    for (Index i = 0; i < genericAppDeclRef->getArgCount(); i++)
+        newArgs.add(genericAppDeclRef->getArg(i));
+
+    bool modified = false;
+    auto bodyGenericDeclRef = DeclRef<GenericDecl>(genericAppDeclRef->getGenericDeclRef());
+
+    for (Index constraintIdx = 0; constraintIdx < bodyConstraints.getCount(); constraintIdx++)
+    {
+        // Only GenericTypeConstraintDecl with an optional modifier needs the NoneWitness
+        // replacement; other constraint types (TypeCoercionConstraintDecl, pack-count, etc.)
+        // are left as-is.  NoneWitness is only ever produced for GenericTypeConstraintDecl
+        // optional slots (see slang-check-overload.cpp TryCheckOverloadCandidateConstraints).
+        auto constraintDecl = as<GenericTypeConstraintDecl>(bodyConstraints[constraintIdx]);
+        if (!constraintDecl || !constraintDecl->hasModifier<OptionalConstraintModifier>())
+            continue;
+
+        Index argIdx = ordinaryParamCount + constraintIdx;
+        if (argIdx >= newArgs.getCount() || !as<NoneWitness>(newArgs[argIdx]))
+            continue;
+
+        // Compute the substituted sub/sup types for this constraint by applying
+        // the body type's generic substitution to the constraint's declaration.
+        auto substConstraintDeclRef = m_astBuilder
+                                          ->getGenericAppDeclRef(
+                                              bodyGenericDeclRef,
+                                              genericAppDeclRef->getArgs(),
+                                              constraintDecl)
+                                          .as<GenericTypeConstraintDecl>();
+        auto subType = getSub(m_astBuilder, substConstraintDeclRef);
+        auto supType = getSup(m_astBuilder, substConstraintDeclRef);
+
+        // getSub/getSup must always succeed on a fully-checked optional constraint.
+        SLANG_RELEASE_ASSERT(subType && supType);
+
+        // Only propagate when the substituted sub type is a bare type variable that belongs
+        // directly to the alias's own generic.  If it is a concrete type (e.g. `int` in
+        // `typealias Half<T> = Pair<T, int>`) or a compound type (e.g. `Bar<T>` in
+        // `typealias Baz<T> = Foo<Bar<T>>`), the constraint cannot be satisfied through
+        // the alias's type params and the NoneWitness is the correct permanent result.
+        auto subTypeDeclRefType = as<DeclRefType>(subType);
+        if (!subTypeDeclRefType ||
+            subTypeDeclRefType->getDeclRef().getDecl()->parentDecl != parentGenericDecl)
+            continue;
+
+        // Add an equivalent optional constraint to the alias's own generic
+        // so that `Baz<float>` can resolve it against float's conformances.
+        auto synConstraintDecl = m_astBuilder->create<GenericTypeConstraintDecl>();
+        synConstraintDecl->nameAndLoc = constraintDecl->getNameAndLoc();
+        synConstraintDecl->loc = constraintDecl->loc;
+        synConstraintDecl->parentDecl = parentGenericDecl;
+        synConstraintDecl->isEqualityConstraint = constraintDecl->isEqualityConstraint;
+        synConstraintDecl->sub = TypeExp(subType);
+        synConstraintDecl->sup = TypeExp(supType);
+        addModifier(synConstraintDecl, m_astBuilder->create<OptionalConstraintModifier>());
+        parentGenericDecl->addDirectMemberDecl(synConstraintDecl);
+
+        // Pre-check the constraint now, while sub.type/sup.type are known-good.
+        // Without this, getDefaultSubstitutionArgs would drive it through
+        // visitGenericTypeConstraintDecl in an uncontrolled context, which could
+        // trigger AndType flattening on the sup type.
+        ensureDecl(synConstraintDecl, DeclCheckState::SignatureChecked);
+
+        // Invalidate cached default substitution args since we just added a member.
+        m_astBuilder->m_cachedGenericDefaultArgs.remove(parentGenericDecl);
+        parentGenericDecl->_cachedArgsForDefaultSubstitution.clear();
+
+        // Replace the NoneWitness with a DeclaredSubtypeWitness that references
+        // the new constraint.  DeclaredSubtypeWitness::_substituteImplOverride
+        // will exchange this for the real witness when Baz is specialized.
+        auto newWitness = m_astBuilder->getDeclaredSubtypeWitness(
+            subType,
+            supType,
+            m_astBuilder->getDirectDeclRef(synConstraintDecl));
+        newArgs[argIdx] = newWitness;
+        modified = true;
+    }
+
+    if (modified)
+    {
+        // Rebuild the body type with the updated constraint witness args.
+        auto newGenericAppDeclRef = m_astBuilder->getGenericAppDeclRef(
+            bodyGenericDeclRef,
+            makeConstArrayView(newArgs.getBuffer(), newArgs.getCount()));
+        decl->type.type = DeclRefType::create(m_astBuilder, newGenericAppDeclRef);
+    }
 }
 
 void SemanticsDeclHeaderVisitor::visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
@@ -15076,12 +15274,78 @@ bool doesTypeHaveNoDiffModifier(Type* type)
     return false;
 }
 
+// True if `name` is an operator that can appear in prefix (unary) position:
+// `-`, `+`, `~`, or `!`. These are the unary operators the core module declares
+// with `__prefix` and that a user may overload. `~`/`!` are unary-only, while
+// `+`/`-` are also binary and so are only treated as prefix when the
+// declaration's arity matches a unary operator (see
+// `maybeInferPrefixModifierForOperator`).
+static bool isPrefixOperatorName(Name* name)
+{
+    if (!name)
+        return false;
+    auto text = name->text.getUnownedSlice();
+    return text == "-" || text == "+" || text == "~" || text == "!";
+}
+
+// Attaches a `PrefixModifier` to a user-defined unary operator declaration
+// (e.g. `A operator-(A a)`) so it can be used in prefix position.
+//
+// Why this is needed: prefix-expression overload resolution only considers
+// candidates carrying a `PrefixModifier` (see `TryCheckOverloadCandidateFixity`).
+// The `__prefix` keyword that sets this modifier is an internal builtin used by
+// the core module, not part of the documented surface language, yet the user
+// guide documents `operator-`/`operator~`/`operator!` as overloadable unary
+// operators; without this inference such a user operator would never be eligible
+// in prefix position.
+//
+// Consider:
+//
+//     struct A { int x; }
+//     A operator-(A a) { A na = { -a.x }; return na; }
+//     A foo(A a) { return -a; }   // prefix `-a` must find `operator-(A)`
+//
+// A unary operator consumes exactly one operand. The operand is the single
+// explicit parameter for a free-function operator, but for an instance-method
+// operator (a member of an aggregate or an `extension`) the operand is the
+// implicit `this`, so the explicit parameter list is empty. We must account for
+// `this`: otherwise a binary instance-method operator such as
+// `extension T { T operator-(T rhs) }` (one explicit parameter plus `this`)
+// would be wrongly tagged prefix, and binary `a - b` would stop resolving to it.
+// Inference also respects an explicit `__prefix`/`__postfix` if the user wrote
+// one.
+void SemanticsDeclHeaderVisitor::maybeInferPrefixModifierForOperator(CallableDecl* decl)
+{
+    if (!isPrefixOperatorName(decl->getName()))
+        return;
+
+    // Respect an explicit fixity modifier if the user wrote one.
+    if (decl->findModifier<PrefixModifier>() || decl->findModifier<PostfixModifier>())
+        return;
+
+    // Use `getParentAggTypeDeclBase` (which walks past any enclosing
+    // `GenericDecl`) rather than inspecting `decl->parentDecl` directly, so a
+    // generic member/extension operator is still recognized as an instance
+    // method; `isEffectivelyStatic` performs the same generic unwrapping.
+    const bool isInstanceMethod =
+        getParentAggTypeDeclBase(decl) != nullptr && !isEffectivelyStatic(decl);
+    const Count unaryParamCount = isInstanceMethod ? 0 : 1;
+    if (decl->getParameters().getCount() != unaryParamCount)
+        return;
+
+    auto prefixModifier = m_astBuilder->create<PrefixModifier>();
+    prefixModifier->loc = decl->loc;
+    addModifier(decl, prefixModifier);
+}
+
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 {
     for (auto paramDecl : decl->getParameters())
     {
         ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
     }
+
+    maybeInferPrefixModifierForOperator(decl);
 
     // Check that no parameter without a default value follows a parameter with one.
     bool seenDefaultParam = false;
@@ -19473,7 +19737,31 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
             backingMember->nameAndLoc.name =
                 getName(String("$bit_field_backing_") + String(backing_nonce));
             backing_nonce++;
-            backingMember->initExpr = nullptr;
+            // Give the synthesized backing storage an explicit zero initializer.
+            // The backing field is synthesized after the constructor signature has been
+            // collected, so it is never a constructor parameter (not in
+            // `m_membersVisibleInCtor`); with a null `initExpr`,
+            // `synthesizeCtorBodyForMemberVar` early-outs for non-parameter members and
+            // never writes it, so `Foo f = {}` on a struct that mixes bitfields with a
+            // normal field would leave the bitfield members reading uninitialized memory
+            // (issue #11844).
+            // The general per-member default-init loop in
+            // `SemanticsDeclBodyVisitor::visitAggTypeDecl` does not cover this: it is gated
+            // on the struct conforming to `IDefaultInitializable`, which these bitfield
+            // structs do not, so it never fires here. Initializing the backing word at the
+            // point of synthesis is therefore the single, uniform source of its zero
+            // default across every synthesized-constructor path.
+            // A raw `IntegerLiteralExpr(0)` (rather than `constructDefaultInitExprForType`)
+            // is deliberate: the backing type is always a builtin unsigned integer
+            // (selected just above), so a typed zero literal is the simplest provably
+            // correct form, and it lowers to an explicit `store 0` on every target —
+            // whereas a `DefaultConstructExpr` emits `= {}` only for CPP/CUDA and would not
+            // zero the scalar on HLSL-class backends.
+            auto zeroBackingInit = m_astBuilder->create<IntegerLiteralExpr>();
+            zeroBackingInit->type = QualType(backingMember->type.type);
+            zeroBackingInit->value = 0;
+            zeroBackingInit->loc = structDecl->loc;
+            backingMember->initExpr = zeroBackingInit;
             backingMember->parentDecl = structDecl;
             const auto backingMemberDeclRef = DeclRef<VarDecl>(backingMember->getDefaultDeclRef());
 
@@ -20078,6 +20366,9 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
             {
                 if (auto decoration = as<RequireCapabilityAttribute>(mod))
                     localDeclaredCaps.unionWith(decoration->capabilitySet);
+                else if (as<Shader64BitIndexingAttribute>(mod))
+                    localDeclaredCaps.unionWith(
+                        CapabilitySet(CapabilityName::spvShader64BitIndexingEXT));
                 else if (auto entrypoint = as<EntryPointAttribute>(mod))
                     stageToJoin = entrypoint->capabilitySet
                                       ? entrypoint->capabilitySet->getTargetStage()
@@ -20108,6 +20399,66 @@ void SemanticsDeclCapabilityVisitor::visitContainerDecl(ContainerDecl* decl)
 {
     // Any potential child must get it's capabilities from `getDeclaredCapabilitySet`.
     decl->inferredCapabilityRequirements = getDeclaredCapabilitySet(decl).freeze(getASTBuilder());
+}
+
+void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extensionDecl)
+{
+    // Set up the extension's own inferred capabilities from its [require(...)] attributes,
+    // the same as any other container decl.
+    visitContainerDecl(extensionDecl);
+
+    // If the extension has no explicit capability requirements, there is nothing to validate
+    // at the extension level. Member functions and constructors with their own [require(...)]
+    // attributes are validated individually in visitFunctionDeclBase; subscripts and properties
+    // are validated in visitSubscriptDecl and visitPropertyDecl via
+    // _checkExtensionMemberCapConflict.
+    if (!extensionDecl->inferredCapabilityRequirements ||
+        extensionDecl->inferredCapabilityRequirements->isEmpty())
+        return;
+
+    // An extension can only be used where its target type is available. Therefore the
+    // capabilities declared on the extension must be compatible with (i.e. have a non-empty
+    // intersection with) the target type's capabilities. We use _propagateRequirement to
+    // detect conflicts: it emits a diagnostic when the intersection of the extension's caps
+    // and the target's caps is empty (i.e. no shared target/stage survives the join).
+    //
+    // Note: this is a non-empty-intersection check, not a strict subset check. An extension
+    // may declare caps that are a superset of or overlap with the target's caps — the check
+    // only fires when the two are disjoint. For example, [require(hlsl)][require(glsl)]
+    // extension on a [require(hlsl)] type passes silently because the intersection {hlsl}
+    // is non-empty. If strict subset semantics are ever desired, the check here and in
+    // _checkExtensionMemberCapConflict would need to be replaced with an explicit subset test.
+    //
+    // We deliberately do NOT write back to extensionDecl->inferredCapabilityRequirements
+    // here: doing so would alter how getDeclaredCapabilitySet walks the parent chain for
+    // child declarations and would produce false positives in code where extension members
+    // legitimately target a narrower subset of the target type's platforms (e.g. a member
+    // [require(hlsl)] on a [require(glsl)][require(hlsl)] extension is valid).
+    auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType.type);
+    if (!targetDeclRefType)
+        return;
+
+    auto targetTypeDecl = targetDeclRefType->getDeclRef().getDecl();
+    if (!targetTypeDecl)
+        return;
+
+    // We must call ensureDecl before the _propagateRequirement call below because
+    // targetTypeDecl->inferredCapabilityRequirements is evaluated as a C++ argument
+    // expression at the call site, before _propagateRequirement runs its own ensureDecl.
+    // Without this pre-call the field can still be null/stale, and _propagateRequirement
+    // tolerates null nodeCaps by no-opping — the conflict check would silently be skipped.
+    // Genuine cycles are diagnosed inside ensureDecl itself (Diagnostics::CyclicReference),
+    // so we do not need a separate guard here.
+    ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
+
+    CapabilitySet checkCapSet{extensionDecl->inferredCapabilityRequirements};
+    _propagateRequirement(
+        this,
+        checkCapSet,
+        extensionDecl,
+        targetTypeDecl,
+        targetTypeDecl->inferredCapabilityRequirements,
+        extensionDecl->loc);
 }
 
 // A `[ForwardDerivative(fn)]` / `[BackwardDerivative(fn)]` attribute references a
@@ -20193,6 +20544,51 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         }
     }
 
+    // A user-defined derivative declared with the inverse placement
+    // `[ForwardDerivativeOf(primal)]` / `[BackwardDerivativeOf(primal)]` records a
+    // derivative *association* on the primal (see `checkDerivativeOfAttributeImpl`,
+    // which calls `registerAssociatedDecl`) rather than a `[ForwardDerivative]` /
+    // `[BackwardDerivative]` modifier on the primal. Because differentiating the primal
+    // invokes the derivative, the primal must carry the derivative's capability
+    // requirements; as with the forward `[ForwardDerivative]` / `[BackwardDerivative]`
+    // placement, the requirement is reflected onto the primal *unconditionally* — it
+    // applies to every use of the primal, not only to a differentiated call (the
+    // regression test raises E36107 from a plain `testC(2.0)`). Without this, a
+    // `[require]` on an inverse-placed derivative is silently dropped.
+    for (auto assoc : getShared()->getAssociatedDeclsForDecl(funcDecl))
+    {
+        if (assoc->kind != DeclAssociationKind::ForwardDerivativeFunc &&
+            assoc->kind != DeclAssociationKind::BackwardDerivativeFunc)
+            continue;
+        auto derivativeFuncDecl = assoc->decl;
+        // Gate on the derivative carrying an explicit `[require]`. This is a gate, not
+        // a payload filter: once a derivative qualifies we propagate its full
+        // `inferredCapabilityRequirements` (the declared `[require]` plus anything its
+        // body infers) — the same payload the other propagation sites in this function
+        // use — not just the declared `[require]` set. The gate exists because the core
+        // module attaches all-targets derivative families to builtins through inverse
+        // placement (the `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]` overloads
+        // for transpose/mul/dot and the math intrinsics in diff.meta.slang); those
+        // derivatives carry no `[require]`, so unconditionally joining their inferred
+        // requirements onto an all-targets builtin primal would over-constrain it (in
+        // practice it breaks core-module compilation). Restricting propagation to an
+        // explicit `[require]` keeps it to deliberate user declarations; a derivative
+        // that only *infers* a target dependency without `[require]` is intentionally
+        // not propagated.
+        if (!derivativeFuncDecl->findModifier<RequireCapabilityAttribute>())
+            continue;
+        ensureDecl(derivativeFuncDecl, DeclCheckState::CapabilityChecked);
+        // Point the provenance note at the derivative function, which is where the
+        // user declared both the `[require]` and the `[*DerivativeOf]` linkage.
+        _propagateRequirement(
+            this,
+            mutableFuncDeclCapSet,
+            funcDecl,
+            derivativeFuncDecl,
+            derivativeFuncDecl->inferredCapabilityRequirements,
+            derivativeFuncDecl->loc);
+    }
+
     // non-static function join's capabilities with parent
     // to become a superset of the parent.
     if (!isEffectivelyStatic(funcDecl))
@@ -20269,6 +20665,94 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
                     .freeze(getASTBuilder());
         }
     }
+
+    // See _checkExtensionMemberCapConflict for the rationale behind checking
+    // only own [require(...)] attributes here.
+    //
+    // Constructors are also checked despite isEffectivelyStatic returning true for
+    // them: a [require(hlsl)] __init inside a [require(glsl)] extension target is
+    // a genuine conflict even though there is no implicit `this` pointer.
+    if (!isEffectivelyStatic(funcDecl) || as<ConstructorDecl>(funcDecl))
+        _checkExtensionMemberCapConflict(funcDecl);
+}
+
+// Verify that a callable extension member's own [require(...)] attributes are
+// compatible with the extension's target type capabilities.
+//
+// We check only the member's own [require(...)] attributes rather than the
+// full declaredCaps (which includes caps inherited from the parent extension)
+// for two reasons:
+//  1. Avoids cascading errors: when the extension itself has an incompatible
+//     [require(X)] (already caught by visitExtensionDecl), members that inherit
+//     X should not also generate errors — fixing the extension fixes them too.
+//  2. Catches a case that full declaredCaps misses: if an extension has a
+//     compatible [require(glsl)] and a member adds its own [require(hlsl)],
+//     declaredCaps would be {hlsl|glsl} and joining that with {glsl} gives the
+//     valid {glsl}, hiding the conflict. Using just {hlsl} detects it.
+void SemanticsDeclCapabilityVisitor::_checkExtensionMemberCapConflict(Decl* memberDecl)
+{
+    CapabilitySet ownDeclaredCaps;
+    for (auto mod : memberDecl->modifiers)
+    {
+        if (auto req = as<RequireCapabilityAttribute>(mod))
+            ownDeclaredCaps.unionWith(req->capabilitySet);
+    }
+    if (ownDeclaredCaps.isEmpty())
+        return;
+
+    // Walk up to find an enclosing ExtensionDecl, but stop at any AggTypeDeclBase:
+    // a member that lives inside a nested struct/class inside the extension belongs to
+    // that nested type, not to the extension target, and must not be checked here.
+    // SubscriptDecl, PropertyDecl, and GenericDecl are transparent wrappers that we
+    // skip past (e.g. an accessor's parent is the subscript, which lives in the extension).
+    auto parentDecl = memberDecl->parentDecl;
+    while (parentDecl && !as<ExtensionDecl>(parentDecl))
+    {
+        if (as<AggTypeDeclBase>(parentDecl))
+            return;
+        parentDecl = parentDecl->parentDecl;
+    }
+    auto extensionDecl = as<ExtensionDecl>(parentDecl);
+    if (!extensionDecl)
+        return;
+
+    auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType.type);
+    if (!targetDeclRefType)
+        return;
+
+    auto targetTypeDecl = targetDeclRefType->getDeclRef().getDecl();
+    if (!targetTypeDecl)
+        return;
+
+    // We must call ensureDecl before the _propagateRequirement call below because
+    // targetTypeDecl->inferredCapabilityRequirements is evaluated as a C++ argument
+    // expression at the call site, before _propagateRequirement runs its own ensureDecl.
+    // Without this pre-call the field can still be null/stale, and _propagateRequirement
+    // tolerates null nodeCaps by no-opping — the conflict check would silently be skipped.
+    // Genuine cycles are diagnosed inside ensureDecl itself (Diagnostics::CyclicReference),
+    // so we do not need a separate guard here.
+    ensureDecl(targetTypeDecl, DeclCheckState::CapabilityChecked);
+    _propagateRequirement(
+        this,
+        ownDeclaredCaps,
+        memberDecl,
+        targetTypeDecl,
+        targetTypeDecl->inferredCapabilityRequirements,
+        memberDecl->loc);
+    // Intentionally do not use ownDeclaredCaps after this: we only
+    // called _propagateRequirement for its conflict-detection side-effect.
+}
+
+void SemanticsDeclCapabilityVisitor::visitSubscriptDecl(SubscriptDecl* subscriptDecl)
+{
+    visitContainerDecl(subscriptDecl);
+    _checkExtensionMemberCapConflict(subscriptDecl);
+}
+
+void SemanticsDeclCapabilityVisitor::visitPropertyDecl(PropertyDecl* propertyDecl)
+{
+    visitContainerDecl(propertyDecl);
+    _checkExtensionMemberCapConflict(propertyDecl);
 }
 
 void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inheritanceDecl)

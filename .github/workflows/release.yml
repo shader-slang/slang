@@ -83,7 +83,6 @@ jobs:
             }
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
-    container: ${{ matrix.image || '' }}
 
     defaults:
       run:

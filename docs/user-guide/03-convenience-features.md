@@ -329,7 +329,7 @@ int test()
     return rs.val; // returns 3.
 }
 ```
-Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators is not supported.
+Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `+`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators is not supported.
 
 In addition, you can overload operator `()` as a member method:
 ```csharp
@@ -705,6 +705,14 @@ heap as an array of the requested resource type, whose stride is defined by the 
 from the `OpConstantSizeOfEXT` instruction. The user can override this behavior and specify a different
 stride with the `-spirv-resource-heap-stride` or `-spirv-sampler-heap-stride` compiler options. For
 acceleration-structure entries, an explicit resource heap stride must be at least 8 bytes.
+
+Alternatively, the `-spirv-unified-descriptor-heap-stride` option makes every resource descriptor-heap
+runtime array use a single shared stride equal to the maximum of the image and buffer descriptor sizes,
+so a heap that holds both buffers and images is indexed at the device's unified stride regardless of which
+descriptor type a particular shader accesses. This affects only the default `OpConstantSizeOfEXT` path
+(used when `-spirv-resource-heap-stride` is 0), so it is mutually exclusive with a non-zero
+`-spirv-resource-heap-stride` (combining the two is an error). The sampler heap and acceleration-structure
+entries are unaffected.
 
 > **Note on `RaytracingAccelerationStructure`:** When the `spvDescriptorHeapEXT` capability is active and
 > a `DescriptorHandle<RaytracingAccelerationStructure>` is dereferenced, Slang loads a 64-bit device address

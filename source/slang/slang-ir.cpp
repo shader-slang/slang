@@ -88,6 +88,9 @@ bool isSimpleDecoration(IROp op)
     switch (op)
     {
     case kIROp_EarlyDepthStencilDecoration:
+    case kIROp_GLSLFragDepthGreaterDecoration:
+    case kIROp_GLSLFragDepthLessDecoration:
+    case kIROp_Shader64BitIndexingDecoration:
     case kIROp_KeepAliveDecoration:
     case kIROp_LineAdjInputPrimitiveTypeDecoration:
     case kIROp_LineInputPrimitiveTypeDecoration:
@@ -9418,6 +9421,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetOptiXRayPayloadPtr:
     case kIROp_UpdateElement:
     case kIROp_MeshOutputRef:
+    case kIROp_NodeOutputRecordGetElementPtr:
     case kIROp_MakeVectorFromScalar:
     case kIROp_Swizzle:
     case kIROp_SwizzleSet: // Doesn't actually "set" anything - just returns the resulting
@@ -9969,6 +9973,7 @@ bool isMovableInst(IRInst* inst)
     case kIROp_FieldAddress:
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
+    case kIROp_NodeOutputRecordGetElementPtr:
     case kIROp_GetOffsetPtr:
     case kIROp_UpdateElement:
     case kIROp_Specialize:

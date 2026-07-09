@@ -5,6 +5,9 @@
 //   2. `&&` must keep short-circuit semantics: the fast path bails on it (it is neither
 //      arithmetic, comparison, nor bitwise) and `convertToLogicOperatorExpr` runs first, so the
 //      right-hand side is not evaluated when the left is false.
+//   3. A user-defined `operator|` with a builtin-float / user-type mix (`float | V`) must still be
+//      selected: the float-bitwise rejection (#11648) fires only when BOTH operands are builtin, so
+//      a builtin/user-type mix falls through to overload resolution.
 //TEST:INTERPRET(filecheck=CHECK):
 
 struct V
@@ -17,6 +20,16 @@ V operator+(V a, int b)
 {
     V r;
     r.x = a.x + b * 1000;
+    return r;
+}
+
+// A user-defined `operator|` with a builtin-float / user-type mix. The float-bitwise fast-path
+// rejection (#11648) only fires when BOTH operands are builtin, so this overload must still be
+// selected for `float | V` rather than the operands being diagnosed as a float bitwise op.
+V operator|(float a, V b)
+{
+    V r;
+    r.x = int(a) * 10 + b.x;
     return r;
 }
 
@@ -33,6 +46,10 @@ void main()
     V r = v + 5; // must select the user operator+: 3 + 5*1000 = 5003
     printf("user=%d\n", r.x);
     //CHECK: user=5003
+
+    V r2 = 2.0f | v; // must select user operator|(float, V): int(2.0)*10 + 3 = 23
+    printf("userOr=%d\n", r2.x);
+    //CHECK: userOr=23
 
     bool b = false && sideEffect(); // must short-circuit: sideEffect() not evaluated
     //CHECK-NOT: called

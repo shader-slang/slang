@@ -6,7 +6,7 @@
 // with the clean E55211 diagnostic instead of emitting an invalidly laid out
 // message payload.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -capability abort -skip-spirv-validation
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -capability abort
 
 struct Mixed
 {
