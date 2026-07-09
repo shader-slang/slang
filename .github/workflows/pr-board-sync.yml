@@ -50,8 +50,8 @@ name: PR Board Sync (reusable)
 #
 # Cross-repo reuse: any shader-slang repo adds a thin caller workflow that
 # declares the PR event triggers and calls this one, mapping the single required
-# secret explicitly (no `secrets: inherit`, and no `permissions:` block needed —
-# this workflow uses the PAT for everything, not the GITHUB_TOKEN):
+# secret explicitly (no `secrets: inherit`; callers should set `permissions: {}`
+# because this workflow uses the PAT for everything, not the GITHUB_TOKEN):
 #
 #   jobs:
 #     board-sync:

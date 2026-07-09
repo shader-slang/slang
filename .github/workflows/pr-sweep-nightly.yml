@@ -13,6 +13,8 @@ on:
     - cron: "0 7 * * *" # nightly ~07:00 UTC (GitHub may delay under load)
   workflow_dispatch: {} # allow on-demand runs
 
+permissions: {}
+
 jobs:
   board-sweep:
     uses: ./.github/workflows/pr-board-sync.yml

@@ -40,6 +40,8 @@ on:
   check_suite:
     types: [completed]
 
+permissions: {}
+
 jobs:
   board-sync:
     # Run directly for everything except a fork PR's review (no secret there);
