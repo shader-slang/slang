@@ -40,8 +40,8 @@ the reference for what slang runs.
 4. Ensure the org-level secret `SLANG_PR_BOT_TOKEN` (a dedicated bot PAT with org
    Projects RW + Members read; repo Contents read, Pull requests write, Issues
    write, Metadata read) is available to the repo. The callers map only that
-   secret; the reusable workflow uses it for every call, so callers need no
-   `permissions:` block.
+   secret; the reusable workflow uses it for every call, so callers should keep
+   `permissions: {}` to drop the unused `GITHUB_TOKEN` scopes.
 
 The nightly sweep (`pr_sweep.py`, run on a cadence) remains the idempotent
 backstop for anything the per-event path cannot see (missed webhooks, fork-PR CI,

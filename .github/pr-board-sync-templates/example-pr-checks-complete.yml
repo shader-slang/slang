@@ -35,6 +35,8 @@ on:
       - "CI"
     types: [completed]
 
+permissions: {}
+
 jobs:
   board-sync:
     uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master

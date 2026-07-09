@@ -21,6 +21,8 @@ name: PR Commit Status Sync
 on:
   status: {}
 
+permissions: {}
+
 jobs:
   board-sync:
     # Skip the initial "pending" each external check posts; only a settled status

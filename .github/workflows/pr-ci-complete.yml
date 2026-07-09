@@ -52,6 +52,8 @@ on:
       - "Verify PR Labels"
     types: [completed]
 
+permissions: {}
+
 jobs:
   board-sync:
     uses: ./.github/workflows/pr-board-sync.yml
