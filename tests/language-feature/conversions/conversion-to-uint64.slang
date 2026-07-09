@@ -59,10 +59,10 @@ void computeMain()
     storeValue(int8_t(67));
     storeValue(int8_t(127));
 #else
-    storeValue(uint64_t(18446744073709551488));
-    storeValue(uint64_t(18446744073709551574));
-    storeValue(uint64_t(67));
-    storeValue(uint64_t(127));
+    storeValue(uint64_t(18446744073709551488U));
+    storeValue(uint64_t(18446744073709551574U));
+    storeValue(uint64_t(67U));
+    storeValue(uint64_t(127U));
 #endif
     // CHECK-NEXT: 18446744073709551488
     // CHECK-NEXT: 18446744073709551574
@@ -76,10 +76,10 @@ void computeMain()
     storeValue(uint8_t(128));
     storeValue(uint8_t(255));
 #else
-    storeValue(uint64_t(0));
-    storeValue(uint64_t(42));
-    storeValue(uint64_t(128));
-    storeValue(uint64_t(255));
+    storeValue(uint64_t(0U));
+    storeValue(uint64_t(42U));
+    storeValue(uint64_t(128U));
+    storeValue(uint64_t(255U));
 #endif
     // CHECK-NEXT: 0
     // CHECK-NEXT: 42
@@ -209,12 +209,12 @@ void computeMain()
     storeValue(4294967295.0LF);
     storeValue(18446744073709549568.0LF); // largest uint64_t value representable by double
 #else
-    storeValue(uint64_t(0));
-    storeValue(uint64_t(0));
-    storeValue(uint64_t(126));
-    storeValue(uint64_t(65534));
-    storeValue(uint64_t(4294967295));
-    storeValue(uint64_t(18446744073709549568));
+    storeValue(uint64_t(0U));
+    storeValue(uint64_t(0U));
+    storeValue(uint64_t(126U));
+    storeValue(uint64_t(65534U));
+    storeValue(uint64_t(4294967295U));
+    storeValue(uint64_t(18446744073709549568U));
 #endif
     // CHECK-NEXT: 0
     // CHECK-NEXT: 0
