@@ -18,8 +18,11 @@ on:
         description: "latest release date (YYYY-MM-DD)"
         default: "2026-12-31"
       sweep:
+        # Default on so per-release sweep DATA is archived in the results repo
+        # (renderable on demand / compared by ladder_scaling.py); only the
+        # latest nightly sweep gets published pages.
         description: "also run each workload's sweep_sizes (scaling curves; ~4x runtime)"
-        default: "false"
+        default: "true"
       samples:
         description: "timed samples per run"
         default: "5"
@@ -99,7 +102,7 @@ jobs:
           UNTIL: ${{ github.event.inputs.until || '2026-12-31' }}
           SAMPLES: ${{ github.event.inputs.samples || '5' }}
           FORCE_ENABLED: ${{ github.event.inputs.force || 'false' }}
-          SWEEP: ${{ github.event.inputs.sweep || 'false' }}
+          SWEEP: ${{ github.event.inputs.sweep || 'true' }}
         run: |
           set -euo pipefail
           SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
@@ -166,6 +169,12 @@ jobs:
           fi
           cd "$SUITE"
           python3 report.py --results "$RESULTS" --index "$RESULTS/index.json"
+          # Re-render the latest NIGHTLY sweep pages too: this deploy replaces
+          # the whole pages tree, so without this the release sweep would wipe
+          # the analysis/sweep/ set the nightly published.
+          python3 sweep_report.py --results "$RESULTS" --latest \
+            --out "$RESULTS/analysis/sweep" \
+            || echo "no swept nightly data yet; skipping sweep pages"
 
       - name: Checkout gh-pages branch
         continue-on-error: true

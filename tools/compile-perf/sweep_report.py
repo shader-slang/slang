@@ -442,14 +442,49 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
     return links
 
 
+def find_latest_swept(results_dir):
+    """Return the newest daily/<label> whose results contain swept (multi-size)
+    data. Daily labels are `YYYY-MM-DD-<shortsha>`, so reverse-lexicographic
+    order is date order; same-date siblings tie-break arbitrarily, which is
+    fine for a latest-sweep view that a nightly refreshes anyway. Exits when
+    no swept daily data exists yet (before the first nightly sweep=true run)."""
+    daily = os.path.join(results_dir, "daily")
+    labels = sorted(os.listdir(daily), reverse=True) if os.path.isdir(daily) else []
+    for label in labels:
+        path = os.path.join(daily, label, "results.json")
+        if not os.path.isfile(path):
+            continue
+        try:
+            runs = json.load(open(path))
+        except ValueError:
+            continue
+        per = {}
+        for r in runs:
+            if r.get("size", 0) > 0 and r.get("timers"):
+                per.setdefault(r["workload"], set()).add(r["size"])
+        if any(len(s) >= 2 for s in per.values()):
+            return label
+    raise SystemExit("no swept daily results found; run the nightly with sweep=true first")
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
     ap.add_argument("--label", default="dev", help="results/<label>/ to report on")
+    ap.add_argument("--latest", action="store_true",
+                    help="report on the newest daily/<label> that has swept "
+                         "(multi-size) data, ignoring --label")
+    ap.add_argument("--out", default=None,
+                    help="output directory (default: <label's results dir>/sweep). "
+                         "Used by CI to render the latest nightly sweep into the "
+                         "published analysis/ tree.")
     ap.add_argument("--metric", default="median", choices=["min", "median", "mean"])
     args = ap.parse_args()
+
+    if args.latest:
+        args.label = find_latest_swept(args.results)
 
     sweeps = load_sweeps(args.results, args.label, args.metric)
     if not sweeps:
@@ -466,7 +501,8 @@ def main():
             floor = r["timers"]["compileInner"][args.metric]
             break
 
-    outdir = os.path.join(analyze.results_dir_for(args.results, args.label), "sweep")
+    outdir = args.out or os.path.join(
+        analyze.results_dir_for(args.results, args.label), "sweep")
     os.makedirs(outdir, exist_ok=True)
     # Per-workload pages (stacked sub-counters + analysis + numbers), then the
     # index's compileInner-only curves linking into them.

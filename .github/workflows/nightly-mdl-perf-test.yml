@@ -24,7 +24,7 @@ on:
         default: ""
       sweep:
         description: "run each workload's sweep_sizes for scaling curves (~4x runtime; tracking still compares the default-size point)"
-        default: "false"
+        default: "true"
       publish:
         description: "push results + update tracking + deploy pages (set false for one-off measurements: results are uploaded as a run artifact only)"
         default: "true"
@@ -123,7 +123,9 @@ jobs:
         env:
           SAMPLES: ${{ github.event.inputs.samples || '5' }}
           ONLY: ${{ github.event.inputs.only }}
-          SWEEP: ${{ github.event.inputs.sweep || 'false' }}
+          # Scheduled runs have no inputs; sweep nightly so the published
+          # "latest sweep" scaling page is at most a day old.
+          SWEEP: ${{ github.event.inputs.sweep || 'true' }}
         run: |
           set -euo pipefail
           SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
@@ -215,6 +217,13 @@ jobs:
           fi
           cd "$SUITE"
           python3 report.py --results "$RESULTS" --index "$RESULTS/index.json"
+          # Latest nightly complexity-sweep pages -> analysis/sweep/ — ONE page
+          # set at a stable URL, overwritten on every deploy (deliberately not
+          # per-label: per-release/per-day sweep DATA stays in the results repo
+          # for on-demand rendering, but only the newest sweep is served).
+          python3 sweep_report.py --results "$RESULTS" --latest \
+            --out "$RESULTS/analysis/sweep" \
+            || echo "no swept nightly data yet; skipping sweep pages"
 
       - name: Checkout gh-pages branch
         if: env.PUBLISH == 'true'
