@@ -263,7 +263,7 @@ Disable specific warning ids.
 
 **-Wall | -Wextra | -Wpedantic**
 
-Enable the corresponding group of opt-in warnings (additive). Staging: the pedantic group is currently enabled by default, so passing the pedantic flag is a no-op today; a future release will make it opt-in. 
+Enable the corresponding group of warnings (additive). The groups are independent: [-Wextra](#wall-1) is on by default, while [-Wall](#wall) and [-Wpedantic](#wall-2) are off by default. 
 
 
 <a id="w"></a>
@@ -361,7 +361,7 @@ Write shader coverage manifest metadata to an explicit JSON sidecar path. Use th
 
 **-trace-coverage-counter-width &lt;bits&gt;**
 
-Per-slot bit width of the synthesized `__slang_coverage` buffer. Accepts `64` (default) or `32`. uint64 counters effectively cannot wrap within any practical run; uint32 counters wrap silently at 2^32 hits per slot. Use `32` when targeting a runtime driver that does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon, which exposes `shaderBufferInt64Atomics = false`). Implies `-trace-coverage` is meaningful; ignored when no coverage mode is enabled. 
+Per-slot bit width of the synthesized `__slang_coverage` buffer. Accepts `64` (default) or `32`. uint64 counters effectively cannot wrap within any practical run; uint32 counters wrap silently at 2^32 hits per slot. Use `32` when targeting a runtime driver that does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon, which exposes `shaderBufferInt64Atomics = false`). Metal targets (`metal`, `metallib`, `metallib-asm`): MSL provides no 64-bit atomic fetch-add, so counting-mode counters are capped to 32 bits; an explicitly requested `64` is capped with warning E45115. Boolean coverage (`-trace-coverage-boolean`) writes plain non-atomic stores and honors the requested width on all targets. Implies `-trace-coverage` is meaningful; ignored when no coverage mode is enabled. 
 
 
 <a id="report-dynamic-dispatch-sites"></a>
@@ -1408,6 +1408,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_EXT_descriptor_heap` : enables the SPV_EXT_descriptor_heap extension 
 * `SPV_KHR_untyped_pointers` : enables the SPV_KHR_untyped_pointers extension 
 * `SPV_KHR_bfloat16` : enables the SPV_KHR_bfloat16 extension 
+* `SPV_EXT_shader_64bit_indexing` : enables the SPV_EXT_shader_64bit_indexing extension 
 * `spvAbort` 
 * `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
@@ -1470,6 +1471,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvVulkanMemoryModelDeviceScopeKHR` 
 * `spvBindlessTextureNV` 
 * `spvDescriptorHeapEXT` 
+* `spvShader64BitIndexingEXT` 
 * `ser_hlsl_native` 
 * `metallib_latest` 
 * `dxil_lib` 

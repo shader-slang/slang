@@ -37,7 +37,12 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
     IRInst* operands[2] = {elementType, type->getDataLayout()};
     auto elementBufferType = builder.getType(kIROp_HLSLRWStructuredBufferType, 2, operands);
 
-    operands[0] = builder.getIntType();
+    // Synthesize the counter with an atomic element type up front: it is only ever accessed
+    // through the atomic increment/decrement below, so `Atomic<int>` is its true element type.
+    // Encoding that here keeps the fact in one place, rather than leaving a later pass to
+    // recover it from the access pattern.
+    auto counterElementType = builder.getType(kIROp_AtomicType, builder.getIntType());
+    operands[0] = counterElementType;
     operands[1] = builder.getType(kIROp_DefaultBufferLayoutType);
     auto counterBufferType = builder.getType(kIROp_HLSLRWStructuredBufferType, 2, operands);
 
@@ -110,12 +115,11 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
             builder.emitFieldExtract(elementBufferType, bufferParam, elementBufferKey);
         auto counterBuffer =
             builder.emitFieldExtract(counterBufferType, bufferParam, counterBufferKey);
-        IRInst* getCounterPtrArgs[] = {counterBuffer, builder.getIntValue(builder.getIntType(), 0)};
-        auto counterBufferPtr = builder.emitIntrinsicInst(
-            builder.getPtrType(builder.getIntType()),
-            kIROp_RWStructuredBufferGetElementPtr,
-            2,
-            getCounterPtrArgs);
+        // Pointer pointee type follows the counter buffer's element type, so this is now
+        // `ptr<Atomic<int>>`, which the atomic op below consumes directly.
+        auto counterBufferPtr = builder.emitRWStructuredBufferGetElementPtr(
+            counterBuffer,
+            builder.getIntValue(builder.getIntType(), 0));
         IRInst* atomicIncArgs[] = {
             counterBufferPtr,
             builder.getIntValue(builder.getIntType(), kIRMemoryOrder_Relaxed)};
@@ -149,12 +153,11 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
             builder.emitFieldExtract(elementBufferType, bufferParam, elementBufferKey);
         auto counterBuffer =
             builder.emitFieldExtract(counterBufferType, bufferParam, counterBufferKey);
-        IRInst* getCounterPtrArgs[] = {counterBuffer, builder.getIntValue(builder.getIntType(), 0)};
-        auto counterBufferPtr = builder.emitIntrinsicInst(
-            builder.getPtrType(builder.getIntType()),
-            kIROp_RWStructuredBufferGetElementPtr,
-            2,
-            getCounterPtrArgs);
+        // Pointer pointee type follows the counter buffer's element type, so this is now
+        // `ptr<Atomic<int>>`, which the atomic op below consumes directly.
+        auto counterBufferPtr = builder.emitRWStructuredBufferGetElementPtr(
+            counterBuffer,
+            builder.getIntValue(builder.getIntType(), 0));
         IRInst* atomicDecArgs[] = {
             counterBufferPtr,
             builder.getIntValue(builder.getIntType(), kIRMemoryOrder_Relaxed)};

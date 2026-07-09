@@ -1439,9 +1439,16 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     switch (type->getOp())
                     {
                     case kIROp_HalfType:
+                        // The `HF` literal suffix is gated behind
+                        // GL_EXT_shader_explicit_arithmetic_types, so register the requirement
+                        // here just as the integer-literal cases above do for their suffixes.
+                        _requireBaseType(BaseType::Half);
                         m_writer->emit("HF");
                         break;
                     case kIROp_DoubleType:
+                        // No `_requireBaseType` here: double is gated by GLSL `#version`, not by an
+                        // extension, and `ShaderExtensionTracker` has no `BaseType::Double`
+                        // mapping, so registering it would be a no-op.
                         m_writer->emit("LF");
                         break;
                     default:
