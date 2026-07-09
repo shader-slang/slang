@@ -16,7 +16,7 @@
 
 // Conversions to 64-bit double from all fundamental scalar types
 //
-// In integer-to-half conversions, precisely convertible values are
+// In 64-bit-integer-to-double conversions, precisely convertible values are
 // used to avoid the effects of rounding. The rounding behavior is
 // implementation-defined at least on SPIR-V targets.
 
