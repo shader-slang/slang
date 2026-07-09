@@ -105,31 +105,50 @@ def superlinear(k):
 
 
 def bucket_series(results_dir, label, metric):
-    """Per-workload phase-bucket totals at each sweep size:
-    {workload: {size: {bucket: ms}}}, using breakdown's mutually-exclusive
-    buckets (named leaf timers + `(self)` residuals). Because the buckets
-    partition compileInner exactly, growth deltas computed from them attribute
-    the compileInner increase without double-counting nested timers — which
-    raw timer names (e.g. SemanticChecking containing its own children) would."""
+    """Per-workload phase-bucket totals at each sweep size plus the per-bucket
+    floor: ({workload: {size: {bucket: ms}}}, {bucket: floor_ms}), using
+    breakdown's mutually-exclusive buckets (named leaf timers + `(self)`
+    residuals). Because the buckets partition compileInner exactly, growth
+    deltas computed from them attribute the compileInner increase without
+    double-counting nested timers — which raw timer names (e.g.
+    SemanticChecking containing its own children) would.
+
+    The floor is the `minimal` workload's bucket decomposition — the same
+    fixed-per-compile canary the top-level panels anchor their linear
+    expectation to, split by bucket ({} if minimal wasn't run)."""
     runs = json.load(open(analyze.results_path(results_dir, label)))
-    per = {}
+    per, floor_b = {}, {}
     for r in runs:
-        if r.get("size", 0) <= 0 or not r.get("timers"):
+        if not r.get("timers"):
             continue
         timers = {k: v[metric] for k, v in r["timers"].items() if v}
+        if r["workload"] == "minimal" and not floor_b:
+            floor_b = breakdown.buckets(timers)
+        if r.get("size", 0) <= 0:
+            continue
         per.setdefault(r["workload"], {})[r["size"]] = breakdown.buckets(timers)
-    return per
+    return per, floor_b
 
 
-def growth_attribution(by_size, top_n=5):
+def growth_attribution(by_size, floor_b=None, top_n=5):
     """Attribute the compileInner growth between the smallest and largest sweep
     size to individual phase buckets, answering "which timer grows, which stays
     constant". Returns (rows, others, flat, total_delta, (n_min, n_max)):
 
       rows   — the top growing buckets (Δ ≥ max(1 ms, 2% of total growth), at
-               most `top_n`), each {name, v0, v1, delta, k}; `k` is the bucket's
-               own power-law exponent t_bucket = a·N^k (None when the bucket is
-               ~0 somewhere, where a log-log fit is undefined).
+               most `top_n`), each {name, v0, v1, delta, k, lin}. `k` is the
+               bucket's own power-law exponent on its floor-subtracted work,
+               (t_bucket − floor_bucket) = a·N^k — the same subtraction fit()
+               does for compileInner, since a fixed cost inside the bucket
+               flattens a raw log-log slope (None when the work is ~0
+               somewhere, where a log-log fit is undefined).
+               `lin` is the same end-point-vs-linear-expectation ratio the
+               top-level panels show, per bucket: the expectation is anchored
+               to the bucket's share of the `minimal` floor (`floor_b`, 0 for
+               buckets absent there) with the slope fitted through-origin on
+               the low-N half of (t − floor); lin = t(N_max) / expectation, so
+               1.0 reads "grew exactly linearly" regardless of the ladder's N
+               ratio (None with <3 points or a non-positive expectation).
       others — buckets above that same Δ threshold but cut by the top-`top_n`
                limit: still real growth, just not the headline. Kept separate
                so they are never mislabeled as constant.
@@ -148,10 +167,21 @@ def growth_attribution(by_size, top_n=5):
     for name in names:
         pts = [(sz, by_size[sz].get(name, 0.0)) for sz in sizes]
         v0, v1 = pts[0][1], pts[-1][1]
+        fb = (floor_b or {}).get(name, 0.0)
+        work = [(x, v - fb) for x, v in pts]
         k = None
-        if all(v > 0 for _, v in pts):
-            _, k, _ = analyze.powfit([x for x, _ in pts], [v for _, v in pts])
-        entries.append({"name": name, "v0": v0, "v1": v1, "delta": v1 - v0, "k": k})
+        if all(w > 0 for _, w in work):
+            _, k, _ = analyze.powfit([x for x, _ in work], [w for _, w in work])
+        lin = None
+        if len(pts) >= 3:
+            lo = pts[:max(2, (len(pts) + 1) // 2)]
+            slope = (sum(x * (v - fb) for x, v in lo)
+                     / (sum(x * x for x, _ in lo) or 1.0))
+            expect = fb + slope * pts[-1][0]
+            if expect > 0:
+                lin = v1 / expect
+        entries.append({"name": name, "v0": v0, "v1": v1, "delta": v1 - v0,
+                        "k": k, "lin": lin})
     entries.sort(key=lambda e: -e["delta"])
     thresh = max(1.0, 0.02 * total) if total > 0 else 1.0
     growing = [e for e in entries if e["delta"] >= thresh]
@@ -162,29 +192,34 @@ def growth_attribution(by_size, top_n=5):
     return rows, others, flat, total, (n0, n1)
 
 
-def render_growth_table(by_size):
+def render_growth_table(by_size, floor_b=None):
     """HTML for the growth-attribution section of a workload page: a top-5
-    'growing buckets' table (Δms, share of total growth, ×grow factor, and the
-    bucket's own ∝N^k exponent), an 'also growing' line for growers cut by the
-    top-5 limit, and a one-line near-constant remainder, so a reader can see at
-    a glance where a super-linear total comes from."""
-    rows, others, flat, total, (n0, n1) = growth_attribution(by_size)
+    'growing buckets' table (Δms, share of total growth, the × lin end-point
+    ratio, and the bucket's own ∝N^k exponent), an 'also growing' line for
+    growers cut by the top-5 limit, and a one-line near-constant remainder, so
+    a reader can see at a glance where a super-linear total comes from."""
+    rows, others, flat, total, (n0, n1) = growth_attribution(by_size, floor_b)
     if not rows and not others and not flat:
         return ""
-    nratio = n1 / n0 if n0 else 0
     s = [f"<h2>Growth attribution (N={n0} &rarr; N={n1})</h2>",
          f"<p class='small'>compileInner grows by <b>{total:.0f} ms</b> across the sweep; "
          f"the mutually-exclusive phase buckets below partition that growth exactly "
-         f"(no nested-timer double counting). N grows &times;{nratio:.0f}, so a linear "
-         f"bucket shows &times;{nratio:.0f} grow / k&approx;1; k&gt;1 is where the "
-         f"super-linearity lives.</p>",
+         f"(no nested-timer double counting). <b>&times; lin</b> is the same metric as "
+         f"the top-level panels, per bucket: the end point vs a linear expectation "
+         f"anchored to the bucket's share of the <code>minimal</code> floor and fitted "
+         f"on the low-N half — 1.0 = grew exactly linearly, &gt;1 bends up. The "
+         f"super-linearity lives where &times; lin (and k) are red.</p>",
          "<table><tr><th>bucket</th>"
          f"<th class=num>t@N={n0}</th><th class=num>t@N={n1}</th>"
          "<th class=num>&Delta; ms</th><th class=num>share</th>"
-         "<th class=num>&times;grow</th><th class=num>&prop;N<sup>k</sup></th></tr>"]
+         "<th class=num>&times; lin</th><th class=num>&prop;N<sup>k</sup></th></tr>"]
     for e in rows:
         share = f"{100 * e['delta'] / total:.0f}%" if total > 0 else "–"
-        grow = f"{e['v1'] / e['v0']:.1f}&times;" if e["v0"] > 0.5 else "new"
+        if e["lin"] is not None:
+            lcls = "reg" if e["lin"] >= 1.15 else "flat"
+            lcell = f"<td class='num {lcls}'>{e['lin']:.2f}&times;</td>"
+        else:
+            lcell = "<td class=num>–</td>"
         if e["k"] is not None:
             kcls = "reg" if superlinear(e["k"]) else "flat"
             kcell = f"<td class='num {kcls}'>{e['k']:.2f}</td>"
@@ -193,7 +228,7 @@ def render_growth_table(by_size):
         s.append(f"<tr><td>{html.escape(e['name'])}</td>"
                  f"<td class=num>{e['v0']:.0f}</td><td class=num>{e['v1']:.0f}</td>"
                  f"<td class=num>{e['delta']:+.0f}</td><td class=num>{share}</td>"
-                 f"<td class=num>{grow}</td>{kcell}</tr>")
+                 f"{lcell}{kcell}</tr>")
     s.append("</table>")
     if others:
         parts = ", ".join(
@@ -332,7 +367,7 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
     Returns {workload: href relative to the sweep report} for linking."""
     import inspect
     from lib import manifest
-    per_bucket = bucket_series(results_dir, label, metric)
+    per_bucket, floor_b = bucket_series(results_dir, label, metric)
     wdir = os.path.join(outdir, "workloads")
     os.makedirs(wdir, exist_ok=True)
     pre = ("background:#fff;border:1px solid #eee;border-radius:6px;padding:8px;overflow:auto")
@@ -398,7 +433,7 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
                 f"<td class='num {kcls}'>{kk:.2f}</td><td class=num>{ft['pow_r2']:.3f}</td>"
                 f"<td class=num>{ci[0][1]:.0f}</td><td class=num>{ci[-1][1]:.0f}</td>"
                 f"<td class='num {topcls}'>{(f'{top:.2f}×' if top else '–')}</td></tr></table>"
-                + render_growth_table(per_bucket.get(wl, {}))
+                + render_growth_table(per_bucket.get(wl, {}), floor_b)
                 + f"<h2>Sweep numbers ({metric} ms)</h2>" + "".join(num)
                 + "</div>")
         with open(os.path.join(wdir, f"{wl}.html"), "w") as fh:
