@@ -41,10 +41,10 @@ regression points at a specific release.
   take `--metric` to switch (default `median`).
 - **Memory:** when GNU `/usr/bin/time` is present, peak RSS per compile is also
   captured (`rss_kb`) — a heavier core module inflates memory, not just time.
-- **Floor + slope:** `ladder_scaling.py --label <label>` fits `time = floor + k·N`
-  from a `--sweep` (multi-size) run, separating a fixed-cost regression (heavier
-  stdlib) from a per-element one (a pass got slower) from a scaling one
-  (super-linear `k`).
+- **Floor + slope:** `ladder_scaling.py --workload <name>` fits
+  `time = floor + slope·N` per release from `--sweep` (multi-size) runs,
+  separating a fixed-cost regression (heavier stdlib) from a per-element one
+  (a pass got slower) from a scaling one (a rising final-step ratio).
 
 > **Reading the numbers:** the synthetic workloads are _stress tests built to
 > amplify_ one pass each. A "3.8×" is a sensitivity figure for that pass, **not**
@@ -65,7 +65,7 @@ Workloads run per release. Synthetic ones are generated deterministically by
 | **autodiff**              | `N` `[Differentiable]` functions in bounded-depth groups, differentiated forward + reverse, plus a differentiable generic                            | the **autodiff IR transform**                                                                                                                                                 | `linkAndOptimizeIR`                                 |
 | **dynamic_dispatch**      | one interface with `N` implementations, dispatched through a runtime-typed existential (defeats static specialization → real witness-table dispatch) | **dynamic-dispatch lowering / specialization**                                                                                                                                | `specializeModule`                                  |
 | **existential_aggregate** | an interface-typed **field** inside a struct (`Scene { IMat m; }`) + `N` impls selected via a switch                                                 | boxing the existential in an aggregate forces **existential-layout legalization** + a witness-per-case specialization blowup (uncovered by the bare-local `dynamic_dispatch`) | `legalizeExistentialTypeLayout`, `specializeModule` |
-| **diagnostics_clean**     | `N` functions with distinct compile-time constants, no errors                                                                                                                             | **semantic checking** at scale — same shape as the old error workload but compiling cleanly, so `SemanticChecking` reflects pure checking cost without diagnostic emission    | `SemanticChecking`                                  |
+| **diagnostics_clean**     | `N` functions with distinct compile-time constants, no errors                                                                                        | **semantic checking** at scale — same shape as the old error workload but compiling cleanly, so `SemanticChecking` reflects pure checking cost without diagnostic emission    | `SemanticChecking`                                  |
 
 ### Core compiler-stage tests
 
@@ -131,7 +131,7 @@ instead ramps _several_ realistic dimensions together — branchy control flow,
 generic calls, bounded inner loops, resource reads, dynamic dispatch, and
 call-graph depth — so the size knob `N` models a real shader growing from
 **simple to highly complex**. Sweep it (`bench.py --only complexity_ladder
---sweep`) and fit with `ladder_scaling.py --label` to get the holistic
+--sweep`) and fit with `ladder_scaling.py` (its default workload) to get the holistic
 complexity → compile-time curve, separating the fixed **floor** from the
 per-unit **slope** and surfacing super-linear bends at high complexity.
 
@@ -189,21 +189,22 @@ python3 sweep_report.py --label dev         # -> results/dev/sweep/sweep_report.
 
 ### Scripts
 
-| File                  | Role                                                                                                                                                                                                                                                                                                                  |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `workloads.py`        | deterministic workload generators, `gen_*(n) -> {filename: source}`                                                                                                                                                                                                                                                   |
-| `manifest.py`         | per-workload spec: invocation, compile mode, primary timers                                                                                                                                                                                                                                                           |
-| `bench.py`            | **test runner** — runs slangc, parses all timers, writes `results.json` (merge-on-write); generated sources go to an auto-removed `--gen-dir` scratch, not the results dir                                                                                                                                            |
-| `fetch_releases.py`   | downloads + caches prebuilt `slangc` per release tag                                                                                                                                                                                                                                                                  |
-| `sweep.py`            | **release sweep** — runs `bench.py` against every cached release                                                                                                                                                                                                                                                      |
-| `compare.py` / `compare_branches.py` | **local regression check** — base-vs-head diff + one-command branch driver; planned for a follow-up PR |
-| `track.py`            | maintains the CI **tracking series** (release history ++ post-release daily ToT points) + runner fingerprint                                                                                                                                                                                                          |
-| `trend.py`            | nightly **drift alert** — latest point vs trailing-median, same-runner; GitHub annotations + non-zero exit on regression                                                                                                                                                                                              |
-| `lib/analyze.py`      | per-`(workload,timer)` series helpers — used as a library by `report.py`, `track.py`, etc. (no standalone CLI yet)                                                                                                                                                                                                    |
-| `breakdown.py`        | **phase attribution** — splits `compileInner` into mutually-exclusive buckets (named leaves + `(self)` residuals); aggregate + per-workload tree; stacked-area **per-release history** (index + per-workload detail pages in `report_per_workload.html`) and **per-sweep** (stacked-area vs N in `sweep_report.html`); standalone CLI: `--label <tag>` prints aggregate + per-workload tables; `--html` writes SVG/HTML; `--workload <name>` prints the full indented timer tree |
-| `report.py`           | single self-contained **HTML report**, cross-release (charts inline + tables)                                                                                                                                                                                                                                         |
-| `ladder_scaling.py`   | cross-release `floor + slope·N` fit table for any swept workload                                                                                                                                                                                                                                                      |
-| `sweep_report.py`     | **complexity-sweep HTML report** for one build — compileInner scaling curves (index) linking to per-workload pages with the stacked sub-counter-vs-N chart, scaling analysis (floor/k/top-2×), and raw per-size numbers                                                                                               |
+| File                                 | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workloads.py`                       | deterministic workload generators, `gen_*(n) -> {filename: source}`                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `manifest.py`                        | per-workload spec: invocation, compile mode, primary timers                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `bench.py`                           | **test runner** — runs slangc, parses all timers, writes `results.json` (merge-on-write); generated sources go to an auto-removed `--gen-dir` scratch, not the results dir                                                                                                                                                                                                                                                                                                       |
+| `fetch_releases.py`                  | downloads + caches prebuilt `slangc` per release tag                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `sweep.py`                           | **release sweep** — runs `bench.py` against every cached release                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `compare.py` / `compare_branches.py` | **local regression check** — base-vs-head diff + one-command branch driver; planned for a follow-up PR                                                                                                                                                                                                                                                                                                                                                                           |
+| `track.py`                           | maintains the CI **tracking series** (release history ++ post-release daily ToT points) + runner fingerprint                                                                                                                                                                                                                                                                                                                                                                     |
+| `trend.py`                           | nightly **drift alert** — latest point vs trailing-median, same-runner; GitHub annotations + non-zero exit on regression                                                                                                                                                                                                                                                                                                                                                         |
+| `lib/analyze.py`                     | per-`(workload,timer)` series helpers — used as a library by `report.py`, `track.py`, etc. (no standalone CLI yet)                                                                                                                                                                                                                                                                                                                                                               |
+| `breakdown.py`                       | **phase attribution** — splits `compileInner` into mutually-exclusive buckets (named leaves + `(self)` residuals); aggregate + per-workload tree; stacked-area **per-release history** (index + per-workload detail pages in `report_per_workload.html`) and **per-sweep** (stacked-area vs N in `sweep_report.html`); standalone CLI: `--label <tag>` prints aggregate + per-workload tables; `--html` writes SVG/HTML; `--workload <name>` prints the full indented timer tree |
+| `report.py`                          | single self-contained **HTML report**, cross-release (charts inline + tables)                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `ladder_scaling.py`                  | cross-release `floor + slope·N` fit table for any swept workload                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `compare_repro.py`                   | **reproducibility check** — compare a fresh sweep against a saved baseline: per-(release, workload, size) `compileInner` drift, worst-first, with a summary and over-threshold flags                                                                                                                                                                                                                                                                                             |
+| `sweep_report.py`                    | **complexity-sweep HTML report** for one build — compileInner scaling curves (index) linking to per-workload pages with the stacked sub-counter-vs-N chart, scaling analysis (floor/k/top-2×), and raw per-size numbers                                                                                                                                                                                                                                                          |
 
 ### Documents
 
@@ -214,8 +215,9 @@ python3 sweep_report.py --label dev         # -> results/dev/sweep/sweep_report.
 
 ### Generated outputs (gitignored)
 
-| Path                                           | What it is                                                          |
-| ---------------------------------------------- | ------------------------------------------------------------------- |
+| Path | What it is |
+| ---- | ---------- |
+
 The first group is stored in `slang-compile-perf` (the CI results repo). The
 second group is regenerable on demand and is gitignored from that repo — generate
 them locally by pointing the report scripts at a checkout of `slang-compile-perf`
@@ -227,17 +229,17 @@ via `--results <checkout-path>`.
 | ---------------------------------------------- | ------------------------------------------------------------------ |
 | `results/releases/<tag>/results.json`          | per-release measurements — source of truth (all timers, all stats) |
 | `results/daily/<label>/results.json+meta.json` | nightly ToT sweeps                                                 |
-| `results/tracking/tracking.json`              | derived tracking series (release history ++ daily tail)            |
+| `results/tracking/tracking.json`               | derived tracking series (release history ++ daily tail)            |
 
 **Regenerable / local only (gitignored from the results repo):**
 
-| Path                                         | What it is                                                      |
-| -------------------------------------------- | --------------------------------------------------------------- |
-| `results/analysis/*.svg`                    | charts                                                          |
-| `results/analysis/report_per_workload.html` | per-workload stacked-area history + drill-down pages            |
-| `results/releases/<tag>/sweep/`             | complexity-sweep report for swept releases                      |
-| `releases/`                                  | cached prebuilt `slangc` per tag (large, gitignored)            |
-| `corpus/`                                    | fetched real-shader corpora, e.g. MDL (large, gitignored)       |
+| Path                                        | What it is                                                |
+| ------------------------------------------- | --------------------------------------------------------- |
+| `results/analysis/*.svg`                    | charts                                                    |
+| `results/analysis/report_per_workload.html` | per-workload stacked-area history + drill-down pages      |
+| `results/releases/<tag>/sweep/`             | complexity-sweep report for swept releases                |
+| `releases/`                                 | cached prebuilt `slangc` per tag (large, gitignored)      |
+| `corpus/`                                   | fetched real-shader corpora, e.g. MDL (large, gitignored) |
 
 ---
 

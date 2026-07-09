@@ -20,8 +20,9 @@ on Windows). See `README.md` Quickstart for copy-paste commands.
   one-command driver (`compare_branches.py`) that builds both sides via a
   git worktree is planned for a follow-up PR.
 - **Scaling of one build (compile time vs size N)** — `bench.py … --sweep` then
-  `sweep_report.py --label <name>`: per-workload `floor + k·N` curves + stacked
-  phase breakdown, to tell a fixed-cost regression from a per-element or
+  `sweep_report.py --label <name>`: per-workload scaling curves with a
+  floor-subtracted power-law fit (`(t − floor) = a·N^k`) + stacked phase
+  breakdown, to tell a fixed-cost regression from a per-element or
   super-linear one.
 - **Across releases** — `fetch_releases.py` (caches platform-matched release
   binaries) + `sweep.py` to bench them all, then `analyze.py` (ranked
@@ -203,14 +204,14 @@ emitter/backend are currently invisible (e.g. a change to the shared C-like
 emitter gets no HLSL/CUDA/GLSL perf signal at all). Planned additions, cheapest
 first:
 
-| Planned workload | Exercises | Cost to add |
-| --- | --- | --- |
-| `emit_hlsl` | HLSL legalization + emitter (the D3D source path — a major backend with zero coverage today) | Trivial: same shader as `codegen_spirv`, `-target hlsl`; no downstream compiler |
-| `emit_cuda` | CUDA lowering + C++-family emitter | Trivial: `-target cuda` emits source, no nvcc |
-| `emit_glsl` | GLSL legalization (distinct path from WGSL/Metal) | Trivial |
-| `codegen_dxil` | Full D3D pipeline incl. dxc downstream | Moderate: needs `dxcompiler.dll` (already shipped on the Windows runner) |
-| `codegen_ptx` | CUDA downstream via nvrtc | Heavier; the perf runner does have a 5090 + driver |
-| host/C++ (`-target cpp`, LLVM) | Host-callable / slang-llvm path | Blocked: nightly builds with `SLANG_SLANG_LLVM_FLAVOR=DISABLE` (prebuilt slang-llvm MSVC CRT link issue); fix that first |
+| Planned workload               | Exercises                                                                                    | Cost to add                                                                                                              |
+| ------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `emit_hlsl`                    | HLSL legalization + emitter (the D3D source path — a major backend with zero coverage today) | Trivial: same shader as `codegen_spirv`, `-target hlsl`; no downstream compiler                                          |
+| `emit_cuda`                    | CUDA lowering + C++-family emitter                                                           | Trivial: `-target cuda` emits source, no nvcc                                                                            |
+| `emit_glsl`                    | GLSL legalization (distinct path from WGSL/Metal)                                            | Trivial                                                                                                                  |
+| `codegen_dxil`                 | Full D3D pipeline incl. dxc downstream                                                       | Moderate: needs `dxcompiler.dll` (already shipped on the Windows runner)                                                 |
+| `codegen_ptx`                  | CUDA downstream via nvrtc                                                                    | Heavier; the perf runner does have a 5090 + driver                                                                       |
+| host/C++ (`-target cpp`, LLVM) | Host-callable / slang-llvm path                                                              | Blocked: nightly builds with `SLANG_SLANG_LLVM_FLAVOR=DISABLE` (prebuilt slang-llvm MSVC CRT link issue); fix that first |
 
 Non-target gaps (no workload covers these at all):
 
@@ -246,14 +247,14 @@ release's `libslang` (so one host-built binary measures every release in the
 ladder — the COM ABI is append-only by contract) and emits timers in the same
 `[*] name  count  N.NNms` format `bench.py` already parses. The workloads:
 
-| Workload | Exercises | Shape |
-| --- | --- | --- |
-| `api_session_create` | `createGlobalSession` + `createSession` (core-module deserialization; the #6579 complaint) | N create/destroy iterations, no sources |
-| `api_many_kernels` | per-compile fixed overhead: N small distinct kernels through loadModule → composite → link → getEntryPointCode in one session | the dimension that amplified the 2026-07 regressions |
-| `api_module_graph` | import resolution + checking + link over a deep, realistic module DAG (interfaces/generics/conformances), loaded through the API | replaces `module_link`'s flat-import shape with a renderer-library-like graph |
-| `api_module_graph_bin` | the same DAG resolved from serialized `.slang-module` binaries — the import path where the 2026-07-03 regression (#11952) lives; source loads were flat across it | source-load + `writeToFile` setup, then a fresh session re-loads via binaries (guarded: fails loudly if resolution falls back to source) |
-| `api_reflection` | `getLayout` + full parameter/type-layout walks (50 per program) over parameter-rich kernels — the binding-table query pattern | driver resolves the `spReflection_*` C API via dlsym (the slang.h accessors are inline wrappers over imports a dlopen tool must resolve itself) |
-| `api_specialize` | `IEntryPoint::specialize` per impl type + link + codegen per variant — the one-kernel-per-material pattern | one module: interface + N conforming structs + generic `computeMain<T>` |
+| Workload               | Exercises                                                                                                                                                         | Shape                                                                                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api_session_create`   | `createGlobalSession` + `createSession` (core-module deserialization; the #6579 complaint)                                                                        | N create/destroy iterations, no sources                                                                                                         |
+| `api_many_kernels`     | per-compile fixed overhead: N small distinct kernels through loadModule → composite → link → getEntryPointCode in one session                                     | the dimension that amplified the 2026-07 regressions                                                                                            |
+| `api_module_graph`     | import resolution + checking + link over a deep, realistic module DAG (interfaces/generics/conformances), loaded through the API                                  | replaces `module_link`'s flat-import shape with a renderer-library-like graph                                                                   |
+| `api_module_graph_bin` | the same DAG resolved from serialized `.slang-module` binaries — the import path where the 2026-07-03 regression (#11952) lives; source loads were flat across it | source-load + `writeToFile` setup, then a fresh session re-loads via binaries (guarded: fails loudly if resolution falls back to source)        |
+| `api_reflection`       | `getLayout` + full parameter/type-layout walks (50 per program) over parameter-rich kernels — the binding-table query pattern                                     | driver resolves the `spReflection_*` C API via dlsym (the slang.h accessors are inline wrappers over imports a dlopen tool must resolve itself) |
+| `api_specialize`       | `IEntryPoint::specialize` per impl type + link + codegen per variant — the one-kernel-per-material pattern                                                        | one module: interface + N conforming structs + generic `computeMain<T>`                                                                         |
 
 `bench.py` gains an `api` mode (timed command = driver + libslang path derived
 from `--slangc`) and a build-once step for the driver; everything downstream

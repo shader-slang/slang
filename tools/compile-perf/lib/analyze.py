@@ -198,33 +198,6 @@ def powfit(xs, ys):
     return math.exp(loga), k, r2
 
 
-def slope_report(results_dir, label, metric):
-    """Decompose compile time into fixed floor + per-element slope from a
-    --sweep run (multiple sizes per workload). A regression in `floor` (heavier
-    stdlib, e.g. PR #9808) is a different bug from a regression in `slope`
-    (a pass got per-element slower) or in scaling (slope rising super-linearly)."""
-    path = results_path(results_dir, label)
-    if not os.path.exists(path):
-        raise SystemExit(f"no results at {path} (run bench.py --sweep --label {label})")
-    by_wl = {}
-    for r in json.load(open(path)):
-        st = r["timers"].get("compileInner")
-        if st and r["size"] > 0:
-            by_wl.setdefault(r["workload"], []).append((r["size"], st[metric]))
-    print(f"Floor + slope fit (compileInner, {metric}) for label '{label}'")
-    print(f"{'workload':18s}{'floor(ms)':>11}{'slope(ms/unit)':>16}{'R^2':>7}   sizes")
-    print("-" * 72)
-    for wl, pts in sorted(by_wl.items()):
-        pts = sorted(set(pts))
-        if len(pts) < 2:
-            continue
-        xs, ys = [p[0] for p in pts], [p[1] for p in pts]
-        a, b, r2 = linfit(xs, ys)
-        print(f"{wl:18s}{a:11.1f}{b:16.4f}{r2:7.3f}   {[x for x in xs]}")
-    print("\nfloor = fixed per-compile cost (core-module load/link); "
-          "slope = marginal cost per generated unit.")
-
-
 def flag_steps(values, rel_thr, abs_floor):
     """values: [(tag,date,val)]. Yield (prev_tag,tag,prev,cur,rel,abs)."""
     flags = []

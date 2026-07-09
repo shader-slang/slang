@@ -73,7 +73,14 @@ def main():
                     return False
                 spec = manifest.BY_NAME.get(wl)
                 if args.sweep and spec and spec.sweep_sizes:
-                    return len(szs) > 1  # need the scaling curve, not one point
+                    # Every configured ladder size must be present: an
+                    # interrupted prior sweep (e.g. a per-run timeout) leaves a
+                    # valid results.json with only the low sizes, and accepting
+                    # it here would leave a permanent gap in the scaling curve
+                    # that only --force could backfill. This also means a
+                    # retuned ladder in the manifest re-sweeps affected
+                    # releases on the next run, by design.
+                    return set(spec.sweep_sizes) <= szs
                 return True
 
             if all(complete(wl) for wl in need):

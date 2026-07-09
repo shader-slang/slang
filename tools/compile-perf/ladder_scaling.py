@@ -50,7 +50,8 @@ def main():
             continue
         xs, ys = [x for x, _ in pts], [y for _, y in pts]
         a, b, r2 = analyze.linfit(xs, ys)
-        # super-linearity: ratio of the top doubling's time growth vs 2.0
+        # super-linearity hint: time ratio across the final size step (linear
+        # scaling makes it equal the sizes' ratio — 2.0 on doubling ladders)
         slin = (ys[-1] / ys[-2]) if (len(ys) >= 2 and ys[-2]) else None
         rows.append((tag, a, b, r2, xs[0], ys[0], xs[-1], ys[-1], slin))
 
@@ -58,11 +59,14 @@ def main():
         raise SystemExit(f"no multi-size data for '{args.workload}'; run "
                          f"sweep.py --only {args.workload} --sweep first")
 
-    nmin, nmax = rows[0][4], rows[0][6]
     print(f"Complexity-scaling curve per release — {args.workload} "
           f"(compileInner {args.metric})\n")
+    # The N range is a per-row column, not part of the header labels: archived
+    # releases may have been swept on a different (older) size ladder than the
+    # current manifest, and labeling every row with rows[0]'s grid would
+    # silently misattribute those points.
     hdr = (f"{'release':14s}{'floor(ms)':>10}{'slope(ms/u)':>12}{'R^2':>6}"
-           f"{f'N={nmin}(ms)':>11}{f'N={nmax}(ms)':>12}{'top2x':>8}{'slopeVs1st':>12}")
+           f"{'N range':>12}{'t@Nmin':>9}{'t@Nmax':>10}{'topStep':>9}{'slopeVs1st':>12}")
     print(hdr)
     print("-" * len(hdr))
     base_slope = rows[0][2]
@@ -70,10 +74,12 @@ def main():
         sl = f"{slin:.2f}x" if slin else "-"
         drift = f"{b/base_slope:.2f}x" if base_slope else "?"
         print(f"{tag:14s}{a:10.1f}{b:12.3f}{r2:6.3f}"
-              f"{y0:11.1f}{y1:12.1f}{sl:>8}{drift:>12}")
+              f"{f'{n0}-{n1}':>12}{y0:9.1f}{y1:10.1f}{sl:>9}{drift:>12}")
 
     print(f"\nfloor = fixed cost; slope = ms per complexity unit; "
-          f"top2x = t(N={rows[0][6]})/t(N={rows[0][6]//2}) (2.00 = linear, >2 = super-linear).")
+          f"topStep = t(N_last)/t(N_second_last), the ratio of the final two "
+          f"swept sizes — equals the sizes' ratio when scaling is linear "
+          f"(2.00 on the suite's doubling ladders; >that = super-linear).")
     f0, fl = rows[0], rows[-1]
     print(f"\nfirst→last: floor {f0[1]:.0f}→{fl[1]:.0f} ms "
           f"({fl[1]/f0[1] if f0[1] else 0:.2f}x), "

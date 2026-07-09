@@ -68,15 +68,17 @@ def main():
 
     print(f"compileInner {args.stat}: new vs baseline drift, "
           f"worst first (flag > {args.warn}%)\n")
-    print(f"{'release':16s}{'workload':22s}{'base(ms)':>10}{'new(ms)':>10}"
+    # size is part of the comparison key: a swept workload contributes one row
+    # per ladder size, and without the column those rows are indistinguishable.
+    print(f"{'release':16s}{'workload':22s}{'size':>7}{'base(ms)':>10}{'new(ms)':>10}"
           f"{'drift%':>9}")
-    print("-" * 67)
+    print("-" * 74)
     flagged = 0
     for adrift, drift, b, n, (tag, wl, sz) in sorted(rows, reverse=True):
         mark = "  <-- " if adrift > args.warn else ""
         if adrift > args.warn:
             flagged += 1
-        print(f"{tag:16s}{wl:22s}{b:>10.2f}{n:>10.2f}{drift:>+8.1f}%{mark}")
+        print(f"{tag:16s}{wl:22s}{sz:>7}{b:>10.2f}{n:>10.2f}{drift:>+8.1f}%{mark}")
 
     drifts = [d for _, d, *_ in rows]
     if drifts:

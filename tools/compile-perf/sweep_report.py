@@ -4,9 +4,10 @@ HTML file (inline SVG scaling curves + a fit table). Stdlib only.
 
 Where report.py shows compile time *across releases* at a fixed size, this shows
 compile time *across sizes* for one binary: the simple->complex scaling curve of
-each swept workload (one point per sweep_size), with a floor+slope*N fit and a
-super-linearity check. Complements ladder_scaling.py (which prints the same fit
-as a cross-release table).
+each swept workload (one point per sweep_size), with a floor-subtracted
+power-law fit ((t - floor) = a*N^k) and a super-linearity check. Complements
+ladder_scaling.py (the cross-release linear floor+slope table over the same
+sweep data).
 
     python3 bench.py --slangc <slangc> --label dev --sweep --only <wl,...>
     python3 sweep_report.py --label dev            # -> results/dev/sweep/sweep_report.html
@@ -22,11 +23,8 @@ from lib import analyze, manifest
 
 def canonical_order(names):
     """Order workload names the same way the default cross-release report
-    orders its panels: the canonical manifest order, unknown names last. Uses
-    manifest.display_order when present (newer suite); otherwise derives the
-    same ordering from the WORKLOADS list position."""
-    if hasattr(manifest, "display_order"):
-        return manifest.display_order(names)
+    orders its panels: the manifest's WORKLOADS list position, unknown names
+    last (alphabetically), so the sweep report and report.py stay aligned."""
     pos = {w.name: i for i, w in enumerate(manifest.WORKLOADS)}
     return sorted(names, key=lambda n: (pos.get(n, len(pos)), n))
 

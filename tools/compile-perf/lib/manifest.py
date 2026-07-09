@@ -420,3 +420,11 @@ WORKLOADS = [
 ]
 
 BY_NAME = {w.name: w for w in WORKLOADS}
+
+# default_size must be a member of every sweep ladder so a swept run also
+# yields the canonical point: analyze.canonical_runs collapses multi-size runs
+# by `size == default_size`, and a ladder that omits it would silently feed a
+# wrong-N point into the cross-release tracking series.
+for _w in WORKLOADS:
+    assert not _w.sweep_sizes or _w.default_size in _w.sweep_sizes, (
+        f"{_w.name}: default_size {_w.default_size} not in sweep_sizes {_w.sweep_sizes}")
