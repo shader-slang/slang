@@ -3519,12 +3519,9 @@ $(type_info.return_type) $(type_info.method_name)(
 
     // Annotation helpers.
     //
-    // Note: creating an annotation flips `doesCalleeHaveSideEffect(target)` in
-    // the unsafe direction for any live callee-side-effect memo (see
-    // `IRDeadCodeEliminationOptions::calleeSideEffectCache`). A pass that adds
-    // annotations must not run inside a simplification fixpoint that shares
-    // such a cache; the debug-mode contract check in
-    // `doesCalleeHaveSideEffect` fires if one does.
+    // Note: adding an annotation changes what `doesCalleeHaveSideEffect(target)`
+    // returns, so it must not happen while a callee-side-effect cache is live
+    // (see `IRDeadCodeEliminationOptions::calleeSideEffectCache`).
     void addAnnotation(IRInst* target, AnnotationKind kind, IRInst* value);
     IRInst* tryLookupAnnotation(IRInst* target, AnnotationKind kind);
 

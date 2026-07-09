@@ -343,32 +343,20 @@ bool isPureFunctionalCall(
 // Returns whether a call insts can be treated as a pure functional inst, and thus can be
 // DCE'd (but not necessarily deduplicated).
 // (no side effects).
-//
-// `calleeSideEffectCache`, when provided, memoizes `doesCalleeHaveSideEffect`
-// per callee — see that function for why the query is expensive and when a
-// cached answer may go stale (only ever conservatively).
 bool isSideEffectFreeFunctionalCall(
     IRCall* call,
     SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None,
     Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr);
 
 // Returns whether calling `callee` can have side effects, either directly or
-// through an associated function attached via an `IRAnnotation` (e.g. a
-// derivative that a pending auto-diff pass may still expand into the caller).
-//
-// The association lookup walks the callee's entire use list, so for a callee
-// shared by many call sites (e.g. a builtin like `sin`) each query is O(#call
-// sites) — quadratic over a pass that queries every call. Passes that issue
-// many queries should use the memoized overload below.
+// through an associated function attached via an `IRAnnotation`. The
+// association lookup walks the callee's entire use list, so each query is
+// O(#call sites to that callee).
 bool doesCalleeHaveSideEffect(IRInst* callee);
 
-// Memoized variant: answers from `cache`, computing once and inserting on a
-// miss. When `cache` is null, behaves exactly like the uncached overload
-// above. A cached answer can go stale only in the conservative direction:
-// annotations are removed (never added) by cleanup passes, so a stale `true`
-// at worst keeps an inst alive for the remainder of the simplification
-// invocation that owns the cache. A debug-mode check verifies that contract
-// on every hit.
+// Memoized variant of the above; `cache` may be null (uncached). See
+// IRDeadCodeEliminationOptions::calleeSideEffectCache for the sharing and
+// staleness contract.
 bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache);
 
 bool isPtrLikeOrHandleType(IRInst* type);

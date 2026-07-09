@@ -1700,14 +1700,6 @@ bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache)
     if (!cache)
         return doesCalleeHaveSideEffect(callee);
 
-    // A hit is trusted without re-verification: within a cache's lifetime the
-    // fresh answer may only move from true to false (passes remove annotations
-    // and add purity decorations, never the reverse), so a stale cached answer
-    // errs conservatively — it can only keep a call alive, never wrongly
-    // eliminate one. See IRDeadCodeEliminationOptions::calleeSideEffectCache
-    // for the cache-lifetime contract. (Recomputing the answer on every hit to
-    // assert this would reintroduce the O(#call-sites^2) walk this cache
-    // exists to remove, in any build that enables the check.)
     if (auto cached = cache->tryGetValue(callee))
         return *cached;
 
