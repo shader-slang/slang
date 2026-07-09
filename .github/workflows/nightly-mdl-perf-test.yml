@@ -316,6 +316,7 @@ jobs:
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_COMPILE_PERF }}
           TREND_OUTCOME: ${{ steps.trend.outcome }}
+          JOB_STATUS: ${{ job.status }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -z "$SLACK_WEBHOOK" ]; then
@@ -323,15 +324,21 @@ jobs:
             exit 0
           fi
           export DATE=$(date -u +%Y-%m-%d)
-          if [ "$TREND_OUTCOME" = "success" ]; then
+          # JOB_STATUS distinguishes "trend was skipped because an earlier step
+          # already failed" (job failed) from "trend was skipped because this is
+          # a publish=false measurement-only run" (nothing failed).
+          if [ "$JOB_STATUS" != "success" ]; then
+            export ICON=":x:"
+            export STATUS="Nightly job failed — see CI run for details"
+          elif [ "$TREND_OUTCOME" = "success" ]; then
             export ICON=":white_check_mark:"
             export STATUS="No regressions detected"
           elif [ "$TREND_OUTCOME" = "failure" ]; then
             export ICON=":warning:"
             export STATUS="Regression detected — see CI run for details"
           else
-            export ICON=":x:"
-            export STATUS="Nightly job failed — see CI run for details"
+            export ICON=":information_source:"
+            export STATUS="Trend check skipped (publish=false measurement-only run)"
           fi
           python3 -c "
           import json, os, urllib.request
@@ -348,6 +355,13 @@ jobs:
               os.environ['SLACK_WEBHOOK'],
               data=json.dumps(payload).encode(),
               headers={'Content-Type': 'application/json'})
-          urllib.request.urlopen(req, timeout=10)
-          print('Slack notification sent')
+          # Non-blocking by contract: a Slack outage must not red an
+          # otherwise-green run (a red step here would be indistinguishable
+          # from a real regression at a glance). The ::warning:: annotation
+          # keeps a broken webhook visible on the run summary.
+          try:
+              urllib.request.urlopen(req, timeout=10)
+              print('Slack notification sent')
+          except Exception as e:
+              print(f'::warning title=Slack notification failed::{e}')
           "
