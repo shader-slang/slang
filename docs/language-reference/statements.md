@@ -217,6 +217,18 @@ return someValue;
 
 The value returned must be able to coerce to the result type of the lexically enclosing function.
 
+> 📝 **Remark:** It is allowed to return an explicit `void` value from function with a `void` result type. For example:
+>
+> ```hlsl
+> void returnVoid() { }
+>
+> void testFunc()
+> {
+>     return returnVoid();
+> }
+> ```
+
+
 ### Discard Statement
 
 A `discard` statement can only be used in the context of a fragment shader, in which case it causes the current invocation to terminate and the graphics system to discard the corresponding fragment so that it does not get combined with the framebuffer pixel at its coordinates.
