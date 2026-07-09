@@ -1,11 +1,19 @@
 //DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 // See https://github.com/shader-slang/slang/issues/11996
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type -xslang -DNO_INT8=1
+// Notes:
+// - HLSL does not have 8-bit integer types
+// - HLSL has 16-bit integers when enabled (Slang does it automatically for the default profile)
+
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -emit-spirv-via-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type
+
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type -xslang -DNO_DOUBLE=1
+// Note: Metal does not have the double type
+
+// Note: WGSL does not have 64-bit integer types, so wgsl is not tested here
 
 // Conversions to 64-bit signed integer from all fundamental scalar types
 
@@ -15,8 +23,12 @@ RWStructuredBuffer<int64_t> outputBuffer;
 static uint i = 0;
 
 [noinline] void storeValue(bool     v) { outputBuffer[i++] = (int64_t)v; }
+
+#ifndef NO_INT8
 [noinline] void storeValue(int8_t   v) { outputBuffer[i++] = (int64_t)v; }
 [noinline] void storeValue(uint8_t  v) { outputBuffer[i++] = (int64_t)v; }
+#endif
+
 [noinline] void storeValue(int16_t  v) { outputBuffer[i++] = (int64_t)v; }
 [noinline] void storeValue(uint16_t v) { outputBuffer[i++] = (int64_t)v; }
 [noinline] void storeValue(int32_t  v) { outputBuffer[i++] = (int64_t)v; }
@@ -25,7 +37,10 @@ static uint i = 0;
 [noinline] void storeValue(uint64_t v) { outputBuffer[i++] = (int64_t)v; }
 [noinline] void storeValue(half     v) { outputBuffer[i++] = (int64_t)v; }
 [noinline] void storeValue(float    v) { outputBuffer[i++] = (int64_t)v; }
+
+#ifndef NO_DOUBLE
 [noinline] void storeValue(double   v) { outputBuffer[i++] = (int64_t)v; }
+#endif
 
 
 [numthreads(1, 1, 1)]
@@ -38,20 +53,34 @@ void computeMain()
     // CHECK-NEXT: 1
 
     // conversions from int8_t
+#ifndef NO_INT8
     storeValue(int8_t(-128));
     storeValue(int8_t(-42));
     storeValue(int8_t(67));
     storeValue(int8_t(127));
+#else
+    storeValue(int64_t(-128));
+    storeValue(int64_t(-42));
+    storeValue(int64_t(67));
+    storeValue(int64_t(127));
+#endif
     // CHECK-NEXT: -128
     // CHECK-NEXT: -42
     // CHECK-NEXT: 67
     // CHECK-NEXT: 127
 
     // conversions from uint8_t
+#ifndef NO_INT8
     storeValue(uint8_t(0));
     storeValue(uint8_t(42));
     storeValue(uint8_t(128));
     storeValue(uint8_t(255));
+#else
+    storeValue(int64_t(0));
+    storeValue(int64_t(42));
+    storeValue(int64_t(128));
+    storeValue(int64_t(255));
+#endif
     // CHECK-NEXT: 0
     // CHECK-NEXT: 42
     // CHECK-NEXT: 128
@@ -180,6 +209,7 @@ void computeMain()
     // CHECK-NEXT: 9223371487098961920
 
     // conversions from double
+#ifndef NO_DOUBLE
     storeValue(-9223372036854775808.0LF); // minimum int64_t number is representable by double
     storeValue(-32768.0LF);
     storeValue(-67.9LF);
@@ -188,6 +218,16 @@ void computeMain()
     storeValue(85.0LF);
     storeValue(32767.0LF);
     storeValue(9223372036854774784.0LF);  // maximum int64_t number representable by double
+#else
+    storeValue(int64_t(-9223372036854775808));
+    storeValue(int64_t(-32768));
+    storeValue(int64_t(-67));
+    storeValue(int64_t(0));
+    storeValue(int64_t(42));
+    storeValue(int64_t(85));
+    storeValue(int64_t(32767));
+    storeValue(int64_t(9223372036854774784));
+#endif
     // CHECK-NEXT: -9223372036854775808
     // CHECK-NEXT: -32768
     // CHECK-NEXT: -67

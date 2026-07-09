@@ -1,11 +1,16 @@
 //DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 // See https://github.com/shader-slang/slang/issues/11996
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
+// Note: HLSL does not have 8-bit integer types, so dx12 is not tested here
+
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -emit-spirv-via-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type
+
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type -xslang -DNO_DOUBLE=1
+// Note: Metal does not have the double type
+
+// Note: WGSL does not have 8-bit integer types, so wgsl is not tested here
 
 // Conversions to 8-bit unsigned integer from all fundamental scalar types
 
@@ -25,7 +30,10 @@ static uint i = 0;
 [noinline] void storeValue(uint64_t v) { outputBuffer[i++] = (uint8_t)v; }
 [noinline] void storeValue(half     v) { outputBuffer[i++] = (uint8_t)v; }
 [noinline] void storeValue(float    v) { outputBuffer[i++] = (uint8_t)v; }
+
+#ifndef NO_DOUBLE
 [noinline] void storeValue(double   v) { outputBuffer[i++] = (uint8_t)v; }
+#endif
 
 
 [numthreads(1, 1, 1)]
@@ -172,12 +180,21 @@ void computeMain()
     // CHECK-NEXT: 255
 
     // conversions from double
+#ifndef NO_DOUBLE
     storeValue(0.0LF);
     storeValue(0.9LF);
     storeValue(126.9LF);
     storeValue(127.0LF);
     storeValue(255.0LF);
     storeValue(255.9LF);
+#else
+    storeValue(uint8_t(0));
+    storeValue(uint8_t(0));
+    storeValue(uint8_t(126));
+    storeValue(uint8_t(127));
+    storeValue(uint8_t(255));
+    storeValue(uint8_t(255));
+#endif
     // CHECK-NEXT: 0
     // CHECK-NEXT: 0
     // CHECK-NEXT: 126

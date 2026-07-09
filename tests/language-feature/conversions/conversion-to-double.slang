@@ -1,11 +1,18 @@
 //DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 // See https://github.com/shader-slang/slang/issues/11996
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type -xslang -DNO_INT8=1
+// Notes:
+// - HLSL does not have 8-bit integer types
+// - HLSL has 16-bit integers when enabled (Slang does it automatically for the default profile)
+
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -emit-spirv-via-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type
+
+// Note: Metal does not have the double type, so metal is not tested here
+
+// Note: WGSL does not have the double type, so wgsl is not tested here
 
 // Conversions to 64-bit double from all fundamental scalar types
 //
@@ -19,8 +26,12 @@ RWStructuredBuffer<double> outputBuffer;
 static uint i = 0;
 
 [noinline] void storeValue(bool     v) { outputBuffer[i++] = (double)v; }
+
+#ifndef NO_INT8
 [noinline] void storeValue(int8_t   v) { outputBuffer[i++] = (double)v; }
 [noinline] void storeValue(uint8_t  v) { outputBuffer[i++] = (double)v; }
+#endif
+
 [noinline] void storeValue(int16_t  v) { outputBuffer[i++] = (double)v; }
 [noinline] void storeValue(uint16_t v) { outputBuffer[i++] = (double)v; }
 [noinline] void storeValue(int32_t  v) { outputBuffer[i++] = (double)v; }
@@ -42,20 +53,34 @@ void computeMain()
     // CHECK-NEXT: 1.0
 
     // conversions from int8_t
+#ifndef NO_INT8
     storeValue(int8_t(-128));
     storeValue(int8_t(-42));
     storeValue(int8_t(67));
     storeValue(int8_t(127));
+#else
+    storeValue(double(-128.0));
+    storeValue(double(-42.0));
+    storeValue(double(67.0));
+    storeValue(double(127.0));
+#endif
     // CHECK-NEXT: -128.0
     // CHECK-NEXT: -42.0
     // CHECK-NEXT: 67.0
     // CHECK-NEXT: 127.0
 
     // conversions from uint8_t
+#ifndef NO_INT8
     storeValue(uint8_t(0));
     storeValue(uint8_t(42));
     storeValue(uint8_t(128));
     storeValue(uint8_t(255));
+#else
+    storeValue(double(0.0));
+    storeValue(double(42.0));
+    storeValue(double(128.0));
+    storeValue(double(255.0));
+#endif
     // CHECK-NEXT: 0.0
     // CHECK-NEXT: 42.0
     // CHECK-NEXT: 128.0

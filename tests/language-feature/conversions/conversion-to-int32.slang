@@ -1,11 +1,20 @@
 //DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 // See https://github.com/shader-slang/slang/issues/11996
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type -xslang -DNO_INT8=1
+// Notes:
+// - HLSL does not have 8-bit integer types
+// - HLSL has 16-bit integers when enabled (Slang does it automatically for the default profile)
+
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -emit-spirv-via-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type
+
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type -xslang -DNO_DOUBLE=1
+// Note: Metal does not have the double type
+
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-wgsl -compute -output-using-type -xslang -DNO_DOUBLE=1 -xslang -DNO_INT8=1 -xslang -DNO_INT16=1 -xslang -DNO_INT64=1
+// Note: WGSL has only the 32-bit integers and 16-bit and 32-bit floats
 
 // Conversions to 32-bit signed integer from all fundamental scalar types
 
@@ -15,17 +24,31 @@ RWStructuredBuffer<int32_t> outputBuffer;
 static uint i = 0;
 
 [noinline] void storeValue(bool     v) { outputBuffer[i++] = (int32_t)v; }
+
+#ifndef NO_INT8
 [noinline] void storeValue(int8_t   v) { outputBuffer[i++] = (int32_t)v; }
 [noinline] void storeValue(uint8_t  v) { outputBuffer[i++] = (int32_t)v; }
+#endif
+
+#ifndef NO_INT16
 [noinline] void storeValue(int16_t  v) { outputBuffer[i++] = (int32_t)v; }
 [noinline] void storeValue(uint16_t v) { outputBuffer[i++] = (int32_t)v; }
+#endif
+
 [noinline] void storeValue(int32_t  v) { outputBuffer[i++] = (int32_t)v; }
 [noinline] void storeValue(uint32_t v) { outputBuffer[i++] = (int32_t)v; }
+
+#ifndef NO_INT64
 [noinline] void storeValue(int64_t  v) { outputBuffer[i++] = (int32_t)v; }
 [noinline] void storeValue(uint64_t v) { outputBuffer[i++] = (int32_t)v; }
+#endif
+
 [noinline] void storeValue(half     v) { outputBuffer[i++] = (int32_t)v; }
 [noinline] void storeValue(float    v) { outputBuffer[i++] = (int32_t)v; }
+
+#ifndef NO_DOUBLE
 [noinline] void storeValue(double   v) { outputBuffer[i++] = (int32_t)v; }
+#endif
 
 
 [numthreads(1, 1, 1)]
@@ -38,26 +61,41 @@ void computeMain()
     // CHECK-NEXT: 1
 
     // conversions from int8_t
+#ifndef NO_INT8
     storeValue(int8_t(-128));
     storeValue(int8_t(-42));
     storeValue(int8_t(67));
     storeValue(int8_t(127));
+#else
+    storeValue(int32_t(-128));
+    storeValue(int32_t(-42));
+    storeValue(int32_t(67));
+    storeValue(int32_t(127));
+#endif
     // CHECK-NEXT: -128
     // CHECK-NEXT: -42
     // CHECK-NEXT: 67
     // CHECK-NEXT: 127
 
     // conversions from uint8_t
+#ifndef NO_INT8
     storeValue(uint8_t(0));
     storeValue(uint8_t(42));
     storeValue(uint8_t(128));
     storeValue(uint8_t(255));
+#else
+    storeValue(int32_t(0));
+    storeValue(int32_t(42));
+    storeValue(int32_t(128));
+    storeValue(int32_t(255));
+#endif
     // CHECK-NEXT: 0
     // CHECK-NEXT: 42
     // CHECK-NEXT: 128
     // CHECK-NEXT: 255
 
     // conversions from int16_t
+#ifndef NO_INT16
     storeValue(int16_t(-32768));
     storeValue(int16_t(-4242));
     storeValue(int16_t(-128));
@@ -68,6 +106,18 @@ void computeMain()
     storeValue(int16_t(127));
     storeValue(int16_t(6767));
     storeValue(int16_t(32767));
+#else
+    storeValue(int32_t(-32768));
+    storeValue(int32_t(-4242));
+    storeValue(int32_t(-128));
+    storeValue(int32_t(-1));
+    storeValue(int32_t(0));
+    storeValue(int32_t(1));
+    storeValue(int32_t(67));
+    storeValue(int32_t(127));
+    storeValue(int32_t(6767));
+    storeValue(int32_t(32767));
+#endif
     // CHECK-NEXT: -32768
     // CHECK-NEXT: -4242
     // CHECK-NEXT: -128
@@ -80,6 +130,7 @@ void computeMain()
     // CHECK-NEXT: 32767
 
     // conversions from uint16_t
+#ifndef NO_INT16
     storeValue(uint16_t(0));
     storeValue(uint16_t(42));
     storeValue(uint16_t(128));
@@ -87,6 +138,15 @@ void computeMain()
     storeValue(uint16_t(32767));
     storeValue(uint16_t(32768));
     storeValue(uint16_t(65535));
+#else
+    storeValue(int32_t(0));
+    storeValue(int32_t(42));
+    storeValue(int32_t(128));
+    storeValue(int32_t(255));
+    storeValue(int32_t(32767));
+    storeValue(int32_t(32768));
+    storeValue(int32_t(65535));
+#endif
     // CHECK-NEXT: 0
     // CHECK-NEXT: 42
     // CHECK-NEXT: 128
@@ -120,11 +180,19 @@ void computeMain()
     // CHECK-NEXT: -16909061
 
     // conversions from int64_t
+#ifndef NO_INT64
     storeValue(0x0000000000000000LL);
     storeValue(0x000000000000007FLL);
     storeValue(0x00000000000000FFLL);
     storeValue(0x1112131440414243LL);
     storeValue(int64_t(0xF1F2F3F4FEFDFCFBLL));
+#else
+    storeValue(int32_t(0));
+    storeValue(int32_t(127));
+    storeValue(int32_t(255));
+    storeValue(int32_t(1078018627));
+    storeValue(int32_t(-16909061));
+#endif
     // CHECK-NEXT: 0
     // CHECK-NEXT: 127
     // CHECK-NEXT: 255
@@ -132,11 +200,19 @@ void computeMain()
     // CHECK-NEXT: -16909061
 
     // conversions from uint64_t
+#ifndef NO_INT64
     storeValue(0x0000000000000000LLU);
     storeValue(0x000000000000007FLLU);
     storeValue(0x00000000000000FFLLU);
     storeValue(0x1112131440414243LLU);
     storeValue(0xF1F2F3F4FEFDFCFBLLU);
+#else
+    storeValue(int32_t(0));
+    storeValue(int32_t(127));
+    storeValue(int32_t(255));
+    storeValue(int32_t(1078018627));
+    storeValue(int32_t(-16909061));
+#endif
     // CHECK-NEXT: 0
     // CHECK-NEXT: 127
     // CHECK-NEXT: 255
@@ -180,6 +256,7 @@ void computeMain()
     // CHECK-NEXT: 2147483520
 
     // conversions from double
+#ifndef NO_DOUBLE
     storeValue(-2147483648.9LF);
     storeValue(-32768.0LF);
     storeValue(-67.9LF);
@@ -188,6 +265,16 @@ void computeMain()
     storeValue(85.0LF);
     storeValue(32767.0LF);
     storeValue(2147483647.999LF);
+#else
+    storeValue(int32_t(-2147483648));
+    storeValue(int32_t(-32768));
+    storeValue(int32_t(-67));
+    storeValue(int32_t(0));
+    storeValue(int32_t(42));
+    storeValue(int32_t(85));
+    storeValue(int32_t(32767));
+    storeValue(int32_t(2147483647));
+#endif
     // CHECK-NEXT: -2147483648
     // CHECK-NEXT: -32768
     // CHECK-NEXT: -67
