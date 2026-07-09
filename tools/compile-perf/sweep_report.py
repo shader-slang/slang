@@ -125,9 +125,9 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
          f'<rect width="{W}" height="{H}" fill="white"/>',
          f'<text x="12" y="30" font-size="17" font-weight="bold">'
          f'Complexity sweep — compileInner vs workload size N ({metric} ms, linear)</text>',
-         f'<text x="12" y="46" font-size="11" fill="#666">dashed = linear expectation '
-         f'extrapolated from the low-N half; the end-point label is actual/linear at max N '
-         f'(red when ≥1.15× — super-linear)</text>']
+         f'<text x="12" y="46" font-size="11" fill="#666">dashed = linear expectation: '
+         f'measured floor (the minimal workload) + slope fitted on the low-N half, extrapolated; '
+         f'the end-point label is actual/linear at max N (red when ≥1.15× — super-linear)</text>']
 
     for k, wl in enumerate(names):
         timers = sweeps[wl]["timers"]
@@ -138,14 +138,24 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
         vmax = max((v for _, v in pts_ci), default=1.0) or 1.0
         nmin, nmax = sizes[0], sizes[-1]
 
-        # Linear expectation: OLS over the low-N half (>=2 points), extrapolated
-        # across the full range. A curve peeling above the dashed line is
-        # super-linear by eye; the end-point ratio quantifies it.
+        # Linear expectation, extrapolated from the low-N half. When the
+        # measured per-compile floor (the `minimal` workload) is available the
+        # intercept is ANCHORED to it and only the slope is fitted
+        # (through-origin OLS on t - floor): at small N the floor is 20-35% of
+        # the reading, so a free intercept both dilutes the slope estimate and
+        # tilts the line when the low half already curves — understating the
+        # end-point ratio. Without a measured floor, fall back to free OLS.
         lin_a = lin_b = None
         lin_ratio = None
         if len(pts_ci) >= 3:
             h = max(2, (len(pts_ci) + 1) // 2)
-            lin_a, lin_b, _ = analyze.linfit(sizes[:h], [v for _, v in pts_ci[:h]])
+            lo = pts_ci[:h]
+            if floor > 0:
+                num = sum(x * (v - floor) for x, v in lo)
+                den = sum(x * x for x, _ in lo) or 1.0
+                lin_a, lin_b = floor, num / den
+            else:
+                lin_a, lin_b, _ = analyze.linfit([x for x, _ in lo], [v for _, v in lo])
             lin_end = lin_a + lin_b * nmax
             if lin_end > 0:
                 lin_ratio = pts_ci[-1][1] / lin_end
