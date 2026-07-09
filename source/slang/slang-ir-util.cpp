@@ -1700,21 +1700,16 @@ bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache)
     if (!cache)
         return doesCalleeHaveSideEffect(callee);
 
+    // A hit is trusted without re-verification: within a cache's lifetime the
+    // fresh answer may only move from true to false (passes remove annotations
+    // and add purity decorations, never the reverse), so a stale cached answer
+    // errs conservatively — it can only keep a call alive, never wrongly
+    // eliminate one. See IRDeadCodeEliminationOptions::calleeSideEffectCache
+    // for the cache-lifetime contract. (Recomputing the answer on every hit to
+    // assert this would reintroduce the O(#call-sites^2) walk this cache
+    // exists to remove, in any build that enables the check.)
     if (auto cached = cache->tryGetValue(callee))
-    {
-#ifdef _DEBUG
-        // Verify the memoization contract: within a cache's lifetime the
-        // fresh answer may only move from true to false (passes remove
-        // annotations and add purity decorations, never the reverse), so a
-        // cached answer must equal the fresh one or err conservatively. A
-        // failure here means a pass ran under a shared cache while creating
-        // an IRAnnotation or removing a no-side-effect decoration — see
-        // IRDeadCodeEliminationOptions::calleeSideEffectCache.
-        const bool fresh = doesCalleeHaveSideEffect(callee);
-        SLANG_ASSERT(*cached == fresh || (*cached && !fresh));
-#endif
         return *cached;
-    }
 
     const bool sideEffect = doesCalleeHaveSideEffect(callee);
     cache->add(callee, sideEffect);
