@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#shared-c-like-base
-//META: doc_section_digest=9bd773e205e5aa520ee4875c2a6aebc4a9d9aabba8cfac9d3b66489e9488c043
+//META: doc_section_digest=9f3194ddc2631c231ae0863cc8c3961c0a5eef6db41560bb17b1114e6c0cf6aa
 //META: purpose=Boundary: an explicit `row_major float4x4` in a cbuffer changes the per-target emit marker — GLSL drops the `_ColMajor` wrapper-struct suffix; SPIR-V emits `ColMajor` member decoration (because SPIR-V matrix layouts are transposed relative to source); WGSL drops the `_ColMajor` infix.
 //META: intent=boundary
 //META: pipeline_stage=emit

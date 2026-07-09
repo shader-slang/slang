@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:30:00+00:00
 //META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
 //META: doc_ref=docs/generated/design/pipeline/overview.md#end-to-end-flow
-//META: doc_section_digest=050f2a1afed02c0a6b611d78eee6fa52f2d4cdf8d79a760ffe0b1f192d46e37b
+//META: doc_section_digest=83e0cd09591679dc891de1a189fb967b34696a3e15bf5b249cb10e3505f9897f
 //META: purpose=A non-trivial source successfully traverses lex, preprocess, parse, check, lower, IR passes, and emit to produce SPIR-V text.
 //META: intent=functional
 //META: pipeline_stage=emit
