@@ -295,7 +295,11 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner"],
-        sweep_sizes=[20, 40, 80, 160],
+        # Window starts at default_size: below N=80 the total is dominated by a
+        # quasi-fixed front-end cost (type sharing makes per-item sema cheap)
+        # and the target pass is <2 ms — no scaling signal. 80..640 is where
+        # legalizeResourceTypes' super-linear growth is visible in the total.
+        sweep_sizes=[80, 160, 320, 640],
     ),
     WorkloadSpec(
         name="reflection_layout",
