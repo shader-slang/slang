@@ -17,7 +17,18 @@ import json
 import os
 
 import breakdown  # stacked phase-composition vs N
-from lib import analyze
+from lib import analyze, manifest
+
+
+def canonical_order(names):
+    """Order workload names the same way the default cross-release report
+    orders its panels: the canonical manifest order, unknown names last. Uses
+    manifest.display_order when present (newer suite); otherwise derives the
+    same ordering from the WORKLOADS list position."""
+    if hasattr(manifest, "display_order"):
+        return manifest.display_order(names)
+    pos = {w.name: i for i, w in enumerate(manifest.WORKLOADS)}
+    return sorted(names, key=lambda n: (pos.get(n, len(pos)), n))
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -98,7 +109,7 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
     linear y). The panel title links to the workload's own page (full sub-counter
     stacked view + analysis + numbers); a compact ∝N^k flag stays for at-a-glance
     super-linearity. The per-timer lines and fit text block live on those pages."""
-    names = sorted(sweeps)
+    names = canonical_order(sweeps)
     n = len(names)
     cols = min(cols, n) or 1
     rows = (n + cols - 1) // cols
@@ -113,7 +124,10 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
          f'font-family="sans-serif" font-size="11">',
          f'<rect width="{W}" height="{H}" fill="white"/>',
          f'<text x="12" y="30" font-size="17" font-weight="bold">'
-         f'Complexity sweep — compileInner vs workload size N ({metric} ms, linear)</text>']
+         f'Complexity sweep — compileInner vs workload size N ({metric} ms, linear)</text>',
+         f'<text x="12" y="46" font-size="11" fill="#666">dashed = linear expectation '
+         f'extrapolated from the low-N half; the end-point label is actual/linear at max N '
+         f'(red when ≥1.15× — super-linear)</text>']
 
     for k, wl in enumerate(names):
         timers = sweeps[wl]["timers"]
@@ -123,7 +137,19 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
         sizes = [sz for sz, _ in pts_ci]
         vmax = max((v for _, v in pts_ci), default=1.0) or 1.0
         nmin, nmax = sizes[0], sizes[-1]
-        hi = vmax * 1.08
+
+        # Linear expectation: OLS over the low-N half (>=2 points), extrapolated
+        # across the full range. A curve peeling above the dashed line is
+        # super-linear by eye; the end-point ratio quantifies it.
+        lin_a = lin_b = None
+        lin_ratio = None
+        if len(pts_ci) >= 3:
+            h = max(2, (len(pts_ci) + 1) // 2)
+            lin_a, lin_b, _ = analyze.linfit(sizes[:h], [v for _, v in pts_ci[:h]])
+            lin_end = lin_a + lin_b * nmax
+            if lin_end > 0:
+                lin_ratio = pts_ci[-1][1] / lin_end
+        hi = max(vmax, (lin_a + lin_b * nmax) if lin_a is not None else 0.0) * 1.08 or 1.0
 
         r, c = divmod(k, cols)
         ox = 8 + c * cw
@@ -159,6 +185,17 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
             s.append(f'<text x="{x:.1f}" y="{oy+mt+ph+15:.1f}" text-anchor="middle" fill="#666">{sz}</text>')
         s.append(f'<text x="{ox+ml+pw/2:.0f}" y="{oy+mt+ph+34:.0f}" text-anchor="middle" fill="#444">N</text>')
 
+        if lin_a is not None:
+            y0 = ymap(max(lin_a + lin_b * nmin, 0.0))
+            y1 = ymap(max(lin_a + lin_b * nmax, 0.0))
+            s.append(f'<line x1="{xmap(nmin):.1f}" y1="{y0:.1f}" x2="{xmap(nmax):.1f}" '
+                     f'y2="{y1:.1f}" stroke="#999" stroke-width="1.4" stroke-dasharray="5,4"/>')
+        if lin_ratio is not None:
+            rcl = "#c0392b" if lin_ratio >= 1.15 else "#888"
+            s.append(f'<text x="{xmap(nmax)-4:.1f}" y="{ymap(pts_ci[-1][1])-6:.1f}" '
+                     f'text-anchor="end" font-size="11" fill="{rcl}" font-weight="600">'
+                     f'{lin_ratio:.2f}× lin</text>')
+
         pts = [(xmap(x), ymap(v)) for x, v in pts_ci]
         if len(pts) >= 2:
             path = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
@@ -182,7 +219,7 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
     os.makedirs(wdir, exist_ok=True)
     pre = ("background:#fff;border:1px solid #eee;border-radius:6px;padding:8px;overflow:auto")
     links = {}
-    for wl in sorted(sweeps):
+    for wl in canonical_order(sweeps):
         spec = manifest.BY_NAME.get(wl)
         timers = sweeps[wl]["timers"]
         ci = timers.get("compileInner")
@@ -284,7 +321,7 @@ def main():
                         floor, link_for=links)
     inline = open(svg).read()
 
-    names = sorted(sweeps)
+    names = canonical_order(sweeps)
     H = ['<!doctype html><meta charset="utf-8">',
          f"<title>Slang compile-perf — complexity sweep ({html.escape(args.label)})</title>",
          f"<style>{CSS}</style>", '<div class="wrap">',
