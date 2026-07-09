@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T15:00:00+00:00
 //META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#generics-ambiguity
-//META: doc_section_digest=6cf4f0017f8ed0ca4ddf4b4f37de1831b62091dde8e6a8351a061ad3fe939266
+//META: doc_section_digest=2adc733a81916b42380544b008460df5b366206d39b999775293a73fe57f1756
 //META: purpose=When the generic-application parse does not commit cleanly the parser rolls back and parses `<` as the less-than operator, so `a < b` in a body context yields a boolean comparison Expr.
 //META: intent=functional
 //META: pipeline_stage=parse

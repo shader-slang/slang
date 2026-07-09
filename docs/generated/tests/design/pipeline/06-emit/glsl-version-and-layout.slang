@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#glsl
-//META: doc_section_digest=2b3b73b53638bb5490d69c961503ad7cfb4ef814caf16dc6fb6c71e52b194563
+//META: doc_section_digest=6dca7359790de973663dcbb3b18e060f0e5599c3d24a2921e655fd173f6356a6
 //META: purpose=The GLSL backend emits a GLSL source with #version, layout(local_size_x = ...) for the compute stage, and layout(std430, binding = N) for a buffer resource.
 //META: intent=functional
 //META: pipeline_stage=emit

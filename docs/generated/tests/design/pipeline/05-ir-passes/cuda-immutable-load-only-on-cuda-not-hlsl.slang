@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=d245d3be9942f0847c45c138b4c2780e7df19ecb
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#target-specific-lowering
-//META: doc_section_digest=15ffe04c81dead304d9773538e8bca993b707b3393574380bcd38d0a23da4044
+//META: doc_section_digest=71044a2d3419fa798e104d5b77b4d7a78d1652bd8571bd4aa028984e8e95b794
 //META: purpose=Boundary (cross-target): the cuda-immutable-load pass fires only when emitting CUDA — HLSL emit of the same uniform read contains no `__ldg(...)` call.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

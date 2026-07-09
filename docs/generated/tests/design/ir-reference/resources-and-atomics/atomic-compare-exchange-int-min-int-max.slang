@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:00:00+00:00
 //META: source_commit=019ec0e5ddac1c14fbad141a3f03d50cf8a5e022
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomiccompareexchange
-//META: doc_section_digest=f64e810eeb8bfcd2dc78872345ca3a0ea2009ac1e4a545333ad63bf1f54ce88c
+//META: doc_section_digest=71b74ee056270d4345b7257154c1737e99ecafed1d54c59932e1d630864a86cf
 //META: purpose=`Atomic<int>::compareExchange(INT_MIN, INT_MAX)` (extreme operand pair) still lowers to the documented `atomicCompareExchange` opcode shape; both literals carry through.
 //META: intent=boundary
 //META: pipeline_stage=lower
