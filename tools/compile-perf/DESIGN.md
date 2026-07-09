@@ -105,9 +105,9 @@ judged. A metric past both a relative (`--rel`, default 1.10×) and absolute
 the push, so the data is still stored). If the judged point's runner differs
 from the history's, it warns and compares only same-runner points.
 On scheduled runs (and manual runs with `notify-slack=true`) the workflow also
-posts a pass/fail Slack notification (`SLACK_WEBHOOK_COMPILE_PERF` secret; the
-step is skipped when unset, and a delivery failure only warns — it never fails
-the run).
+posts a Slack status notification — clean / regression detected / job failed /
+trend check skipped (`SLACK_WEBHOOK_COMPILE_PERF` secret; the step is skipped
+when unset, and a delivery failure only warns — it never fails the run).
 
 ### Runner-change procedure
 

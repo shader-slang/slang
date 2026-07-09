@@ -324,18 +324,21 @@ jobs:
             exit 0
           fi
           export DATE=$(date -u +%Y-%m-%d)
-          # JOB_STATUS distinguishes "trend was skipped because an earlier step
-          # already failed" (job failed) from "trend was skipped because this is
-          # a publish=false measurement-only run" (nothing failed).
-          if [ "$JOB_STATUS" != "success" ]; then
+          # A regression must be classified BEFORE the generic-failure case: the
+          # trend step exits non-zero on a regression, which also drives
+          # job.status to failure, so testing JOB_STATUS first would shadow the
+          # regression message. JOB_STATUS then distinguishes "trend skipped
+          # because an earlier step failed" (job failed) from "trend skipped
+          # because this is a publish=false measurement-only run".
+          if [ "$TREND_OUTCOME" = "failure" ]; then
+            export ICON=":warning:"
+            export STATUS="Regression detected — see CI run for details"
+          elif [ "$JOB_STATUS" != "success" ]; then
             export ICON=":x:"
             export STATUS="Nightly job failed — see CI run for details"
           elif [ "$TREND_OUTCOME" = "success" ]; then
             export ICON=":white_check_mark:"
             export STATUS="No regressions detected"
-          elif [ "$TREND_OUTCOME" = "failure" ]; then
-            export ICON=":warning:"
-            export STATUS="Regression detected — see CI run for details"
           else
             export ICON=":information_source:"
             export STATUS="Trend check skipped (publish=false measurement-only run)"
