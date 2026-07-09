@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#hlsl
-//META: doc_section_digest=be31c035a4983e8352a963da8245a71e0675d21c0124091e0f8e223068f3565f
+//META: doc_section_digest=68b0765d324468831c9bc5c6f0ecd5b00ac4379b32d4be88b4cfe501a835481d
 //META: purpose=The HLSL backend's binary route hands its HLSL source off to DXC, producing DXIL bytecode whose disassembly carries an LLVM-style entry-point signature.
 //META: intent=expansion
 //META: pipeline_stage=emit

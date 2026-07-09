@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#targets
-//META: doc_section_digest=e324a10260c794d77c45954ccddaf61cf66af2794e97a8289f9655330ee625d4
+//META: doc_section_digest=01592114ee53e6fb4d64d35bfd46e14fb1203ef5ea4792bcbf05944b2edfe91c
 //META: purpose=The Targets table lists `SLANG_SPIRV` and `SLANG_SPIRV_ASM` as variants of the same emit backend; both `-target spirv-asm` produces SPIR-V text (the assembly-text-form observable in the no-GPU runner).
 //META: intent=functional
 //META: pipeline_stage=emit

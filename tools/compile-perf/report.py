@@ -44,8 +44,13 @@ def combined_index(release_index, results_dir):
             meta = json.load(open(mp)) if os.path.exists(mp) else {}
             recs.append({"tag": label, "date": meta.get("date", label[:10]),
                          "version": meta.get("commit", ""), "slangc": "tot",
-                         "kind": "daily"})
-    recs.sort(key=lambda r: (r.get("date", ""), r.get("kind") == "daily"))
+                         "kind": "daily",
+                         "commit_time": meta.get("commit_time", "")})
+    # Same-date daily points order by the commit's full timestamp (true code
+    # order) when meta carries it; the tag is the deterministic fallback for
+    # points registered before commit_time existed. See track.py.
+    recs.sort(key=lambda r: (r.get("date", ""), r.get("kind") == "daily",
+                             r.get("commit_time") or "", r.get("tag", "")))
     return recs
 
 

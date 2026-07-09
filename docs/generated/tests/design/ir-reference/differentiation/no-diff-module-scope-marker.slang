@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:32:24+00:00
 //META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#opcodes
-//META: doc_section_digest=aacf05fed4ed4ce34369f80555096390dd0ba483e842c1405e66f4d2a320bfb7
+//META: doc_section_digest=5251f06bb7f70c9893cfc402425163cd28989f883880155f2b7d9979f81db7f6
 //META: purpose=The no_diff parameter marker is implemented by a unique module-scope let %k : Void = no_diff value that all Attributed(T, %k) wrappers reference.
 //META: intent=functional
 //META: pipeline_stage=lower

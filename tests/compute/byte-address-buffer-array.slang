@@ -4,8 +4,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk -shaderobj -output-using-type
 
 //TEST:SIMPLE(filecheck=CHECK2):-target hlsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK3):-target spirv -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK3):-target spirv -emit-spirv-directly -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK3):-target spirv -entry computeMain -stage compute -O1
+//TEST:SIMPLE(filecheck=CHECK3):-target spirv -emit-spirv-directly -entry computeMain -stage compute -O1
 
 // Confirm compilation of `(RW)ByteAddressBuffer` with aligned load / stores to wider data types.
 

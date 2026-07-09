@@ -8,7 +8,7 @@ self-hosted-runner:
     - GCP
     - GCP-T4
     - GPU
-    - nvrgfx-perf
+    - nvrgfx-perf-kernelvm-bridge
     - perf
     - regression-test
     - SM80Plus

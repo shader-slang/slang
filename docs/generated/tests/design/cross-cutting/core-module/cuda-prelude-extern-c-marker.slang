@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:48:55Z
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/cross-cutting/core-module.md#preludes
-//META: doc_section_digest=aa6dfad5c535c2a139def7eece16399b9abb61a5dab99ce3129b1ab73720d4de
+//META: doc_section_digest=3fd3a3b1952a153c673f4097307847aae9458c9235f966bba1f554d66684ebec
 //META: purpose=Emitted CUDA output references the CUDA prelude — a compute entry point is emitted with `extern "C"` linkage and `__global__` annotation defined by slang-cuda-prelude.h.
 //META: intent=functional
 //META: pipeline_stage=emit

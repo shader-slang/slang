@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T15:00:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/base.md#stmt-modifiablesyntaxnode
-//META: doc_section_digest=79ffb4284faeb40aaaece2b8fa53ff16f233b766fdb5bf8f30d2558160f8acd0
+//META: doc_section_digest=b8e45fdf14a4fc2ad85d6862cbe2bd20640950c98eef010f031bc7894043b45d
 //META: purpose=Stmt derives from ModifiableSyntaxNode, so a statement can carry one or more modifiers (e.g. an unroll attribute on a for-statement).
 //META: intent=functional
 //META: pipeline_stage=check

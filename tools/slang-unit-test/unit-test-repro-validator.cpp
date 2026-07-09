@@ -1326,3 +1326,54 @@ SLANG_UNIT_TEST(reproLoadUsesSourceFileElementIndex)
     spDestroyCompileRequest(externalRequest);
     spDestroySession(session);
 }
+
+SLANG_UNIT_TEST(reproLoadRejectsFileWithoutContents)
+{
+    typedef ReproUtil::RequestState RequestState;
+    typedef ReproUtil::SourceFileState SourceFileState;
+    typedef ReproUtil::FileState FileState;
+    typedef ReproUtil::TranslationUnitRequestState TranslationUnitRequestState;
+
+    // A source-file entry whose file has no serialized contents must be
+    // rejected cleanly at load: `validateSourceFileState` requires contents,
+    // and `LoadContext::getSourceFile` relies on that invariant when it
+    // materializes the blob (it release-asserts a blob exists rather than
+    // tolerating the forbidden shape). This pins the rejection contract —
+    // the load fails, it does not crash, and it does not partially apply.
+    OffsetContainer container;
+    auto requestPtr = container.newObject<RequestState>();
+    auto translationUnits = container.newArray<TranslationUnitRequestState>(1);
+    auto tuSourceFiles = container.newArray<Offset32Ptr<SourceFileState>>(1);
+
+    auto sourceFile = container.newObject<SourceFileState>();
+    auto file = container.newObject<FileState>();
+    auto pathString =
+        container.newString("repro-load-tolerates-file-without-contents-nonexistent.slang");
+
+    // Deliberately no `contents`: only the identity fields are recorded, and
+    // the path must not resolve on the real file system.
+    container[file]->foundPath = pathString;
+    container[file]->uniqueName = pathString;
+    container[file]->uniqueIdentity = pathString;
+    container[sourceFile]->foundPath = pathString;
+    container[sourceFile]->file = file;
+
+    container[requestPtr]->translationUnits = translationUnits;
+    container[translationUnits[0]].language = SourceLanguage::Slang;
+    container[translationUnits[0]].sourceFiles = tuSourceFiles;
+    container[tuSourceFiles[0]] = sourceFile;
+
+    List<uint8_t> payload;
+    containerToBuffer(container, payload);
+    List<uint8_t> riffData;
+    buildStateRiff(payload, riffData);
+
+    auto session = spCreateSession();
+    auto externalRequest = spCreateCompileRequest(session);
+    SLANG_CHECK(SLANG_FAILED(
+        spLoadRepro(externalRequest, nullptr, riffData.getBuffer(), riffData.getCount())));
+    SLANG_CHECK(spGetTranslationUnitCount(externalRequest) == 0);
+
+    spDestroyCompileRequest(externalRequest);
+    spDestroySession(session);
+}
