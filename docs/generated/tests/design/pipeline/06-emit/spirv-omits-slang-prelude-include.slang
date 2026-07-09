@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#preludes
-//META: doc_section_digest=e35f51be3beae3d8e169e53667630c421c042fdc0c864ef7e4a6aea3014b6b82
+//META: doc_section_digest=662517bd41c8bd49e13fd073aac07441f7d6f4436de15e438cb6e432551329d5
 //META: purpose=Negative: SPIR-V emit does NOT include any slang-*-prelude.h header (SPIR-V is not in the preludes table in the source doc).
 //META: intent=negative
 //META: pipeline_stage=emit

@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T13:48:38Z
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#breadcrumbs
-//META: doc_section_digest=d65add87a553b75b168020a969cb739b5014e573c8568f2ebfe82d91d3709072
+//META: doc_section_digest=e66bcf251b4763f3b9fe76172945dbeb8b5734c25ed722ba890dafbc77c9976a
 //META: purpose=When an unqualified name inside a method resolves to a field of the enclosing struct, lookup records a `This` breadcrumb so the synthesized expression reads `this.field`.
 //META: intent=functional
 //META: pipeline_stage=check

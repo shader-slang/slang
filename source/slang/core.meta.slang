@@ -2087,7 +2087,12 @@ T __attachToNativeRef(NativeRef<T> nativeVal)
 //@public:
 
 /// Represents a string.
-/// This type can only be used on the CPU target.
+/// This type is backed by the Slang core runtime (`Slang::String`), which is
+/// available on host CPU targets (e.g. `-target host-cpp`) and the LLVM-backed
+/// CPU path (`-emit-cpu-via-llvm`). It is explicitly rejected when generating
+/// kernel C++/CUDA output (`-target cpp`, `-target cuda`, `-target ptx`); use
+/// `NativeString` (a null-terminated `const char*`) there instead. On other
+/// GPU/shader targets `String` is not a supported value type.
 __magic_type(StringType)
 __intrinsic_type($(kIROp_StringType))
 struct String
@@ -3782,6 +3787,31 @@ __prefix T operator !(T v0)
     return v0.not();
 }
 
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator &=(in out T v0, T v1)
+{
+    v0 = v0 & v1;
+    return v0;
+}
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator |=(in out T v0, T v1)
+{
+    v0 = v0 | v1;
+    return v0;
+}
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator ^=(in out T v0, T v1)
+{
+    v0 = v0 ^ v1;
+    return v0;
+}
+
 // The operator overloads defined above already allows Enum types to be used
 // in logical operators, but we still provide overloads for __EnumTypes and map
 // them directly to intrinsic op to allow constant propagation at AST level to
@@ -3796,6 +3826,11 @@ __generic<T : __EnumType>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitOr))
 T operator |(T v0, T v1);
+
+__generic<T : __EnumType>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitXor))
+T operator ^(T v0, T v1);
 
 __generic<T : __EnumType>
 [__unsafeForceInlineEarly]
@@ -4494,6 +4529,19 @@ attribute_syntax [instance(count: int)]         : InstanceAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
 
+// SPIR-V 64-bit indexing
+/// Used on a function to require the `SPV_EXT_shader_64bit_indexing` SPIR-V extension.
+/// @remarks When this attribute is applied to a SPIR-V entry point, or to any function in the
+/// entry point's call graph, the emitted SPIR-V entry point requires the `Shader64BitIndexingEXT`
+/// capability, declares `OpExtension "SPV_EXT_shader_64bit_indexing"`, and enables the
+/// `Shader64BitIndexingEXT` execution mode. This permits 64-bit (`int64`/`uint64`) indices into
+/// arrays, buffers, and resources. The requirement propagates up the call graph like `[require()]`.
+/// @remarks This attribute is a pure opt-in marker: the requirement is honored only where the
+/// programmer applies it. The compiler does not infer it from the use of 64-bit indices, nor does
+/// it diagnose 64-bit indexing performed without the attribute.
+__attributeTarget(FuncDecl)
+attribute_syntax [Shader64BitIndexing]  : Shader64BitIndexingAttribute;
+
 // Compute Shader
 
 /// Specifies the size of the thread group a compute shader.
@@ -4898,9 +4946,6 @@ attribute_syntax [QuadDerivatives] : QuadDerivativesAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
 
-__generic<T>
-typealias NodePayloadPtr = Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::NodePayloadAMDX)>;
-
 __attributeTarget(StructDecl)
 attribute_syntax [raypayload] : RayPayloadAttribute;
 
@@ -5040,16 +5085,19 @@ semantic sv_dispatchthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -5061,16 +5109,19 @@ semantic sv_groupid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -5079,6 +5130,7 @@ semantic sv_groupindex
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 }
 
@@ -5090,16 +5142,19 @@ semantic sv_groupthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 

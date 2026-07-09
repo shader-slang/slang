@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:50:55+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#stripfrontendonlyinstructions
-//META: doc_section_digest=14f6a7b07242b6298cbc13f7d2d10a7c3a385bb0f04856ad82f45cbb7629d49f
+//META: doc_section_digest=0338c482f31db9ec609b7d197159c0d41972d319a43bd46ec46d511b5e5dc326
 //META: purpose=Phase D's stripFrontEndOnlyInstructions (D10) removes IRHighLevelDeclDecoration before the LOWER-TO-IR dump.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

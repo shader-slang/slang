@@ -44,8 +44,13 @@ def combined_index(release_index, results_dir):
             meta = json.load(open(mp)) if os.path.exists(mp) else {}
             recs.append({"tag": label, "date": meta.get("date", label[:10]),
                          "version": meta.get("commit", ""), "slangc": "tot",
-                         "kind": "daily"})
-    recs.sort(key=lambda r: (r.get("date", ""), r.get("kind") == "daily"))
+                         "kind": "daily",
+                         "commit_time": meta.get("commit_time", "")})
+    # Same-date daily points order by the commit's full timestamp (true code
+    # order) when meta carries it; the tag is the deterministic fallback for
+    # points registered before commit_time existed. See track.py.
+    recs.sort(key=lambda r: (r.get("date", ""), r.get("kind") == "daily",
+                             r.get("commit_time") or "", r.get("tag", "")))
     return recs
 
 
@@ -68,7 +73,7 @@ def main():
     # index_path-based loaders also see the daily points.
     cindex = combined_index(index, args.results)
     cindex_path = os.path.join(outdir, "_combined_index.json")
-    with open(cindex_path, "w") as fh:
+    with open(cindex_path, "w", encoding="utf-8") as fh:
         json.dump(cindex, fh, indent=2)
 
     series, _, order = analyze.load_series(cindex, args.results, args.metric)
@@ -84,7 +89,7 @@ def main():
         args.results, cindex_path, args.metric,
         os.path.join(outdir, "perf_per_benchmark_coarse.svg"),
         breakdown.FE_GO_ORDER, breakdown.coarse_buckets, link_for=wl_links)
-    svg_coarse_html = open(svg_pw_coarse).read()
+    svg_coarse_html = open(svg_pw_coarse, encoding="utf-8").read()
 
     PW = ['<!doctype html><meta charset="utf-8">',
           f"<title>Slang compile-perf — per workload</title><style>{CSS}</style>",
@@ -107,7 +112,7 @@ def main():
           "</div>"]
 
     out = os.path.join(outdir, "report_per_workload.html")
-    with open(out, "w") as fh:
+    with open(out, "w", encoding="utf-8") as fh:
         fh.write("\n".join(PW))
     print(f"wrote {out}  ({n_rel} releases + {n_day} daily)")
 

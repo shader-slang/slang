@@ -2185,15 +2185,6 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
-    // Disallow converting to a ParameterGroupType.
-    //
-    // TODO(tfoley): Under what circumstances would this check ever be needed?
-    //
-    if (as<ParameterGroupType>(toType))
-    {
-        return _failedCoercion(toType, outToExpr, fromExpr, sink);
-    }
-
     // If the type that we are converting from is a parameter group type
     // (something like `ConstantBuffer<X>` or `ParameterBlock<X>`) and we
     // are converting to some type `Y`, then we want to allow for a multi-step
@@ -2372,6 +2363,41 @@ bool SemanticsVisitor::_coerce(
         if (outCost)
             *outCost = subCost + kConversionCost_ImplicitDereference;
         return true;
+    }
+
+    // Fast path: at an implicit coercion site, an opaque generic type parameter
+    // cannot convert to a concrete scalar builtin, so skip the initializer-based
+    // conversion search that makes up the rest of this function. Ranking an
+    // operator call on a constrained generic `T` against the many concrete
+    // scalar overloads otherwise runs one full (always-failing) conversion
+    // search per rejected candidate — the dominant semantic-checking cost in
+    // generic-heavy code (issue #11897). The `ImplicitCastMethodKey` failure
+    // cache below cannot absorb this: its key includes the `Type*`, and every
+    // generic declaration has a distinct `T` type object.
+    //
+    // Soundness: by this point the exact-match, subtype-witness, and
+    // type-equality-witness paths have all failed, and at an implicit site
+    // nested conversions are disallowed, so an initializer could only match
+    // `T` exactly — and no scalar builtin declares an implicit initializer
+    // with an opaque generic parameter type (a contingent core-module
+    // property, pinned by generic-arithmetic-coerce-diag.slang). The one
+    // exception is `bool` (`__init<T : __EnumType>(T)` in core.meta.slang),
+    // so `bool` targets are excluded. Everything else stays on the search
+    // path: explicit casts, vector/matrix/aggregate targets, and `DeclRefType`
+    // scalars such as `BFloat16`/FP8 (which do declare generic initializers).
+    // Pack elements never reach this test (`each T` has type `EachType`, not
+    // a decl-ref); a bare pack-parameter decl-ref, should a checker path ever
+    // form one at a coercion, is intentionally rejected under the same
+    // argument (no scalar builtin accepts a pack). The boundaries are pinned
+    // by tests/language-feature/generics/generic-arithmetic-coerce*.slang.
+    const auto toTypeBasic = as<BasicExpressionType>(toType);
+    const bool toTypeIsScalarBuiltin = toTypeBasic && toTypeBasic->getBaseType() != BaseType::Bool;
+    const auto fromTypeGenericParamDeclRef =
+        isDeclRefTypeOf<GenericTypeParamDeclBase>(fromType.type);
+    if (site != CoercionSite::ExplicitCoercion && toTypeIsScalarBuiltin &&
+        fromTypeGenericParamDeclRef)
+    {
+        return _failedCoercion(toType, outToExpr, fromExpr, sink);
     }
 
     // The main general-purpose approach for conversion is

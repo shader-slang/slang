@@ -14,6 +14,10 @@ Compile modes:
 - "link"    : multi-file. Precompile every non-main file to .slang-module, then
               compile the main file (the one whose name contains "main") to a
               target against them. Stresses module read + linkIR.
+- "api"     : driven by native/api-driver.cpp against libslang instead of by
+              slangc. Measures the compilation-API dimension (session setup,
+              module loading, per-compile fixed overhead) that a one-shot CLI
+              invocation cannot separate. api_cmd selects the driver mode.
 """
 
 from dataclasses import dataclass, field
@@ -32,8 +36,6 @@ class WorkloadSpec:
     extra_flags: list = field(default_factory=list)
     # phase timers that best localize this bucket's cost
     primary_timers: list = field(default_factory=lambda: ["compileInner"])
-    # intentionally non-zero exit (compile errors expected)
-    expect_fail: bool = False
     # emit reflection JSON (bench.py supplies a writable per-run path). Exercises
     # the reflection serializer in addition to the layout engine.
     reflection_json: bool = False
@@ -42,6 +44,13 @@ class WorkloadSpec:
     # contains "main", or the first file if none does. If set, used directly
     # as the compile entry point.
     main_file: str = None
+    # for mode="api": the api-driver subcommand ("session-create",
+    # "many-kernels", "module-graph", "module-graph-bin", "specialize"), the
+    # root module name for the by-name-loading modes, and extra driver flags
+    # (e.g. --reflect).
+    api_cmd: str = None
+    api_root: str = None
+    api_flags: list = field(default_factory=list)
 
 
 # Standard target invocation avoids GPU drivers and stays comparable across
@@ -132,16 +141,6 @@ WORKLOADS = [
         # signal of the bare-local dynamic_dispatch workload.
         primary_timers=["compileInner", "specializeModule",
                         "legalizeExistentialTypeLayout", "simplifyIR"],
-    ),
-    WorkloadSpec(
-        name="diagnostics_errors",
-        bucket="diagnostics",
-        gen=workloads.gen_diagnostics_errors,
-        default_size=400,
-        mode="target",
-        extra_flags=SPIRV,
-        primary_timers=["frontEndExecute", "SemanticChecking", "compileInner"],
-        expect_fail=True,
     ),
     WorkloadSpec(
         name="diagnostics_clean",
@@ -299,6 +298,79 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["simplifyIR", "frontEndExecute", "compileInner"],
+    ),
+    # ---- API-path workloads (application-integration dimension) -----------
+    # Driven by native/api-driver.cpp against libslang (see DESIGN.md
+    # "API-path workloads"). These cover the costs a one-shot slangc run pays
+    # exactly once and cannot separate: session creation (core-module load),
+    # per-compile fixed overhead across many small kernels, and import
+    # resolution over a deep module graph.
+    WorkloadSpec(
+        name="api_session_create",
+        bucket="api_overhead",
+        gen=workloads.gen_api_none,
+        default_size=10,  # createGlobalSession+createSession iterations
+        mode="api",
+        api_cmd="session-create",
+        primary_timers=["apiCreateGlobalSession", "apiCreateSession", "apiTotal"],
+    ),
+    WorkloadSpec(
+        name="api_many_kernels",
+        bucket="api_overhead",
+        gen=workloads.gen_api_kernels,
+        default_size=100,
+        mode="api",
+        api_cmd="many-kernels",
+        primary_timers=["apiTotal", "apiLoadModule", "apiGetCode"],
+    ),
+    WorkloadSpec(
+        name="api_module_graph",
+        bucket="api_overhead",
+        gen=workloads.gen_api_module_graph,
+        default_size=150,
+        mode="api",
+        api_cmd="module-graph",
+        api_root="graph_main",
+        primary_timers=["apiTotal", "apiLoadModule", "apiGetCode"],
+    ),
+    # Same DAG loaded through serialized .slang-module binaries — the import
+    # path where the 2026-07-03 module-loading regression (#11952) lives;
+    # source-based loads (above) were flat across it.
+    WorkloadSpec(
+        name="api_module_graph_bin",
+        bucket="api_overhead",
+        gen=workloads.gen_api_module_graph,
+        default_size=150,
+        mode="api",
+        api_cmd="module-graph-bin",
+        api_root="graph_main",
+        primary_timers=["apiTotal", "apiLoadModule"],
+    ),
+    # Per-program reflection walk (getLayout + full parameter/type-layout
+    # traversal) over parameter-rich kernels — the binding-table query pattern
+    # every API client pays per compiled program.
+    WorkloadSpec(
+        name="api_reflection",
+        bucket="api_overhead",
+        gen=workloads.gen_api_reflect_kernels,
+        default_size=40,
+        mode="api",
+        api_cmd="many-kernels",
+        api_flags=["--reflect"],
+        primary_timers=["apiReflection", "apiTotal", "apiGetCode"],
+    ),
+    # One generic entry point specialized per impl type via
+    # IEntryPoint::specialize — the one-kernel-per-material pattern; stresses
+    # specialization + link per variant.
+    WorkloadSpec(
+        name="api_specialize",
+        bucket="api_overhead",
+        gen=workloads.gen_api_specialize,
+        default_size=60,
+        mode="api",
+        api_cmd="specialize",
+        api_root="spec_root",
+        primary_timers=["apiSpecialize", "apiLink", "apiGetCode", "apiTotal"],
     ),
     # ---- real-shader corpus ----------------------------------------------
     WorkloadSpec(

@@ -1,5 +1,5 @@
 // This test just needs to run without crashing.
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -llvm -compute -Xslang -O0 -Xslang -g3
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -llvm -compute -Xslang -g3
 //TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 

@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T15:00:00+00:00
 //META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#decl-keywords
-//META: doc_section_digest=232bb23f0daa18d59b047831901c0b444bf01283e5c09bd1d859fc8824f19b7c
+//META: doc_section_digest=e3d06ef8bf7a4508b0ecb0515b3867979078821ac9b8143e7b039cd76e1b73b1
 //META: purpose=`__subscript(args) -> T { get { ... } }` is a decl keyword that binds `v[args]` syntax to a user-defined accessor.
 //META: intent=functional
 //META: pipeline_stage=parse
