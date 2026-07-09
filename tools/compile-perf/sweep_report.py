@@ -104,6 +104,112 @@ def superlinear(k):
     return k is not None and k > 1.15
 
 
+def bucket_series(results_dir, label, metric):
+    """Per-workload phase-bucket totals at each sweep size:
+    {workload: {size: {bucket: ms}}}, using breakdown's mutually-exclusive
+    buckets (named leaf timers + `(self)` residuals). Because the buckets
+    partition compileInner exactly, growth deltas computed from them attribute
+    the compileInner increase without double-counting nested timers — which
+    raw timer names (e.g. SemanticChecking containing its own children) would."""
+    runs = json.load(open(analyze.results_path(results_dir, label)))
+    per = {}
+    for r in runs:
+        if r.get("size", 0) <= 0 or not r.get("timers"):
+            continue
+        timers = {k: v[metric] for k, v in r["timers"].items() if v}
+        per.setdefault(r["workload"], {})[r["size"]] = breakdown.buckets(timers)
+    return per
+
+
+def growth_attribution(by_size, top_n=5):
+    """Attribute the compileInner growth between the smallest and largest sweep
+    size to individual phase buckets, answering "which timer grows, which stays
+    constant". Returns (rows, others, flat, total_delta, (n_min, n_max)):
+
+      rows   — the top growing buckets (Δ ≥ max(1 ms, 2% of total growth), at
+               most `top_n`), each {name, v0, v1, delta, k}; `k` is the bucket's
+               own power-law exponent t_bucket = a·N^k (None when the bucket is
+               ~0 somewhere, where a log-log fit is undefined).
+      others — buckets above that same Δ threshold but cut by the top-`top_n`
+               limit: still real growth, just not the headline. Kept separate
+               so they are never mislabeled as constant.
+      flat   — the genuinely minor remainder (each ≤ the threshold, i.e. ≤2%
+               of total growth), sorted by size at N_max so the sentence reads
+               biggest-first.
+      total_delta — compileInner(N_max) − compileInner(N_min); since buckets
+              partition compileInner, the per-bucket shares sum to 100%."""
+    sizes = sorted(by_size)
+    if len(sizes) < 2:
+        return [], [], [], 0.0, (0, 0)
+    n0, n1 = sizes[0], sizes[-1]
+    names = sorted({b for bm in by_size.values() for b in bm})
+    total = sum(by_size[n1].values()) - sum(by_size[n0].values())
+    entries = []
+    for name in names:
+        pts = [(sz, by_size[sz].get(name, 0.0)) for sz in sizes]
+        v0, v1 = pts[0][1], pts[-1][1]
+        k = None
+        if all(v > 0 for _, v in pts):
+            _, k, _ = analyze.powfit([x for x, _ in pts], [v for _, v in pts])
+        entries.append({"name": name, "v0": v0, "v1": v1, "delta": v1 - v0, "k": k})
+    entries.sort(key=lambda e: -e["delta"])
+    thresh = max(1.0, 0.02 * total) if total > 0 else 1.0
+    growing = [e for e in entries if e["delta"] >= thresh]
+    rows, others = growing[:top_n], growing[top_n:]
+    picked = {e["name"] for e in growing}
+    flat = sorted((e for e in entries if e["name"] not in picked),
+                  key=lambda e: -e["v1"])
+    return rows, others, flat, total, (n0, n1)
+
+
+def render_growth_table(by_size):
+    """HTML for the growth-attribution section of a workload page: a top-5
+    'growing buckets' table (Δms, share of total growth, ×grow factor, and the
+    bucket's own ∝N^k exponent), an 'also growing' line for growers cut by the
+    top-5 limit, and a one-line near-constant remainder, so a reader can see at
+    a glance where a super-linear total comes from."""
+    rows, others, flat, total, (n0, n1) = growth_attribution(by_size)
+    if not rows and not others and not flat:
+        return ""
+    nratio = n1 / n0 if n0 else 0
+    s = [f"<h2>Growth attribution (N={n0} &rarr; N={n1})</h2>",
+         f"<p class='small'>compileInner grows by <b>{total:.0f} ms</b> across the sweep; "
+         f"the mutually-exclusive phase buckets below partition that growth exactly "
+         f"(no nested-timer double counting). N grows &times;{nratio:.0f}, so a linear "
+         f"bucket shows &times;{nratio:.0f} grow / k&approx;1; k&gt;1 is where the "
+         f"super-linearity lives.</p>",
+         "<table><tr><th>bucket</th>"
+         f"<th class=num>t@N={n0}</th><th class=num>t@N={n1}</th>"
+         "<th class=num>&Delta; ms</th><th class=num>share</th>"
+         "<th class=num>&times;grow</th><th class=num>&prop;N<sup>k</sup></th></tr>"]
+    for e in rows:
+        share = f"{100 * e['delta'] / total:.0f}%" if total > 0 else "–"
+        grow = f"{e['v1'] / e['v0']:.1f}&times;" if e["v0"] > 0.5 else "new"
+        if e["k"] is not None:
+            kcls = "reg" if superlinear(e["k"]) else "flat"
+            kcell = f"<td class='num {kcls}'>{e['k']:.2f}</td>"
+        else:
+            kcell = "<td class=num>–</td>"
+        s.append(f"<tr><td>{html.escape(e['name'])}</td>"
+                 f"<td class=num>{e['v0']:.0f}</td><td class=num>{e['v1']:.0f}</td>"
+                 f"<td class=num>{e['delta']:+.0f}</td><td class=num>{share}</td>"
+                 f"<td class=num>{grow}</td>{kcell}</tr>")
+    s.append("</table>")
+    if others:
+        parts = ", ".join(
+            f"{html.escape(e['name'])} (+{e['delta']:.0f} ms, "
+            f"{100 * e['delta'] / total:.0f}%)" if total > 0 else
+            f"{html.escape(e['name'])} (+{e['delta']:.0f} ms)"
+            for e in others)
+        s.append(f"<p class='small'><b>Also growing</b> (below top-5): {parts}.</p>")
+    if flat:
+        parts = ", ".join(f"{html.escape(e['name'])} ({e['v0']:.0f}&rarr;{e['v1']:.0f} ms)"
+                          for e in flat)
+        s.append(f"<p class='small'><b>Near-constant</b> (&le;2% of growth each): "
+                 f"{parts}.</p>")
+    return "".join(s)
+
+
 def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
     """One panel per workload: just the compileInner scaling curve vs N (zero-based
     linear y). The panel title links to the workload's own page (full sub-counter
@@ -221,10 +327,12 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
 
 def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
     """One detail page per swept workload: the stacked sub-counter view vs N, the
-    scaling analysis (floor / k / top-2×), and the raw per-size sweep numbers.
+    scaling analysis (floor / k / top-2×), the growth-attribution table (which
+    phase buckets the growth lands in), and the raw per-size sweep numbers.
     Returns {workload: href relative to the sweep report} for linking."""
     import inspect
     from lib import manifest
+    per_bucket = bucket_series(results_dir, label, metric)
     wdir = os.path.join(outdir, "workloads")
     os.makedirs(wdir, exist_ok=True)
     pre = ("background:#fff;border:1px solid #eee;border-radius:6px;padding:8px;overflow:auto")
@@ -290,7 +398,8 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
                 f"<td class='num {kcls}'>{kk:.2f}</td><td class=num>{ft['pow_r2']:.3f}</td>"
                 f"<td class=num>{ci[0][1]:.0f}</td><td class=num>{ci[-1][1]:.0f}</td>"
                 f"<td class='num {topcls}'>{(f'{top:.2f}×' if top else '–')}</td></tr></table>"
-                f"<h2>Sweep numbers ({metric} ms)</h2>" + "".join(num)
+                + render_growth_table(per_bucket.get(wl, {}))
+                + f"<h2>Sweep numbers ({metric} ms)</h2>" + "".join(num)
                 + "</div>")
         with open(os.path.join(wdir, f"{wl}.html"), "w") as fh:
             fh.write(body)
