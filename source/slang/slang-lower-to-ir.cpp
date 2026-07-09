@@ -4462,6 +4462,14 @@ void collectParameterLists(
 
 bool isConstExprVar(Decl* decl)
 {
+    // The ConstExprModifier branch is only reachable for ParamDecl, because
+    // checkModifier() rewrites ConstExprModifier → ConstModifier for all other
+    // VarDeclBase nodes (see slang-check-modifier.cpp). On parameters, constexpr
+    // means "argument must be a compile-time constant at the call site".
+    //
+    // The HLSLStaticModifier + ConstModifier branch matches any `static const`
+    // variable declaration (including those originally written as `static constexpr`
+    // and rewritten during semantic checking).
     if (decl->hasModifier<ConstExprModifier>())
     {
         return true;

@@ -3558,6 +3558,13 @@ IRInst* maybeTranslateForwardDerivative(
 
     IRFunc* targetFunc = cast<IRFunc>(base);
 
+    // Backstop for when the front-end `checkAutoDiffUsages` validation is disabled: forward-
+    // differentiating a function that calls a `bwd_diff` result is unsupported (the result of
+    // `bwd_diff` is not differentiable) and would otherwise fail with an internal error downstream.
+    // Diagnose and leave the translate inst in place rather than producing a malformed derivative.
+    if (diagnoseDifferentiatingBackwardDiffResult(sink, targetFunc))
+        return inst;
+
     IRInst* fwdDiffFunc;
     IRBuilder builder(sharedContext->moduleInst);
 

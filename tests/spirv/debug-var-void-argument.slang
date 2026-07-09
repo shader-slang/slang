@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -g2 -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -g2
 //
 // When function arguments are legalized to Void and removed from the function
 // signature, debug variable metadata for the remaining arguments must be

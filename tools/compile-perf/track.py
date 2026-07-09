@@ -108,9 +108,17 @@ def _daily_points(results_dir):
             meta = json.load(open(mp))
         date = meta.get("date") or label[:10]  # label prefix is YYYY-MM-DD
         pts.append({"label": label, "date": date, "kind": "daily",
-                    "commit": meta.get("commit", ""), "runner": meta.get("runner", ""),
+                    "commit": meta.get("commit", ""),
+                    "commit_time": meta.get("commit_time", ""),
+                    "runner": meta.get("runner", ""),
                     "metrics": _point_metrics(rj)})
-    pts.sort(key=lambda p: (p["date"], p["label"]))
+    # Within one date the label tiebreak is the short SHA — lexicographic hex,
+    # unrelated to code order (labels carry only the commit's DATE, and e.g.
+    # master's HEAD is usually committed the previous day, so same-date
+    # siblings are common). Sort by the commit's full timestamp when meta
+    # carries it so siblings land in true code order; the label remains the
+    # deterministic fallback for points registered before commit_time existed.
+    pts.sort(key=lambda p: (p["date"], p.get("commit_time") or "", p["label"]))
     return pts
 
 
@@ -143,7 +151,7 @@ def rebuild(results_dir, index_path):
     return out
 
 
-def register(results_dir, index_path, label, commit, date, corpus_sha=""):
+def register(results_dir, index_path, label, commit, date, corpus_sha="", commit_time=""):
     ddir = os.path.join(results_dir, "daily", label)
     rj = os.path.join(ddir, "results.json")
     if not os.path.exists(rj):
@@ -153,6 +161,10 @@ def register(results_dir, index_path, label, commit, date, corpus_sha=""):
             "runner": runner_id(), "kind": "daily"}
     if corpus_sha:
         meta["corpus_sha"] = corpus_sha
+    # Full committer timestamp (git log -1 --format=%cI): orders same-date
+    # sibling points by code chronology in the tracking series and reports.
+    if commit_time:
+        meta["commit_time"] = commit_time
     with open(os.path.join(ddir, "meta.json"), "w", encoding="utf-8") as fh:
         json.dump(meta, fh, indent=2)
     print(f"registered daily {label} (commit {commit[:9] or '?'}, runner {meta['runner']})")
@@ -210,6 +222,9 @@ def main():
     ap.add_argument("--commit", default="")
     ap.add_argument("--date", default="")
     ap.add_argument("--corpus-sha", default="", dest="corpus_sha")
+    ap.add_argument("--commit-time", default="", dest="commit_time",
+                    help="the swept commit's full committer timestamp "
+                         "(git log -1 --format=%%cI); orders same-date points")
     args = ap.parse_args()
 
     if args.cmd == "runner-id":
@@ -221,7 +236,8 @@ def main():
     elif args.cmd == "register":
         if not args.label:
             ap.error("register needs --label")
-        register(args.results, args.index, args.label, args.commit, args.date, args.corpus_sha)
+        register(args.results, args.index, args.label, args.commit, args.date,
+                 args.corpus_sha, args.commit_time)
     elif args.cmd == "merge-index":
         if not args.index or not os.path.exists(args.index):
             ap.error("merge-index needs --index <new-index.json>")

@@ -20,7 +20,9 @@ Checking, Parameter Binding, Examples, Type-Parameter-Packs, and Pack-Queries se
 write one test per claim along the dimensions the doc commits to (basic, boundary, negative,
 types, back-ends). Functional value observations use `COMPARE_COMPUTE -cpu`; target-dependent
 emission is fanned out across `hlsl / spirv-asm / glsl / metal / wgsl / cpp` `SIMPLE`
-directives; negative claims use `DIAGNOSTIC_TEST` pinned to `E39999`. Pack features are
+directives; negative claims use `DIAGNOSTIC_TEST` pinned to the specific diagnostic code the
+compiler emits for each failure (`E30440` generic constraint not satisfied, `E30442` cannot
+deduce generic argument, `E38029` type argument doesn't conform to interface). Pack features are
 exercised through the same `-cpu` value path (which specializes and monomorphizes them). Two
 doc surfaces are unimplemented by the compiler and are recorded under Doc gaps rather than
 shipped as failing tests: the `where countof(P) == expr` pack-count grammar (rejected at parse

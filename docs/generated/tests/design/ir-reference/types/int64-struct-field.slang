@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=690f6a3084801386b77186394e0f6e8c120824a4
 //META: doc_ref=docs/generated/design/ir-reference/types.md#struct-and-class-containers
-//META: doc_section_digest=dd2ec8aef79db3f253a059c2cf01af45d95108a02c8daa3922585ed0db6730ef
+//META: doc_section_digest=b49b3d499615e99101dda545c0f7fef50e62178dcf5f11f8dcef9ff0becec030
 //META: purpose=Expansion: a struct field of Int64 lowers to a field(...) row carrying Int64.
 //META: intent=expansion
 //META: pipeline_stage=lower
