@@ -25,6 +25,9 @@ on:
       publish:
         description: "push results + update tracking + deploy pages (set false for one-off measurements: results are uploaded as a run artifact only)"
         default: "true"
+      notify-slack:
+        description: "send the Slack notification for this manual run too (scheduled runs always notify) — lets the notification path be tested end-to-end without waiting for the cron"
+        default: "false"
 
 concurrency:
   group: nightly-mdl-perf-test
@@ -308,7 +311,7 @@ jobs:
           python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" --label "${PERF_LABEL:?}"
 
       - name: Notify Slack
-        if: github.event_name == 'schedule' && always()
+        if: always() && (github.event_name == 'schedule' || github.event.inputs.notify-slack == 'true')
         shell: bash
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_COMPILE_PERF }}
