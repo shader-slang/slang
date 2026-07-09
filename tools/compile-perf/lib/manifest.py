@@ -74,7 +74,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["generateIR", "simplifyIR", "compileInner"],
-        sweep_sizes=[1000, 2000, 4000, 8000],
+        sweep_sizes=[500, 1000, 2000, 4000],
     ),
     WorkloadSpec(
         name="serialize",
@@ -83,7 +83,7 @@ WORKLOADS = [
         default_size=1500,
         mode="module",
         primary_timers=["writeSerializedModuleAST", "writeSerializedModuleIR", "compileInner"],
-        sweep_sizes=[500, 1000, 1500, 3000],
+        sweep_sizes=[375, 750, 1500, 3000],
     ),
     WorkloadSpec(
         name="conformance",
@@ -92,7 +92,7 @@ WORKLOADS = [
         default_size=600,
         mode="module",
         primary_timers=["SemanticChecking", "frontEndExecute"],
-        sweep_sizes=[150, 300, 600, 1200],
+        sweep_sizes=[600, 1200, 2400, 4800],
     ),
     WorkloadSpec(
         name="loop_unroll",
@@ -104,7 +104,7 @@ WORKLOADS = [
         primary_timers=["unrollLoopsInModule", "simplifyIR", "compileInner"],
         # default_size must be a member so a --sweep run also yields the canonical
         # (default-size) point used for cross-release comparison.
-        sweep_sizes=[100, 200, 300, 600],
+        sweep_sizes=[75, 150, 300, 600],
     ),
     # ---- suspected-regression features -----------------------------------
     WorkloadSpec(
@@ -115,7 +115,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["compileInner", "linkAndOptimizeIR", "frontEndExecute"],
-        sweep_sizes=[50, 100, 200, 400],
+        sweep_sizes=[25, 50, 100, 200],
     ),
     WorkloadSpec(
         name="dynamic_dispatch",
@@ -143,7 +143,7 @@ WORKLOADS = [
         primary_timers=["compileInner", "specializeModule",
                         "legalizeExistentialTypeLayout", "simplifyIR"],
         # default_size (100) must be a member so --sweep yields the canonical point.
-        sweep_sizes=[40, 80, 100, 200, 320],
+        sweep_sizes=[50, 100, 200, 400],
     ),
     WorkloadSpec(
         name="diagnostics_clean",
@@ -153,7 +153,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["frontEndExecute", "SemanticChecking", "compileInner"],
-        sweep_sizes=[100, 200, 400, 800],
+        sweep_sizes=[400, 800, 1600, 3200],
     ),
     # ---- core compiler-stage buckets --------------------------------------
     WorkloadSpec(
@@ -163,7 +163,7 @@ WORKLOADS = [
         default_size=2000,
         mode="module",
         primary_timers=["parseTranslationUnit", "frontEndExecute"],
-        sweep_sizes=[500, 1000, 2000, 4000],
+        sweep_sizes=[250, 500, 1000, 2000],
     ),
     WorkloadSpec(
         name="sema_generics",
@@ -172,7 +172,7 @@ WORKLOADS = [
         default_size=1000,
         mode="module",
         primary_timers=["SemanticChecking", "frontEndExecute"],
-        sweep_sizes=[250, 500, 1000, 2000],
+        sweep_sizes=[125, 250, 500, 1000],
     ),
     # ---- type checking: operator overload resolution + implicit conversion -
     # Front-end-only (module mode) stressors for the quietly expensive part of
@@ -195,7 +195,7 @@ WORKLOADS = [
         default_size=600,
         mode="module",
         primary_timers=["SemanticChecking", "frontEndExecute"],
-        sweep_sizes=[150, 300, 600, 1200],
+        sweep_sizes=[300, 600, 1200, 2400],
     ),
     WorkloadSpec(
         name="overload_resolution",
@@ -204,7 +204,7 @@ WORKLOADS = [
         default_size=600,
         mode="module",
         primary_timers=["SemanticChecking", "frontEndExecute"],
-        sweep_sizes=[150, 300, 600, 1200],
+        sweep_sizes=[600, 1200, 2400, 4800],
     ),
     WorkloadSpec(
         name="specialization",
@@ -244,7 +244,7 @@ WORKLOADS = [
         mode="link",
         extra_flags=SPIRV,
         primary_timers=["linkIR", "compileInner"],
-        sweep_sizes=[25, 50, 100, 200],
+        sweep_sizes=[50, 100, 200, 400],
     ),
     # ---- source-target emission (the text backends spirv-directly skips) --
     # Same shader as codegen_spirv, but emitted to a textual GPU language so the
@@ -284,7 +284,7 @@ WORKLOADS = [
         extra_flags=SPIRV,
         primary_timers=["compileInner", "frontEndExecute", "linkAndOptimizeIR",
                         "simplifyIR"],
-        sweep_sizes=[20, 40, 80, 160, 320, 640, 1280],
+        sweep_sizes=[160, 320, 640, 1280],
     ),
     # ---- coverage-gap stressors (passes / paths no other workload hits) ---
     WorkloadSpec(
@@ -320,7 +320,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["simplifyIR", "frontEndExecute", "compileInner"],
-        sweep_sizes=[30, 60, 120, 240],
+        sweep_sizes=[60, 120, 240, 480],
     ),
     # ---- real-shader corpus ----------------------------------------------
     WorkloadSpec(
