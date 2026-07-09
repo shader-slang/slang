@@ -8,11 +8,11 @@
 //TEST:SIMPLE(filecheck=GLSL_GRADS):    -allow-glsl -stage fragment -entry fragMain -target glsl -DGLSL
 
 // Sampling gradients available. Implicit LOD sampling translates to OpImageSampleImplicitLod and similar
-//TEST:SIMPLE(filecheck=SPIR_GRADS):  -allow-glsl -stage fragment -entry fragMain -target spirv -DSPIRV
-//TEST:SIMPLE(filecheck=SPIR_GRADS):  -allow-glsl -stage compute -entry computeMain -target spirv -DSPIRV -capability SPV_KHR_compute_shader_derivatives
+//TEST:SIMPLE(filecheck=SPIR_GRADS):  -allow-glsl -stage fragment -entry fragMain -target spirv -DSPIRV -O3
+//TEST:SIMPLE(filecheck=SPIR_GRADS):  -allow-glsl -stage compute -entry computeMain -target spirv -DSPIRV -capability SPV_KHR_compute_shader_derivatives -O3
 
 // sampling gradients not available. Implicit LOD sampling translates to OpImageSampleExplicitLod with Lod=0 and similar
-//TEST:SIMPLE(filecheck=SPIR_NOGRADS):  -allow-glsl -stage vertex -entry vertexMain -target spirv -DSPIRV -DVERTEX_STAGE -DNO_GRADS
+//TEST:SIMPLE(filecheck=SPIR_NOGRADS):  -allow-glsl -stage vertex -entry vertexMain -target spirv -DSPIRV -DVERTEX_STAGE -DNO_GRADS -O3
 
 //TEST:SIMPLE(filecheck=CUDA): -allow-glsl -stage compute  -entry computeMain -target cuda -DCUDA
 //TEST:SIMPLE(filecheck=CUDA): -allow-glsl -stage fragment -entry fragMain -target cuda -DCUDA
@@ -176,11 +176,11 @@ bool textureFuncs( Sampler1D<T> gsampler1D
     // GLSL_NOGRADS-LABEL:  textureFuncs_0
     typealias gvec4 = vector<T.Element,4>;
 
-    constexpr float coord = 0.5;
+    const float coord = 0.5;
 
-    constexpr ivec2 offset2D = ivec2(2);
-    constexpr ivec3 offset3D = ivec3(3);
-    constexpr ivec2 offsets[4] = { ivec2(1), ivec2(2), ivec2(3), ivec2(4) };
+    const ivec2 offset2D = ivec2(2);
+    const ivec3 offset3D = ivec3(3);
+    const ivec2 offsets[4] = { ivec2(1), ivec2(2), ivec2(3), ivec2(4) };
 
     bool ignoreResultF32 = ignoreResult && T.Element is float;
     bool ignoreResultI32 = ignoreResult && T.Element is int32_t;

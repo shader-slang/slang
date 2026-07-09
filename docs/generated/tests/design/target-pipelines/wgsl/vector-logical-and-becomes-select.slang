@@ -1,16 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:46:22Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-fable-5
+//META: generated_at=2026-07-08T15:43:19Z
+//META: source_commit=b15b8060d2525b8cd123f2268fafbcd82e837fb3
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#legalizelogicalandor
-//META: doc_section_digest=77623d96e7c34fe5ce0ff46d2e739f512c1a986984dfae15e8ac26f0397159dc
-//META: purpose=Logical and-or over vector operands is rewritten to a WGSL select() call by legalizeLogicalAndOr
+//META: doc_section_digest=31e2bf882cf18f134bbb571399e19e522a9fece1fc1faa590fa3f2d7c1f3c2cd
+//META: purpose=Logical AND over vector operands is legalized with vector-of-bool operand and result types and emits as a WGSL select over vec3<bool> operands
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// WGSL forbids '&&' on vector operands, so legalizeLogicalAndOr
-// rewrites the expression to select(false_value, true_value, cond).
+// Verifies legalizeLogicalAndOr keeps a vector logical AND expressible
+// in WGSL: the pass fixes the And's operand/result types to
+// vector<bool,N>, and the WGSL output renders the vector And as a
+// select whose operands are vec3<bool> values (WGSL's && is
+// scalar-only). CHECK pins the select over vec3<bool> operands that
+// the legalized And produces.
 
 //TEST:SIMPLE(filecheck=CHECK):-target wgsl -entry main -stage compute
 

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#namespacedecl-moduledecl-filedecl
-//META: doc_section_digest=081eefb5df95b1052109f01da319f6c20dfdae3022986c491d04ad23688d1558
+//META: doc_section_digest=d4f66ae4ecd0c9db07c2bf1b96051aba8c0c48fb0aa33c09268b87a2b7e1d6f4
 //META: purpose=Multiple textual namespace declarations with the same name in one module are collapsed into one NamespaceDecl during parsing.
 //META: intent=functional
 //META: pipeline_stage=check

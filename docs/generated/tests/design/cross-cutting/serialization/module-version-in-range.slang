@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:14:10Z
 //META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
 //META: doc_ref=docs/generated/design/cross-cutting/serialization.md#versioning-and-backwards-compatibility
-//META: doc_section_digest=41997d3fc27d62a3eb3a497d5531f44759bc711d8f020bbbeb72e5763f26c307
+//META: doc_section_digest=d46b97e06e35009ce9c2016dabfff70a207c8c3767540db4769ba1f9398a4df7
 //META: purpose=The version baked into a freshly-written module is a positive integer; the version-gate machinery the doc names always stamps a value.
 //META: intent=functional
 //META: pipeline_stage=link

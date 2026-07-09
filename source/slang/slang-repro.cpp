@@ -775,13 +775,25 @@ struct LoadContext
                 pathInfo.uniqueIdentity = m_base->asRaw(file->uniqueIdentity)->getSlice();
             }
 
-            dstFile = new SourceFile(m_sourceManager, pathInfo, blob->getBufferSize());
-            dstFile->setContents(blob);
+            // Every load path runs the state through `isReproStateValid`
+            // first, and the validator rejects any source-file entry whose
+            // file has no serialized contents (see `validateSourceFileState`
+            // in slang-repro-validator.cpp), so by the time we get here the
+            // blob always exists. Assert that producer-side invariant rather
+            // than silently tolerating a shape the validator forbids.
+            SLANG_RELEASE_ASSERT(blob);
+
+            // Create through the manager's factory so the file is registered in
+            // its owned-files list and freed with the manager. A bare
+            // `new SourceFile` paired with only `addSourceFile` below would be
+            // indexed for lookup but never deleted, since the manager's
+            // destructor only frees the files it created.
+            dstFile = m_sourceManager->createSourceFileWithBlob(pathInfo, blob);
 
             // Add to map
             m_sourceFileMap.add(sourceFile, dstFile);
 
-            // Add to manager
+            // Add to manager's unique-identity lookup
             m_sourceManager->addSourceFile(pathInfo.uniqueIdentity, dstFile);
         }
         return dstFile;

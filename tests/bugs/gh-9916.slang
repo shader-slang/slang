@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry fragmentMain
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry fragmentMain -O3
 //TEST:SIMPLE(filecheck=CHECK_BINDLESS): -target spirv-asm -stage fragment -entry fragmentMain -capability spvBindlessTextureNV -DUSE_BINDLESS_NV
 
 // A global DescriptorHandle constant lowers to a module-scope descriptor-handle

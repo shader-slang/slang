@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:50:00+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#matrix-layout-modifiers
-//META: doc_section_digest=f5bf6180424a661517e1d7eed081d1290763e2ddcb8df006dbe35e44a85076e4
+//META: doc_section_digest=9c412555177df54d8a02994bc4dd822ca52bf44cd21e2b3b4fa0c13ca797d935
 //META: purpose=`row_major` matrix-layout modifier survives into emitted GLSL layout.
 //META: intent=functional
 //META: pipeline_stage=emit

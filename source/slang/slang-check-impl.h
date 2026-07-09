@@ -9,6 +9,9 @@
 #include "slang-compiler.h"
 #include "slang-visitor.h"
 
+#include <cstring>
+#include <type_traits>
+
 namespace Slang
 {
 template<typename P, typename... Args>
@@ -215,11 +218,6 @@ struct GenericArgumentInferenceFailure
         GenericParamUnificationConflict,
     };
 
-    // Empty payload type for `Kind::None`.
-    struct NonePayload
-    {
-    };
-
     struct VariadicPackCountMismatch
     {
         SourceLoc location = SourceLoc();
@@ -292,9 +290,6 @@ struct GenericArgumentInferenceFailure
     Kind kind = Kind::None;
     union
     {
-        // Keep `Kind::None` as a real active union member; without this, GCC
-        // reports maybe-uninitialized errors when overload candidates are copied.
-        NonePayload nonePayload;
         VariadicPackCountMismatch variadicPackCountMismatch;
         GenericArityMismatch genericArityMismatch;
         OrdinaryGenericParamNotInferred ordinaryGenericParamNotInferred;
@@ -303,39 +298,32 @@ struct GenericArgumentInferenceFailure
         GenericParamUnificationConflict genericParamUnificationConflict;
     };
 
-    // Every payload must be trivially destructible: that is what makes the
-    // placement-new in `set*()` / `copyActiveMemberFrom` (which never destroys
-    // the previously active member first) well-defined.
+    // Every payload must be trivially copyable: that is what lets this struct
+    // use the implicitly-defaulted (trivial) copy/assignment, which copies the
+    // whole object representation instead of switching on `kind` to copy only
+    // the active member. A kind-switched copy performs conditional reads of
+    // individual payload fields, which GCC's -Werror=maybe-uninitialized
+    // rejects (it cannot prove the read member is the initialized one) once
+    // `OverloadCandidate` values are copied inside standard-library
+    // algorithms. Trivial copyability also implies trivial destructibility,
+    // which is what makes the placement-new in the `set*()` members (which
+    // never destroy the previously active member first) well-defined.
     static_assert(
-        std::is_trivially_destructible_v<NonePayload> &&
-            std::is_trivially_destructible_v<VariadicPackCountMismatch> &&
-            std::is_trivially_destructible_v<GenericArityMismatch> &&
-            std::is_trivially_destructible_v<OrdinaryGenericParamNotInferred> &&
-            std::is_trivially_destructible_v<InterfaceConformanceNotSatisfied> &&
-            std::is_trivially_destructible_v<GenericConstraintNotSatisfied> &&
-            std::is_trivially_destructible_v<GenericParamUnificationConflict>,
-        "GenericArgumentInferenceFailure payloads must be trivially destructible");
+        std::is_trivially_copyable_v<VariadicPackCountMismatch> &&
+            std::is_trivially_copyable_v<GenericArityMismatch> &&
+            std::is_trivially_copyable_v<OrdinaryGenericParamNotInferred> &&
+            std::is_trivially_copyable_v<InterfaceConformanceNotSatisfied> &&
+            std::is_trivially_copyable_v<GenericConstraintNotSatisfied> &&
+            std::is_trivially_copyable_v<GenericParamUnificationConflict>,
+        "GenericArgumentInferenceFailure payloads must be trivially copyable");
 
-    GenericArgumentInferenceFailure()
-        : nonePayload()
-    {
-    }
-
-    GenericArgumentInferenceFailure(GenericArgumentInferenceFailure const& other)
-        : kind(other.kind)
-    {
-        copyActiveMemberFrom(other);
-    }
-
-    GenericArgumentInferenceFailure& operator=(GenericArgumentInferenceFailure const& other)
-    {
-        if (this == &other)
-            return *this;
-
-        kind = other.kind;
-        copyActiveMemberFrom(other);
-        return *this;
-    }
+    // Zero the tag and the full union storage so every byte of the object is
+    // initialized from birth and the trivial copy above never reads an
+    // indeterminate byte. `Kind::None` is value zero, so the zeroed tag is the
+    // correct "no failure recorded" state; assert that so a reordering of the
+    // enum cannot silently break this constructor.
+    static_assert(int(Kind::None) == 0, "zero-initialized tag must mean Kind::None");
+    GenericArgumentInferenceFailure() { std::memset(static_cast<void*>(this), 0, sizeof(*this)); }
 
     // Select a union variant and return a reference for the caller to populate.
     // Each setter begins the chosen member's lifetime with placement-new and
@@ -373,49 +361,15 @@ struct GenericArgumentInferenceFailure
         kind = Kind::GenericParamUnificationConflict;
         return *new (&genericParamUnificationConflict) GenericParamUnificationConflict();
     }
-
-private:
-    // Begin the lifetime of whichever union member `kind` selects, copy-
-    // constructing it from `other`'s active member. The payloads embed a
-    // `SourceLoc`, which has a user-provided copy constructor and so is not
-    // trivially copyable; assigning into a union member whose lifetime has not
-    // begun would be undefined. Placement-new starts that lifetime correctly
-    // for both copy construction (no member live yet) and copy assignment (the
-    // previously active member is trivially destructible, so it needs no
-    // explicit destruction before the new member is constructed in place).
-    void copyActiveMemberFrom(GenericArgumentInferenceFailure const& other)
-    {
-        switch (other.kind)
-        {
-        case Kind::VariadicPackCountMismatch:
-            new (&variadicPackCountMismatch)
-                VariadicPackCountMismatch(other.variadicPackCountMismatch);
-            break;
-        case Kind::GenericArityMismatch:
-            new (&genericArityMismatch) GenericArityMismatch(other.genericArityMismatch);
-            break;
-        case Kind::OrdinaryGenericParamNotInferred:
-            new (&ordinaryGenericParamNotInferred)
-                OrdinaryGenericParamNotInferred(other.ordinaryGenericParamNotInferred);
-            break;
-        case Kind::InterfaceConformanceNotSatisfied:
-            new (&interfaceConformanceNotSatisfied)
-                InterfaceConformanceNotSatisfied(other.interfaceConformanceNotSatisfied);
-            break;
-        case Kind::GenericConstraintNotSatisfied:
-            new (&genericConstraintNotSatisfied)
-                GenericConstraintNotSatisfied(other.genericConstraintNotSatisfied);
-            break;
-        case Kind::GenericParamUnificationConflict:
-            new (&genericParamUnificationConflict)
-                GenericParamUnificationConflict(other.genericParamUnificationConflict);
-            break;
-        case Kind::None:
-            new (&nonePayload) NonePayload(other.nonePayload);
-            break;
-        }
-    }
 };
+
+// The zero-filling constructor and the implicitly-defaulted copy operations
+// above rely on the whole type — not just each payload — being trivially
+// copyable; assert it so a user-provided copy operation or a non-trivial
+// member cannot be reintroduced without failing the build.
+static_assert(
+    std::is_trivially_copyable_v<GenericArgumentInferenceFailure>,
+    "GenericArgumentInferenceFailure must be trivially copyable");
 
 DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal);
 bool arePackCountExpectedCountsEqual(ASTBuilder* astBuilder, IntVal* left, IntVal* right);

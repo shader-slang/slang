@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ir-reference/values.md#fieldaddress-vs-fieldextract
-//META: doc_section_digest=8630a844543700b647b31dc8de2111393a6e2d61ce3abe98c96f921ac5c4e59f
+//META: doc_section_digest=b929d13db9d53781ec2c11e4242e8e0af59a8dca73a1df81aaebfca2c9aa94f1
 //META: purpose=A `MemberExpr` on a struct *value* (rvalue position) lowers to `get_field`, while the lvalue path uses `get_field_addr`.
 //META: intent=functional
 //META: pipeline_stage=lower

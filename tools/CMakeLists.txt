@@ -377,6 +377,12 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         REQUIRED_BY slang-test
         FOLDER test/tools
     )
+    # The #11856 unit test drives DeviceCache::acquireDevice, so compile it into this module too.
+    target_sources(
+        gfx-unit-test
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/render-test/slang-test-device-cache.cpp
+    )
 
     slang_add_target(
         render-test
@@ -422,7 +428,14 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             SLANG_SHARED_LIBRARY_TOOL
             SLANG_NO_DEPRECATION
         USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
+        LINK_WITH_PRIVATE
+            core
+            compiler-core
+            unit-test
+            slang
+            metal-cpp
+            Threads::Threads
+        LINK_WITH_FRAMEWORK Foundation Metal
         INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/source
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
