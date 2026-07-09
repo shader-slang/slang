@@ -136,7 +136,6 @@ SLANG_UNIT_TEST(memoryArena)
     }
 
     {
-        int count = 0;
         const size_t blockSize = 1024;
 
         for (TestMode mode = TestMode(0); int(mode) < int(TestMode::eCount);
@@ -151,8 +150,6 @@ SLANG_UNIT_TEST(memoryArena)
 
             for (int i = 0; i < 10000; i++)
             {
-                count++;
-
                 const int var = randGen.nextInt32() & 0x3ff;
                 if (var < 3 && blocks.getCount() > 0)
                 {

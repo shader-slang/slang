@@ -234,23 +234,25 @@ layout(constant_id = 1) const int MyConst = 1;
 
 DXC supports a few attributes and command-line arguments for targeting SPIR-V. Similar to DXC, Slang supports a few of the attributes as follows:
 
-### [[vk::binding(binding: int, set: int = 0)]]
+### [[vk]]
 
 Similar to `binding` layout qualifier in Vulkan. It specifies the uniform buffer binding point, and the descriptor set for Vulkan.
 
-### [[vk::location(X)]]
+This attribute may be placed on a global shader parameter or on an entry-point parameter. When placed on an entry-point resource parameter, the requested `binding` and `set` are honored on Khronos targets (SPIR-V and GLSL) and on WGSL; parameters without an explicit binding are allocated automatically into the default set, and an overlapping explicit binding is diagnosed just as for global parameters. On targets that do not support this (for example D3D/HLSL), the attribute on an entry-point parameter is ignored with a warning.
+
+### [[vk]]
 
 Same as `location` layout qualifier in Vulkan. For vertex shader inputs, it specifies the number of the vertex attribute from which input values are taken. For inputs of all other shader types, the location specifies a vector number that can be used to match against outputs from a previous shader stage.
 
-### [[vk::index(Y)]]
+### [[vk]]
 
 Same as `index` layout qualifier in Vulkan. It is valid only when used with [[location(X)]]. For fragment shader outputs, the location and index specify the color output number and index receiving the values of the output. For outputs of all other shader stages, the location specifies a vector number that can be used to match against inputs in a subsequent shader stage.
 
-### [[vk::input_attachment_index(i)]]
+### [[vk]]
 
 Same as `input_attachment_index` layout qualifier in Vulkan. It selects which subpass input is being read from. It is valid only when used on subpassInput type uniform variables.
 
-### [[vk::push_constant]]
+### [[vk]]
 
 Same as `push_constant` layout qualifier in Vulkan. It is applicable only to a uniform block and it will be copied to a special memory location where the GPU may have more direct access.
 
@@ -420,7 +422,7 @@ It cannot be used with -emit-spirv-directly
 ### -g
 
 Include debug information in the generated code, where possible.
-When targeting SPIR-V, this option emits [SPIR-V NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc).
+When targeting SPIR-V, this option emits [SPIR-V NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.asciidoc).
 
 ### -O<optimization-level>
 

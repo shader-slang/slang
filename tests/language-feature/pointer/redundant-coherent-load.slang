@@ -19,7 +19,8 @@ void computeMain(uint3 group_thread_id: SV_GroupThreadID)
     *ptr = 8;
     outputBuffer[0] = loadCoherent<4, MemoryScope::Invocation>(ptr);
     // CHECK: 8
-    // SPIRV: OpStore %ptr %int_8
+    // SPIRV: %[[#PTR:]] = OpPtrAccessChain {{.*}} %int_0
+    // SPIRV: OpStore %[[#PTR]] %int_8
     // SPIRV-NOT: OpLoad
     // SPIRV: %[[#OUTPUT_BUFFER1:]] = OpAccessChain {{.*}} %outputBuffer %{{.*}} %int_0
     // SPIRV: OpStore %[[#OUTPUT_BUFFER1]] %int_8
@@ -31,7 +32,7 @@ void computeMain(uint3 group_thread_id: SV_GroupThreadID)
     storeCoherent<4, MemoryScope::Device>(offset1, 9);
     outputBuffer[1] = loadCoherent<4, MemoryScope::Workgroup>(offset1);
     // CHECK-NEXT: 9
-    // SPIRV: %[[#PTR_OFFSET:]] = OpPtrAccessChain {{.*}} %ptr %int_1
+    // SPIRV: %[[#PTR_OFFSET:]] = OpPtrAccessChain {{.*}} %[[#PTR]] %int_1
     // SPIRV: OpStore %[[#PTR_OFFSET]] %int_9
     // SPIRV-NOT: OpLoad
     // SPIRV: %[[#OUTPUT_BUFFER2:]] = OpAccessChain {{.*}} %outputBuffer %{{.*}} %int_1

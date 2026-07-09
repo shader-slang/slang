@@ -365,6 +365,10 @@ public:
         LLVMDebugNode* file,
         int line) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
+    getDebugForwardDeclareType(CharSlice name, LLVMDebugNode* file, int line) override;
+    SLANG_NO_THROW void SLANG_MCALL
+    replaceDebugForwardDeclareType(LLVMDebugNode* replace, LLVMDebugNode* with) override;
+    SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL
     getDebugFunctionType(LLVMDebugNode* returnType, Slice<LLVMDebugNode*> paramTypes) override;
     SLANG_NO_THROW LLVMDebugNode* SLANG_MCALL getDebugFunction(
         LLVMDebugNode* funcType,
@@ -719,16 +723,16 @@ void LLVMBuilder::finalize()
     // llvmModule->print(rso, nullptr);
     // printf("%s\n", out.c_str());
 
+    // Debug info must be finalized before verifyModule, as otherwise the
+    // unresolved debug nodes can cause verification errors.
+    if (options.debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
+        llvmDebugBuilder->finalize();
+
     llvm::verifyModule(*llvmModule, &llvm::errs());
 
     // O0 is separately handled inside `optimize()`; we need to call it in
     // any case to make sure that `ForceInline` functions get inlined.
     optimize();
-
-    if (options.debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
-    {
-        llvmDebugBuilder->finalize();
-    }
 }
 
 void LLVMBuilder::emitGlobalLLVMIR(const std::string& textIR)
@@ -1723,9 +1727,11 @@ LLVMDebugNode* LLVMBuilder::getDebugVectorType(
 
     llvm::Metadata* subscript = llvmDebugBuilder->getOrCreateSubrange(0, elementCount);
     llvm::DINodeArray subscriptArray = llvmDebugBuilder->getOrCreateArray(subscript);
+    uint64_t sizeBits = sizeBytes > 0 ? static_cast<uint64_t>(sizeBytes) * 8 : 0;
+    uint64_t alignBits = alignBytes > 0 ? static_cast<uint64_t>(alignBytes) * 8 : 0;
     return llvmDebugBuilder->createVectorType(
-        sizeBytes * 8,
-        alignBytes * 8,
+        sizeBits,
+        alignBits,
         llvm::cast<llvm::DIType>(elementType),
         subscriptArray);
 }
@@ -1738,9 +1744,12 @@ LLVMDebugNode* LLVMBuilder::getDebugArrayType(
 {
     llvm::Metadata* subscript = llvmDebugBuilder->getOrCreateSubrange(0, elementCount);
     llvm::DINodeArray subscriptArray = llvmDebugBuilder->getOrCreateArray(subscript);
+    // Guard against invalid (negative) sizes from unsized/dynamically-sized types.
+    uint64_t sizeBits = sizeBytes > 0 ? static_cast<uint64_t>(sizeBytes) * 8 : 0;
+    uint64_t alignBits = alignBytes > 0 ? static_cast<uint64_t>(alignBytes) * 8 : 0;
     return llvmDebugBuilder->createArrayType(
-        sizeBytes * 8,
-        alignBytes * 8,
+        sizeBits,
+        alignBits,
         llvm::cast<llvm::DIType>(elementType),
         subscriptArray);
 }
@@ -1762,9 +1771,9 @@ LLVMDebugNode* LLVMBuilder::getDebugStructField(
         charSliceToLLVM(name),
         llvmFile,
         line,
-        size * 8,
-        alignment * 8,
-        offset * 8,
+        size > 0 ? static_cast<uint64_t>(size) * 8 : 0,
+        alignment > 0 ? static_cast<uint64_t>(alignment) * 8 : 0,
+        offset > 0 ? static_cast<uint64_t>(offset) * 8 : 0,
         llvm::DINode::FlagZero,
         llvm::cast<llvm::DIType>(type));
 }
@@ -1788,11 +1797,34 @@ LLVMDebugNode* LLVMBuilder::getDebugStructType(
         charSliceToLLVM(name),
         llvmFile,
         line,
-        size * 8,
-        alignment * 8,
+        size > 0 ? static_cast<uint64_t>(size) * 8 : 0,
+        alignment > 0 ? static_cast<uint64_t>(alignment) * 8 : 0,
         llvm::DINode::FlagZero,
         nullptr,
         fieldTypes);
+}
+
+LLVMDebugNode* LLVMBuilder::getDebugForwardDeclareType(
+    CharSlice name,
+    LLVMDebugNode* file,
+    int line)
+{
+    if (!file)
+        file = compileUnit->getFile();
+    llvm::DIFile* llvmFile = llvm::cast<llvm::DIFile>(file);
+
+    return llvmDebugBuilder->createReplaceableCompositeType(
+        llvm::dwarf::DW_TAG_structure_type,
+        charSliceToLLVM(name),
+        llvmFile,
+        llvmFile,
+        line);
+}
+
+void LLVMBuilder::replaceDebugForwardDeclareType(LLVMDebugNode* replace, LLVMDebugNode* with)
+{
+    llvm::TempMDNode fwdDecl(replace);
+    llvmDebugBuilder->replaceTemporary(std::move(fwdDecl), with);
 }
 
 LLVMDebugNode* LLVMBuilder::getDebugFunctionType(
@@ -2291,8 +2323,9 @@ SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
 
     std::unique_ptr<llvm::orc::LLJIT> jit;
     {
-        llvm::orc::LLJITBuilder jitBuilder;
-        llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = jitBuilder.create();
+        // Construct the LLJIT with AVX-512 disabled in the JIT TargetMachine;
+        // see #11062 and the docstring for createAVX512SafeLLJIT.
+        llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = createAVX512SafeLLJIT();
 
         if (!expectJit)
         {
@@ -2343,7 +2376,7 @@ SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
 
 } // namespace slang_llvm
 
-extern "C" SLANG_DLL_EXPORT SlangResult createLLVMBuilder_V2(
+extern "C" SLANG_DLL_EXPORT SlangResult createLLVMBuilder_V3(
     const SlangUUID& intfGuid,
     Slang::ILLVMBuilder** out,
     Slang::LLVMBuilderOptions options,

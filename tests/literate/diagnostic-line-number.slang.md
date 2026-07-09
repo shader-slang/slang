@@ -9,7 +9,7 @@ report the correct line number from the original Markdown file.
 void foo()
 {
     int x = undefinedVar;
-//CHECK:    ^ undefined identifier
-//CHECK:    ^ undefined identifier 'undefinedVar'.
+//CHECK:    ^^^^^^^^^^^^ undefined identifier
+//CHECK:    ^^^^^^^^^^^^ undefined identifier 'undefinedVar'.
 }
 ```

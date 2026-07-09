@@ -1,6 +1,5 @@
 implementing neural;
 
-#include "common-def.slang"
 
 
 internal interface IArrayAccessor<T>
@@ -9,6 +8,16 @@ internal interface IArrayAccessor<T>
     {
         static_assert(false, "atomicAdd is not supported for IArrayAccessor");
     }
+
+    /// Packed vector atomic add for two consecutive elements starting at index.
+    /// For half types on CUDA, this maps to a single half2 atomic instruction.
+    /// Default implementation falls back to two scalar atomicAdd calls.
+    internal void atomicAddPacked(int index, vector<T, 2> value)
+    {
+        static_assert(false, "atomicAdd is not supported for IArrayAccessor");
+    }
+
+    internal uint4 readUint4(int uint4Index);
 
     __subscript(int index)->T
     {
@@ -23,6 +32,38 @@ internal extension<T> RWStructuredBuffer<T>.Handle : IArrayAccessor<T>
     override internal void atomicAdd(int index, T value)
     {
         __atomic_reduce_add(this[index], value);
+    }
+
+    [ForceInline]
+    override internal void atomicAddPacked(int index, vector<T, 2> value)
+    {
+        __target_switch
+        {
+        case cuda:
+            // Packed atomic requires the address to be aligned to sizeof(vector<T, 2>).
+            // For half, index must be even (aligned to 4 bytes).
+            if ((index & 1) == 0)
+            {
+                let scalarPtr = &this[index];
+                let vecPtr = reinterpret<vector<T, 2>*>(scalarPtr);
+                __atomic_reduce_add(vecPtr[0], value);
+            }
+            else
+            {
+                // Misaligned: fall back to two scalar atomics.
+                __atomic_reduce_add(this[index], value[0]);
+                __atomic_reduce_add(this[index + 1], value[1]);
+            }
+        default:
+            // On other targets, fall back to two scalar atomic adds.
+            __atomic_reduce_add(this[index], value[0]);
+            __atomic_reduce_add(this[index + 1], value[1]);
+        }
+    }
+
+    override internal uint4 readUint4(int uint4Index)
+    {
+        return uint4(0);
     }
 }
 
@@ -42,10 +83,45 @@ internal extension<T> Ptr<T> : IArrayAccessor<T>
     {
         __atomic_reduce_add(this[index], value);
     }
+
+    [ForceInline]
+    override internal void atomicAddPacked(int index, vector<T, 2> value)
+    {
+        __target_switch
+        {
+        case cuda:
+            // Packed atomic requires the address to be aligned to sizeof(vector<T, 2>).
+            // For half, index must be even (aligned to 4 bytes).
+            if ((index & 1) == 0)
+            {
+                let scalarPtr = this + index;
+                let vecPtr = reinterpret<vector<T, 2> *>(scalarPtr);
+                __atomic_reduce_add(vecPtr[0], value);
+            }
+            else
+            {
+                // Misaligned: fall back to two scalar atomics.
+                __atomic_reduce_add(this[index], value[0]);
+                __atomic_reduce_add(this[index + 1], value[1]);
+            }
+        default:
+            // On other targets, fall back to two scalar atomic adds.
+            __atomic_reduce_add(this[index], value[0]);
+            __atomic_reduce_add(this[index + 1], value[1]);
+        }
+    }
+
+    override internal uint4 readUint4(int uint4Index)
+    {
+        return uint4(0);
+    }
 }
 
 internal extension<T, int N> Array<T, N> : IArrayAccessor<T>
 {
+    static const int elementsPerUint4 = sizeof(uint4) / sizeof(T);
+    static const int uint4Count = N / elementsPerUint4;
+
     internal __subscript(int index) -> T
     {
         [ForceInline]
@@ -54,9 +130,16 @@ internal extension<T, int N> Array<T, N> : IArrayAccessor<T>
         [ForceInline]
         set { this[index] = newValue; }
     }
+
+    [ForceInline]
+    override internal uint4 readUint4(int uint4Index)
+    {
+        let uint4Array = bit_cast<uint4[uint4Count]>(this);
+        return uint4Array[uint4Index];
+    }
 }
 
-VISIBILITY_LEVEL enum AccessOp : uint32_t
+internal enum AccessOp : uint32_t
 {
     READ,
     WRITE,

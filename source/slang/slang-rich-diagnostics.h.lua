@@ -59,6 +59,7 @@ local cpp_type_map = {
 	capabilityatomlist = "List<CapabilityAtom>",
 	astnodetype = "ASTNodeType",
 	codegentarget = "CodeGenTarget",
+	declvisibility = "DeclVisibility",
 }
 function M.getCppType(lua_type)
 	local mapped = cpp_type_map[lua_type]
@@ -229,6 +230,33 @@ function M.getSeverityEnum(severity_name)
 			"Unknown severity '"
 				.. tostring(severity_name)
 				.. "'. Supported severities: "
+				.. table.concat(supported, ", ")
+		)
+	end
+	return mapped
+end
+
+-- Helper function to convert warning-level (group) names to C++ WarningLevel enum values.
+local warning_level_map = {
+	["default"] = "WarningLevel::Default",
+	["all"] = "WarningLevel::All",
+	["extra"] = "WarningLevel::Extra",
+	["pedantic"] = "WarningLevel::Pedantic",
+}
+
+function M.getWarningLevelEnum(level_name)
+	-- Default to the always-on group when a diagnostic carries no explicit level.
+	local mapped = warning_level_map[level_name or "default"]
+	if not mapped then
+		local supported = {}
+		for key in pairs(warning_level_map) do
+			supported[#supported + 1] = key
+		end
+		table.sort(supported)
+		error(
+			"Unknown warning level '"
+				.. tostring(level_name)
+				.. "'. Supported levels: "
 				.. table.concat(supported, ", ")
 		)
 	end

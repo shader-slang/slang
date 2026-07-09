@@ -162,7 +162,7 @@ public:
     Slang::String dllDirectoryPath;
     Slang::String exePath;
 
-    /// Timeout time for communication over connection.
+    /// Timeout time for communication over connection, in milliseconds.
     /// NOTE! If the timeout is hit, the connection will be destroyed, and then recreated.
     /// To test it, compile the core module, if it takes too much time, the core module will be
     /// repeatedly compiled and each time fail.
@@ -172,7 +172,9 @@ public:
     /// TODO(JS): We could split the core module compilation from other actions, and have timeout
     /// specific for that. To do this we could have a 'compileCoreModule' RPC method.
     ///
-    /// Current default is 120 seconds.
+    /// Current default is 120 seconds. Windows debug builds default to 300 seconds, and ARM debug
+    /// builds default to 600 seconds. SLANG_TEST_RPC_TIMEOUT_MS can override the default with a
+    /// value in the range 1..86400000 milliseconds.
     Slang::Int connectionTimeOutInMs = 120 * 1000;
 
     void setThreadIndex(int index);
@@ -203,10 +205,12 @@ public:
 
     Slang::IFileCheck* getFileCheck() { return m_fileCheck; };
 
+    /// Invoke after it has been determined that the LLVM render target is enabled
+    SlangResult locateLLVMFileCheck();
+
 protected:
     SlangResult _createJSONRPCConnection(Slang::RefPtr<Slang::JSONRPCConnection>& out);
 
-    SlangResult locateFileCheck();
 
     struct SharedLibraryTool
     {

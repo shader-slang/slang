@@ -54,14 +54,75 @@ namespace SlangRecord
 // Record an output parameter (for non-COM T* outputs, no wrapping)
 #define RECORD_OUTPUT(arg) _ctx.record(RecordFlag::Output, *arg)
 
+// Release a replay-only PREPARE_POINTER_OUTPUT temporary at method-scope exit,
+// but only when that temporary is a blob pointer.
+//
+// When the caller passes a null output pointer, PREPARE_POINTER_OUTPUT redirects
+// it to `_temp_<arg>` (this is always the case on the replay path, where
+// callWithDefaults passes null, and can also happen in record mode when the user
+// discards the output). `_temp_<arg>` then receives a freshly created owning
+// reference: the real implementation (getActual()) writes a blob into it, and on
+// playback recordBlobByHash detaches the recorded blob into it. The proxy method
+// discards that output, so `_temp_<arg>` is the sole owner and must release it or
+// the blob leaks (issue #11936).
+//
+// This is restricted to blobs on purpose. Blobs are serialized by content hash
+// and are never registered in the proxy registry, so the temporary really is
+// their sole owner. Registry-tracked proxies (ISession, IModule, file systems,
+// ...) are not ISlangBlob-derived, so the guard is a compile-time no-op for
+// them; their lifetime is driven by the replayed addRef/release stream and must
+// not be force-released here. Non-COM temporaries (e.g. SlangPathType) are also
+// no-ops. Whenever `arg` was a non-null caller pointer, `_temp_<arg>` stays null,
+// so the guard never touches a caller-provided output.
+template<typename T>
+struct BlobOutputTempReleaser
+{
+    T& temp;
+    explicit BlobOutputTempReleaser(T& t)
+        : temp(t)
+    {
+    }
+    ~BlobOutputTempReleaser()
+    {
+        if constexpr (
+            std::is_pointer_v<T> && std::is_base_of_v<ISlangBlob, std::remove_pointer_t<T>>)
+        {
+            if (temp)
+                temp->release();
+        }
+    }
+    BlobOutputTempReleaser(const BlobOutputTempReleaser&) = delete;
+    BlobOutputTempReleaser& operator=(const BlobOutputTempReleaser&) = delete;
+};
+
 // Prepare a pointer output parameter (T** style)
 // Creates a temporary local variable if the pointer is null.
 // The temporary lives until the end of the enclosing scope, so this macro
 // must be used at function-body scope (not inside an inner block) to ensure
 // the temporary outlives all subsequent uses of `arg`.
+// The temporary is named `_temp_<arg>` and is zero-initialized. Besides the null-redirect above,
+// call sites may redirect `arg` to `&_temp_<arg>` on a failure path so a subsequent RECORD_OUTPUT
+// serializes a defined 0 rather than dereferencing caller memory the wrapped API left unwritten on
+// failure (see GlobalSessionProxy::getDownstreamCompilerVersion, issue #11865).
+// A BlobOutputTempReleaser is attached so a blob left in `_temp_<arg>` on the
+// replay path is released at scope exit rather than leaked (issue #11936).
 // Usage: PREPARE_POINTER_OUTPUT(outBlob) where outBlob is ISlangBlob**
 //        or PREPARE_POINTER_OUTPUT(pathTypeOut) where pathTypeOut is SlangPathType*
-#define PREPARE_POINTER_OUTPUT(arg)             \
+#define PREPARE_POINTER_OUTPUT(arg)                                                           \
+    std::decay_t<decltype(*arg)> _temp_##arg{};                                               \
+    ::SlangRecord::BlobOutputTempReleaser<std::decay_t<decltype(*arg)>> _temp_releaser_##arg{ \
+        _temp_##arg};                                                                         \
+    if (!arg)                                                                                 \
+    arg = &_temp_##arg
+
+// Prepare a pointer input parameter (T* style)
+// During replay, callWithDefaults passes nullptr for pointer args. This macro
+// provides a stack-allocated default so RECORD_INPUT(*arg) can read into it.
+// The temporary lives until the end of the enclosing scope, so this macro
+// must be used at function-body scope (not inside an inner block) to ensure
+// the temporary outlives all subsequent uses of `arg`.
+// Usage: PREPARE_POINTER_INPUT(sessionDesc) where sessionDesc is SessionDesc*
+#define PREPARE_POINTER_INPUT(arg)              \
     std::decay_t<decltype(*arg)> _temp_##arg{}; \
     if (!arg)                                   \
     arg = &_temp_##arg

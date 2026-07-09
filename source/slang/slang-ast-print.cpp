@@ -84,7 +84,7 @@ void ASTPrinter::addExpr(Expr* expr)
 
     auto& sb = m_builder;
 
-    if (const auto incompleteExpr = as<IncompleteExpr>(expr))
+    if (const auto incompleteExpr = as<IncompleteExpr>(expr); incompleteExpr)
     {
         sb << "<incomplete>";
     }
@@ -179,10 +179,10 @@ void ASTPrinter::addExpr(Expr* expr)
             sb << "u";
             break;
         case BaseType::Int64:
-            sb << "l";
+            sb << "ll";
             break;
         case BaseType::UInt64:
-            sb << "ul";
+            sb << "ull";
             break;
         case BaseType::Int16:
             sb << "s";
@@ -195,6 +195,12 @@ void ASTPrinter::addExpr(Expr* expr)
             break;
         case BaseType::UInt8:
             sb << "ub";
+            break;
+        case BaseType::IntPtr:
+            sb << "z";
+            break;
+        case BaseType::UIntPtr:
+            sb << "uz";
             break;
         default:
             // Don't add a suffix for other types
@@ -292,11 +298,31 @@ void ASTPrinter::addExpr(Expr* expr)
         }
         sb << ")";
     }
+    else if (const auto builtinOpExpr = as<BuiltinOperatorExpr>(expr))
+    {
+        // A fast-path builtin operator renders like the equivalent `operator OP` form:
+        // `(a OP b)` for binary, `OP a` for unary.
+        auto opText = getBuiltinOperationOpText(builtinOpExpr->op);
+        if (builtinOpExpr->arguments.getCount() == 2)
+        {
+            sb << "(";
+            addExpr(builtinOpExpr->arguments[0]);
+            sb << " " << opText << " ";
+            addExpr(builtinOpExpr->arguments[1]);
+            sb << ")";
+        }
+        else if (builtinOpExpr->arguments.getCount() == 1)
+        {
+            sb << opText;
+            addExpr(builtinOpExpr->arguments[0]);
+        }
+        return;
+    }
     else if (const auto invokeExpr = as<InvokeExpr>(expr))
     {
         if (const auto operatorExpr = as<OperatorExpr>(invokeExpr))
         {
-            if (const auto infixExpr = as<InfixExpr>(operatorExpr))
+            if (const auto infixExpr = as<InfixExpr>(operatorExpr); infixExpr)
             {
                 // Binary operator
                 if (invokeExpr->arguments.getCount() == 2)
@@ -317,7 +343,7 @@ void ASTPrinter::addExpr(Expr* expr)
                     return;
                 }
             }
-            else if (const auto prefixExpr = as<PrefixExpr>(operatorExpr))
+            else if (const auto prefixExpr = as<PrefixExpr>(operatorExpr); prefixExpr)
             {
                 // Prefix operator
                 if (operatorExpr->functionExpr && as<VarExpr>(operatorExpr->functionExpr) &&
@@ -336,7 +362,7 @@ void ASTPrinter::addExpr(Expr* expr)
                 }
                 return;
             }
-            else if (const auto postfixExpr = as<PostfixExpr>(operatorExpr))
+            else if (const auto postfixExpr = as<PostfixExpr>(operatorExpr); postfixExpr)
             {
                 // Postfix operator
                 if (invokeExpr->arguments.getCount() > 0)
@@ -355,7 +381,7 @@ void ASTPrinter::addExpr(Expr* expr)
                 }
                 return;
             }
-            else if (const auto selectExpr = as<SelectExpr>(operatorExpr))
+            else if (const auto selectExpr = as<SelectExpr>(operatorExpr); selectExpr)
             {
                 // Ternary operator: cond ? ifTrue : ifFalse
                 if (invokeExpr->arguments.getCount() == 3)
@@ -818,19 +844,23 @@ void ASTPrinter::addExpr(Expr* expr)
     }
     else if (const auto higherOrderInvokeExpr = as<HigherOrderInvokeExpr>(expr))
     {
-        if (const auto primalSubstituteExpr = as<PrimalSubstituteExpr>(higherOrderInvokeExpr))
+        if (const auto primalSubstituteExpr = as<PrimalSubstituteExpr>(higherOrderInvokeExpr);
+            primalSubstituteExpr)
         {
             sb << "__primal(";
         }
-        else if (const auto forwardDiffExpr = as<ForwardDifferentiateExpr>(higherOrderInvokeExpr))
+        else if (const auto forwardDiffExpr = as<ForwardDifferentiateExpr>(higherOrderInvokeExpr);
+                 forwardDiffExpr)
         {
             sb << "__fwd_diff(";
         }
-        else if (const auto backwardDiffExpr = as<BackwardDifferentiateExpr>(higherOrderInvokeExpr))
+        else if (const auto backwardDiffExpr = as<BackwardDifferentiateExpr>(higherOrderInvokeExpr);
+                 backwardDiffExpr)
         {
             sb << "__bwd_diff(";
         }
-        else if (const auto dispatchKernelExpr = as<DispatchKernelExpr>(higherOrderInvokeExpr))
+        else if (const auto dispatchKernelExpr = as<DispatchKernelExpr>(higherOrderInvokeExpr);
+                 dispatchKernelExpr)
         {
             sb << "__dispatch_kernel(";
         }
@@ -1018,7 +1048,7 @@ void ASTPrinter::addExpr(Expr* expr)
 
         sb << "<";
         bool first = true;
-        for (auto arg : partiallyAppliedGenericExpr->knownGenericArgs)
+        for (auto arg : partiallyAppliedGenericExpr->providedOrdinaryArgs)
         {
             if (!first)
                 sb << ", ";
@@ -1165,7 +1195,7 @@ void ASTPrinter::addExpr(Expr* expr)
             addExpr(tryExpr->base);
         }
     }
-    else if (const auto defaultConstructExpr = as<DefaultConstructExpr>(expr))
+    else if (const auto defaultConstructExpr = as<DefaultConstructExpr>(expr); defaultConstructExpr)
     {
         sb << "default(";
         addType(expr->type);
@@ -1670,7 +1700,7 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
             m_builder << " ";
         }
     }
-    else if (const auto propertyDecl = as<PropertyDecl>(decl))
+    else if (const auto propertyDecl = as<PropertyDecl>(decl); propertyDecl)
     {
         m_builder << "property ";
     }
@@ -1698,11 +1728,11 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
             m_builder << " ";
         }
     }
-    else if (const auto assocType = as<AssocTypeDecl>(decl))
+    else if (const auto assocType = as<AssocTypeDecl>(decl); assocType)
     {
         m_builder << "associatedtype ";
     }
-    else if (const auto attribute = as<AttributeDecl>(decl))
+    else if (const auto attribute = as<AttributeDecl>(decl); attribute)
     {
         m_builder << "attribute ";
     }
@@ -1763,6 +1793,67 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
     ASTBuilder* astBuilder)
 {
     return getDeclSignatureString(item.declRef, astBuilder);
+}
+
+void ASTPrinter::addGenericConstraint(Decl* constraintDecl)
+{
+    StringBuilder& sb = m_builder;
+    if (auto typeConstraint = as<GenericTypeConstraintDecl>(constraintDecl))
+    {
+        addType(typeConstraint->sub.type);
+        sb << (typeConstraint->isEqualityConstraint ? " == " : " : ");
+        addType(typeConstraint->sup.type);
+    }
+    else if (auto coercion = as<TypeCoercionConstraintDecl>(constraintDecl))
+    {
+        // A coercion constraint is written `where To(From)` in Slang, requiring
+        // `From` to be convertible to `To`; render it the same way so the
+        // diagnostic echoes the source syntax.
+        addType(coercion->toType.type);
+        sb << "(";
+        addType(coercion->fromType.type);
+        sb << ")";
+    }
+    else if (auto nonEmpty = as<NonEmptyPackConstraintDecl>(constraintDecl))
+    {
+        sb << "nonempty(";
+        if (auto packVar = as<DeclRefExpr>(nonEmpty->packExpr))
+            sb << getText(packVar->name);
+        sb << ")";
+    }
+    else if (auto packCount = as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
+    {
+        // A variadic pack-count constraint is written `where countof(P) == N`,
+        // requiring the pack `P` to have exactly `N` elements; echo that form.
+        sb << "countof(";
+        addExpr(packCount->packExpr);
+        sb << ") == ";
+        if (packCount->expectedCountExpr)
+            addExpr(packCount->expectedCountExpr);
+        else if (packCount->expectedCountVal)
+            addVal(packCount->expectedCountVal);
+    }
+    else if (auto hasDiffTypeInfo = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
+    {
+        // A differentiable-type-info constraint is written `where
+        // __hasDiffTypeInfo(T)`; echo that form.
+        sb << "__hasDiffTypeInfo(";
+        addType(hasDiffTypeInfo->type.type);
+        sb << ")";
+    }
+    else if (constraintDecl && constraintDecl->getName())
+    {
+        sb << getText(constraintDecl->getName());
+    }
+}
+
+/* static */ String ASTPrinter::getGenericConstraintString(
+    Decl* constraintDecl,
+    ASTBuilder* astBuilder)
+{
+    ASTPrinter astPrinter(astBuilder);
+    astPrinter.addGenericConstraint(constraintDecl);
+    return astPrinter.getString();
 }
 
 /* static */ UnownedStringSlice ASTPrinter::getPart(

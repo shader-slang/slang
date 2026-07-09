@@ -488,6 +488,152 @@ Modifier* SemanticsVisitor::validateAttribute(
 
         waveSizeAttr->numLanes = value;
     }
+    else if (auto nodeLaunchAttr = as<NodeLaunchAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        String mode;
+        if (!checkLiteralStringVal(attr->args[0], &mode))
+            return nullptr;
+        auto modeSlice = mode.getUnownedSlice();
+        if (modeSlice.caseInsensitiveEquals(toSlice("broadcasting")))
+        {
+            nodeLaunchAttr->mode = "broadcasting";
+        }
+        else if (modeSlice.caseInsensitiveEquals(toSlice("thread")))
+        {
+            nodeLaunchAttr->mode = "thread";
+        }
+        else if (modeSlice.caseInsensitiveEquals(toSlice("coalescing")))
+        {
+            nodeLaunchAttr->mode = "coalescing";
+        }
+        else
+        {
+            getSink()->diagnose(Diagnostics::InvalidNodeLaunchMode{.mode = mode, .attr = attr});
+            return nullptr;
+        }
+    }
+    else if (auto gridAttr = as<NodeMaxDispatchGridAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 3)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "3",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        gridAttr->x = checkConstantIntVal(attr->args[0]);
+        gridAttr->y = checkConstantIntVal(attr->args[1]);
+        gridAttr->z = checkConstantIntVal(attr->args[2]);
+        if (!gridAttr->x || !gridAttr->y || !gridAttr->z)
+            return nullptr;
+    }
+    else if (auto fixedGridAttr = as<NodeDispatchGridAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 3)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "3",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        fixedGridAttr->x = checkConstantIntVal(attr->args[0]);
+        fixedGridAttr->y = checkConstantIntVal(attr->args[1]);
+        fixedGridAttr->z = checkConstantIntVal(attr->args[2]);
+        if (!fixedGridAttr->x || !fixedGridAttr->y || !fixedGridAttr->z)
+            return nullptr;
+    }
+    else if (auto maxRecAttr = as<MaxRecordsAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        auto value = checkConstantIntVal(attr->args[0]);
+        if (!value)
+            return nullptr;
+        maxRecAttr->value = value;
+    }
+    else if (auto nodeIDAttr = as<NodeIDAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount < 1 || argCount > 2)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1...2",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+
+        String name;
+        if (!checkLiteralStringVal(attr->args[0], &name))
+            return nullptr;
+        nodeIDAttr->name = name;
+        if (argCount == 2)
+        {
+            auto arrayIndex = checkConstantIntVal(attr->args[1]);
+            if (!arrayIndex)
+                return nullptr;
+            nodeIDAttr->arrayIndex = arrayIndex;
+        }
+        else
+        {
+            nodeIDAttr->arrayIndex = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 0);
+        }
+    }
+    else if (auto nodeArraySizeAttr = as<NodeArraySizeAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 1)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "1",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+        auto count = checkConstantIntVal(attr->args[0]);
+        if (!count)
+            return nullptr;
+        nodeArraySizeAttr->count = count;
+    }
+    else if (as<NodeIsProgramEntryAttribute>(attr) || as<AllowSparseNodesAttribute>(attr))
+    {
+        auto argCount = attr->args.getCount();
+        if (argCount != 0)
+        {
+            getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attrName = attr->keywordName,
+                .expected = "0",
+                .provided = (int64_t)argCount,
+                .attr = attr});
+            return nullptr;
+        }
+    }
     else if (auto anyValueSizeAttr = as<AnyValueSizeAttribute>(attr))
     {
         // This case handles GLSL-oriented layout attributes
@@ -814,7 +960,7 @@ Modifier* SemanticsVisitor::validateAttribute(
             addModifier(attr->attributeDecl, targetModifier);
         }
     }
-    else if (const auto unrollAttr = as<UnrollAttribute>(attr))
+    else if (const auto unrollAttr = as<UnrollAttribute>(attr); unrollAttr)
     {
         // Check has an argument. We need this because default behavior is to give an error
         // if an attribute has arguments, but not handled explicitly (and the default param will
@@ -848,7 +994,7 @@ Modifier* SemanticsVisitor::validateAttribute(
             maxItersAttrs->value = checkLinkTimeConstantIntVal(attr->args[0]);
         }
     }
-    else if (const auto userDefAttr = as<UserDefinedAttribute>(attr))
+    else if (const auto userDefAttr = as<UserDefinedAttribute>(attr); userDefAttr)
     {
         // check arguments against attribute parameters defined in attribClassDecl
         Index paramIndex = 0;
@@ -1090,7 +1236,8 @@ Modifier* SemanticsVisitor::validateAttribute(
             return nullptr;
         }
     }
-    else if (const auto derivativeMemberAttr = as<DerivativeMemberAttribute>(attr))
+    else if (const auto derivativeMemberAttr = as<DerivativeMemberAttribute>(attr);
+             derivativeMemberAttr)
     {
         auto varDecl = as<VarDeclBase>(attrTarget);
         if (!varDecl)
@@ -1112,6 +1259,36 @@ Modifier* SemanticsVisitor::validateAttribute(
         }
 
         deprecatedAttr->message = message;
+    }
+    else if (auto removedSinceAttr = as<RemovedSinceAttribute>(attr))
+    {
+        SLANG_ASSERT(attr->args.getCount() == 2);
+
+        auto sinceVersion = checkConstantIntVal(attr->args[0]);
+        if (sinceVersion == nullptr)
+        {
+            return nullptr;
+        }
+
+        const int32_t kMinVersion = -1;
+        const int32_t kMaxVersion = 9999;
+        if ((sinceVersion->getValue() < kMinVersion) || (sinceVersion->getValue() > kMaxVersion))
+        {
+            getSink()->diagnose(Diagnostics::RemovedSinceBadVersion{
+                .minVersion = kMinVersion,
+                .maxVersion = kMaxVersion,
+                .location = removedSinceAttr->loc});
+            return nullptr;
+        }
+
+        String message;
+        if (!checkLiteralStringVal(attr->args[1], &message))
+        {
+            return nullptr;
+        }
+
+        removedSinceAttr->sinceVersion = int32_t(sinceVersion->getValue());
+        removedSinceAttr->message = message;
     }
     else if (auto knownBuiltinAttr = as<KnownBuiltinAttribute>(attr))
     {
@@ -1203,7 +1380,8 @@ Modifier* SemanticsVisitor::validateAttribute(
         requirePreludeAttr->capabilitySet = CapabilitySet(capName).freeze(getASTBuilder());
         if (auto stringLitExpr = as<StringLiteralExpr>(attr->args[1]))
         {
-            requirePreludeAttr->prelude = getStringLiteralTokenValue(stringLitExpr->token);
+            requirePreludeAttr->prelude =
+                getStringLiteralTokenValue(stringLitExpr->token, getSink());
         }
         else
         {
@@ -1238,6 +1416,17 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     UncheckedAttribute* uncheckedAttr,
     ModifiableSyntaxNode* attrTarget)
 {
+    // `__func_extension` is syntax sugar for a generated extension containing
+    // a synthesized derivative/apply function. Validate attributes against the
+    // eventual inner function so callable attributes like `[ForceInline]` work
+    // the same way they would on the desugared declaration.
+    auto effectiveAttrTarget = attrTarget;
+    if (auto funcExtensionDecl = as<FuncExtensionDecl>(attrTarget))
+    {
+        if (funcExtensionDecl->innerFunc)
+            effectiveAttrTarget = funcExtensionDecl->innerFunc;
+    }
+
     auto attrName = uncheckedAttr->getKeywordName();
     auto attrDecl = lookUpAttributeDecl(attrName, uncheckedAttr->scope);
 
@@ -1298,7 +1487,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
         {
             // We didn't have enough arguments for the
             // number of parameters declared.
-            if (const auto defaultArg = paramDecl->initExpr)
+            if (const auto defaultArg = paramDecl->initExpr; defaultArg)
             {
                 // The attribute declaration provided a default,
                 // so we should use that.
@@ -1337,7 +1526,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     bool validTarget = false;
     for (auto attrTargetMod : attrDecl->getModifiersOfType<AttributeTargetModifier>())
     {
-        if (attrTarget->getClass().isSubClassOf(attrTargetMod->syntaxClass))
+        if (effectiveAttrTarget->getClass().isSubClassOf(attrTargetMod->syntaxClass))
         {
             validTarget = true;
             break;
@@ -1350,7 +1539,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     {
     // Allowed only on struct fields.
     case ASTNodeType::VkStructOffsetAttribute:
-        auto targetDecl = as<Decl>(attrTarget);
+        auto targetDecl = as<Decl>(effectiveAttrTarget);
         validTarget = validTarget && targetDecl && as<StructDecl>(getParentDecl(targetDecl));
         break;
     };
@@ -1363,7 +1552,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     }
 
     // Now apply type-specific validation to the attribute.
-    if (!validateAttribute(attr, attrDecl, attrTarget))
+    if (!validateAttribute(attr, attrDecl, effectiveAttrTarget))
     {
         return uncheckedAttr;
     }
@@ -1436,7 +1625,20 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::HLSLVolatileModifier:
     case ASTNodeType::GLSLPrecisionModifier:
     case ASTNodeType::HLSLGroupSharedModifier:
+    case ASTNodeType::NumThreadsAttribute:
         return modifierType;
+
+    case ASTNodeType::NodeLaunchAttribute:
+    case ASTNodeType::MaxRecordsAttribute:
+    case ASTNodeType::NodeIDAttribute:
+    case ASTNodeType::NodeIsProgramEntryAttribute:
+    case ASTNodeType::AllowSparseNodesAttribute:
+    case ASTNodeType::NodeArraySizeAttribute:
+        return modifierType;
+
+    case ASTNodeType::NodeDispatchGridAttribute:
+    case ASTNodeType::NodeMaxDispatchGridAttribute:
+        return ASTNodeType::NodeDispatchGridAttribute;
 
     case ASTNodeType::HLSLStaticModifier:
     case ASTNodeType::ActualGlobalModifier:
@@ -1460,6 +1662,10 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::PrivateModifier:
     case ASTNodeType::InternalModifier:
         return ASTNodeType::VisibilityModifier;
+
+    case ASTNodeType::EnumClassModifier:
+    case ASTNodeType::UnscopedEnumAttribute:
+        return ASTNodeType::EnumClassModifier;
 
     default:
         return ASTNodeType::NodeBase;
@@ -1564,10 +1770,14 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::PostfixModifier:
         return as<CallableDecl>(decl);
 
-    case ASTNodeType::BuiltinModifier:
     case ASTNodeType::PublicModifier:
     case ASTNodeType::PrivateModifier:
     case ASTNodeType::InternalModifier:
+        return as<VarDeclBase>(decl) || as<AggTypeDeclBase>(decl) || as<NamespaceDeclBase>(decl) ||
+               as<CallableDecl>(decl) || as<TypeDefDecl>(decl) || as<PropertyDecl>(decl) ||
+               as<SyntaxDecl>(decl) || as<AttributeDecl>(decl) || as<InheritanceDecl>(decl);
+
+    case ASTNodeType::BuiltinModifier:
     case ASTNodeType::ExternModifier:
     case ASTNodeType::HLSLExportModifier:
     case ASTNodeType::ExternCppModifier:
@@ -1580,6 +1790,10 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
 
     case ASTNodeType::ConstModifier:
     case ASTNodeType::HLSLStaticModifier:
+    // ConstExprModifier is intentionally allowed on VarDeclBase (in addition to
+    // CallableDecl/ParamDecl) so that checkModifier() can intercept it, emit
+    // E31227, and replace it with ConstModifier. Without this, the parser-level
+    // modifier would be rejected before checkModifier() ever runs.
     case ASTNodeType::ConstExprModifier:
     case ASTNodeType::PreciseModifier:
         return as<VarDeclBase>(decl) || as<CallableDecl>(decl);
@@ -1755,6 +1969,39 @@ Modifier* SemanticsVisitor::checkModifier(
         }
     }
 
+    if (as<ConstExprModifier>(m))
+    {
+        // `constexpr` on a parameter is a supported Slang feature meaning
+        // "must be a compile-time constant at the call site". On a variable
+        // declaration it is not supported — warn and treat it as `const` so
+        // that common idioms like `static constexpr uint N = 4` compile.
+        // On a function declaration, `constexpr` is silently accepted and
+        // ignored (no warning), intentionally: warning on function-level
+        // constexpr is out of scope for this PR and would be a separate
+        // diagnostic with its own discussion.
+        if (as<VarDeclBase>(syntaxNode) && !as<ParamDecl>(syntaxNode))
+        {
+            // Reject `constexpr T* p;` — C-style pointer const is disallowed
+            // regardless of whether the modifier was written `const` or `constexpr`.
+            // Still emit E31227 first so the user knows constexpr was rewritten, then
+            // E20017 to explain why the rewritten `const T*` is also rejected.
+            if (auto varDeclBase = as<VarDeclBase>(syntaxNode))
+            {
+                if (as<PointerTypeExpr>(varDeclBase->type.exp))
+                {
+                    getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = m});
+                    getSink()->diagnose(
+                        Diagnostics::ConstNotAllowedOnCStylePtrDecl{.location = m->loc});
+                    return nullptr;
+                }
+            }
+            getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = m});
+            auto constMod = m_astBuilder->create<ConstModifier>();
+            constMod->loc = m->loc;
+            constMod->keywordName = getSession()->getNameObj("const");
+            return constMod;
+        }
+    }
     if (as<ConstModifier>(m))
     {
         if (auto varDeclBase = as<VarDeclBase>(syntaxNode))
@@ -1823,7 +2070,7 @@ Modifier* SemanticsVisitor::checkModifier(
         }
     }
 
-    if (const auto externModifier = as<ExternModifier>(m))
+    if (const auto externModifier = as<ExternModifier>(m); externModifier)
     {
         if (auto varDecl = as<VarDeclBase>(syntaxNode))
         {
@@ -1918,6 +2165,11 @@ Modifier* SemanticsVisitor::checkModifier(
                     genDecl->ownedScope);
                 if (!scrutineeResults.isValid())
                 {
+                    // No "did you mean ...?" suggestion here (unlike the
+                    // `VarExpr` path): a `__target_intrinsic` scrutinee names a
+                    // capability/target identifier, not an ordinary in-scope
+                    // declaration, so a Levenshtein match against the lexical
+                    // scope would be misleading.
                     getSink()->diagnose(Diagnostics::UndefinedIdentifier{
                         .name = targetIntrinsic->scrutinee.name,
                         .location = targetIntrinsic->scrutinee.loc});
@@ -2197,25 +2449,29 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     // We will keep track of the modifiers for each conflict group.
     Dictionary<ASTNodeType, Modifier*> mapExclusiveGroupToModifier;
 
+    // Pre-scan: if both `constexpr` and explicit `const` appear on a non-param
+    // VarDecl, emit the warning for `constexpr` and remove it from the list
+    // before the main loop so that the main loop does not see `constexpr` and
+    // produce a spurious duplicate-ConstModifier error (E31202).
+    // This must be done before the loop because the main loop zeroes
+    // `modifier->next` before each `checkModifier` call, which would defeat
+    // `findModifier` if we tried to do this inside the loop.
+    if (as<VarDeclBase>(syntaxNode) && !as<ParamDecl>(syntaxNode))
+    {
+        if (auto ceM = syntaxNode->findModifier<ConstExprModifier>())
+        {
+            if (syntaxNode->findModifier<ConstModifier>())
+            {
+                getSink()->diagnose(Diagnostics::ConstexprUnsupported{.modifier = ceM});
+                removeModifier(syntaxNode, ceM);
+            }
+        }
+    }
+
     Modifier* modifier = syntaxNode->modifiers.first;
     bool ignoreUnallowedModifier = false;
     while (modifier)
     {
-        // Check if a modifier belonging to the same conflict group is already
-        // defined.
-        Modifier* existingModifier = nullptr;
-        auto conflictGroup = getModifierConflictGroupKind(modifier->astNodeType);
-        if (conflictGroup != ASTNodeType::NodeBase)
-        {
-            if (mapExclusiveGroupToModifier.tryGetValue(conflictGroup, existingModifier))
-            {
-                getSink()->diagnose(Diagnostics::DuplicateModifier{
-                    .existingModifier = existingModifier,
-                    .modifier = modifier});
-            }
-            mapExclusiveGroupToModifier[conflictGroup] = modifier;
-        }
-
         // Because we are rewriting the list in place, we need to extract
         // the next modifier here (not at the end of the loop).
         auto next = modifier->next;
@@ -2255,6 +2511,25 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
 
         // Move along to the next modifier
         modifier = next;
+    }
+
+    // Check for mutually exclusive modifier conflicts
+    for (modifier = resultModifiers; modifier; modifier = modifier->next)
+    {
+        // Check if a modifier belonging to the same conflict group is already
+        // defined.
+        Modifier* existingModifier = nullptr;
+        auto conflictGroup = getModifierConflictGroupKind(modifier->astNodeType);
+        if (conflictGroup != ASTNodeType::NodeBase)
+        {
+            if (mapExclusiveGroupToModifier.tryGetValue(conflictGroup, existingModifier))
+            {
+                getSink()->diagnose(Diagnostics::DuplicateModifier{
+                    .existingModifier = existingModifier,
+                    .modifier = modifier});
+            }
+            mapExclusiveGroupToModifier[conflictGroup] = modifier;
+        }
     }
 
     // Whether we actually re-wrote anything or note, lets

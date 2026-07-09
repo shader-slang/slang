@@ -77,6 +77,9 @@ struct RequiredLoweringPassSet
     bool missingReturn;
     bool nonVectorCompositeSelect;
     bool matrixSwizzleStore;
+    bool coverageTracing;
+    bool barrierFlagValidation;
+    bool appendConsumeStructuredBuffer;
 };
 
 /// A context for code generation in the compiler back-end
@@ -177,6 +180,8 @@ public:
     bool shouldDumpIR();
     bool shouldReportCheckpointIntermediates();
     bool shouldReportDynamicDispatchSites();
+    bool shouldTraceCoverage();
+    bool shouldTraceAnyCoverage();
 
     bool shouldTrackLiveness();
 

@@ -30,9 +30,10 @@ float4 main(VertexOutput input) : SV_Target
 // CHECK-DAG: [[MAIN_FILE:%[0-9]+]] = OpString "{{.*}}debug-global-variable-source-import.slang"
 // CHECK-DAG: [[SOURCE_MAIN:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugSource [[MAIN_FILE]] %{{[0-9]+}}
 
-// Verify that DebugCompilationUnit references the main file source, not the imported module
-// CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugCompilationUnit %uint_{{[0-9]+}} %uint_{{[0-9]+}} [[SOURCE_MAIN]] %uint_{{[0-9]+}}
+// Verify that DebugCompilationUnit references the main file source, not the imported module,
+// and capture its result ID for scope verification below.
+// CHECK-DAG: [[CU_MAIN:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugCompilationUnit %uint_{{[0-9]+}} %uint_{{[0-9]+}} [[SOURCE_MAIN]] %uint_{{[0-9]+}}
 
-// Verify that DebugGlobalVariable for entry point parameters references the main file source
-// The key fix: DebugGlobalVariable should reference the main file source, not the imported file source
-// CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugGlobalVariable {{%[0-9]+}} {{%[0-9]+}} [[SOURCE_MAIN]] %uint_0 %uint_0
+// Verify that DebugGlobalVariable references the main file source AND has the main file's
+// DebugCompilationUnit as its parent scope (not the imported module's compilation unit).
+// CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugGlobalVariable {{%[0-9]+}} {{%[0-9]+}} [[SOURCE_MAIN]] %uint_0 %uint_0 [[CU_MAIN]]

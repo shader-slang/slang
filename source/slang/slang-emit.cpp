@@ -9,6 +9,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-writer.h"
+#include "slang-capability.h"
 #include "slang-check-out-of-bound-access.h"
 #include "slang-emit-c-like.h"
 #include "slang-emit-cpp.h"
@@ -34,7 +35,7 @@
 #include "slang-ir-cleanup-void.h"
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-com-interface.h"
-#include "slang-ir-composite-reg-to-mem.h"
+#include "slang-ir-coverage-instrument.h"
 #include "slang-ir-cuda-immutable-load.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
@@ -81,6 +82,7 @@
 #include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-conditional-type.h"
 #include "slang-ir-lower-coopvec.h"
+#include "slang-ir-lower-cpu-resource-types.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
 #include "slang-ir-lower-enum-type.h"
@@ -141,7 +143,7 @@
 #include "slang-vm-bytecode.h"
 
 #include <assert.h>
-
+#include <limits>
 Slang::String get_slang_cpp_host_prelude();
 Slang::String get_slang_torch_prelude();
 
@@ -419,6 +421,7 @@ void calcRequiredLoweringPassSet(
     case kIROp_DebugNoScope:
     case kIROp_DebugFunction:
     case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugCompilationUnit:
         result.debugInfo = true;
         break;
     case kIROp_ResultType:
@@ -520,6 +523,10 @@ void calcRequiredLoweringPassSet(
     case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
         break;
+    case kIROp_HLSLAppendStructuredBufferType:
+    case kIROp_HLSLConsumeStructuredBufferType:
+        result.appendConsumeStructuredBuffer = true;
+        break;
     case kIROp_DynamicResourceType:
         result.dynamicResource = true;
         break;
@@ -541,6 +548,15 @@ void calcRequiredLoweringPassSet(
     case kIROp_Select:
         if (!isScalarOrVectorType(inst->getFullType()))
             result.nonVectorCompositeSelect = true;
+        break;
+    case kIROp_IncrementCoverageCounter:
+    case kIROp_IncrementFunctionCoverageCounter:
+    case kIROp_IncrementBranchCoverageCounter:
+        result.coverageTracing = true;
+        break;
+    case kIROp_GetEnumBarrierMemoryTypeFlags:
+    case kIROp_GetEnumBarrierSemanticFlags:
+        result.barrierFlagValidation = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -870,6 +886,20 @@ void lowerSumVectorMatrixInsts(IRModule* module)
     pass.processModule();
 }
 
+void removeWeakUseInsts(IRModule* module)
+{
+    List<IRInst*> weakUseInsts;
+    for (auto inst : module->getModuleInst()->getGlobalInsts())
+    {
+        if (inst->getOp() == kIROp_WeakUse)
+            weakUseInsts.add(inst);
+    }
+
+    for (auto weakUse : weakUseInsts)
+    {
+        weakUse->removeAndDeallocate();
+    }
+}
 
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
@@ -916,6 +946,13 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    // Create the post-emit metadata object up-front so that IR passes
+    // that need to record reportable data (e.g. `instrumentCoverage`'s
+    // source-entry mapping) can write into it directly. `collectMetadata`
+    // later fills in binding / exported-function fields.
+    auto metadata = new ArtifactPostEmitMetadata;
+    outLinkedIR.metadata = metadata;
+
     // For now, only emit the debug build identifier if separate debug info is enabled
     // and only if there are targets.
     // TODO: We will ultimately need to change this to always emit the instruction.
@@ -930,6 +967,11 @@ Result linkAndOptimizeIR(
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    {
+        bool validate = !isCPUTarget(targetRequest) && !isCUDATarget(targetRequest);
+        SLANG_PASS(validateAndRemoveAssumeAddress, validate, sink);
+    }
 
     // If the user specified the flag that they want us to dump
     // IR, then do it here, for the target-specific, but
@@ -950,14 +992,6 @@ Result linkAndOptimizeIR(
         SLANG_PASS(lowerGLSLShaderStorageBufferObjectsToStructuredBuffers, sink);
 
     SLANG_PASS(translateEntryPointInParamToBorrow, sink);
-
-    if (requiredLoweringPassSet.globalVaryingVar)
-        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
-
-    if (requiredLoweringPassSet.resolveVaryingInputRef)
-        SLANG_PASS(resolveVaryingInputRef);
-
-    SLANG_PASS(fixEntryPointCallsites);
 
     // Replace any global constants with their values.
     //
@@ -994,6 +1028,141 @@ Result linkAndOptimizeIR(
     // can assume that all ordinary/uniform data is strictly
     // passed using constant buffers.
     //
+    // Shader coverage instrumentation. The pass synthesizes
+    // `__slang_coverage` as an `IRGlobalParam` directly in the
+    // linked program IR, extends the program-scope var layout, and
+    // rewrites coverage marker ops to atomic adds. Runs BEFORE
+    // `collectGlobalUniformParameters` so the synthesized buffer
+    // gets packed into `GlobalParams` alongside user globals on
+    // targets that pack ordinary uniforms (CPU, CUDA).
+    //
+    // Coverage markers carry source position on their built-in `sourceLoc`,
+    // so this pass is independent of debug-info state. It writes its
+    // source-entry mapping into `metadata`, exposed to hosts via
+    // ICoverageTracingMetadata.
+    if (requiredLoweringPassSet.coverageTracing)
+    {
+        // Pull explicit binding values from `-trace-coverage-binding`
+        // here; pass -1 for either side to request auto-allocation in
+        // the synthesis routine.
+        int explicitBinding = -1;
+        int explicitSpace = -1;
+        List<int> reservedSpaces;
+        auto& opts = codeGenContext->getTargetReq()->getOptionSet();
+        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
+        {
+            if (values->getCount() > 0)
+            {
+                explicitBinding = (int)(*values)[0].intValue;
+                explicitSpace = (int)(*values)[0].intValue2;
+            }
+        }
+        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageReservedSpace))
+        {
+            for (auto value : *values)
+            {
+                if (value.kind != CompilerOptionValueKind::Int)
+                {
+                    if (sink)
+                    {
+                        SLANG_DIAGNOSE_UNEXPECTED(
+                            sink,
+                            SourceLoc(),
+                            "TraceCoverageReservedSpace option value must be an integer");
+                    }
+                    return SLANG_FAIL;
+                }
+                if (value.intValue < 0 || value.intValue > std::numeric_limits<int>::max())
+                {
+                    if (sink)
+                    {
+                        sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                            .option = "-trace-coverage-reserved-space",
+                            .parsedValue = value.intValue,
+                        });
+                    }
+                    return SLANG_FAIL;
+                }
+                reservedSpaces.add((int)value.intValue);
+            }
+        }
+        // Default to uint64. Customers opt down to uint32 (4 bytes per
+        // slot) only when targeting a runtime driver without 64-bit
+        // shader-atomic-add support — notably MoltenVK on Apple Silicon,
+        // where Vulkan reports `shaderBufferInt64Atomics = false`. The
+        // compiler can't see the runtime driver, so the choice is the
+        // caller's responsibility.
+        int counterByteWidth = kDefaultCoverageCounterByteWidth;
+        bool hasExplicitCounterByteWidth = false;
+        if (auto values =
+                opts.options.tryGetValue(CompilerOptionName::TraceCoverageCounterByteWidth))
+        {
+            if (values->getCount() > 0)
+            {
+                counterByteWidth = (int)(*values)[0].intValue;
+                hasExplicitCounterByteWidth = true;
+            }
+        }
+        // Validate the byte width on the API path. The CLI parser
+        // (`slang-options.cpp`) already validates the user-facing bit
+        // width and stores 4 or 8, but a host that sets the
+        // `TraceCoverageCounterByteWidth` option directly bypasses that
+        // check. Only 4 and 8 have a synthesizable element type; rather
+        // than silently coercing anything else to uint32 (which would
+        // hide a caller's misconfiguration — e.g. forwarding bits 32/64
+        // instead of bytes 4/8), fail loudly here, matching the CLI's
+        // `E45113` guarantee.
+        if (counterByteWidth != 4 && counterByteWidth != 8)
+        {
+            sink->diagnose(Diagnostics::CoverageCounterWidthBytesInvalid{
+                .byteWidth = counterByteWidth,
+            });
+            return SLANG_FAIL;
+        }
+        // Metal cannot execute 64-bit counting-mode coverage: MSL provides no
+        // 64-bit atomic fetch-add (its `_valid_fetch_add_type` constraint
+        // rejects `device atomic_ulong*`), so the Metal compiler fails every
+        // counter increment with "no matching function for call to
+        // 'atomic_fetch_add_explicit'". Cap counting-mode counters to 4 bytes
+        // for Metal targets (`metal`, `metallib`, `metallib-asm`). Unlike the
+        // validation block above, which rejects out-of-contract widths loudly
+        // because they indicate a caller bug, this cap adjusts a *valid* width
+        // to a platform limitation: the uncapped default (8) is capped
+        // silently, and an explicitly requested 8 is capped with warning
+        // E45115 so a caller who spelled out `-trace-coverage-counter-width
+        // 64` learns their choice was not honored.
+        // Boolean mode (`-trace-coverage-boolean`) is exempt: it writes plain
+        // non-atomic stores (`*slot = 1`), which MSL accepts at either width —
+        // verified against the Metal compiler — so the requested width is
+        // honored there.
+        bool coverageBoolean = false;
+        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
+        {
+            if (values->getCount() > 0)
+                coverageBoolean = (*values)[0].intValue != 0;
+        }
+        if (isMetalTarget(targetRequest) && counterByteWidth > 4 && !coverageBoolean)
+        {
+            if (hasExplicitCounterByteWidth)
+                sink->diagnose(Diagnostics::CoverageCounterWidthCappedForMetal{});
+            counterByteWidth = 4;
+        }
+        SLANG_PASS(
+            instrumentCoverage,
+            sink,
+            codeGenContext->shouldTraceAnyCoverage(),
+            explicitBinding,
+            explicitSpace,
+            reservedSpaces.getBuffer(),
+            (int)reservedSpaces.getCount(),
+            counterByteWidth,
+            coverageBoolean,
+            targetRequest,
+            outLinkedIR.globalScopeVarLayout,
+            *metadata);
+        validateIRModuleIfEnabled(codeGenContext, irModule);
+    }
+
     SLANG_PASS(collectGlobalUniformParameters, outLinkedIR.globalScopeVarLayout, target);
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
@@ -1079,6 +1248,17 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    if (requiredLoweringPassSet.coverageTracing)
+    {
+        SLANG_PASS(
+            finalizeCoverageInstrumentationMetadata,
+            sink,
+            codeGenContext->shouldTraceAnyCoverage(),
+            outLinkedIR.globalScopeVarLayout,
+            targetRequest,
+            *metadata);
+    }
+
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)
     SLANG_PASS(lowerLValueCast, targetProgram);
 
@@ -1087,12 +1267,6 @@ Result linkAndOptimizeIR(
     //
     if (requiredLoweringPassSet.enumType)
         SLANG_PASS(lowerEnumType, sink);
-
-    // Lower enum types early since enums and enum casts may appear in
-    // specialization & not resolving them here would block specialization.
-    //
-    if (requiredLoweringPassSet.enumType)
-        lowerEnumType(irModule, sink);
 
     IRSimplificationOptions defaultIRSimplificationOptions =
         IRSimplificationOptions::getDefault(targetProgram);
@@ -1192,12 +1366,6 @@ Result linkAndOptimizeIR(
     // This must happen after specialization since DiffTypeInfo is hoistable.
     lowerDiffTypeInfoInsts(irModule);
 
-    // Lower `Result<T,E>` types into ordinary struct types. This must happen
-    // after specialization, since otherwise incompatible copies of the lowered
-    // result structure are generated.
-    if (requiredLoweringPassSet.resultType)
-        SLANG_PASS(lowerResultType, targetProgram, sink);
-
     if (requiredLoweringPassSet.conditionalType)
         SLANG_PASS(lowerConditionalType, sink);
 
@@ -1213,6 +1381,15 @@ Result linkAndOptimizeIR(
 
     if (requiredLoweringPassSet.optionalType)
         SLANG_PASS(lowerOptionalType, sink);
+
+    // Lower `Result<T,E>` types into ordinary struct types. This must happen
+    // after specialization, since otherwise incompatible copies of the lowered
+    // result structure are generated.
+    //
+    // This pass depends on getting accurate results from getAnyValueSize(),
+    // and must therefore run after lowering Optional types.
+    if (requiredLoweringPassSet.resultType)
+        SLANG_PASS(lowerResultType, targetProgram, sink);
 
     if (requiredLoweringPassSet.nonVectorCompositeSelect)
     {
@@ -1328,21 +1505,8 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(lowerExistentials, targetProgram, sink);
 
-    // get rid of weak-use insts and any dictionaries in the
-    // module inst.
-    //
-    // -- put into a pass --
-    List<IRInst*> weakUseInsts;
-    for (auto insts : irModule->getModuleInst()->getGlobalInsts())
-    {
-        if (insts->getOp() == kIROp_WeakUse)
-            weakUseInsts.add(insts);
-    }
-
-    for (auto weakUse : weakUseInsts)
-    {
-        weakUse->removeAndDeallocate();
-    }
+    // Get rid of weak-use insts and any dictionaries in the module inst.
+    SLANG_PASS(removeWeakUseInsts);
 
     clearTranslationDictionary(irModule);
 
@@ -1448,10 +1612,28 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    if ((target == CodeGenTarget::HLSL || isD3DTarget(targetRequest)) &&
+        requiredLoweringPassSet.barrierFlagValidation)
+    {
+        SLANG_PASS(validateBarrierFlagsForHLSL, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
+
     // On non-HLSL targets, there isn't an implementation of `AppendStructuredBuffer`
     // and `ConsumeStructuredBuffer` types, so we lower them into normal struct types
     // of `RWStructuredBuffer` typed fields now.
-    if (target != CodeGenTarget::HLSL)
+    //
+    // Gated on `appendConsumeStructuredBuffer` to skip this whole-module walk when
+    // neither type is present. `calcRequiredLoweringPassSet` flags accumulate across the
+    // post-link and post-specialization scans (they are not reset between them). These
+    // types are produced by the front-end and are never synthesized by an IR pass, so in
+    // particular none is created after the last scan: any instance present here was
+    // recorded by a scan and set the flag, and the gate can never be a false-negative
+    // (skip a needed lowering). The flag can only be stale-true (e.g. an unused buffer
+    // dead-code-eliminated after a scan), a harmless no-op walk — so gating is
+    // behavior-preserving.
+    if (target != CodeGenTarget::HLSL && requiredLoweringPassSet.appendConsumeStructuredBuffer)
     {
         SLANG_PASS(lowerAppendConsumeStructuredBuffers, targetProgram, sink);
     }
@@ -1553,6 +1735,21 @@ Result linkAndOptimizeIR(
         if (isD3DTarget(targetRequest))
         {
             SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+
+            // HLSL SM 6.7+ requires every member of a `[raypayload]` struct to declare
+            // both a `read(...)` and a `write(...)` qualifier. The call-site fill above
+            // only covers payload structs reached through a `TraceRay`-style call, so a
+            // user-authored struct with one-sided PAQ that only reaches a hit shader
+            // (e.g. a per-stage-compiled shader library) would slip through. Fill any
+            // missing per-side PAQs structurally on every `[raypayload]` struct.
+            auto profile = getEffectiveTargetProfile(
+                targetProgram->getTargetReq(),
+                targetProgram->getOptionSet());
+            if (profile.getFamily() == ProfileFamily::DX &&
+                profile.getVersion() >= ProfileVersion::DX_6_7)
+            {
+                SLANG_PASS(legalizeRayPayloadAccessQualifiersForHLSL);
+            }
         }
 
         if (requiredLoweringPassSet.existentialTypeLayout)
@@ -1703,6 +1900,14 @@ Result linkAndOptimizeIR(
         switch (target)
         {
         default:
+            if (isCPUTargetViaLLVM(targetRequest))
+            {
+                // We need to scalarize the loads on LLVM CPU targets, as
+                // ByteAddressBuffer loads & stores may only have an alignment
+                // of 4, meaning that vector loads / stores could be misaligned
+                // and cause crashes with SSE, AVX etc. SIMD instruction sets.
+                byteAddressBufferOptions.scalarizeVectorLoadStore = true;
+            }
             break;
 
         case CodeGenTarget::GLSL:
@@ -1770,7 +1975,9 @@ Result linkAndOptimizeIR(
         {
         case CodeGenTarget::HLSL:
             {
-                auto profile = codeGenContext->getTargetProgram()->getOptionSet().getProfile();
+                auto profile = getEffectiveTargetProfile(
+                    targetProgram->getTargetReq(),
+                    targetProgram->getOptionSet());
                 if (profile.getFamily() == ProfileFamily::DX)
                 {
                     if (profile.getVersion() <= ProfileVersion::DX_5_0)
@@ -1797,6 +2004,17 @@ Result linkAndOptimizeIR(
             targetProgram,
             codeGenContext->getSink(),
             byteAddressBufferOptions);
+    }
+
+    if (isCPUTargetViaLLVM(targetRequest))
+    {
+        // On CPU LLVM targets, the target itself has no concept of resource
+        // types (CPUs have no opinions on what a texture is), so we can lower
+        // those to concrete types here.
+        //
+        // We perform this after ByteAddressBuffer op lowering so that we don't
+        // have to deal with misaligned pointers.
+        SLANG_PASS(lowerCPUResourceTypes, codeGenContext);
     }
 
     // For SPIR-V, this function is called elsewhere, so that it can happen after address space
@@ -1835,6 +2053,18 @@ Result linkAndOptimizeIR(
         SLANG_PASS(resolveTextureFormat);
         break;
     }
+
+    // Specialization can expose references to global varying builtins that were
+    // previously hidden behind generic/interface dispatch. Translate all global
+    // varying inputs/outputs now, after specialization, but before target
+    // entry-point legalization.
+    if (requiredLoweringPassSet.globalVaryingVar)
+        SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
+
+    if (requiredLoweringPassSet.resolveVaryingInputRef)
+        SLANG_PASS(resolveVaryingInputRef);
+
+    SLANG_PASS(fixEntryPointCallsites);
 
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
@@ -2096,6 +2326,9 @@ Result linkAndOptimizeIR(
     else if (isKhronosTarget(targetRequest))
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::KhronosTarget;
+    else if (isMetalTarget(targetRequest))
+        bufferElementTypeLoweringOptions.loweringPolicyKind =
+            BufferElementTypeLoweringPolicyKind::Metal;
     else
         bufferElementTypeLoweringOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::Default;
@@ -2245,6 +2478,73 @@ Result linkAndOptimizeIR(
     // Run a final round of simplifications to clean up unused things after phi-elimination.
     SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
 
+    // Metal rejects pointer-to-pointer types in buffer pointee types (e.g.
+    // `device int* device*` as a struct field in a [[buffer(N)]] binding).
+    //
+    // Required predecessors:
+    //   (a) specializeAddressSpaceForMetal — needs real pointer types
+    //   (b) the main lowerBufferElementTypeToStorageType — matrix/bool
+    //       fields must already be lowered
+    //   (c) the main eliminatePhis — so the late eliminatePhis below
+    //       only processes phis introduced by this pass
+    //
+    // Metal buffer element types go through three lowerBufferElementTypeToStorageType
+    // invocations:
+    //   1. MetalParameterBlock (~line 1606): resource fields -> DescriptorHandle
+    //   2. Default/Khronos (~line 2225): matrix/bool -> lowered representations
+    //   3. MetalPointerLowering (here): pointer fields -> UIntPtr
+    // Each can decorate types with [PhysicalType]; pass 3 uses
+    // shouldSkipPhysicalTypes = false to re-process types from passes 1 and 2.
+    //
+    // This does not conflict with the earlier MetalParameterBlock run
+    // because they target orthogonal field kinds within the same types:
+    // that pass converts resource fields to DescriptorHandle; this one
+    // converts pointer fields to UIntPtr (shouldSkipPhysicalTypes returns
+    // false to re-process types already decorated by that earlier pass).
+    //
+    // Safety: this sequence is safe to run in every Metal compilation,
+    // even when no pointer fields are present. processModule scans all
+    // global buffer types; if needsElementLowering returns false for all
+    // of them, no types are created and no IR is modified, making the
+    // subsequent passes no-ops on unchanged IR.
+    if (isMetalTarget(targetRequest))
+    {
+        BufferElementTypeLoweringOptions metalPtrOptions;
+        metalPtrOptions.loweringPolicyKind =
+            BufferElementTypeLoweringPolicyKind::MetalPointerLowering;
+        SLANG_PASS(lowerBufferElementTypeToStorageType, targetProgram, metalPtrOptions);
+
+        // Materialize the [ForceInline] pack/unpack helpers the pass
+        // creates. This is a module-wide call, but at this point in the
+        // pipeline all prior [ForceInline] functions have already been
+        // inlined and removed by the earlier performForceInlining call.
+        // The only remaining [ForceInline] functions are the pack/unpack
+        // helpers just created above.
+        SLANG_PASS(performForceInlining);
+
+        // The loop-based pack/unpack for large arrays (>kMaxArraySizeToUnroll)
+        // introduces block parameters via emitLoopBlocks. Since the main
+        // eliminatePhis already ran, these new phis must be eliminated
+        // before emission.
+        //
+        // Liveness is disabled because liveness markers serve downstream
+        // GLSL targets via applyGLSLLiveness; Metal does not consume them,
+        // and the markers were already finalized before the main
+        // eliminatePhis. LivenessMode::Disabled skips marker insertion;
+        // it does not strip or invalidate markers placed by earlier passes.
+        PhiEliminationOptions phiEliminationOptions;
+        SLANG_PASS(eliminatePhis, LivenessMode::Disabled, phiEliminationOptions);
+
+        // Address-space specialization is not re-run here — it already
+        // executed against the original typed IR and must not see the
+        // lowered UIntPtr types. eliminateMultiLevelBreak is unnecessary
+        // because the generated loops are single-level. Full simplifyIR
+        // (which includes constructSSA) is counterproductive because
+        // eliminatePhis just took the IR out of SSA form — the emitter
+        // expects non-SSA IR at this point.
+        SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
+    }
+
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should
     // reflect the IR that code is generated from as closely as possible.
@@ -2263,19 +2563,36 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
     }
 
-    SLANG_PASS(validateCooperativeOperations, sink);
-
-    auto metadata = new ArtifactPostEmitMetadata;
-    outLinkedIR.metadata = metadata;
+    // Runs after target-specific lowering so it only captures cooperative types that remain
+    // as native constructs visible to the driver (see ICooperativeTypesMetadata docs).
+    {
+        auto targetCaps = targetRequest->getTargetCaps();
+        if (targetCaps.atLeastOneSetImpliedInOther(
+                CapabilitySet(CapabilityName::cooperative_matrix)) ==
+                CapabilitySet::ImpliesReturnFlags::Implied ||
+            targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(
+                CapabilityName::cooperative_vector)) == CapabilitySet::ImpliesReturnFlags::Implied)
+        {
+            SLANG_PASS(collectCooperativeMetadata, sink, *metadata);
+        }
+    }
 
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
     {
         SLANG_PASS(unexportNonEmbeddableIR, target);
     }
 
-    SLANG_PASS(collectMetadata, *metadata);
-
-    outLinkedIR.metadata = metadata;
+    {
+        auto targetCaps = targetRequest->getTargetCaps();
+        if (target != CodeGenTarget::PyTorchCppBinding &&
+            targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(
+                CapabilityName::descriptor_handle)) == CapabilitySet::ImpliesReturnFlags::Implied)
+        {
+            if (!targetProgram->getOrCreateLayout(sink))
+                return SLANG_FAIL;
+        }
+    }
+    SLANG_PASS(collectMetadata, targetProgram, *metadata);
 
     if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
         SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
@@ -2346,7 +2663,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     else
     {
         desc.entryPointStage = Stage::Unknown;
-        desc.effectiveProfile = targetProgram->getOptionSet().getProfile();
+        desc.effectiveProfile =
+            getEffectiveTargetProfile(targetRequest, targetProgram->getOptionSet());
     }
     desc.sourceWriter = &sourceWriter;
 
@@ -2861,9 +3179,79 @@ static SlangResult createArtifactFromIR(
 
     artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
 
-    IDownstreamCompiler* compiler = codeGenContext->getSession()->getOrLoadDownstreamCompiler(
-        PassThroughMode::SpirvOpt,
-        codeGenContext->getSink());
+    // Decide whether any downstream (slang-glslang / SPIRV-Tools) work is actually required
+    // for this artifact before paying the cost of loading the downstream compiler module.
+    //
+    // Slang emits and legalizes SPIR-V natively, so the natively emitted blob added above is
+    // already a complete, valid module. The downstream `slang-glslang` compiler is only needed
+    // to: (a) run the SPIRV-Tools optimizer when an optimization level above `None` is
+    // requested; (b) link multiple SPIR-V modules together when separately compiled / embedded
+    // downstream modules are present; (c) validate the result when SPIR-V validation is enabled;
+    // or (d) emit separate debug info, which is produced as a side effect of the downstream
+    // compile step. When none of these apply -- for example a single-module `-O0 -target spirv`
+    // compile -- the natively emitted SPIR-V is the final output, so we skip loading
+    // `slang-glslang` entirely and leave the artifact as-is. This keeps a default `-O0` SPIR-V
+    // compile free of any dependency on the `slang-glslang` module (issue #11662); without this
+    // gate the load was unconditional and a build without `slang-glslang` failed with E00100
+    // even though no downstream work was needed.
+    bool isPrecompilation = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
+        CompilerOptionName::EmbedDownstreamIR);
+
+    // Collect the SPIR-V modules that would participate in a downstream link. This walks IR
+    // only (it does not need the downstream compiler), so it is safe to do before deciding
+    // whether to load that compiler, and we reuse the result for the link below.
+    List<uint32_t*> spirvFiles;
+    List<uint32_t> spirvSizes;
+    const bool downstreamLinkingAllowed =
+        !isPrecompilation && !codeGenContext->shouldSkipDownstreamLinking();
+    if (downstreamLinkingAllowed)
+    {
+        // Start with the SPIR-V we just generated.
+        // SPIRV-Tools-link expects the size in 32-bit words
+        // whereas the spirv blob size is in bytes.
+        spirvFiles.add((uint32_t*)spirv.getBuffer());
+        spirvSizes.add(int(spirv.getCount()) / 4);
+
+        // Iterate over all modules in the linkedIR. For each module, if it
+        // contains an embedded downstream ir instruction, add it to the list
+        // of spirv files.
+        auto program = codeGenContext->getProgram();
+
+        program->enumerateIRModules(
+            [&](IRModule* irModule)
+            {
+                for (auto globalInst : irModule->getModuleInst()->getChildren())
+                {
+                    if (auto inst = as<IREmbeddedDownstreamIR>(globalInst))
+                    {
+                        if (inst->getTarget() == CodeGenTarget::SPIRV)
+                        {
+                            auto slice = inst->getBlob()->getStringSlice();
+                            spirvFiles.add((uint32_t*)slice.begin());
+                            spirvSizes.add(int(slice.getLength()) / 4);
+                        }
+                    }
+                }
+            });
+
+        SLANG_ASSERT(int(spirv.getCount()) % 4 == 0);
+        SLANG_ASSERT(spirvFiles.getCount() == spirvSizes.getCount());
+    }
+
+    const bool needsLink = downstreamLinkingAllowed && spirvFiles.getCount() > 1;
+    const bool needsOptimization =
+        codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel() !=
+        OptimizationLevel::None;
+    const bool needsValidation = shouldRunSPIRVValidation(codeGenContext);
+    const bool needsSeparateDebugInfo = targetCompilerOptions.shouldEmitSeparateDebugInfo();
+    const bool needsDownstreamCompiler =
+        needsLink || needsOptimization || needsValidation || needsSeparateDebugInfo;
+
+    IDownstreamCompiler* compiler = needsDownstreamCompiler
+                                        ? codeGenContext->getSession()->getOrLoadDownstreamCompiler(
+                                              PassThroughMode::SpirvOpt,
+                                              codeGenContext->getSink())
+                                        : nullptr;
     if (compiler)
     {
 #if 0
@@ -2871,68 +3259,26 @@ static SlangResult createArtifactFromIR(
         compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
 #endif
 
-        bool isPrecompilation = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
-            CompilerOptionName::EmbedDownstreamIR);
-
-        if (!isPrecompilation && !codeGenContext->shouldSkipDownstreamLinking())
+        if (needsLink)
         {
             ComPtr<IArtifact> linkedArtifact;
+            SlangResult linkresult = compiler->link(
+                (const uint32_t**)spirvFiles.getBuffer(),
+                (const uint32_t*)spirvSizes.getBuffer(),
+                (uint32_t)spirvFiles.getCount(),
+                linkedArtifact.writeRef());
 
-            // collect spirv files
-            List<uint32_t*> spirvFiles;
-            List<uint32_t> spirvSizes;
-
-            // Start with the SPIR-V we just generated.
-            // SPIRV-Tools-link expects the size in 32-bit words
-            // whereas the spirv blob size is in bytes.
-            spirvFiles.add((uint32_t*)spirv.getBuffer());
-            spirvSizes.add(int(spirv.getCount()) / 4);
-
-            // Iterate over all modules in the linkedIR. For each module, if it
-            // contains an embedded downstream ir instruction, add it to the list
-            // of spirv files.
-            auto program = codeGenContext->getProgram();
-
-            program->enumerateIRModules(
-                [&](IRModule* irModule)
-                {
-                    for (auto globalInst : irModule->getModuleInst()->getChildren())
-                    {
-                        if (auto inst = as<IREmbeddedDownstreamIR>(globalInst))
-                        {
-                            if (inst->getTarget() == CodeGenTarget::SPIRV)
-                            {
-                                auto slice = inst->getBlob()->getStringSlice();
-                                spirvFiles.add((uint32_t*)slice.begin());
-                                spirvSizes.add(int(slice.getLength()) / 4);
-                            }
-                        }
-                    }
-                });
-
-            SLANG_ASSERT(int(spirv.getCount()) % 4 == 0);
-            SLANG_ASSERT(spirvFiles.getCount() == spirvSizes.getCount());
-
-            if (spirvFiles.getCount() > 1)
+            if (linkresult != SLANG_OK)
             {
-                SlangResult linkresult = compiler->link(
-                    (const uint32_t**)spirvFiles.getBuffer(),
-                    (const uint32_t*)spirvSizes.getBuffer(),
-                    (uint32_t)spirvFiles.getCount(),
-                    linkedArtifact.writeRef());
-
-                if (linkresult != SLANG_OK)
-                {
-                    return SLANG_FAIL;
-                }
-
-                ComPtr<ISlangBlob> blob;
-                linkedArtifact->loadBlob(ArtifactKeep::No, blob.writeRef());
-                artifact = _Move(linkedArtifact);
+                return SLANG_FAIL;
             }
+
+            ComPtr<ISlangBlob> blob;
+            linkedArtifact->loadBlob(ArtifactKeep::No, blob.writeRef());
+            artifact = _Move(linkedArtifact);
         }
 
-        if (shouldRunSPIRVValidation(codeGenContext))
+        if (needsValidation)
         {
             if (SLANG_FAILED(
                     compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))

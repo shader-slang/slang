@@ -127,6 +127,7 @@ option(
 option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
+option(SLANG_ENABLE_VALIDATION_VM_BYTECODE "Enable VM bytecode validation" ON)
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(
     SLANG_IGNORE_ABORT_MSG
@@ -164,6 +165,11 @@ option(
     ON
 )
 option(
+    SLANG_ENABLE_SLANG_PROXY
+    "Build the legacy slang.dll proxy and libslang symlink backward-compatibility outputs for slang-compiler"
+    ON
+)
+option(
     SLANG_ENABLE_TESTS
     "Enable test targets, some tests may require SLANG_ENABLE_SLANG_RHI, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT"
     ON
@@ -174,12 +180,6 @@ option(
     ON
 )
 option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
-
-option(
-    SLANG_GITHUB_TOKEN
-    "Use a given token value for accessing Github REST API"
-    ""
-)
 
 advanced_option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
 advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
@@ -303,12 +303,25 @@ advanced_option(
     "Build using user defined path for cmark"
     OFF
 )
-
 advanced_option(
-    SLANG_EXCLUDE_DAWN
-    "Optionally exclude webgpu_dawn from the build"
+    SLANG_OVERRIDE_FAST_FLOAT_PATH
+    "Build using user defined path for fast_float"
     OFF
 )
+
+set(SLANG_EXCLUDE_DAWN_DEFAULT ON)
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(SLANG_EXCLUDE_DAWN_DEFAULT OFF)
+endif()
+advanced_option(
+    SLANG_EXCLUDE_DAWN
+    "Optionally exclude Dawn WebGPU support from the build"
+    ${SLANG_EXCLUDE_DAWN_DEFAULT}
+)
+set(SLANG_HAS_WEBGPU_SUPPORT OFF)
+if(NOT SLANG_EXCLUDE_DAWN)
+    set(SLANG_HAS_WEBGPU_SUPPORT ON)
+endif()
 
 advanced_option(
     SLANG_EXCLUDE_TINT
@@ -367,7 +380,7 @@ enum_option(
 if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     # If the user didn't specify a URL, find the best one now
     if(NOT SLANG_SLANG_LLVM_BINARY_URL)
-        get_best_slang_binary_release_url("${SLANG_GITHUB_TOKEN}" url)
+        get_best_slang_binary_release_url(url)
         if(NOT DEFINED url)
             if(SLANG_SLANG_LLVM_FLAVOR STREQUAL FETCH_BINARY_IF_POSSIBLE)
                 message(
@@ -389,7 +402,7 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     )
 endif()
 
-if(NOT SLANG_EXCLUDE_DAWN)
+if(SLANG_HAS_WEBGPU_SUPPORT)
     if(NOT DEFINED SLANG_WEBGPU_DAWN_BINARY_URL)
         set(webgpu_dawn_release_tag "webgpu_dawn-0")
         if(
@@ -555,7 +568,6 @@ if(SLANG_WEBGPU_DAWN_BINARY_URL)
         "webgpu_dawn"
         "${SLANG_WEBGPU_DAWN_BINARY_URL}"
         IGNORE_FAILURE
-        SLANG_GITHUB_TOKEN ${SLANG_GITHUB_TOKEN}
     )
 endif()
 
@@ -568,7 +580,6 @@ if(SLANG_SLANG_TINT_BINARY_URL)
         "slang-tint"
         "${SLANG_SLANG_TINT_BINARY_URL}"
         IGNORE_FAILURE
-        SLANG_GITHUB_TOKEN ${SLANG_GITHUB_TOKEN}
     )
 endif()
 
@@ -589,6 +600,14 @@ add_subdirectory(source/slang-core-module)
 add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
+if(TARGET slangc)
+    # Keep DXC runtime artifacts and headers staged for targeted slangc builds.
+    foreach(_dxc_stage_target copy-dxcompiler copy-dxil stage-dxc-headers)
+        if(TARGET ${_dxc_stage_target})
+            add_dependencies(slangc ${_dxc_stage_target})
+        endif()
+    endforeach()
+endif()
 add_subdirectory(source/slang-dispatcher)
 add_subdirectory(source/standard-modules)
 add_subdirectory(examples)
@@ -643,29 +662,47 @@ configure_package_config_file(
 # Conditionally handle the case for Emscripten where slang does not create
 # linkable targets. In this case do not export the targets. Otherwise, just
 # export the slang targets.
+#
+# A STATIC build used to be excluded here because slang's internal link
+# dependencies (core, prelude, compiler-core, slang-capability-*,
+# slang-lookup-tables, SPIRV-Headers, ...) leaked onto its public link
+# interface and weren't in any export set, which made install(EXPORT ...) fail
+# (see issue #5821 / PR #6158). slang_add_target now wraps private link deps in
+# $<BUILD_LOCAL_INTERFACE:...> / $<BUILD_INTERFACE:...> (cmake/SlangTarget.cmake),
+# so those targets no longer appear in the install/export interface and a static
+# install exports cleanly. Exporting also for STATIC keeps SlangConfig.cmake's
+# unconditional include() of slangTargets.cmake (cmake/SlangConfig.cmake.in)
+# satisfied, so find_package(slang) works for static installs too.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    if(NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
-        install(
-            EXPORT SlangTargets
-            FILE ${PROJECT_NAME}Targets.cmake
-            NAMESPACE ${PROJECT_NAME}::
-            DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
+    install(
+        EXPORT SlangTargets
+        FILE ${PROJECT_NAME}Targets.cmake
+        NAMESPACE ${PROJECT_NAME}::
+        DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
+    )
+
+    # The pkgconfig file stays gated on non-STATIC builds. Unlike the CMake
+    # export above, extras/pkgconfig/slang-compiler.pc.in cannot describe a
+    # static link: it lists only `-lslang-compiler` and leaves Libs.private
+    # empty (it explicitly documents that `pkg-config --static` is unsupported).
+    # Installing it for a STATIC build would hand downstream users a link line
+    # that omits every transitive internal archive (core, compiler-core,
+    # slang-capability-*, slang-lookup-tables, bundled miniz/lz4, ...), causing
+    # unresolved-symbol errors at link time. Static consumers should use
+    # find_package(slang) instead, which the export above now supports.
+    if(UNIX AND NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
+        configure_file(
+            "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
+            "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+            @ONLY
         )
 
-        if(UNIX)
-            configure_file(
-                "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
-                "${PROJECT_BINARY_DIR}/slang-compiler.pc"
-                @ONLY
-            )
-
-            # TODO: When build system is changed to respect CMAKE_INSTALL_LIBDIR,
-            # update this destination.
-            install(
-                FILES "${PROJECT_BINARY_DIR}/slang-compiler.pc"
-                DESTINATION "lib/pkgconfig"
-            )
-        endif()
+        # TODO: When build system is changed to respect CMAKE_INSTALL_LIBDIR,
+        # update this destination.
+        install(
+            FILES "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+            DESTINATION "lib/pkgconfig"
+        )
     endif()
 endif()
 

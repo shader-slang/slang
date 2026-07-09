@@ -107,13 +107,22 @@ gcloud compute scp "${SCALER_DIR}/deploy/scaler-windows.service" "${VM_NAME}:/tm
   --zone="${ZONE}" --project="${PROJECT}"
 gcloud compute scp "${SCALER_DIR}/deploy/scaler-linux.service" "${VM_NAME}:/tmp/scaler-linux.service" \
   --zone="${ZONE}" --project="${PROJECT}"
+gcloud compute scp "${SCALER_DIR}/deploy/scaler-linux-sm80plus.service" "${VM_NAME}:/tmp/scaler-linux-sm80plus.service" \
+  --zone="${ZONE}" --project="${PROJECT}"
 gcloud compute scp "${SCALER_DIR}/deploy/scaler-windows-build.service" "${VM_NAME}:/tmp/scaler-windows-build.service" \
+  --zone="${ZONE}" --project="${PROJECT}"
+gcloud compute scp "${SCALER_DIR}/deploy/scaler-linux-build.service" "${VM_NAME}:/tmp/scaler-linux-build.service" \
+  --zone="${ZONE}" --project="${PROJECT}"
+gcloud compute scp "${SCALER_DIR}/deploy/scaler-linux-analytics.service" "${VM_NAME}:/tmp/scaler-linux-analytics.service" \
   --zone="${ZONE}" --project="${PROJECT}"
 
 gcloud compute ssh "${VM_NAME}" --zone="${ZONE}" --project="${PROJECT}" --command="
     sudo mv /tmp/scaler-windows.service /etc/systemd/system/scaler-windows.service
     sudo mv /tmp/scaler-linux.service /etc/systemd/system/scaler-linux.service
+    sudo mv /tmp/scaler-linux-sm80plus.service /etc/systemd/system/scaler-linux-sm80plus.service
     sudo mv /tmp/scaler-windows-build.service /etc/systemd/system/scaler-windows-build.service
+    sudo mv /tmp/scaler-linux-build.service /etc/systemd/system/scaler-linux-build.service
+    sudo mv /tmp/scaler-linux-analytics.service /etc/systemd/system/scaler-linux-analytics.service
     sudo systemctl daemon-reload
 "
 echo ""
@@ -145,3 +154,12 @@ echo "  gcloud compute ssh ${VM_NAME} --zone=${ZONE} --project=${PROJECT} --comm
 echo ""
 echo "  # Start Linux scaler (after creating linux-gpu-runner template)"
 echo "  gcloud compute ssh ${VM_NAME} --zone=${ZONE} --project=${PROJECT} --command='sudo systemctl enable --now scaler-linux'"
+echo ""
+echo "  # Start Linux SM80Plus scaler (after creating linux-gpu-runner-sm80plus-l4 template)"
+echo "  gcloud compute ssh ${VM_NAME} --zone=${ZONE} --project=${PROJECT} --command='sudo systemctl enable --now scaler-linux-sm80plus'"
+echo ""
+echo "  # Start Linux build scaler (after creating linux-build-runner template)"
+echo "  gcloud compute ssh ${VM_NAME} --zone=${ZONE} --project=${PROJECT} --command='sudo systemctl enable --now scaler-linux-build'"
+echo ""
+echo "  # Start Linux analytics scaler (after creating linux-analytics-runner template)"
+echo "  gcloud compute ssh ${VM_NAME} --zone=${ZONE} --project=${PROJECT} --command='sudo systemctl enable --now scaler-linux-analytics'"

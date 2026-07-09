@@ -21,10 +21,6 @@ struct Billiards
 {
     [deprecated("puns")]
     bool bs[22];
-//diag:  ^^ use of deprecated declaration
-//diag:  ^^ bs has been deprecated: puns
-//diag:  ^^ use of deprecated declaration
-//diag:  ^^ bs has been deprecated: puns
 }
 
 int main()

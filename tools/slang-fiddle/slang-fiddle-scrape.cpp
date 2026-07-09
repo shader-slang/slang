@@ -1063,7 +1063,7 @@ private:
         {
             checkMemberDecls(namespaceDecl);
         }
-        else if (auto varDecl = as<VarDecl>(decl))
+        else if (auto varDecl = as<VarDecl>(decl); varDecl)
         {
             // Note: for now we aren't trying to check the type
             // or the initial-value expression of a field.
@@ -1582,7 +1582,7 @@ bool findOutputFileIncludeDirective(List<TokenWithTrivia> tokens, String outputF
         if (cursor->getType() != TokenType::StringLiteral)
             continue;
 
-        auto includedFileName = getStringLiteralTokenValue(cursor->getToken());
+        auto includedFileName = getStringLiteralTokenValue(cursor->getToken(), nullptr);
         if (includedFileName == outputFileName)
             return true;
     }

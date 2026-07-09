@@ -126,9 +126,8 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
                                                                   ->resolve())
                                           : nullptr;
 
-    if (auto rawFwdDiffFuncType = as<FwdDiffFuncType>(rawDirectFuncType))
+    if (auto rawFwdDiffFuncType = as<FwdDiffFuncType>(rawDirectFuncType); rawFwdDiffFuncType)
     {
-        SLANG_UNUSED(rawFwdDiffFuncType);
         if (auto substFwdDiffFuncType = as<FwdDiffFuncType>(substitutedDirectFuncType))
         {
             auto diffTypeWitness =
@@ -306,7 +305,24 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
 
         // Conveniently, the `facet` stores a pre-computed witness for the
         // subtype relationship, which we can use here.
-        return as<SubtypeWitness>(facet->subtypeWitness->resolve());
+        auto witness = as<SubtypeWitness>(facet->subtypeWitness->resolve());
+
+        // `getInheritanceInfo` for an interface *type* roots its facet witnesses at the
+        // interface's `ThisType` (treating the type as a requirement template; see #11469).
+        // When the query `subType` is the interface (existential box) itself, the facet
+        // witness's `sub` is the standalone `ThisType`, not the box we were asked about.
+        // Re-root the witness onto the queried `subType` so the returned witness satisfies
+        // the invariant `result->getSub() == subType`; this yields a well-formed,
+        // box-rooted witness instead of one anchored at a free-floating `ThisType`.
+        if (auto boxWitness = as<DeclaredSubtypeWitness>(witness))
+        {
+            if (boxWitness->getSub() != subType)
+                return m_astBuilder->getDeclaredSubtypeWitness(
+                    subType,
+                    boxWitness->getSup(),
+                    boxWitness->getDeclRef());
+        }
+        return witness;
     }
     //
     // TODO: We could expand upon the test using the facet list above
@@ -351,6 +367,15 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // during visitGenericTypeConstraintDecl. If we get here, something is wrong.
         SLANG_UNEXPECTED("AndType should have been flattened before reaching isSubtype");
     }
+    else if (auto eachSubType = as<EachType>(subType))
+    {
+        // `each T : U` is satisfied when every element of `T` satisfies `U`.
+        if (auto patternWitness =
+                isSubtype(eachSubType->getElementType(), superType, isSubTypeOptions))
+        {
+            return m_astBuilder->getEachSubtypeWitness(subType, superType, patternWitness);
+        }
+    }
     else if (auto subTypePack = as<ConcreteTypePack>(subType))
     {
         // An empty type pack vacuously satisfies any element-wise subtype constraint.
@@ -361,6 +386,22 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
                 superType,
                 ArrayView<SubtypeWitness*>());
         }
+
+        List<SubtypeWitness*> elementWitnesses;
+        for (Index i = 0; i < subTypePack->getTypeCount(); ++i)
+        {
+            auto elementWitness =
+                isSubtype(subTypePack->getElementType(i), superType, isSubTypeOptions);
+            if (!elementWitness)
+                return failureWitness;
+
+            elementWitnesses.add(elementWitness);
+        }
+
+        return m_astBuilder->getSubtypeWitnessPack(
+            subType,
+            superType,
+            elementWitnesses.getArrayView());
     }
     // default is failure
     return failureWitness;

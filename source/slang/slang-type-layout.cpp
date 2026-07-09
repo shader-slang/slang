@@ -962,6 +962,26 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
     }
 };
 
+// Metal structured buffer elements use natural (scalar-aligned, tightly
+// packed) vector and matrix layout. `MetalBufferElementTypeLoweringPolicy`
+// lowers vectors/matrices in such buffers to MSL packed vectors so the
+// emitted MSL agrees with this layout.
+struct MetalStructuredBufferLayoutRulesImpl : MetalLayoutRulesImpl
+{
+    SimpleLayoutInfo GetVectorLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t elementCount) override
+    {
+        SLANG_UNUSED(elementType);
+        SimpleLayoutInfo vectorInfo;
+        vectorInfo.kind = elementInfo.kind;
+        vectorInfo.size = elementInfo.size * elementCount;
+        vectorInfo.alignment = elementInfo.alignment;
+        return vectorInfo;
+    }
+};
+
 struct HLSLStructuredBufferLayoutRulesImpl : DefaultLayoutRulesImpl
 {
     // HLSL structured buffers drop the restrictions added for constant buffers,
@@ -2581,6 +2601,9 @@ struct MetalObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::Texture:
             return SimpleLayoutInfo(LayoutResourceKind::MetalTexture, 1);
 
+        case ShaderParameterKind::SubpassInput:
+            return SimpleLayoutInfo(LayoutResourceKind::InputAttachmentIndex, 1);
+
         case ShaderParameterKind::SamplerState:
             return SimpleLayoutInfo(LayoutResourceKind::SamplerState, 1);
 
@@ -2650,6 +2673,8 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
             {
                 return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 2);
             }
+        case ShaderParameterKind::SubpassInput:
+            return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1);
         default:
             SLANG_UNEXPECTED("unhandled shader parameter kind");
             UNREACHABLE_RETURN(SimpleLayoutInfo());
@@ -2685,6 +2710,8 @@ struct MetalTier2ObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::TextureSampler:
         case ShaderParameterKind::MutableTextureSampler:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 16, 8);
+        case ShaderParameterKind::SubpassInput:
+            return SimpleLayoutInfo(LayoutResourceKind::InputAttachmentIndex, 1);
         default:
             SLANG_UNEXPECTED("unhandled shader parameter kind");
             UNREACHABLE_RETURN(SimpleLayoutInfo());
@@ -2696,6 +2723,7 @@ static MetalObjectLayoutRulesImpl kMetalObjectLayoutRulesImpl;
 static MetalArgumentBufferElementLayoutRulesImpl kMetalArgumentBufferElementLayoutRulesImpl;
 static MetalTier2ObjectLayoutRulesImpl kMetalTier2ObjectLayoutRulesImpl;
 static MetalLayoutRulesImpl kMetalLayoutRulesImpl;
+static MetalStructuredBufferLayoutRulesImpl kMetalStructuredBufferLayoutRulesImpl;
 
 LayoutRulesImpl kMetalAnyValueLayoutRulesImpl_ = {
     &kMetalLayoutRulesFamilyImpl,
@@ -2729,7 +2757,7 @@ LayoutRulesImpl kMetalTier2ParameterBlockLayoutRulesImpl_ = {
 
 LayoutRulesImpl kMetalStructuredBufferLayoutRulesImpl_ = {
     &kMetalLayoutRulesFamilyImpl,
-    &kMetalLayoutRulesImpl,
+    &kMetalStructuredBufferLayoutRulesImpl,
     &kMetalObjectLayoutRulesImpl,
 };
 
@@ -3048,7 +3076,7 @@ static LayoutSize GetElementCount(IntVal* val)
             return LayoutSize::infinite();
         return LayoutSize(LayoutSize::RawValue(constantVal->getValue()));
     }
-    else if (const auto varRefVal = as<DeclRefIntVal>(val))
+    else if (const auto varRefVal = as<DeclRefIntVal>(val); varRefVal)
     {
         // TODO: We want to treat the case where the number of
         // elements in an array depends on a generic parameter
@@ -3060,11 +3088,11 @@ static LayoutSize GetElementCount(IntVal* val)
         //
         return LayoutSize::invalid();
     }
-    else if (const auto polyIntVal = as<PolynomialIntVal>(val))
+    else if (const auto polyIntVal = as<PolynomialIntVal>(val); polyIntVal)
     {
         return LayoutSize::invalid();
     }
-    else if (as<FuncCallIntVal>(val))
+    else if (as<BuiltinOperationIntVal>(val))
     {
         return LayoutSize::invalid();
     }
@@ -3329,6 +3357,16 @@ bool isWGPUTarget(TargetRequest* targetReq)
     return isWGPUTarget(targetReq->getTarget());
 }
 
+bool doesTargetSupportVkBindingOnEntryPointParameters(CodeGenTarget target)
+{
+    return isKhronosTarget(target) || isWGPUTarget(target);
+}
+
+bool doesTargetSupportVkBindingOnEntryPointParameters(TargetRequest* targetReq)
+{
+    return doesTargetSupportVkBindingOnEntryPointParameters(targetReq->getTarget());
+}
+
 bool isKernelTarget(CodeGenTarget codeGenTarget)
 {
     return ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)).style ==
@@ -3353,7 +3391,7 @@ static bool getLLVMBuiltinTypeLayoutInfo(TargetRequest* targetReq, TargetBuiltin
     using InfoFuncV1 =
         SlangResult (*)(Slang::CharSlice targetTriple, Slang::TargetBuiltinTypeLayoutInfo* info);
 
-    auto infoFunc = (InfoFuncV1)llvmLib->findFuncByName("getLLVMTargetBuiltinTypeLayoutInfo_V1");
+    auto infoFunc = (InfoFuncV1)llvmLib->findFuncByName("getLLVMTargetBuiltinTypeLayoutInfo_V2");
 
     if (!infoFunc)
         return false;
@@ -3366,6 +3404,8 @@ TargetBuiltinTypeLayoutInfo getBuiltinTypeLayoutInfo(TargetRequest* targetReq)
 {
     TargetBuiltinTypeLayoutInfo info;
     info.genericPointerSize = 8; // Assume 64-bit pointers by default.
+    info.stringSize = 0;         // Assume strings are unsized types by default.
+    info.stringAlignment = 0;
 
     // If we don't know the target, we just have to assume the defaults. This
     // type of usage occurs in IR checking passes prior to target-specific
@@ -3621,7 +3661,8 @@ RefPtr<TypeLayout> applyOffsetToTypeLayout(
     bool anyHit = false;
     for (auto oldResInfo : oldTypeLayout->resourceInfos)
     {
-        if (const auto offsetResInfo = offsetVarLayout->FindResourceInfo(oldResInfo.kind))
+        if (const auto offsetResInfo = offsetVarLayout->FindResourceInfo(oldResInfo.kind);
+            offsetResInfo)
         {
             anyHit = true;
             break;
@@ -3717,7 +3758,8 @@ IRTypeLayout* applyOffsetToTypeLayout(
     for (auto oldResInfo : oldTypeLayout->getSizeAttrs())
     {
         if (const auto offsetResInfo =
-                offsetVarLayout->findOffsetAttr(oldResInfo->getResourceKind()))
+                offsetVarLayout->findOffsetAttr(oldResInfo->getResourceKind());
+            offsetResInfo)
         {
             anyHit = true;
             break;
@@ -5553,7 +5595,12 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         rowTypeLayout->type = rowType;
         rowTypeLayout->rules = rules;
-        rowTypeLayout->uniformAlignment = elementInfo.getUniformLayout().alignment;
+        // The row vector is an element of the matrix, so its alignment in this context is the
+        // matrix's array alignment (e.g. 16 bytes for std140 / HLSL constant buffers, where every
+        // row is aligned up to a 16-byte boundary).  Using the scalar element's alignment here
+        // would cause `getStride()` on the row vector to report the natural vector size (e.g. 12
+        // for a `float3`) instead of the matrix element stride (16).
+        rowTypeLayout->uniformAlignment = info.alignment;
 
         rowTypeLayout->uniformStride = colStride;
         rowTypeLayout->elementTypeLayout = elementTypeLayout;
@@ -5775,8 +5822,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                 // If the field has an explicit offset, then we will
                 // use that to place it.
                 //
-                if (const auto packOffsetModifier =
-                        field.getDecl()->findModifier<HLSLPackOffsetSemantic>())
+                if (auto packOffsetModifier =
+                        field.getDecl()->findModifier<HLSLPackOffsetSemantic>();
+                    packOffsetModifier)
                 {
                     TypeLayoutResult fieldResult = _createTypeLayout(
                         context,
@@ -5789,8 +5837,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             for (auto field :
                  getFields(context.astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
-                if (const auto packOffsetModifier =
-                        field.getDecl()->findModifier<HLSLPackOffsetSemantic>())
+                if (auto packOffsetModifier =
+                        field.getDecl()->findModifier<HLSLPackOffsetSemantic>();
+                    packOffsetModifier)
                     continue;
 
                 // The fields of a `struct` type may include existential (interface)
@@ -5829,6 +5878,19 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             typeLayoutBuilder.endLayout();
 
             return _updateLayout(context, type, typeLayoutBuilder.getTypeLayoutResult());
+        }
+        else if (auto classDeclRef = declRef.as<ClassDecl>())
+        {
+            if (context.sink)
+            {
+                auto name = classDeclRef.getName();
+                context.sink->diagnose(Diagnostics::ClassTypeNotSupported{
+                    .name = name ? String(name->text) : String("(anonymous)"),
+                    .location = context.layoutDeclForDiagnostics
+                                    ? context.layoutDeclForDiagnostics->loc
+                                    : classDeclRef.getLoc()});
+            }
+            return createSimpleTypeLayout(SimpleLayoutInfo(), type, rules);
         }
         else if (auto globalGenericParamDecl = declRef.as<GlobalGenericParamDecl>())
         {
@@ -6053,6 +6115,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                         break;
                     }
                 }
+                // TODO: PR #1612 (Theresa Foley) - fits is computed but never used.
+                // The intended use was to branch on fits to select storage strategy.
+                SLANG_UNUSED(fits);
             }
             // Interface type occupies a uniform slot for the fixed size storage, with alignment of
             // 4 bytes.

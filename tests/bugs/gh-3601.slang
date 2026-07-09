@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
 struct TestStruct
 {
     uint index;
@@ -23,7 +23,7 @@ void funcThatTakesPointer(PP* p)
 }
 int* funcThatReturnsPointer(PP* p)
 {
-    return &p.data;
+    return __getAddress(p.data);
 }
 
 // CHECK: OpEntryPoint

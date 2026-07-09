@@ -184,6 +184,7 @@ extern "C"
 }
 
 // Disassemble the given SPIRV-ASM instructions and return the result as a string.
+// The caller owns *outString and must release it with glslang_freeDisassembly().
 extern "C"
 #ifdef _MSC_VER
     _declspec(dllexport)
@@ -230,6 +231,18 @@ extern "C"
     }
 }
 
+// Free a disassembly buffer returned by glslang_disassembleSPIRVWithResult.
+extern "C"
+#ifdef _MSC_VER
+    _declspec(dllexport)
+#else
+    __attribute__((__visibility__("default")))
+#endif
+        void glslang_freeDisassembly(char* disassembly)
+{
+    delete[] disassembly;
+}
+
 
 // Disassemble the given SPIRV-ASM instructions.
 extern "C"
@@ -244,7 +257,7 @@ extern "C"
     auto succ = glslang_disassembleSPIRVWithResult(contents, contentsSize, &result);
     if (result)
         fprintf(stdout, "%s\n", result);
-    delete result;
+    glslang_freeDisassembly(result);
     return succ;
 }
 
@@ -263,8 +276,6 @@ static int glslang_optimizeSPIRV(
     {
         return 0;
     }
-
-    const auto debugInfoType = request.debugInfoType;
 
     spvtools::Optimizer optimizer(targetEnv);
 
@@ -287,15 +298,6 @@ static int glslang_optimizeSPIRV(
         outDiags.push_back(diag);
     };
     optimizer.SetMessageConsumer(messageConsumer);
-
-    // If debug info is being generated at Minimal level or above, propagate
-    // line information into all SPIR-V instructions. This avoids loss of
-    // information when instructions are deleted or moved. Later, remove
-    // redundant information to minimize final SPRIR-V size.
-    if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)
-    {
-        optimizer.RegisterPass(spvtools::CreatePropagateLineInfoPass());
-    }
 
     spvtools::OptimizerOptions spvOptOptions;
 
@@ -507,11 +509,6 @@ static int glslang_optimizeSPIRV(
 
             break;
         }
-    }
-
-    if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)
-    {
-        optimizer.RegisterPass(spvtools::CreateRedundantLineInfoElimPass());
     }
 
     spvOptOptions.set_run_validator(false); // Don't run the validator by default

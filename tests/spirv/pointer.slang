@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute -O0 -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute -emit-spirv-directly
 
 
 struct PP
@@ -18,7 +18,7 @@ void funcThatTakesPointer(PP* p)
 }
 int* funcThatReturnsPointer(PP* p)
 {
-    return &p.data;
+    return __getAddress(p.data);
 }
 
 void funcWithInOutParam(inout PP p)

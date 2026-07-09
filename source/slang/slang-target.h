@@ -15,6 +15,7 @@
 #include "slang-compiler-options.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
 
+#include <mutex>
 #include <slang.h>
 
 namespace Slang
@@ -100,6 +101,10 @@ bool isCPUTarget(CodeGenTarget target);
 bool isWGPUTarget(TargetRequest* targetReq);
 bool isWGPUTarget(CodeGenTarget target);
 
+/// Does the target honor `[[vk::binding]]` on entry-point resource parameters?
+bool doesTargetSupportVkBindingOnEntryPointParameters(TargetRequest* targetReq);
+bool doesTargetSupportVkBindingOnEntryPointParameters(CodeGenTarget target);
+
 // Are we generating code for a Kernel-style target (as opposed to host-style target)
 bool isKernelTarget(CodeGenTarget codeGenTarget);
 
@@ -160,6 +165,8 @@ private:
     CompilerOptionSet optionSet;
     CapabilitySet cookedCapabilities;
     RefPtr<HLSLToVulkanLayoutOptions> hlslToVulkanOptions;
+    // Layout/codegen threads share one TargetRequest and lazily initialize this derived state.
+    std::mutex m_mutex;
 };
 
 /// Are resource types "bindless" (implemented as ordinary data) on the given `target`?

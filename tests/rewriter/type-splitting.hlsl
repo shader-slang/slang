@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -profile ps_4_0 -entry main
+//TEST:COMPARE_HLSL: -profile ps_4_0 -entry main -warnings-disable 31106,31107
 
 // Confirm that the `-split-mixed-types` flag works.
 

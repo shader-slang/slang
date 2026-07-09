@@ -120,6 +120,9 @@ bool isPointerOfType(IRInst* ptrType, IROp opCode);
 
 bool isUserPointerType(IRInst* type);
 
+// True if inst produces a derived address from another base address.
+bool isAddressInst(IRInst* inst);
+
 // Builds a dictionary that maps from requirement key to requirement value for `interfaceType`.
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType);
 
@@ -127,6 +130,71 @@ bool isComInterfaceType(IRType* type);
 
 // If `type` is a vector, returns its element type. Otherwise, return `type`.
 IRType* getVectorElementType(IRType* type);
+
+struct IRInstOperandSource
+{
+    IRInst* inst;
+
+    Index getOperandCount() const { return Index(inst->getOperandCount()); }
+    IRInst* getOperand(Index index) const { return inst->getOperand(UInt(index)); }
+};
+
+struct IRArrayOperandSource
+{
+    ArrayView<IRInst*> operands;
+
+    Index getOperandCount() const { return operands.getCount(); }
+    IRInst* getOperand(Index index) const { return operands[index]; }
+};
+
+/// Collects variadic operands from an indexed operand source, unwrapping a single `MakeStruct`
+/// when present.
+template<typename TOperandSource, typename TList>
+void collectFlattenedVariadicOperandsImpl(
+    const TOperandSource& operandSource,
+    Index firstOperandIndex,
+    TList& outOperands)
+{
+    auto operandCount = operandSource.getOperandCount();
+    SLANG_RELEASE_ASSERT(firstOperandIndex >= 0 && firstOperandIndex <= operandCount);
+    if (operandCount == firstOperandIndex + 1)
+    {
+        auto operand = operandSource.getOperand(firstOperandIndex);
+        if (auto makeStruct = as<IRMakeStruct>(operand))
+        {
+            for (UInt i = 0; i < makeStruct->getOperandCount(); i++)
+                outOperands.add(makeStruct->getOperand(i));
+        }
+        else
+        {
+            outOperands.add(operand);
+        }
+        return;
+    }
+
+    for (Index i = firstOperandIndex; i < operandCount; i++)
+        outOperands.add(operandSource.getOperand(i));
+}
+
+/// Collects variadic operands, unwrapping the single `MakeStruct` form when present.
+template<typename TList>
+void collectFlattenedVariadicOperands(IRInst* inst, Index firstOperandIndex, TList& outOperands)
+{
+    collectFlattenedVariadicOperandsImpl(IRInstOperandSource{inst}, firstOperandIndex, outOperands);
+}
+
+/// Collects variadic operands from an operand view, unwrapping a single `MakeStruct` when present.
+template<typename TList>
+void collectFlattenedVariadicOperands(
+    ArrayView<IRInst*> operands,
+    Index firstOperandIndex,
+    TList& outOperands)
+{
+    collectFlattenedVariadicOperandsImpl(
+        IRArrayOperandSource{operands},
+        firstOperandIndex,
+        outOperands);
+}
 
 // If `type` is a vector or a coop matrix, returns its element type. Otherwise, return `type`.
 IRType* getVectorOrCoopMatrixElementType(IRType* type);
@@ -288,7 +356,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
 /// Get a unit-type (aka `void`) value using the `poison` instruction,
 /// which indicates an undefined (and potentially unstable) value.
 ///
-IRInst* getUnitPoisonVal(IRBuilder builder, IRModule* module);
+IRInst* getUnitPoisonVal(IRBuilder* builder);
 
 // The the equivalent op of (a op b) in (b op' a). For example, a > b is equivalent to b < a. So (<)
 // ==> (>).
@@ -453,12 +521,18 @@ bool isFirstBlock(IRInst* inst);
 bool isSpecConstRateType(IRType* type);
 void hoistInstAndOperandsToGlobal(IRBuilder* builder, IRInst* inst);
 IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* oldType);
+IRType* ensureSpecConstRate(IRBuilder* builder, IRType* type);
 bool canOperationBeSpecConst(
     IROp op,
     IRType* resultType,
     IRInst* const* fixedArgs,
     IRUse* operands);
-bool isInstHoistable(IROp op, IRType* type, IRInst* const* fixedArgs);
+bool shouldHaveSpecConstRate(
+    IROp op,
+    IRType* resultType,
+    UInt operandCount,
+    IRInst* const* operands);
+bool isInstHoistable(IROp op);
 
 // most of <algorithm> doesn't work on out non-const iterators, so define this
 // version
@@ -528,6 +602,16 @@ bool tryGetConstantIntLit(IRInst* inst, Int64& outValue);
 bool areKnownEqualShapeElements(IRInst* left, IRInst* right);
 
 IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> elements);
+
+/// Returns true if `type` is one of the work-graph record types (e.g.
+/// DispatchNodeInputRecord<T>, ThreadNodeInputRecord<T>, NodeOutput<T>, etc.).
+/// These types are opaque ABI objects that must survive type legalization unchanged.
+bool isWorkGraphRecordType(IRType* type);
+
+/// Returns the element type operand for generic work-graph record types, or null
+/// for non-generic record types. Empty record types such as `EmptyNodeOutput`
+/// intentionally return null because they carry no payload element type.
+IRType* getWorkGraphRecordElementType(IRType* type);
 
 } // namespace Slang
 

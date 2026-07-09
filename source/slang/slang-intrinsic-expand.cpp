@@ -8,6 +8,47 @@
 namespace Slang
 {
 
+// Return whether `intrinsicText` is one of the sentinel placeholder definitions
+// used in the meta-`.slang` modules to mark an operation that has no valid
+// lowering for the current target/shape, e.g.:
+//   __intrinsic_asm "<invalid intrinsic>"                  (CUDA unsupported texture shape)
+//   __intrinsic_asm "<invalid intrinsics>"                 (typo'd plural, Metal blocks)
+//   __intrinsic_asm "<invalid intrinsic: unimplemented shape>" (WGSL array texture)
+//   __intrinsic_asm "invalid texture shape"                (CUDA Sample default branch)
+//   __intrinsic_asm "<Not supported>"                      (e.g. multisample texture read)
+// The `startsWith("<invalid intrinsic")` check covers both the singular and the
+// typo'd plural `<invalid intrinsics>` forms. These placeholders were historically
+// emitted verbatim, producing uncompilable target code; we detect them so a proper
+// diagnostic can be issued instead. A grep of the meta modules confirms these are
+// the only `__intrinsic_asm` strings matching these patterns, so there are no
+// legitimate definitions to misflag.
+static bool _isUnsupportedIntrinsicPlaceholder(const UnownedStringSlice& intrinsicText)
+{
+    return intrinsicText.startsWith(UnownedStringSlice("<invalid intrinsic")) ||
+           intrinsicText == UnownedStringSlice("invalid texture shape") ||
+           intrinsicText == UnownedStringSlice("<Not supported>");
+}
+
+// Produce a human-readable name for the operation being lowered, for use in the
+// `UnsupportedTargetIntrinsic` diagnostic, taken from the name hint on the called
+// function. The callee operand may be a wrapper (e.g. an `IRSpecialize` of a
+// generic intrinsic) rather than the `IRFunc`/`IRGeneric` that carries the
+// `IRNameHintDecoration`, so resolve through wrappers with
+// `getResolvedInstForDecorations` first (the same resolution the intrinsic
+// dispatch in `emitCallExpr` uses). The `intrinsicInst` returned by
+// `findTargetIntrinsicDefinition` is the matched `IRTargetIntrinsicDecoration` or
+// `IRGenericAsm`, not the called function, so it is not used here.
+static String _getIntrinsicOperationName(IRCall* callInst)
+{
+    if (auto callee = callInst->getCalleeUse()->get())
+    {
+        auto resolved = getResolvedInstForDecorations(callee);
+        if (auto nameHint = resolved->findDecoration<IRNameHintDecoration>())
+            return nameHint->getName();
+    }
+    return "<unknown>";
+}
+
 void IntrinsicExpandContext::emit(
     IRCall* inst,
     IRUse* args,
@@ -20,6 +61,45 @@ void IntrinsicExpandContext::emit(
     m_text = intrinsicText;
     m_callInst = inst;
     m_intrinsicInst = intrinsicInst;
+
+    // If the intrinsic definition is a placeholder marking an operation with no
+    // valid lowering for this target, emit a diagnostic rather than the bogus
+    // text (which would produce uncompilable target code).
+    //
+    // Emission raising an error means the generated source is discarded (the
+    // emit pipeline bails on a non-zero error count), so the placeholder value
+    // emitted here is never handed to a downstream compiler; it only needs to
+    // keep the surrounding expression well-formed for the rest of this emit
+    // pass. We therefore emit a target-appropriate default: braced default-init
+    // `(T{})` on the C++-family targets that accept it (matching
+    // `_emitInstAsDefaultInitializedVar`), and a parenthesized zero elsewhere so
+    // we never emit C++-only syntax for HLSL/GLSL/WGSL/Metal/SPIR-V.
+    if (_isUnsupportedIntrinsicPlaceholder(intrinsicText))
+    {
+        m_emitter->getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+            .operation = _getIntrinsicOperationName(inst),
+            .location = inst->sourceLoc});
+
+        const auto retType = inst->getDataType();
+        if (as<IRVoidType>(retType) == nullptr)
+        {
+            switch (m_emitter->getTarget())
+            {
+            case CodeGenTarget::CPPSource:
+            case CodeGenTarget::HostCPPSource:
+            case CodeGenTarget::PyTorchCppBinding:
+            case CodeGenTarget::CUDASource:
+                m_writer->emit("(");
+                m_emitter->emitType(retType);
+                m_writer->emit("{})");
+                break;
+            default:
+                m_writer->emit("(0)");
+                break;
+            }
+        }
+        return;
+    }
 
     const auto returnType = inst->getDataType();
 
@@ -573,7 +653,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             elementType = dropNormAttributes(elementType);
 
             SLANG_ASSERT(elementType);
-            if (const auto basicType = as<IRBasicType>(elementType))
+            if (const auto basicType = as<IRBasicType>(elementType); basicType)
             {
                 // A scalar result is expected
 
@@ -596,7 +676,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                     m_writer->emit(swiz[elementCount]);
                 }
             }
-            else if (const auto attrType = as<IRAttributedType>(elementType))
+            else if (const auto attrType = as<IRAttributedType>(elementType); attrType)
             {
                 SLANG_UNEXPECTED("unhandled attributed type in intrinsic definition");
             }

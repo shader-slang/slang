@@ -12,6 +12,8 @@
         when specializing complicated generics. We might need to optimize this
         in the future. File an issue to track the this #9755.
 
+tests/bugs/neural-autodiff-constexpr-crash.slang
+tests/bugs/neural-autodiff-constexpr-crash-full.slang
 tests/neural/bias-sum-reduce.slang
 tests/neural/common.slang
 tests/neural/mma-helper-test-multi-warps-arbitrary-size.slang

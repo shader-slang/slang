@@ -4,10 +4,15 @@
 
 glob_append(neural_shader_sources "*.slang")
 
+# Unit test sources (not copied to build output, resolved via -I at compile time)
+glob_append(neural_unittest_sources "unit-test/*.slang")
+
 # Set output directories for build tree
 # Files go under a "slang/" subdirectory so that `import slang.neural;` resolves
 # to <standard-module-dir>/slang/neural.slang-module at runtime.
-set(neural_output_dir "${CMAKE_BINARY_DIR}/$<CONFIG>/${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}/slang")
+set(neural_output_dir
+    "${CMAKE_BINARY_DIR}/$<CONFIG>/${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}/slang"
+)
 set(neural_module_file "${neural_output_dir}/${SLANG_NEURAL_MODULE_FILE_NAME}")
 
 # Copy neural shader files to output directory
@@ -25,29 +30,28 @@ foreach(shader_file ${neural_shader_sources})
     list(APPEND neural_copied_files ${dest_file})
 endforeach()
 
-# Determine which compiler to use for building the module
+# Determine which bootstrap compiler to use for building the module.
 # For cross-compilation, use slang-bootstrap from SLANG_GENERATORS_PATH
 # (slang-bootstrap is a standalone tool with no external dependencies)
-# Otherwise, use the slangc built as part of this build
+# Otherwise, use the slang-bootstrap target built as part of this build.
 if(SLANG_GENERATORS_PATH)
     if(CMAKE_HOST_WIN32)
         set(CMAKE_HOST_EXECUTABLE_SUFFIX ".exe")
     else()
         set(CMAKE_HOST_EXECUTABLE_SUFFIX "")
     endif()
-    set(SLANG_COMPILER "${SLANG_GENERATORS_PATH}/slang-bootstrap${CMAKE_HOST_EXECUTABLE_SUFFIX}")
-    set(SLANG_COMPILER_DEPENDENCY)
-elseif(SLANG_ENABLE_SLANGC)
-    set(SLANG_COMPILER "$<TARGET_FILE:slangc>")
-    set(SLANG_COMPILER_DEPENDENCY
-        slangc
-        slang
+    set(SLANG_COMPILER
+        "${SLANG_GENERATORS_PATH}/slang-bootstrap${CMAKE_HOST_EXECUTABLE_SUFFIX}"
     )
-else()
-    # As a fallback, use the system-installed `slangc` compiler
-    set(SLANG_COMPILER slangc)
     set(SLANG_COMPILER_DEPENDENCY)
+else()
+    # Build standard modules with slang-bootstrap so this target never requires
+    # slangc.exe. Load the generated core module so this step does not recompile it.
+    set(SLANG_COMPILER slang-bootstrap)
+    set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
 endif()
+set(SLANG_COMPILER_CORE_MODULE_ARGS -load-core-module ${core_module_archive})
+set(SLANG_COMPILER_EXTRA_DEPS generate_core_module)
 
 # Determine compiler flags based on build type
 if(SLANG_STANDARD_MODULE_DEVELOP_BUILD)
@@ -57,20 +61,25 @@ else()
 endif()
 
 # Build neural.slang-module and output to the output directory
+# Pass -I to source dir so that __include "unit-test/..." resolves without copying.
 add_custom_command(
     OUTPUT ${neural_module_file}
-    COMMAND ${SLANG_COMPILER} ${NEURAL_MODULE_DEFINES} neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
-    DEPENDS ${neural_copied_files} ${SLANG_COMPILER_DEPENDENCY}
+    COMMAND
+        ${SLANG_COMPILER} ${SLANG_COMPILER_CORE_MODULE_ARGS} ${NEURAL_MODULE_DEFINES} -I
+        ${CMAKE_CURRENT_SOURCE_DIR} neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
+    DEPENDS
+        ${neural_copied_files}
+        ${neural_unittest_sources}
+        ${SLANG_COMPILER_DEPENDENCY}
+        ${SLANG_COMPILER_EXTRA_DEPS}
     WORKING_DIRECTORY ${neural_output_dir}
     VERBATIM
 )
 
-# Create a target to ensure the neural module is built
-add_custom_target(
-    slang-neural-module
-    ALL
-    DEPENDS ${neural_module_file}
-)
+# Create a target to ensure the neural module is built.
+# The prelinkIR crashes that previously blocked SLANG_EMBED_CORE_MODULE=OFF builds
+# are fixed (PRs #10835, #10847). Build the neural module unconditionally.
+add_custom_target(slang-neural-module ALL DEPENDS ${neural_module_file})
 set_target_properties(slang-neural-module PROPERTIES FOLDER generated)
 
 # Install the neural directory to the configured location in the release package

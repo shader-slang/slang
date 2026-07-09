@@ -29,6 +29,7 @@
 #include "directory-util.h"
 #include "options.h"
 #include "parse-diagnostic-util.h"
+#include "slang-test-optimization-options.h"
 #include "slangc-tool.h"
 #include "slangi-tool.h"
 #include "test-context.h"
@@ -1425,7 +1426,6 @@ static SlangResult _extractRenderTestRequirements(
     }
 
     // The native language for the API
-    SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
     SlangCompileTarget target = SLANG_TARGET_NONE;
     SlangPassThrough passThru = SLANG_PASS_THROUGH_NONE;
 
@@ -1433,12 +1433,10 @@ static SlangResult _extractRenderTestRequirements(
     {
     case RenderApiType::D3D11:
         target = SLANG_DXBC;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
         passThru = SLANG_PASS_THROUGH_FXC;
         break;
     case RenderApiType::D3D12:
         target = SLANG_DXIL;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_HLSL;
         passThru = SLANG_PASS_THROUGH_DXC;
         if (useDxbc)
         {
@@ -1448,40 +1446,32 @@ static SlangResult _extractRenderTestRequirements(
         break;
     case RenderApiType::Vulkan:
         target = SLANG_SPIRV;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_GLSL;
         passThru = SLANG_PASS_THROUGH_GLSLANG;
         break;
     case RenderApiType::Metal:
         target = SLANG_METAL_LIB;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_METAL;
         passThru = SLANG_PASS_THROUGH_METAL;
         break;
     case RenderApiType::CPU:
         target = SLANG_SHADER_HOST_CALLABLE;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
         passThru = SLANG_PASS_THROUGH_GENERIC_C_CPP;
         break;
     case RenderApiType::CUDA:
         target = SLANG_PTX;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_CUDA;
         passThru = SLANG_PASS_THROUGH_NVRTC;
         break;
     case RenderApiType::WebGPU:
         target = SLANG_WGSL;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_WGSL;
         passThru = SLANG_PASS_THROUGH_TINT;
         break;
     case RenderApiType::LLVM:
         target = SLANG_SHADER_HOST_CALLABLE;
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_LLVM;
         passThru = SLANG_PASS_THROUGH_NONE;
         break;
     }
 
-    SlangSourceLanguage sourceLanguage = nativeLanguage;
     if (!usePassthru)
     {
-        sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
         passThru = SLANG_PASS_THROUGH_NONE;
     }
 
@@ -2136,6 +2126,7 @@ TestResult runDocTest(TestContext* context, TestInput& input)
     }
 
     _initSlangCompiler(context, cmdLine);
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -2263,6 +2254,7 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
             cmdLine.addArg(arg);
         }
     }
+    SlangTest::addDefaultSlangOptimization(cmdLine);
     ExecuteResult exeRes;
 
     // TODO(Yong) HACK:
@@ -2682,6 +2674,8 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     {
         return TestResult::Ignored;
     }
+    // Keep compiler-based tests on the default optimization level unless a test opts out.
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -2744,6 +2738,7 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
     {
         cmdLine.addArg(arg);
     }
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -2902,6 +2897,7 @@ TestResult runCompile(TestContext* context, TestInput& input)
             cmdLine.addArg(arg);
         }
     }
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -2940,6 +2936,7 @@ TestResult runCompileTarget(TestContext* context, TestInput& input)
     }
 
     cmdLine.addArg("-compile-only");
+    SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3015,6 +3012,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
     {
         cmdLine.addArg(arg);
     }
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3110,6 +3108,7 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
     {
         cmdLine.addArg(arg);
     }
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3469,6 +3468,7 @@ static TestResult generateExpectedOutput(
     {
         expectedCmdLine.addArg(arg);
     }
+    SlangTest::addDefaultSlangOptimization(expectedCmdLine);
 
     ExecuteResult expectedExeRes;
     TEST_RETURN_ON_DONE(
@@ -3515,6 +3515,7 @@ TestResult generateActualOutput(
     {
         actualCmdLine.addArg(arg);
     }
+    SlangTest::addDefaultSlangOptimization(actualCmdLine);
 
     ExecuteResult actualExeRes;
     TEST_RETURN_ON_DONE(
@@ -3632,6 +3633,7 @@ TestResult generateHLSLBaseline(
     cmdLine.addArg(targetFormat);
     cmdLine.addArg("-pass-through");
     cmdLine.addArg(passThroughName);
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3691,6 +3693,7 @@ static TestResult _runHLSLComparisonTest(
 
     cmdLine.addArg("-target");
     cmdLine.addArg(targetFormat);
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3778,6 +3781,7 @@ TestResult doGLSLComparisonTestRun(
     {
         cmdLine.addArg(arg);
     }
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3931,6 +3935,7 @@ TestResult runPerformanceProfile(TestContext* context, TestInput& input)
     {
         cmdLine.addArg(arg);
     }
+    SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -4101,6 +4106,7 @@ TestResult runComputeComparisonImpl(
     cmdLine.addArg("-o");
     auto actualOutputFile = outputStem + ".actual.txt";
     cmdLine.addArg(actualOutputFile);
+    SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
 
     if (context->isExecuting())
     {
@@ -4205,6 +4211,7 @@ TestResult doRenderComparisonTestRun(
     cmdLine.addArg(langOption);
     cmdLine.addArg("-o");
     cmdLine.addArg(outputStem + outputKind + ".png");
+    SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -5567,16 +5574,17 @@ static SlangResult runUnitTestModule(
         return SLANG_FAIL;
 
     renderer_test::CoreDebugCallback coreDebugCallback;
-    renderer_test::CoreToRHIDebugBridge rhiDebugBridge;
-    rhiDebugBridge.setCoreCallback(&coreDebugCallback);
 
     UnitTestContext unitTestContext;
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
-    unitTestContext.enabledApis = context->options.enabledApis;
+    // Intersect with probed available APIs so unit tests skip instead of fail
+    // when the required device type is not present on the current machine.
+    unitTestContext.enabledApis =
+        context->options.enabledApis & _getAvailableRenderApiFlags(context);
     unitTestContext.enableDebugLayers = context->options.enableDebugLayers;
     unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
-    unitTestContext.debugCallback = &rhiDebugBridge;
+    unitTestContext.debugCallback = nullptr;
 
     auto testCount = testModule->getTestCount();
 
@@ -5624,7 +5632,7 @@ static SlangResult runUnitTestModule(
             spawnType == SpawnType::UseFullyIsolatedTestServer)
         {
             TestServerProtocol::ExecuteUnitTestArgs args;
-            args.enabledApis = context->options.enabledApis;
+            args.enabledApis = context->options.enabledApis & _getAvailableRenderApiFlags(context);
             args.enableDebugLayers = context->options.enableDebugLayers;
             args.moduleName = moduleName;
             args.testName = test.testName;
@@ -5649,6 +5657,7 @@ static SlangResult runUnitTestModule(
                 // If the rpc failed, output an error message
                 if (SLANG_FAILED(rpcRes))
                 {
+                    testResult = TestResult::Fail;
                     reporter->message(TestMessageType::RunError, "rpc failed");
                 }
 
@@ -5694,6 +5703,11 @@ static SlangResult runUnitTestModule(
 
             // Clear any previous debug messages
             coreDebugCallback.clear();
+            auto rhiDebugBridge = renderer_test::createRetainedCoreToRHIDebugBridge();
+            unitTestContext.debugCallback = rhiDebugBridge.Ptr();
+            renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
+                *rhiDebugBridge,
+                &coreDebugCallback);
 
             try
             {
@@ -5851,6 +5865,11 @@ SlangResult innerMain(int argc, char** argv)
         const auto hostCallableCompiler = session->getDownstreamCompilerForTransition(
             SLANG_CPP_SOURCE,
             SLANG_SHADER_HOST_CALLABLE);
+
+        if (hasLlvm)
+        {
+            SLANG_RETURN_ON_FAIL(context.locateLLVMFileCheck());
+        }
 
         if (hasLlvm && hostCallableCompiler == SLANG_PASS_THROUGH_LLVM && SLANG_PROCESSOR_X86)
         {

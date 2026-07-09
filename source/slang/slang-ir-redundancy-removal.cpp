@@ -488,7 +488,7 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStoreBase* store)
 
     // A store can be removed if it stores into a local variable
     // that has no other uses than store.
-    if (const auto varInst = as<IRVar>(rootVar))
+    if (const auto varInst = as<IRVar>(rootVar); varInst)
     {
         bool hasNonStoreUse = false;
         // If the entire access chain doesn't non-store use, we can safely remove it.

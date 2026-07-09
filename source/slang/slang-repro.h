@@ -22,6 +22,10 @@ repeat the compilation, or extracted such that everything that was specified in 
 can be inspected and modified. */
 struct ReproUtil
 {
+    // ReproUtil is an internal compiler helper declared under source/, not part of the public
+    // include/slang.h API. The SLANG_API members are grouped below as binary link points for
+    // companion modules such as slang-unit-test-tool; external consumers should use the public C
+    // APIs for repro loading and extraction.
     enum
     {
         kMajorVersion = 0,
@@ -172,6 +176,64 @@ struct ReproUtil
         SlangMatrixLayoutMode defaultMatrixLayoutMode;
     };
 
+    // Cross-DLL entry points.
+    //
+    // Keep SLANG_API methods grouped here so ownership boundaries stay visible during review.
+    // These functions must not expose mutable owning containers such as List<T>. Use blobs or
+    // caller-owned raw byte spans for any data that crosses a binary module boundary.
+    SLANG_API static StableHashCode32 getTypeHash();
+
+    /// Load a validated requestState into request.
+    /// requestState must come from a buffer accepted by loadState() or isReproStateValid().
+    /// Returns SLANG_FAIL if requestState or request is null.
+    /// The overrideFileSystem is optional and can be passed as nullptr. If set, as each file is
+    /// loaded it will attempt to load from fileSystem the *uniqueName*
+    SLANG_API static SlangResult load(
+        OffsetBase& base,
+        RequestState* requestState,
+        ISlangFileSystem* overrideFileSystem,
+        EndToEndCompileRequest* request);
+
+    /// Create a cache file system that uses contents of a validated request state.
+    /// The passed in fileSystem is used for accessing any file accesses not found in the cache.
+    /// Returns SLANG_FAIL if requestState is null.
+    SLANG_API static SlangResult loadFileSystem(
+        OffsetBase& base,
+        RequestState* requestState,
+        ISlangFileSystem* fileSystem,
+        ComPtr<ISlangFileSystemExt>& outFileSystem);
+
+    /// Load, unwrap, version-check, and validate a serialized repro state payload into a COM blob.
+    /// On invalid repro-state payloads, clears *outBlob, emits Diagnostics::InvalidReproState
+    /// through sink, and returns SLANG_FAIL.
+    SLANG_API static SlangResult loadState(
+        const uint8_t* data,
+        size_t size,
+        DiagnosticSink* sink,
+        ISlangBlob** outBlob);
+
+    /// Return the RequestState root for a validated repro state payload stored in raw bytes.
+    /// data must point to bytes accepted by loadState() or isReproStateValid().
+    /// Returns nullptr when data is null or size is too small to contain the root object.
+    SLANG_API static const RequestState* getRequest(const void* data, size_t size);
+
+    SLANG_API static SlangResult extractFilesToDirectory(const String& file, DiagnosticSink* sink);
+
+    /// Extract files from a validated request state into fileSystem.
+    /// Returns SLANG_FAIL if requestState or fileSystem is null.
+    SLANG_API static SlangResult extractFiles(
+        OffsetBase& base,
+        RequestState* requestState,
+        ISlangMutableFileSystem* fileSystem);
+
+    /// Given the repo file work out a suitable path
+    SLANG_API static SlangResult calcDirectoryPathFromFilename(
+        const String& filename,
+        String& outPath);
+
+private:
+    friend class EndToEndCompileRequest;
+
     static SlangResult store(
         EndToEndCompileRequest* request,
         OffsetContainer& inOutContainer,
@@ -181,47 +243,7 @@ struct ReproUtil
 
     static SlangResult saveState(EndToEndCompileRequest* request, Stream* stream);
 
-    /// Create a cache file system that uses contents of the request state.
-    /// The passed in fileSystem is used for accessing any file accesses not found in the cache
-    static SlangResult loadFileSystem(
-        OffsetBase& base,
-        RequestState* requestState,
-        ISlangFileSystem* fileSystem,
-        ComPtr<ISlangFileSystemExt>& outFileSystem);
-
-    /// Load the requestState into request
-    /// The overrideFileSystem is optional and can be passed as nullptr. If set, as each file is
-    /// loaded it will attempt to load from fileSystem the *uniqueName*
-    static SlangResult load(
-        OffsetBase& base,
-        RequestState* requestState,
-        ISlangFileSystem* overrideFileSystem,
-        EndToEndCompileRequest* request);
-
-    static SlangResult loadState(
-        const String& filename,
-        DiagnosticSink* sink,
-        List<uint8_t>& outBuffer);
-    static SlangResult loadState(Stream* stream, DiagnosticSink* sink, List<uint8_t>& outBuffer);
-    static SlangResult loadState(
-        const uint8_t* data,
-        size_t size,
-        DiagnosticSink* sink,
-        List<uint8_t>& outBuffer);
-
-    static RequestState* getRequest(const List<uint8_t>& inBuffer);
-
-    static SlangResult extractFilesToDirectory(const String& file, DiagnosticSink* sink);
-
-    static SlangResult extractFiles(
-        OffsetBase& base,
-        RequestState* requestState,
-        ISlangMutableFileSystem* fileSystem);
-
-    /// Given the repo file work out a suitable path
-    static SlangResult calcDirectoryPathFromFilename(const String& filename, String& outPath);
-
-    /// Given a request trys to determine a suitable dump file name, that is unique.
+    /// Given a request tries to determine a suitable dump file name that is unique.
     static SlangResult findUniqueReproDumpStream(
         EndToEndCompileRequest* request,
         String& outFileName,

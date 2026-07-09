@@ -66,7 +66,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     d.y = 12;
 
     // PtrProcessor path: dereferences Data* and returns x + y = 42
-    var proc = makeProcessor(typeSelector[0], &d, 0);
+    var proc = makeProcessor(typeSelector[0], __getAddress(d), 0);
     // CHECK: 42
     outputBuffer[0] = proc.process();
 
@@ -78,7 +78,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // Modify the data and re-dispatch through PtrProcessor
     d.x = 100;
     d.y = -10;
-    var proc3 = makeProcessor(typeSelector[0], &d, 0);
+    var proc3 = makeProcessor(typeSelector[0], __getAddress(d), 0);
     // CHECK: 90
     outputBuffer[2] = proc3.process();
 }

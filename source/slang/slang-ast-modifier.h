@@ -206,6 +206,25 @@ class LocalTempVarModifier : public Modifier
     FIDDLE(...)
 };
 
+// Marks a `VarDecl` whose existential type has been opened directly
+// (i.e. `maybeMoveTemp` reused the variable instead of creating a temporary).
+// If the variable is later reassigned, the opened existential type identity
+// would become stale, so the assignment must be diagnosed.
+FIDDLE()
+class ExistentialOpenedOnVarModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+// Marks a `VarDecl` that has been reassigned after its initial declaration.
+// A variable with this modifier will not be reused directly in `maybeMoveTemp`;
+// instead, a fresh temporary will be created for each existential opening.
+FIDDLE()
+class VarReassignedModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 // An `extern` variable in an extension is used to introduce additional attributes on an existing
 // field.
 FIDDLE()
@@ -1003,8 +1022,20 @@ class CallAttribute : public Attribute
 };
 // `[call]`
 
+// Marks an enum declaration as unscoped. Added by the parser either from the
+// user-written `[UnscopedEnum]` attribute, or implicitly when a non-generic
+// plain `enum` is compiled with `-unscoped-enum`. Generic enums do not carry
+// this attribute even when `-unscoped-enum` is in effect.
 FIDDLE()
 class UnscopedEnumAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+// Marker for enum class declarations, used to detect conflicting explicit
+// unscoped/scoped enum declarations. This modifier has no further semantics.
+FIDDLE()
+class EnumClassModifier : public Modifier
 {
     FIDDLE(...)
 };
@@ -1218,6 +1249,13 @@ class EarlyDepthStencilAttribute : public Attribute
 };
 // `[earlydepthstencil]`
 
+FIDDLE()
+class Shader64BitIndexingAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+// `[Shader64BitIndexing]`
+
 // An HLSL `[numthreads(x,y,z)]` attribute
 FIDDLE()
 class NumThreadsAttribute : public Attribute
@@ -1244,6 +1282,67 @@ class WaveSizeAttribute : public Attribute
     // followings: 4, 8, 16, 32, 64 or 128.
     //
     FIDDLE() IntVal* numLanes;
+};
+
+// Work-graph node shader attributes
+
+FIDDLE()
+class NodeLaunchAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() String mode; // "broadcasting" | "thread" | "coalescing"
+};
+
+FIDDLE()
+class NodeMaxDispatchGridAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* x;
+    FIDDLE() IntVal* y;
+    FIDDLE() IntVal* z;
+};
+
+FIDDLE()
+class NodeDispatchGridAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* x;
+    FIDDLE() IntVal* y;
+    FIDDLE() IntVal* z;
+};
+
+FIDDLE()
+class MaxRecordsAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* value;
+};
+
+FIDDLE()
+class NodeIDAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() String name;
+    FIDDLE() IntVal* arrayIndex;
+};
+
+FIDDLE()
+class NodeIsProgramEntryAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class AllowSparseNodesAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class NodeArraySizeAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* count;
 };
 
 FIDDLE()
@@ -1350,6 +1449,19 @@ class MutatingAttribute : public Attribute
 //
 FIDDLE()
 class NonmutatingAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+// A `[NoDiscard]` attribute, which indicates that the result of a
+// function call should not be discarded. When a call to a function
+// marked with this attribute is made in a context where its result is
+// discarded — an expression statement, or a `for` loop's side-effect
+// expression, including through parentheses and pass-through operands —
+// the compiler emits an error.
+//
+FIDDLE()
+class NoDiscardAttribute : public Attribute
 {
     FIDDLE(...)
 };
@@ -1612,6 +1724,7 @@ class DifferentiableAttribute : public Attribute
 
     auto begin(Val* targetVal) const
     {
+        SLANG_ASSERT(hasAssociatedVals(targetVal));
         return m_associatedValMapping.tryGetValue(targetVal)->begin();
     }
 
@@ -1984,6 +2097,17 @@ FIDDLE()
 class DeprecatedAttribute : public Attribute
 {
     FIDDLE(...)
+    FIDDLE() String message;
+};
+
+/// A `[RemovedSince(languageVersion, "message")]` attribute indicates that the
+/// target has been removed starting from the specified language version.
+///
+FIDDLE()
+class RemovedSinceAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() int32_t sinceVersion;
     FIDDLE() String message;
 };
 

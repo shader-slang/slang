@@ -9,26 +9,23 @@ on:
       server-count:
         required: false
         type: number
-        default: 8
-      test-category:
+        default: 2
+      timeout-minutes:
         required: false
-        type: string
-        default: smoke
+        type: number
+        default: 120
 
 jobs:
   sanitizer:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 120
+    timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
       id-token: write
       contents: read
-      packages: read
+      packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
 
     container:
       image: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
       options: --user root
 
     env:
@@ -40,9 +37,9 @@ jobs:
 
     steps:
       - name: Configure Git safe directory
-        run: git config --global --add safe.directory '*'
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           submodules: "recursive"
           # Need full history to diff PR changes against the base branch
@@ -67,7 +64,7 @@ jobs:
 
       - name: Authenticate to Google Cloud
         if: env.IS_FORK_PR != 'true'
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
@@ -77,13 +74,17 @@ jobs:
         with:
           platform: linux
 
+      # sccache is a build accelerator, not a correctness input: a cache miss
+      # or a transient cache-service error must degrade to a slower (cold)
+      # build, never fail the job.
       - name: Restore sccache cache
-        uses: actions/cache/restore@v4
+        continue-on-error: true
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache
-          key: sccache-linux-clang-18-x86_64-asan-${{ github.sha }}
+          key: sccache-linux-clang-18-x86_64-asan-v2-${{ github.sha }}
           restore-keys: |
-            sccache-linux-clang-18-x86_64-asan-
+            sccache-linux-clang-18-x86_64-asan-v2-
 
       - name: Setup LLVM from GCS
         uses: ./.github/actions/setup-llvm-from-gcs
@@ -149,7 +150,7 @@ jobs:
             -DSLANG_ENABLE_EXAMPLES=OFF \
             "${cmake_launcher_defines[@]}"
 
-          cmake --build --preset releaseWithDebugInfo -j$(nproc)
+          cmake --build --preset releaseWithDebugInfo -j$(nproc) --verbose
 
           if command -v sccache &> /dev/null; then
             echo "sccache statistics (post-build):"
@@ -158,10 +159,10 @@ jobs:
 
       - name: Save sccache cache
         if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache
-          key: sccache-linux-clang-18-x86_64-asan-${{ github.sha }}
+          key: sccache-linux-clang-18-x86_64-asan-v2-${{ github.sha }}
 
       - name: Verify sanitizer runtime is active
         if: steps.build.outcome == 'success'
@@ -186,7 +187,6 @@ jobs:
       - name: Run Tests with Sanitizers
         if: steps.build.outcome == 'success'
         env:
-          TEST_CATEGORY: ${{ inputs.test-category }}
           SERVER_COUNT: ${{ inputs.server-count }}
         run: |
           # halt_on_error=0: continue after each error to find more issues
@@ -198,6 +198,10 @@ jobs:
 
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+          # Sanitizer tests exercise the LLVM JIT on GCP runners that can
+          # mis-report AVX-512 support and emit instructions the host cannot
+          # execute (#11831).
+          export SLANG_DISABLE_AVX512=1
 
           echo "=== Pre-flight checks ==="
           echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
@@ -205,7 +209,6 @@ jobs:
           ldd "$bin_dir/slang-test" 2>&1 | head -30 || true
 
           slang_test_args=(
-            "-category" "$TEST_CATEGORY"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-expected-failure-list" "tests/expected-failure-no-gpu.txt"
             "-expected-failure-list" "tests/expected-failure-linux.txt"
@@ -218,6 +221,12 @@ jobs:
             slang_test_args+=("-use-test-server")
             slang_test_args+=("-server-count" "$SERVER_COUNT")
           fi
+
+          # Print the fully-resolved command so the CI log shows exactly which
+          # arguments were used (the conditional logic only shows the source).
+          printf '+ %q' "$bin_dir/slang-test"
+          printf ' %q' "${slang_test_args[@]}"
+          printf '\n'
 
           # Non-zero exits are expected (sanitizer errors, test failures); this
           # job gates only on sanitizer log output in the Summary step.
@@ -259,17 +268,27 @@ jobs:
 
           if [ "$total_logs" -gt 0 ]; then
             # Prepare expected-findings patterns (strip comments and blank lines).
+            # Regular patterns match against SUMMARY lines; LEAK: patterns match
+            # function names against full log content for leak findings only.
             expected_patterns="/tmp/expected-patterns.txt"
+            expected_leak_patterns="/tmp/expected-leak-patterns.txt"
             if [ -f cmake/expected-sanitizer-findings.txt ]; then
               grep -v '^\s*#' cmake/expected-sanitizer-findings.txt \
-                | grep -v '^\s*$' > "$expected_patterns" || true
+                | grep -v '^\s*$' \
+                | grep -v '^LEAK:' > "$expected_patterns" || true
+              grep -v '^\s*#' cmake/expected-sanitizer-findings.txt \
+                | grep -v '^\s*$' \
+                | sed -n 's/^LEAK:[[:space:]]*//p' > "$expected_leak_patterns" || true
             else
               : > "$expected_patterns"
+              : > "$expected_leak_patterns"
             fi
             has_expected_patterns=false
-            if [ -s "$expected_patterns" ]; then
+            if [ -s "$expected_patterns" ] || [ -s "$expected_leak_patterns" ]; then
               has_expected_patterns=true
-              echo "Loaded $(wc -l < "$expected_patterns" | tr -d ' ') expected-finding pattern(s)"
+              regular_count=$(wc -l < "$expected_patterns" | tr -d ' ')
+              leak_count=$(wc -l < "$expected_leak_patterns" | tr -d ' ')
+              echo "Loaded $((regular_count + leak_count)) expected-finding pattern(s) ($leak_count leak)"
             fi
 
             # Classify each sanitizer log into one of three buckets:
@@ -288,10 +307,60 @@ jobs:
               # Check if all findings in this log are expected.
               summaries=$(grep -h 'SUMMARY:' "$f" 2>/dev/null || true)
               if $has_expected_patterns && [ -n "$summaries" ]; then
-                unexpected=$(echo "$summaries" | grep -vFf "$expected_patterns" || true)
+                # First pass: remove summaries matching regular (SUMMARY) patterns.
+                if [ -s "$expected_patterns" ]; then
+                  unexpected=$(echo "$summaries" | grep -vFf "$expected_patterns" || true)
+                else
+                  unexpected="$summaries"
+                fi
                 if [ -z "$unexpected" ]; then
                   expected_files="${expected_files}${f}"$'\n'
                   continue
+                fi
+                # Second pass: for remaining leak summaries, check stack traces.
+                # A leak SUMMARY is expected if any "Direct leak" block in the
+                # file matches at least one LEAK: pattern. Indirect leaks are
+                # children of the direct allocation and don't need independent
+                # matching — they share the same root cause.
+                if [ -s "$expected_leak_patterns" ]; then
+                  still_unexpected=""
+                  while IFS= read -r line; do
+                    if echo "$line" | grep -q 'leaked'; then
+                      # Check if any Direct leak block matches an expected pattern.
+                      # Preamble lines before the first leak block are skipped.
+                      # Indirect leak blocks are skipped (child allocations).
+                      matched_direct=$(awk '
+                        BEGIN {
+                          while ((getline pat < ARGV[1]) > 0) pats[++n] = pat
+                          delete ARGV[1]
+                        }
+                        /^Direct leak of/ {
+                          if (in_leak && block != "") check()
+                          in_leak = 1; block = $0 "\n"; next
+                        }
+                        /^Indirect leak of/ {
+                          if (in_leak && block != "") check()
+                          in_leak = 1; block = ""; skip = 1; next
+                        }
+                        in_leak && !skip { block = block $0 "\n" }
+                        /^$/ { skip = 0 }
+                        END { if (in_leak && block != "") check(); print matched + 0 }
+                        function check() {
+                          for (i = 1; i <= n; i++)
+                            if (index(block, pats[i]) > 0) { matched++; return }
+                        }
+                      ' "$expected_leak_patterns" "$f" 2>/dev/null)
+                      if [ "${matched_direct:-0}" -gt 0 ]; then
+                        continue  # At least one direct leak matches expected pattern
+                      fi
+                    fi
+                    still_unexpected="${still_unexpected}${line}"$'\n'
+                  done <<< "$unexpected"
+                  still_unexpected=$(echo "$still_unexpected" | sed '/^\s*$/d')
+                  if [ -z "$still_unexpected" ]; then
+                    expected_files="${expected_files}${f}"$'\n'
+                    continue
+                  fi
                 fi
               fi
 
@@ -409,6 +478,54 @@ jobs:
               fi
             fi
 
+            # Warn about stale expected-findings patterns that matched nothing.
+            stale_patterns=""
+            if [ -s "$expected_patterns" ] || [ -s "$expected_leak_patterns" ]; then
+              matched_summaries=""
+              matched_logs=""
+              if [ -n "$expected_files" ]; then
+                matched_summaries=$(echo "$expected_files" | sed '/^$/d' \
+                  | xargs grep -h 'SUMMARY:' 2>/dev/null | sort -u || true)
+                matched_logs=$(echo "$expected_files" | sed '/^$/d' || true)
+              fi
+
+              if [ -s "$expected_patterns" ]; then
+                while IFS= read -r pat; do
+                  if [ -z "$matched_summaries" ] \
+                     || ! echo "$matched_summaries" | grep -qF "$pat"; then
+                    stale_patterns="${stale_patterns}${pat}"$'\n'
+                    echo "::warning::Stale expected-finding pattern never matched: $pat"
+                  fi
+                done < "$expected_patterns"
+              fi
+
+              if [ -s "$expected_leak_patterns" ]; then
+                while IFS= read -r pat; do
+                  found=false
+                  if [ -n "$matched_logs" ]; then
+                    while IFS= read -r mf; do
+                      if [ -n "$mf" ] && grep -qF "$pat" "$mf" 2>/dev/null; then
+                        found=true
+                        break
+                      fi
+                    done <<< "$matched_logs"
+                  fi
+                  if ! $found; then
+                    stale_patterns="${stale_patterns}LEAK: ${pat}"$'\n'
+                    echo "::warning::Stale expected LEAK pattern never matched: $pat"
+                  fi
+                done < "$expected_leak_patterns"
+              fi
+            fi
+            stale_patterns="${stale_patterns%$'\n'}"
+            stale_count=0
+            if [ -n "$stale_patterns" ]; then
+              stale_count=$(echo "$stale_patterns" | wc -l | tr -d ' ')
+              echo ""
+              echo "--- Stale expected-finding patterns ($stale_count never matched) ---"
+              echo "$stale_patterns"
+            fi
+
             echo ""
             echo "========================================"
             echo ""
@@ -456,6 +573,17 @@ jobs:
                   echo ""
                 fi
               fi
+              if [ "$stale_count" -gt 0 ]; then
+                echo "### Stale expected findings: $stale_count"
+                echo ""
+                echo "These patterns in \`cmake/expected-sanitizer-findings.txt\` matched no sanitizer output."
+                echo "The underlying issues may be fixed — consider removing them."
+                echo ""
+                echo '```'
+                echo "$stale_patterns"
+                echo '```'
+                echo ""
+              fi
               echo "Download the \`sanitizer-logs\` artifact for full stack traces."
             } >> "$GITHUB_STEP_SUMMARY"
 
@@ -497,7 +625,7 @@ jobs:
 
       - name: Upload Sanitizer Logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: sanitizer-logs
           path: asan-logs/

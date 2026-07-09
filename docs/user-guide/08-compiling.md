@@ -200,6 +200,14 @@ If multiple source files are passed to `slangc`, they will be grouped into trans
 
 * Each `.slang-module` file forms its own translation unit.
 
+To read source from standard input, pass `-` as an input after `--` and specify the source language with `-lang`, because the language cannot be inferred from a file extension:
+
+```bash
+slangc -lang slang -target spirv -entry computeMain -- - < hello-world.slang
+```
+
+Standard input can be used once per invocation and is limited to 256 MiB. Diagnostics for source read from standard input use `<stdin>` as the source path. When `-lang slang` is used, standard input is grouped into the same translation unit as `.slang` files. Other source languages, such as `-lang hlsl`, are grouped into their own translation unit, matching the file-based rules above.
+
 ### `slangc` Entry Points
 
 When using `slangc`, you will typically want to identify which entry point(s) you intend to compile.
@@ -591,6 +599,75 @@ When building Slang from source, the DXC headers are automatically copied to
 `build/dxc/include/` during the build, so you can use `-Xdxc -Ibuild/dxc/include`
 for local development and testing.
 
+#### Querying Cooperative Type Metadata Used by a Shader
+
+Before dispatching a shader that uses cooperative vector or matrix operations,
+applications may need to verify that the driver supports the specific types and
+combinations the shader uses.
+
+Slang exposes this information via the `slang::ICooperativeTypesMetadata`
+interface, obtained from the `slang::IMetadata` pointer returned by
+`getTargetMetadata()` or `getEntryPointMetadata()`.
+
+The interface reports the distinct cooperative matrix types, cooperative vector
+type-usage records, and supported operation-specific combinations that survive
+in the final target output. Targets that lower cooperative types to ordinary
+arrays report empty lists.
+
+```c++
+slang::IComponentType* program = ...;
+slang::IMetadata* metadata = nullptr;
+program->getTargetMetadata(targetIndex, &metadata);
+
+auto* coopMeta = static_cast<slang::ICooperativeTypesMetadata*>(
+    metadata ? metadata->castAs(slang::ICooperativeTypesMetadata::getTypeGuid()) : nullptr);
+
+if (coopMeta)
+{
+    SlangUInt vecTypeCount = coopMeta->getCooperativeVectorTypeCount();
+    for (SlangUInt i = 0; i < vecTypeCount; ++i)
+    {
+        slang::CooperativeVectorTypeUsageInfo typeInfo = {};
+        coopMeta->getCooperativeVectorTypeByIndex(i, &typeInfo);
+        // typeInfo.componentType, typeInfo.maxSize, typeInfo.usedForTrainingOp
+    }
+
+    SlangUInt vecCombCount = coopMeta->getCooperativeVectorCombinationCount();
+    for (SlangUInt i = 0; i < vecCombCount; ++i)
+    {
+        slang::CooperativeVectorCombination comb = {};
+        coopMeta->getCooperativeVectorCombinationByIndex(i, &comb);
+        // comb.inputType, comb.inputInterpretation, comb.matrixInterpretation,
+        // comb.biasInterpretation, comb.resultType, comb.transpose
+    }
+
+    SlangUInt matCombCount = coopMeta->getCooperativeMatrixCombinationCount();
+    for (SlangUInt i = 0; i < matCombCount; ++i)
+    {
+        slang::CooperativeMatrixCombination comb = {};
+        coopMeta->getCooperativeMatrixCombinationByIndex(i, &comb);
+        // comb.m, comb.n, comb.k, comb.componentTypeA/B/C/Result,
+        // comb.scope, comb.saturate
+    }
+}
+```
+
+### Experimental Standard Modules
+
+Some standard-library APIs are packaged as experimental modules. A shader must enable
+experimental features before importing one of these modules, for example with
+`slangc -experimental-feature`.
+
+The work graph APIs are available from:
+
+```slang
+import experimental.workgraph;
+```
+
+`experimental.workgraph` provides work graph node attributes, record types, and barrier
+helpers for HLSL Shader Model 6.8 work graph shaders. The module is experimental and the API
+surface may change before it is stabilized.
+
 ## Using the Compilation API
 
 The C++ API provided by Slang is meant to provide more complete control over compilation for applications that need it.
@@ -908,7 +985,7 @@ In many cases `kernelBlob->getBufferPointer()` can be passed directly to the app
 
 ## Multithreading
 
-The only functions which are currently thread-safe are:
+The following global-session creation helpers are thread-safe:
 
 ```C++
 SlangSession* spCreateSession(const char* deprecated);
@@ -922,11 +999,30 @@ const char* spGetBuildTagString();
 
 This assumes Slang has been built with the C++ multithreaded runtime, as is the default.
 
-All other functions and methods are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and can only execute on a single thread. More precisely, functions and methods can only be called on a *single* thread at *any one time*. This means for example a global session can be used across multiple threads, as long as some synchronization enforces that only one thread can be in a Slang call at any one time.
+Beyond those helpers, Slang should still be treated as non-reentrant by default on shared objects. Front-end operations such as loading modules, type checking, specialization, and `link()` are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and require external synchronization when multiple threads share a global session, a session, or objects created from them.
 
-Much of the Slang API is available through [COM interfaces](https://en.wikipedia.org/wiki/Component_Object_Model). In strict COM, interfaces should be atomically reference counted. Currently *MOST* Slang API COM interfaces are *NOT* atomic reference counted. One exception is the `ISlangSharedLibrary` interface when produced from [host-callable](../cpu-target.md#host-callable). It is atomically reference counted, allowing it to persist and be used beyond the original compilation and be freed on a different thread.
+Distinct global sessions may be used concurrently from different threads, even when those threads happen to call the same Slang API entry point at the same time.
 
+There is one important experimental exception for backend code generation. After an `IComponentType` has been fully specialized and linked, the following `IComponentType` methods are supported for concurrent use:
 
+```C++
+getEntryPointCode()
+getResultAsFileSystem()
+getTargetCode()
+getTargetMetadata()
+getEntryPointMetadata()
+```
+
+This enables a serial-frontend / parallel-backend workflow:
+
+1. Create sessions, load modules, specialize components, and call `link()` under external synchronization.
+2. Once you have fully linked component types, fan out backend compilation work across threads by calling the methods above for different entry points, targets, or specializations.
+
+This backend parallelism is still experimental. It is supported, but it should not yet be treated as fully hardened for every production workload.
+
+All other functions and methods should still be assumed non-reentrant when they operate on shared Slang objects. Unless documented otherwise, protect a shared global session, session, or object graph derived from them with external synchronization.
+
+Much of the Slang API is available through [COM interfaces](https://en.wikipedia.org/wiki/Component_Object_Model). Strict COM expects atomic reference counting. Slang does not yet make that guarantee uniformly across every exposed interface. Many core compiler objects implemented via `RefObject` or `ComBaseObject` do use atomic reference counts, but some interfaces still use custom or singleton lifetime management. Unless documented otherwise, do not assume that an arbitrary Slang API object can be retained or released safely from unrelated threads solely because it is exposed as a COM interface. One explicit cross-thread lifetime guarantee is the `ISlangSharedLibrary` interface when produced from [host-callable](../cpu-target.md#host-callable). It is atomically reference counted, allowing it to persist and be used beyond the original compilation and be freed on a different thread.
 ## Compiler Options
 
 Both the `SessionDesc` and `TargetDesc` structures contain fields that encode a `CompilerOptionEntry` array for additional compiler options to apply on the session or the target. In addition,
@@ -976,6 +1072,7 @@ meanings of their `CompilerOptionValue` encodings.
 | DisableWarnings    | Specifies a list of warnings to disable. `stringValue0` encodes comma separated list of warning codes or names. |
 | EnableWarning      | Specifies a list of warnings to enable. `stringValue0` encodes comma separated list of warning codes or names. |
 | DisableWarning     | Specify a warning to disable. `stringValue0` encodes the warning code or name. |
+| WarningLevel       | Enable a group of opt-in warnings, modeled on clang/gcc. `intValue0` encodes a `SlangWarningLevel` group (`SLANG_WARNING_LEVEL_ALL`/`_EXTRA`/`_PEDANTIC`; `SLANG_WARNING_LEVEL_DEFAULT` is the always-on group and is a no-op here). Repeatable and additive, matching the `-Wall`/`-Wextra`/`-Wpedantic` command-line flags. The groups are independent (not nested): `extra` is on by default while `pedantic` is off by default, and warnings in the always-on default group are unaffected. |
 | ReportDownstreamTime | Turn on/off downstream compilation time report. `intValue0` encodes a bool value for the setting. |
 | ReportPerfBenchmark | Turn on/off reporting of time spent in different parts of the compiler. `intValue0` encodes a bool value for the setting. |
 | SkipSPIRVValidation | Specifies whether or not to skip the validation step after emitting SPIR-V. `intValue0` encodes a bool value for the setting. |
@@ -1007,11 +1104,30 @@ meanings of their `CompilerOptionValue` encodings.
 | DebugInformationFormat | Specifies the format of debug info. `intValue0` a value defined in the `SlangDebugInfoFormat` enum. |
 | VulkanBindShiftAll | Specifies the `-fvk-bind-shift` option for all spaces. `intValue0`: kind, `intValue1`: shift. |
 | GenerateWholeProgram | When set will emit target code for the entire program instead of for a specific entry point. `intValue0` specifies a bool value for the setting. |
-| UseUpToDateBinaryModule | When set will only load precompiled modules if it is up-to-date with its source. `intValue0` specifies a bool value for the setting. |
+| UseUpToDateBinaryModule | When set, the compiler verifies that a precompiled `.slang-module` is up-to-date with its source before loading it; out-of-date binaries are recompiled from source. Standalone binaries whose primary source is not on the search path are still loaded (compiler-version and option-set validation are skipped in that path). `intValue0` specifies a bool value for the setting. |
 | ValidateUniformity | When set will perform [uniformity analysis](a1-05-uniformity.md).|
+| SPIRVResourceHeapStride | Specifies the byte stride for the resource descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to emit `OpConstantSizeOfEXT(ResourceType)` as the default stride. For `RaytracingAccelerationStructure` entries, the 0 default emits a literal 8-byte `ArrayStride` for the `uint64` device address elements; explicit stride values still override these defaults, but must be at least 8 bytes for acceleration-structure entries. |
+| SPIRVSamplerHeapStride | Specifies the byte stride for the sampler descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
+| SPIRVUnifiedDescriptorHeapStride | When generating SPIR-V with `spvDescriptorHeapEXT`, emits each resource descriptor-heap runtime array's `ArrayStride` as the maximum of the image and buffer descriptor sizes, so a single heap shared by buffers and images is indexed at the device's unified stride. Only affects the default `OpConstantSizeOfEXT` path (used when `SPIRVResourceHeapStride` is 0); mutually exclusive with a non-zero `SPIRVResourceHeapStride` (combining the two is an error). Does not affect the sampler heap or acceleration-structure entries. `intValue0` specifies a bool value for the setting. |
+| ForceDXLayout | When set forces the compiler to use DirectX-compatible (HLSL register packing) rules when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |
+| ForceCLayout | When set forces the compiler to use C struct layout rules (natural alignment, no HLSL/GLSL padding) when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |
+| DenormalModeFp16 | Specifies how 16-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
+| DenormalModeFp32 | Specifies how 32-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
+| DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
+| UseMSVCStyleBitfieldPacking | When set uses MSVC-compatible bitfield packing rules instead of the default GLSL/Vulkan rules. `intValue0` specifies a bool value for the setting. |
+
+### Compiler Option ABI Stability
+
+Each `CompilerOptionName` enumerator has an explicit integer value in `include/slang.h`. You
+can safely pass option names through the `CompilerOptionEntry` API and rely on them remaining
+consistent across Slang releases.
+
+New options are assigned explicit integer values above the current `CountOf` sentinel; existing
+values are never changed. Deprecated options are retained as numbered placeholders to prevent
+renumbering of subsequent members.
 
 ## Debugging
 
-Slang's SPIR-V backend supports generating debug information using the [NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc).
+Slang's SPIR-V backend supports generating debug information using the [NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.asciidoc).
 To enable debugging information when targeting SPIR-V, specify the `-emit-spirv-directly` and the `-g2` argument when using `slangc` tool, or set `EmitSpirvDirectly` to `1` and `DebugInformation` to `SLANG_DEBUG_INFO_LEVEL_STANDARD` when using the API.
 Debugging support has been tested with RenderDoc.

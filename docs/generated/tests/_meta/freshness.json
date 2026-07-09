@@ -1,0 +1,320 @@
+{
+  "bundles": {
+    "conformance/generics": {
+      "generated_at": "2026-07-08T15:08:47+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "8ac9e49a5b7020af6a8040544b9f76f0fbf40898",
+      "source_doc_digest": "b0c5e1d5ca87b9ca5bb42dc8ae9e6903730d17bbdfe4e2d476ec8c4508dd3533",
+      "watched_paths_digest": "0562c6b219f71cccfe2292b995a887d6b1fca1434b23dc47dec81b86acfd8abe"
+    },
+    "design/ast-reference/base": {
+      "generated_at": "2026-07-02T10:13:14+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "8e2a63cbf22c85332796702fd02a875466486a23",
+      "source_doc_digest": "aa845ab462b17892bcb3ed3f8ee0e41dbf4e764758eb37e1bd358370513bd2cd",
+      "watched_paths_digest": "791702e985b41a9050e6b69e409b63ea1f55b1413ef661ac84540de37ab58aa2"
+    },
+    "design/ast-reference/declarations": {
+      "generated_at": "2026-07-02T10:13:14+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "8e2a63cbf22c85332796702fd02a875466486a23",
+      "source_doc_digest": "b7d08bcc51c3f918cd55b8863cd5806c912f1e3ef965ff48b63e3f3d1c318bdc",
+      "watched_paths_digest": "b710b32cbdf2abb7d102772d3e742f9c8a66b4aa33424fc02ec1f63cfde5b5ae"
+    },
+    "design/ast-reference/expressions": {
+      "generated_at": "2026-07-08T16:29:17+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "45cf36e24518df1b75dcec46eb7a241a3f35a89551b9e3c35c2749fb5db92219",
+      "watched_paths_digest": "0a175ffa61652c93c1cdbb8262fa2566e956de0b013d7eaa78064b0605f22bd3"
+    },
+    "design/ast-reference/modifiers": {
+      "generated_at": "2026-07-08T16:29:17+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "8e283720bb9d09542f70b4d7239027ace190b3728d913743192557d037d3dffe",
+      "watched_paths_digest": "36cac2004486f2f516d7f4cfbe584a65e0cac1628b8c15747b207c45eef93a3d"
+    },
+    "design/ast-reference/statements": {
+      "generated_at": "2026-07-08T16:29:17+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "adac2f34224135ba8a45a04f337f0fd26c7b7fd9239ffac44204b29ad57bc8ed",
+      "watched_paths_digest": "636374007b0e00d6163ef380dfb7adff70390f7fd465a04f65c37f48a7f6c243"
+    },
+    "design/ast-reference/types": {
+      "generated_at": "2026-07-02T10:13:14+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "8e2a63cbf22c85332796702fd02a875466486a23",
+      "source_doc_digest": "9c52ba15d0eafbd60acaa7a5a0aaabf4123c728ae98bbcd3de937ab4696060f4",
+      "watched_paths_digest": "69b1b4b4ebfd2e31c72694cb96999536c58a4466e09db936fc79e843d50fc2ad"
+    },
+    "design/ast-reference/values": {
+      "generated_at": "2026-07-08T16:29:17+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "a15329fde483d4d614b5cff578da4bf9ace2510a825d089fbdb743ff84a447e5",
+      "watched_paths_digest": "59d9c296dab00215747c1612d4e02a2ca0687dc420a756bf65f6af88fc474010"
+    },
+    "design/cross-cutting/core-module": {
+      "generated_at": "2026-07-08T16:29:17+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "42c626f59557854c4030d0843ad97cb01bfbc4e7157230f8771f14d599c18464",
+      "watched_paths_digest": "44a19518d1f529a2d0fb2168250f8036c473136794a68ba7ecfc13e163c34713"
+    },
+    "design/cross-cutting/diagnostics": {
+      "generated_at": "2026-07-08T16:29:17+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "e9b5a870e02f2b8ebc65d021bed4b0316369df893fb8835ea6ead9831968d7f4",
+      "watched_paths_digest": "0ebab086a889cd98ff0e9598543b78509c97f476fc611a087214ce3097387326"
+    },
+    "design/cross-cutting/diagnostics-catalog": {
+      "generated_at": "2026-07-08T16:29:18+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "e9b5a870e02f2b8ebc65d021bed4b0316369df893fb8835ea6ead9831968d7f4",
+      "watched_paths_digest": "baa2df8be32434db0476c93d671a991e74f71e90dc2b41c9c787969e75bf16ab"
+    },
+    "design/cross-cutting/ir-instructions": {
+      "generated_at": "2026-07-02T10:13:14+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "8e2a63cbf22c85332796702fd02a875466486a23",
+      "source_doc_digest": "6d95051b87c06dc35373e8bea70f37f8883df3086f06535f1e3cedc75e1d0bda",
+      "watched_paths_digest": "d751033463c899e79fa28872743e407c2b94549f8a38f7fbee46b22f76d02010"
+    },
+    "design/cross-cutting/serialization": {
+      "generated_at": "2026-07-08T16:29:18+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "1bd6466a65577a768ef03f48f4d41c5efe70ac2cecff8f88540217809c9b628f",
+      "watched_paths_digest": "60f1a8a05667738d86c14e10379e954c06900dc12cede14092b14ad907cc71b2"
+    },
+    "design/cross-cutting/targets": {
+      "generated_at": "2026-07-08T16:29:18+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "a6189024953d5a1e32e48c6c61cc9f88f7f263a89014942f409c1e2c6a389e63",
+      "watched_paths_digest": "df0799a847893556e4ffd027f7eca8059c1cd8c1d65904ee313a2cc255d63b39"
+    },
+    "design/ir-reference/control-flow": {
+      "generated_at": "2026-07-08T16:29:18+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "b47cac85a89d196bcdf4006d6346c7365a3f7a4741fabacd4f051cbbe9831013",
+      "watched_paths_digest": "37d40d6faa1f92d8e35b6cc828752b61f477cec57399105ffa0243bf29abd8ce"
+    },
+    "design/ir-reference/decorations": {
+      "generated_at": "2026-07-08T16:29:18+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "543ef07a018da0fce5b6b418df9248d11717d540b3c99c4ad14e5418822fe88a",
+      "watched_paths_digest": "694ede7ee9a0c71887ca7d26c855b3ecf4911eac160f884ac7385feae9061311"
+    },
+    "design/ir-reference/differentiation": {
+      "generated_at": "2026-07-08T16:29:18+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "6e279be87ce710694f4992c25f87c0813ef33ef71662c600601e8c83f7b3ae5e",
+      "watched_paths_digest": "37d40d6faa1f92d8e35b6cc828752b61f477cec57399105ffa0243bf29abd8ce"
+    },
+    "design/ir-reference/generics-and-existentials": {
+      "generated_at": "2026-07-08T16:29:19+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "0bd7555b042bc75dbc13731df1952ac3a77f120c285e182111736d940903bc3c",
+      "watched_paths_digest": "37d40d6faa1f92d8e35b6cc828752b61f477cec57399105ffa0243bf29abd8ce"
+    },
+    "design/ir-reference/metadata": {
+      "generated_at": "2026-07-08T16:29:19+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "807d1564535ea25fca5ea205398f9ed09de1cd2839b5e7fac83d572738eae03d",
+      "watched_paths_digest": "694ede7ee9a0c71887ca7d26c855b3ecf4911eac160f884ac7385feae9061311"
+    },
+    "design/ir-reference/misc": {
+      "generated_at": "2026-07-08T16:29:19+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "3201c356dbf77564071cd215274cd959b19b83bd01f65bbb0cdca9a2a2e72737",
+      "watched_paths_digest": "37d40d6faa1f92d8e35b6cc828752b61f477cec57399105ffa0243bf29abd8ce"
+    },
+    "design/ir-reference/resources-and-atomics": {
+      "generated_at": "2026-07-08T16:29:19+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "dca12ca76fd01ca5396314861fd43cc339b4702f3c78bc87268cebd64a268b2c",
+      "watched_paths_digest": "37d40d6faa1f92d8e35b6cc828752b61f477cec57399105ffa0243bf29abd8ce"
+    },
+    "design/ir-reference/structure": {
+      "generated_at": "2026-07-08T16:29:19+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "6a673eaf658a8318762f99b01d6a0b626fd5348c4febb165c47bfe5873912a5e",
+      "watched_paths_digest": "37d40d6faa1f92d8e35b6cc828752b61f477cec57399105ffa0243bf29abd8ce"
+    },
+    "design/ir-reference/types": {
+      "generated_at": "2026-07-08T16:29:19+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "15b9d62a62385ebfcfd57158f7198b7ed0af9a1d3d7d55bbad6749a960e30355",
+      "watched_paths_digest": "37d40d6faa1f92d8e35b6cc828752b61f477cec57399105ffa0243bf29abd8ce"
+    },
+    "design/ir-reference/values": {
+      "generated_at": "2026-07-02T10:13:14+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "8e2a63cbf22c85332796702fd02a875466486a23",
+      "source_doc_digest": "bcd01df5ef096d7d6c123437dc729f53c1be624d5e9012d9aa5f9f7b3834e594",
+      "watched_paths_digest": "37d40d6faa1f92d8e35b6cc828752b61f477cec57399105ffa0243bf29abd8ce"
+    },
+    "design/name-resolution/lookup": {
+      "generated_at": "2026-07-08T16:29:19+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "d1129a7104e57d8eee37a931e8a62eb04849373ce10efe7e30c33eeca1f76803",
+      "watched_paths_digest": "15c93dc3a3b09cbac688d2594caf45280d17b71572e144bd955998803e47e564"
+    },
+    "design/name-resolution/overload-resolution": {
+      "generated_at": "2026-07-02T10:13:15+00:00",
+      "model": "claude-opus-4-8",
+      "source_commit": "8e2a63cbf22c85332796702fd02a875466486a23",
+      "source_doc_digest": "f30d2e1d8317631f0556f7a128cddc81436ff846d442456e3b363935106421f1",
+      "watched_paths_digest": "92bc84d918f8d6f3d9d7a36baf3b6659758ef0cb88391aa38104fe0399a60629"
+    },
+    "design/name-resolution/scopes": {
+      "generated_at": "2026-07-08T16:29:19+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "c9901843c1eb994344b12c42c0822075e416d164b0ce0439a8556b971985a664",
+      "watched_paths_digest": "40c4cf00e9666a39b09588bbd8d3f43205747a31f3e28345a73faeebd523b538"
+    },
+    "design/name-resolution/visibility": {
+      "generated_at": "2026-07-08T16:29:20+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "b3b2a562a9cd719aa7598ee0fbb0ca299a6d3d9d8a3dc99d745bc04938a4cebf",
+      "watched_paths_digest": "d9879084c6f83184f939d8017b787a782850cd88bdcbfcb043e21460d7430390"
+    },
+    "design/pipeline/01-lex-preprocess": {
+      "generated_at": "2026-07-08T16:29:20+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "563f90496a27dd39b1a9b8d65a3047faa7586bf0967c03e7df031620deaef6bf",
+      "watched_paths_digest": "60e51623e794f61d16d542039b22969034d84551bebe0572c397b5ad2817e830"
+    },
+    "design/pipeline/02-parse-ast": {
+      "generated_at": "2026-07-08T16:29:20+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "404a4b69ccaaab4ac0001d88566cc86b7831e52fdb6303ae67b57195e4be0cee",
+      "watched_paths_digest": "924fd5d883c30d8b665a43a53d4d0621163042dfc5fc60a00f70578c160a9c66"
+    },
+    "design/pipeline/03-semantic-check": {
+      "generated_at": "2026-07-08T15:08:47+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "8ac9e49a5b7020af6a8040544b9f76f0fbf40898",
+      "source_doc_digest": "6d8666ce84da327589c421d02bf9ec5b19ae43b68ed61932a0ba48045a900b99",
+      "watched_paths_digest": "d4079a0fc0173dbe0c595344a2b20bc9f5959b4d624db4fbc5a628619d120628"
+    },
+    "design/pipeline/04-ast-to-ir": {
+      "generated_at": "2026-07-08T16:29:20+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "0c811a87ac30a9bd7739f1990c1c695adcfbacd1611a578aa0d650aa80cf4d7e",
+      "watched_paths_digest": "ee8f5d22353edfd7c8285d12947d6ecb5b807ed2567feebd8c556abbff308de1"
+    },
+    "design/pipeline/04b-pre-link-passes": {
+      "generated_at": "2026-07-08T16:29:20+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "e0d4c50075fe7f2b5839f98c130a2c687a0a415f14824734f4115ff88b074a62",
+      "watched_paths_digest": "5fd330bb5dc669554017fa64d5ec4a4c30ea4f447b4705c1408c941d0321b8ca"
+    },
+    "design/pipeline/04c-layout-ir": {
+      "generated_at": "2026-07-08T16:29:20+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "9b6158d7e5acb02aa1b757edd899285f1af9ec5c04fbf19720f0d92279a2577e",
+      "watched_paths_digest": "86bbfdebdcb7d059413023bd2a5365accd03714a9240ae7c9fbd97a4b0a64877"
+    },
+    "design/pipeline/05-ir-passes": {
+      "generated_at": "2026-07-08T16:29:21+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "9b612748303375a875904420521eb2d5f0d9917e027398565f78bf29a4625079",
+      "watched_paths_digest": "993b819ed15a123fa0467d979176e4f1847bc356debcfcf47bd2e49bec4bae81"
+    },
+    "design/pipeline/06-emit": {
+      "generated_at": "2026-07-08T16:29:22+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "13256eb4db7a7c031f7c9ce86c83c52b665b71640efbf183c1e10d7a3a0d7287",
+      "watched_paths_digest": "fac8415efbb66247c338b8c2c8aadd62740793c447514be7f0322a90e59e4260"
+    },
+    "design/pipeline/overview": {
+      "generated_at": "2026-07-08T16:29:22+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "ccae4a0249559c5338a677481fb182f985e80da86b0cbd05f166d925ebb771c3",
+      "watched_paths_digest": "6c82a300975905673577576ebaca8a292bb446b25fdb648371801e34e2ba45a5"
+    },
+    "design/syntax-reference/grammar": {
+      "generated_at": "2026-07-08T16:29:22+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "1ac39a3aa10e2afc1aff2f29719b13ca1bb170cae4a1be801c5b9af73071a713",
+      "watched_paths_digest": "e140594fcaabe3c5ecc7f5814554826536a7e971ba6f8c81768926570634f2cb"
+    },
+    "design/syntax-reference/keywords-and-builtins": {
+      "generated_at": "2026-07-08T16:29:22+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "31efbf586226ac4b81ac5909ece09c8e196bdb24d60514a455486ba94aa76619",
+      "watched_paths_digest": "f34cbbb5ad05c85939d27098f8d0ce3d4a62265c79f8cf064ef3314bf10a4cb0"
+    },
+    "design/syntax-reference/tokens": {
+      "generated_at": "2026-07-08T16:29:22+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "0b949c0b1f6444fe83ad99806f8fa1508b7986ea3cff1276a4c2266c7c0aa946",
+      "watched_paths_digest": "fc4c0d0b7afe3747c7f396db882642da7a6dc6be38de951d7ce863baf7c5c065"
+    },
+    "design/target-pipelines/cuda": {
+      "generated_at": "2026-07-08T16:29:22+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "180ca43d35cbbb3334adb6d01efe1099130020ac730236da193a59fbc16bde0f",
+      "watched_paths_digest": "ad07f5b052fbc3ea0f2f78a28e0d8b35da511dcf225f413fc78e488b54de0114"
+    },
+    "design/target-pipelines/hlsl": {
+      "generated_at": "2026-07-08T16:29:22+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "a4bcfa80dd9235b4a6f7af4eae2005510d5f002ab5b11e282e01b28bce2974ba",
+      "watched_paths_digest": "344fb9a1b55a4fb1c3e2bc06954d1166cb37de7665f37b4b861ed3da521c9335"
+    },
+    "design/target-pipelines/metal": {
+      "generated_at": "2026-07-08T16:29:23+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "a4276079f8ae13d9cc670ff5d914dfa455a34cdea31429fa3cb79d0777490247",
+      "watched_paths_digest": "509d4e6191b1ede20bbac5e825122e35a853d6ecf0350688d4f84a5490c3ff03"
+    },
+    "design/target-pipelines/spirv": {
+      "generated_at": "2026-07-08T16:29:23+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "10be3de2274669a95468f05da95066d4121c76e8bb790c51daf56e63af528687",
+      "watched_paths_digest": "636bb5e90845a2454ccc0306143aaa1d83f55e1d1f49b58151e60343a04dc9d8"
+    },
+    "design/target-pipelines/wgsl": {
+      "generated_at": "2026-07-08T16:29:23+00:00",
+      "model": "claude-fable-5",
+      "source_commit": "00548f9f2adcf9e8fddd2ecb2d334414fd443ee3",
+      "source_doc_digest": "d5dbeb108c97e47b68dc718114a4b360ee03b4f59e15e21d89f10a87bd9b3137",
+      "watched_paths_digest": "708940454748298d7d84e9429f7b321ac8d31d91c90ab2b5d1312b897ff3c6a1"
+    }
+  },
+  "schema_version": 1
+}

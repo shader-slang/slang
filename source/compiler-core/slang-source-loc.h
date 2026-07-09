@@ -11,6 +11,8 @@
 #include "slang-source-map.h"
 #include "slang.h"
 
+#include <mutex>
+
 namespace Slang
 {
 
@@ -140,10 +142,11 @@ public:
     {
     }
 
-    SourceLoc(SourceLoc const& loc)
-        : raw(loc.raw)
-    {
-    }
+    // Copying must stay defaulted (not user-provided) so SourceLoc remains
+    // trivially copyable: aggregates that embed a SourceLoc in a union rely on
+    // that to get trivial whole-object copies (see
+    // `GenericArgumentInferenceFailure` in slang-check-impl.h).
+    SourceLoc(SourceLoc const& loc) = default;
 
     SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return raw == rhs.raw; }
     SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(raw == rhs.raw); }
@@ -361,6 +364,8 @@ protected:
     // we will cache the starting offset of each line break in
     // the input file:
     List<uint32_t> m_lineBreakOffsets;
+    // Parallel diagnostics and backend work can lazily populate these SourceFile caches.
+    std::mutex m_cacheMutex;
 
     // If set then the locations in this file are really from locations from elsewhere,
     // where the SourceMap specifies that mapping

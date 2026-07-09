@@ -246,7 +246,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     }
     if (strlen(platformFileName) == 0)
         platformFileName = nullptr;
-    const auto mode = RTLD_NOW | RTLD_GLOBAL | (isUnclosable ? RTLD_NODELETE : 0);
+    const auto mode = RTLD_NOW | RTLD_LOCAL | (isUnclosable ? RTLD_NODELETE : 0);
     void* h = dlopen(platformFileName, mode);
     if (!h)
     {

@@ -605,10 +605,10 @@ void DocMarkdownWriter::writeVar(const ASTMarkup::Entry& entry, VarDecl* varDecl
     {
         out << toSlice("<span class='code_keyword'>const</span> ");
     }
-    if (varDecl->hasModifier<ConstExprModifier>())
-    {
-        out << toSlice("<span class='code_keyword'>constexpr</span> ");
-    }
+    // Note: ConstExprModifier on variable declarations is rewritten to ConstModifier
+    // during semantic checking (see slang-check-modifier.cpp), so no constexpr branch
+    // is needed here. constexpr on function parameters is intentionally omitted from
+    // documentation signatures as it is a call-site constraint, not a type qualifier.
     if (varDecl->hasModifier<InModifier>())
     {
         out << toSlice("<span class='code_keyword'>in</span> ");
@@ -918,13 +918,41 @@ void DocMarkdownWriter::writeSignature(CallableDecl* callableDecl)
         out << "<span class='code_keyword'>static</span> ";
     }
 
+    auto declRef = makeDeclRef(callableDecl);
+
+    if (hasDirectFuncType(declRef.as<CallableDecl>()))
+    {
+        // For declarations whose type is expressed as a single func-type expression
+        // (e.g. autodiff synthesized functions like fwd_diff, bwd_diff), print as
+        //   name : <func-type>
+        // since the func-type may not decompose into a simple return + params form.
+        ASTPrinter namePrinter(
+            m_astBuilder,
+            ASTPrinter::OptionFlag::ParamNames |
+                ASTPrinter::OptionFlag::NoSpecializedExtensionTypeName);
+        namePrinter.addDeclPath(declRef);
+        out << translateToHTMLWithLinks(callableDecl, namePrinter.getSlice());
+
+        auto substituted = declRef.substitute(m_astBuilder, callableDecl->funcType.type);
+        auto resolved = substituted ? substituted->resolve() : nullptr;
+
+        ASTPrinter typePrinter(
+            m_astBuilder,
+            ASTPrinter::OptionFlag::ParamNames |
+                ASTPrinter::OptionFlag::NoSpecializedExtensionTypeName);
+        typePrinter.addType(as<Type>(resolved));
+
+        out << toSlice(" : ") << translateToHTMLWithLinks(callableDecl, typePrinter.getSlice());
+        return;
+    }
+
     List<ASTPrinter::Part> parts;
 
     ASTPrinter printer(
         m_astBuilder,
         ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoSpecializedExtensionTypeName,
         &parts);
-    printer.addDeclSignature(makeDeclRef(callableDecl));
+    printer.addDeclSignature(declRef);
 
     Signature signature;
     getSignature(parts, signature);

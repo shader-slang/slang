@@ -26,6 +26,21 @@ bool isUserPointerType(IRInst* type)
     return ptrType->getAddressSpace() == AddressSpace::UserPointer;
 }
 
+bool isAddressInst(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_FieldAddress:
+    case kIROp_GetElementPtr:
+    case kIROp_GetOffsetPtr:
+    case kIROp_RWStructuredBufferGetElementPtr:
+    case kIROp_NodeOutputRecordGetElementPtr:
+        return true;
+    default:
+        return false;
+    }
+}
+
 IRType* getVectorElementType(IRType* type)
 {
     if (auto vectorType = as<IRVectorType>(type))
@@ -307,6 +322,11 @@ bool isValueType(IRInst* dataType)
     case kIROp_RaytracingAccelerationStructureType:
     case kIROp_GLSLAtomicUintType:
     case kIROp_EnumType:
+    // Work-graph input records are immutable payload views, so treat them as values.
+    case kIROp_DispatchNodeInputRecordType:
+    case kIROp_ThreadNodeInputRecordType:
+    case kIROp_GroupNodeInputRecordsType:
+    case kIROp_EmptyNodeInputType:
         return true;
     default:
         // Read-only resource handles are considered as Value type.
@@ -921,6 +941,7 @@ IRInst* getRootAddr(IRInst* addr)
         {
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
+        case kIROp_NodeOutputRecordGetElementPtr:
             addr = addr->getOperand(0);
             continue;
         default:
@@ -939,6 +960,7 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
         {
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
+        case kIROp_NodeOutputRecordGetElementPtr:
             outAccessChain.add(addr->getOperand(1));
             if (outTypes)
                 outTypes->add(addr->getFullType());
@@ -1225,6 +1247,13 @@ bool isPtrLikeOrHandleType(IRInst* type)
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
     case kIROp_GLSLShaderStorageBufferType:
+    // Work-graph output records are mutable handles, so treat them as pointer-like.
+    case kIROp_ThreadNodeOutputRecordsType:
+    case kIROp_GroupNodeOutputRecordsType:
+    case kIROp_NodeOutputType:
+    case kIROp_NodeOutputArrayType:
+    case kIROp_EmptyNodeOutputType:
+    case kIROp_EmptyNodeOutputArrayType:
         return true;
     }
     return false;
@@ -1326,26 +1355,10 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
     return false;
 }
 
-IRInst* getUnitPoisonVal(IRBuilder builder, IRModule* module)
+IRInst* getUnitPoisonVal(IRBuilder* builder)
 {
-    IRInst* undefInst = nullptr;
-
-    for (auto inst : module->getModuleInst()->getChildren())
-    {
-        if (inst->getOp() == kIROp_Poison && inst->getDataType() &&
-            inst->getDataType()->getOp() == kIROp_VoidType)
-        {
-            undefInst = inst;
-            break;
-        }
-    }
-    if (!undefInst)
-    {
-        auto voidType = builder.getVoidType();
-        builder.setInsertAfter(voidType);
-        undefInst = builder.emitPoison(voidType);
-    }
-    return undefInst;
+    builder->setInsertInto(builder->getModule()->getModuleInst());
+    return builder->getPoison(builder->getVoidType());
 }
 
 IROp getSwapSideComparisonOp(IROp op)
@@ -1477,6 +1490,8 @@ IRInst* tryFindBasePtr(IRInst* inst, IRInst* parentFunc)
         return tryFindBasePtr(as<IRGetElementPtr>(inst)->getBase(), parentFunc);
     case kIROp_FieldAddress:
         return tryFindBasePtr(as<IRFieldAddress>(inst)->getBase(), parentFunc);
+    case kIROp_NodeOutputRecordGetElementPtr:
+        return tryFindBasePtr(inst->getOperand(0), parentFunc);
     default:
         return nullptr;
     }
@@ -1730,7 +1745,7 @@ IRInst* getInstInBlock(IRInst* inst)
 {
     SLANG_RELEASE_ASSERT(inst);
 
-    if (const auto block = as<IRBlock>(inst->getParent()))
+    if (const auto block = as<IRBlock>(inst->getParent()); block)
         return inst;
 
     return getInstInBlock(inst->getParent());
@@ -2486,6 +2501,10 @@ IRType* getElementType(IRBuilder& builder, IRType* valueType)
     {
         return vectorType->getElementType();
     }
+    else if (auto packedVectorType = as<IRMetalPackedVectorType>(valueType))
+    {
+        return packedVectorType->getElementType();
+    }
     else if (auto basicType = as<IRBasicType>(valueType))
     {
         return basicType;
@@ -2694,7 +2713,6 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                 // instead of before the `if`. This situation can occur in the IR if
                 // the original code is lowered from a `do-while` loop.
                 //
-                bool shouldInitializeVar = false;
                 if (loopHeaderBlockMap.containsKey(commonDominator))
                 {
                     bool shouldMoveToHeader = false;
@@ -2715,7 +2733,6 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                     if (shouldMoveToHeader)
                     {
                         commonDominator = loopHeaderBlockMap[commonDominator];
-                        shouldInitializeVar = true;
                     }
                 }
 
@@ -2726,16 +2743,6 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                     // common dominator.
                     if (var->getParent() != commonDominator)
                         var->insertBefore(commonDominator->getTerminator());
-
-                    if (shouldInitializeVar)
-                    {
-                        IRBuilder builder(func);
-                        builder.setInsertAfter(var);
-                        builder.emitStore(
-                            var,
-                            builder.emitDefaultConstruct(
-                                as<IRPtrTypeBase>(var->getDataType())->getValueType()));
-                    }
                 }
                 else if (shouldDuplicateInstAtUseSite(inst, target))
                 {
@@ -2781,8 +2788,6 @@ void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
                     IRBuilder builder(func);
                     builder.setInsertBefore(commonDominator->getTerminator());
                     IRVar* tempVar = builder.emitVar(inst->getFullType());
-                    auto defaultVal = builder.emitDefaultConstruct(inst->getFullType());
-                    builder.emitStore(tempVar, defaultVal);
 
                     traverseUses(
                         inst,
@@ -2855,6 +2860,27 @@ IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* o
     return oldType;
 }
 
+// Ensures `type` carries a SpecConst rate.
+// If the type already has a different rate (e.g. ConstExpr from a `static const`
+// expression whose operands are specialization constants), the existing rate is
+// replaced, as a value that depends on a spec-const is only known at pipeline
+// creation time, so `ConstExpr` (compile-time) would be incorrect.
+//
+IRType* ensureSpecConstRate(IRBuilder* builder, IRType* type)
+{
+    if (isSpecConstRateType(type))
+        return type;
+
+    // Strip any existing rate (e.g. ConstExpr) to avoid double-wrapping,
+    // since getRateQualifiedType does not unwrap for us.
+    if (auto rateQualified = as<IRRateQualifiedType>(type))
+        return builder->getRateQualifiedType(
+            builder->getSpecConstRate(),
+            rateQualified->getValueType());
+
+    return builder->getRateQualifiedType(builder->getSpecConstRate(), type);
+}
+
 bool canOperationBeSpecConst(IROp op, IRType* resultType, IRInst* const* fixedArgs, IRUse* operands)
 {
     // Returns true for ops that can be declared as an operation under `OpSpecConstantOp`.
@@ -2915,18 +2941,44 @@ bool canOperationBeSpecConst(IROp op, IRType* resultType, IRInst* const* fixedAr
     }
 }
 
-bool isSpecConstOpHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
+bool shouldHaveSpecConstRate(
+    IROp op,
+    IRType* resultType,
+    UInt operandCount,
+    IRInst* const* operands)
 {
-    auto rateType = as<IRRateQualifiedType>(type);
-    return rateType && as<IRSpecConstRate>(rateType->getRate()) &&
-           canOperationBeSpecConst(op, rateType->getValueType(), fixedArgs, nullptr);
+    if (operandCount == 0)
+        return false;
+
+    // Unwrap any rate qualification so canOperationBeSpecConst sees the bare
+    // value type. isFloatingType checks as<IRBasicType> which doesn't match
+    // rate-qualified types like @ConstExpr float, so without unwrapping we
+    // would incorrectly allow float arithmetic as `OpSpecConstantOp`.
+    IRType* valueType = resultType;
+    if (auto rateQualifiedType = as<IRRateQualifiedType>(resultType))
+        valueType = rateQualifiedType->getValueType();
+
+    if (!canOperationBeSpecConst(op, valueType, operands, nullptr))
+        return false;
+
+    // An instruction whose result carries a spec-const rate is hoisted and
+    // emitted as OpSpecConstantOp for SPIR-V. That is only valid when
+    // every operand is itself a specialization constant or a plain
+    // constant. Mixing in a runtime value would produce invalid SPIR-V.
+    bool hasSpecConstOperand = false;
+    for (UInt ii = 0; ii < operandCount; ++ii)
+    {
+        if (isSpecConstRateType(operands[ii]->getFullType()))
+            hasSpecConstOperand = true;
+        else if (!as<IRConstant>(operands[ii]))
+            return false;
+    }
+    return hasSpecConstOperand;
 }
 
-
-bool isInstHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
+bool isInstHoistable(IROp op)
 {
-    return (getIROpInfo(op).flags & kIROpFlag_Hoistable) ||
-           isSpecConstOpHoistable(op, type, fixedArgs);
+    return (getIROpInfo(op).flags & kIROpFlag_Hoistable);
 }
 
 IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type)
@@ -3278,6 +3330,48 @@ IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> eleme
         return builder.emitMakeTuple(resultType, elements.getCount(), elements.getBuffer());
 
     return builder.emitMakeValuePack(resultType, elements.getCount(), elements.getBuffer());
+}
+
+bool isWorkGraphRecordType(IRType* type)
+{
+    SLANG_ASSERT(type);
+    switch (type->getOp())
+    {
+    case kIROp_DispatchNodeInputRecordType:
+    case kIROp_ThreadNodeInputRecordType:
+    case kIROp_GroupNodeInputRecordsType:
+    case kIROp_EmptyNodeInputType:
+    case kIROp_ThreadNodeOutputRecordsType:
+    case kIROp_GroupNodeOutputRecordsType:
+    case kIROp_NodeOutputType:
+    case kIROp_NodeOutputArrayType:
+    case kIROp_EmptyNodeOutputType:
+    case kIROp_EmptyNodeOutputArrayType:
+        return true;
+    default:
+        return false;
+    }
+}
+
+IRType* getWorkGraphRecordElementType(IRType* type)
+{
+    SLANG_ASSERT(type);
+
+    switch (type->getOp())
+    {
+    case kIROp_DispatchNodeInputRecordType:
+    case kIROp_ThreadNodeInputRecordType:
+    case kIROp_GroupNodeInputRecordsType:
+    case kIROp_ThreadNodeOutputRecordsType:
+    case kIROp_GroupNodeOutputRecordsType:
+    case kIROp_NodeOutputType:
+    case kIROp_NodeOutputArrayType:
+        return as<IRType>(type->getOperand(0));
+    default:
+        break;
+    }
+
+    return nullptr;
 }
 
 } // namespace Slang

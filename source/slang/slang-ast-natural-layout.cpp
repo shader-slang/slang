@@ -237,6 +237,11 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
         }
         else if (const auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
         {
+            // This struct isn't actually what it seems to be and will get
+            // lowered into some magic type, so we can't know its size yet.
+            if (structDeclRef.getDecl()->hasModifier<MagicTypeModifier>())
+                return NaturalSize::makeInvalid();
+
             // Poison the cache whilst we construct
             m_typeToSize.add(type, NaturalSize::makeInvalid());
 

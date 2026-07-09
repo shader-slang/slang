@@ -95,6 +95,7 @@ ConstantBuffer, (RW/RasterizerOrdered)StructuredBuffer, (RW/RasterizerOrdered)By
 ConstantBuffer translates to the `uniform` address space with `read` access mode in WGSL.
 ByteAddressBuffer and RWByteAddressBuffer translate to `array<u32>` in the `storage` address space, with the `read` and `read_write` access modes in WGSL, respectively.
 StructuredBuffer and RWStructuredBuffer with struct type T translate to `array<T>` in the `storage` address space, with the `read` and `read_write` access modes in WGSL, respectively.
+AppendStructuredBuffer with element type T translates to two bindings in the `storage` address space, an `array<T>` that holds the elements and an `array<atomic<i32>>` that holds the append counter. The Append method updates this counter with the WGSL `atomicAdd` built-in.
 
 Interlocked operations
 ----------------------
@@ -157,6 +158,9 @@ WGSL requires explicit address space qualifiers. Slang automatically assigns app
 | RW/Structured Buffers | `storage`           |
 | Group Shared          | `workgroup`         |
 | Parameter Blocks      | `uniform`           |
+
+Module-scope `static const` globals are emitted as a WGSL `const` (a compile-time value) when their type is a scalar, vector, or matrix.
+A `static const` global of **array** type is instead emitted as a `var<private>` (with the same initializer), because a WGSL `const` is a compile-time value that may only be indexed by a const-expression, whereas a `var<private>` is addressable and so can be indexed by a runtime value (for example `positions[vertexID]`).
 
 
 Matrix type translation

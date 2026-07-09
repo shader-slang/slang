@@ -274,6 +274,38 @@ SlangResult Session::checkPassThroughSupport(SlangPassThrough inPassThrough)
     return checkExternalCompilerSupport(this, PassThroughMode(inPassThrough));
 }
 
+SlangResult Session::getDownstreamCompilerVersion(
+    SlangPassThrough inPassThrough,
+    int* outMajor,
+    int* outMinor)
+{
+    // Validate at the public boundary: only a real (non-None), in-range pass-through can name a
+    // loadable compiler. getOrLoadDownstreamCompiler indexes per-type arrays by the enum value, so
+    // reject out-of-range values here rather than indexing out of bounds.
+    if (inPassThrough <= SLANG_PASS_THROUGH_NONE || inPassThrough >= SLANG_PASS_THROUGH_COUNT_OF)
+        return SLANG_E_NOT_FOUND;
+
+    // Route through the same lazy-discovery funnel that compilation uses, so the reported version
+    // is guaranteed to be the library that will actually be used for this pass-through (it shares
+    // the memoized cache and honors setDownstreamCompilerPath + the standard search order).
+    IDownstreamCompiler* compiler =
+        getOrLoadDownstreamCompiler(PassThroughMode(inPassThrough), nullptr);
+    if (!compiler)
+        return SLANG_E_NOT_FOUND;
+
+    // Read the version from the loaded compiler's descriptor: it is the uniform numeric source
+    // across pass-throughs, populated at load (e.g. NVRTC via nvrtcVersion in its init). For some
+    // compilers it is the only place the version is exposed — NVRTC, for one, never implements
+    // getVersionString — while others (glslang, Tint) leave it at (0,0). Hence the desc, not the
+    // version string.
+    const SemanticVersion& version = compiler->getDesc().version;
+    if (outMajor)
+        *outMajor = version.m_major;
+    if (outMinor)
+        *outMinor = version.m_minor;
+    return SLANG_OK;
+}
+
 void Session::writeCoreModuleDoc(String config)
 {
     ASTBuilder* astBuilder = getBuiltinLinkage()->getASTBuilder();
@@ -1034,7 +1066,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(
          source == CodeGenTarget::CPPHeader))
     {
         // We prefer LLVM if it's available
-        if (const auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr))
+        if (const auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr); llvm)
         {
             return SLANG_PASS_THROUGH_LLVM;
         }

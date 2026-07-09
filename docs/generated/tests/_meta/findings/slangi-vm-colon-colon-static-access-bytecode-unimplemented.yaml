@@ -1,0 +1,40 @@
+schema_version: 1
+id: slangi-vm-colon-colon-static-access-bytecode-unimplemented
+bundle: conformance/expressions-member-access
+suspected_kind: regression
+title: "[slangi] `EnumType::Name` static access aborts: VM bytecode unimplemented"
+observed_at: 2026-06-01T17:00:00+00:00
+scope: cpp
+evidence:
+  command: ./build/Release/bin/slangi <repro.slang>
+  source_slang: docs/generated/tests/language-reference/expressions-member-access/static-dot-vs-colon-colon.slang
+  observed_summary: |
+    The language reference's #static-member-expressions section
+    states `Color.Red` and `Color::Red` are equivalent. Under
+    slangi, the `.` form works (per the sibling tests in
+    `language-reference/types-enum/`); the `::` form aborts:
+      error[E99997]: Slang compilation aborted due to an exception
+      of N5Slang13InternalErrorE unimplemented: VM bytecode gen
+      for inst.
+    The frontend parses `::` correctly (the message is from the
+    VM bytecode emitter, not the parser), so the equivalence
+    holds at the AST/IR level but breaks at the VM emit stage.
+  exit_code: 1
+  stderr_tail: "unimplemented: VM bytecode gen for inst."
+expected:
+  claim: |
+    Per the language reference: "These are equivalent: `Color.Red`
+    and `Color::Red`." Both expressions must produce the same
+    enumerator value under any backend, including slangi.
+  citation_kind: doc
+  citation: docs/language-reference/expressions-member-access.md
+provenance:
+  agent_model: claude-opus-4-7
+  source_commit: d25453d7f0b4867db4cb5eabf34fb6cd088cf596
+  doc_anchor: docs/language-reference/expressions-member-access.md#static-member-expressions
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — the `.` form is documented equivalent and works in this test (just the `::` lines fail)."
+    - "Frontend bug: ruled out — the InternalError names the VM bytecode emitter."
+    - "Related to other slangi-VM unimplemented findings in this campaign (swizzle-assign, matrix-mij OOB, vector-scalar broadcast)."

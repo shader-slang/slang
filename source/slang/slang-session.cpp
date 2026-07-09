@@ -20,7 +20,7 @@
 namespace Slang
 {
 
-// Helper function to find the neural.slang module path
+// Helper function to find the standard module root path.
 static String getStandardModuleDirPath()
 {
     // Get the path of the currently loaded libslang.so/slang.dll by using a known exported symbol
@@ -34,21 +34,30 @@ static String getStandardModuleDirPath()
     if (libslangDir.getLength() == 0)
         return String();
 
-    // TODO: Change this to SLANG_STANDARD_MODULE_DIR_NAME directory if we add more standard modules
     String stdModuleDirPath = Path::combine(libslangDir, SLANG_STANDARD_MODULE_DIR_NAME);
     return stdModuleDirPath;
 }
 
 static String findStandardModulePath(String const& stdModuleDirPath, String const& moduleName)
 {
-    // The neural module is always in the same directory as libslang.so/slang.dll
-    // e.g., bin/slang-standard-module/ on Windows, lib/slang-standard-module/ on Linux/Mac
+    // Standard modules are co-located with libslang.so/slang.dll under
+    // SLANG_STANDARD_MODULE_DIR_NAME.
+    // Hierarchical imports map to subdirectories, e.g. "slang/neural" or "experimental/workgraph".
     String stdModulePath = Path::combine(stdModuleDirPath, moduleName + ".slang-module");
 
     if (File::exists(stdModulePath))
         return stdModulePath;
 
     return String();
+}
+
+static SHA1::Digest computeSourceBlobDigest(ISlangBlob* blob)
+{
+    SLANG_RELEASE_ASSERT(blob);
+
+    DigestBuilder<SHA1> digestBuilder;
+    digestBuilder.append(blob);
+    return digestBuilder.finalize();
 }
 
 Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage)
@@ -112,11 +121,10 @@ Linkage::~Linkage()
         auto globalSession = getSessionImpl();
         std::lock_guard<std::mutex> lock(globalSession->m_typeCheckingCacheMutex);
         if (!globalSession->m_typeCheckingCache ||
-            globalSession->getTypeCheckingCache()->resolvedOperatorOverloadCache.getCount() <
-                getTypeCheckingCache()->resolvedOperatorOverloadCache.getCount())
+            globalSession->getTypeCheckingCache()->conversionCostCache.getCount() <
+                getTypeCheckingCache()->conversionCostCache.getCount())
         {
             globalSession->m_typeCheckingCache = m_typeCheckingCache;
-            getTypeCheckingCache()->version++;
         }
         destroyTypeCheckingCache();
     }
@@ -238,28 +246,44 @@ slang::IModule* Linkage::loadModuleFromBlob(
 
     try
     {
-        auto getDigestStr = [](auto x)
-        {
-            DigestBuilder<SHA1> digestBuilder;
-            digestBuilder.append(x);
-            return digestBuilder.finalize().toString();
-        };
+        SHA1::Digest sourceDigest = computeSourceBlobDigest(source);
 
         String moduleNameStr = moduleName;
         if (!moduleName)
-            moduleNameStr = getDigestStr(source);
+            moduleNameStr = sourceDigest.toString();
 
         auto name = getNamePool()->getName(moduleNameStr);
         RefPtr<LoadedModule> loadedModule;
         if (mapNameToLoadedModules.tryGetValue(name, loadedModule))
         {
-            return loadedModule;
+            if (!loadedModule)
+                return nullptr;
+
+            if (blobType != ModuleBlobType::Source)
+                return loadedModule;
+
+            // Returning the cached module is only safe when the incoming source
+            // is identical to whatever produced the cached module; otherwise the
+            // caller expects a module they have never actually loaded, leading
+            // to silent wrong-module use (and sometimes crashes) downstream.
+            // See #10957.
+            if (loadedModule->getSourceDigest() == sourceDigest)
+            {
+                return loadedModule;
+            }
+
+            sink.diagnose(Diagnostics::ModuleAlreadyLoadedWithDifferentSource{
+                .moduleName = name,
+                .location = SourceLoc(),
+            });
+            sink.getBlobIfNeeded(outDiagnostics);
+            return nullptr;
         }
         String pathStr = path;
         if (pathStr.getLength() == 0)
         {
             // If path is empty, use a digest from source as path.
-            pathStr = getDigestStr(source);
+            pathStr = sourceDigest.toString();
         }
         auto pathInfo = PathInfo::makeFromString(pathStr);
         if (File::exists(pathStr))
@@ -272,6 +296,8 @@ slang::IModule* Linkage::loadModuleFromBlob(
         }
         RefPtr<Module> module =
             loadModuleImpl(name, pathInfo, source, SourceLoc(), &sink, nullptr, blobType);
+        if (module)
+            module->setSourceDigest(sourceDigest);
         sink.getBlobIfNeeded(outDiagnostics);
         return asExternal(module.get());
     }
@@ -367,6 +393,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
     slang::IComponentType** outCompositeComponentType,
     ISlangBlob** outDiagnostics)
 {
+    // Composite creation still mutates linkage-owned front-end state, so keep it serialized
+    // with other specialize/link/layout operations.
+    std::lock_guard<std::recursive_mutex> lock(getComponentTypeOperationMutex());
+
     if (outCompositeComponentType == nullptr)
         return SLANG_E_INVALID_ARG;
 
@@ -500,8 +530,15 @@ bool Linkage::isSpecialized(DeclRef<Decl> declRef)
         return true; // no generics => always specialized
 
     auto defaultArgs = getDefaultSubstitutionArgs(getASTBuilder(), &visitor, as<GenericDecl>(decl));
-    auto currentArgs =
-        SubstitutionSet(declRef).findGenericAppDeclRef(as<GenericDecl>(decl))->getArgs();
+
+    // If the declRef carries no generic-application substitution for this
+    // generic at all (e.g. a bare reference to a generic entry point discovered
+    // via `[shader(...)]`), then nothing has been substituted, so it is
+    // unspecialized.
+    auto genericAppDeclRef = SubstitutionSet(declRef).findGenericAppDeclRef(as<GenericDecl>(decl));
+    if (!genericAppDeclRef)
+        return false;
+    auto currentArgs = genericAppDeclRef->getArgs();
 
     if (defaultArgs.getCount() != currentArgs.getCount()) // should really never happen.
         return true;
@@ -750,6 +787,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
 
     auto name = getMangledNameForConformanceWitness(m_astBuilder, subType, supType);
     auto interfaceName = getMangledTypeName(m_astBuilder, supType);
+    // API lookups share the same sequential-ID maps that IR lowering updates when tagging
+    // witness tables, so keep each lookup/allocation atomic.
+    std::lock_guard<std::mutex> lock(m_sequentialIDMapMutex);
     uint32_t resultIndex = 0;
     if (mapMangledNameToRTTIObjectIndex.tryGetValue(name, resultIndex))
     {
@@ -1690,7 +1730,11 @@ RefPtr<Module> Linkage::findOrImportModule(
             // out any other options.
             //
             if (module)
+            {
+                if (type == ModuleBlobType::Source)
+                    module->setSourceDigest(computeSourceBlobDigest(fileContents));
                 return module;
+            }
         }
     }
 
@@ -1795,7 +1839,12 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
     String moduleSrcPath = "";
 
     auto dependencyChunks = moduleChunk->getFileDependencies();
-    if (auto firstDependencyChunk = dependencyChunks.getFirst())
+    // The first dependency is the module's own source file. We still check it like the rest of
+    // the dependencies, but if that primary source is unavailable we accept the standalone
+    // precompiled module instead of treating it as stale. Missing later dependencies still
+    // indicate a stale source-backed module cache.
+    auto firstDependencyChunk = dependencyChunks.getFirst();
+    if (firstDependencyChunk)
     {
         moduleSrcPath = firstDependencyChunk->getValue();
 
@@ -1811,6 +1860,7 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
         }
     }
 
+    Index dependencyIndex = 0;
     for (auto dependencyChunk : dependencyChunks)
     {
         auto file = dependencyChunk->getValue();
@@ -1823,8 +1873,21 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* bas
                 sourceFile = loadSourceFile(moduleSrcPath, file);
         }
         if (!sourceFile)
-            return false;
+        {
+            if (dependencyIndex == 0)
+            {
+                // If the module's own source file is unavailable, we can't prove staleness, so
+                // fall back to accepting the standalone precompiled module. Missing later
+                // dependencies still indicate a stale source-backed module cache.
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
         digestBuilder.append(sourceFile->getDigest());
+        dependencyIndex++;
     }
     return digestBuilder.finalize() == existingDigest;
 }

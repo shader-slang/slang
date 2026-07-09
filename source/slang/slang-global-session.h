@@ -20,6 +20,8 @@
 #include "slang-pass-through.h"
 #include "slang-target.h"
 
+#include <mutex>
+
 namespace Slang
 {
 
@@ -152,6 +154,10 @@ public:
     checkCompileTargetSupport(SlangCompileTarget target) override;
     SLANG_NO_THROW SlangResult SLANG_MCALL
     checkPassThroughSupport(SlangPassThrough passThrough) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL getDownstreamCompilerVersion(
+        SlangPassThrough passThrough,
+        int* outMajor,
+        int* outMinor) override;
 
     void writeCoreModuleDoc(String config);
     SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -185,6 +191,8 @@ public:
     SLANG_NO_THROW void SLANG_MCALL
     getCompilerElapsedTime(double* outTotalTime, double* outDownstreamTime) override
     {
+        // Backend work can still be updating these totals while callers read them.
+        std::lock_guard<std::mutex> lock(m_compileTimeMutex);
         *outDownstreamTime = m_downstreamCompileTime;
         *outTotalTime = m_totalCompileTime;
     }
@@ -308,8 +316,18 @@ public:
         Module*& outModule);
     ~Session();
 
-    void addDownstreamCompileTime(double time) { m_downstreamCompileTime += time; }
-    void addTotalCompileTime(double time) { m_totalCompileTime += time; }
+    void addDownstreamCompileTime(double time)
+    {
+        // Parallel backend jobs accumulate into shared timing counters on the session.
+        std::lock_guard<std::mutex> lock(m_compileTimeMutex);
+        m_downstreamCompileTime += time;
+    }
+    void addTotalCompileTime(double time)
+    {
+        // Parallel backend jobs accumulate into shared timing counters on the session.
+        std::lock_guard<std::mutex> lock(m_compileTimeMutex);
+        m_totalCompileTime += time;
+    }
 
     ISlangSharedLibrary* getOrLoadSlangLLVM();
 
@@ -335,6 +353,10 @@ public:
     RefPtr<RefObject> m_typeCheckingCache;
     TypeCheckingCache* getTypeCheckingCache();
     std::mutex m_typeCheckingCacheMutex;
+    // GenericCCpp probing can recurse into per-compiler loads while holding the same lock.
+    std::recursive_mutex m_downstreamCompilerMutex;
+    // Backend compilation threads update and read these aggregate timing counters concurrently.
+    std::mutex m_compileTimeMutex;
 
 private:
     struct BuiltinModuleInfo

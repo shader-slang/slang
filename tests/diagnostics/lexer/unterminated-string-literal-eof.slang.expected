@@ -1,0 +1,15 @@
+result code = -1
+standard error = {
+tests/diagnostics/lexer/unterminated-string-literal-eof.slang(13): error 10004: end of file in literal
+tests/diagnostics/lexer/unterminated-string-literal-eof.slang(13): error 10007: invalid string escape: '\'
+String s = "abc\
+           ^~~~~
+error[E20001]: unexpected token
+  --> tests/diagnostics/lexer/unterminated-string-literal-eof.slang:13:17
+   |
+13 | String s = "abc\
+   |                 ^ unexpected end of file, expected ';'
+---'
+}
+standard output = {
+}

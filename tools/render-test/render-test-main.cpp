@@ -193,6 +193,25 @@ static void _outputProfileTime(uint64_t startTicks, uint64_t endTicks)
     out.print("profile-time=%g\n", time);
 }
 
+static rhi::Feature _getFeatureFromName(const UnownedStringSlice& featureName)
+{
+    struct FeatureNameMapEntry
+    {
+        const char* name;
+        rhi::Feature feature;
+    };
+
+#define SLANG_RHI_FEATURES_X(id, name) {name, rhi::Feature::id},
+    static const FeatureNameMapEntry kFeatureNameMap[] = {SLANG_RHI_FEATURES(SLANG_RHI_FEATURES_X)};
+#undef SLANG_RHI_FEATURES_X
+
+    for (auto& entry : kFeatureNameMap)
+        if (featureName == UnownedStringSlice(entry.name))
+            return entry.feature;
+
+    return rhi::Feature::_Count;
+}
+
 class ProgramVars;
 
 struct ShaderOutputPlan
@@ -282,6 +301,7 @@ struct AssignValsFromLayoutContext
     ShaderOutputPlan& outputPlan;
     TestResourceContext& resourceContext;
     IAccelerationStructure* accelerationStructure;
+    Dictionary<String, ComPtr<IBuffer>> namedBuffers;
 
     AssignValsFromLayoutContext(
         IDevice* device,
@@ -316,6 +336,14 @@ struct AssignValsFromLayoutContext
 
     SlangResult assignData(ShaderCursor const& dstCursor, ShaderInputLayout::DataVal* srcVal)
     {
+        if (srcVal->addressRefs.getCount() > 0)
+        {
+            StdWriters::getError().print(
+                "error: data=[bufferName] address references are only supported in buffer"
+                " (ubuffer) inputs, not uniform data\n");
+            return SLANG_FAIL;
+        }
+
         const size_t bufferSize = srcVal->bufferData.getCount() * sizeof(uint32_t);
 
         ShaderCursor dataCursor = dstCursor;
@@ -408,10 +436,42 @@ struct AssignValsFromLayoutContext
         }
     }
 
-    SlangResult assignBuffer(ShaderCursor const& dstCursor, ShaderInputLayout::BufferVal* srcVal)
+    SlangResult assignBuffer(
+        ShaderCursor const& dstCursor,
+        ShaderInputLayout::BufferVal* srcVal,
+        String const& fieldName = String())
     {
         const InputBufferDesc& srcBuffer = srcVal->bufferDesc;
         auto& bufferData = srcVal->bufferData;
+
+        // Resolve buffer address references: replace placeholders with actual device addresses
+        // of previously created named buffers.
+        if (srcVal->addressRefs.getCount() > 0 && srcBuffer.stride > 0 && srcBuffer.stride < 4)
+        {
+            StdWriters::getError().print(
+                "error: data=[bufferName] requires stride >= 4 (got %d);"
+                " device addresses occupy 8 bytes and would be mangled by sub-word packing\n",
+                srcBuffer.stride);
+            return SLANG_FAIL;
+        }
+        for (auto& ref : srcVal->addressRefs)
+        {
+            ComPtr<IBuffer> refBuffer;
+            if (namedBuffers.tryGetValue(ref.bufferName, refBuffer))
+            {
+                uint64_t addr = refBuffer->getDeviceAddress();
+                bufferData[ref.dataOffset] = (uint32_t)(addr & 0xFFFFFFFF);
+                bufferData[ref.dataOffset + 1] = (uint32_t)(addr >> 32);
+            }
+            else
+            {
+                StdWriters::getError().print(
+                    "error: buffer '%s' referenced in data=[] not found"
+                    " (ensure it is declared before this buffer)\n",
+                    ref.bufferName.begin());
+                return SLANG_FAIL;
+            }
+        }
 
         // When stride=1 or stride=2, each value in data=[] should occupy only `stride` bytes.
         // Pack values per uint32, little-endian (first value in LSB).
@@ -449,6 +509,10 @@ struct AssignValsFromLayoutContext
 
         // Keep buffer alive in resource context
         resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
+
+        // Register named buffer for cross-referencing by other buffers' data=[]
+        if (fieldName.getLength() > 0)
+            namedBuffers[fieldName] = bufferResource;
 
         // Check for device address/pointer FIRST (before descriptor handles)
         // This ensures plain uint64/pointer types use device addresses, not descriptor handles
@@ -695,7 +759,7 @@ struct AssignValsFromLayoutContext
                         (int)fieldIndex);
                     return SLANG_E_INVALID_ARG;
                 }
-                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val));
+                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val, field.name));
             }
             else
             {
@@ -707,7 +771,7 @@ struct AssignValsFromLayoutContext
                         field.name.begin());
                     return SLANG_E_INVALID_ARG;
                 }
-                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val));
+                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val, field.name));
             }
         }
         return SLANG_OK;
@@ -798,11 +862,25 @@ struct AssignValsFromLayoutContext
         ShaderCursor const& dstCursor,
         ShaderInputLayout::AccelerationStructureVal* srcVal)
     {
+        SLANG_UNUSED(srcVal);
+        if (isDescriptorHandleType(dstCursor))
+        {
+            if (!accelerationStructure)
+                return SLANG_E_NOT_AVAILABLE;
+            DescriptorHandle handle;
+            SLANG_RETURN_ON_FAIL(accelerationStructure->getDescriptorHandle(&handle));
+            SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
+            return SLANG_OK;
+        }
+
         dstCursor.setBinding(accelerationStructure);
         return SLANG_OK;
     }
 
-    SlangResult assign(ShaderCursor const& dstCursor, ShaderInputLayout::ValPtr const& srcVal)
+    SlangResult assign(
+        ShaderCursor const& dstCursor,
+        ShaderInputLayout::ValPtr const& srcVal,
+        String const& fieldName = String())
     {
         auto& entryCursor = dstCursor;
         switch (srcVal->kind)
@@ -811,7 +889,7 @@ struct AssignValsFromLayoutContext
             return assignData(dstCursor, (ShaderInputLayout::DataVal*)srcVal.Ptr());
 
         case ShaderInputType::Buffer:
-            return assignBuffer(dstCursor, (ShaderInputLayout::BufferVal*)srcVal.Ptr());
+            return assignBuffer(dstCursor, (ShaderInputLayout::BufferVal*)srcVal.Ptr(), fieldName);
 
         case ShaderInputType::CombinedTextureSampler:
             return assignCombinedTextureSampler(
@@ -1260,6 +1338,8 @@ void RenderTestApp::setProjectionMatrix(IShaderObject* rootObject)
     float kIdentity[16] =
         {1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f};
     auto info = m_device->getInfo();
+    // TODO: PR #7303 (Simon Kallweit) - info is set but never used.
+    SLANG_UNUSED(info);
     ShaderCursor(rootObject)
         .getField("Uniforms")
         .getDereferenced()
@@ -1689,9 +1769,6 @@ static SlangResult _innerMain(
         }
     }
 
-    static renderer_test::CoreToRHIDebugBridge debugCallback;
-    debugCallback.setCoreCallback(stdWriters->getDebugCallback());
-
     // Use the profile name set on options if set
     input.profile = options.profileName.getLength() ? options.profileName : input.profile;
 
@@ -1822,12 +1899,13 @@ static SlangResult _innerMain(
     }
 
     CachedDeviceWrapper deviceWrapper;
+    // The acquired device's debug bridge; bound to this invocation's callback below (#11856).
+    Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> deviceBridge;
     {
         DeviceDesc desc = {};
         desc.deviceType = options.deviceType;
 
         desc.enableValidation = options.enableDebugLayers;
-        desc.debugCallback = &debugCallback;
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)
@@ -1835,9 +1913,9 @@ static SlangResult _innerMain(
         else
             desc.slang.targetFlags = 0;
 
-        List<const char*> requiredFeatureList;
+        List<rhi::Feature> requiredFeatureList;
         for (auto& name : options.renderFeatures)
-            requiredFeatureList.add(name.getBuffer());
+            requiredFeatureList.add(_getFeatureFromName(name.getUnownedSlice()));
 
         desc.requiredFeatures = requiredFeatureList.getBuffer();
         desc.requiredFeatureCount = (int)requiredFeatureList.getCount();
@@ -1888,7 +1966,7 @@ static SlangResult _innerMain(
             SlangResult res;
             if (options.cacheRhiDevice)
             {
-                res = DeviceCache::acquireDevice(desc, rhiDevice.writeRef());
+                res = DeviceCache::acquireDevice(desc, rhiDevice.writeRef(), &deviceBridge);
                 if (SLANG_FAILED(res))
                 {
                     rhiDevice = nullptr;
@@ -1896,6 +1974,9 @@ static SlangResult _innerMain(
             }
             else
             {
+                // Not caching: create the device wired to a fresh retained bridge.
+                deviceBridge = renderer_test::createRetainedCoreToRHIDebugBridge();
+                desc.debugCallback = deviceBridge.Ptr();
                 res = rhi::getRHI()->createDevice(desc, rhiDevice.writeRef());
                 if (SLANG_FAILED(res))
                 {
@@ -1939,6 +2020,13 @@ static SlangResult _innerMain(
             }
         }
     }
+
+    // Bind this invocation's callback to the device's bridge for the adapter query and rendering;
+    // clearing on scope exit lets a later cached-device message with no active scope drop (#11785).
+    SLANG_ASSERT(deviceBridge);
+    renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
+        *deviceBridge,
+        stdWriters->getDebugCallback());
 
     // Print adapter info after device creation but before any other operations
     if (options.showAdapterInfo)

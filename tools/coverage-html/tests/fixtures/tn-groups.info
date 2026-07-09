@@ -1,0 +1,16 @@
+TN:test_alpha
+SF:shared.c
+DA:1,5
+DA:2,0
+DA:3,0
+LF:3
+LH:1
+end_of_record
+TN:test_beta
+SF:shared.c
+DA:1,2
+DA:2,4
+DA:3,0
+LF:3
+LH:2
+end_of_record
