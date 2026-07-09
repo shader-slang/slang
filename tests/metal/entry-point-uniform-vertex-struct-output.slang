@@ -1,6 +1,6 @@
 // Regression: an entry-point `uniform T*` parameter on a vertex shader must still be bound as a
 // buffer argument on the Metal target when the vertex entry's output is lowered into a return
-// struct by legalizeVertexShaderOutputParamsForMetal -> lowerOutParameters. That pass replaces
+// struct by legalizeShaderOutputParamsForMetal -> lowerOutParameters. That pass replaces
 // the entry point with a wrapper function; the moved-to-global uniform's
 // IREntryPointParamDecoration used to keep pointing at the original function, so
 // introduceExplicitGlobalContext failed to thread it into the wrapper and the [[buffer]] argument
