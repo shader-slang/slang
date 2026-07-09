@@ -836,19 +836,19 @@ static int runRtComposite(const LibSlang& lib, const std::string& dir, const std
     Timers timers;
     Scope total(timers, "apiTotal");
 
-    slang::IGlobalSession* globalSession = nullptr;
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
     {
         Scope s(timers, "apiCreateGlobalSession");
-        if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, &globalSession)))
+        if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
         {
             printf("error: slang_createGlobalSession failed\n");
             return 1;
         }
     }
-    slang::ISession* session = nullptr;
+    Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, &session)))
+        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -856,13 +856,11 @@ static int runRtComposite(const LibSlang& lib, const std::string& dir, const std
     }
 
     slang::IModule* module = nullptr;
-    slang::IBlob* diagnostics = nullptr;
+    Slang::ComPtr<slang::IBlob> diagnostics;
     {
         Scope s(timers, "apiLoadModule");
-        module = session->loadModule(root.c_str(), &diagnostics);
+        module = session->loadModule(root.c_str(), diagnostics.writeRef());
         printDiagnostics(diagnostics);
-        if (diagnostics)
-            diagnostics->release();
         if (!module)
             return 1;
     }
@@ -870,12 +868,13 @@ static int runRtComposite(const LibSlang& lib, const std::string& dir, const std
     static const char* kEntryNames[] = {"rayGenMain", "closestHitMain", "missMain"};
     const int kEntryCount = 3;
     slang::IComponentType* components[1 + kEntryCount] = {module};
-    slang::IEntryPoint* entryPoints[kEntryCount] = {};
+    Slang::ComPtr<slang::IEntryPoint> entryPoints[kEntryCount];
     {
         Scope s(timers, "apiFindEntryPoint");
         for (int i = 0; i < kEntryCount; i++)
         {
-            if (SLANG_FAILED(module->findEntryPointByName(kEntryNames[i], &entryPoints[i])))
+            if (SLANG_FAILED(
+                    module->findEntryPointByName(kEntryNames[i], entryPoints[i].writeRef())))
             {
                 printf("error: findEntryPointByName(%s) failed\n", kEntryNames[i]);
                 return 1;
@@ -884,55 +883,39 @@ static int runRtComposite(const LibSlang& lib, const std::string& dir, const std
         }
     }
 
-    slang::IComponentType* composite = nullptr;
-    diagnostics = nullptr;
+    Slang::ComPtr<slang::IComponentType> composite;
     {
         Scope s(timers, "apiComposite");
         SlangResult res = session->createCompositeComponentType(
             components,
             1 + kEntryCount,
-            &composite,
-            &diagnostics);
+            composite.writeRef(),
+            diagnostics.writeRef());
         printDiagnostics(diagnostics);
-        if (diagnostics)
-            diagnostics->release();
         if (SLANG_FAILED(res))
             return 1;
     }
-    slang::IComponentType* linked = nullptr;
-    diagnostics = nullptr;
+    Slang::ComPtr<slang::IComponentType> linked;
     {
         Scope s(timers, "apiLink");
-        SlangResult res = composite->link(&linked, &diagnostics);
+        SlangResult res = composite->link(linked.writeRef(), diagnostics.writeRef());
         printDiagnostics(diagnostics);
-        if (diagnostics)
-            diagnostics->release();
         if (SLANG_FAILED(res))
             return 1;
     }
     for (int i = 0; i < kEntryCount; i++)
     {
-        slang::IBlob* code = nullptr;
-        diagnostics = nullptr;
+        Slang::ComPtr<slang::IBlob> code;
         Scope s(timers, "apiGetCode");
-        SlangResult res = linked->getEntryPointCode(i, 0, &code, &diagnostics);
+        SlangResult res = linked->getEntryPointCode(i, 0, code.writeRef(), diagnostics.writeRef());
         printDiagnostics(diagnostics);
-        if (diagnostics)
-            diagnostics->release();
         if (SLANG_FAILED(res) || !code || !code->getBufferSize())
         {
             printf("error: getEntryPointCode produced no code for %s\n", kEntryNames[i]);
             return 1;
         }
-        code->release();
     }
 
-    linked->release();
-    composite->release();
-    for (int i = 0; i < kEntryCount; i++)
-        entryPoints[i]->release();
-    session->release();
-    globalSession->release();
     total.stop();
     timers.report();
     return 0;
