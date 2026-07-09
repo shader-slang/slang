@@ -45,7 +45,8 @@ class WorkloadSpec:
     # as the compile entry point.
     main_file: str = None
     # for mode="api": the api-driver subcommand ("session-create",
-    # "many-kernels", "module-graph", "module-graph-bin", "specialize"), the
+    # "many-kernels", "module-graph", "module-graph-bin", "specialize",
+    # "rt-composite"), the
     # root module name for the by-name-loading modes, and extra driver flags
     # (e.g. --reflect).
     api_cmd: str = None

@@ -736,6 +736,22 @@ _RT_UTILS = 48
 _RT_SCENE = 24
 
 
+
+def _rt_pick_distinct(base, stride, count, modulo):
+    """Deterministically pick `count` DISTINCT indices in [0, modulo): walk
+    base + k*stride and skip collisions. Callers import each picked module and
+    index the result positionally, so distinctness is a hard requirement, not
+    an accident of the current stride/modulo choice."""
+    picks = []
+    k = 0
+    while len(picks) < count:
+        c = (base + k * stride) % modulo
+        if c not in picks:
+            picks.append(c)
+        k += 1
+    return picks
+
+
 def _rt_util_module(i):
     """One utility-layer module: original math/sampling helpers with a couple
     of imports from earlier utility modules so the layer forms a DAG."""
@@ -772,8 +788,13 @@ def _rt_util_module(i):
 def _rt_scene_module(i, n_utils):
     """One scene-layer module (lights/camera/intersection helpers) importing a
     handful of utility modules and, above layer 0, earlier scene modules."""
-    us = sorted({(i * 5 + k * 11) % n_utils for k in range(3)})
+    us = _rt_pick_distinct(i * 5, 11, 3, n_utils)
     imports = "".join(f"import rutil_{u};\n" for u in us)
+    # scene_light_{i} calls scene_light_{i-1}: a LINEAR chain (fan-in 1), so
+    # inlined size grows O(_RT_SCENE) per call site — unlike the fan-in^depth
+    # chain-of-chains that OOM'd gen_api_module_graph's first version (its
+    # leaf-only rule targets multiplicative growth, which a 1-ary chain has
+    # none of).
     prev = f"import rscene_{i - 1};\n" if i > 0 else ""
     prev_call = f"    l += scene_light_{i - 1}(p * 0.97, n);\n" if i > 0 else ""
     c = 1.0 + (i % 13) / 16.0
@@ -802,7 +823,7 @@ def _rt_material_module(i, n_utils, n_scene):
     """One material module: a BSDF and a material conforming to the shared
     interfaces, with texture/sampler/parameter state and eval/sample methods
     that lean on the utility and scene layers."""
-    us = sorted({(i * 17 + k * 7) % n_utils for k in range(4)})
+    us = _rt_pick_distinct(i * 17, 7, 4, n_utils)
     sc = (i * 3) % n_scene
     imports = "".join(f"import rutil_{u};\n" for u in us) + f"import rscene_{sc};\n"
     r = 0.1 + (i % 9) / 10.0
