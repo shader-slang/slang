@@ -1645,12 +1645,7 @@ bool isSideEffectFreeFunctionalCall(
     SideEffectAnalysisOptions options,
     Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
-    // The only point that deals with cache optionality: pick the memoized or
-    // plain overload; both contain no further cache plumbing.
-    const bool calleeHasSideEffect =
-        calleeSideEffectCache ? doesCalleeHaveSideEffect(call->getCallee(), *calleeSideEffectCache)
-                              : doesCalleeHaveSideEffect(call->getCallee());
-    if (!calleeHasSideEffect)
+    if (!doesCalleeHaveSideEffect(call->getCallee(), calleeSideEffectCache))
     {
         return areCallArgumentsSideEffectFree(call, options);
     }
@@ -1700,9 +1695,12 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
     return sideEffect;
 }
 
-bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>& cache)
+bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache)
 {
-    if (auto cached = cache.tryGetValue(callee))
+    if (!cache)
+        return doesCalleeHaveSideEffect(callee);
+
+    if (auto cached = cache->tryGetValue(callee))
     {
 #ifdef _DEBUG
         // Verify the memoization contract: within a cache's lifetime the
@@ -1719,7 +1717,7 @@ bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>& cache)
     }
 
     const bool sideEffect = doesCalleeHaveSideEffect(callee);
-    cache.add(callee, sideEffect);
+    cache->add(callee, sideEffect);
     return sideEffect;
 }
 

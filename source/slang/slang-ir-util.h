@@ -363,12 +363,13 @@ bool isSideEffectFreeFunctionalCall(
 bool doesCalleeHaveSideEffect(IRInst* callee);
 
 // Memoized variant: answers from `cache`, computing once and inserting on a
-// miss. A cached answer can go stale only in the conservative direction:
+// miss. When `cache` is null, behaves exactly like the uncached overload
+// above. A cached answer can go stale only in the conservative direction:
 // annotations are removed (never added) by cleanup passes, so a stale `true`
 // at worst keeps an inst alive for the remainder of the simplification
 // invocation that owns the cache. A debug-mode check verifies that contract
 // on every hit.
-bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>& cache);
+bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache);
 
 bool isPtrLikeOrHandleType(IRInst* type);
 
