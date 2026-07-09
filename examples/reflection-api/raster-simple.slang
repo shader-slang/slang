@@ -56,7 +56,7 @@ uniform ConstantBuffer<Camera>      camera;
 uniform ParameterBlock<Environment> environment;
 
 [shader("vertex")]
-[require(sm_6_0)]
+[require(hlsl_spirv, sm_6_0)]
 void vertexMain(
     in AssembledVertex assembledVertex : A,
     out RasterVertex rasterVertex : R,
@@ -74,7 +74,7 @@ void vertexMain(
 }
 
 [shader("fragment")]
-[require(sm_6_0)]
+[require(hlsl_spirv, sm_6_0)]
 float4 fragmentMain(
     in RasterVertex vertex : R)
     : SV_Target0
