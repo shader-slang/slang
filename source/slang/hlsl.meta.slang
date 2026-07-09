@@ -31553,6 +31553,67 @@ extension CoopVec<T, N> : IDifferentiable
     }
 }
 
+// Conditional custom derivatives keep the general arithmetic subscript unchanged while making
+// only floating-point CoopVec specializations differentiable.
+// `CoopVec<T, N>` stores differential lanes as `T`, while an accessor signature exposes them as
+// `T.Differential`. These types are representation-identical for builtin floating-point `T`, so
+// the reinterprets below only bridge the associated type in generic checking.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::__subscript::get)(
+    DifferentialPair<CoopVec<T, N>> self,
+    int index) -> DifferentialPair<T>
+{
+    return diffPair(self.p[index], reinterpret<T.Differential, T>(self.d[index]));
+}
+
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::__subscript::get)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    int index,
+    T.Differential dOut) -> void
+{
+    // The call site accumulates contributions from separate getter calls, so this rule returns
+    // only the selected lane's contribution and zero for every other lane.
+    var dSelf = CoopVec<T, N>.dzero();
+    dSelf[index] = reinterpret<T, T.Differential>(dOut);
+    self = diffPair(self.p, dSelf);
+}
+
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::__subscript::set)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    int index,
+    DifferentialPair<T> newValue) -> void
+{
+    var primal = self.p;
+    var differential = self.d;
+    primal[index] = newValue.p;
+    differential[index] = reinterpret<T, T.Differential>(newValue.d);
+    self = diffPair(primal, differential);
+}
+
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::__subscript::set)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    int index,
+    inout DifferentialPair<T> newValue) -> void
+{
+    var dSelf = self.d;
+    newValue = diffPair(newValue.p, reinterpret<T.Differential, T>(dSelf[index]));
+    // The store overwrote this lane, so its incoming adjoint belongs to `newValue`, not the old
+    // value of `self[index]`.
+    dSelf[index] = T(0);
+    self = diffPair(self.p, dSelf);
+}
+
 // Keep the general value-pack constructor as an extension so overload resolution compares it
 // against the floating differentiable constructor using extension-to-extension rules.
 extension<T : __BuiltinArithmeticType, let N : int> CoopVec<T, N>

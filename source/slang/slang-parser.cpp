@@ -1492,6 +1492,18 @@ static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = null
     }
 }
 
+// Parse a name used after `::`. In a qualified chain such as `Type::__subscript::get`, the
+// declaration keyword names the `SubscriptDecl` stored internally as `operator[]`.
+static NameLoc ParseStaticMemberName(Parser* parser)
+{
+    if (parser->LookAheadToken("__subscript") && parser->LookAheadToken(TokenType::Scope, 1))
+    {
+        auto subscriptToken = parser->ReadToken("__subscript");
+        return NameLoc(getSubscriptOperatorName(parser->astBuilder), subscriptToken.loc);
+    }
+    return expectIdentifier(parser);
+}
+
 // A "declarator" as used in C-style languages
 struct Declarator : RefObject
 {
@@ -4781,8 +4793,7 @@ static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
             parser->FillPosition(decl);
             parser->PushScope(decl);
 
-            // TODO: the use of this name here is a bit magical...
-            decl->nameAndLoc.name = getName(parser, "operator[]");
+            decl->nameAndLoc.name = getSubscriptOperatorName(parser->astBuilder);
 
             parseParameterList(parser, decl);
 
@@ -9167,7 +9178,7 @@ static Expr* parsePostfixExpr(Parser* parser)
                 staticMemberExpr->baseExpression = expr;
                 parser->ReadToken(TokenType::Scope);
                 parser->FillPosition(staticMemberExpr);
-                staticMemberExpr->name = expectIdentifier(parser).name;
+                staticMemberExpr->name = ParseStaticMemberName(parser).name;
 
                 if (peekTokenType(parser) == TokenType::OpLess)
                     expr = maybeParseGenericApp(parser, staticMemberExpr);

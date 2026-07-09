@@ -18497,14 +18497,36 @@ const char* getDerivativeAttrName<PrimalSubstituteAttribute>()
     return "PrimalSubstitute";
 }
 
+// Returns the parameters that participate in a callable's derivative signature. As established by
+// `collectParameterLists` and `getFuncType`, an accessor nested under a callable parent receives
+// the parent's parameters before its own. For example, a subscript setter receives `index` before
+// `newValue`; a property has no callable parent parameters to contribute.
+static List<ParamDecl*> getParametersForDerivativeSignature(FunctionDeclBase* func)
+{
+    List<ParamDecl*> params;
+    if (auto accessor = as<AccessorDecl>(func))
+    {
+        if (auto parentCallable = as<CallableDecl>(accessor->parentDecl))
+        {
+            for (auto param : parentCallable->getParameters())
+                params.add(param);
+        }
+    }
+    for (auto param : func->getParameters())
+        params.add(param);
+    return params;
+}
+
 ArgsWithDirectionInfo getImaginaryArgsToFunc(
     ASTBuilder* astBuilder,
     FunctionDeclBase* func,
     SourceLoc loc)
 {
+    auto params = getParametersForDerivativeSignature(func);
+
     List<Expr*> imaginaryArguments;
     List<ParamPassingMode> directions;
-    for (auto param : func->getParameters())
+    for (auto param : params)
     {
         auto arg = astBuilder->create<VarExpr>();
         arg->declRef = makeDeclRef(param);
@@ -18546,8 +18568,10 @@ ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
                                              ? ParamPassingMode::In
                                              : ParamPassingMode::BorrowInOut;
 
+    auto params = getParametersForDerivativeSignature(originalFuncDecl);
+
     List<Expr*> imaginaryArguments;
-    for (auto param : originalFuncDecl->getParameters())
+    for (auto param : params)
     {
         auto arg = visitor->getASTBuilder()->create<VarExpr>();
         arg->declRef = makeDeclRef(param);
@@ -18566,7 +18590,7 @@ ArgsWithDirectionInfo getImaginaryArgsToForwardDerivative(
 
     // Copy parameter directions as is.
     List<ParamPassingMode> expectedParamDirections;
-    for (auto param : originalFuncDecl->getParameters())
+    for (auto param : params)
     {
         expectedParamDirections.add(getParamPassingMode(param));
     }
@@ -18617,7 +18641,9 @@ ArgsWithDirectionInfo getImaginaryArgsToBackwardDerivative(
                param->findModifier<InOutModifier>() == nullptr;
     };
 
-    for (auto param : originalFuncDecl->getParameters())
+    auto params = getParametersForDerivativeSignature(originalFuncDecl);
+
+    for (auto param : params)
     {
         auto arg = visitor->getASTBuilder()->create<VarExpr>();
         arg->declRef = makeDeclRef(param);
