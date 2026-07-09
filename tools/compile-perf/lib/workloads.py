@@ -636,6 +636,150 @@ def gen_module_link(n):
 
 
 # --------------------------------------------------------------------------- #
+# API-path workloads (driven by native/api-driver.cpp, not slangc).
+# These measure the compilation-API dimension — session setup, module loading,
+# per-compile fixed overhead — where application-integration regressions
+# amplify (see DESIGN.md "API-path workloads").
+# --------------------------------------------------------------------------- #
+
+def gen_api_none(n):
+    """The session-create workload needs no sources; the driver only creates
+    and destroys sessions (`--iters n` is passed by bench.py)."""
+    return {}
+
+
+def gen_api_kernels(n):
+    """n small, mutually independent compute kernels, one file each, the way
+    application middleware (e.g. slangpy) generates one kernel per call
+    signature. Each kernel is deliberately tiny so per-compile fixed overhead
+    (module setup, link, codegen floor) dominates — the dimension where
+    small-program regressions amplify."""
+    files = {}
+    for i in range(n):
+        c1 = 1.0 + (i % 89) / 100.0
+        c2 = (i % 31) / 10.0
+        files[f"kernel_{i:03d}.slang"] = (
+            _HEADER
+            + f"RWStructuredBuffer<float> buf_{i};\n\n"
+            + f"float helper_{i}(float x) {{ return sin(x * {c1}) + x * {c2}; }}\n\n"
+            + '[shader("compute")]\n[numthreads(32,1,1)]\n'
+            + "void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n"
+            + f"    float v = buf_{i}[tid.x];\n"
+            + f"    v = helper_{i}(v) + helper_{i}(v * 2.0);\n"
+            + f"    buf_{i}[tid.x] = v;\n}}\n"
+        )
+    return files
+
+
+def gen_api_module_graph(n):
+    """n modules in a layered import DAG (width 8, each module importing up to
+    3 from the previous layer) plus a shared interface base and a root that the
+    driver loads by name. Unlike module_link's flat one-function modules, each
+    module carries an interface conformance, a generic call, and cross-module
+    calls — the shape of a real renderer shader library, loaded through the
+    API's import-resolution path rather than precompiled .slang-module files."""
+    width = 8
+    files = {}
+    files["gmod_base.slang"] = (
+        _HEADER
+        + "module gmod_base;\n\n"
+        + "public interface IXform { float apply(float x); }\n\n"
+        + "public float applyTwice<T : IXform>(T t, float x) { return t.apply(t.apply(x)); }\n"
+    )
+    for i in range(n):
+        layer = i // width
+        imports = ["import gmod_base;"]
+        calls = []
+        if layer > 0:
+            prev = [p for p in range(n) if p // width == layer - 1]
+            for k in range(min(3, len(prev))):
+                p = prev[(i + k) % len(prev)]
+                imports.append(f"import gmod_{p};")
+                # Call the imported module's non-recursive leaf, NOT its chain:
+                # chains calling chains multiplies inlined code by fan-in^depth
+                # and the compile explodes (observed as OOM-kill at n=150).
+                # Leaf calls keep codegen linear in n while the import DAG —
+                # the load/check cost this workload exists to measure — stays
+                # just as deep.
+                calls.append(f"    r += leaf_{p}(r * 0.99{k});\n")
+        body = (
+            _HEADER
+            + f"module gmod_{i};\n"
+            + "\n".join(imports) + "\n\n"
+            + f"public struct Xf_{i} : IXform\n{{\n"
+            + f"    public float apply(float x) {{ return x * 1.00{i % 97} + 0.0{i % 13}; }}\n}}\n\n"
+            + f"public float leaf_{i}(float x) {{ return sin(x * 1.0{i % 7}) + x * 0.5{i % 11}; }}\n\n"
+            + f"public float chain_{i}(float x)\n{{\n"
+            + f"    Xf_{i} xf;\n"
+            + f"    float r = applyTwice(xf, x);\n"
+            + "".join(calls)
+            + "    return r;\n}\n"
+        )
+        files[f"gmod_{i}.slang"] = body
+    top = [i for i in range(n) if i // width == (n - 1) // width]
+    main = [_HEADER, "module graph_main;\n"]
+    for i in top:
+        main.append(f"import gmod_{i};\n")
+    main.append("\n" + _buf())
+    main.append('[shader("compute")]\n[numthreads(1,1,1)]\n')
+    main.append("void computeMain()\n{\n    float acc = outBuf[0];\n")
+    for i in top:
+        main.append(f"    acc = chain_{i}(acc);\n")
+    main.append("    outBuf[0] = acc;\n}\n")
+    files["graph_main.slang"] = "".join(main)
+    return files
+
+
+def gen_api_reflect_kernels(n):
+    """n kernels with deliberately parameter-rich signatures (nested constant
+    buffers, arrays, textures, samplers) so that walking each compiled
+    program's layout — the reflection query pattern every API client uses to
+    build binding tables — has realistic work per program. Used with the
+    driver's --reflect option, which walks the layout after each compile."""
+    files = {}
+    for i in range(n):
+        files[f"kernel_{i:03d}.slang"] = (
+            _HEADER
+            + f"struct Inner_{i}\n{{\n    float4 a;\n    float3 b;\n    int2 c[4];\n}}\n\n"
+            + f"struct Params_{i}\n{{\n    Inner_{i} inner[3];\n    float4x4 xf;\n"
+            + f"    uint flags;\n    float blend[{2 + i % 5}];\n}}\n\n"
+            + f"ConstantBuffer<Params_{i}> cb_{i};\n"
+            + f"StructuredBuffer<float4> inBuf_{i};\n"
+            + f"RWStructuredBuffer<float4> outBuf_{i};\n"
+            + f"Texture2D tex_{i};\nSamplerState samp_{i};\n\n"
+            + '[shader("compute")]\n[numthreads(8,8,1)]\n'
+            + "void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n"
+            + f"    float4 v = inBuf_{i}[tid.x];\n"
+            + f"    v += tex_{i}.SampleLevel(samp_{i}, v.xy, 0);\n"
+            + f"    v *= mul(cb_{i}.xf, v);\n"
+            + f"    v.x += cb_{i}.inner[tid.x % 3].a.x + cb_{i}.blend[0];\n"
+            + f"    outBuf_{i}[tid.x] = v;\n}}\n"
+        )
+    return files
+
+
+def gen_api_specialize(n):
+    """One module with an interface, n conforming impl structs, and a generic
+    computeMain<T : IOp>. The driver's specialize mode compiles one variant
+    per impl through IEntryPoint::specialize — the application pattern where
+    one kernel is stamped out per material/config type, stressing
+    specialization + link cost per variant."""
+    src = [_HEADER, "module spec_root;\n\n"]
+    src.append("public interface IOp\n{\n    static float eval(float x);\n}\n\n")
+    for i in range(n):
+        c1 = 1.0 + (i % 89) / 100.0
+        c2 = (i % 31) / 10.0
+        src.append(
+            f"public struct Impl_{i} : IOp\n{{\n"
+            f"    public static float eval(float x) {{ return sin(x * {c1}) + x * {c2}; }}\n}}\n\n"
+        )
+    src.append(_buf())
+    src.append('[shader("compute")]\n[numthreads(1,1,1)]\n')
+    src.append("void computeMain<T : IOp>()\n{\n    outBuf[0] = T.eval(outBuf[0]);\n}\n")
+    return {"spec_root.slang": "".join(src)}
+
+
+# --------------------------------------------------------------------------- #
 # Real-shader corpus (not generated). Copy corpus files into corpus/<name>/
 # before running the suite (CI does this via actions/checkout of MDL-SDK).
 # --------------------------------------------------------------------------- #
