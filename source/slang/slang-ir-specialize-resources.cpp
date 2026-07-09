@@ -38,7 +38,6 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         // our decision.
         //
         type = unwrapArray(type);
-        bool isArray = type != param->getDataType();
 
         // On all of our (current) targets, a function that
         // takes a `ConstantBuffer<T>` parameter requires
@@ -64,7 +63,7 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         if (isKhronosTarget(targetRequest))
         {
             if (targetProgram->getOptionSet().shouldEmitSPIRVDirectly())
-                return isIllegalSPIRVParameterType(type, isArray);
+                return isIllegalSPIRVParameterType(type);
             else
                 return isIllegalGLSLParameterType(type);
         }
@@ -1361,22 +1360,20 @@ bool isIllegalGLSLParameterType(IRType* type)
     return false;
 }
 
-bool isIllegalSPIRVParameterType(IRType* type, bool isArray)
+bool isIllegalSPIRVParameterType(IRType* type)
 {
     if (isIllegalGLSLParameterType(type))
         return true;
 
-    // If we are emitting SPIRV direclty, we need to specialize
-    // all Texture types.
+    // When emitting SPIR-V directly, both `Texture` and `SamplerState` parameters are
+    // specialized, so a bindless `DescriptorHandle` argument is passed to the callee by
+    // index and the resource is re-materialized in the callee body — symmetrically for the
+    // two resource kinds. Treating samplers like textures here (rather than only when the
+    // sampler param is an array) is what keeps that codegen symmetric; see #12004.
     if (as<IRTextureType>(type))
         return true;
-    if (isArray)
-    {
-        if (as<IRSamplerStateTypeBase>(type))
-        {
-            return true;
-        }
-    }
+    if (as<IRSamplerStateTypeBase>(type))
+        return true;
     return false;
 }
 
