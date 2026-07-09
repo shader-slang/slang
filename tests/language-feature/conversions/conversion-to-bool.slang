@@ -223,13 +223,13 @@ void computeMain()
 
     // conversions from half float
     storeValue(0.0hf);
-    storeValue(0.9hf);
+    storeValue(-0.0hf);
     storeValue(126.9hf);
     storeValue(127.0hf);
     storeValue(255.0hf);
     storeValue(255.9hf);
     // CHECK-NEXT: 0
-    // CHECK-NEXT: 1
+    // CHECK-NEXT: 0
     // CHECK-NEXT: 1
     // CHECK-NEXT: 1
     // CHECK-NEXT: 1
