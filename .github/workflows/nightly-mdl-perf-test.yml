@@ -311,7 +311,7 @@ jobs:
           python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" --label "${PERF_LABEL:?}"
 
       - name: Notify Slack
-        if: always() && (github.event_name == 'schedule' || github.event.inputs.notify-slack == 'true')
+        if: always() && (github.event_name == 'schedule' || github.event.inputs['notify-slack'] == 'true')
         shell: bash
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_COMPILE_PERF }}
@@ -340,9 +340,11 @@ jobs:
             export ICON=":white_check_mark:"
             export STATUS="No regressions detected"
           else
-            # Covers every green-job case where the trend step did not run
-            # (publish=false today; also a cancelled/regated step) — phrased
-            # generically so it stays true if the trend step's gate changes.
+            # Reached when the trend step did not run while the job stayed
+            # green: its gate (if: env.PUBLISH == 'true') makes
+            # steps.trend.outcome report "skipped", which matches neither
+            # branch above. Phrased generically so the message stays true if
+            # that gate changes.
             export ICON=":information_source:"
             export STATUS="Trend check did not run — see CI run for details"
           fi
