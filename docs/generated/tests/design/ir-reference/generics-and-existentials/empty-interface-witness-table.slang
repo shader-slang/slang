@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:13:27Z
 //META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witness-tables-and-witness-facts
-//META: doc_section_digest=3383849aee881833e2f4b2d76aefa96ea7b5e5f52c85e003f63997da83c112e0
+//META: doc_section_digest=8666fb5a8a3e866e04eed6573b9b735ade91d11b88b56b96aa10b6822be031b8
 //META: purpose=A struct conforming to an interface with zero methods emits an empty witness_table (no witness_table_entry rows).
 //META: intent=boundary
 //META: pipeline_stage=lower

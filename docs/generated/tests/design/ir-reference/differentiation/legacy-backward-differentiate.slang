@@ -12,10 +12,10 @@
 // `__bwd_diff(f)` on a `[BackwardDifferentiable]` function lowers to a
 // `LegacyBackwardDifferentiate` IR value whose three operands are the
 // bwd-callable function, the remat function, and the intermediate-
-// context type. The doc lists `BackwardDifferentiate` as the AST
-// origin of `__bwd_diff`, but the actual LOWER-TO-IR opcode is the
-// legacy bridge form; the unzip pass later converts it to the
-// modern triple. Recorded as a doc gap.
+// context type. The `__bwd_diff` expression form is resolved before
+// IR lowering, so no `BackwardDifferentiate` opcode appears here —
+// the legacy bridge form is the LOWER-TO-IR spelling, and the unzip
+// pass converts it to the modern triple later in the pipeline.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

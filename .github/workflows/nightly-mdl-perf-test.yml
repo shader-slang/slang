@@ -166,6 +166,24 @@ jobs:
           path: bench-results/
           if-no-files-found: ignore
 
+      # Exercise the api-driver + api workloads every night WITHOUT publishing:
+      # they are opt-in for the tracked series until the history is resynced
+      # with them, but unexercised code bit-rots — this builds the driver with
+      # the host cl and runs all six api workloads against the just-built
+      # slang, writing to a scratch dir the job discards. Failures fail the job before results are pushed.
+      - name: API workload smoke (non-publishing)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/tools/compile-perf"
+          # The list comes from the manifest so a future api workload can never
+          # be silently missing here — the one source of truth names them.
+          API_WORKLOADS="$(python3 -c 'from lib import manifest; print(",".join(w.name for w in manifest.WORKLOADS if w.mode == "api"))')"
+          python3 bench.py --slangc "$GITHUB_WORKSPACE/build/Release/bin/slangc.exe" \
+            --label api-smoke --out "$GITHUB_WORKSPACE/api-smoke-results" \
+            --samples 1 --warmup 0 \
+            --only "$API_WORKLOADS"
+
       - name: Push results
         if: env.PUBLISH == 'true'
         shell: bash

@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T15:00:00+00:00
 //META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#the-major-node-families
-//META: doc_section_digest=533753bf58b03097d708a72394179634eea26760dccf152ebe2bcd53f0cfb0c0
+//META: doc_section_digest=5749d9886287d8389af87cb5a6a536a28da48a421ac9a27f86809fca6a7b5676
 //META: purpose=A `{ ... }` block parses into a Stmt that holds an ordered sequence of sub-statements, executed in source order.
 //META: intent=functional
 //META: pipeline_stage=parse
