@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:02:55+00:00
 //META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#per-entry-point-steps
-//META: doc_section_digest=88bd1a1de6592fbd4873bdcc84f730186523fdd89ee42e0e9473c34ee75a0278
+//META: doc_section_digest=f1f711647a8ab7d8ff9b7722b3142e2807223fee33504a2cd14c041ae35af7c5
 //META: purpose=lowerEntryPointLayout encodes parameter bindings and stage into the IREntryPointLayout; the merged IR shows a stage(...) operand inside the entry-point's varLayout and a systemValueSemantic(...) operand for SV_DispatchThreadID.
 //META: intent=functional
 //META: pipeline_stage=layout

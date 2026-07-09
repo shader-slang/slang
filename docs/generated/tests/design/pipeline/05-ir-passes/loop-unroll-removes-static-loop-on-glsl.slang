@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#loop-transformations
-//META: doc_section_digest=2f4c4839739aa129e6a768311053d73d3691a989f5e00f77e04a70f426d5093f
+//META: doc_section_digest=352225772f21036f2bb726491a17e9298fba9124204787acc9180745246b4332
 //META: purpose=The loop-unroll pass unrolls a static `[ForceUnroll]` loop with a compile-time bound — no `for` loop remains in the emit on GLSL.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

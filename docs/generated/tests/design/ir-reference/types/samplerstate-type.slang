@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T13:50:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/ir-reference/types.md#resource-and-texture-types
-//META: doc_section_digest=094f3ccbff16c121504cf60cd04ae15b937c78df94da8d568013fe4104a433b9
+//META: doc_section_digest=4995d79f1d575606442d0357f0fb015ffcc2489a1b4116d09d5d6d1d0bde2e0f
 //META: purpose=A uniform SamplerState declaration lowers to a global_param of IR type SamplerState.
 //META: intent=functional
 //META: pipeline_stage=lower

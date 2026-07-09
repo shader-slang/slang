@@ -13,8 +13,9 @@
 // example: `testFunc<T>(T x, T y)` is called with a value of type A and a value
 // of type B (both conform to IBase). Inference has two non-fundamental
 // candidates for T, which the doc says is an error requiring explicit binding.
-// CHECK asserts E39999 "could not specialize generic" fires (non-exhaustive
-// skips the trailing "see declaration" note).
+// CHECK asserts E30442 "cannot deduce generic argument" fires with the
+// conflicting-requirements detail (non-exhaustive skips the trailing
+// "see declaration" note).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl
 
@@ -42,6 +43,7 @@ void computeMain()
     A a;
     B b;
     testFunc(a, b);
-    //CHECK: E39999
+//CHECK:    ^ cannot deduce generic argument for 'T': conflicting requirements 'A' and 'B'
+    //CHECK: E30442
     outputBuffer[0] = 0;
 }
