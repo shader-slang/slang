@@ -13,8 +13,10 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-metal -compute -output-using-type -xslang -DNO_DOUBLE=1
 // Note: Metal does not have the double type
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-wgsl -compute -output-using-type -xslang -DNO_DOUBLE=1 -xslang -DNO_INT8=1 -xslang -DNO_INT16=1 -xslang -DNO_INT64=1
-// Note: WGSL has only the 32-bit integers and 16-bit and 32-bit floats
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-wgsl -compute -output-using-type -render-feature half -xslang -DNO_DOUBLE=1 -xslang -DNO_INT8=1 -xslang -DNO_INT16=1 -xslang -DNO_INT64=1
+// Note: WGSL has only the 32-bit integers and 16-bit and 32-bit floats.
+// The 16-bit float (half) requires the f16 WGSL extension, so gate the test
+// on the "half" render feature.
 
 // Conversions to 16-bit float from all fundamental scalar types
 //
