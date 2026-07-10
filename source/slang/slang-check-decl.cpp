@@ -7012,6 +7012,16 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             auto packCountConstraintDecl =
                 as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
         {
+            // Header checking owns the diagnostics for an invalid pack target or a non-foldable
+            // count expression. Requirement-witness synthesis can run during recovery too, so
+            // preserve those diagnostics instead of trying to clone a proof with missing checked
+            // values.
+            SLANG_ASSERT(packCountConstraintDecl->actualCountVal);
+            SLANG_ASSERT(packCountConstraintDecl->expectedCountVal);
+            if (!packCountConstraintDecl->actualCountVal ||
+                !packCountConstraintDecl->expectedCountVal)
+                continue;
+
             auto synConstraintDecl = m_astBuilder->create<GenericVariadicPackCountConstraintDecl>();
             synConstraintDecl->nameAndLoc = packCountConstraintDecl->getNameAndLoc();
             synConstraintDecl->parentDecl = synGenericDecl;
@@ -7078,18 +7088,11 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             {
                 synConstraintDecl->expectedCountExpr = packCountConstraintDecl->expectedCountExpr;
             }
-            // Header checking must populate the checked values before we clone the generic
-            // signature. The cloned signature's constraints are later consumed positionally by
-            // `getDefaultSubstitutionArgs` and `DeclaredVariadicPackCountWitness`; dropping this
-            // proof during recovery would shift every following witness argument into the wrong
-            // slot instead of producing a diagnosable failure.
-            SLANG_RELEASE_ASSERT(packCountConstraintDecl->actualCountVal);
             synConstraintDecl->actualCountVal =
                 as<IntVal>(packCountConstraintDecl->actualCountVal->substitute(
                     m_astBuilder,
                     SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
 
-            SLANG_RELEASE_ASSERT(packCountConstraintDecl->expectedCountVal);
             synConstraintDecl->expectedCountVal =
                 as<IntVal>(packCountConstraintDecl->expectedCountVal->substitute(
                     m_astBuilder,
