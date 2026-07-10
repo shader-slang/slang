@@ -201,10 +201,10 @@ public:
         return false;
     }
 
-    // Returns whether a call target was lowered from a ref accessor. Mandatory autodiff
-    // validation runs before high-level declaration decorations are stripped, so the source
-    // declaration is the canonical way to distinguish this unsupported by-reference return from
-    // an ordinary pointer-producing operation.
+    // Returns whether a call target was lowered from a ref accessor. Autodiff validation runs
+    // before high-level declaration decorations are stripped. The source declaration is therefore
+    // the canonical way to distinguish this unsupported by-reference return from an ordinary
+    // pointer-producing operation.
     bool isRefAccessorCallee(IRInst* callee)
     {
         auto resolvedCallee = getResolvedInstForDecorations(callee);
