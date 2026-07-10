@@ -3881,6 +3881,13 @@ struct IRTypeLegalizationPass
         // the value had been replaced.
         //
         auto typeBeforeLegalize = inst->getFullType();
+#if _DEBUG
+        // Snapshot the operands so the debug build can enforce the invariant
+        // the change detection below relies on (see the comment there).
+        List<IRInst*> operandsBeforeLegalize;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+            operandsBeforeLegalize.add(inst->getOperand(i));
+#endif
 
         LegalVal legalVal = legalizeInst(context, inst);
         registerLegalizedValue(context, inst, legalVal);
@@ -3908,10 +3915,36 @@ struct IRTypeLegalizationPass
         // (issue #12040). We only requeue such instructions when this step
         // actually changed the value they depend on.
         //
+        // The reason a revisit is ever needed: within a round, a user `u` can
+        // be processed before its operand `inst` (readiness is checked
+        // against the add-time flag), so `u` legalizes against a mapping for
+        // `inst` that is not registered yet. Skipping `u`'s requeue here is
+        // safe exactly when `inst` was unchanged, because an unchanged
+        // `simple` result registers the identity mapping — the same answer
+        // `u`'s legalization already assumed on the map miss.
+        //
+        // The change detection relies on an invariant every current
+        // legalizer satisfies: a legalizer returning `LegalVal::simple(inst)`
+        // may signal a change ONLY by returning a different `irValue` or by
+        // mutating the instruction's full type — never by mutating an
+        // operand (or other semantically significant state) in place while
+        // leaving value and type identical. Non-`simple` flavors are always
+        // treated as changed, which is why `changed` defaults to `true`.
+        // The debug build asserts the operand part of the invariant below.
+        //
         bool changed = true;
         if (legalVal.flavor == LegalVal::Flavor::simple)
         {
             changed = legalVal.irValue != inst || inst->getFullType() != typeBeforeLegalize;
+
+#if _DEBUG
+            if (!changed)
+            {
+                SLANG_ASSERT(inst->getOperandCount() == (UInt)operandsBeforeLegalize.getCount());
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                    SLANG_ASSERT(inst->getOperand(i) == operandsBeforeLegalize[i]);
+            }
+#endif
 
             // The resulting inst may be different from the one we added to the
             // worklist, so ensure that the appropriate flags are set.
