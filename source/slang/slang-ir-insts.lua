@@ -2090,6 +2090,16 @@ local insts = {
 				},
 			},
 			{
+				synthesizedParameterGroup = {
+					-- Marks a parameter-group element struct that was synthesized by the
+					-- compiler (e.g. by collecting entry-point `uniform`/resource parameters)
+					-- rather than written by the user. Diagnostics that only make sense for
+					-- source-authored groups (such as "special type leaks from parameter
+					-- group") are suppressed for these.
+					struct_name = "SynthesizedParameterGroupDecoration",
+				},
+			},
+			{
 				dependsOn = {
 					-- A `[dependsOn(x)]` decoration indicates that the parent instruction depends on `x`
 					-- even if it does not otherwise reference it.

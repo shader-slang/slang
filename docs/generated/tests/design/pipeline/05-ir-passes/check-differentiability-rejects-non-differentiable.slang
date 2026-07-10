@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#differentiation-autodiff
-//META: doc_section_digest=f363d4438dd831bd4247c3b90982530b88aa7e9408107707c0706aef72c337c6
+//META: doc_section_digest=b4cb4d2b326413135968f5ac6f18511513e37e164b0ceb6805f88ce4abbb1f2a
 //META: purpose=The check-differentiability pass diagnoses calling a non-`[Differentiable]` function from a forward-derivative context.
 //META: intent=negative
 //META: pipeline_stage=ir-pass

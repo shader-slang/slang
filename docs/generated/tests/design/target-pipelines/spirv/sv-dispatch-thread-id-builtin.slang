@@ -3,14 +3,14 @@
 //META: generated_at=2026-05-20T17:30:00+00:00
 //META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#legalizeentrypointsforglsl-despite-the-name
-//META: doc_section_digest=5fecd0eb9a12a63e0294d7fc25d4ccc9d8e7cc1d7f20cc7a08f9fadaa7ec7ae7
+//META: doc_section_digest=2c1360d0390bc8ea5290e8fdf3327144bc7531f6c710e535527202f2faed4659
 //META: purpose=SV_DispatchThreadID lowers to gl_GlobalInvocationID with BuiltIn GlobalInvocationId decoration in SPIR-V.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // legalizeEntryPointsForGLSL is reused by the SPIR-V direct-emit
-// path (Phase C step 3). It rewrites the SV_DispatchThreadID
+// path (Phase C step 6). It rewrites the SV_DispatchThreadID
 // system-value parameter as a gl_GlobalInvocationID input variable
 // decorated BuiltIn GlobalInvocationId.
 

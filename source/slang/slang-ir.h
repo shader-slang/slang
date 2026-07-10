@@ -775,7 +775,9 @@ struct IRInst
     /// It is possible that this instruction has side effects?
     ///
     /// This is a conservative test, and will return `true` if an exact answer can't be determined.
-    bool mightHaveSideEffects(SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None);
+    bool mightHaveSideEffects(
+        SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None,
+        Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr);
 
     // RTTI support
     static bool isaImpl(IROp) { return true; }
@@ -2256,7 +2258,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 24;
+    const static UInt k_maxSupportedModuleVersion = 25;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:

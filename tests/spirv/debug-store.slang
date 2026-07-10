@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2
 
 // Test that writes to stand-in proxy variables for an `in` parameter are
 // properly updating the corresponding debug variable for the parameter when
