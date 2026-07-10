@@ -401,7 +401,7 @@ markdown_formatting() {
 # Shipped files - the public headers in include/ and the preludes in
 # prelude/ - must be pure ASCII: a non-ASCII byte makes MSVC emit C4819
 # (a /WX hard error) for consumers building with a non-UTF-8 source
-# charset (#12016 / #12018).
+# charset.
 ascii_check() {
   echo "Checking shipped headers and preludes are pure ASCII..." >&2
 
