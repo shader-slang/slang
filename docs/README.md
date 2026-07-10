@@ -35,3 +35,5 @@ A [paper](http://graphics.cs.cmu.edu/projects/slang/) on the Slang system was ac
 Yong He's [dissertation](http://graphics.cs.cmu.edu/projects/renderergenerator/yong_he_thesis.pdf) provided more detailed discussion of the design of the Slang system.
 
 <!-- devin-review tooling probe (R0): no-op docs edit; draft, do not merge. -->
+
+<!-- devin-review tooling probe (R1): second no-op edit to trigger re-analysis. -->
