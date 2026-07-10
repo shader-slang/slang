@@ -5019,13 +5019,6 @@ err(
 )
 
 err(
-    "cannot-differentiate-through-ref-accessor",
-    41037,
-    "cannot differentiate through ref accessor",
-    span { loc = "location", message = "derivative cannot be propagated through a user-defined ref accessor because differentiable by-reference returns are not supported." }
-)
-
-err(
     "loss-of-derivative-using-non-differentiable-location-as-out-arg",
     41025,
     "derivative is lost passing non-differentiable location",
