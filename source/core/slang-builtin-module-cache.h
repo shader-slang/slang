@@ -14,8 +14,8 @@ namespace Slang
 /// The cache layout is [uint64_t library timestamp][serialized module bytes]. The timestamp is
 /// stored in host byte order because the cache is tied to the shared-library build that created it,
 /// rather than being a portable module archive. A timestamp of zero means that the library
-/// timestamp is unavailable, so write() rejects it and never creates a cache that could match that
-/// failure sentinel.
+/// timestamp is unavailable or that its modification time is exactly the epoch, so write() rejects
+/// it and never creates a cache that could match the failure sentinel.
 struct BuiltinModuleCache
 {
     /// Reads a cache created for `expectedLibraryTimestamp` and returns its module payload.
