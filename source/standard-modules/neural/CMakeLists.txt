@@ -50,7 +50,7 @@ else()
     set(SLANG_COMPILER slang-bootstrap)
     set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
 endif()
-set(SLANG_COMPILER_CORE_MODULE_ARGS -load-core-module ${core_module_archive})
+set(SLANG_COMPILER_CORE_MODULE_ARGS -load-core-module ${core_module_archive_without_timestamp})
 set(SLANG_COMPILER_EXTRA_DEPS generate_core_module)
 
 # Determine compiler flags based on build type

@@ -106,6 +106,8 @@ class SharedLibraryUtils
 {
 public:
     static String getSharedLibraryFileName(void* symbolInLib);
+    /// Returns the modification timestamp used to validate module caches for `fileName`.
+    static uint64_t getFileTimestamp(const String& fileName);
     static uint64_t getSharedLibraryTimestamp(void* symbolInLib);
 };
 
