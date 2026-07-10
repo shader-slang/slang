@@ -110,8 +110,13 @@ jobs:
           python3 fetch_releases.py --repo "$GITHUB_WORKSPACE" \
             --since "$SINCE" --until "$UNTIL" "${force[@]}"
           # Sweep every release into the results repo (history baseline).
+          # --api: api-path workloads are part of the tracked suite; the driver
+          # dlopens each release's libslang, so the whole window gets baselines.
+          # Releases measured before the api workloads existed count as
+          # incomplete and are re-benched (full suite, same runner) on the next
+          # dispatch — that IS the backfill path; no force needed.
           python3 sweep.py --index releases/index.json --results "$RESULTS" \
-            --samples "$SAMPLES" "${force[@]}"
+            --samples "$SAMPLES" --api "${force[@]}"
           # Merge newly swept releases into the full index (not overwrite) so
           # report.py uses all historical data, not just the swept window.
           python3 track.py merge-index --results "$RESULTS" --index releases/index.json

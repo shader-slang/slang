@@ -147,7 +147,10 @@ jobs:
           cp external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang "$SUITE/corpus/mdl/"
 
           cd "$SUITE"
-          args=(--slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" --samples "$SAMPLES" --warmup 1)
+          # --api: the api-path workloads (session create, module graph,
+          # reflection, specialize, ...) are part of the tracked nightly set —
+          # the driver is built once per run with the host cl.
+          args=(--slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" --samples "$SAMPLES" --warmup 1 --api)
           [ -n "$ONLY" ] && args+=(--only "$ONLY")
           # Daily ToT sweep -> perf-results/daily/<label>/results.json
           python3 bench.py "${args[@]}"
@@ -287,26 +290,3 @@ jobs:
           set -euo pipefail
           cd "$GITHUB_WORKSPACE/tools/compile-perf"
           python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" --label "${PERF_LABEL:?}"
-
-      # Exercise the api-driver + EVERY mode="api" workload from the manifest
-      # (count-free: the list is derived below) against the just-built slang,
-      # writing to a scratch dir the job discards. The api workloads are
-      # opt-in for the tracked series until the history is resynced with
-      # them, but unexercised code bit-rots. This step runs LAST — after the
-      # results push and the trend check — so a smoke failure reddens the job
-      # without ever blocking the night's real results. always(): the smoke
-      # must run even when the trend check just failed — a regression night is
-      # exactly when the compiler changed and api breakage is most likely.
-      - name: API workload smoke (non-publishing)
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$GITHUB_WORKSPACE/tools/compile-perf"
-          # The list comes from the manifest so a future api workload can never
-          # be silently missing here — the one source of truth names them.
-          API_WORKLOADS="$(python3 -c 'from lib import manifest; print(",".join(w.name for w in manifest.WORKLOADS if w.mode == "api"))')"
-          python3 bench.py --slangc "$GITHUB_WORKSPACE/build/Release/bin/slangc.exe" \
-            --label api-smoke --out "$GITHUB_WORKSPACE/api-smoke-results" \
-            --samples 1 --warmup 0 \
-            --only "$API_WORKLOADS"
