@@ -3475,14 +3475,19 @@ bool SemanticsVisitor::TryUnifyVals(
         auto fstParam = getDeclRefIntValIgnoringCasts(fstInt);
         auto sndParam = getDeclRefIntValIgnoringCasts(sndInt);
 
-        bool okay = false;
         if (fstParam)
-            okay |=
-                TryUnifyIntParam(constraints, unificationOptions, fstParam->getDeclRef(), sndInt);
+            TryUnifyIntParam(constraints, unificationOptions, fstParam->getDeclRef(), sndInt);
         if (sndParam)
-            okay |=
-                TryUnifyIntParam(constraints, unificationOptions, sndParam->getDeclRef(), fstInt);
-        return okay;
+            TryUnifyIntParam(constraints, unificationOptions, sndParam->getDeclRef(), fstInt);
+
+        // Direct generic value parameters above can add inference facts such as `N = M + 1`.
+        // Other non-constant integer values are harder: this routine does not solve arithmetic
+        // equations or prove symbolic inequality. For example, `N + 1` and `M + 1` may become
+        // equal after substitution, while `N + 1` and `N + 2` cannot; both are outside what this
+        // inference pass can decide. Since distinct constants were already rejected above, leave
+        // unresolved non-constant pairs to the later checking/proof path instead of rejecting them
+        // here.
+        return true;
     }
 
     if (auto fstWit = as<DeclaredSubtypeWitness>(fst))

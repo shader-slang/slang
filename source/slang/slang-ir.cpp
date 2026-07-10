@@ -90,6 +90,8 @@ bool isSimpleDecoration(IROp op)
     case kIROp_EarlyDepthStencilDecoration:
     case kIROp_GLSLFragDepthGreaterDecoration:
     case kIROp_GLSLFragDepthLessDecoration:
+    case kIROp_Shader64BitIndexingDecoration:
+    case kIROp_SynthesizedParameterGroupDecoration:
     case kIROp_KeepAliveDecoration:
     case kIROp_LineAdjInputPrimitiveTypeDecoration:
     case kIROp_LineInputPrimitiveTypeDecoration:
@@ -9253,7 +9255,9 @@ void IRInst::transferDecorationsTo(IRInst* target)
     }
 }
 
-bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
+bool IRInst::mightHaveSideEffects(
+    SideEffectAnalysisOptions options,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
     // TODO: We should drive this based on flags specified
     // in `ir-inst-defs.yaml` isntead of hard-coding things here,
@@ -9307,7 +9311,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
             //
             auto call = cast<IRCall>(this);
             return !(
-                isSideEffectFreeFunctionalCall(call, options) ||
+                isSideEffectFreeFunctionalCall(call, options, calleeSideEffectCache) ||
                 call->findDecoration<IRIgnoreSideEffectsDecoration>());
         }
         break;

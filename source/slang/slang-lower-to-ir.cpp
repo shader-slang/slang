@@ -4481,6 +4481,14 @@ void collectParameterLists(
 
 bool isConstExprVar(Decl* decl)
 {
+    // The ConstExprModifier branch is only reachable for ParamDecl, because
+    // checkModifier() rewrites ConstExprModifier → ConstModifier for all other
+    // VarDeclBase nodes (see slang-check-modifier.cpp). On parameters, constexpr
+    // means "argument must be a compile-time constant at the call site".
+    //
+    // The HLSLStaticModifier + ConstModifier branch matches any `static const`
+    // variable declaration (including those originally written as `static constexpr`
+    // and rewritten during semantic checking).
     if (decl->hasModifier<ConstExprModifier>())
     {
         return true;
@@ -6976,6 +6984,54 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             auto irVal = context->irBuilder->emitMakeOptionalNone(optType);
             return LoweredValInfo::simple(irVal);
         }
+    }
+
+    LoweredValInfo visitCastOptionalExpr(CastOptionalExpr* expr)
+    {
+        auto builder = getBuilder();
+
+        auto srcOpt = lowerRValueExpr(context, expr->valueArg);
+        auto srcOptIR = getSimpleVal(context, srcOpt);
+
+        auto toOptType = lowerType(context, expr->type);
+        SLANG_RELEASE_ASSERT(toOptType->getOp() == kIROp_OptionalType);
+
+        auto var = builder->emitVar(toOptType);
+
+        auto hasValue = builder->emitOptionalHasValue(srcOptIR);
+
+        IRBlock* trueBlock;
+        IRBlock* falseBlock;
+        IRBlock* afterBlock;
+        builder->emitIfElseWithBlocks(hasValue, trueBlock, falseBlock, afterBlock);
+
+        // True branch: extract inner value, coerce to U, wrap in Optional<U>.
+        builder->setInsertInto(trueBlock);
+        {
+            auto extractedInner = builder->emitGetOptionalValue(srcOptIR);
+
+            // Bind the synthetic innerVarDecl so the inner coercion expression resolves it.
+            context->setValue(expr->innerVarDecl, LoweredValInfo::simple(extractedInner));
+
+            auto coercedInner = lowerRValueExpr(context, expr->innerCoercedExpr);
+            auto coercedInnerIR = getSimpleVal(context, coercedInner);
+
+            auto someVal = builder->emitMakeOptionalValue(toOptType, coercedInnerIR);
+            builder->emitStore(var, someVal);
+            builder->emitBranch(afterBlock);
+        }
+
+        // False branch: source is none, propagate none.
+        builder->setInsertInto(falseBlock);
+        {
+            auto noneVal = builder->emitMakeOptionalNone(toOptType);
+            builder->emitStore(var, noneVal);
+            builder->emitBranch(afterBlock);
+        }
+
+        builder->setInsertInto(afterBlock);
+        auto result = builder->emitLoad(var);
+        return LoweredValInfo::simple(result);
     }
 
     LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* /*expr*/)
@@ -10523,35 +10579,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         List<IRInst*> entryPoints{};
         for (const auto modifier : decl->modifiers)
         {
-            if (const auto layoutLocalSizeAttr = as<GLSLLayoutLocalSizeAttribute>(modifier))
-            {
-                verifyComputeDerivativeGroupModifier = true;
-                getAllEntryPointsNoOverride(entryPoints);
-
-                LoweredValInfo extents[3];
-
-                for (int i = 0; i < 3; ++i)
-                {
-                    extents[i] = layoutLocalSizeAttr->specConstExtents[i]
-                                     ? emitDeclRef(
-                                           context,
-                                           layoutLocalSizeAttr->specConstExtents[i],
-                                           lowerType(
-                                               context,
-                                               getType(
-                                                   context->astBuilder,
-                                                   layoutLocalSizeAttr->specConstExtents[i])))
-                                     : lowerVal(context, layoutLocalSizeAttr->extents[i]);
-                }
-
-                for (auto d : entryPoints)
-                    as<IRNumThreadsDecoration>(getBuilder()->addNumThreadsDecoration(
-                        d,
-                        getSimpleVal(context, extents[0]),
-                        getSimpleVal(context, extents[1]),
-                        getSimpleVal(context, extents[2])));
-            }
-            else if (as<GLSLLayoutDerivativeGroupQuadAttribute>(modifier))
+            if (as<GLSLLayoutDerivativeGroupQuadAttribute>(modifier))
             {
                 verifyComputeDerivativeGroupModifier = true;
                 getAllEntryPointsNoOverride(entryPoints);
@@ -10705,9 +10733,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl)
     {
-        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
+        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl);
+            globalGenericParamDecl)
         {
-            SLANG_UNUSED(globalGenericParamDecl);
             auto builder = getBuilder();
             auto fromType = lowerType(context, decl->fromType.Ptr());
             auto toType = lowerType(context, decl->toType);
@@ -10723,9 +10751,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitNonEmptyPackConstraintDecl(NonEmptyPackConstraintDecl* decl)
     {
-        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
+        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl);
+            globalGenericParamDecl)
         {
-            SLANG_UNUSED(globalGenericParamDecl);
             auto witnessType = getBuilder()->getWitnessTableType(getBuilder()->getVoidType());
             auto inst = getBuilder()->emitGlobalGenericParam(witnessType);
             addLinkageDecoration(context, inst, decl);
@@ -15119,6 +15147,40 @@ static void lowerFrontEndEntryPointToIR(
             entryPoint->getProfile(),
             entryPointName->text.getUnownedSlice(),
             moduleName.getUnownedSlice());
+    }
+
+    // The `[Shader64BitIndexing]` attribute requires the `spvShader64BitIndexingEXT` capability,
+    // which the semantic checker unions into `inferredCapabilityRequirements` for the attributed
+    // function and, transitively, for every entry point that can reach it through its call graph.
+    // The corresponding SPIR-V `Shader64BitIndexingEXT` execution mode (and its owning
+    // `OpCapability`/`OpExtension`) is entry-point scoped, so we lift the requirement onto the
+    // entry point here (never onto an attributed callee, where an execution mode would be invalid).
+    // The SPIR-V back-end emits all three from this single decoration. Reading the inferred
+    // capability set rather than the attribute directly covers the direct, call-graph, and
+    // `[require(spvShader64BitIndexingEXT)]` cases uniformly.
+    if (auto inferredCaps = entryPointFuncDecl->inferredCapabilityRequirements)
+    {
+        CapabilitySet caps{inferredCaps};
+        bool requiresShader64BitIndexing = false;
+        // Scan for membership of the atom in *any* alternative of the capability set. We iterate
+        // `getAtomSets()` rather than calling `caps.implies(spvShader64BitIndexingEXT)` because
+        // `implies()` is AND-across-all-alternatives: it would only report the atom when *every*
+        // target alternative requires it, which is too strict for a presence test.
+        for (auto atomSet : caps.getAtomSets())
+        {
+            for (auto atomVal : atomSet)
+            {
+                if (asAtom(atomVal) == CapabilityAtom::spvShader64BitIndexingEXT)
+                {
+                    requiresShader64BitIndexing = true;
+                    break;
+                }
+            }
+            if (requiresShader64BitIndexing)
+                break;
+        }
+        if (requiresShader64BitIndexing)
+            builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(instToDecorate);
     }
 }
 

@@ -1,17 +1,17 @@
 //META: generated=true
 //META: model=claude-opus-4-8
-//META: generated_at=2026-06-24T09:20:31Z
-//META: source_commit=b25e06aeb8862d207541c3d812c57cb9e381b802
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/types.md#andtype
-//META: doc_section_digest=7025dcc263ba359294366e6446e2fc71a77eb827f3573dd04518f3b52362df10
-//META: purpose=An AndType `IA & IB` requires conformance to both interfaces; a type that conforms to only one fails the conjunction and the call is rejected.
+//META: doc_section_digest=276be3a0ef406e1f03533a72d5ee898889d527b8cf55e4a39ec109f47c8fac42
+//META: purpose=An AndType `IA & IB` requires both conformances; a type conforming to only IA is rejected where `IA & IB` is required.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The flip side of AndType conjunction: a type that conforms to
-// only IA but not IB is NOT accepted where `IA & IB` is required,
-// and the checker rejects the call.
+// Negative flip side of AndType conjunction: a type conforming to
+// only IA (not IB) is not accepted where `IA & IB` is required. CHECK
+// pins the non-conformance diagnostic naming the missing interface.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
@@ -21,9 +21,6 @@ interface IB { int b(); }
 struct OnlyA : IA { int a() { return 1; } }
 
 int combined<T : IA & IB>(T v) { return v.a() * 10 + v.b(); }
-/*CHECK:
-    ^^^^^^^^ see declaration of func combined<T> -> int
-*/
 
 void main()
 {

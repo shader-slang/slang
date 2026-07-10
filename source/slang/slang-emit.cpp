@@ -523,6 +523,10 @@ void calcRequiredLoweringPassSet(
     case kIROp_HLSLByteAddressBufferType:
         result.byteAddressBuffer = true;
         break;
+    case kIROp_HLSLAppendStructuredBufferType:
+    case kIROp_HLSLConsumeStructuredBufferType:
+        result.appendConsumeStructuredBuffer = true;
+        break;
     case kIROp_DynamicResourceType:
         result.dynamicResource = true;
         break;
@@ -553,6 +557,14 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetEnumBarrierMemoryTypeFlags:
     case kIROp_GetEnumBarrierSemanticFlags:
         result.barrierFlagValidation = true;
+        break;
+    case kIROp_TaggedUnionType:
+    case kIROp_MakeTaggedUnion:
+    case kIROp_GetTagFromTaggedUnion:
+    case kIROp_GetTypeTagFromTaggedUnion:
+    case kIROp_GetValueFromTaggedUnion:
+    case kIROp_CastInterfaceToTaggedUnionPtr:
+        result.taggedUnion = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1089,11 +1101,15 @@ Result linkAndOptimizeIR(
         // compiler can't see the runtime driver, so the choice is the
         // caller's responsibility.
         int counterByteWidth = kDefaultCoverageCounterByteWidth;
+        bool hasExplicitCounterByteWidth = false;
         if (auto values =
                 opts.options.tryGetValue(CompilerOptionName::TraceCoverageCounterByteWidth))
         {
             if (values->getCount() > 0)
+            {
                 counterByteWidth = (int)(*values)[0].intValue;
+                hasExplicitCounterByteWidth = true;
+            }
         }
         // Validate the byte width on the API path. The CLI parser
         // (`slang-options.cpp`) already validates the user-facing bit
@@ -1111,13 +1127,33 @@ Result linkAndOptimizeIR(
             });
             return SLANG_FAIL;
         }
-        // Opt-in boolean mode (off by default): record whether each entry
-        // executed (non-atomic store of 1) instead of an exact count.
+        // Metal cannot execute 64-bit counting-mode coverage: MSL provides no
+        // 64-bit atomic fetch-add (its `_valid_fetch_add_type` constraint
+        // rejects `device atomic_ulong*`), so the Metal compiler fails every
+        // counter increment with "no matching function for call to
+        // 'atomic_fetch_add_explicit'". Cap counting-mode counters to 4 bytes
+        // for Metal targets (`metal`, `metallib`, `metallib-asm`). Unlike the
+        // validation block above, which rejects out-of-contract widths loudly
+        // because they indicate a caller bug, this cap adjusts a *valid* width
+        // to a platform limitation: the uncapped default (8) is capped
+        // silently, and an explicitly requested 8 is capped with warning
+        // E45115 so a caller who spelled out `-trace-coverage-counter-width
+        // 64` learns their choice was not honored.
+        // Boolean mode (`-trace-coverage-boolean`) is exempt: it writes plain
+        // non-atomic stores (`*slot = 1`), which MSL accepts at either width —
+        // verified against the Metal compiler — so the requested width is
+        // honored there.
         bool coverageBoolean = false;
         if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
         {
             if (values->getCount() > 0)
                 coverageBoolean = (*values)[0].intValue != 0;
+        }
+        if (isMetalTarget(targetRequest) && counterByteWidth > 4 && !coverageBoolean)
+        {
+            if (hasExplicitCounterByteWidth)
+                sink->diagnose(Diagnostics::CoverageCounterWidthCappedForMetal{});
+            counterByteWidth = 4;
         }
         SLANG_PASS(
             instrumentCoverage,
@@ -1461,8 +1497,18 @@ Result linkAndOptimizeIR(
     }
 
     // Tagged union type lowering typically generates more reinterpret instructions.
-    if (SLANG_PASS(lowerTaggedUnionTypes, sink))
-        requiredLoweringPassSet.reinterpret = true;
+    //
+    // Gated on `taggedUnion` to skip this whole-module walk when no tagged-union IR is present.
+    // The tagged-union opcodes are produced only by the typeflow specialization pass, which runs
+    // before the last `calcRequiredLoweringPassSet` scan, so the flag cannot be a false-negative
+    // (any tagged-union inst reaching here was seen by that scan). When the flag is false the pass
+    // would be a no-op and create no reinterpret insts, so leaving `reinterpret` untouched is
+    // correct. (Full producer trace in the PR for issue #11917.)
+    if (requiredLoweringPassSet.taggedUnion)
+    {
+        if (SLANG_PASS(lowerTaggedUnionTypes, sink))
+            requiredLoweringPassSet.reinterpret = true;
+    }
 
     SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
 
@@ -1595,7 +1641,17 @@ Result linkAndOptimizeIR(
     // On non-HLSL targets, there isn't an implementation of `AppendStructuredBuffer`
     // and `ConsumeStructuredBuffer` types, so we lower them into normal struct types
     // of `RWStructuredBuffer` typed fields now.
-    if (target != CodeGenTarget::HLSL)
+    //
+    // Gated on `appendConsumeStructuredBuffer` to skip this whole-module walk when
+    // neither type is present. `calcRequiredLoweringPassSet` flags accumulate across the
+    // post-link and post-specialization scans (they are not reset between them). These
+    // types are produced by the front-end and are never synthesized by an IR pass, so in
+    // particular none is created after the last scan: any instance present here was
+    // recorded by a scan and set the flag, and the gate can never be a false-negative
+    // (skip a needed lowering). The flag can only be stale-true (e.g. an unused buffer
+    // dead-code-eliminated after a scan), a harmless no-op walk — so gating is
+    // behavior-preserving.
+    if (target != CodeGenTarget::HLSL && requiredLoweringPassSet.appendConsumeStructuredBuffer)
     {
         SLANG_PASS(lowerAppendConsumeStructuredBuffers, targetProgram, sink);
     }
