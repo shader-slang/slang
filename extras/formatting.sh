@@ -104,7 +104,9 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --)
     shift
-    explicit_files=("$@")
+    # Strip a leading ./ from each path so the anchored path-prefix patterns
+    # below (include/*, prelude/*) match however the caller spelled the path.
+    explicit_files=("${@#./}")
     break
     ;;
   *)
