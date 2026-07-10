@@ -147,7 +147,10 @@ jobs:
           cp external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang "$SUITE/corpus/mdl/"
 
           cd "$SUITE"
-          args=(--slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" --samples "$SAMPLES" --warmup 1)
+          # --api: the api-path workloads (session create, module graph,
+          # reflection, specialize, ...) are part of the tracked nightly set —
+          # the driver is built once per run with the host cl.
+          args=(--slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" --samples "$SAMPLES" --warmup 1 --api)
           [ -n "$ONLY" ] && args+=(--only "$ONLY")
           # Daily ToT sweep -> perf-results/daily/<label>/results.json
           python3 bench.py "${args[@]}"

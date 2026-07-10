@@ -35,13 +35,18 @@ called _constants_, as opposed to _runtime values_. This is discussed in more de
 Contents
 --------
 
-* [Literal Expressions](expressions-literal.md)
-* [Identifiers](expressions-identifier.md)
-* [Operators](expressions-operators.md)
-* [Member Access Expressions](expressions-member-access.md)
-* [Operator Precedence](expressions-operator-precedence.md)
-* [`this` Expression](expressions-this.md)
-* [Conversions](expressions-conversions.md)
+* Atomic expressions:
+  * [Literal Expressions](expressions-literal.md)
+  * [Identifiers](expressions-identifier.md)
+  * [`this` Expression](expressions-this.md)
+  * Builtin keyword expressions
+* Operator expressions:
+  * [Operators](expressions-operators.md)
+  * [Member Access Expressions](expressions-member-access.md)
+  * [Operator Precedence](expressions-operator-precedence.md)
+  * [Casts and Conversions](expressions-conversions.md)
+  * [Overload Resolution](expressions-overload-resolution.md)
+* [Lambda expressions](expressions-lambda.md)
 * [Initializer Expressions](expressions-initializer.md)
 * [Value Categories](expressions-value-categories.md)
 * [Evaluation of Expressions](expressions-evaluation-classes.md)

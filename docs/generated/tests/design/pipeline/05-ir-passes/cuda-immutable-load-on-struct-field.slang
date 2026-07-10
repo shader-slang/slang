@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#target-specific-lowering
-//META: doc_section_digest=7d2dd721ab3c1d33497a937e79d182339817290b8e4a173ec5ce69d40d28ae8d
+//META: doc_section_digest=71044a2d3419fa798e104d5b77b4d7a78d1652bd8571bd4aa028984e8e95b794
 //META: purpose=Expansion: cuda-immutable-load wraps reads of a struct-field uniform — `Settings.factor` is read via `__ldg(&...)` on CUDA. Struct-field axis alongside the scalar uniform case.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

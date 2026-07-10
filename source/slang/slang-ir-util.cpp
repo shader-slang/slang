@@ -1640,9 +1640,12 @@ bool isPureFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
     return false;
 }
 
-bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
+bool isSideEffectFreeFunctionalCall(
+    IRCall* call,
+    SideEffectAnalysisOptions options,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
-    if (!doesCalleeHaveSideEffect(call->getCallee()))
+    if (!doesCalleeHaveSideEffect(call->getCallee(), calleeSideEffectCache))
     {
         return areCallArgumentsSideEffectFree(call, options);
     }
@@ -1689,6 +1692,19 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
             });
     }
 
+    return sideEffect;
+}
+
+bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache)
+{
+    if (!cache)
+        return doesCalleeHaveSideEffect(callee);
+
+    if (auto cached = cache->tryGetValue(callee))
+        return *cached;
+
+    const bool sideEffect = doesCalleeHaveSideEffect(callee);
+    cache->add(callee, sideEffect);
     return sideEffect;
 }
 

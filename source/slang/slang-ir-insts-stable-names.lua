@@ -864,10 +864,11 @@ return {
 	["Type.WorkGraphRecordTypeBase.EmptyNodeOutput"] = 888,
 	["Type.WorkGraphRecordTypeBase.EmptyNodeOutputArray"] = 889,
 	["Decoration.shader64BitIndexing"] = 890,
-	["Type.UntypedResourceHandle"] = 891,
-	["Type.UntypedSamplerHandle"] = 892,
-	["CastUIntToUntypedResourceHandle"] = 893,
-	["CastUntypedResourceHandleToUInt"] = 894,
-	["CastUIntToUntypedSamplerHandle"] = 895,
-	["CastUntypedSamplerHandleToUInt"] = 896
+	["Decoration.synthesizedParameterGroup"] = 891,
+	["Type.UntypedResourceHandle"] = 892,
+	["Type.UntypedSamplerHandle"] = 893,
+	["CastUIntToUntypedResourceHandle"] = 894,
+	["CastUntypedResourceHandleToUInt"] = 895,
+	["CastUIntToUntypedSamplerHandle"] = 896,
+	["CastUntypedSamplerHandleToUInt"] = 897
 }

@@ -9304,7 +9304,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             // Float to bool cast.
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
-            auto zero = builder.getIntValue(fromType, 0);
+            auto zero = builder.getFloatValue(fromType, 0.0);
             if (auto vecType = as<IRVectorType>(toTypeV))
             {
                 auto zeroV =

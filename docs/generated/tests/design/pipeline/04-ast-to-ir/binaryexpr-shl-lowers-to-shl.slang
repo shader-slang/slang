@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T18:00:00+00:00
-//META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
+//META: model=claude-fable-5
+//META: generated_at=2026-07-08T16:30:00Z
+//META: source_commit=110ca68915f1b6690e19a647e3437e1ad1f78a03
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=7d43267959b0c547516266beea43e6e96622d37270bfab810d9819a48f90812b
-//META: purpose=A BinaryExpr `a << n` lowers to an `shl` IR opcode — a pure-value inst representing left-shift in the doc's arithmetic-Expr row.
+//META: doc_section_digest=19eb09c072c556dd0799b5002c2f1b24781da93f2cebc122ca027062c24e0b84
+//META: purpose=A builtin `a << n` (a checker fast-path BuiltinOperatorExpr) lowers to an `shl` IR opcode — a pure-value inst representing left-shift in the doc's BuiltinOperatorExpr row.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.

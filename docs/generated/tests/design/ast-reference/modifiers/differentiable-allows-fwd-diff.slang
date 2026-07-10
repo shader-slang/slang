@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:50:00+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#differentiability-attributes
-//META: doc_section_digest=4ba0842f116047916828c7e60c076affbd0939fd9e85537ac882355c33512aba
+//META: doc_section_digest=ddc100e59f5dbc8e6427bee216436bc28885c27054045a53cb1dab673bdfe559
 //META: purpose=A `[Differentiable]` function can be passed to `fwd_diff` and produces a sensible derivative.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
