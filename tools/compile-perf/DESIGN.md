@@ -245,6 +245,15 @@ ladder — the COM ABI is append-only by contract) and emits timers in the same
 from `--slangc`) and a build-once step for the driver; everything downstream
 (results.json, track/trend/report) is unchanged.
 
+**Enablement status:** the api workloads are part of the TRACKED nightly set
+(the nightly passes `--api`) and render in the report's own "API-path
+workloads" section, stacked by driver phase with `apiTotal` as the top edge
+(they have no `compileInner`, so they are excluded from the compiler grid).
+The release history baseline backfills through the normal
+**compile-perf-release-sweep** dispatch: `sweep.py --api` counts the api
+workloads as required, so releases measured before they existed are simply
+re-benched (full suite, same runner) on the next run — no `force` needed.
+
 **Planned API-path extensions (not yet implemented):**
 
 - **RT multi-entry-point composites** — raygen/closesthit/miss entry points
