@@ -434,6 +434,21 @@ void calcRequiredLoweringPassSet(
         result.conditionalType = true;
         break;
     case kIROp_EnumType:
+    // The enum-cast ops are lowered by the same `lowerEnumType` pass as the type
+    // itself, so flag `enumType` on them too. Constant folding can eliminate the
+    // last live `IREnumType` while leaving a degenerate cast behind (e.g. an
+    // enum-typed local holding a constant folds to `CastEnumToInt(1 : UInt)`);
+    // flagging only the type would then skip the pass and strand the cast at
+    // emit (#12048). `CastIntToEnum`/`EnumCast` produce an enum-typed result, so a
+    // surviving one keeps its `IREnumType` alive and the `kIROp_EnumType` arm
+    // already covers it; they are listed here for parity with `lowerEnumType`'s
+    // handled set. The `Constexpr*` cast variants are intentionally excluded: they
+    // arise only in constant `IntVal` contexts (`emitConstexprCast`, from
+    // `visitTypeCastIntVal`), never in runtime value flow that reaches emit, and
+    // `lowerEnumType` has no case for them.
+    case kIROp_CastEnumToInt:
+    case kIROp_CastIntToEnum:
+    case kIROp_EnumCast:
         result.enumType = true;
         break;
     case kIROp_TextureType:
