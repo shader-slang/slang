@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#cuda
-//META: doc_section_digest=aec099a690ba0cb7b3cba6485d62487754f84f320420d4d5113995c23ee1a4bb
+//META: doc_section_digest=9cfeac8f090cb9a01fdb3acef4528aeff307864f7ce250f0942e224932dda122
 //META: purpose=The CUDA backend emits CUDA source that includes slang-cuda-prelude.h and exports the entry point as an extern "C" __global__ function.
 //META: intent=functional
 //META: pipeline_stage=emit

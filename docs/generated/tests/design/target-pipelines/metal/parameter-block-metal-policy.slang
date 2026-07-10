@@ -2,8 +2,8 @@
 //META: model=claude-opus-4-7
 //META: generated_at=2026-05-20T17:50:00Z
 //META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
-//META: doc_ref=docs/generated/design/target-pipelines/metal.md#metal-specific-lowerbufferelementtypetostoragetype
-//META: doc_section_digest=402fbd082c2a298b616bbcc98ca821e8dc84d270680f801b050b215045c8be2f
+//META: doc_ref=docs/generated/design/target-pipelines/metal.md#metals-three-lowerbufferelementtypetostoragetype-invocations
+//META: doc_section_digest=836e9573185f6aff1abb3c7758ad765b45c7765530128f9d01ed780be2599b0d
 //META: purpose=ParameterBlock<T> uses the MetalParameterBlock lowering policy: resource-typed fields become descriptor handles (raw `T device*` pointer fields) and the block binds as one `constant*` parameter.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

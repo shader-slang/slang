@@ -77,6 +77,7 @@ protected:
     glslang_ValidateSPIRVFunc m_validate = nullptr;
     glslang_DisassembleSPIRVFunc m_disassemble = nullptr;
     glslang_DisassembleSPIRVWithResultFunc m_disassembleWithResult = nullptr;
+    glslang_FreeDisassemblyFunc m_freeDisassembly = nullptr;
     glslang_LinkSPIRVFunc m_link = nullptr;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
@@ -94,6 +95,8 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
         (glslang_DisassembleSPIRVFunc)library->findFuncByName("glslang_disassembleSPIRV");
     m_disassembleWithResult = (glslang_DisassembleSPIRVWithResultFunc)library->findFuncByName(
         "glslang_disassembleSPIRVWithResult");
+    m_freeDisassembly =
+        (glslang_FreeDisassemblyFunc)library->findFuncByName("glslang_freeDisassembly");
     m_link = (glslang_LinkSPIRVFunc)library->findFuncByName("glslang_linkSPIRV");
 
     if (m_compile_1_0 == nullptr && m_compile_1_1 == nullptr && m_compile_1_2 == nullptr)
@@ -339,6 +342,10 @@ SlangResult GlslangDownstreamCompiler::disassembleWithResult(
         if (resultString)
         {
             outString = String(resultString);
+            if (m_freeDisassembly)
+            {
+                m_freeDisassembly(resultString);
+            }
             return SLANG_OK;
         }
     }

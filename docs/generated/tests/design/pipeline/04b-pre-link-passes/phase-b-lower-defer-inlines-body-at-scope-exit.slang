@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:50:55+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#lowerdefer
-//META: doc_section_digest=378b9cfa7a738a36382fa87ee64681bba1d424cc7440c22662ab65a447b8a84b
+//META: doc_section_digest=3bac62f90d7ddc781f4e1431dae6c46cbea7ddc5f4f21f85ba26ccb887d7a12f
 //META: purpose=Phase B's lowerDefer (B3) emits the defer body at scope exit so downstream passes see straight-line code; no defer opcode survives.
 //META: intent=functional
 //META: pipeline_stage=lower

@@ -78,7 +78,7 @@ struct GLSLShaderStorageBuffer {}
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, appendstructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, appendstructuredbuffer)]
 uint2 __structuredBufferGetDimensions(AppendStructuredBuffer<T,L> buffer);
 
 __generic<T,L:IBufferDataLayout>
@@ -121,7 +121,7 @@ When generating code for other targets, this parameter is ignored and has no eff
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLAppendStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLAppendStructuredBufferType))
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, appendstructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, appendstructuredbuffer)]
 struct AppendStructuredBuffer
 {
     __intrinsic_op($(kIROp_StructuredBufferAppend))
@@ -133,6 +133,7 @@ struct AppendStructuredBuffer
     ///@param numStructs The number of elements in the buffer.
     ///@param stride The stride of the buffer.
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, appendstructuredbuffer)]
     void GetDimensions(
         out uint numStructs,
         out uint stride)

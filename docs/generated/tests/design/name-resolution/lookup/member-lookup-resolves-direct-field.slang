@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T13:48:38Z
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#member-lookup
-//META: doc_section_digest=68a2d43cee4f2785028c9292caeaac660921efdc95b8ec2b5eface8a8b89a0dc
+//META: doc_section_digest=c0f68fbd11fbf74cffbc1af19923571c01f9108c320fe0630ddecaa337b4ac7c
 //META: purpose=lookUpMember on a DeclRefType resolves a direct field of the type via the underlying decl.
 //META: intent=functional
 //META: pipeline_stage=check
