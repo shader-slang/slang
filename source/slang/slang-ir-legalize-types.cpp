@@ -3874,6 +3874,14 @@ struct IRTypeLegalizationPass
         // register the result of legalization as the proper value
         // for that instruction.
         //
+        // Capture the type before legalization: several legalization paths
+        // (params, local/global vars, funcs) mutate the instruction in place
+        // via `setFullType`/`setDataType` and still return it as a `simple`
+        // value, and such a mutation must count as a change below just as if
+        // the value had been replaced.
+        //
+        auto typeBeforeLegalize = inst->getFullType();
+
         LegalVal legalVal = legalizeInst(context, inst);
         registerLegalizedValue(context, inst, legalVal);
 
@@ -3903,7 +3911,7 @@ struct IRTypeLegalizationPass
         bool changed = true;
         if (legalVal.flavor == LegalVal::Flavor::simple)
         {
-            changed = legalVal.irValue != inst;
+            changed = legalVal.irValue != inst || inst->getFullType() != typeBeforeLegalize;
 
             // The resulting inst may be different from the one we added to the
             // worklist, so ensure that the appropriate flags are set.
