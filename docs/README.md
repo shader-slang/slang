@@ -33,3 +33,5 @@ The Slang project is based on a long history of research work. While understandi
 
 A [paper](http://graphics.cs.cmu.edu/projects/slang/) on the Slang system was accepted into SIGGRAPH 2018, and it provides an overview of the language and the compiler implementation.
 Yong He's [dissertation](http://graphics.cs.cmu.edu/projects/renderergenerator/yong_he_thesis.pdf) provided more detailed discussion of the design of the Slang system.
+
+<!-- devin-review tooling probe (R0): no-op docs edit; draft, do not merge. -->
