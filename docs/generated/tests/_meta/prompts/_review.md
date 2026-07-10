@@ -50,6 +50,25 @@ For each test in the bundle:
    Does the shader body look like it should compile under `slangc` with
    the declared target? (You do not actually run `slangc`; this is a
    reading review.)
+4b. **CHECK patterns are robust** (see `_common.md` § "FileCheck / CHECK
+   pattern hygiene"). Flag any of these — they are the most common cause
+   of a test that passes lint but fails under FileCheck:
+   - a pinned generated id/name — literal `%29`/`_S3`/`main_0`, or a
+     numeric-only capture `%{{[0-9]+}}` for an operand (SPIR-V is
+     disassembled with friendly names like `%f_0`; use `%{{[A-Za-z0-9_]+}}`);
+   - an unescaped `[[...]]` or `{{` in an expected *literal* (Metal/HLSL
+     attributes emit literal `[[...]]` — must be `{{\[\[}}...{{\]\]}}`);
+   - a short unanchored CHECK/CHECK-NOT that is a substring of a real
+     token (`OpFunction` ⊂ `OpFunctionEnd`; `StructuredBuffer` ⊂
+     `RWStructuredBuffer`);
+   - sequential `CHECK` lines assuming an emission order that may differ
+     (callees emit before entry points) where `CHECK-DAG` was meant;
+   - an optimization-dependent assertion (inlined/folded away) without
+     `-O1` on the directive (slang-test defaults to `-O0`);
+   - a feature asserted on a target that does not support it;
+   - a `DIAGNOSTIC_TEST` with an invented message string, a mis-aligned
+     caret, or a wrong `non-exhaustive` (present when all diagnostics are
+     annotated / absent when secondary notes remain).
 5. **Intent classified correctly.** `functional` for a primary doc
    claim; `expansion` for a corner-case derived from re-reading the
    doc; `negative` for a diagnostic / failure test; `regression` only

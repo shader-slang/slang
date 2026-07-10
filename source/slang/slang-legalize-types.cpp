@@ -529,6 +529,17 @@ struct TupleTypeBuilder
             originalStructType->transferDecorationsTo(ordinaryStructType);
             copyNameHintAndDebugDecorations(originalStructType, ordinaryStructType);
 
+            // `transferDecorationsTo` above moved every decoration off `originalStructType`
+            // onto `ordinaryStructType`, including the synthesized-parameter-group marker.
+            // The parameter-group leak diagnostic in `legalizeTypeImpl` reads that marker off
+            // the *original* struct, and the same buffer can be re-legalized on a later pass,
+            // so the original must keep it. We re-add it here (rather than inside
+            // `copyNameHintAndDebugDecorations`, whose other callers flatten varying-IO
+            // structs and debug vars where this marker has no meaning) to keep the marker's
+            // scope narrow to parameter-group structs (issue #11825).
+            if (ordinaryStructType->findDecoration<IRSynthesizedParameterGroupDecoration>())
+                builder->addSynthesizedParameterGroupDecoration(originalStructType);
+
             // The new struct type will appear right after the original in the IR,
             // so that we can be sure any instruction that could reference the
             // original can also reference the new one.
@@ -1236,12 +1247,31 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
         }
         else
         {
+            // Whether this parameter group was synthesized by the compiler rather than
+            // written by the user. We read the marker *before* legalizing the element type:
+            // legalizing a struct with mixed resource/ordinary fields moves the original
+            // struct's decorations onto a new "ordinary" struct via `transferDecorationsTo`
+            // and then re-adds this marker onto the original (see the struct-splitting site
+            // above). Reading it here keeps this independent of that re-add, so we don't
+            // depend on the ordering of the nested legalization that happens inside
+            // `legalizeType` below.
+            bool isSynthesizedGroup =
+                originalElementType->findDecoration<IRSynthesizedParameterGroupDecoration>() !=
+                nullptr;
+
             legalElementType = legalizeType(context, originalElementType);
 
             // When special types leak out of a parameter group, they need to
             // be bound differently. Warn the user when this happens.
+            //
+            // We only warn for source-authored groups. A group whose element struct
+            // carries `SynthesizedParameterGroupDecoration` was created by the compiler
+            // (e.g. by collecting entry-point `uniform`/resource parameters, or global
+            // shader parameters, into an implicit constant buffer). The user wrote a flat
+            // parameter/global list, not the grouping, so there is nothing for them to
+            // restructure and the warning is just noise (issue #11825).
             if (legalElementType.flavor == LegalType::Flavor::pair &&
-                as<IRConstantBufferType>(type))
+                as<IRConstantBufferType>(type) && !isSynthesizedGroup)
             {
                 // The parameter group type's source location can be empty
                 // (e.g. when it comes from a linked module). Fall back to the

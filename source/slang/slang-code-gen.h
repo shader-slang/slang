@@ -80,6 +80,7 @@ struct RequiredLoweringPassSet
     bool coverageTracing;
     bool barrierFlagValidation;
     bool appendConsumeStructuredBuffer;
+    bool taggedUnion;
 };
 
 /// A context for code generation in the compiler back-end
