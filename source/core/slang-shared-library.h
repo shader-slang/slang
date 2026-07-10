@@ -106,8 +106,9 @@ class SharedLibraryUtils
 {
 public:
     static String getSharedLibraryFileName(void* symbolInLib);
-    /// Returns the modification timestamp used to validate module caches for fileName, or zero
-    /// when the path is empty or its timestamp is unavailable.
+    /// Returns an opaque modification stamp for fileName, or zero when unavailable.
+    /// Non-zero stamps are meaningful only for equality comparisons between results from this
+    /// function on the same host; their units and resolution are platform-defined.
     static uint64_t getFileTimestamp(const String& fileName);
     static uint64_t getSharedLibraryTimestamp(void* symbolInLib);
 };

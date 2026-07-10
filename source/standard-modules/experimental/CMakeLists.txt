@@ -43,6 +43,8 @@ else()
     set(SLANG_COMPILER slang-bootstrap)
     set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
 endif()
+# Every compiler selection, including an external generator, loads the archive produced by
+# generate_core_module so building the workgraph module does not compile the core module again.
 set(SLANG_COMPILER_CORE_MODULE_ARGS -load-core-module ${core_module_archive_without_timestamp})
 set(SLANG_COMPILER_EXTRA_DEPS generate_core_module)
 
