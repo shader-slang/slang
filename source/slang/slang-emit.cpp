@@ -1841,6 +1841,11 @@ Result linkAndOptimizeIR(
     else
         SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
 
+    // Enforce that no untyped descriptor-heap handle (`ResourceDescriptorHeap[i]` /
+    // `SamplerDescriptorHeap[j]`) survives to emit: lower any that peephole did not collapse to its
+    // underlying `uint` index. Runs for every target, after simplification, before emit/layout.
+    SLANG_PASS(lowerUntypedResourceHandleToUInt);
+
     if (requiredLoweringPassSet.dynamicResourceHeap)
         SLANG_PASS(lowerDynamicResourceHeap, targetProgram, sink);
 

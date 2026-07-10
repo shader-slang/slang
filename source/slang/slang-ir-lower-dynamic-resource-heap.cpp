@@ -93,4 +93,61 @@ void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, Di
     }
 }
 
+void lowerUntypedResourceHandleToUInt(IRModule* module)
+{
+    // Collect the casts and the type ops in a single walk before mutating, so replacing/removing
+    // insts does not invalidate the traversal.
+    List<IRInst*> castsToForward;
+    List<IRInst*> typesToRewrite;
+
+    List<IRInst*> workList;
+    workList.add(module->getModuleInst());
+    while (workList.getCount())
+    {
+        auto inst = workList.getLast();
+        workList.removeLast();
+        for (auto child : inst->getChildren())
+            workList.add(child);
+
+        switch (inst->getOp())
+        {
+        case kIROp_CastUIntToUntypedResourceHandle:
+        case kIROp_CastUntypedResourceHandleToUInt:
+        case kIROp_CastUIntToUntypedSamplerHandle:
+        case kIROp_CastUntypedSamplerHandleToUInt:
+            castsToForward.add(inst);
+            break;
+        case kIROp_UntypedResourceHandleType:
+        case kIROp_UntypedSamplerHandleType:
+            typesToRewrite.add(inst);
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (castsToForward.getCount() == 0 && typesToRewrite.getCount() == 0)
+        return;
+
+    // Forward the casts first: after the type rewrite below both operand and result are `uint`, so
+    // each cast is an identity that just passes its heap index through.
+    for (auto cast : castsToForward)
+    {
+        cast->replaceUsesWith(cast->getOperand(0));
+        cast->removeAndDeallocate();
+    }
+
+    // Rewrite the untyped handle types to the canonical `uint`, so no untyped handle reaches emit.
+    if (typesToRewrite.getCount())
+    {
+        IRBuilder builder(module);
+        auto uintType = builder.getUIntType();
+        for (auto type : typesToRewrite)
+        {
+            type->replaceUsesWith(uintType);
+            type->removeAndDeallocate();
+        }
+    }
+}
+
 } // namespace Slang

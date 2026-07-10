@@ -422,8 +422,9 @@ local insts = {
 			{
 				UntypedResourceHandle = {
 					-- An opaque, untyped handle produced by `ResourceDescriptorHeap[i]`. It is nullary:
-					-- the heap index lives in the value, not the type. It is emitted directly as `uint`
-					-- (backends print the type as uint; there is no separate pre-emit lowering pass).
+					-- the heap index lives in the value, not the type. `lowerUntypedResourceHandleToUInt`
+					-- rewrites it to its underlying `uint` heap index before emit, so it never reaches
+					-- emit/layout (which treat a survivor as an internal error).
 					struct_name = "UntypedResourceHandleType",
 					hoistable = true,
 				},
@@ -431,7 +432,8 @@ local insts = {
 			{
 				UntypedSamplerHandle = {
 					-- An opaque, untyped handle produced by `SamplerDescriptorHeap[j]`. Nullary, like
-					-- `UntypedResourceHandle`; emitted directly as `uint` (no pre-emit lowering pass).
+					-- `UntypedResourceHandle`; lowered to `uint` by the same
+					-- `lowerUntypedResourceHandleToUInt` pass and likewise never reaches emit/layout.
 					struct_name = "UntypedSamplerHandleType",
 					hoistable = true,
 				},
@@ -2747,8 +2749,9 @@ local insts = {
 	-- already concrete types.
 	{ CastDescriptorHandleToResource = { operands = { { "handle" } } } },
 	{ CastResourceToDescriptorHandle = { operands = { { "resource" } } } },
-	-- Wrap/unwrap a `uint` heap index in an untyped descriptor-heap handle. Both the operand
-	-- and the result lower to `uint`, so these emit as pass-throughs of their single operand.
+	-- Wrap/unwrap a `uint` heap index in an untyped descriptor-heap handle. This is an internal
+	-- representation only: the `lowerUntypedResourceHandleToUInt` pass forwards each cast to its
+	-- `uint` operand and removes it before emit, so these ops never reach a target emitter.
 	{ CastUIntToUntypedResourceHandle = { operands = { { "index" } } } },
 	{ CastUntypedResourceHandleToUInt = { operands = { { "handle" } } } },
 	{ CastUIntToUntypedSamplerHandle = { operands = { { "index" } } } },

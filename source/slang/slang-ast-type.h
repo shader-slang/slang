@@ -485,8 +485,9 @@ class DescriptorHandleType : public PointerLikeType
 // It wraps a single `uint` heap index and only ever implicit-converts to a concrete
 // resource (CBV_SRV_UAV) type or to a resource-family `DescriptorHandle<T>`; the concrete
 // type is recovered from the conversion target. It is a plain builtin (not a
-// `PointerLikeType`) because it does not dereference. A handle that no conversion consumes
-// is emitted directly as its underlying `uint` (there is no separate lowering pass).
+// `PointerLikeType`) because it does not dereference. It never survives to emit: the
+// `lowerUntypedResourceHandleToUInt` IR pass rewrites every untyped handle to its underlying
+// `uint` heap index before emit/layout, which treat a survivor as an internal error.
 FIDDLE()
 class UntypedResourceHandleType : public BuiltinType
 {
@@ -496,8 +497,8 @@ class UntypedResourceHandleType : public BuiltinType
 // An opaque, untyped sampler handle produced by indexing `SamplerDescriptorHeap[j]`.
 // Behaves exactly like `UntypedResourceHandleType` but only converts to sampler types or to
 // a sampler-family `DescriptorHandle<T>` (the resource/sampler heap families are kept
-// disjoint by the per-kind conversions in hlsl.meta.slang). It too is emitted as `uint` if
-// it survives to emit.
+// disjoint by the per-kind conversions in hlsl.meta.slang). It is lowered to `uint` by the
+// same `lowerUntypedResourceHandleToUInt` pass and likewise never reaches emit.
 FIDDLE()
 class UntypedSamplerHandleType : public BuiltinType
 {
