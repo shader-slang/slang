@@ -398,14 +398,10 @@ markdown_formatting() {
   prettier_formatting
 }
 
-# Check that the files we ship to consumers - the public headers in include/
-# and the preludes in prelude/, which get compiled into downstream projects -
-# contain only ASCII bytes. A non-ASCII byte (such as an em-dash in a comment)
-# makes MSVC emit C4819 for consumers who build with a non-UTF-8 source
-# charset (e.g. /source-charset:.932), which /WX promotes to a hard error;
-# see issue #12016 / PR #12018. There is no auto-fix: the right ASCII
-# replacement depends on the text, so this check fails in both modes and the
-# offending characters must be edited by hand.
+# Shipped files - the public headers in include/ and the preludes in
+# prelude/ - must be pure ASCII: a non-ASCII byte makes MSVC emit C4819
+# (a /WX hard error) for consumers building with a non-UTF-8 source
+# charset (#12016 / #12018).
 ascii_check() {
   echo "Checking shipped headers and preludes are pure ASCII..." >&2
 
