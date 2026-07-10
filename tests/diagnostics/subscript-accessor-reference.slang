@@ -18,6 +18,19 @@ struct RefOnly
     }
 }
 
+struct LiteralName
+{
+    static int __subscript()
+    {
+        return 1;
+    }
+}
+
+int useLiteralSubscriptName()
+{
+    return LiteralName::__subscript();
+}
+
 __func_extension fwd_diff(ReadOnly::__subscript::bogus)() -> void
 //CHECK:                                         ^^^^^ member not found
 //CHECK:                                         ^^^^^ 'bogus' is not a member of '(int) -> float'.
