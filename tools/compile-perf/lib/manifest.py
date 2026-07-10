@@ -44,8 +44,20 @@ class WorkloadSpec:
     # contains "main", or the first file if none does. If set, used directly
     # as the compile entry point.
     main_file: str = None
+    # sys.platform values this workload can run on (None = all). Workloads
+    # needing a platform-bound downstream toolchain (dxc, nvrtc) set this;
+    # bench.py excludes them from the DEFAULT set elsewhere but still runs
+    # them when named explicitly in --only, failing loudly if the tool is
+    # genuinely absent (downstream_required below is what enforces that).
+    platforms: list = None
+    # The workload's number is meaningless without its downstream compiler:
+    # missing-downstream diagnostics (E00100 etc.), which bench.py normally
+    # treats as benign, fail this workload instead — otherwise a host without
+    # the toolchain would record Slang-internal timers and report OK.
+    downstream_required: bool = False
     # for mode="api": the api-driver subcommand ("session-create",
-    # "many-kernels", "module-graph", "module-graph-bin", "specialize"), the
+    # "many-kernels", "module-graph", "module-graph-bin", "specialize",
+    # "rt-composite"), the
     # root module name for the by-name-loading modes, and extra driver flags
     # (e.g. --reflect).
     api_cmd: str = None
@@ -256,6 +268,61 @@ WORKLOADS = [
         extra_flags=["-target", "wgsl"],
         primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
     ),
+    WorkloadSpec(
+        name="emit_hlsl",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "hlsl", "-entry", "computeMain"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+    ),
+    WorkloadSpec(
+        name="emit_glsl",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "glsl", "-entry", "computeMain"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+    ),
+    WorkloadSpec(
+        name="emit_cuda",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "cuda"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+    ),
+    # ---- downstream compilers (Windows perf runner only) -------------------
+    # These measure the full pipeline INCLUDING the downstream compiler (dxc
+    # for DXIL, nvrtc for PTX) — an internal application benchmark showed
+    # downstream time is ~60% of a real app's combined compile time, and the
+    # suite had no signal for it. generateOutput spans slang emit + the
+    # downstream invocation; wall_ms is the end-to-end number.
+    WorkloadSpec(
+        name="codegen_dxil",
+        bucket="codegen_downstream",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "dxil", "-profile", "sm_6_6"],
+        primary_timers=["generateOutput", "compileInner"],
+        platforms=["win32"],
+        downstream_required=True,
+    ),
+    WorkloadSpec(
+        name="codegen_ptx",
+        bucket="codegen_downstream",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "ptx"],
+        primary_timers=["generateOutput", "compileInner"],
+        platforms=["win32"],
+        downstream_required=True,
+    ),
     # ---- complexity ladder: realistic mixed shader, simple -> complex ------
     # Sweep this to see the holistic compile-time curve as a representative
     # shader grows in complexity (control flow + generics + dispatch + resources
@@ -371,6 +438,33 @@ WORKLOADS = [
         api_cmd="specialize",
         api_root="spec_root",
         primary_timers=["apiSpecialize", "apiLink", "apiGetCode", "apiTotal"],
+    ),
+    # ---- rt_renderer: generated renderer-shaped corpus (DESIGN.md Phase 2) --
+    # Few×HEAVY programs over a ~100-module utility/scene/material library
+    # behind IMaterial/IBSDF interfaces — the real-application shape where each
+    # program pays the whole library's import cost. n = material count.
+    WorkloadSpec(
+        name="rt_renderer",
+        bucket="rt_renderer",
+        gen=workloads.gen_rt_renderer,
+        default_size=24,
+        mode="api",
+        api_cmd="rt-composite",
+        api_root="rt_kernels",
+        primary_timers=["apiTotal", "apiLoadModule", "apiGetCode"],
+    ),
+    # One compute-kernel variant per material via IEntryPoint::specialize —
+    # link-time specialization against interface-heavy cross-module code.
+    WorkloadSpec(
+        name="rt_renderer_specialize",
+        bucket="rt_renderer",
+        gen=workloads.gen_rt_renderer,
+        default_size=24,
+        mode="api",
+        api_cmd="specialize",
+        api_root="rt_compute",
+        api_flags=["--impl-prefix", "Material_"],
+        primary_timers=["apiTotal", "apiGetCode", "apiSpecialize"],
     ),
     # ---- real-shader corpus ----------------------------------------------
     WorkloadSpec(

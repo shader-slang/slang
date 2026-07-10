@@ -19,7 +19,8 @@
 //     api-driver <libslang> many-kernels      --dir DIR [--reflect]
 //     api-driver <libslang> module-graph      --dir DIR --root MODULENAME [--reflect]
 //     api-driver <libslang> module-graph-bin  --dir DIR --root MODULENAME
-//     api-driver <libslang> specialize        --dir DIR --root MODULENAME
+//     api-driver <libslang> specialize        --dir DIR --root MODULENAME [--impl-prefix P]
+//     api-driver <libslang> rt-composite      --dir DIR --root MODULENAME
 //
 // Exit code 0 on success; on any Slang failure, diagnostics are printed to
 // stdout (bench.py's real_error() recognizes "error" lines) and the exit code
@@ -298,8 +299,11 @@ static SlangResult createSession(
 }
 
 // Recursively sums field counts and uniform sizes of a type layout, the way an
-// application walks reflection to build binding tables. The returned value is
-// accumulated into a checksum so the traversal cannot be considered dead.
+// application walks reflection to build binding tables. The sum is an opaque
+// token (it mixes a byte size with field counts), not a layout metric — it
+// exists only to consume the query results. The traversal itself cannot be
+// optimized away regardless: every query is a call through the dlopen'd
+// library, which the host compiler cannot see into.
 static long walkTypeLayout(const LibSlang& lib, SlangReflectionTypeLayout* tl, int depth)
 {
     if (!tl || depth > 12)
@@ -421,8 +425,8 @@ static bool compileEntryPoint(
 
     if (reflectWith)
     {
-        static long s_checksum = 0;
-        if (!reflectProgram(*reflectWith, linked, timers, s_checksum))
+        long checksum = 0;
+        if (!reflectProgram(*reflectWith, linked, timers, checksum))
             return false;
     }
 
@@ -580,10 +584,12 @@ static int runModuleGraph(
 // module-graph-bin: like module-graph, but the timed load resolves the DAG
 // from serialized .slang-module binaries instead of source — the import path
 // where the 2026-07-03 module-loading regression (#11952) lives, which
-// source-based loads do not exercise. Setup (untimed apiTotal-wise it is
-// timed under its own names): load the graph from source once and write every
-// loaded module out with IModule::writeToFile; then a FRESH session re-loads
-// the root, letting import resolution pick the binaries.
+// source-based loads do not exercise. Setup runs before the apiTotal scope
+// opens, so it does not count toward apiTotal, but its phases are still timed
+// and reported individually (apiLoadModuleSource, apiWriteModule): load the
+// graph from source once and write every loaded module out with
+// IModule::writeToFile; then a FRESH session re-loads the root, letting
+// import resolution pick the binaries.
 static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const std::string& root)
 {
     Timers timers;
@@ -699,7 +705,11 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
 // IEntryPoint::specialize -> composite -> link -> getEntryPointCode) — the
 // application pattern where one kernel is stamped out per material/config
 // type, stressing specialization + link per variant.
-static int runSpecialize(const LibSlang& lib, const std::string& dir, const std::string& root)
+static int runSpecialize(
+    const LibSlang& lib,
+    const std::string& dir,
+    const std::string& root,
+    const std::string& implPrefix)
 {
     if (!lib.reflFindTypeByName)
     {
@@ -754,8 +764,8 @@ static int runSpecialize(const LibSlang& lib, const std::string& dir, const std:
 
     for (int i = 0;; i++)
     {
-        char implName[32];
-        snprintf(implName, sizeof(implName), "Impl_%d", i);
+        char implName[64];
+        snprintf(implName, sizeof(implName), "%s%d", implPrefix.c_str(), i);
         auto type = (slang::TypeReflection*)lib.reflFindTypeByName(
             (SlangReflection*)moduleLayout,
             implName);
@@ -763,7 +773,7 @@ static int runSpecialize(const LibSlang& lib, const std::string& dir, const std:
         {
             if (i == 0)
             {
-                printf("error: type Impl_0 not found in %s\n", root.c_str());
+                printf("error: type %s0 not found in %s\n", implPrefix.c_str(), root.c_str());
                 return 1;
             }
             break; // ran past the last generated impl
@@ -820,6 +830,102 @@ static int runSpecialize(const LibSlang& lib, const std::string& dir, const std:
     return 0;
 }
 
+// rt-composite: load a root module whose imports pull in the whole generated
+// renderer library, then compose its raygen/closesthit/miss entry points into
+// ONE program (createCompositeComponentType), link, and generate code for each
+// entry — the ray-tracing pipeline shape applications compile, where every
+// program pays the full library import cost (few×heavy, complementing
+// many-kernels' many×tiny).
+static int runRtComposite(const LibSlang& lib, const std::string& dir, const std::string& root)
+{
+    Timers timers;
+    Scope total(timers, "apiTotal");
+
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
+    {
+        Scope s(timers, "apiCreateGlobalSession");
+        if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
+        {
+            printf("error: slang_createGlobalSession failed\n");
+            return 1;
+        }
+    }
+    Slang::ComPtr<slang::ISession> session;
+    {
+        Scope s(timers, "apiCreateSession");
+        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
+        {
+            printf("error: createSession failed\n");
+            return 1;
+        }
+    }
+
+    slang::IModule* module = nullptr;
+    Slang::ComPtr<slang::IBlob> diagnostics;
+    {
+        Scope s(timers, "apiLoadModule");
+        module = session->loadModule(root.c_str(), diagnostics.writeRef());
+        printDiagnostics(diagnostics);
+        if (!module)
+            return 1;
+    }
+
+    static const char* kEntryNames[] = {"rayGenMain", "closestHitMain", "missMain"};
+    const int kEntryCount = 3;
+    slang::IComponentType* components[1 + kEntryCount] = {module};
+    Slang::ComPtr<slang::IEntryPoint> entryPoints[kEntryCount];
+    {
+        Scope s(timers, "apiFindEntryPoint");
+        for (int i = 0; i < kEntryCount; i++)
+        {
+            if (SLANG_FAILED(
+                    module->findEntryPointByName(kEntryNames[i], entryPoints[i].writeRef())))
+            {
+                printf("error: findEntryPointByName(%s) failed\n", kEntryNames[i]);
+                return 1;
+            }
+            components[1 + i] = entryPoints[i];
+        }
+    }
+
+    Slang::ComPtr<slang::IComponentType> composite;
+    {
+        Scope s(timers, "apiComposite");
+        SlangResult res = session->createCompositeComponentType(
+            components,
+            1 + kEntryCount,
+            composite.writeRef(),
+            diagnostics.writeRef());
+        printDiagnostics(diagnostics);
+        if (SLANG_FAILED(res))
+            return 1;
+    }
+    Slang::ComPtr<slang::IComponentType> linked;
+    {
+        Scope s(timers, "apiLink");
+        SlangResult res = composite->link(linked.writeRef(), diagnostics.writeRef());
+        printDiagnostics(diagnostics);
+        if (SLANG_FAILED(res))
+            return 1;
+    }
+    for (int i = 0; i < kEntryCount; i++)
+    {
+        Slang::ComPtr<slang::IBlob> code;
+        Scope s(timers, "apiGetCode");
+        SlangResult res = linked->getEntryPointCode(i, 0, code.writeRef(), diagnostics.writeRef());
+        printDiagnostics(diagnostics);
+        if (SLANG_FAILED(res) || !code || !code->getBufferSize())
+        {
+            printf("error: getEntryPointCode produced no code for %s\n", kEntryNames[i]);
+            return 1;
+        }
+    }
+
+    total.stop();
+    timers.report();
+    return 0;
+}
+
 static const char* argValue(int argc, char** argv, const char* flag)
 {
     for (int i = 3; i + 1 < argc; i++)
@@ -844,7 +950,9 @@ int main(int argc, char** argv)
                "       api-driver <libslang> many-kernels      --dir DIR [--reflect]\n"
                "       api-driver <libslang> module-graph      --dir DIR --root NAME [--reflect]\n"
                "       api-driver <libslang> module-graph-bin  --dir DIR --root NAME\n"
-               "       api-driver <libslang> specialize        --dir DIR --root NAME\n");
+               "       api-driver <libslang> specialize        --dir DIR --root NAME "
+               "[--impl-prefix P]\n"
+               "       api-driver <libslang> rt-composite      --dir DIR --root NAME\n");
         return 2;
     }
     LibSlang lib;
@@ -891,8 +999,13 @@ int main(int argc, char** argv)
         return runModuleGraph(lib, dir, root, reflect);
     if (mode == "module-graph-bin")
         return runModuleGraphBin(lib, dir, root);
+    if (mode == "rt-composite")
+        return runRtComposite(lib, dir, root);
     if (mode == "specialize")
-        return runSpecialize(lib, dir, root);
+    {
+        const char* prefix = argValue(argc, argv, "--impl-prefix");
+        return runSpecialize(lib, dir, root, prefix ? prefix : "Impl_");
+    }
     printf("error: unknown mode %s\n", mode.c_str());
     return 2;
 }
