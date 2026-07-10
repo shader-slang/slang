@@ -163,7 +163,7 @@ use `int(x)` constructor-style casts.
 - [ ] Every doc section that names user-facing keywords has at least
       one test anchored to it: `#statement-keywords`,
       `#decl-keywords`, `#simple-modifiers`, `#expression-keywords`,
-      `#core-module-supplied-vocabulary`,
+      `#core-module-syntax-declarations`,
       `#reserved-identifier-prefixes`.
 - [ ] At least one test uses **overload resolution against typed
       parameters** to prove that `int`, `uint`, `float`, and `bool`

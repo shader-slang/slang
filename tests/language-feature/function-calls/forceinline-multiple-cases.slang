@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -O0 -g3
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -g3
 RWStructuredBuffer<int> outputBuffer;
 
 // Function with a single basic block

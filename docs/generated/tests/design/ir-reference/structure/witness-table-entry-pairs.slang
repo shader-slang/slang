@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T19:00:00+00:00
 //META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#witnesstableentry-vs-interfacereqentry
-//META: doc_section_digest=e8a37c42024011b8e8da83a48b8a19297651c7ef6969d0dc113a8d44a20563b1
+//META: doc_section_digest=d7c7ad588c113313764fd264e2afc39c7d8373fbecd1555ffb014b51b6a42262
 //META: purpose=Each row of a witness_table is a witness_table_entry pairing a requirementKey with the concrete satisfying function value.
 //META: intent=functional
 //META: pipeline_stage=lower

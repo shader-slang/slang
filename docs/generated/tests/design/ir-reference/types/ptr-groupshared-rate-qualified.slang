@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T13:50:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/ir-reference/types.md#rates-and-rate-qualified-types
-//META: doc_section_digest=480f214056fa4a8161f1c884e5d3f82bfc07b1bc1c95814f32ba958d315dc859
+//META: doc_section_digest=261694f2495663c52fa91ea5888b76d9946c341ceeccfee48aa2adb230c18973
 //META: purpose=A groupshared declaration is typed RateQualified(GroupShared, Ptr(<T>)) in the IR.
 //META: intent=functional
 //META: pipeline_stage=lower

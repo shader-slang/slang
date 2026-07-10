@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:50:55+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-a-ast-walk-and-ir-emission
-//META: doc_section_digest=e769492b0e2a17642d0c2176c69b9635c5d888e1e9fd7ee6420efd9df5b09e62
+//META: doc_section_digest=e1b449b7fcdd81d8efc3a0ebc0902561859fb0966734d156746b5be25c2fee00
 //META: purpose=Phase A row A6 calls lowerFrontEndEntryPointToIR once per entry point so the entry-point IRFunc skeleton exists before the full declaration walk.
 //META: intent=functional
 //META: pipeline_stage=lower

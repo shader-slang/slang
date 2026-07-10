@@ -58,6 +58,10 @@ jobs:
 
     env:
       IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+      # LLVM can mis-report AVX-512 support on virtual machines, as observed on
+      # both GitHub-hosted and GCP VMs. Apply the workaround to every coverage
+      # platform so all slang-llvm JIT test processes inherit it (#11062).
+      SLANG_DISABLE_AVX512: "1"
 
     defaults:
       run:
@@ -234,13 +238,6 @@ jobs:
           # Set SPIRV validation environment variables (same as regular CI)
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-
-          # Match regular CPU-only CI's #11062 mitigation. Linux coverage runs
-          # CPU/LLVM and synthesized LLVM test paths on GitHub-hosted runners,
-          # so it can hit the same slang-llvm JIT AVX-512 SIGILL.
-          if [[ "${{ inputs.os }}" == "linux" ]]; then
-            export SLANG_DISABLE_AVX512=1
-          fi
 
           # Build slang-test arguments (same as regular CI)
           test_args=(
