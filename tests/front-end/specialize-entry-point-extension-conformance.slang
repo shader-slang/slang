@@ -14,12 +14,11 @@
 // The conformance itself resolves fine everywhere else (in-body generic calls,
 // manual wrapper entry points, or when the extensions live in an imported
 // module); it failed only at this boundary. A successful emit -- i.e. the
-// entry point makes it to SPIR-V without E38029 -- proves the witness is now
-// found. `-skip-spirv-validation` keeps the test independent of the downstream
-// SPIR-V toolchain.
+// entry point makes it to valid SPIR-V without E38029 -- proves the witness is
+// now found.
 
-//TEST:SIMPLE(filecheck=CHECK_FLOAT): -target spirv-asm -entry shader -specialize float -skip-spirv-validation
-//TEST:SIMPLE(filecheck=CHECK_UINT): -target spirv-asm -entry shader -specialize uint32_t -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CHECK_FLOAT): -target spirv-asm -entry shader -specialize float
+//TEST:SIMPLE(filecheck=CHECK_UINT): -target spirv-asm -entry shader -specialize uint32_t
 
 interface IDenorm
 {
