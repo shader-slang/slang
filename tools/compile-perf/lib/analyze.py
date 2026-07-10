@@ -167,8 +167,11 @@ def classify(values, step_thr=1.4, drift_thr=1.25):
 
 
 def linfit(xs, ys):
-    """Ordinary least squares y = a + b*x. Returns (a, b, r2)."""
+    """Ordinary least squares y = a + b*x. Returns (a, b, r2); (0, 0, 0) with
+    fewer than 2 points, where no line is determined (mirrors powfit)."""
     n = len(xs)
+    if n < 2:
+        return 0.0, 0.0, 0.0
     sx, sy = sum(xs), sum(ys)
     sxx = sum(x * x for x in xs)
     sxy = sum(x * y for x, y in zip(xs, ys))

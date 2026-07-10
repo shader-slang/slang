@@ -23,8 +23,11 @@ on:
         description: "comma-separated workload subset (blank = full suite)"
         default: ""
       sweep:
+        # Opt-in (~4x runtime): dispatch with sweep=true when fresh scaling
+        # curves are wanted; the published sweep page shows the newest sweep
+        # whenever one last ran.
         description: "run each workload's sweep_sizes for scaling curves (~4x runtime; tracking still compares the default-size point)"
-        default: "true"
+        default: "false"
       publish:
         description: "push results + update tracking + deploy pages (set false for one-off measurements: results are uploaded as a run artifact only)"
         default: "true"
@@ -123,9 +126,7 @@ jobs:
         env:
           SAMPLES: ${{ github.event.inputs.samples || '5' }}
           ONLY: ${{ github.event.inputs.only }}
-          # Scheduled runs have no inputs; sweep nightly so the published
-          # "latest sweep" scaling page is at most a day old.
-          SWEEP: ${{ github.event.inputs.sweep || 'true' }}
+          SWEEP: ${{ github.event.inputs.sweep || 'false' }}
         run: |
           set -euo pipefail
           SUITE="$GITHUB_WORKSPACE/tools/compile-perf"

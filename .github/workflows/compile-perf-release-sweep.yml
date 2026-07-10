@@ -18,11 +18,11 @@ on:
         description: "latest release date (YYYY-MM-DD)"
         default: "2026-12-31"
       sweep:
-        # Default on so per-release sweep DATA is archived in the results repo
-        # (renderable on demand / compared by ladder_scaling.py); only the
-        # latest nightly sweep gets published pages.
+        # Opt-in: set true to archive per-release sweep DATA in the results
+        # repo (renderable on demand / compared by ladder_scaling.py); only
+        # the latest nightly sweep gets published pages.
         description: "also run each workload's sweep_sizes (scaling curves; ~4x runtime)"
-        default: "true"
+        default: "false"
       samples:
         description: "timed samples per run"
         default: "5"
@@ -102,7 +102,7 @@ jobs:
           UNTIL: ${{ github.event.inputs.until || '2026-12-31' }}
           SAMPLES: ${{ github.event.inputs.samples || '5' }}
           FORCE_ENABLED: ${{ github.event.inputs.force || 'false' }}
-          SWEEP: ${{ github.event.inputs.sweep || 'true' }}
+          SWEEP: ${{ github.event.inputs.sweep || 'false' }}
         run: |
           set -euo pipefail
           SUITE="$GITHUB_WORKSPACE/tools/compile-perf"

@@ -92,14 +92,20 @@ def fit(pts, floor=0.0):
     return {"a": a, "k": k, "pow_r2": pow_r2, "top": top}
 
 
-def superlinear(k):
-    """True when the power-law exponent k is meaningfully above linear (k=1.0).
+# The 0.15 noise buffer shared by both super-linearity thresholds: a fit over
+# 3-5 points is noisy, and readings within 15% of the linear expectation are
+# not actionable. K_NOISE_BUFFER couples the exponent cutoff (linear k=1.0)
+# and the top-step cutoff (linear = 2.0 on the suite's x2 doubling ladders) so
+# they move together if the ladders' spacing or length ever changes.
+K_NOISE_BUFFER = 0.15
+SUPERLINEAR_K = 1.0 + K_NOISE_BUFFER
+SUPERLINEAR_TOP2X = 2.0 + K_NOISE_BUFFER
 
-    The 0.15 buffer above 1.0 absorbs fitting noise from small N ranges — a
-    power-law fit with 3-5 points is noisy and k between 1.0 and 1.15 is not
-    actionable. Raise this threshold if the suite's N ranges are extended.
-    """
-    return k is not None and k > 1.15
+
+def superlinear(k):
+    """True when the power-law exponent k is meaningfully above linear (k=1.0),
+    i.e. past the shared noise buffer documented on K_NOISE_BUFFER."""
+    return k is not None and k > SUPERLINEAR_K
 
 
 def bucket_series(results_dir, label, metric):
@@ -214,7 +220,7 @@ def render_growth_table(by_size, floor_b=None):
     for e in rows:
         share = f"{100 * e['delta'] / total:.0f}%" if total > 0 else "–"
         if e["lin"] is not None:
-            lcls = "reg" if e["lin"] >= 1.15 else "flat"
+            lcls = "reg" if e["lin"] >= SUPERLINEAR_K else "flat"
             lcell = f"<td class='num {lcls}'>{e['lin']:.2f}&times;</td>"
         else:
             lcell = "<td class=num>–</td>"
@@ -266,7 +272,7 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
          f'Complexity sweep — compileInner vs workload size N ({metric} ms, linear)</text>',
          f'<text x="12" y="46" font-size="11" fill="#666">dashed = linear expectation: '
          f'measured floor (the minimal workload) + slope fitted on the low-N half, extrapolated; '
-         f'the end-point label is actual/linear at max N (red when ≥1.15× — super-linear)</text>']
+         f'the end-point label is actual/linear at max N (red when ≥{SUPERLINEAR_K}× — super-linear)</text>']
 
     for k, wl in enumerate(names):
         timers = sweeps[wl]["timers"]
@@ -340,7 +346,7 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
             s.append(f'<line x1="{xmap(nmin):.1f}" y1="{y0:.1f}" x2="{xmap(nmax):.1f}" '
                      f'y2="{y1:.1f}" stroke="#999" stroke-width="1.4" stroke-dasharray="5,4"/>')
         if lin_ratio is not None:
-            rcl = "#c0392b" if lin_ratio >= 1.15 else "#888"
+            rcl = "#c0392b" if lin_ratio >= SUPERLINEAR_K else "#888"
             s.append(f'<text x="{xmap(nmax)-4:.1f}" y="{ymap(pts_ci[-1][1])-6:.1f}" '
                      f'text-anchor="end" font-size="11" fill="{rcl}" font-weight="600">'
                      f'{lin_ratio:.2f}× lin</text>')
@@ -385,7 +391,7 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
         ft = fit(ci, floor)
         kk, top = ft["k"], ft["top"]
         kcls = "reg" if superlinear(kk) else "flat"
-        topcls = "reg" if (top and top > 2.15) else "flat"
+        topcls = "reg" if (top and top > SUPERLINEAR_TOP2X) else "flat"
         desc = (inspect.getdoc(spec.gen) if spec and spec.gen else "") or "(no description)"
         flags = " ".join(spec.extra_flags) if spec and spec.extra_flags else "(none)"
         meta = (f"<b>bucket:</b> {html.escape(spec.bucket)} &nbsp;·&nbsp; <b>mode:</b> "
@@ -454,7 +460,10 @@ def find_latest_swept(results_dir):
             continue
         try:
             runs = json.load(open(path))
-        except ValueError:
+        except (ValueError, OSError):
+            # An unreadable daily (corrupt json, permission change) skips that
+            # one label rather than aborting the whole latest-sweep scan —
+            # matching sweep.py's completeness loader.
             continue
         per = {}
         for r in runs:
@@ -520,7 +529,7 @@ def main():
          "<h2>Scaling curves (compileInner)</h2>",
          '<p class="small">Each panel is one workload\'s <b>compileInner</b> vs '
          '<code>N</code> on a zero-based linear axis, flagged with the floor-subtracted '
-         'exponent <b>∝N<sup>k</sup></b> (red ⇒ super-linear, k&gt;1.15). '
+         f'exponent <b>∝N<sup>k</sup></b> (red ⇒ super-linear, k&gt;{SUPERLINEAR_K}). '
          f'<b>Click a workload name</b> for its sub-counter stacked view, the full scaling '
          f'analysis (floor {floor:.0f} ms / k / top-2×), and the raw sweep numbers.</p>',
          f'<div class="chart">{inline}</div>']

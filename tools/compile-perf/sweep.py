@@ -86,6 +86,9 @@ def main():
                     # retuned ladder in the manifest re-sweeps affected
                     # releases on the next run, by design.
                     return set(spec.sweep_sizes) <= szs
+                # True covers: no --sweep requested; a spec with no ladder
+                # (nothing to sweep); and a workload present in results.json
+                # but gone from the manifest (no ladder left to validate).
                 return True
 
             if all(complete(wl) for wl in need):

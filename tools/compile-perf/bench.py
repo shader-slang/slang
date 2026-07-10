@@ -468,14 +468,15 @@ def main():
         sizes = spec.sweep_sizes if (args.sweep and spec.sweep_sizes) else [spec.default_size]
         for size in sizes:
             print(f"[run] {spec.name:18s} n={size:<5d} ", end="", flush=True)
-            # A generator failure (e.g. a missing corpus) must cost ONE
-            # workload, not the whole run's results: everything measured
-            # before it would be lost, since results.json is written at the
-            # end. Record the failure and keep going.
+            # ANY generator/run failure (missing corpus, a generator bug, a
+            # bad manifest field) must cost ONE workload, not the whole run's
+            # results: everything measured before it would be lost, since
+            # results.json is written at the end. Record the failure and keep
+            # going; bench still exits non-zero at the end via the ok-count.
             try:
                 rec = run_spec(slangc, spec, size, args.samples, args.warmup, gen_root,
                                api=api)
-            except (FileNotFoundError, OSError) as e:
+            except Exception as e:  # noqa: BLE001 — isolation is the contract
                 rec = {
                     "workload": spec.name, "bucket": spec.bucket, "size": size,
                     "mode": spec.mode, "ok": False, "setup_ok": False,
