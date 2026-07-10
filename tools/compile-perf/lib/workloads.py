@@ -719,12 +719,15 @@ def gen_api_specialize(n):
 # --------------------------------------------------------------------------- #
 # rt_renderer: a generated renderer-shaped corpus (DESIGN.md Phase 2).
 #
-# Replicates the shape of a real application's shader library — the internal
+# Replicates the shape of a real application's shader library. The internal
 # benchmark whose regression sensitivity motivated the api workloads compiles
 # ~10-25 programs per test, each importing a ~160-module / ~28k-line renderer
 # library (utility/scene/material layers, interface-driven materials), which
 # makes every program a few-hundred-ms compile: few×HEAVY, where
-# api_many_kernels is many×tiny. Being generated, the corpus is deterministic
+# api_many_kernels is many×tiny. Those figures describe the replicated
+# ORIGINAL; this generator produces the same shape at ~100 modules with the
+# default n=24 materials (see the constants below). Being generated, the
+# corpus is deterministic
 # (same n -> identical bytes): no external checkout, no license surface, no
 # pinning, and no corpus-drift resyncs.
 # --------------------------------------------------------------------------- #
@@ -741,7 +744,17 @@ def _rt_pick_distinct(base, stride, count, modulo):
     """Deterministically pick `count` DISTINCT indices in [0, modulo): walk
     base + k*stride and skip collisions. Callers import each picked module and
     index the result positionally, so distinctness is a hard requirement, not
-    an accident of the current stride/modulo choice."""
+    an accident of the current stride/modulo choice.
+
+    Precondition: count <= modulo // gcd(stride, modulo) — the walk only ever
+    visits that many distinct residues, so a triple outside the bound could
+    never terminate. Asserted so a bad future constant fails loudly instead of
+    hanging corpus generation."""
+    import math
+    cycle_len = modulo // math.gcd(stride, modulo)
+    assert count <= cycle_len, (
+        f"_rt_pick_distinct: cannot pick {count} distinct values from a walk "
+        f"of cycle length {cycle_len} (stride={stride}, modulo={modulo})")
     picks = []
     k = 0
     while len(picks) < count:

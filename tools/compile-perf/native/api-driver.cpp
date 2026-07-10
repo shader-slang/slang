@@ -299,8 +299,11 @@ static SlangResult createSession(
 }
 
 // Recursively sums field counts and uniform sizes of a type layout, the way an
-// application walks reflection to build binding tables. The returned value is
-// accumulated into a checksum so the traversal cannot be considered dead.
+// application walks reflection to build binding tables. The sum is an opaque
+// token (it mixes a byte size with field counts), not a layout metric — it
+// exists only to consume the query results. The traversal itself cannot be
+// optimized away regardless: every query is a call through the dlopen'd
+// library, which the host compiler cannot see into.
 static long walkTypeLayout(const LibSlang& lib, SlangReflectionTypeLayout* tl, int depth)
 {
     if (!tl || depth > 12)
@@ -422,8 +425,8 @@ static bool compileEntryPoint(
 
     if (reflectWith)
     {
-        static long s_checksum = 0;
-        if (!reflectProgram(*reflectWith, linked, timers, s_checksum))
+        long checksum = 0;
+        if (!reflectProgram(*reflectWith, linked, timers, checksum))
             return false;
     }
 
@@ -581,10 +584,12 @@ static int runModuleGraph(
 // module-graph-bin: like module-graph, but the timed load resolves the DAG
 // from serialized .slang-module binaries instead of source — the import path
 // where the 2026-07-03 module-loading regression (#11952) lives, which
-// source-based loads do not exercise. Setup (untimed apiTotal-wise it is
-// timed under its own names): load the graph from source once and write every
-// loaded module out with IModule::writeToFile; then a FRESH session re-loads
-// the root, letting import resolution pick the binaries.
+// source-based loads do not exercise. Setup runs before the apiTotal scope
+// opens, so it does not count toward apiTotal, but its phases are still timed
+// and reported individually (apiLoadModuleSource, apiWriteModule): load the
+// graph from source once and write every loaded module out with
+// IModule::writeToFile; then a FRESH session re-loads the root, letting
+// import resolution pick the binaries.
 static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const std::string& root)
 {
     Timers timers;
