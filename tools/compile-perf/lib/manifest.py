@@ -302,6 +302,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=["-target", "hlsl", "-entry", "computeMain"],
         primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
     ),
     WorkloadSpec(
         name="emit_glsl",
@@ -311,6 +312,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=["-target", "glsl", "-entry", "computeMain"],
         primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
     ),
     WorkloadSpec(
         name="emit_cuda",
@@ -320,6 +322,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=["-target", "cuda"],
         primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
     ),
     # ---- downstream compilers (Windows perf runner only) -------------------
     # These measure the full pipeline INCLUDING the downstream compiler (dxc
@@ -337,6 +340,7 @@ WORKLOADS = [
         primary_timers=["generateOutput", "compileInner"],
         platforms=["win32"],
         downstream_required=True,
+        sweep_sizes=[100, 200, 400, 800],
     ),
     WorkloadSpec(
         name="codegen_ptx",
@@ -348,6 +352,7 @@ WORKLOADS = [
         primary_timers=["generateOutput", "compileInner"],
         platforms=["win32"],
         downstream_required=True,
+        sweep_sizes=[100, 200, 400, 800],
     ),
     # ---- complexity ladder: realistic mixed shader, simple -> complex ------
     # Sweep this to see the holistic compile-time curve as a representative
