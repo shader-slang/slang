@@ -1,4 +1,5 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
+//TEST:SIMPLE(filecheck=DEBUG):-target spirv-asm -dump-ir -o /dev/null -entry computeMain -stage compute -g -experimental-feature
 
 // Verify that user code can name multi-index subscript accessors as function-extension targets.
 // The two indices also lock down the parent-then-accessor parameter ordering.
@@ -115,3 +116,12 @@ void computeMain()
     // CHECK-NEXT: 0.0
     // CHECK-NEXT: 8.0
 }
+
+// The user-written implementations of custom backward derivatives are intentionally unnamed.
+// Their linkage names must still identify the DebugFunction paired with each DebugLocation.
+// DEBUG: let [[GET_DEBUG:%[0-9]+]] : Void = DebugFunction("_S{{.*}}", [[GET_LINE:[0-9]+]] : UInt, 50 : UInt
+// DEBUG: [DebugFunction([[GET_DEBUG]])]
+// DEBUG-NEXT: [DebugLocation({{.*}}, [[GET_LINE]] : UInt, 50 : UInt)]
+// DEBUG: let [[SET_DEBUG:%[0-9]+]] : Void = DebugFunction("_S{{.*}}", [[SET_LINE:[0-9]+]] : UInt, 50 : UInt
+// DEBUG: [DebugFunction([[SET_DEBUG]])]
+// DEBUG-NEXT: [DebugLocation({{.*}}, [[SET_LINE]] : UInt, 50 : UInt)]

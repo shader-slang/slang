@@ -14560,6 +14560,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // is needed for emitting debug information
         auto nameHint = irFunc->findDecoration<IRNameHintDecoration>();
         IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
+
+        // Consider a custom backward derivative written as
+        // `__func_extension bwd_diff(foo)(...) { ... }`. Its user-written implementation is
+        // intentionally unnamed because the generated extension also contains the public
+        // `bwd_diff` function that copies it. The implementation still has source-level debug
+        // locations and a linkage name, so use that linkage name as its debug name. This keeps
+        // every function with an IRDebugLocationDecoration paired with the IRDebugFuncDecoration
+        // that the inliner and debug-info emitters expect.
+        if (!nameOperand)
+        {
+            auto linkageInst = findOuterMostGeneric(irFunc);
+            if (auto linkage = linkageInst->findDecoration<IRLinkageDecoration>())
+                nameOperand = linkage->getMangledNameOperand();
+        }
+
         if (nameOperand)
         {
             getBuilder()->setInsertBefore(irFunc);
