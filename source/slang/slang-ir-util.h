@@ -402,6 +402,8 @@ bool isZero(IRInst* inst);
 
 bool isOne(IRInst* inst);
 
+bool isLiteralValue(IRInst* inst);
+
 // Casts inst to IRPtrTypeBase, excluding UserPointer address space.
 IRPtrTypeBase* asRelevantPtrType(IRInst* inst);
 
