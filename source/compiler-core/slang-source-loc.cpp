@@ -616,13 +616,10 @@ int SourceFile::calcColumnIndex(int lineIndex, int offset, int tabSize)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceFile !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void SourceFile::setContents(ISlangBlob* blob)
+ComPtr<ISlangBlob> SourceFile::decodeContentBlob(ISlangBlob* rawBlob)
 {
-    const UInt rawContentSize = blob->getBufferSize();
-
-    SLANG_ASSERT(rawContentSize == m_contentSize);
-
-    Byte* rawContentBegin = (Byte*)blob->getBufferPointer();
+    const UInt rawContentSize = rawBlob->getBufferSize();
+    Byte* rawContentBegin = (Byte*)rawBlob->getBufferPointer();
 
     // Query the encoding type and discard the Unicode Byte-Order-Marker before decoding
     size_t offset;
@@ -632,23 +629,27 @@ void SourceFile::setContents(ISlangBlob* blob)
     if (offset == 0 && type == CharEncodeType::UTF8)
     {
         // Fast-path: If the input is UTF-8 without a BOM, we can use it directly.
-        m_contentBlob = blob;
+        return ComPtr<ISlangBlob>(rawBlob);
     }
-    else
-    {
-        // Slow path: Allocate and decode a new buffer for the data, then move that into
-        // m_contentBlob.
-        List<char> decodedBuffer;
-        CharEncoding::getEncoding(type)->decode(
-            rawContentBegin + offset,
-            int(rawContentSize - offset),
-            decodedBuffer);
 
-        auto size = decodedBuffer.getCount();
-        ScopedAllocation temp;
-        temp.attach(decodedBuffer.detachBuffer(), size);
-        m_contentBlob = RawBlob::moveCreate(temp);
-    }
+    // Slow path: Allocate and decode a new buffer for the data, then move that into a fresh blob.
+    List<char> decodedBuffer;
+    CharEncoding::getEncoding(type)->decode(
+        rawContentBegin + offset,
+        int(rawContentSize - offset),
+        decodedBuffer);
+
+    auto size = decodedBuffer.getCount();
+    ScopedAllocation temp;
+    temp.attach(decodedBuffer.detachBuffer(), size);
+    return RawBlob::moveCreate(temp);
+}
+
+void SourceFile::setContents(ISlangBlob* blob)
+{
+    SLANG_ASSERT(blob->getBufferSize() == m_contentSize);
+
+    m_contentBlob = decodeContentBlob(blob);
 
     char const* decodedContentBegin = (char const*)m_contentBlob->getBufferPointer();
     const UInt decodedContentSize = m_contentBlob->getBufferSize();
