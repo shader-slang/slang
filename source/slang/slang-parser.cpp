@@ -1492,8 +1492,10 @@ static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = null
     }
 }
 
-// Parse a name used after `::`. In a qualified chain such as `Type::__subscript::get`, the
-// declaration keyword names the `SubscriptDecl` stored internally as `operator[]`.
+// Parse a static member name after `::`. When `__subscript` is itself followed by `::`, as in
+// `Type::__subscript::get`, translate the declaration keyword to the `SubscriptDecl`'s internal
+// `operator[]` name. The trailing scope token is required: without it, preserve the literal
+// identifier so expressions such as `Type::__subscript()` keep their ordinary meaning.
 static NameLoc ParseStaticMemberName(Parser* parser)
 {
     if (parser->LookAheadToken("__subscript") && parser->LookAheadToken(TokenType::Scope, 1))
