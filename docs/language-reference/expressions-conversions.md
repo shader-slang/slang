@@ -63,25 +63,73 @@ the behavior is [undefined](basics-behavior.md).
 As a compatibility feature for legacy code, Slang supports using a cast where the base expression is an
 integer literal zero and the target type is a user-defined [structure](types-struct.md) type:
 
-```hlsl
-MyStruct s = (MyStruct) 0;
-```
-
-The semantics of such a cast are equivalent to initialization from an empty initializer list:
-
-```hlsl
-MyStruct s = {};
-```
+> 📝 **Remark:** As a compatibility feature for legacy code, Slang supports a cast from literal 0 to a
+> user-defined [structure](types-struct.md) type. This is equivalent to initializing the structure with an
+> empty initializer list.
+>
+> ```hlsl
+> MyStruct s = (MyStruct) 0;
+>
+> // is same as
+>
+> ```hlsl
+> MyStruct s = {};
+> ```
+>
+> This is a deprecated feature and subject to be removed in a future Slang language version.
+> See also [GitHub issue 12045](https://github.com/shader-slang/slang/issues/12045).
 
 ### Cast to Void
 
-A cast to the [void](types-fundamental.md) is a special kind of cast. The cast itself is a no operation
-producing a `void` value. The primary use of a `void` cast is mark a value consumed, suppressing related
-warnings. See also [attribute \[NoDiscard\]](../../../core-module-reference/attributes/nodiscard-02.html).
+A cast to the [void](types-fundamental.md) is a no operation cast producing a `void` value. The primary use of
+a `void` cast is mark the value consumed, suppressing related warnings. See also
+[attribute \[NoDiscard\]](../../../core-module-reference/attributes/nodiscard-02.html).
 
+### Casts Between Scalar, Vector, and Matrix Types
 
 
 ## Implicit Type Conversion
+
+Implicit type conversion occurs when the type of a value does not match with the required type, there is an
+explicit conversion available, and implicit conversion is allowed.
+
+The following implicit type conversions are allowed:
+
+- `bool` to an integer type
+- integer type to a wider integer type, same signedness (aka. integer promotion)
+- `half` to `float`
+- scalar `T` to `vector<T, N>` (where `N` is any legal value)
+- scalar `T` to `matrix<T, R, C>` (where `R` and `C` are any legal values)
+- `vector<T, N>` to `vector<U, N>` where conversion `T` &rarr; `U` is allowed
+- `matrix<T, R, C>` to `matrix<U, R, C>` where conversion `T` &rarr; `U` is allowed
+- a type to its conformance type
+- `none` or value of `T` to `Optional<T>`
+- `nullptr` to any pointer type
+- sized array to unsized array of same element type
+- `enum` type to its tag type
+
+The following implicit type conversions are allowed but not recommended. These implicit type conversions
+trigger a warning.
+
+- `bool` to a floating point type
+- integer type to a `bool`
+- integer type to a narrower integer type, except integer literals whose values fit in the narrower type
+- integer type to same width integer type with different signedness, except integer literals whose values fit
+  in the target type
+- integer type to a floating-point type and vice versa
+- floating-point type to a narrower float type
+- float-point type to a double type (possible performance issue)
+- vector to vector and matrix to matrix where the target element type is narrower or has different signedness
+- integer vector to a floating-point vector and vice versa
+- `enum` to integer type other than its tag type
+
+
+> 📝 **Remark:** Some usual contexts for implicit type conversions:
+>
+> - Assigning a value of one type to a variable of another type
+> - [Function](expressions-operators.md) call where the argument type does not match the parameter type
+> - [Operator](expressions-operators.md) call where the argument type does not match the parameter type
+> - [Generic argument application](generics.md) where the argument type does not match the generic parameter type
 
 
 
