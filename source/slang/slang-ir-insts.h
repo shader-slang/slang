@@ -3518,6 +3518,10 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* tryLookupCompilerDictionaryValue(IRCompilerDictionary* dict, IRInst* translationInst);
 
     // Annotation helpers.
+    //
+    // Note: adding an annotation changes what `doesCalleeHaveSideEffect(target)`
+    // returns, so it must not happen while a callee-side-effect cache is live
+    // (see `IRDeadCodeEliminationOptions::calleeSideEffectCache`).
     void addAnnotation(IRInst* target, AnnotationKind kind, IRInst* value);
     IRInst* tryLookupAnnotation(IRInst* target, AnnotationKind kind);
 
