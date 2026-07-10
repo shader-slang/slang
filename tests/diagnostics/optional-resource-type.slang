@@ -1,8 +1,6 @@
-// Test that Optional<T> with a resource/opaque type T produces a diagnostic.
-// Regression test for https://github.com/shader-slang/slang/issues/8277
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_NEG): -target spirv -DNEGATIVE
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_GEN): -target spirv -DGENERIC_MEMBER
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_NEG): -target spirv -DNEGATIVE
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_GEN): -target spirv -DGENERIC_MEMBER
 
 #if defined(GENERIC_MEMBER)
 
@@ -16,14 +14,18 @@ struct StructWithOptionalTexture<T>
 struct TextureHolder<T>
 {
     T item;
-    // CHECK_GEN-DAG: {{.*}}optional-resource-type.slang:[[# @LINE+1]]
     __subscript()->Optional<T> { get { return none; } }
-    // CHECK_GEN-DAG: {{.*}}optional-resource-type.slang:[[# @LINE+1]]
+//CHECK_GEN:                                  ^^^^ E41037
+//CHECK_GEN:                                  ^^^^ 'Texture2D' is a resource or opaque type
     Optional<T> getNone() { return none; }
-    // CHECK_GEN-DAG: {{.*}}optional-resource-type.slang:[[# @LINE+1]]
+//CHECK_GEN:                       ^^^^ E41037
+//CHECK_GEN:                       ^^^^ 'Texture2D' is a resource or opaque type
     Optional<Optional<T>> getNestedNone() { return none; }
-    // CHECK_GEN-DAG: {{.*}}optional-resource-type.slang:[[# @LINE+1]]
+//CHECK_GEN:                                       ^^^^ E41037
+//CHECK_GEN:                                       ^^^^ 'Optional<Texture2D>' is a resource or opaque type
     Optional<StructWithOptionalTexture<T>> getStructNone() { return none; }
+//CHECK_GEN:                                                        ^^^^ E41037
+//CHECK_GEN:                                                        ^^^^ 'StructWithOptionalTexture' is a resource or opaque type
 }
 
 [vk::binding(0, 1)] TextureHolder<Texture2D> gHolderSubscript;
@@ -35,12 +37,6 @@ struct TextureHolder<T>
 float4 fs_main() : SV_Target
 {
     // Keep all four none values live through specialization.
-    // CHECK_GEN-DAG: error[E41037]
-    // CHECK_GEN-DAG: error[E41037]
-    // CHECK_GEN-DAG: error[E41037]
-    // CHECK_GEN-DAG: error[E41037]
-    // The clean diagnostic must replace the pre-fix internal error.
-    // CHECK_GEN-NOT: error[E99997]
     float4 a = gHolderSubscript[].value.Load(int3(0));
     float4 b = gHolderMethod.getNone().value.Load(int3(0));
     float4 c = gHolderNested.getNestedNone().value.value.Load(int3(0));
@@ -50,10 +46,9 @@ float4 fs_main() : SV_Target
 
 #elif !defined(NEGATIVE)
 
-// --- parameter positions ---
-
-// CHECK: error[E30902]
 float doOperation(Optional<SamplerState> transformationInfo)
+//CHECK:          ^^^^^^^^ E30902
+//CHECK:          ^^^^^^^^ 'SamplerState' is a resource or opaque type
 {
     if (transformationInfo.hasValue)
     {
@@ -62,29 +57,33 @@ float doOperation(Optional<SamplerState> transformationInfo)
     return 0.0;
 }
 
-// CHECK: error[E30902]
 float withTexture(Optional<Texture2D> t) { return 0.0; }
+//CHECK:          ^^^^^^^^ E30902
+//CHECK:          ^^^^^^^^ 'Texture2D<vector<float,4>>' is a resource or opaque type
 
-// CHECK: error[E30902]
 float withBuffer(Optional<RWStructuredBuffer<float>> b) { return 0.0; }
+//CHECK:         ^^^^^^^^ E30902
+//CHECK:         ^^^^^^^^ 'RWStructuredBuffer<float, DefaultDataLayout>' is a resource or opaque type
 
-// CHECK: error[E30902]
 float withCbuffer(Optional<ConstantBuffer<float>> cb) { return 0.0; }
+//CHECK:          ^^^^^^^^ E30902
+//CHECK:          ^^^^^^^^ 'ConstantBuffer<float, DefaultDataLayout>' is a resource or opaque type
 
-// --- variable declaration positions ---
-
-// CHECK: error[E30902]
 Optional<SamplerState> gSampler;
+/*CHECK:
+^^^^^^^^ E30902
+^^^^^^^^ 'SamplerState' is a resource or opaque type
+*/
 
-// CHECK: error[E30902]
 Optional<Texture2D> gTexture;
+/*CHECK:
+^^^^^^^^ E30902
+^^^^^^^^ 'Texture2D<vector<float,4>>' is a resource or opaque type
+*/
 
-// --- return type positions ---
-
-// CHECK: error[E30902]
 Optional<SamplerState> getSampler() { return none; }
-
-// --- struct transitively containing an opaque field ---
+//CHECK:                                     ^^^^ E30902
+//CHECK:                                     ^^^^ 'SamplerState' is a resource or opaque type
 
 struct WithResource
 {
@@ -92,13 +91,15 @@ struct WithResource
     Texture2D tex;
 }
 
-// CHECK: error[E30902]
 float withStructResource(Optional<WithResource> s) { return 0.0; }
+//CHECK:                 ^^^^^^^^ E30902
+//CHECK:                 ^^^^^^^^ 'WithResource' is a resource or opaque type
 
-// CHECK: error[E30902]
 Optional<WithResource> gStructResource;
-
-// --- generic specialization: valid at declaration, error fires at the opaque call site ---
+/*CHECK:
+^^^^^^^^ E30902
+^^^^^^^^ 'WithResource' is a resource or opaque type
+*/
 
 void process<T>(Optional<T> value) {}
 
@@ -108,15 +109,12 @@ void main(RWStructuredBuffer<float> buffer)
 {
     buffer[0] = doOperation(none);
 
-    // CHECK: error[E30902]
     process<SamplerState>(none);
+//CHECK:                  ^^^^ E30902
+//CHECK:                  ^^^^ 'SamplerState' is a resource or opaque type
 }
 
 #else
-
-// Negative: non-resource payloads must produce no diagnostic from either layer.
-// CHECK_NEG-NOT: error[E30902]
-// CHECK_NEG-NOT: error[E41037]
 
 float withFloat(Optional<float> x) { return x.hasValue ? x.value : 0.0; }
 float withInt(Optional<int> x) { return x.hasValue ? float(x.value) : 0.0; }
@@ -124,7 +122,6 @@ float withInt(Optional<int> x) { return x.hasValue ? float(x.value) : 0.0; }
 struct MyStruct { float v; };
 float withStruct(Optional<MyStruct> x) { return x.hasValue ? x.value.v : 0.0; }
 
-// A generic member accessor with a non-opaque payload must specialize and lower without E41037.
 struct NonOpaqueHolder<T>
 {
     T item;
