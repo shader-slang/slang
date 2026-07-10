@@ -3906,31 +3906,16 @@ struct IRTypeLegalizationPass
         // * `i` is a user of `inst`, or
         // * `i` is a child of `inst`.
         //
-        // When legalization left `inst` unchanged, a user or child that has
-        // already been added or processed does not need to be revisited: its
-        // own legalization consulted (or will consult) a mapping that this
-        // step did not alter. Re-adding unconditionally makes every round of
-        // `processModule` re-legalize almost everything the previous rounds
-        // did, which turns the pass quadratic on long dependence chains
-        // (issue #12040). We only requeue such instructions when this step
-        // actually changed the value they depend on.
-        //
-        // The reason a revisit is ever needed: within a round, a user `u` can
-        // be processed before its operand `inst` (readiness is checked
-        // against the add-time flag), so `u` legalizes against a mapping for
-        // `inst` that is not registered yet. Skipping `u`'s requeue here is
-        // safe exactly when `inst` was unchanged, because an unchanged
-        // `simple` result registers the identity mapping — the same answer
-        // `u`'s legalization already assumed on the map miss.
-        //
-        // The change detection relies on an invariant every current
-        // legalizer satisfies: a legalizer returning `LegalVal::simple(inst)`
-        // may signal a change ONLY by returning a different `irValue` or by
-        // mutating the instruction's full type — never by mutating an
-        // operand (or other semantically significant state) in place while
-        // leaving value and type identical. Non-`simple` flavors are always
-        // treated as changed, which is why `changed` defaults to `true`.
-        // The debug build asserts the operand part of the invariant below.
+        // Requeue already-queued users/children only when this step actually
+        // changed `inst`: re-adding them unconditionally re-legalizes almost
+        // everything every round, which is quadratic on long dependence
+        // chains (#12040). The skip is safe because a user processed before
+        // its operand assumed the identity mapping on the map miss, and an
+        // unchanged `simple` result registers exactly that identity. This
+        // relies on an invariant (asserted below in debug builds): a
+        // legalizer signals change only by returning a different `irValue`
+        // or mutating the full type, never by mutating an operand in place;
+        // non-`simple` flavors always count as changed.
         //
         bool changed = true;
         if (legalVal.flavor == LegalVal::Flavor::simple)
