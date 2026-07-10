@@ -1327,8 +1327,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 return __getTexture().Sample(__getSampler(), location);
@@ -1357,8 +1357,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return spirv_asm
                 {
                     OpCapability MinLod;
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 return __getTexture().Sample(__getSampler(), location, offset);
@@ -1388,8 +1388,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return spirv_asm
                 {
                     OpCapability MinLod;
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset|MinLod $offset $clamp;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset|MinLod $offset $clamp;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
         }
     }
@@ -1415,10 +1415,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
                 %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod $this $location ConstOffset|MinLod $offset $clamp;
                 %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
 
                 OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
         default:
             status = 0;
@@ -1447,8 +1447,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias $bias;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias $bias;
+                    __truncate $$T result __sampledType(T) %__sampled;
 
                 };
             case wgsl:
@@ -1477,8 +1477,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias|ConstOffset $bias $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias|ConstOffset $bias $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 return __getTexture().SampleBias(__getSampler(), location, bias, offset);
@@ -1506,10 +1506,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
                 %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod $this $location Bias|ConstOffset $bias $offset;
                 %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract  %sparseResult 1;
+                %__sampled:__sampledType(T) = OpCompositeExtract  %sparseResult 1;
 
                 OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
         }
     }
@@ -2008,8 +2008,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad $gradX $gradY;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad $gradX $gradY;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY);
@@ -2036,8 +2036,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset $gradX $gradY $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset $gradX $gradY $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset);
@@ -2066,8 +2066,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return spirv_asm
                 {
                     OpCapability MinLod;
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
         }
     }
@@ -2093,10 +2093,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
                 %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod $this $location Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
                 %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
 
                 OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
         }
     }
@@ -2152,8 +2152,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod $level;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod $level;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 return __getTexture().SampleLevel(__getSampler(), location, level);
@@ -2180,8 +2180,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod|ConstOffset $level $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod|ConstOffset $level $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 return __getTexture().SampleLevel(__getSampler(), location, level, offset);
@@ -2208,10 +2208,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
                 %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod $this $location Lod|ConstOffset $level $offset;
                 %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
 
                 OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
         }
     }
@@ -2582,8 +2582,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 return spirv_asm
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -2649,8 +2649,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 return spirv_asm
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|ConstOffset $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|ConstOffset $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<
@@ -2714,8 +2714,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 {
                     OpCapability MinLod;
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|ConstOffset|MinLod $offset $clamp;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|ConstOffset|MinLod $offset $clamp;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
         }
     }
@@ -2743,10 +2743,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
                 %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod $sampledImage $location ConstOffset|MinLod $offset $clamp;
                 %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
 
                 OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
         default:
             status = 0;
@@ -2799,8 +2799,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 return spirv_asm
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|Bias $bias;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|Bias $bias;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -2863,8 +2863,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 return spirv_asm
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|Bias|ConstOffset $bias $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|Bias|ConstOffset $bias $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -2907,10 +2907,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
                 %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod $sampledImage $location Bias|ConstOffset|MinLod $bias $offset $clamp;
                 %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
 
                 OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
        }
     }
@@ -3472,8 +3472,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 return spirv_asm
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Grad $gradX $gradY;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Grad $gradX $gradY;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -3536,8 +3536,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 return spirv_asm
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Grad|ConstOffset $gradX $gradY $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Grad|ConstOffset $gradX $gradY $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
 
                 };
             case wgsl:
@@ -3601,8 +3601,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 {
                     OpCapability MinLod;
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
         }
     }
@@ -3630,10 +3630,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
                 %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod $sampledImage $location Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
                 %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
 
                 OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
        }
     }
@@ -3717,8 +3717,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 return spirv_asm
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Lod $level;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Lod $level;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -3782,8 +3782,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 return spirv_asm
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Lod|ConstOffset $level $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Lod|ConstOffset $level $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -3824,10 +3824,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
                 %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod $sampledImage $location Lod|ConstOffset $level $offset;
                 %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
 
                 OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
         }
     }
@@ -4632,16 +4632,16 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 return spirv_asm
                 {
                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                    %sampled:__sampledType(T) = OpImageFetch $image $coord Lod $lod;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled:__sampledType(T) = OpImageFetch $image $coord Lod $lod;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             }
             else
             {
                 return spirv_asm
                 {
-                    %sampled:__sampledType(T) = OpImageFetch $this $coord Lod $lod;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled:__sampledType(T) = OpImageFetch $this $coord Lod $lod;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             }
         case wgsl:
@@ -4699,16 +4699,16 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                     return spirv_asm
                     {
                         // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                        %sampled:__sampledType(T) = OpImageFetch $image $coord Lod|ConstOffset $lod $offset;
-                        __truncate $$T result __sampledType(T) %sampled;
+                        %__sampled:__sampledType(T) = OpImageFetch $image $coord Lod|ConstOffset $lod $offset;
+                        __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
                 else
                 {
                     return spirv_asm
                     {
-                        %sampled:__sampledType(T) = OpImageFetch $this $coord Lod|ConstOffset $lod $offset;
-                        __truncate $$T result __sampledType(T) %sampled;
+                        %__sampled:__sampledType(T) = OpImageFetch $this $coord Lod|ConstOffset $lod $offset;
+                        __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
         }
@@ -4737,10 +4737,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                      // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                      %sparseResult:%sparseResultType = OpImageSparseFetch $image $coord Lod|ConstOffset $lod $offset;
                      %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                     %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
 
                      OpStore &status %residentCode;
-                     __truncate $$T result __sampledType(T) %sampled;
+                     __truncate $$T result __sampledType(T) %__sampled;
                  };
              }
              else
@@ -4752,10 +4752,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 
                      %sparseResult:%sparseResultType = OpImageSparseFetch $this $coord Lod|ConstOffset $lod $offset;
                      %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                     %sampled:__sampledType(T) = OpCompositeExtract  %sparseResult 1;
+                     %__sampled:__sampledType(T) = OpCompositeExtract  %sparseResult 1;
 
                      OpStore &status %residentCode;
-                     __truncate $$T result __sampledType(T) %sampled;
+                     __truncate $$T result __sampledType(T) %__sampled;
                  };
              }
         default:
@@ -4791,16 +4791,16 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                         return spirv_asm
                         {
                             // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                            %sampled:__sampledType(T) = OpImageFetch $image $location;
-                            __truncate $$T result __sampledType(T) %sampled;
+                            %__sampled:__sampledType(T) = OpImageFetch $image $location;
+                            __truncate $$T result __sampledType(T) %__sampled;
                         };
                     }
                     else
                     {
                         return spirv_asm
                         {
-                            %sampled:__sampledType(T) = OpImageFetch $this $location;
-                            __truncate $$T result __sampledType(T) %sampled;
+                            %__sampled:__sampledType(T) = OpImageFetch $this $location;
+                            __truncate $$T result __sampledType(T) %__sampled;
                         };
                     }
                 case wgsl:
@@ -4868,16 +4868,16 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                     return spirv_asm
                     {
                         // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                        %sampled:__sampledType(T) = OpImageFetch $image $location Sample $sampleIndex;
-                        __truncate $$T result __sampledType(T) %sampled;
+                        %__sampled:__sampledType(T) = OpImageFetch $image $location Sample $sampleIndex;
+                        __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
                 else
                 {
                     return spirv_asm
                     {
-                        %sampled:__sampledType(T) = OpImageFetch $this $location Sample $sampleIndex;
-                        __truncate $$T result __sampledType(T) %sampled;
+                        %__sampled:__sampledType(T) = OpImageFetch $this $location Sample $sampleIndex;
+                        __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
             case wgsl:
@@ -4916,16 +4916,16 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                     return spirv_asm
                     {
                         // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                        %sampled:__sampledType(T) = OpImageFetch $image $location ConstOffset|Sample $offset $sampleIndex;
-                        __truncate $$T result __sampledType(T) %sampled;
+                        %__sampled:__sampledType(T) = OpImageFetch $image $location ConstOffset|Sample $offset $sampleIndex;
+                        __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
                 else
                 {
                     return spirv_asm
                     {
-                        %sampled:__sampledType(T) = OpImageFetch $this $location ConstOffset|Sample $offset  $sampleIndex;
-                        __truncate $$T result __sampledType(T) %sampled;
+                        %__sampled:__sampledType(T) = OpImageFetch $this $location ConstOffset|Sample $offset  $sampleIndex;
+                        __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
         }
@@ -4951,10 +4951,10 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                      // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
                      %sparseResult:%sparseResultType = OpImageSparseFetch $image $location ConstOffset|Sample $offset $sampleIndex;
                      %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                     %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
 
                      OpStore &status %residentCode;
-                     __truncate $$T result __sampledType(T) %sampled;
+                     __truncate $$T result __sampledType(T) %__sampled;
                  };
              }
              else
@@ -4966,10 +4966,10 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 
                      %sparseResult:%sparseResultType = OpImageSparseFetch $this $location ConstOffset|Sample $offset $sampleIndex;
                      %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                     %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
 
                      OpStore &status %residentCode;
-                     __truncate $$T result __sampledType(T) %sampled;
+                     __truncate $$T result __sampledType(T) %__sampled;
                  };
              }
         default:
@@ -5092,8 +5092,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled:__sampledType(T) = OpImageRead $this $location;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled:__sampledType(T) = OpImageRead $this $location;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case metal:
                 switch (Shape.flavor)
@@ -5193,8 +5193,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled:__sampledType(T) = OpImageRead $this $location ConstOffset $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled:__sampledType(T) = OpImageRead $this $location ConstOffset $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
         }
     }
@@ -5429,8 +5429,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled:__sampledType(T) = OpImageRead $this $location Sample $sampleIndex;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled:__sampledType(T) = OpImageRead $this $location Sample $sampleIndex;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, $(access), isShadow, isCombined, format>();
@@ -5454,8 +5454,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled:__sampledType(T) = OpImageRead $this $location ConstOffset|Sample $offset $sampleIndex;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled:__sampledType(T) = OpImageRead $this $location ConstOffset|Sample $offset $sampleIndex;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
         }
     }
@@ -19365,8 +19365,8 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
             __requireTargetExtension("GL_EXT_samplerless_texture_functions");
             __intrinsic_asm "$(glslLoadFuncName)($0, $1)$z";
         case spirv: return spirv_asm {
-                %sampled:__sampledType(T) = $(spvLoadInstName) $this $location;
-                __truncate $$T result __sampledType(T) %sampled;
+                %__sampled:__sampledType(T) = $(spvLoadInstName) $this $location;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
         }
     }
