@@ -5,11 +5,13 @@
 // collapses it, so `UntypedResourceHandleType` never reaches emit anyway. Under `-O0`
 // (`shouldPerformMinimumOptimizations`), `simplifyIR` — and therefore peephole — does not run
 // (slang-emit.cpp runs `eliminateDeadCode` instead), so the handle would otherwise survive to emit.
-// The unconditional `lowerUntypedResourceHandleToUInt` pass must still remove it; without that pass
-// emit/layout hit `SLANG_UNEXPECTED("...should have been lowered to uint")`. So this compiling at all
-// under `-O0` is the assertion: the pass ran and the type is gone.
+// The `lowerUntypedResourceHandleToUInt` pass (gated on `requiredLoweringPassSet.untypedResourceHandle`,
+// which this shader sets) must still remove it; without that pass emit/layout hit
+// `SLANG_UNEXPECTED("...should have been lowered to uint")`. So this compiling at all under `-O0` is
+// the assertion: the pass ran and the type is gone.
 
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -profile cs_6_6 -O0
+//TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain -profile cs_6_6 -O0
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -stage compute -entry computeMain -capability spvDescriptorHeapEXT -O0
 
 RWStructuredBuffer<float> outputBuffer;
@@ -35,6 +37,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // that feeds the heap subscript), and compiles — proving the -O0 lowering path is intact.
 // HLSL: ResourceDescriptorHeap[
 // HLSL: SamplerDescriptorHeap[
+
+// The DXIL directive routes that emitted HLSL through DXC at -O0: reaching a valid DXIL module
+// confirms DXC accepts the lowered heap output when the handle survived to the lowering pass.
+// DXIL: define void @computeMain(
 
 // SPIR-V still declares and indexes the descriptor heap; reaching valid SPIR-V at -O0 proves the
 // untyped handle type was lowered before emit rather than tripping the internal-error assert.

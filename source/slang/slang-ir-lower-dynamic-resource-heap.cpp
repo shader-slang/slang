@@ -126,9 +126,6 @@ void lowerUntypedResourceHandleToUInt(IRModule* module)
         }
     }
 
-    if (castsToForward.getCount() == 0 && typesToRewrite.getCount() == 0)
-        return;
-
     // Forward the casts first: after the type rewrite below both operand and result are `uint`, so
     // each cast is an identity that just passes its heap index through.
     for (auto cast : castsToForward)

@@ -2,10 +2,10 @@
 // `UntypedResourceHandle(i)` / `UntypedSamplerHandle(j)` is a construction site distinct from the
 // `ResourceDescriptorHeap[i]` subscript. This is the escape hatch around a subscript-only gate:
 // without gating the constructor too, `Texture2D t = UntypedResourceHandle(i);` would still reach
-// the Family-1 conversion and emit garbage on a target that cannot lower a `uint2` descriptor
-// handle (here Metal). The `[require(glsl_hlsl_spirv_wgsl, descriptor_handle)]` on the untyped
-// handle constructors closes that escape — direct construction is diagnosed the same as the
-// subscript form.
+// the untyped-handle-to-concrete-type conversion and emit garbage on a target that cannot lower a
+// `uint2` descriptor handle (here Metal). The `[require(glsl_hlsl_spirv_wgsl, descriptor_handle)]`
+// on the untyped handle constructors closes that escape — direct construction is diagnosed the
+// same as the subscript form.
 //
 // The two constructors are gated independently, so the resource and sampler constructors are
 // exercised from their own entry points — `resourceMain` references only `UntypedResourceHandle`

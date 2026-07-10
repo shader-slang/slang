@@ -12,6 +12,7 @@
 // path has nothing to preserve or regress on that target.
 
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -profile cs_6_6
+//TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain -profile cs_6_6
 
 RWStructuredBuffer<float> outputBuffer;
 
@@ -27,3 +28,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // wrap/unwrap and the peephole fold.
 // HLSL: ResourceDescriptorHeap[{{.*}}NonUniformResourceIndex(
 // HLSL: SamplerDescriptorHeap[{{.*}}NonUniformResourceIndex(
+
+// The DXIL directive routes the emitted HLSL through DXC: reaching a valid DXIL module confirms DXC
+// accepts the untyped-handle path's SM6.6 heap output.
+// DXIL: define void @computeMain(
