@@ -78,6 +78,20 @@ PERF_FLAG = "-report-perf-benchmark"
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
+# slangc infers the requested artifact from the -o extension for some targets
+# (and per-entry-point output binding for the text targets), so the output name
+# must match the -target rather than always being out.spv.
+_TARGET_EXT = {"spirv": "spv", "dxil": "dxil", "ptx": "ptx", "metal": "metal",
+               "wgsl": "wgsl", "hlsl": "hlsl", "glsl": "glsl", "cuda": "cu"}
+
+
+def _target_ext(extra_flags):
+    for i, flag in enumerate(extra_flags):
+        if flag == "-target" and i + 1 < len(extra_flags):
+            return _TARGET_EXT.get(extra_flags[i + 1], "out")
+    return "spv"
+
+
 def find_libslang(slangc):
     """Locate the slang shared library belonging to a slangc binary, trying the
     layouts of release packages (bin/ + ../lib/) and build trees (same dir).
@@ -187,7 +201,7 @@ def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
     # per-run output path so the layout/reflection serializer is exercised without
     # polluting the results directory.
     f = spec.main_file or main or list(files)[0]
-    out = os.path.join(gen_dir, "out.spv")
+    out = os.path.join(gen_dir, "out." + _target_ext(spec.extra_flags))
     extra = list(spec.extra_flags)
     # reflection JSON needs a writable path; gen_dir is per-run and writable.
     if getattr(spec, "reflection_json", False):
@@ -246,16 +260,23 @@ def run_once(cmd):
 # hosts that lack it. Release tarballs bundle these, so they usually don't fire.
 _BENIGN = ("E00100", "E52002", "spirv-opt", "spirv-dis", "slang-glslang",
            "failed to load downstream", "pass-through compiler not found")
+# For downstream_required workloads a missing downstream compiler is THE
+# failure being guarded against, not noise: slangc can emit its internal
+# timers before the downstream handoff, so without this the run would record
+# timers and report OK with no DXIL/PTX ever produced. Only genuinely
+# irrelevant tool noise stays benign.
+_BENIGN_DOWNSTREAM_REQUIRED = ("E52002", "spirv-opt", "spirv-dis", "slang-glslang")
 # Matches the modern "error[E30015]:" and legacy "error 30015:" slangc formats,
 # plus the api-driver's bare "error: ..." lines.
 _ERR_RE = re.compile(r"error\[|: error:|\berror \d+:|^error: ")
 
 
-def real_error(text):
+def real_error(text, benign=_BENIGN):
     """A genuine compile error in either the modern or legacy slangc format,
-    ignoring benign missing-downstream-tool diagnostics."""
+    ignoring the given benign diagnostics (by default, missing-downstream-tool
+    noise; downstream_required workloads pass a stricter set)."""
     for line in text.splitlines():
-        if _ERR_RE.search(line) and not any(b in line for b in _BENIGN):
+        if _ERR_RE.search(line) and not any(b in line for b in benign):
             return line.strip()
     return None
 
@@ -297,6 +318,9 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
         if rc != 0:
             setup_ok = False
 
+    benign = (_BENIGN_DOWNSTREAM_REQUIRED
+              if getattr(spec, "downstream_required", False) else _BENIGN)
+
     timed = cmds["timed"]
     for _ in range(warmup):
         run_once(timed)
@@ -328,12 +352,12 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
         walls.append(wall)
         if rss is not None:
             rsses.append(rss)
-        err = real_error(text)
+        err = real_error(text, benign)
         sample_ok.append(err is None)  # ok when no compile error
         for name, ms in parse_timers(text).items():
             per_timer.setdefault(name, []).append(ms)
 
-    err = real_error(last_text)
+    err = real_error(last_text, benign)
     got_timers = bool(per_timer)
     # A run that produced no timers and no recognizable diagnostic would report
     # a bare "no timers" with the actual output lost — surface the first output
@@ -400,6 +424,17 @@ def main():
     specs = manifest.WORKLOADS
     if not args.api and not args.only:
         specs = [s for s in specs if s.mode != "api"]
+    # Platform-bound workloads (downstream toolchains like dxc/nvrtc) leave the
+    # default set on other platforms; naming one in --only runs it regardless —
+    # explicit intent fails loudly if the tool is genuinely absent.
+    if not args.only:
+        skipped = [s2.name for s2 in specs
+                   if s2.platforms and sys.platform not in s2.platforms]
+        if skipped:
+            print(f"[skip] platform-bound workloads not on {sys.platform}: "
+                  + ", ".join(skipped))
+        specs = [s2 for s2 in specs
+                 if not s2.platforms or sys.platform in s2.platforms]
     if args.only:
         want = set(args.only.split(","))
         specs = [s for s in specs if s.name in want]
