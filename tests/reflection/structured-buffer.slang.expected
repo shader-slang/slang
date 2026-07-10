@@ -41,6 +41,8 @@ standard output = {
                 "resultType": {
                     "kind": "struct",
                     "name": "S",
+                    "uniformSize": 16,
+                    "uniformStride": 16,
                     "fields": [
                         {
                             "name": "a",

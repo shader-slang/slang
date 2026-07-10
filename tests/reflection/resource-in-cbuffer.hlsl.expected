@@ -15,6 +15,8 @@ standard output = {
                 "kind": "constantBuffer",
                 "elementType": {
                     "kind": "struct",
+                    "uniformSize": 16,
+                    "uniformStride": 16,
                     "fields": [
                         {
                             "name": "v",
@@ -67,6 +69,8 @@ standard output = {
                 "elementVarLayout": {
                     "type": {
                         "kind": "struct",
+                        "uniformSize": 16,
+                        "uniformStride": 16,
                         "fields": [
                             {
                                 "name": "v",
