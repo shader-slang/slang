@@ -256,10 +256,6 @@ re-benched (full suite, same runner) on the next run — no `force` needed.
 
 **Planned API-path extensions (not yet implemented):**
 
-- **RT multi-entry-point composites** — raygen/closesthit/miss entry points
-  composed into one program via `createCompositeComponentType` and compiled
-  per-target. Arrives naturally with the Phase-2 public RT corpus below
-  (synthetic RT entry points are possible earlier if the corpus lags).
 - **Concurrent compilation** — a thread pool issuing `getEntryPointCode` for
   many kernels concurrently (the documented experimental threading surface).
   Engines compile in parallel; a contention/locking regression is invisible to
@@ -286,8 +282,8 @@ maintenance, and corpus-drift risk for no benefit over a generator. Instead, a
 close-enough ORIGINAL test case, generated like every other workload
 (deterministic: same n → identical bytes, so no pinning or resync-on-drift):
 
-- a renderer-shaped module library at the internal benchmark's scale
-  (~150 modules / ~25k lines): a utility layer (math/sampling/color), a scene
+- a renderer-shaped module library (~100 modules at the default n=24
+  materials; n is the size dial): a utility layer (math/sampling/color), a scene
   layer (lights, camera, intersection), and a material system — `IMaterial` /
   `IBSDF` interfaces with N conforming material modules carrying
   texture/sampler/cbuffer parameters and eval/sample methods;
@@ -295,8 +291,9 @@ close-enough ORIGINAL test case, generated like every other workload
   dominated the internal data — each of its programs paid 100–700 ms of Slang
   compile because of library imports, unlike `api_many_kernels`' many×tiny);
 - raygen/closesthit/miss entry points composed into one program through
-  `createCompositeComponentType` (the planned RT multi-entry-point extension
-  lands here), plus compute variants so the workload also runs GPU-less;
+  `createCompositeComponentType` (the driver's rt-composite mode — this
+  delivers the RT multi-entry-point extension), plus a compute variant so the
+  corpus also runs GPU-less;
 - one kernel variant per material through `IEntryPoint::specialize` — the
   link-time-specialization pattern against interface-heavy code, which
   `api_specialize`'s single-module version only approximates.
