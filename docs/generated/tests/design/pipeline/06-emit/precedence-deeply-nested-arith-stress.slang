@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#operator-precedence-and-parenthesization
-//META: doc_section_digest=71c6e6a3dd9f98cd8871ef646710647c71e8dc0f8d4f04eda428d745f76e66a0
+//META: doc_section_digest=a2e62c88cb036bd6e478b72fe0c0927a3fea8fa974753f6e229c435bd5f2db1a
 //META: purpose=Stress: a deeply nested arithmetic expression `((a+b)*(c+d)) - (a*b) + c*d` is emitted with the minimum parentheses set — additions stay parenthesised when they sit under a multiplication, but mul-precedence subexpressions are not over-wrapped.
 //META: intent=stress
 //META: pipeline_stage=emit

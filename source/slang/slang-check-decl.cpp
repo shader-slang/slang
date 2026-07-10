@@ -1206,6 +1206,12 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->value);
         dispatchIfNotNull(expr->typeExpr);
     }
+    void visitCastOptionalExpr(CastOptionalExpr* expr)
+    {
+        dispatchIfNotNull(expr->valueArg);
+        // innerVarDecl is synthetic; innerCoercedExpr references it
+        dispatchIfNotNull(expr->innerCoercedExpr);
+    }
     void visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr*) { return; }
     void visitSPIRVAsmExpr(SPIRVAsmExpr*) { return; }
     void visitModifiedTypeExpr(ModifiedTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }
@@ -20053,6 +20059,48 @@ static void _propagateRequirement(
 
 CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt);
 
+// Return the function declaration that `expr` ultimately references, peeling off the
+// syntactic wrappers that can sit between the surface reference and the underlying
+// `DeclRefExpr`. Two families of wrapper matter here:
+//   * generic application / higher-order invoke — e.g. `[BackwardDerivative(testCBwd<float>)]`
+//     stores a `GenericAppExpr`, and a `fwd_diff(fn)` / `bwd_diff(fn)` operand is a
+//     `HigherOrderInvokeExpr`;
+//   * the base of a checked `primal.fwd_diff` / `primal.bwd_diff` member reference — after
+//     checking, that base is a `SharedTypeExpr` (the function-as-type) that may wrap a
+//     `CastToSuperTypeExpr` (cast to the `IForwardDifferentiable` / `IBackwardDifferentiable`
+//     interface) around the original `primal` reference, possibly parenthesized.
+// Returns null when the peeled expression is not a direct function reference.
+static FunctionDeclBase* _getFuncDeclFromExpr(Expr* expr)
+{
+    for (;;)
+    {
+        if (auto genericApp = as<GenericAppExpr>(expr))
+            expr = genericApp->functionExpr;
+        else if (auto higherOrder = as<HigherOrderInvokeExpr>(expr))
+            expr = higherOrder->baseFunction;
+        else if (auto castToSuper = as<CastToSuperTypeExpr>(expr))
+            expr = castToSuper->valueArg;
+        else if (auto sharedType = as<SharedTypeExpr>(expr))
+            expr = sharedType->base.exp;
+        else if (auto paren = as<ParenExpr>(expr))
+            expr = paren->base;
+        else
+            break;
+    }
+    if (auto declRefExpr = as<DeclRefExpr>(expr))
+        return as<FunctionDeclBase>(declRefExpr->declRef.getDecl());
+    return nullptr;
+}
+
+// A `[ForwardDerivative(fn)]` / `[BackwardDerivative(fn)]` attribute references a
+// user-defined derivative function `fn` that is not part of the decorated function's
+// body. Resolve the referenced function decl from the (already checked) attribute
+// `funcExpr` so a caller can propagate its capability requirements.
+static FunctionDeclBase* _getUserDefinedDerivativeFuncDecl(UserDefinedDerivativeAttribute* attr)
+{
+    return _getFuncDeclFromExpr(attr->funcExpr);
+}
+
 template<typename ProcessFunc, typename ParentDiagnosticFunc>
 struct CapabilityDeclReferenceVisitor
     : public SemanticsDeclReferenceVisitor<
@@ -20090,6 +20138,134 @@ struct CapabilityDeclReferenceVisitor
     {
         if (decl)
             handleProcessFunc(decl, decl->inferredCapabilityRequirements, refLoc);
+    }
+    // Join a user-defined derivative's capability requirements into the differentiating
+    // function, gated on the derivative carrying an explicit `[require]`. The gate is
+    // essential rather than cosmetic: the core module differentiates its own builtins
+    // (e.g. `fwd_diff(__length_impl)` in diff.meta.slang), and those derivative families
+    // carry no `[require]`, so joining their inferred requirements onto a builtin during
+    // core-module compilation would over-constrain it. Restricting propagation to an
+    // explicit `[require]` keeps deliberate user declarations only (see issue #11551).
+    void propagateUserDefinedDerivativeRequirement(Decl* derivativeFuncDecl)
+    {
+        if (!derivativeFuncDecl->findModifier<RequireCapabilityAttribute>())
+            return;
+        this->ensureDecl(derivativeFuncDecl, DeclCheckState::CapabilityChecked);
+        // Point the provenance note at the derivative function's name, which is where the
+        // user declared both the `[require]` and the derivative linkage. The `see-using-of`
+        // note pairs the decl name with this location, so use the identifier location
+        // (`getNameLoc()`) for a stable caret rather than `Decl::loc`, which is not
+        // guaranteed to sit on the identifier. Fall back to `loc` if the name has no
+        // location.
+        SourceLoc provenanceLoc = derivativeFuncDecl->getNameLoc();
+        if (!provenanceLoc.isValid())
+            provenanceLoc = derivativeFuncDecl->loc;
+        handleProcessFunc(
+            derivativeFuncDecl,
+            derivativeFuncDecl->inferredCapabilityRequirements,
+            provenanceLoc);
+    }
+    // Propagate the `[require]` capability requirements of `primalFuncDecl`'s user-defined
+    // forward (`wantForward == true`) or backward (`wantForward == false`) derivative onto
+    // the current differentiating function. Both derivative placements are handled and
+    // matched by direction: the forward placement (`[ForwardDerivative]` /
+    // `[BackwardDerivative]` modifier on the primal) and the inverse placement
+    // (`[ForwardDerivativeOf]` / `[BackwardDerivativeOf]` on the derivative, recorded as a
+    // derivative association on the primal). `fwd_diff` pulls only the forward derivative,
+    // `bwd_diff` only the backward one.
+    void propagateDerivativesOfPrimal(FunctionDeclBase* primalFuncDecl, bool wantForward)
+    {
+        if (!primalFuncDecl)
+            return;
+        DeclAssociationKind wantAssociationKind = wantForward
+                                                      ? DeclAssociationKind::ForwardDerivativeFunc
+                                                      : DeclAssociationKind::BackwardDerivativeFunc;
+
+        // Forward placement: `[ForwardDerivative]` / `[BackwardDerivative]` on the primal.
+        for (auto attr : primalFuncDecl->getModifiersOfType<UserDefinedDerivativeAttribute>())
+        {
+            bool isForwardAttr = as<ForwardDerivativeAttribute>(attr) != nullptr;
+            if (isForwardAttr != wantForward)
+                continue;
+            if (auto derivativeFuncDecl = _getUserDefinedDerivativeFuncDecl(attr))
+                propagateUserDefinedDerivativeRequirement(derivativeFuncDecl);
+        }
+
+        // Inverse placement: `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]` on the
+        // derivative, recorded as an association on the primal.
+        for (auto assoc : this->getShared()->getAssociatedDeclsForDecl(primalFuncDecl))
+        {
+            if (assoc->kind != wantAssociationKind)
+                continue;
+            propagateUserDefinedDerivativeRequirement(assoc->decl);
+        }
+    }
+    // Recognize a checked differentiation use-site of the form `primal.fwd_diff` /
+    // `primal.bwd_diff` and propagate the primal's user-defined derivative requirement.
+    //
+    // A `fwd_diff(primal)` / `bwd_diff(primal)` operator materializes the primal's
+    // user-defined derivative only when the primal is actually *differentiated*, so its
+    // `[require]` capability requirements belong at the differentiation use-site rather than
+    // on the primal (issue #11859: a plain `testC(2.0)` must compile even when `testC` has a
+    // `[require(spirv)]` backward derivative, whereas `bwd_diff(testC)` on an incompatible
+    // target must still error — issue #11551). Semantic checking rewrites an *invoked*
+    // `bwd_diff(fn)(args)` into a member reference `fn.bwd_diff` (see
+    // `convertHigherOrderExprToLookup` in slang-check-expr.cpp), so by capability-check time
+    // the use-site is a member access whose member is the `fwd_diff` / `bwd_diff` associated
+    // function of the built-in `IForwardDifferentiable` / `IBackwardDifferentiable` interface,
+    // and whose base is the primal. `memberDecl` is that member; `baseExpr` is the primal.
+    //
+    // The `fwd_diff` / `bwd_diff` members are matched by name. The interface requirement decls
+    // (core.meta.slang) carry a `BuiltinRequirementModifier`, but a checked use-site resolves
+    // to the *satisfying* member on the concrete function type, which does not carry that
+    // modifier; the member name is the stable signal. This cannot collide with a user
+    // declaration, because these members live only on the built-in function-type interfaces
+    // (users cannot add members to a function type), and `_getFuncDeclFromExpr` further
+    // requires the base to resolve to a function — a non-differentiation member access named
+    // `fwd_diff` / `bwd_diff` on some other type would yield a null primal and no-op here.
+    void maybePropagateForDiffMember(Decl* memberDecl, Expr* baseExpr)
+    {
+        if (!memberDecl || !memberDecl->getName())
+            return;
+        auto name = memberDecl->getName()->text.getUnownedSlice();
+        bool wantForward;
+        if (name == UnownedStringSlice("fwd_diff"))
+            wantForward = true;
+        else if (name == UnownedStringSlice("bwd_diff"))
+            wantForward = false;
+        else
+            return;
+        propagateDerivativesOfPrimal(_getFuncDeclFromExpr(baseExpr), wantForward);
+    }
+    void visitStaticMemberExpr(StaticMemberExpr* expr)
+    {
+        Base::visitStaticMemberExpr(expr);
+        maybePropagateForDiffMember(expr->declRef.getDecl(), expr->baseExpression);
+    }
+    void visitMemberExpr(MemberExpr* expr)
+    {
+        Base::visitMemberExpr(expr);
+        maybePropagateForDiffMember(expr->declRef.getDecl(), expr->baseExpression);
+    }
+    // A `fwd_diff(primal)` / `bwd_diff(primal)` that survives semantic checking as a
+    // `HigherOrderInvokeExpr` — a bare (non-invoked) operator, or an invoked form that was not
+    // rewritten to a `primal.fwd_diff` member reference (see `maybePropagateForDiffMember` for
+    // the rewritten form). Both hook paths are exercised in practice and funnel into
+    // `propagateDerivativesOfPrimal`.
+    void visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
+    {
+        // Preserve the base behavior: the primal itself is referenced by the diff use.
+        this->dispatchIfNotNull(expr->baseFunction);
+
+        bool wantForward;
+        if (as<ForwardDifferentiateExpr>(expr))
+            wantForward = true;
+        else if (as<BackwardDifferentiateExpr>(expr))
+            wantForward = false;
+        else
+            return; // Other higher-order invokes do not materialize a user-defined derivative.
+
+        propagateDerivativesOfPrimal(_getFuncDeclFromExpr(expr->baseFunction), wantForward);
     }
     void visitDiscardStmt(DiscardStmt* stmt)
     {
@@ -20481,30 +20657,6 @@ void SemanticsDeclCapabilityVisitor::visitExtensionDecl(ExtensionDecl* extension
         extensionDecl->loc);
 }
 
-// A `[ForwardDerivative(fn)]` / `[BackwardDerivative(fn)]` attribute references a
-// user-defined derivative function `fn` that is not part of the decorated function's
-// body, so its capability requirements would otherwise be ignored. Resolve the
-// referenced function decl from the (already checked) attribute `funcExpr` so the
-// caller can propagate its capability requirements onto the primal function.
-static FunctionDeclBase* _getUserDefinedDerivativeFuncDecl(UserDefinedDerivativeAttribute* attr)
-{
-    Expr* expr = attr->funcExpr;
-    // The derivative reference may be wrapped in generic-application or
-    // higher-order-invoke nodes; dig down to the underlying decl reference.
-    for (;;)
-    {
-        if (auto genericApp = as<GenericAppExpr>(expr))
-            expr = genericApp->functionExpr;
-        else if (auto higherOrder = as<HigherOrderInvokeExpr>(expr))
-            expr = higherOrder->baseFunction;
-        else
-            break;
-    }
-    if (auto declRefExpr = as<DeclRefExpr>(expr))
-        return as<FunctionDeclBase>(declRefExpr->declRef.getDecl());
-    return nullptr;
-}
-
 void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
 {
     setParentFuncOfVisitor(funcDecl);
@@ -20537,77 +20689,13 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
         [this, funcDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, funcDecl, category); });
 
-    // A user-defined forward/backward derivative function is invoked when this
-    // function is differentiated, so its capability requirements must also be
-    // reflected on this function. These references live on attributes rather than
-    // in the function body, so propagate them explicitly here.
-    for (auto attr : funcDecl->getModifiersOfType<UserDefinedDerivativeAttribute>())
-    {
-        if (auto derivativeFuncDecl = _getUserDefinedDerivativeFuncDecl(attr))
-        {
-            ensureDecl(derivativeFuncDecl, DeclCheckState::CapabilityChecked);
-            // Point the provenance note at the referenced derivative function
-            // inside the attribute (e.g. the 'foo' in [BackwardDerivative(foo)])
-            // rather than the whole attribute, since that is what the user needs
-            // to fix. Fall back to the attribute location if the reference has
-            // no valid location.
-            SourceLoc refLoc = attr->funcExpr ? attr->funcExpr->loc : SourceLoc();
-            if (!refLoc.isValid())
-                refLoc = attr->loc;
-            _propagateRequirement(
-                this,
-                mutableFuncDeclCapSet,
-                funcDecl,
-                derivativeFuncDecl,
-                derivativeFuncDecl->inferredCapabilityRequirements,
-                refLoc);
-        }
-    }
-
-    // A user-defined derivative declared with the inverse placement
-    // `[ForwardDerivativeOf(primal)]` / `[BackwardDerivativeOf(primal)]` records a
-    // derivative *association* on the primal (see `checkDerivativeOfAttributeImpl`,
-    // which calls `registerAssociatedDecl`) rather than a `[ForwardDerivative]` /
-    // `[BackwardDerivative]` modifier on the primal. Because differentiating the primal
-    // invokes the derivative, the primal must carry the derivative's capability
-    // requirements; as with the forward `[ForwardDerivative]` / `[BackwardDerivative]`
-    // placement, the requirement is reflected onto the primal *unconditionally* — it
-    // applies to every use of the primal, not only to a differentiated call (the
-    // regression test raises E36107 from a plain `testC(2.0)`). Without this, a
-    // `[require]` on an inverse-placed derivative is silently dropped.
-    for (auto assoc : getShared()->getAssociatedDeclsForDecl(funcDecl))
-    {
-        if (assoc->kind != DeclAssociationKind::ForwardDerivativeFunc &&
-            assoc->kind != DeclAssociationKind::BackwardDerivativeFunc)
-            continue;
-        auto derivativeFuncDecl = assoc->decl;
-        // Gate on the derivative carrying an explicit `[require]`. This is a gate, not
-        // a payload filter: once a derivative qualifies we propagate its full
-        // `inferredCapabilityRequirements` (the declared `[require]` plus anything its
-        // body infers) — the same payload the other propagation sites in this function
-        // use — not just the declared `[require]` set. The gate exists because the core
-        // module attaches all-targets derivative families to builtins through inverse
-        // placement (the `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]` overloads
-        // for transpose/mul/dot and the math intrinsics in diff.meta.slang); those
-        // derivatives carry no `[require]`, so unconditionally joining their inferred
-        // requirements onto an all-targets builtin primal would over-constrain it (in
-        // practice it breaks core-module compilation). Restricting propagation to an
-        // explicit `[require]` keeps it to deliberate user declarations; a derivative
-        // that only *infers* a target dependency without `[require]` is intentionally
-        // not propagated.
-        if (!derivativeFuncDecl->findModifier<RequireCapabilityAttribute>())
-            continue;
-        ensureDecl(derivativeFuncDecl, DeclCheckState::CapabilityChecked);
-        // Point the provenance note at the derivative function, which is where the
-        // user declared both the `[require]` and the `[*DerivativeOf]` linkage.
-        _propagateRequirement(
-            this,
-            mutableFuncDeclCapSet,
-            funcDecl,
-            derivativeFuncDecl,
-            derivativeFuncDecl->inferredCapabilityRequirements,
-            derivativeFuncDecl->loc);
-    }
+    // A user-defined forward/backward derivative is invoked only when the primal is
+    // *differentiated* (`fwd_diff` / `bwd_diff`), not on every call to the primal.
+    // Its `[require]` capability requirements are therefore propagated at the
+    // differentiation use-site — see `CapabilityDeclReferenceVisitor::
+    // visitHigherOrderInvokeExpr` above — rather than onto the primal here, so a plain
+    // non-differentiated call to the primal is not over-constrained (issues #11551 and
+    // #11859).
 
     // non-static function join's capabilities with parent
     // to become a superset of the parent.

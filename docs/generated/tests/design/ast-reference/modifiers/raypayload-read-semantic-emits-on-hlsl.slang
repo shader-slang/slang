@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#hlsl-semantics-sv
-//META: doc_section_digest=263271bb940f26749b79bfb1a80c0ba824f265574a0cdb225499d631772676d2
+//META: doc_section_digest=54f4af64d5483b7505c99a89151017d4036d4772330ee479fadd0f341299c8f6
 //META: purpose=`RayPayloadReadSemantic` / `RayPayloadWriteSemantic` access qualifiers on a `[raypayload]` struct field survive to emitted HLSL.
 //META: intent=functional
 //META: pipeline_stage=emit

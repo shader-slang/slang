@@ -6969,6 +6969,54 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
+    LoweredValInfo visitCastOptionalExpr(CastOptionalExpr* expr)
+    {
+        auto builder = getBuilder();
+
+        auto srcOpt = lowerRValueExpr(context, expr->valueArg);
+        auto srcOptIR = getSimpleVal(context, srcOpt);
+
+        auto toOptType = lowerType(context, expr->type);
+        SLANG_RELEASE_ASSERT(toOptType->getOp() == kIROp_OptionalType);
+
+        auto var = builder->emitVar(toOptType);
+
+        auto hasValue = builder->emitOptionalHasValue(srcOptIR);
+
+        IRBlock* trueBlock;
+        IRBlock* falseBlock;
+        IRBlock* afterBlock;
+        builder->emitIfElseWithBlocks(hasValue, trueBlock, falseBlock, afterBlock);
+
+        // True branch: extract inner value, coerce to U, wrap in Optional<U>.
+        builder->setInsertInto(trueBlock);
+        {
+            auto extractedInner = builder->emitGetOptionalValue(srcOptIR);
+
+            // Bind the synthetic innerVarDecl so the inner coercion expression resolves it.
+            context->setValue(expr->innerVarDecl, LoweredValInfo::simple(extractedInner));
+
+            auto coercedInner = lowerRValueExpr(context, expr->innerCoercedExpr);
+            auto coercedInnerIR = getSimpleVal(context, coercedInner);
+
+            auto someVal = builder->emitMakeOptionalValue(toOptType, coercedInnerIR);
+            builder->emitStore(var, someVal);
+            builder->emitBranch(afterBlock);
+        }
+
+        // False branch: source is none, propagate none.
+        builder->setInsertInto(falseBlock);
+        {
+            auto noneVal = builder->emitMakeOptionalNone(toOptType);
+            builder->emitStore(var, noneVal);
+            builder->emitBranch(afterBlock);
+        }
+
+        builder->setInsertInto(afterBlock);
+        auto result = builder->emitLoad(var);
+        return LoweredValInfo::simple(result);
+    }
+
     LoweredValInfo visitAggTypeCtorExpr(AggTypeCtorExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("codegen for aggregate type constructor expression");
@@ -10543,35 +10591,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         List<IRInst*> entryPoints{};
         for (const auto modifier : decl->modifiers)
         {
-            if (const auto layoutLocalSizeAttr = as<GLSLLayoutLocalSizeAttribute>(modifier))
-            {
-                verifyComputeDerivativeGroupModifier = true;
-                getAllEntryPointsNoOverride(entryPoints);
-
-                LoweredValInfo extents[3];
-
-                for (int i = 0; i < 3; ++i)
-                {
-                    extents[i] = layoutLocalSizeAttr->specConstExtents[i]
-                                     ? emitDeclRef(
-                                           context,
-                                           layoutLocalSizeAttr->specConstExtents[i],
-                                           lowerType(
-                                               context,
-                                               getType(
-                                                   context->astBuilder,
-                                                   layoutLocalSizeAttr->specConstExtents[i])))
-                                     : lowerVal(context, layoutLocalSizeAttr->extents[i]);
-                }
-
-                for (auto d : entryPoints)
-                    as<IRNumThreadsDecoration>(getBuilder()->addNumThreadsDecoration(
-                        d,
-                        getSimpleVal(context, extents[0]),
-                        getSimpleVal(context, extents[1]),
-                        getSimpleVal(context, extents[2])));
-            }
-            else if (as<GLSLLayoutDerivativeGroupQuadAttribute>(modifier))
+            if (as<GLSLLayoutDerivativeGroupQuadAttribute>(modifier))
             {
                 verifyComputeDerivativeGroupModifier = true;
                 getAllEntryPointsNoOverride(entryPoints);

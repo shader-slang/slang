@@ -4072,6 +4072,13 @@ err(
     span { loc = "location", message = "invalid suffix '~suffix' on floating-point literal" }
 )
 
+err(
+    "invalid-floating-point-literal-number",
+    39999,
+    "invalid floating-point number",
+    span { loc = "location", message = "invalid floating-point number '~number' on floating-point literal" }
+)
+
 warning(
     "integer-literal-too-large",
     40004,

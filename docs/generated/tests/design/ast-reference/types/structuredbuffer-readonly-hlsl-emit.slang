@@ -19,7 +19,7 @@
 StructuredBuffer<int> g_in;
 RWStructuredBuffer<int> g_out;
 
-//CHECK-DAG: StructuredBuffer<int
+//CHECK-DAG: {{^}}StructuredBuffer<int
 //CHECK-DAG: RWStructuredBuffer<int
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)

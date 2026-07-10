@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/ir-reference/types.md#strings-and-dynamic-types
-//META: doc_section_digest=6a9d8c3140290ee10be2242b0279924f5334c2ed95e44fc5ad5aace3a95de920
+//META: doc_section_digest=c04b8a1847af997ad945935b041afb21eab30b2a9f7d0f5458538c20fbcb664a
 //META: purpose=A string literal in a printf call produces an operand of IR type String in the dump.
 //META: intent=functional
 //META: pipeline_stage=lower

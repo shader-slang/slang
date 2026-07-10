@@ -1,8 +1,8 @@
 // Validate DebugTypeMatrix column major argument for local and function parameter and return value matrices.
 // Expect matrix layout to always be row-major as the layout modifier only applies to buffer types (ConstantBuffer/RWStructuredBuffer/etc).
 //
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -g2 -O0 -matrix-layout-row-major
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -g2 -O0 -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -g2 -matrix-layout-row-major
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -g2 -matrix-layout-column-major
 
 struct S
 {

@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:50:55+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#synthesizebitfieldaccessors
-//META: doc_section_digest=58fdc92508daf1d634e71de3c3efda4535d7c1e0dddc262515ee34d0afb791dd
+//META: doc_section_digest=c2d2df90c4b2c2c8f46765e0696ec29fb0906d49ab6c8b66b1c7249dc34ff972
 //META: purpose=Phase B's synthesizeBitFieldAccessors (B4) synthesises get/set bodies for bit-field accessors so the early-inlining loop can inline them.
 //META: intent=functional
 //META: pipeline_stage=lower

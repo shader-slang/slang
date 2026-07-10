@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#synthesizeactivemask
-//META: doc_section_digest=807beb50708ecff4cd73020be94bfc6da9ea1700a3b7ba517d8d6fd5c09f635d
+//META: doc_section_digest=d5d74eb55ef0b953f5cabff60e64c0b4128f9850b1cc103fada075896a2c9bea
 //META: purpose=synthesizeActiveMask threads an explicit warp-mask through a wave-active sum so the CUDA emit calls _waveSum with a synthesized mask operand instead of leaving the implicit IR-level active-mask reference.
 //META: intent=expansion
 //META: pipeline_stage=emit
