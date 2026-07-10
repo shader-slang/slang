@@ -91,6 +91,7 @@ bool isSimpleDecoration(IROp op)
     case kIROp_GLSLFragDepthGreaterDecoration:
     case kIROp_GLSLFragDepthLessDecoration:
     case kIROp_Shader64BitIndexingDecoration:
+    case kIROp_SynthesizedParameterGroupDecoration:
     case kIROp_KeepAliveDecoration:
     case kIROp_LineAdjInputPrimitiveTypeDecoration:
     case kIROp_LineInputPrimitiveTypeDecoration:
