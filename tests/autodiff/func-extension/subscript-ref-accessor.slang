@@ -1,7 +1,8 @@
-//TEST:SIMPLE:-experimental-feature
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry computeMain -stage compute -experimental-feature
 
-// Verify that a ref subscript accessor can be named as a custom-derivative target. This is a
-// front-end test because target lowering of user-defined ref accessors is not supported yet.
+// A ref subscript accessor can be named as a custom-derivative target, but differentiating an
+// actual indexing expression through it is not supported until ref accessor returns have a
+// consistent by-reference representation in the AST and IR.
 
 struct RefCell : IDifferentiable
 {
@@ -34,25 +35,21 @@ __func_extension fwd_diff(RefCell::__subscript::ref)(
     return diffPair(self.p[index], self.d[index]);
 }
 
-__func_extension bwd_diff(RefCell::__subscript::ref)(
-    inout DifferentialPair<RefCell> self,
-    int index,
-    float dOut) -> void
+[Differentiable]
+float readRefCell(RefCell value, int index)
 {
-    var dSelf = RefCell.dzero();
-    dSelf[index] = dOut;
-    self = diffPair(self.p, dSelf);
+    return value[index];
+/*CHECK:
+    ^^^^^^ cannot differentiate through ref accessor
+    ^^^^^^ derivative cannot be propagated through a user-defined ref accessor because differentiable by-reference returns are not supported.
+*/
 }
 
-void testRefAccessorDerivativeReference()
+[numthreads(1, 1, 1)]
+void computeMain()
 {
     let primal = RefCell(2.0);
     let differential = RefCell(20.0);
 
-    let getResult = fwd_diff(RefCell::__subscript::ref)(
-        diffPair(primal, differential),
-        1);
-
-    var getSelf = diffPair(primal);
-    bwd_diff(RefCell::__subscript::ref)(getSelf, 0, 7.0);
+    fwd_diff(readRefCell)(diffPair(primal, differential), 1);
 }

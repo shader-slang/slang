@@ -201,6 +201,20 @@ public:
         return false;
     }
 
+    // Returns whether a call target was lowered from a ref accessor. Mandatory autodiff
+    // validation runs before high-level declaration decorations are stripped, so the source
+    // declaration is the canonical way to distinguish this unsupported by-reference return from
+    // an ordinary pointer-producing operation.
+    bool isRefAccessorCallee(IRInst* callee)
+    {
+        auto resolvedCallee = getResolvedInstForDecorations(callee);
+        if (auto highLevelDecl = resolvedCallee->findDecoration<IRHighLevelDeclDecoration>())
+        {
+            return as<RefAccessorDecl>(highLevelDecl->getDecl()) != nullptr;
+        }
+        return false;
+    }
+
     bool canAddressHoldDerivative(
         DifferentiableTypeConformanceContext& diffTypeContext,
         IRInst* addr)
@@ -737,6 +751,30 @@ public:
                         if (!diffTypeContext.isDifferentiableType(paramBaseType))
                             continue;
                         addToExpectDiffWorkList(arg);
+                    }
+                    break;
+                }
+            case kIROp_Load:
+                {
+                    // Consider this example:
+                    //
+                    //     [Differentiable]
+                    //     float read(S value) { return value[0]; }
+                    //
+                    // A user-defined `ref` accessor lowers the indexing expression to a call that
+                    // returns a pointer, followed by this load. The AST still models the accessor
+                    // as returning the storage value, so its custom derivative has a value-pair
+                    // result that cannot differentiate this pointer. Diagnose only after backward
+                    // propagation establishes that the load must produce a derivative.
+                    auto load = as<IRLoad>(inst);
+                    if (auto refAccessorCall = as<IRCall>(load->getPtr()))
+                    {
+                        if (isRefAccessorCallee(refAccessorCall->getCallee()))
+                        {
+                            sink->diagnose(Diagnostics::CannotDifferentiateThroughRefAccessor{
+                                .location = refAccessorCall->sourceLoc,
+                            });
+                        }
                     }
                     break;
                 }
