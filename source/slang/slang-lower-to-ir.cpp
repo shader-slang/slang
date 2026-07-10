@@ -3634,9 +3634,82 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 }
 
 
+/// Implementation of typeContainsNonCopyable. `depth` limits recursion to guard against
+/// malformed programs that produce pathologically deep or cyclic type graphs during semantic
+/// recovery. The limit is `kMaxTypeNestingDepth`, matching other recursive type walkers
+/// (slang-type-layout.cpp, slang-check-decl.cpp).
+///
+/// A StructDecl*-keyed visited set cannot be used here because a generic struct can appear
+/// at multiple depths with different type arguments — e.g. `Wrapper<Wrapper<Atomic<int>>>`
+/// visits the same StructDecl(Wrapper) twice, once with T=Wrapper<Atomic<int>> and once
+/// with T=Atomic<int>. Keying on StructDecl* would short-circuit the inner visit and miss
+/// the Atomic<int> field. A depth limit avoids this while still bounding stack use on any
+/// finite-depth type graph. Valid programs cannot have by-value struct cycles (the type
+/// checker rejects infinite-size types), so the depth limit is only a safety guard.
+static bool typeContainsNonCopyableImpl(Type* type, ASTBuilder* astBuilder, int depth)
+{
+    // Guard against malformed programs that produce deeply nested or cyclic type graphs.
+    // kMaxTypeNestingDepth matches the limit used by other recursive type walkers in this
+    // codebase (slang-type-layout.cpp, slang-check-decl.cpp). Valid programs have
+    // finite-depth struct layouts, so this limit is only a safety guard.
+    if (depth >= (int)kMaxTypeNestingDepth)
+        return false;
+    // Unwrap modifier wrappers (e.g. NoDiffType applied to `this` by autodiff)
+    // so the underlying type is visible.
+    type = unwrapModifiedType(type);
+    // Recurse into array element types (ArrayExpressionType is a DeclRefType,
+    // but its decl is not a StructDecl, so the struct branch below would miss it).
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return typeContainsNonCopyableImpl(arrayType->getElementType(), astBuilder, depth + 1);
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return false;
+    if (declRefType->getDeclRef().getDecl()->findModifier<NonCopyableTypeAttribute>())
+        return true;
+    if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
+    {
+        auto substs = SubstitutionSet(declRefType->getDeclRef());
+        for (auto field : structDecl->getFields())
+        {
+            if (!field->type.type)
+                continue;
+            Type* fieldType = astBuilder ? substituteType(substs, astBuilder, field->type.type)
+                                         : field->type.type;
+            if (typeContainsNonCopyableImpl(fieldType, astBuilder, depth + 1))
+                return true;
+        }
+        for (auto inh : structDecl->getMembersOfType<InheritanceDecl>())
+        {
+            if (!inh->base.type)
+                continue;
+            Type* baseType =
+                astBuilder ? substituteType(substs, astBuilder, inh->base.type) : inh->base.type;
+            // Only follow struct inheritance, not interface conformances.
+            // InheritanceDecl is used for both; filtering here prevents treating
+            // interface base types as struct fields and descending into them.
+            auto baseDeclRefType = as<DeclRefType>(baseType);
+            if (!baseDeclRefType || !baseDeclRefType->getDeclRef().as<StructDecl>())
+                continue;
+            if (typeContainsNonCopyableImpl(baseType, astBuilder, depth + 1))
+                return true;
+        }
+    }
+    return false;
+}
+
+/// Returns true if `type` is, or transitively contains, a non-copyable field.
+/// Used to determine whether copy-in/copy-out semantics are invalid for a type.
+/// `astBuilder` is used to apply generic substitutions when traversing struct fields;
+/// if null, substitutions are skipped (generic cases may be missed).
+static bool typeContainsNonCopyable(Type* type, ASTBuilder* astBuilder)
+{
+    return typeContainsNonCopyableImpl(type, astBuilder, 0);
+}
+
 ParamPassingMode adjustParamPassingModeBasedOnParamType(
     ParamPassingMode originalMode,
-    Type* paramType)
+    Type* paramType,
+    ASTBuilder* astBuilder)
 {
     // A mesh-shader output's direction is intrinsic to its `MeshOutputType` (carried by
     // IRMeshOutputDecoration), so the `out` on the `out vertices T[N]` spelling must not
@@ -3644,6 +3717,28 @@ ParamPassingMode adjustParamPassingModeBasedOnParamType(
     // `OutputVertices<T,N>` spelling and make the HLSL emitter print a doubled `out`.
     if (as<MeshOutputType>(paramType))
         originalMode = ParamPassingMode::In;
+
+    // A `[mutating]` method on a type that transitively contains a non-copyable field
+    // cannot use copy-in/copy-out semantics: copy-in/copy-out creates a local copy,
+    // which is invalid for non-copyable types. Promote to true reference (`Ref`) so
+    // the caller passes a pointer to the original storage rather than a local copy.
+    //
+    // BorrowInOut is the mode for explicit `inout` parameters (via
+    // getExplicitlyDeclaredParamPassingMode) and for `[mutating] this` parameters
+    // (via getActualParamPassingModeForImplicitThisParam). Both reach this function,
+    // so the promotion applies to both.
+    // Plain `In` and `Out` parameters on types that transitively contain non-copyable
+    // fields are not promoted here; the E41403 diagnostic fires downstream if such a
+    // parameter is used as an atomic destination.
+    //
+    // This check is done before the isCopyableType guard below because a struct
+    // containing non-copyable fields is not itself marked [__NonCopyableType]
+    // (isNonCopyableType is not transitive), yet BorrowInOut semantics are still
+    // semantically invalid for it.
+    //
+    if (originalMode == ParamPassingMode::BorrowInOut &&
+        typeContainsNonCopyable(paramType, astBuilder))
+        return ParamPassingMode::Ref;
 
     // If the type is copyable, then the original mode is appropriate to use.
     //
@@ -3668,10 +3763,20 @@ ParamPassingMode adjustParamPassingModeBasedOnParamType(
     }
 }
 
-ParamPassingMode getParamPassingMode(ParamDecl* paramDecl)
+ParamPassingMode getParamPassingMode(DeclRef<ParamDecl> paramDeclRef, ASTBuilder* astBuilder)
 {
+    auto paramDecl = paramDeclRef.getDecl();
     auto declaredMode = getExplicitlyDeclaredParamPassingMode(paramDecl);
-    auto actualMode = adjustParamPassingModeBasedOnParamType(declaredMode, paramDecl->getType());
+    // Use getType (substituted declared type) rather than getParamValueType here.
+    // getParamValueType wraps no_diff parameters in ModifiedType(NoDiffModifierVal, ...),
+    // but isCopyableType and isNonCopyableType do not unwrap ModifiedType. Without this,
+    // a `no_diff Atomic<int>` parameter would be misidentified as copyable: its
+    // In-mode would not be promoted to BorrowIn, and a BorrowInOut parameter on a
+    // struct containing `no_diff Atomic<int>` fields would not be promoted to Ref.
+    auto actualMode = adjustParamPassingModeBasedOnParamType(
+        declaredMode,
+        getType(astBuilder, paramDeclRef),
+        astBuilder);
     return actualMode;
 }
 
@@ -3858,7 +3963,8 @@ ParamPassingMode getDeclaredParamPassingModeForImplicitThisParam(
 
 ParamPassingMode getActualParamPassingModeForImplicitThisParam(
     Decl* declWithImplicitThisParam,
-    Type* thisParamType)
+    Type* thisParamType,
+    ASTBuilder* astBuilder)
 {
     //
     // TODO(tfoley): This logic largely mirrors what was in place when I factored out this
@@ -3871,7 +3977,8 @@ ParamPassingMode getActualParamPassingModeForImplicitThisParam(
     //
 
     auto declaredMode = getDeclaredParamPassingModeForImplicitThisParam(declWithImplicitThisParam);
-    auto actualMode = adjustParamPassingModeBasedOnParamType(declaredMode, thisParamType);
+    auto actualMode =
+        adjustParamPassingModeBasedOnParamType(declaredMode, thisParamType, astBuilder);
     return actualMode;
 }
 
@@ -4089,11 +4196,18 @@ IRLoweringParameterInfo getParameterInfo(
     DeclRef<ParamDecl> const& paramDeclRef)
 {
     auto paramDecl = paramDeclRef.getDecl();
+    // getParamValueType wraps no_diff params in ModifiedType(NoDiffModifierVal,...);
+    // that wrapper is needed for autodiff lowering (info.type below) but must not
+    // be passed to adjustParamPassingModeBasedOnParamType, because isCopyableType /
+    // isNonCopyableType do not unwrap ModifiedType. Use getType for mode adjustment.
     auto paramType = getParamValueType(context->astBuilder, paramDeclRef);
+    auto paramTypeForMode = getType(context->astBuilder, paramDeclRef);
 
     auto declaredParamPassingMode = getExplicitlyDeclaredParamPassingMode(paramDecl);
-    auto adjustedParamPassingMode =
-        adjustParamPassingModeBasedOnParamType(declaredParamPassingMode, paramType);
+    auto adjustedParamPassingMode = adjustParamPassingModeBasedOnParamType(
+        declaredParamPassingMode,
+        paramTypeForMode,
+        context->astBuilder);
 
     IRLoweringParameterInfo info;
     info.type = paramType;
@@ -4146,10 +4260,11 @@ ParameterListCollectMode getModeForCollectingParentParameters(Decl* decl, Contai
 void addThisParameter(
     ParamPassingMode impliedParamPassingMode,
     Type* type,
-    ParameterLists* ioParameterLists)
+    ParameterLists* ioParameterLists,
+    ASTBuilder* astBuilder)
 {
     auto adjustedParamPassingMode =
-        adjustParamPassingModeBasedOnParamType(impliedParamPassingMode, type);
+        adjustParamPassingModeBasedOnParamType(impliedParamPassingMode, type, astBuilder);
 
     IRLoweringParameterInfo info;
     info.type = type;
@@ -4387,7 +4502,8 @@ void collectParameterLists(
                 addThisParameter(
                     impliedParamPassingModeForImplicitThisParam,
                     thisType,
-                    ioParameterLists);
+                    ioParameterLists,
+                    context->astBuilder);
             }
         }
     }
@@ -4531,8 +4647,10 @@ void _lowerInfoFromFuncType(
     {
         auto thisType = getThisParamTypeForContainer(context, declRef.getParent());
 
-        ParamPassingMode innerThisParamDirection =
-            getActualParamPassingModeForImplicitThisParam(declRef.getDecl(), thisType);
+        ParamPassingMode innerThisParamDirection = getActualParamPassingModeForImplicitThisParam(
+            declRef.getDecl(),
+            thisType,
+            context->astBuilder);
 
         // Hack for how this-types work for looked up function for AD 2.0..
         if (auto lookup = as<LookupDeclRef>((declRef.declRefBase)))
@@ -4542,14 +4660,15 @@ void _lowerInfoFromFuncType(
             {
                 innerThisParamDirection = getActualParamPassingModeForImplicitThisParam(
                     as<DeclRefType>(lookupSource)->getDeclRef().getDecl(),
-                    thisType);
+                    thisType,
+                    context->astBuilder);
             }
         }
 
         if (thisType)
         {
             thisType =
-                as<Type>(thisType->substitute(getCurrentASTBuilder(), SubstitutionSet(declRef)));
+                as<Type>(thisType->substitute(context->astBuilder, SubstitutionSet(declRef)));
         }
 
         // If we're looking something up on a callable, the this-type determination will
@@ -5162,8 +5281,7 @@ struct ExprLoweringContext
         Count argCounter = 0;
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(getASTBuilder(), funcDeclRef))
         {
-            auto paramDecl = paramDeclRef.getDecl();
-            auto paramDirection = getParamPassingMode(paramDecl);
+            auto paramDirection = getParamPassingMode(paramDeclRef, getASTBuilder());
 
             Index argIndex = argCounter++;
             addDirectCallArgs(expr, argIndex, paramDirection, paramDeclRef, ioArgs, ioFixups);
@@ -5566,7 +5684,8 @@ struct ExprLoweringContext
                     {
                         auto thisParamMode = getActualParamPassingModeForImplicitThisParam(
                             funcDeclRef.getDecl(),
-                            thisType);
+                            thisType,
+                            context->astBuilder);
 
                         addCallArgsForParam(context, thisParamMode, baseExpr, &irArgs, &argFixups);
                     }

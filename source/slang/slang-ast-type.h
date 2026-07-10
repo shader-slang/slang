@@ -930,18 +930,30 @@ class NamedExpressionType : public Type
 /// usually this is a mode returned by `getExplicitlyDeclaredParamPassingMode()`
 /// or something similar.
 ///
-/// The `paramType` should be the declared type of the parameter, not including
-/// any of the wrapper types that are used to represent parameter-passing modes.
+/// The `paramType` should be the plain declared type of the parameter — the result of
+/// `getType(astBuilder, paramDeclRef)`, not `getParamValueType`. `getParamValueType`
+/// wraps `no_diff` parameters in `ModifiedType(NoDiffModifierVal,...)`. The top-level
+/// `MeshOutputType` check and the `isCopyableType` call in this function inspect
+/// `paramType` directly and do not unwrap `ModifiedType`. Only the transitive non-copyable
+/// check (`typeContainsNonCopyable`) strips modifier wrappers internally. Passing a
+/// `ModifiedType`-wrapped value would therefore cause the `MeshOutputType` and copyability
+/// branches to silently miss their target types.
 ///
-/// This function is primarily concerned with adjusting a parameter-passing
-/// mode to account for non-copyable types, which may need different defaults
-/// than a copyable type. It also forces mesh-shader output parameters
-/// (`MeshOutputType`) to a direction-neutral mode, since their output direction
-/// is intrinsic to the type rather than to an explicit `out` modifier.
+/// This function adjusts the mode to account for non-copyable types and for
+/// types that transitively contain non-copyable fields (e.g. a struct whose
+/// field is `Atomic<T>`), which cannot use copy-in/copy-out semantics.
+/// It also forces mesh-shader output parameters (`MeshOutputType`) to a
+/// direction-neutral mode, since their output direction is intrinsic to the
+/// type rather than to an explicit `out` modifier.
+///
+/// `astBuilder` is used to apply generic substitutions when inspecting field
+/// types. Passing null is accepted but may miss non-copyable fields inside
+/// generic field types.
 ///
 ParamPassingMode adjustParamPassingModeBasedOnParamType(
     ParamPassingMode originalMode,
-    Type* paramType);
+    Type* paramType,
+    ASTBuilder* astBuilder);
 
 // A function type is defined by its parameter types
 // and its result type.
