@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00Z
 //META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
 //META: doc_ref=docs/generated/design/cross-cutting/core-module.md#standard-modules
-//META: doc_section_digest=e736541fe370e6b141fb2ebd19d2f4b376079f81f8b0c4c945979076e75beca5
+//META: doc_section_digest=214348552ef6e4ffe8088c7b0cb4eb2a7428707c2251091bf17344d6d0fee1d3
 //META: purpose=Negative: `import` of a non-existent module name is rejected at the module-loader stage.
 //META: intent=negative
 //META: pipeline_stage=preprocess

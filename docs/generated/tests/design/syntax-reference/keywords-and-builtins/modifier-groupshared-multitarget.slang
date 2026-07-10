@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T15:00:00+00:00
 //META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#simple-modifiers
-//META: doc_section_digest=f4322db59ceb8b8af42c196b566ca82e3f4804c47a61babf133a4e241eddf511
+//META: doc_section_digest=14131d1346ae80bf12a86c5f0464133e39600a2d8baef546279830e042b6cb1c
 //META: purpose=`groupshared` is a simple HLSL-flavored storage modifier; it lowers to `groupshared` in HLSL emit and to `shared` in GLSL emit.
 //META: intent=functional
 //META: pipeline_stage=emit

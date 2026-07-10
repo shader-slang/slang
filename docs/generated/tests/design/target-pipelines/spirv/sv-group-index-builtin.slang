@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:30:00+00:00
 //META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#legalizeentrypointsforglsl-despite-the-name
-//META: doc_section_digest=5fecd0eb9a12a63e0294d7fc25d4ccc9d8e7cc1d7f20cc7a08f9fadaa7ec7ae7
+//META: doc_section_digest=2c1360d0390bc8ea5290e8fdf3327144bc7531f6c710e535527202f2faed4659
 //META: purpose=SV_GroupIndex lowers to gl_LocalInvocationIndex with BuiltIn LocalInvocationIndex decoration in SPIR-V.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

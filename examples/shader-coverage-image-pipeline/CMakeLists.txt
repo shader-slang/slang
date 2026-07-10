@@ -59,6 +59,11 @@ add_executable(
     vk_compute_demo.h
     vk_compute_demo.cpp
 )
+# Apply the project-default compile/link options, as the bvh-traversal demo
+# does. In particular this adds the SLANG_ENABLE_ASAN sanitizer flags to the
+# link line; without them the executable fails to link against the
+# ASAN-instrumented slang libraries in sanitizer builds.
+set_default_compile_options(shader-coverage-image-pipeline USE_FEWER_WARNINGS)
 add_dependencies(shader-coverage-image-pipeline ${_copy_target})
 
 target_include_directories(

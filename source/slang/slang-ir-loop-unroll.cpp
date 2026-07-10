@@ -534,7 +534,8 @@ bool unrollLoopsInFunc(
     TargetProgram* targetProgram,
     IRModule* module,
     IRGlobalValueWithCode* func,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    bool* outChanged)
 {
     List<IRLoop*> loops = collectLoopsInFunc(
         func,
@@ -560,6 +561,13 @@ bool unrollLoopsInFunc(
             return false;
         }
 
+        // Only report a change once a loop has actually been rewritten:
+        // callers (the specialize fixpoint) take another full simplification
+        // round when this fires, and a collected-but-orphaned loop that the
+        // guard above skips must not trigger that.
+        if (outChanged)
+            *outChanged = true;
+
         // Make sure we simplify things as much as possible before
         // attempting to potentially unroll outer loop.
         simplifyCFG(func, CFGSimplificationOptions::getDefault());
@@ -569,7 +577,11 @@ bool unrollLoopsInFunc(
     return true;
 }
 
-bool unrollLoopsInModule(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
+bool unrollLoopsInModule(
+    IRModule* module,
+    TargetProgram* target,
+    DiagnosticSink* sink,
+    bool* outChanged)
 {
     SLANG_PROFILE;
 
@@ -580,7 +592,7 @@ bool unrollLoopsInModule(IRModule* module, TargetProgram* target, DiagnosticSink
 
         if (auto func = as<IRGlobalValueWithCode>(inst))
         {
-            bool result = unrollLoopsInFunc(target, module, func, sink);
+            bool result = unrollLoopsInFunc(target, module, func, sink, outChanged);
             if (!result)
                 return false;
         }

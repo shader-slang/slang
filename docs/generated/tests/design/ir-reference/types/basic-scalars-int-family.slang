@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T13:50:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/ir-reference/types.md#basic-scalar-types
-//META: doc_section_digest=63ee1ec4667453d54a2bcd56e4fb65f66647e427edd024e6dec258599bc428c6
+//META: doc_section_digest=90fd91b1a21860b3569e7b02fb36035ba69014ded4abafe7604e89fcb5aea51a
 //META: purpose=The signed-integer scalar opcodes Int8, Int16, Int, Int64 appear as struct-field types in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower

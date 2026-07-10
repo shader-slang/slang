@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools
-//META: doc_section_digest=701541a00a1b084515168e6adaa766b069355955c8c77e0f8307c0318b34f251
+//META: doc_section_digest=a11b0c6012622aa65eafd1deea44aaeb117d13faf8de8cf2fe2778e1dd206d36
 //META: purpose=A fragment entry point that uses a RasterizerOrderedTexture2D inside beginInvocationInterlock/endInvocationInterlock triggers insertFragmentShaderInterlock — the SPIR-V emit declares the FragmentShaderPixelInterlockEXT capability and adds OpExecutionMode %main PixelInterlockOrderedEXT.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

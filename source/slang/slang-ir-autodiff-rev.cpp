@@ -1008,6 +1008,15 @@ IRInst* maybeTranslateBackwardDerivative(
             targetFunc,
             &translater.diffTypeContext);
 
+    // Backstop for when the front-end `checkAutoDiffUsages` validation is disabled: a function that
+    // itself calls a `bwd_diff` result is not differentiable and would crash the unzip pass below.
+    if (diagnoseDifferentiatingBackwardDiffResult(sink, targetFunc))
+        return emitPoisonBackwardDiffResult(
+            &builder,
+            translateInst,
+            targetFunc,
+            &translater.diffTypeContext);
+
     IRInst* bwdPrimalFunc;
     IRInst* bwdRematFunc;
     IRInst* bwdPropagateFunc;
@@ -1053,6 +1062,14 @@ IRInst* maybeTranslateTrivialBackwardDerivative(
 
     auto targetFunc = cast<IRFunc>(baseFunc);
     if (diagnoseUnsupportedAbortForBackwardDiff(sink, targetFunc))
+        return emitPoisonBackwardDiffResult(
+            &builder,
+            translateInst,
+            targetFunc,
+            &translater.diffTypeContext);
+
+    // Backstop (see maybeTranslateBackwardDerivative) for when front-end validation is disabled.
+    if (diagnoseDifferentiatingBackwardDiffResult(sink, targetFunc))
         return emitPoisonBackwardDiffResult(
             &builder,
             translateInst,
