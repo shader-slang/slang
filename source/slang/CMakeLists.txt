@@ -403,6 +403,9 @@ if(NOT SLANG_EMBED_CORE_MODULE AND SLANG_LIB_TYPE STREQUAL "SHARED")
         PROPERTIES FOLDER generated
     )
 
+    # CMake installation preserves the shared library's timestamp, so this cache stays valid.
+    # Other packaging must also preserve it; otherwise the runtime rejects and regenerates the
+    # cache on first use.
     install(
         FILES "${core_module_cache}"
         DESTINATION ${core_module_cache_install_dir}

@@ -20,6 +20,8 @@ struct BuiltinModuleCache
 {
     /// Reads a cache created for `expectedLibraryTimestamp` and returns its module payload.
     ///
+    /// A cache containing only its timestamp header is structurally valid and returns an empty
+    /// payload. Deserializing and validating the payload is the caller's responsibility.
     /// The output pointer refers to memory owned by outStorage and remains valid only while that
     /// storage stays alive and unmodified. Both output values are cleared when reading or
     /// validation fails.
