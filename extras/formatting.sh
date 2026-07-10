@@ -412,7 +412,7 @@ ascii_check() {
   for file in "${files[@]}"; do
     # LC_ALL=C makes grep match raw bytes rather than decoded characters.
     if matches=$(LC_ALL=C $GREP_BIN -nP '[^\x00-\x7F]' "$file"); then
-      echo "error: non-ASCII bytes in shipped file $file (breaks MSVC consumers using a non-UTF-8 source charset, see #12016):" >&2
+      echo "error: non-ASCII bytes in shipped file $file (breaks MSVC consumers using a non-UTF-8 source charset):" >&2
       echo "$matches" >&2
       exit_code=1
     fi
