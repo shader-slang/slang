@@ -95,10 +95,9 @@ useNegative ? -1.0f : 1.0f
 The condition may be either a single value of type `bool`, or a vector of `bool`.
 When a vector of `bool` is used, the two values being selected between must be vectors, and selection is performed component-wise.
 
-> Note: Unlike C, C++, GLSL, and most other C-family languages, Slang currently follows the precedent of HLSL where `?:` does not short-circuit.
+> Note: When its condition is a scalar `bool`, the `?:` operator short-circuits: only the selected one of the two operand expressions is evaluated. This matches C, C++, GLSL, and modern HLSL.
 >
-> This decision may change (for the scalar case) in a future version of the language.
-> Programmer are encouraged to write code that does not depend on whether or not `?:` short-circuits.
+> When the condition is a vector of `bool`, selection is performed component-wise and `?:` does *not* short-circuit — both operand expressions are evaluated. Use of `?:` with a vector condition is deprecated; call `select` instead.
 
 Parenthesized Expression
 ----------------------
