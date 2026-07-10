@@ -73,6 +73,19 @@ __func_extension bwd_diff(Grid::__subscript::set)(
     self = diffPair(self.p, dSelf);
 }
 
+[Differentiable]
+float readGrid(Grid value, int row, int column)
+{
+    return value[row, column];
+}
+
+[Differentiable]
+Grid writeGrid(Grid value, int row, int column, float newValue)
+{
+    value[row, column] = newValue;
+    return value;
+}
+
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
@@ -82,26 +95,28 @@ void computeMain()
     let primal = Grid(float4(1.0, 2.0, 3.0, 4.0));
     let differential = Grid(float4(10.0, 20.0, 30.0, 40.0));
 
-    let getResult = fwd_diff(Grid::__subscript::get)(
-        diffPair(primal, differential),
-        1,
-        0);
+    let getResult = fwd_diff(readGrid)(diffPair(primal, differential), 1, 0);
     outputBuffer[0] = getResult.p;
     outputBuffer[1] = getResult.d;
 
     var getSelf = diffPair(primal);
-    bwd_diff(Grid::__subscript::get)(getSelf, 0, 1, 5.0);
+    bwd_diff(readGrid)(getSelf, 0, 1, 5.0);
     outputBuffer[2] = getSelf.d.values[0];
     outputBuffer[3] = getSelf.d.values[1];
 
-    var setSelf = diffPair(primal, differential);
-    fwd_diff(Grid::__subscript::set)(setSelf, 1, 1, diffPair(9.0, 90.0));
-    outputBuffer[4] = setSelf.p[1, 1];
-    outputBuffer[5] = setSelf.d[1, 1];
+    let setResult =
+        fwd_diff(writeGrid)(diffPair(primal, differential), 1, 1, diffPair(9.0, 90.0));
+    outputBuffer[4] = setResult.p[1, 1];
+    outputBuffer[5] = setResult.d[1, 1];
 
-    var setSelfBackward = diffPair(primal, Grid(float4(5.0, 6.0, 7.0, 8.0)));
+    var setSelfBackward = diffPair(primal);
     var newValue = diffPair(9.0);
-    bwd_diff(Grid::__subscript::set)(setSelfBackward, 1, 1, newValue);
+    bwd_diff(writeGrid)(
+        setSelfBackward,
+        1,
+        1,
+        newValue,
+        Grid(float4(5.0, 6.0, 7.0, 8.0)));
     outputBuffer[6] = setSelfBackward.d.values[2];
     outputBuffer[7] = setSelfBackward.d.values[3];
     outputBuffer[8] = newValue.d;

@@ -1,7 +1,6 @@
 //TEST:SIMPLE:-experimental-feature
 
-// Verify that a ref subscript accessor can be named as a custom-derivative target. This is a
-// front-end test because target lowering of user-defined ref accessors is not supported yet.
+// Verify that a ref subscript accessor can be named as a custom-derivative target.
 
 struct RefCell : IDifferentiable
 {
