@@ -49,3 +49,7 @@ The following operators are overloadable:
 
 In addition, call, subscript, and property access operators may be declared for structs. See
 [Structures](types-struct.md) for details.
+
+> 📝 **Remark:** Starting from Slang 2026, the comma (`,`) is no longer an operator. It is used as a separator
+> in [call expressions](expressions-operators.md), [initializer expressions](expressions-initializer.md),
+> [tuple expressions](types-tuple.md), and various [declarations](declarations.md).

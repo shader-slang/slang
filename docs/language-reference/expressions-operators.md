@@ -204,10 +204,14 @@ Canonical semantics:
 - The **address of** operator returns a pointer to the operand. The operand must be
   [addressable](expressions-value-categories.md).
 - The **comma operator** (Slang 2025 and earlier) returns the right-hand-side parameter. Starting from Slang
-  2026, the comma is no longer an overloadable operator.
+  2026, the comma is no longer an operator.
 
 > ⚠️ **Warning:** The _pointer dereference_ and _address of_ operators are currently experimental in Slang. The
 > details are subject to change.
+
+> 📝 **Remark:** Starting from Slang 2026, the comma (`,`) is no longer an operator. It is used as a separator
+> in call expressions, [initializer expressions](expressions-initializer.md),
+> [tuple expressions](types-tuple.md), and various [declarations](declarations.md).
 
 
 ### Ternary Conditional Operator
