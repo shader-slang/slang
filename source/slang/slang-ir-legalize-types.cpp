@@ -3891,8 +3891,20 @@ struct IRTypeLegalizationPass
         // * `i` is a user of `inst`, or
         // * `i` is a child of `inst`.
         //
+        // When legalization left `inst` unchanged, a user or child that has
+        // already been added or processed does not need to be revisited: its
+        // own legalization consulted (or will consult) a mapping that this
+        // step did not alter. Re-adding unconditionally makes every round of
+        // `processModule` re-legalize almost everything the previous rounds
+        // did, which turns the pass quadratic on long dependence chains
+        // (issue #12040). We only requeue such instructions when this step
+        // actually changed the value they depend on.
+        //
+        bool changed = true;
         if (legalVal.flavor == LegalVal::Flavor::simple)
         {
+            changed = legalVal.irValue != inst;
+
             // The resulting inst may be different from the one we added to the
             // worklist, so ensure that the appropriate flags are set.
             //
@@ -3904,11 +3916,13 @@ struct IRTypeLegalizationPass
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
             auto user = use->getUser();
-            maybeAddToWorkList(user);
+            if (changed || !hasBeenAddedToWorkListOrProcessed(user))
+                maybeAddToWorkList(user);
         }
         for (auto child : inst->getDecorationsAndChildren())
         {
-            maybeAddToWorkList(child);
+            if (changed || !hasBeenAddedToWorkListOrProcessed(child))
+                maybeAddToWorkList(child);
         }
     }
 
