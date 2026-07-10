@@ -527,14 +527,18 @@ struct TupleTypeBuilder
             IRStructType* ordinaryStructType = builder->createStructType();
             ordinaryStructType->sourceLoc = originalStructType->sourceLoc;
             originalStructType->transferDecorationsTo(ordinaryStructType);
-
-            // This moves the original struct's decorations onto the new ordinary struct and
-            // then clones the "identity" decorations (name hint, debug, linkage, and the
-            // synthesized-parameter-group marker) back onto the original, so the original
-            // stays recognizable when it is re-legalized on a later pass. In particular the
-            // parameter-group leak diagnostic in `legalizeTypeImpl` reads the marker off the
-            // original struct (issue #11825).
             copyNameHintAndDebugDecorations(originalStructType, ordinaryStructType);
+
+            // `transferDecorationsTo` above moved every decoration off `originalStructType`
+            // onto `ordinaryStructType`, including the synthesized-parameter-group marker.
+            // The parameter-group leak diagnostic in `legalizeTypeImpl` reads that marker off
+            // the *original* struct, and the same buffer can be re-legalized on a later pass,
+            // so the original must keep it. We re-add it here (rather than inside
+            // `copyNameHintAndDebugDecorations`, whose other callers flatten varying-IO
+            // structs and debug vars where this marker has no meaning) to keep the marker's
+            // scope narrow to parameter-group structs (issue #11825).
+            if (ordinaryStructType->findDecoration<IRSynthesizedParameterGroupDecoration>())
+                builder->addSynthesizedParameterGroupDecoration(originalStructType);
 
             // The new struct type will appear right after the original in the IR,
             // so that we can be sure any instruction that could reference the
@@ -1247,10 +1251,10 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
             // written by the user. We read the marker *before* legalizing the element type:
             // legalizing a struct with mixed resource/ordinary fields moves the original
             // struct's decorations onto a new "ordinary" struct via `transferDecorationsTo`
-            // and then restores the identity decorations (including this marker) onto the
-            // original in `copyNameHintAndDebugDecorations`. Reading it here keeps this
-            // independent of that restore, so we don't depend on the ordering of the nested
-            // legalization that happens inside `legalizeType` below.
+            // and then re-adds this marker onto the original (see the struct-splitting site
+            // above). Reading it here keeps this independent of that re-add, so we don't
+            // depend on the ordering of the nested legalization that happens inside
+            // `legalizeType` below.
             bool isSynthesizedGroup =
                 originalElementType->findDecoration<IRSynthesizedParameterGroupDecoration>() !=
                 nullptr;
