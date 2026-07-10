@@ -56,7 +56,8 @@ class WorkloadSpec:
     # the toolchain would record Slang-internal timers and report OK.
     downstream_required: bool = False
     # for mode="api": the api-driver subcommand ("session-create",
-    # "many-kernels", "module-graph", "module-graph-bin", "specialize"), the
+    # "many-kernels", "module-graph", "module-graph-bin", "specialize",
+    # "rt-composite"), the
     # root module name for the by-name-loading modes, and extra driver flags
     # (e.g. --reflect).
     api_cmd: str = None
@@ -437,6 +438,33 @@ WORKLOADS = [
         api_cmd="specialize",
         api_root="spec_root",
         primary_timers=["apiSpecialize", "apiLink", "apiGetCode", "apiTotal"],
+    ),
+    # ---- rt_renderer: generated renderer-shaped corpus (DESIGN.md Phase 2) --
+    # Few×HEAVY programs over a ~100-module utility/scene/material library
+    # behind IMaterial/IBSDF interfaces — the real-application shape where each
+    # program pays the whole library's import cost. n = material count.
+    WorkloadSpec(
+        name="rt_renderer",
+        bucket="rt_renderer",
+        gen=workloads.gen_rt_renderer,
+        default_size=24,
+        mode="api",
+        api_cmd="rt-composite",
+        api_root="rt_kernels",
+        primary_timers=["apiTotal", "apiLoadModule", "apiGetCode"],
+    ),
+    # One compute-kernel variant per material via IEntryPoint::specialize —
+    # link-time specialization against interface-heavy cross-module code.
+    WorkloadSpec(
+        name="rt_renderer_specialize",
+        bucket="rt_renderer",
+        gen=workloads.gen_rt_renderer,
+        default_size=24,
+        mode="api",
+        api_cmd="specialize",
+        api_root="rt_compute",
+        api_flags=["--impl-prefix", "Material_"],
+        primary_timers=["apiTotal", "apiGetCode", "apiSpecialize"],
     ),
     # ---- real-shader corpus ----------------------------------------------
     WorkloadSpec(
