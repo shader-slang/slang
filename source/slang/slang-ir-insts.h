@@ -498,6 +498,12 @@ struct IREntryPointParamDecoration : IRDecoration
 };
 
 FIDDLE()
+struct IRSynthesizedParameterGroupDecoration : IRDecoration
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
 struct IRFormatDecoration : IRDecoration
 {
     FIDDLE(leafInst())
@@ -3518,6 +3524,10 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* tryLookupCompilerDictionaryValue(IRCompilerDictionary* dict, IRInst* translationInst);
 
     // Annotation helpers.
+    //
+    // Note: adding an annotation changes what `doesCalleeHaveSideEffect(target)`
+    // returns, so it must not happen while a callee-side-effect cache is live
+    // (see `IRDeadCodeEliminationOptions::calleeSideEffectCache`).
     void addAnnotation(IRInst* target, AnnotationKind kind, IRInst* value);
     IRInst* tryLookupAnnotation(IRInst* target, AnnotationKind kind);
 
@@ -5320,6 +5330,11 @@ $(type_info.return_type) $(type_info.method_name)(
     void addEntryPointParamDecoration(IRInst* inst, IRFunc* entryPointFunc)
     {
         addDecoration(inst, kIROp_EntryPointParamDecoration, entryPointFunc);
+    }
+
+    void addSynthesizedParameterGroupDecoration(IRInst* inst)
+    {
+        addDecoration(inst, kIROp_SynthesizedParameterGroupDecoration);
     }
 
     void addRayPayloadDecoration(IRType* inst) { addDecoration(inst, kIROp_RayPayloadDecoration); }

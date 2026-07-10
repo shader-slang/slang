@@ -14,6 +14,10 @@ Compile modes:
 - "link"    : multi-file. Precompile every non-main file to .slang-module, then
               compile the main file (the one whose name contains "main") to a
               target against them. Stresses module read + linkIR.
+- "api"     : driven by native/api-driver.cpp against libslang instead of by
+              slangc. Measures the compilation-API dimension (session setup,
+              module loading, per-compile fixed overhead) that a one-shot CLI
+              invocation cannot separate. api_cmd selects the driver mode.
 """
 
 from dataclasses import dataclass, field
@@ -40,6 +44,24 @@ class WorkloadSpec:
     # contains "main", or the first file if none does. If set, used directly
     # as the compile entry point.
     main_file: str = None
+    # sys.platform values this workload can run on (None = all). Workloads
+    # needing a platform-bound downstream toolchain (dxc, nvrtc) set this;
+    # bench.py excludes them from the DEFAULT set elsewhere but still runs
+    # them when named explicitly in --only, failing loudly if the tool is
+    # genuinely absent (downstream_required below is what enforces that).
+    platforms: list = None
+    # The workload's number is meaningless without its downstream compiler:
+    # missing-downstream diagnostics (E00100 etc.), which bench.py normally
+    # treats as benign, fail this workload instead — otherwise a host without
+    # the toolchain would record Slang-internal timers and report OK.
+    downstream_required: bool = False
+    # for mode="api": the api-driver subcommand ("session-create",
+    # "many-kernels", "module-graph", "module-graph-bin", "specialize"), the
+    # root module name for the by-name-loading modes, and extra driver flags
+    # (e.g. --reflect).
+    api_cmd: str = None
+    api_root: str = None
+    api_flags: list = field(default_factory=list)
 
 
 # Standard target invocation avoids GPU drivers and stays comparable across
@@ -48,12 +70,12 @@ class WorkloadSpec:
 SPIRV = ["-target", "spirv", "-emit-spirv-directly"]
 
 WORKLOADS = [
-    # ---- real-world / holistic (whole pipeline) ------------------------
-    # This list order is CANONICAL: bench.py runs workloads in it and the
-    # HTML report renders panels in it (manifest.display_order), so the page
-    # layout stays constant: real-world first, then (once added) the api
-    # workloads, then the pipeline stages front end -> back end.
-    # Real MDL/DXR path-tracing shader corpus: the holistic end-to-end signal.
+    # The list order is CANONICAL: it is the report's constant panel order
+    # (via display_order below) and bench.py's run order. Sections: real-world
+    # / holistic first, then the API-path workloads, then the compiler
+    # pipeline front end -> back end (parse .. sema .. IR .. specialization ..
+    # backends), downstream-compiler workloads last.
+    # ---- real-shader corpus ----------------------------------------------
     WorkloadSpec(
         name="mdl_dxr",
         bucket="real_world",
@@ -64,9 +86,10 @@ WORKLOADS = [
         main_file="hit.slang",
         primary_timers=["compileInner", "frontEndExecute", "linkAndOptimizeIR"],
     ),
-    # Realistic mixed shader, simple -> complex: control flow + generics +
-    # dispatch + resources + call depth all scale together — the holistic
-    # compile-time curve, vs the single-axis stressors below.
+    # ---- complexity ladder: realistic mixed shader, simple -> complex ------
+    # Sweep this to see the holistic compile-time curve as a representative
+    # shader grows in complexity (control flow + generics + dispatch + resources
+    # + call depth all scale together), vs the single-axis stressors above.
     WorkloadSpec(
         name="complexity_ladder",
         bucket="realistic_scaling",
@@ -77,9 +100,81 @@ WORKLOADS = [
         primary_timers=["compileInner", "frontEndExecute", "linkAndOptimizeIR",
                         "simplifyIR"],
     ),
-    # ---- compiler pipeline, front end -> back end ----------------------
-    # (api workloads slot in between the holistic and pipeline sections
-    # when they are added)
+    # ---- API-path workloads (application-integration dimension) -----------
+    # Driven by native/api-driver.cpp against libslang (see DESIGN.md
+    # "API-path workloads"). These cover the costs a one-shot slangc run pays
+    # exactly once and cannot separate: session creation (core-module load),
+    # per-compile fixed overhead across many small kernels, and import
+    # resolution over a deep module graph.
+    WorkloadSpec(
+        name="api_session_create",
+        bucket="api_overhead",
+        gen=workloads.gen_api_none,
+        default_size=10,  # createGlobalSession+createSession iterations
+        mode="api",
+        api_cmd="session-create",
+        primary_timers=["apiCreateGlobalSession", "apiCreateSession", "apiTotal"],
+    ),
+    WorkloadSpec(
+        name="api_many_kernels",
+        bucket="api_overhead",
+        gen=workloads.gen_api_kernels,
+        default_size=100,
+        mode="api",
+        api_cmd="many-kernels",
+        primary_timers=["apiTotal", "apiLoadModule", "apiGetCode"],
+    ),
+    WorkloadSpec(
+        name="api_module_graph",
+        bucket="api_overhead",
+        gen=workloads.gen_api_module_graph,
+        default_size=150,
+        mode="api",
+        api_cmd="module-graph",
+        api_root="graph_main",
+        primary_timers=["apiTotal", "apiLoadModule", "apiGetCode"],
+    ),
+    # Same DAG loaded through serialized .slang-module binaries — the import
+    # path where the 2026-07-03 module-loading regression (#11952) lives;
+    # source-based loads (above) were flat across it.
+    WorkloadSpec(
+        name="api_module_graph_bin",
+        bucket="api_overhead",
+        gen=workloads.gen_api_module_graph,
+        default_size=150,
+        mode="api",
+        api_cmd="module-graph-bin",
+        api_root="graph_main",
+        primary_timers=["apiTotal", "apiLoadModule"],
+    ),
+    # Per-program reflection walk (getLayout + full parameter/type-layout
+    # traversal) over parameter-rich kernels — the binding-table query pattern
+    # every API client pays per compiled program.
+    WorkloadSpec(
+        name="api_reflection",
+        bucket="api_overhead",
+        gen=workloads.gen_api_reflect_kernels,
+        default_size=40,
+        mode="api",
+        api_cmd="many-kernels",
+        api_flags=["--reflect"],
+        primary_timers=["apiReflection", "apiTotal", "apiGetCode"],
+    ),
+    # One generic entry point specialized per impl type via
+    # IEntryPoint::specialize — the one-kernel-per-material pattern; stresses
+    # specialization + link per variant.
+    WorkloadSpec(
+        name="api_specialize",
+        bucket="api_overhead",
+        gen=workloads.gen_api_specialize,
+        default_size=60,
+        mode="api",
+        api_cmd="specialize",
+        api_root="spec_root",
+        primary_timers=["apiSpecialize", "apiLink", "apiGetCode", "apiTotal"],
+    ),
+
+    # ---- per-compile floor (core-module load + link) ---------------------
     WorkloadSpec(
         name="minimal",
         bucket="core_link",
@@ -92,6 +187,7 @@ WORKLOADS = [
         primary_timers=["compileInner", "linkIR", "readSerializedModuleIR",
                         "loadBuiltinModule"],
     ),
+    # ---- core compiler-stage buckets --------------------------------------
     WorkloadSpec(
         name="parse",
         bucket="parse",
@@ -125,10 +221,11 @@ WORKLOADS = [
         mode="module",
         primary_timers=["SemanticChecking", "frontEndExecute"],
     ),
-    # Typecheck trio: front-end-only stressors for the quietly expensive part
-    # of semantic checking — every binary operator and cross-type assignment
-    # runs overload resolution + conversion-cost ranking. parse/sema_generics
-    # don't isolate this.
+    # ---- type checking: operator overload resolution + implicit conversion -
+    # Front-end-only (module mode) stressors for the quietly expensive part of
+    # semantic checking: every binary operator and cross-type assignment runs
+    # overload resolution + conversion-cost ranking. parse/sema_generics don't
+    # isolate this (uniform types / generic-constraint cost dominate there).
     WorkloadSpec(
         name="operator_typecheck",
         bucket="typecheck",
@@ -153,6 +250,7 @@ WORKLOADS = [
         mode="module",
         primary_timers=["SemanticChecking", "frontEndExecute"],
     ),
+    # ---- shared-infrastructure / scaling stressors -----------------------
     WorkloadSpec(
         name="ir_builder",
         bucket="ir_infra",
@@ -213,6 +311,7 @@ WORKLOADS = [
         primary_timers=["compileInner", "specializeModule",
                         "legalizeExistentialTypeLayout", "simplifyIR"],
     ),
+    # ---- suspected-regression features -----------------------------------
     WorkloadSpec(
         name="autodiff",
         bucket="autodiff",
@@ -249,6 +348,7 @@ WORKLOADS = [
         extra_flags=SPIRV,
         primary_timers=["simplifyIR", "frontEndExecute", "compileInner"],
     ),
+    # ---- coverage-gap stressors (passes / paths no other workload hits) ---
     WorkloadSpec(
         name="resource_aggregate",
         bucket="resource_legalize",
@@ -277,9 +377,11 @@ WORKLOADS = [
         extra_flags=SPIRV,
         primary_timers=["generateOutput", "compileInner"],
     ),
-    # Source-target emission (the text backends -emit-spirv-directly skips):
-    # same shader as codegen_spirv but emitted to a textual GPU language, so
-    # emitEntryPointsSourceFromIR + target legalization are exercised.
+    # ---- source-target emission (the text backends spirv-directly skips) --
+    # Same shader as codegen_spirv, but emitted to a textual GPU language so the
+    # whole emitEntryPointsSourceFromIR path + target legalization (legalizeIRForMetal /
+    # legalizeIRForWGSL) is exercised — entirely bypassed by -emit-spirv-directly,
+    # so no other workload covers it. Metal/WGSL emit text with no external toolchain.
     WorkloadSpec(
         name="emit_metal",
         bucket="codegen_source",
@@ -298,6 +400,61 @@ WORKLOADS = [
         extra_flags=["-target", "wgsl"],
         primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
     ),
+    WorkloadSpec(
+        name="emit_hlsl",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "hlsl", "-entry", "computeMain"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+    ),
+    WorkloadSpec(
+        name="emit_glsl",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "glsl", "-entry", "computeMain"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+    ),
+    WorkloadSpec(
+        name="emit_cuda",
+        bucket="codegen_source",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "cuda"],
+        primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+    ),
+    # ---- downstream compilers (Windows perf runner only) -------------------
+    # These measure the full pipeline INCLUDING the downstream compiler (dxc
+    # for DXIL, nvrtc for PTX) — an internal application benchmark showed
+    # downstream time is ~60% of a real app's combined compile time, and the
+    # suite had no signal for it. generateOutput spans slang emit + the
+    # downstream invocation; wall_ms is the end-to-end number.
+    WorkloadSpec(
+        name="codegen_dxil",
+        bucket="codegen_downstream",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "dxil", "-profile", "sm_6_6"],
+        primary_timers=["generateOutput", "compileInner"],
+        platforms=["win32"],
+        downstream_required=True,
+    ),
+    WorkloadSpec(
+        name="codegen_ptx",
+        bucket="codegen_downstream",
+        gen=workloads.gen_codegen,
+        default_size=400,
+        mode="target",
+        extra_flags=["-target", "ptx"],
+        primary_timers=["generateOutput", "compileInner"],
+        platforms=["win32"],
+        downstream_required=True,
+    ),
 ]
 
 BY_NAME = {w.name: w for w in WORKLOADS}
@@ -311,4 +468,3 @@ def display_order(names):
     the report."""
     pos = {w.name: i for i, w in enumerate(WORKLOADS)}
     return sorted(names, key=lambda n: (pos.get(n, len(pos)), n))
-

@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=690f6a3084801386b77186394e0f6e8c120824a4
 //META: doc_ref=docs/generated/design/ir-reference/types.md#basic-scalar-types
-//META: doc_section_digest=63ee1ec4667453d54a2bcd56e4fb65f66647e427edd024e6dec258599bc428c6
+//META: doc_section_digest=90fd91b1a21860b3569e7b02fb36035ba69014ded4abafe7604e89fcb5aea51a
 //META: purpose=Expansion: a scalar UInt16 surfaces as the IR type of a uniform uint16_t global_param.
 //META: intent=expansion
 //META: pipeline_stage=lower

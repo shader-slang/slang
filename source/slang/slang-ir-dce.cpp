@@ -516,7 +516,7 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
                                                       ? SideEffectAnalysisOptions::None
                                                       : SideEffectAnalysisOptions::UseDominanceTree;
 
-    if (inst->mightHaveSideEffects(sideEffectOptions))
+    if (inst->mightHaveSideEffects(sideEffectOptions, options.calleeSideEffectCache))
     {
         return true;
     }
@@ -685,6 +685,9 @@ bool eliminateDeadCode(IRModule* module, IRDeadCodeEliminationOptions const& opt
     DeadCodeEliminationContext context;
     context.module = module;
     context.options = options;
+    Dictionary<IRInst*, bool> calleeSideEffectCache;
+    if (!context.options.calleeSideEffectCache)
+        context.options.calleeSideEffectCache = &calleeSideEffectCache;
     return context.processModule();
 }
 
@@ -693,6 +696,9 @@ bool eliminateDeadCode(IRInst* root, IRDeadCodeEliminationOptions const& options
     DeadCodeEliminationContext context;
     context.module = root->getModule();
     context.options = options;
+    Dictionary<IRInst*, bool> calleeSideEffectCache;
+    if (!context.options.calleeSideEffectCache)
+        context.options.calleeSideEffectCache = &calleeSideEffectCache;
     return context.processInst(root);
 }
 

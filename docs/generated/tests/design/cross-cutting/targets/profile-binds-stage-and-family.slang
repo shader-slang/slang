@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#profiles
-//META: doc_section_digest=40b4f2fae77db035dad60bd27fe1b81fe055b218323e5afdfe04adf91d306631
+//META: doc_section_digest=d4fdc256b63091b576a1224e1ef7e5c69edbdda207c4f87eb2742b3fb509fb67
 //META: purpose=A Profile binds a `Family` + `Version` to a target. `-profile sm_6_0` parses and the resulting capability set lets a compute shader compile on HLSL; `-profile glsl_450` does the same on GLSL.
 //META: intent=functional
 //META: pipeline_stage=check

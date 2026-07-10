@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -g3 -O0 -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -g3 -emit-spirv-directly
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute
 
 // Regression test for shader-slang/slang#11563: name hints for methods declared

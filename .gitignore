@@ -152,3 +152,6 @@ __pycache__/
 .slang-replays*
 log*.txt
 replay-capture
+
+# Pre-staged AI-review artifacts (REVIEW.md Step 1)
+/tmp/
