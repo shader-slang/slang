@@ -32,4 +32,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 // CHECK: var<private> kGrid_{{[0-9]+}} : array<array<i32
 // CHECK-SAME: = array
-// CHECK-SAME: (array<i32
+// CHECK-SAME: ( array<i32

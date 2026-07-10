@@ -44,7 +44,12 @@ def main():
           f"({args.samples} samples + {args.warmup} warmup each)\n")
 
     want = set(args.only.split(",")) if args.only else None
-    all_wls = {w.name for w in manifest.WORKLOADS}
+    # Match bench.py's default-set platform gate: platform-bound workloads
+    # (codegen_dxil/ptx need dxc/nvrtc) never run here off-platform, so counting
+    # them as "needed" would make need <= present false forever and re-sweep
+    # every release on such hosts.
+    all_wls = {w.name for w in manifest.WORKLOADS
+               if not w.platforms or sys.platform in w.platforms}
     failures = []
     for i, rec in enumerate(ready, 1):
         tag = rec["tag"]

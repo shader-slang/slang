@@ -178,46 +178,44 @@ secret already covers pushes to that repo.
 
 ## Design decisions
 
-| Decision                  | Choice                                                                          | Rationale                                                                                                                                                           |
-| ------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Release binaries          | Prebuilt published per tag, platform-matched (Linux `.tar.gz` / Windows `.zip`) | Fast, reproducible, matches shipped artifacts; source builds only for commit-level bisect                                                                           |
-| Measurement flag          | `-report-perf-benchmark`                                                        | Stable across the supported release window; the `detailed` variant only adds sub-timers on newer builds                                                             |
-| Headline metric           | `compileInner`, **median** of N timed runs                                      | Excludes the fixed core-module-load floor, so it is stable across releases. Median over min: reflects the typical run and is steadier when run-to-run spread shifts |
-| Per-compile floor         | the `minimal` workload's `compileInner`                                         | The N→0 limit — a direct measurement of fixed per-compile cost, not a fitted intercept (which can go negative on convex curves)                                     |
-| Timer scope / attribution | all nested phase timers; attribute via **leaf** timers                          | A jump in `compileInner` is traced down `generateOutput → linkAndOptimizeIR → specializeModule`; using leaves avoids double-counting nested timers                  |
-| Phase decomposition       | mutually-exclusive buckets (top-down)                                           | Named leaves + `(self)` residuals; if a child timer overshoots its parent it is scaled proportionally so the buckets always sum to `compileInner`                   |
-| Output                    | `results.json` only                                                             | JSON holds median/min/mean/stdev per timer; generated sources + compiled outputs go to an auto-removed `--gen-dir` tempdir so the results dir stays scratch-free    |
-| Robustness                | 1 warmup + N timed runs (default 5)                                             | The warmup absorbs cold-cache/first-run effects; multiple timed samples + median tame scheduling noise                                                              |
-| Determinism               | generators are deterministic (same N → identical bytes)                         | A release sweep compares like with like, and base/head always compile identical inputs                                                                              |
-| GPU / SDK dependency      | none                                                                            | Every workload is GPU-free and external-SDK-free, so it runs headless in CI                                                                                         |
-| Target                    | `-target spirv -emit-spirv-directly` (text backends use `-target metal`/`wgsl`) | Measures Slang itself, not a downstream `spirv-opt`                                                                                                                 |
-| Comparability             | absolute times are **runner-specific**                                          | Every point in a comparison must come from the same machine (see the tracking model + runner fingerprint above)                                                     |
+| Decision                  | Choice                                                                          | Rationale                                                                                                                                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Release binaries          | Prebuilt published per tag, platform-matched (Linux `.tar.gz` / Windows `.zip`) | Fast, reproducible, matches shipped artifacts; source builds only for commit-level bisect                                                                                                                     |
+| Measurement flag          | `-report-perf-benchmark`                                                        | Stable across the supported release window; the `detailed` variant only adds sub-timers on newer builds                                                                                                       |
+| Headline metric           | `compileInner`, **median** of N timed runs                                      | Excludes the fixed core-module-load floor, so it is stable across releases. Median over min: reflects the typical run and is steadier when run-to-run spread shifts                                           |
+| Per-compile floor         | the `minimal` workload's `compileInner`                                         | The N→0 limit — a direct measurement of fixed per-compile cost, not a fitted intercept (which can go negative on convex curves)                                                                               |
+| Timer scope / attribution | all nested phase timers; attribute via **leaf** timers                          | A jump in `compileInner` is traced down `generateOutput → linkAndOptimizeIR → specializeModule`; using leaves avoids double-counting nested timers                                                            |
+| Platform-bound workloads  | `WorkloadSpec.platforms` gates the DEFAULT set; `--only` overrides              | The default suite must pass on contributor machines (macOS/Linux) without dxc/nvrtc, but silently hiding a workload misreports coverage — bench prints a `[skip]` note; naming one explicitly runs it anyway  |
+| Downstream workloads      | `downstream_required`: missing-toolchain diagnostics are REAL errors            | slangc emits its internal timers before the downstream handoff, so without this a host missing dxc/nvrtc would record timers and report OK with no DXIL/PTX produced — the opposite of the workload's purpose |
+| Phase decomposition       | mutually-exclusive buckets (top-down)                                           | Named leaves + `(self)` residuals; if a child timer overshoots its parent it is scaled proportionally so the buckets always sum to `compileInner`                                                             |
+| Output                    | `results.json` only                                                             | JSON holds median/min/mean/stdev per timer; generated sources + compiled outputs go to an auto-removed `--gen-dir` tempdir so the results dir stays scratch-free                                              |
+| Robustness                | 1 warmup + N timed runs (default 5)                                             | The warmup absorbs cold-cache/first-run effects; multiple timed samples + median tame scheduling noise                                                                                                        |
+| Determinism               | generators are deterministic (same N → identical bytes)                         | A release sweep compares like with like, and base/head always compile identical inputs                                                                                                                        |
+| GPU / SDK dependency      | none                                                                            | Every workload is GPU-free and external-SDK-free, so it runs headless in CI                                                                                                                                   |
+| Target                    | `-target spirv -emit-spirv-directly` (text backends use `-target metal`/`wgsl`) | Measures Slang itself, not a downstream `spirv-opt`                                                                                                                                                           |
+| Comparability             | absolute times are **runner-specific**                                          | Every point in a comparison must come from the same machine (see the tracking model + runner fingerprint above)                                                                                               |
 
 Benchmarking the whole suite is ~1.5–2.5 min per build; building `slangc` (minutes)
 dominates wall-clock, so the real constraints are timing noise and runner
 contention, not the bench runtime.
 
-## Planned workloads — known coverage gaps (2026-07-07)
+## Planned workloads — known coverage gaps (updated 2026-07-09)
 
-The suite emits SPIR-V (direct), Metal, and WGSL only. Regressions in any other
-emitter/backend are currently invisible (e.g. a change to the shared C-like
-emitter gets no HLSL/CUDA/GLSL perf signal at all). Planned additions, cheapest
-first:
+The suite now covers every source-emitting backend (SPIR-V direct, Metal, WGSL,
+HLSL, GLSL, CUDA via the `emit_*` workloads) plus the two downstream compilers
+available on the Windows perf runner (`codegen_dxil` through dxc,
+`codegen_ptx` through nvrtc), and the API path (`api_*` workloads:
+session-setup, many-kernels, module graph, reflection, link-time
+specialization — closing the `createGlobalSession` gap from discussion #6579).
+Remaining known gaps:
 
-| Planned workload               | Exercises                                                                                    | Cost to add                                                                                                              |
-| ------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `emit_hlsl`                    | HLSL legalization + emitter (the D3D source path — a major backend with zero coverage today) | Trivial: same shader as `codegen_spirv`, `-target hlsl`; no downstream compiler                                          |
-| `emit_cuda`                    | CUDA lowering + C++-family emitter                                                           | Trivial: `-target cuda` emits source, no nvcc                                                                            |
-| `emit_glsl`                    | GLSL legalization (distinct path from WGSL/Metal)                                            | Trivial                                                                                                                  |
-| `codegen_dxil`                 | Full D3D pipeline incl. dxc downstream                                                       | Moderate: needs `dxcompiler.dll` (already shipped on the Windows runner)                                                 |
-| `codegen_ptx`                  | CUDA downstream via nvrtc                                                                    | Heavier; the perf runner does have a 5090 + driver                                                                       |
-| host/C++ (`-target cpp`, LLVM) | Host-callable / slang-llvm path                                                              | Blocked: nightly builds with `SLANG_SLANG_LLVM_FLAVOR=DISABLE` (prebuilt slang-llvm MSVC CRT link issue); fix that first |
+| Planned workload               | Exercises                       | Cost to add                                                                                                              |
+| ------------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| host/C++ (`-target cpp`, LLVM) | Host-callable / slang-llvm path | Blocked: nightly builds with `SLANG_SLANG_LLVM_FLAVOR=DISABLE` (prebuilt slang-llvm MSVC CRT link issue); fix that first |
 
 Non-target gaps (no workload covers these at all):
 
 - preprocessor/macro-heavy compile (expansion cost has no dedicated signal)
-- `createGlobalSession` / session-setup cost (recurring community complaint —
-  see shader-slang/slang discussion #6579)
 - capability-checking overhead
 
 Related tooling follow-ups tracked alongside these (from the 2026-07 VM runner
