@@ -367,6 +367,8 @@ set_target_properties(
 # Generate it from the build's core archive after the shared library is linked so the first slangc
 # invocation can load the same archive without compiling the core module again.
 if(NOT SLANG_EMBED_CORE_MODULE AND SLANG_LIB_TYPE STREQUAL "SHARED")
+    # Place the cache beside the shared library: DLLs use the runtime directory on Windows, while
+    # shared libraries use the library directory on other platforms.
     if(WIN32)
         get_target_property(
             core_module_cache_dir

@@ -10,9 +10,19 @@ namespace Slang
 {
 
 /// Reads and writes the timestamp-prefixed cache used for serialized built-in modules.
+///
+/// The cache layout is [uint64_t library timestamp][serialized module bytes]. The timestamp is
+/// stored in host byte order because the cache is tied to the shared-library build that created it,
+/// rather than being a portable module archive. A timestamp of zero means that the library
+/// timestamp is unavailable, so write() rejects it and never creates a cache that could match that
+/// failure sentinel.
 struct BuiltinModuleCache
 {
     /// Reads a cache created for `expectedLibraryTimestamp` and returns its module payload.
+    ///
+    /// The output pointer refers to memory owned by outStorage and remains valid only while that
+    /// storage stays alive and unmodified. Both output values are cleared when reading or
+    /// validation fails.
     static SlangResult read(
         const String& cachePath,
         uint64_t expectedLibraryTimestamp,
