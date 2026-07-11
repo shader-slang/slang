@@ -1,7 +1,8 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-// The render-test host stores initialization data in uint32_t words. This 142-byte buffer exceeds
-// List's initial capacity and checks that the final partial word is present when the RHI copies it.
+// List's initial capacity is 16 uint32_t words (64 bytes). This 142-byte buffer therefore forces
+// the old code to allocate only 35 words (140 bytes), so ASan detects the RHI's two-byte over-read;
+// the shader checks alone cannot observe this host-side allocation bug.
 //TEST_INPUT:ubuffer(data=[0], count=71, stride=2):out,name=outputBuffer
 RWStructuredBuffer<uint16_t> outputBuffer;
 
