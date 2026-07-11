@@ -5147,6 +5147,15 @@ void legalizeConstantBufferLoadForGLSL(IRModule* module)
                         builder.setInsertBefore(load);
                         for (auto field : elementType->getFields())
                         {
+                            if (as<IRVoidType>(field->getFieldType()))
+                            {
+                                // The `cleanUpVoidType` IR pass will remove this field and operand.
+                                // Use the canonical void value to avoid creating a field-address
+                                // and load chain that would otherwise require dead-code
+                                // elimination.
+                                elements.add(builder.getVoidValue());
+                                continue;
+                            }
                             auto fieldAddr = builder.emitFieldAddress(
                                 builder.getPtrType(field->getFieldType()),
                                 load->getPtr(),
