@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T20:31:07+00:00
 //META: source_commit=019ec0e5ddac1c14fbad141a3f03d50cf8a5e022
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#hlsl-specific-runtime-predicates
-//META: doc_section_digest=05a2ea3acb9ebb0668e90f202fe188cf4ca1f104177b22521b8652d6efbd73eb
+//META: doc_section_digest=ce9c25c8a5d33fe74b91dc7322b965005f5a868196c5a421ef204f52fd057439
 //META: purpose=Boundary: [vk::binding(N, M)] attributes do not pin HLSL registers — the resource still emits at the positional register(u0).
 //META: intent=boundary
 //META: pipeline_stage=emit

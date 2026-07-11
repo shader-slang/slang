@@ -9,6 +9,9 @@
 #include "slang-compiler.h"
 #include "slang-visitor.h"
 
+#include <cstring>
+#include <type_traits>
+
 namespace Slang
 {
 template<typename P, typename... Args>
@@ -194,80 +197,181 @@ struct BasicTypeKeyPair
     HashCode getHashCode() const { return combineHash(type1.getRaw(), type2.getRaw()); }
 };
 
-struct OperatorOverloadCacheKey
+// Focused failure data produced while a generic candidate is still being
+// inferred. The generic solver fills this optional record with the first
+// concrete reason a candidate failed, and `CompleteOverloadCandidate` formats
+// it into a focused diagnostic only if overload resolution selects that failed
+// candidate. Each `Kind` captures just the offending fields (counts, a
+// parameter name, or the substituted sub/super types) at the failure site;
+// the more expensive diagnostic formatting is deferred to the selected-
+// candidate path so speculative candidates never pay for it.
+struct GenericArgumentInferenceFailure
 {
-    int32_t operatorName;
-    bool isGLSLMode;
-    BasicTypeKey args[2];
-    bool operator==(OperatorOverloadCacheKey key) const
+    enum class Kind
     {
-        return operatorName == key.operatorName && args[0] == key.args[0] &&
-               args[1] == key.args[1] && isGLSLMode == key.isGLSLMode;
+        None,
+        VariadicPackCountMismatch,
+        GenericArityMismatch,
+        OrdinaryGenericParamNotInferred,
+        InterfaceConformanceNotSatisfied,
+        GenericConstraintNotSatisfied,
+        GenericParamUnificationConflict,
+    };
+
+    struct VariadicPackCountMismatch
+    {
+        SourceLoc location = SourceLoc();
+        int64_t expectedCount = 0;
+        int64_t actualCount = 0;
+    };
+
+    // The call supplied a number of value arguments that the generic function's
+    // parameter list could not match, so argument-to-parameter matching failed
+    // before any inference could run.
+    struct GenericArityMismatch
+    {
+        SourceLoc location = SourceLoc();
+        Int expectedParamCount = 0;
+        Int actualArgCount = 0;
+    };
+
+    // An ordinary generic parameter (such as a type `T` that appears only in
+    // return position, or a value `N` not mentioned in any parameter) was never
+    // determined from the call, so its solver constraint stayed unsatisfied.
+    // The parameter declaration itself is stored (not just its name) so the
+    // diagnostic can use the full declaration (name, type-vs-value kind, loc).
+    struct OrdinaryGenericParamNotInferred
+    {
+        SourceLoc location = SourceLoc();
+        Decl* member = nullptr;
+    };
+
+    // A source generic constraint `T : IFoo` could not be discharged: the
+    // inferred argument for `T` (`subType`) does not conform to the required
+    // interface (`supType`). The capture site records these only once both are
+    // concrete (its `hasUnreadyDependenciesForVal` guard), so they are always
+    // fully substituted under the current (failed) specialization when read.
+    struct InterfaceConformanceNotSatisfied
+    {
+        SourceLoc location = SourceLoc();
+        Type* subType = nullptr;
+        Type* supType = nullptr;
+    };
+
+    // A source generic constraint that is not an interface conformance could not
+    // be satisfied — the general fallback for every constraint kind handled by
+    // the witness solver other than conformance (today: equality `where T == X`,
+    // type coercion `where U(T)`, non-empty pack `where nonempty(P)`, ...).
+    // `constraintDecl` is the source constraint declaration, rendered to a
+    // readable form (e.g. `T == int`, `T : IFoo`, `int(T)`) by
+    // `ASTPrinter::getGenericConstraintString`; `constraintLoc` anchors a
+    // "see declaration" note. The declaration is captured (not a pre-rendered
+    // string) so formatting stays deferred to `CompleteOverloadCandidate`.
+    struct GenericConstraintNotSatisfied
+    {
+        SourceLoc location = SourceLoc();
+        Decl* constraintDecl = nullptr;
+        SourceLoc constraintLoc = SourceLoc();
+    };
+
+    // Two ordinary constraints inferred conflicting arguments for one generic
+    // parameter (e.g. `foo<T>(T, T)` with unrelated `A`/`B`, or `foo<let N:int>`
+    // required to be both `4` and `8`). Captures the parameter declaration and
+    // both candidate values; `Val*` covers both type parameters (the candidates
+    // are `Type`s) and value parameters (the candidates are `IntVal`s).
+    struct GenericParamUnificationConflict
+    {
+        SourceLoc location = SourceLoc();
+        Decl* paramDecl = nullptr;
+        Val* firstVal = nullptr;
+        Val* secondVal = nullptr;
+    };
+
+    Kind kind = Kind::None;
+    union
+    {
+        VariadicPackCountMismatch variadicPackCountMismatch;
+        GenericArityMismatch genericArityMismatch;
+        OrdinaryGenericParamNotInferred ordinaryGenericParamNotInferred;
+        InterfaceConformanceNotSatisfied interfaceConformanceNotSatisfied;
+        GenericConstraintNotSatisfied genericConstraintNotSatisfied;
+        GenericParamUnificationConflict genericParamUnificationConflict;
+    };
+
+    // Every payload must be trivially copyable: that is what lets this struct
+    // use the implicitly-defaulted (trivial) copy/assignment, which copies the
+    // whole object representation instead of switching on `kind` to copy only
+    // the active member. A kind-switched copy performs conditional reads of
+    // individual payload fields, which GCC's -Werror=maybe-uninitialized
+    // rejects (it cannot prove the read member is the initialized one) once
+    // `OverloadCandidate` values are copied inside standard-library
+    // algorithms. Trivial copyability also implies trivial destructibility,
+    // which is what makes the placement-new in the `set*()` members (which
+    // never destroy the previously active member first) well-defined.
+    static_assert(
+        std::is_trivially_copyable_v<VariadicPackCountMismatch> &&
+            std::is_trivially_copyable_v<GenericArityMismatch> &&
+            std::is_trivially_copyable_v<OrdinaryGenericParamNotInferred> &&
+            std::is_trivially_copyable_v<InterfaceConformanceNotSatisfied> &&
+            std::is_trivially_copyable_v<GenericConstraintNotSatisfied> &&
+            std::is_trivially_copyable_v<GenericParamUnificationConflict>,
+        "GenericArgumentInferenceFailure payloads must be trivially copyable");
+
+    // Zero the tag and the full union storage so every byte of the object is
+    // initialized from birth and the trivial copy above never reads an
+    // indeterminate byte. `Kind::None` is value zero, so the zeroed tag is the
+    // correct "no failure recorded" state; assert that so a reordering of the
+    // enum cannot silently break this constructor.
+    static_assert(int(Kind::None) == 0, "zero-initialized tag must mean Kind::None");
+    GenericArgumentInferenceFailure() { std::memset(static_cast<void*>(this), 0, sizeof(*this)); }
+
+    // Select a union variant and return a reference for the caller to populate.
+    // Each setter begins the chosen member's lifetime with placement-new and
+    // updates `kind` in lockstep, so the invariant "`kind` names the live union
+    // member" holds by construction at every capture site. The previously
+    // active member is trivially destructible, so it needs no explicit
+    // destruction before the new member is constructed in place.
+    VariadicPackCountMismatch& setVariadicPackCountMismatch()
+    {
+        kind = Kind::VariadicPackCountMismatch;
+        return *new (&variadicPackCountMismatch) VariadicPackCountMismatch();
     }
-    HashCode getHashCode() const
+    GenericArityMismatch& setGenericArityMismatch()
     {
-        return combineHash(operatorName, args[0].getRaw(), args[1].getRaw(), isGLSLMode ? 1 : 0);
+        kind = Kind::GenericArityMismatch;
+        return *new (&genericArityMismatch) GenericArityMismatch();
     }
-    bool fromOperatorExpr(OperatorExpr* opExpr)
+    OrdinaryGenericParamNotInferred& setOrdinaryGenericParamNotInferred()
     {
-        // First, lets see if the argument types are ones
-        // that we can encode in our space of keys.
-        args[0] = BasicTypeKey::invalid();
-        args[1] = BasicTypeKey::invalid();
-        if (opExpr->arguments.getCount() > 2)
-            return false;
-
-        for (Index i = 0; i < opExpr->arguments.getCount(); i++)
-        {
-            auto key = makeBasicTypeKey(opExpr->arguments[i]->type, opExpr->arguments[i]);
-            if (key.getRaw() == BasicTypeKey::invalid().getRaw())
-            {
-                return false;
-            }
-            args[i] = key;
-        }
-
-        // Next, lets see if we can find an intrinsic opcode
-        // attached to an overloaded definition (filtered for
-        // definitions that could conceivably apply to us).
-        //
-        // TODO: This should really be parsed on the operator name
-        // plus fixity, rather than the intrinsic opcode...
-        //
-        // We will need to reject postfix definitions for prefix
-        // operators, and vice versa, to ensure things work.
-        //
-        auto prefixExpr = as<PrefixExpr>(opExpr);
-        auto postfixExpr = as<PostfixExpr>(opExpr);
-
-        if (auto overloadedBase = as<OverloadedExpr>(opExpr->functionExpr))
-        {
-            for (auto item : overloadedBase->lookupResult2)
-            {
-                // Look at a candidate definition to be called and
-                // see if it gives us a key to work with.
-                //
-                Decl* funcDecl = item.declRef.getDecl();
-                if (auto genDecl = as<GenericDecl>(funcDecl))
-                    funcDecl = genDecl->inner;
-
-                // Reject definitions that have the wrong fixity.
-                //
-                if (prefixExpr && !funcDecl->findModifier<PrefixModifier>())
-                    continue;
-                if (postfixExpr && !funcDecl->findModifier<PostfixModifier>())
-                    continue;
-
-                if (auto intrinsicOp = funcDecl->findModifier<IntrinsicOpModifier>())
-                {
-                    operatorName = intrinsicOp->op;
-                    return true;
-                }
-            }
-        }
-        return false;
+        kind = Kind::OrdinaryGenericParamNotInferred;
+        return *new (&ordinaryGenericParamNotInferred) OrdinaryGenericParamNotInferred();
+    }
+    InterfaceConformanceNotSatisfied& setInterfaceConformanceNotSatisfied()
+    {
+        kind = Kind::InterfaceConformanceNotSatisfied;
+        return *new (&interfaceConformanceNotSatisfied) InterfaceConformanceNotSatisfied();
+    }
+    GenericConstraintNotSatisfied& setGenericConstraintNotSatisfied()
+    {
+        kind = Kind::GenericConstraintNotSatisfied;
+        return *new (&genericConstraintNotSatisfied) GenericConstraintNotSatisfied();
+    }
+    GenericParamUnificationConflict& setGenericParamUnificationConflict()
+    {
+        kind = Kind::GenericParamUnificationConflict;
+        return *new (&genericParamUnificationConflict) GenericParamUnificationConflict();
     }
 };
+
+// The zero-filling constructor and the implicitly-defaulted copy operations
+// above rely on the whole type — not just each payload — being trivially
+// copyable; assert it so a user-provided copy operation or a non-trivial
+// member cannot be reintroduced without failing the build.
+static_assert(
+    std::is_trivially_copyable_v<GenericArgumentInferenceFailure>,
+    "GenericArgumentInferenceFailure must be trivially copyable");
+
+DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal);
 
 struct OverloadCandidate
 {
@@ -326,6 +430,29 @@ struct OverloadCandidate
     // arguments so that we don't have to repeat work across checking
     // phases. Currently this is only needed for generics.
     SubstitutionSet subst;
+
+    // For a generic candidate, the number of leading ordinary generic arguments
+    // that were supplied explicitly (as opposed to filled from a parameter's
+    // default). `TryCheckOverloadCandidateConstraints` hands this prefix to the
+    // generic constraint solver so defaults and witness arguments are resolved by
+    // the solver's fixpoint -- the same path used for inferred generic arguments
+    // -- rather than a separate linear pass. -1 until computed.
+    Index explicitGenericArgCount = -1;
+
+    // When a generic candidate fails before producing a specialized decl-ref,
+    // the solver can record a focused failure reason here. The selected failed
+    // candidate reports this reason instead of falling back to only the generic
+    // "could not specialize" diagnostic.
+    GenericArgumentInferenceFailure genericInferenceFailure;
+
+    // Records the first argument that failed to type-check while trying this
+    // candidate, so a "no applicable overload" diagnostic can point the user at
+    // which argument is wrong (issue #7857). `argMismatchArgIndex` is the 0-based
+    // argument index (-1 until a mismatch is recorded); `argMismatchExpectedType`
+    // is the parameter type and `argMismatchActualType` is the argument type.
+    Index argMismatchArgIndex = -1;
+    Type* argMismatchExpectedType = nullptr;
+    Type* argMismatchActualType = nullptr;
 };
 
 struct ResolvedOperatorOverload
@@ -345,11 +472,7 @@ struct ResolvedOperatorOverload
 
 struct TypeCheckingCache : public RefObject
 {
-    Dictionary<OperatorOverloadCacheKey, ResolvedOperatorOverload> resolvedOperatorOverloadCache;
     Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
-
-    // The version used to invalidate the cached declRefs in ResolvedOperatorOverload entries.
-    int version = 0;
 };
 
 enum class CoercionSite
@@ -779,6 +902,21 @@ struct SharedSemanticsContext : public RefObject
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
 
+    // Whether the `glsl` module has been imported into this checking session. Set when the
+    // `glsl` import is handled (see `importModuleIntoScope`), rather than scanning the imported
+    // module list on demand, because the builtin-operator fast path consults
+    // `isGLSLOperatorScope()` for every operator expression.
+    bool m_isGLSLModuleImported = false;
+
+public:
+    /// Is the current checking session in GLSL operator scope? True when `-allow-glsl` is set or
+    /// the `glsl` module has been imported (its overloads give builtin operators GLSL semantics).
+    bool isGLSLOperatorScope()
+    {
+        return getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL) ||
+               m_isGLSLModuleImported;
+    }
+
 public:
     SharedSemanticsContext(
         Linkage* linkage,
@@ -817,6 +955,18 @@ public:
     /// Invalidate inheritance info for `type`
     void invalidateInheritanceInfo(Type* type);
 
+    /// Try to resolve the endpoint types of `constraintDeclRef` enough to match it
+    /// during inheritance computation, for both constraint scans in
+    /// `_calcInheritanceInfo` (the access-centric scan for associated-type accesses and
+    /// the sub-centric scan for generic type parameters). A leaf endpoint is resolved
+    /// eagerly; an unresolved multi-level (member-expression) endpoint is NOT resolved
+    /// (doing so would re-enter the in-progress type).
+    ///
+    /// Returns true if the endpoints are resolved and the caller may proceed to match
+    /// the constraint; false if a multi-level endpoint is still unresolved (the caller
+    /// then defers the constraint and records it as an in-progress skip).
+    bool tryResolveConstraintTypes(DeclRef<GenericTypeConstraintDecl> constraintDeclRef);
+
     void registerAssociatedDecl(Decl* original, DeclAssociationKind assoc, Decl* declaration);
 
     List<RefPtr<DeclAssociation>> const& getAssociatedDeclsForDecl(Decl* decl);
@@ -842,15 +992,27 @@ public:
 
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker() { return &m_glslBindingOffsetTracker; }
 
-    /// Get the processed inheritance information for `type`, including all its facets
+    /// Get the processed inheritance information for `type`, including all its facets.
+    ///
+    /// `ioSkippedIncompleteFacet` is an internal accumulator used to make
+    /// inheritance computation tolerant of *benevolent* cycles introduced by
+    /// equality constraints (e.g. an interface `__constraint A == B`, which
+    /// makes `T.A` and `T.B` mutual bases). When a computation has to skip a
+    /// constraint because its base type is still being computed (an ancestor on
+    /// the call stack), the skipped ancestor's `DeclRef` is recorded here so the
+    /// caller can tell its result is *contextual* (partial) and must not be
+    /// cached. External callers leave it null. See `_getInheritanceInfo` for the
+    /// "skipped-ancestors minus self" completeness rule.
     InheritanceInfo getInheritanceInfo(
         Type* type,
-        InheritanceCircularityInfo* circularityInfo = nullptr);
+        InheritanceCircularityInfo* circularityInfo = nullptr,
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet = nullptr);
 
     /// Get the processed inheritance information for `extension`, including all its facets
     InheritanceInfo getInheritanceInfo(
         DeclRef<ExtensionDecl> const& extension,
-        InheritanceCircularityInfo* circularityInfo = nullptr);
+        InheritanceCircularityInfo* circularityInfo = nullptr,
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet = nullptr);
 
     /// Prevent an unsupported case of
     /// ```
@@ -914,14 +1076,24 @@ private:
     InheritanceInfo _getInheritanceInfo(
         DeclRef<Decl> declRef,
         Type* selfType,
-        InheritanceCircularityInfo* circularityInfo);
+        InheritanceCircularityInfo* circularityInfo,
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet = nullptr);
 
-    InheritanceInfo _calcInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo);
+    InheritanceInfo _calcInheritanceInfo(
+        Type* type,
+        InheritanceCircularityInfo* circularityInfo,
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet);
 
     InheritanceInfo _calcInheritanceInfo(
         DeclRef<Decl> declRef,
         Type* selfType,
-        InheritanceCircularityInfo* circularityInfo);
+        InheritanceCircularityInfo* circularityInfo,
+        HashSet<DeclRef<Decl>>* ioSkippedIncompleteFacet);
+
+    /// True if inheritance info for `type` is currently being computed (its
+    /// cache entry is marked in-progress) -- i.e. `type` is an ancestor on the
+    /// current inheritance-computation stack. Used to detect benevolent cycles.
+    bool _isInheritanceInfoBeingComputed(Type* type);
 
     UInt getDeclExtensionEpoch(Decl* decl) const;
     void bumpDeclExtensionEpoch(Decl* decl);
@@ -2096,7 +2268,7 @@ public:
         RefPtr<WitnessTable> witnessTable);
 
     bool doesTypeSatisfyConstraintRequirements(
-        DeclRef<ContainerDecl> requiredAssociatedTypeDeclRef,
+        DeclRef<ContainerDecl> requirementDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
     bool doesTypeSatisfyAssociatedTypeRequirement(
@@ -2262,8 +2434,18 @@ public:
         RefPtr<WitnessTable> witnessTable,
         MethodWitnessSynthesisFailureDetails* outFailureDetails = nullptr);
 
-    /// Clone generic containers.
-    DeclRef<Decl> liftDeclFromGenericContainers(Decl* decl, SubstitutionSet& outSubst);
+    /// Clone the generic containers that make `decl` well-scoped after relocation.
+    ///
+    /// Generated interface requirements can be moved from a callable's local generic context to a
+    /// sibling requirement on the interface. This clones the enclosing generic signatures, rewrites
+    /// references from the source binders to the cloned binders, and returns a decl-ref that maps
+    /// the source environment to the relocated declaration. `destinationParentDecl` lets callers
+    /// place the cloned generic chain under the semantic owner that should contain the generated
+    /// declaration.
+    DeclRef<Decl> liftDeclFromGenericContainers(
+        Decl* decl,
+        SubstitutionSet& outSubst,
+        ContainerDecl* destinationParentDecl = nullptr);
 
     enum SynthesisPattern
     {
@@ -2534,6 +2716,14 @@ public:
         ConstantFoldingKind kind,
         ConstantFoldingCircularityInfo* circularityInfo);
 
+    /// Constant-fold a builtin-operator fast-path node (`a + b`, `N / 2`, etc.), producing a
+    /// concrete `ConstantIntVal`, a `PolynomialIntVal` (for `+`/`-`/`*`), or a decl-free
+    /// `BuiltinOperationIntVal` when operands are still symbolic.
+    IntVal* tryConstantFoldBuiltinOperatorExpr(
+        SubstExpr<BuiltinOperatorExpr> expr,
+        ConstantFoldingKind kind,
+        ConstantFoldingCircularityInfo* circularityInfo);
+
     /// Try to apply front-end constant folding to determine the value of `expr`.
     IntVal* tryConstantFoldExpr(
         SubstExpr<Expr> expr,
@@ -2625,9 +2815,25 @@ public:
 
     DeclRef<Decl> getRequirementAsLookedUpDecl(ASTBuilder* astBuilder, Decl* decl);
 
+    /// Calculate the builtin differentiable function interface type for a callable-as-type.
+    ///
+    /// The plain overloads derive the type-info witness from `baseFuncAsType`. The
+    /// `WithWitness` overloads are used when conformance checking already selected a specific
+    /// witness, so the computed interface type stays tied to that proof instead of re-synthesizing
+    /// a different one.
     FuncType* getCalculatedDiffFuncType(const char* magicCalcName, Type* baseFuncAsType)
     {
         Val* args[] = {baseFuncAsType, getDiffTypeInfoWitness(baseFuncAsType)};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, typeInfoWitness};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2642,6 +2848,17 @@ public:
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
 
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* operand1,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, operand1, typeInfoWitness};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
     FuncType* getCalculatedDiffFuncType(
         const char* magicCalcName,
         Type* baseFuncAsType,
@@ -2649,6 +2866,18 @@ public:
         Type* operand2)
     {
         Val* args[] = {baseFuncAsType, operand1, operand2, getDiffTypeInfoWitness(baseFuncAsType)};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* operand1,
+        Type* operand2,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, operand1, operand2, typeInfoWitness};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2844,6 +3073,22 @@ public:
         // needs to pull newly discovered constraints into the iterative loop.
         ShortList<SolverConstraint, 8> discoveredConstraints;
 
+        // Hidden witness arguments discovered while unifying full generic-app
+        // decl-refs. Consider this example:
+        //
+        //     interface ITensor<T, int D>
+        //     {
+        //         T load<each TIndex>(TIndex indices)
+        //             where TIndex == int
+        //             where countof(TIndex) == D;
+        //     }
+        //
+        // A use site for this requirement already carries proof arguments for `load`'s source
+        // generic constraints. When that lookup resolves to a satisfying method, the solver should
+        // preserve those proof arguments instead of recomputing them from default declaration
+        // context.
+        Dictionary<Decl*, Val*> discoveredWitnessArgs;
+
         // Additional subtype witnesses available to the current constraint solving context.
         Type* subTypeForAdditionalWitnesses = nullptr;
         Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitnesses = nullptr;
@@ -2852,6 +3097,13 @@ public:
         // This tracks costs when a type parameter is promoted to satisfy an interface
         // constraint (e.g., int -> float to satisfy __BuiltinFloatingPointType).
         ConversionCost typePromotionCost = kConversionCost_None;
+
+        // Optional channel for a generic-argument solve to explain a focused
+        // failure to overload completion. Solving can run while collecting
+        // speculative candidates, so diagnostics are delayed until overload
+        // resolution selects the failed candidate.
+        GenericArgumentInferenceFailure* failure = nullptr;
+        SourceLoc applicationLoc = SourceLoc();
     };
 
     bool isRelevantGeneric(GenericInferenceContext& system, Decl* generic);
@@ -3341,7 +3593,8 @@ public:
         OverloadResolveContext& context,
         ArrayView<Val*> providedOrdinaryArgs,
         ConversionCost& outBaseCost,
-        List<QualType>* innerParameterTypes = nullptr);
+        List<QualType>* innerParameterTypes = nullptr,
+        GenericArgumentInferenceFailure* outFailure = nullptr);
 
     void AddTypeOverloadCandidates(Type* type, OverloadResolveContext& context);
 
@@ -3512,8 +3765,12 @@ public:
         ASTBuilder* astBuilder,
         DeclRef<InterfaceDecl> interfaceDeclRef);
 
-    bool doesCalleeHaveFwdDiff(DeclRef<CallableDecl> declRef);
-    bool doesCalleeHaveBwdDiff(DeclRef<CallableDecl> declRef);
+    // Differentiability of a function is represented by conformance of the function-as-type to
+    // `IForwardDifferentiable`/`IBackwardDifferentiable`. Query that conformance directly instead
+    // of probing for the `fwd_diff`/`bwd_diff` associated-function entries; those entries are
+    // witnesses produced by the conformance, not the source of truth.
+    SubtypeWitness* isFuncForwardDifferentiable(DeclRef<CallableDecl> declRef);
+    SubtypeWitness* isFuncBackwardDifferentiable(DeclRef<CallableDecl> declRef);
 };
 
 
@@ -3562,6 +3819,11 @@ public:
 
     Expr* visitInvokeExpr(InvokeExpr* expr);
 
+    // A `BuiltinOperatorExpr` is produced already-checked by `convertToBuiltinArithmeticOp`
+    // (during `visitInvokeExpr`), so checking it is a no-op; this exists for visitor
+    // completeness / idempotent re-checks.
+    Expr* visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr);
+
     Expr* visitSelectExpr(SelectExpr* expr);
 
     Expr* visitVarExpr(VarExpr* expr);
@@ -3605,6 +3867,7 @@ public:
     CASE(ExtractExistentialValueExpr)
     CASE(OpenRefExpr)
     CASE(MakeOptionalExpr)
+    CASE(CastOptionalExpr)
     CASE(PartiallyAppliedGenericExpr)
     CASE(PackExpr)
 #undef CASE
@@ -3656,6 +3919,59 @@ public:
 private:
     // Convert the logic operator expression to not use 'InvokeExpr' type
     Expr* convertToLogicOperatorExpr(InvokeExpr* expr);
+
+    // Recognize an ordinary builtin operator on builtin scalar/vector/matrix operands and
+    // rewrite it directly to a `BuiltinOperatorExpr` carrying the resolved `BuiltinOperationKind`,
+    // returning null when the operator should instead go through normal overload resolution.
+    //
+    // This exists for performance: the vast majority of operators in real shader code are builtin
+    // arithmetic/comparison/bitwise/unary ops on numeric scalars/vectors/matrices, and routing
+    // each one through full generic `operator OP` overload resolution (candidate collection,
+    // inference, coercion) is a large front-end cost. Handling them here lets the common case skip
+    // all of that and lower straight to the corresponding builtin IR op.
+    //
+    // Recognized: `+ - * / %`, `== != < > <= >=`, `& | ^ << >>`, and unary `- ! ~` on builtin
+    // integer/floating-point/bool operands (same-type operands as-is; different builtin types
+    // promoted via `getBuiltinArithmeticCommonType`). Returns null to fall back to normal
+    // resolution for: the short-circuiting `&&`/`||`, mixed shapes that are not
+    // broadcast-compatible, user-defined operand types, and -- in GLSL operator scope only --
+    // matrix operands and vector equality (`==`/`!=`), whose semantics the `glsl` module owns.
+    Expr* convertToBuiltinArithmeticOp(InvokeExpr* expr);
+
+    // For a builtin binary operator `a OP b` whose operands have *different* builtin
+    // scalar/vector/matrix types, compute the common operand type that overload resolution
+    // would converge on (the "usual arithmetic conversions"): the result element type is the
+    // higher-ranked of the two base types (float beats int; among ints the larger size wins,
+    // and on a size tie the unsigned type wins) so neither operand needs a narrowing
+    // conversion, and the result shape broadcasts a scalar against a vector/matrix (requiring
+    // matching extents for vector-vector / matrix-matrix). Returns null when the operands are
+    // not both builtin numeric scalar/vector/matrix types or the shapes are not
+    // broadcast-compatible, in which case the caller falls back to overload resolution.
+    Type* getBuiltinArithmeticCommonType(Type* left, Type* right);
+
+    // Return `target` with its element/base type replaced by `newElementType`, preserving the
+    // composite shape: a scalar becomes `newElementType`, a `vector<T,N>` becomes
+    // `vector<newElementType,N>`, and a `matrix<T,R,C>` becomes `matrix<newElementType,R,C>`.
+    Type* substituteElementOfCompositeType(Type* target, Type* newElementType);
+
+    // Coerce the operands of a builtin binary operator to the common operand type that overload
+    // resolution would have selected (via `getBuiltinArithmeticCommonType`), and return that
+    // type. Each operand is converted to its *own* shape with the common element base (so e.g. a
+    // `vector * scalar` stays a two-shape operation that backends can lower to a vector-times-
+    // scalar instruction). `outLeftArg`/`outRightArg` receive the (possibly coerced) operand
+    // expressions. Operands that are already the same type are returned unchanged. Returns null
+    // when the operands are not broadcast-compatible builtin numeric types or a coercion fails,
+    // signalling that the fast-path conversion should be abandoned.
+    Type* coerceOperandsOfBuiltinBinaryExpr(
+        Expr* leftArg,
+        Expr* rightArg,
+        Expr*& outLeftArg,
+        Expr*& outRightArg);
+
+    // True when builtin operators may have GLSL rather than Slang/HLSL semantics: either
+    // `-allow-glsl` is set, or the `glsl` module is in scope (its `operator*` overloads
+    // make `mat * mat` a matrix product). The builtin-operator fast path is disabled then.
+    bool isGLSLOperatorScope();
 };
 
 struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmtVisitor>
@@ -3724,6 +4040,11 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
     void visitExpressionStmt(ExpressionStmt* stmt);
 
     void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt);
+
+    // If `expr` is the discarded result of a call to a `[NoDiscard]` function,
+    // emit an error. Used for any context where an expression's result is
+    // ignored (an expression statement, or a `for` loop's side-effect expression).
+    void maybeDiagnoseDiscardedNoDiscardResult(Expr* expr);
 
     // Try to infer the max number of iterations the loop will run.
     void tryInferLoopMaxIterations(ForStmt* stmt);
@@ -3869,6 +4190,17 @@ Witness* findNonEmptyPackWitnessForConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
     Val* constrainedArg,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    bool shouldEmitError);
+
+// Return the witness that proves `actualCount == expectedCount`, or `nullptr`
+// if the concrete count or an in-scope declared constraint cannot prove that
+// equality.
+Witness* findVariadicPackCountWitnessForConstraint(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    IntVal* actualCount,
+    IntVal* expectedCount,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError);
 

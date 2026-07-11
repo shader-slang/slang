@@ -1,23 +1,22 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-12T09:35:18+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 05b1016228f8c0bbf2fd6e6ea6d165c4d173a37c116aea0c0eccdb47c10abf97
+model: claude-opus-4.8
+generated_at: 2026-06-29T15:31:15Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 69b1b4b4ebfd2e31c72694cb96999536c58a4466e09db936fc79e843d50fc2ad
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
 # Types Reference
 
-The reference for every concrete `Type` subclass in the Slang AST.
+The reference for every concrete `Type` subclass in the Slang AST,
+written for a contributor reading checker or IR-lowering code that
+inspects or constructs Slang types.
 
 `Type` is internally a subclass of `Val`, not a direct child of
 `NodeBase`; see [base.md](base.md#type-val) for the relationship. The
 non-Type `Val` subhierarchy (witnesses, integer values, substitutions)
 lives in [values.md](values.md).
-
-Audience: a contributor reading checker or IR-lowering code that
-inspects or constructs Slang types.
 
 ## Source
 
@@ -34,6 +33,7 @@ declarations that `DeclRefType` references at the surface level.
 
 ```mermaid
 flowchart TD
+  NodeBase --> Val
   Val --> Type
   Type --> OverloadGroupType
   Type --> InitializerListType
@@ -45,7 +45,6 @@ flowchart TD
   Type --> FuncType
   Type --> AndType
   Type --> ModifiedType
-  Type --> ThisType
   Type --> ExtractExistentialType
   Type --> ExistentialSpecializedType
   Type --> GenericDeclRefType
@@ -59,6 +58,7 @@ flowchart TD
   DeclRefType --> ConditionalType
   DeclRefType --> AtomicType
   DeclRefType --> TupleType
+  DeclRefType --> ThisType
   ArithmeticExpressionType --> BasicExpressionType
   ArithmeticExpressionType --> VectorExpressionType
   ArithmeticExpressionType --> MatrixExpressionType
@@ -71,11 +71,11 @@ flowchart TD
   BuiltinType --> PtrTypeBase
   BuiltinType --> OptionalType
   BuiltinType --> NativeRefType
+  BuiltinType --> SubpassInputType
+  BuiltinType --> SamplerStateType
+  BuiltinType --> BuiltinGenericType
   BuiltinType --> OtherBuiltins["IBufferDataLayoutType, FeedbackType, TensorViewType, DynamicType, ..."]
   ResourceType --> TextureTypeBase
-  ResourceType --> SubpassInputType
-  ResourceType --> SamplerStateType
-  ResourceType --> BuiltinGenericType
   TextureTypeBase --> TextureType
   TextureTypeBase --> GLSLImageType
   BuiltinGenericType --> PointerLikeType
@@ -116,21 +116,21 @@ Abstract intermediates: `ArithmeticExpressionType`, `Fp8Type`,
 | `InitializerListType` | `Type` | (operand-encoded) | (none) | The pseudo-type of an initializer list before it has been matched to a target type. |
 | `ErrorType` | `Type` | (operand-encoded) | (none) | The type of expressions that failed checking; lets checking continue without cascading errors. |
 | `BottomType` | `Type` | (operand-encoded) | (none) | Bottom type representing "no value"; used in the type lattice. |
-| `DeclRefType` | `Type` | (declRef encoded as Val operand) | [type ref](../syntax-reference/grammar.md#types) | A type defined by reference to a declaration (`StructDecl`, `InterfaceDecl`, `EnumDecl`, ...). |
+| `DeclRefType` | `Type` | `declRef: DeclRef<Decl>` | [type ref](../syntax-reference/grammar.md#types) | A type defined by reference to a declaration (`StructDecl`, `InterfaceDecl`, `EnumDecl`, ...). |
 | `TypeType` | `Type` | (operand-encoded) | (none) | The type *of* a type expression (i.e. the "kind" `Type`). |
 | `NamedExpressionType` | `Type` | (operand-encoded) | [typedef ref](../syntax-reference/grammar.md#types) | A typedef'd / typealias'd type that preserves the original name for diagnostics. |
 | `NamespaceType` | `Type` | (operand-encoded) | (none) | The type of a namespace expression. |
 | `GenericDeclRefType` | `Type` | (operand-encoded) | (none) | A reference to a generic declaration without its arguments applied. |
-| `FuncType` | `Type` | (param-types, result-type, error-type operand-encoded) | [function type](../syntax-reference/grammar.md#types) | Function type with parameter types, return type, and optional error type. |
+| `FuncType` | `Type` | `paramTypes: Type*, result: Type*, error: Type*` | [function type](../syntax-reference/grammar.md#types) | Function type with parameter types, return type, and optional error type. |
 
 ### Arithmetic types (scalar / vector / matrix)
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `BasicExpressionType` | `ArithmeticExpressionType` | (operand-encoded) | [basic type](../syntax-reference/grammar.md#types) | Scalar built-in type: `int`, `uint`, `float`, `bool`, `void`, etc. |
-| `VectorExpressionType` | `ArithmeticExpressionType` | (element-type, count operand-encoded) | [vector type](../syntax-reference/grammar.md#types) | `vector<T,N>` / shorthand `float3`, `int4`, ... |
-| `MatrixExpressionType` | `ArithmeticExpressionType` | (element-type, rows, cols, layout operand-encoded) | [matrix type](../syntax-reference/grammar.md#types) | `matrix<T,R,C>` / `floatRxC`. |
-| `CoopVectorExpressionType` | `ArithmeticExpressionType` | (operand-encoded) | (none) | Cooperative-vector type (subgroup-cooperative math). |
+| `VectorExpressionType` | `ArithmeticExpressionType` | `elementType: Type*, elementCount: IntVal*` | [vector type](../syntax-reference/grammar.md#types) | `vector<T,N>` / shorthand `float3`, `int4`, ... |
+| `MatrixExpressionType` | `ArithmeticExpressionType` | `elementType: Type*, rowCount: IntVal*, columnCount: IntVal*, layout: IntVal*` | [matrix type](../syntax-reference/grammar.md#types) | `matrix<T,R,C>` / `floatRxC`. |
+| `CoopVectorExpressionType` | `ArithmeticExpressionType` | `elementType: Type*, elementCount: IntVal*` | (none) | Cooperative-vector type (subgroup-cooperative math). |
 | `DifferentialPairType` | `ArithmeticExpressionType` | (operand-encoded) | (none) | Differential pair `(primal, differential)` used by autodiff. |
 | `DifferentialPtrPairType` | `ArithmeticExpressionType` | (operand-encoded) | (none) | Differential pair of pointers (for in-place gradients). |
 | `FloatE4M3Type` | `Fp8Type` | (operand-encoded) | (none) | 8-bit float with 4 exponent / 3 mantissa bits. |
@@ -141,11 +141,11 @@ Abstract intermediates: `ArithmeticExpressionType`, `Fp8Type`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `ArrayExpressionType` | `DeclRefType` | (element-type, element-count operand-encoded) | [array type](../syntax-reference/grammar.md#types) | Sized or unsized array of elements. |
-| `TupleType` | `DeclRefType` | (member-types operand-encoded) | [tuple type](../syntax-reference/grammar.md#types) | `(T1, T2, ...)` tuple. |
-| `ConditionalType` | `DeclRefType` | (operand-encoded) | (none) | Compile-time conditional type. |
-| `AtomicType` | `DeclRefType` | (operand-encoded) | (none) | Atomic wrapper type. |
-| `OptionalType` | `BuiltinType` | (operand-encoded) | [optional type](../syntax-reference/grammar.md#types) | `Optional<T>`. |
+| `ArrayExpressionType` | `DeclRefType` | `elementType: Type*, elementCount: IntVal*` | [array type](../syntax-reference/grammar.md#types) | Sized or unsized array of elements. |
+| `TupleType` | `DeclRefType` | `members: Type* (per index), typePack: Type*` | [tuple type](../syntax-reference/grammar.md#types) | `(T1, T2, ...)` tuple. |
+| `ConditionalType` | `DeclRefType` | `valueType: Type*, hasValue: IntVal*` | (none) | Compile-time conditional type. |
+| `AtomicType` | `DeclRefType` | `elementType: Type*` | (none) | Atomic wrapper type. |
+| `OptionalType` | `BuiltinType` | `valueType: Type*` | [optional type](../syntax-reference/grammar.md#types) | `Optional<T>`. |
 | `NativeRefType` | `BuiltinType` | (operand-encoded) | (none) | Internal native-reference type used in low-level lowering. |
 | `EnumTypeType` | `BuiltinType` | (operand-encoded) | (none) | The type of an `enum` type itself (its "kind"). |
 
@@ -153,8 +153,8 @@ Abstract intermediates: `ArithmeticExpressionType`, `Fp8Type`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `PtrTypeBase` | `BuiltinType` | (operand-encoded) | [pointer type](../syntax-reference/grammar.md#types) | Common base for raw pointer / reference families. |
-| `PtrType` | `PtrTypeBase` | (operand-encoded) | [pointer type](../syntax-reference/grammar.md#types) | `T*` raw pointer. |
+| `PtrTypeBase` | `BuiltinType` | `valueType: Type*, addressSpace: Val*, accessQualifier: Val*` | [pointer type](../syntax-reference/grammar.md#types) | Common base for raw pointer / reference families. |
+| `PtrType` | `PtrTypeBase` | `valueType: Type* (inherited)` | [pointer type](../syntax-reference/grammar.md#types) | `T*` raw pointer. |
 | `ExplicitRefType` | `PtrTypeBase` | (operand-encoded) | (none) | Explicit reference type. |
 | `ParamPassingModeType` | `PtrTypeBase` | (operand-encoded) | (none) | Common base for parameter-passing modes. |
 | `OutParamType` | `OutParamTypeBase` | (operand-encoded) | [out param](../syntax-reference/grammar.md#types) | `out T` parameter type. |
@@ -254,10 +254,10 @@ Abstract intermediates: `ArithmeticExpressionType`, `Fp8Type`,
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `ThisType` | `DeclRefType` | (interface decl-ref encoded) | [This](../syntax-reference/grammar.md#types) | The `This` type of an interface or extension. |
-| `ExtractExistentialType` | `Type` | (operand-encoded) | (none) | The "concrete inside" of an existential value, exposed after opening. |
+| `ExtractExistentialType` | `Type` | `declRef: DeclRef<VarDeclBase>, originalInterfaceType: Type*, originalInterfaceDeclRef: DeclRef<InterfaceDecl>` | (none) | The "concrete inside" of an existential value, exposed after opening. |
 | `ExistentialSpecializedType` | `Type` | (operand-encoded) | (none) | An existential specialized with concrete witnesses (mid-lowering). |
 | `AndType` | `Type` | (operand-encoded) | [conjunction type](../syntax-reference/grammar.md#types) | `T & U` conformance-conjunction type. |
-| `ModifiedType` | `Type` | (operand-encoded) | [type modifier](../syntax-reference/grammar.md#types) | A base type with modifiers applied. |
+| `ModifiedType` | `Type` | `base: Type*, modifiers: Val* (per index)` | [type modifier](../syntax-reference/grammar.md#types) | A base type with modifiers applied. |
 
 ### Differentiable-function types
 

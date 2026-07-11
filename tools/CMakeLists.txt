@@ -74,6 +74,7 @@ else()
     )
 endif()
 generator(slang-embed)
+generator(slang-core-module-cache)
 generator(slang-generate USE_FEWER_WARNINGS)
 generator(slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
 generator(slang-capability-generator LINK_WITH_PRIVATE compiler-core)
@@ -285,7 +286,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
-    add_dependencies(slang-test slang-neural-module)
+    add_dependencies(slang-test slang-neural-module slang-workgraph-module)
 
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}
@@ -323,6 +324,11 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     #
     # `platform` contains all the platform abstractions for a GUI application.
     #
+    # The public header gui.h includes both imgui.h and slang-rhi.h. imgui is
+    # INCLUDE_FROM_PUBLIC (below) so consumers of gui.h inherit its (override-aware) leaf
+    # include dir, since including gui.h transitively includes imgui.h; slang-rhi stays
+    # INCLUDE_FROM_PRIVATE because every current gui.h consumer links slang-rhi directly.
+    #
     slang_add_target(
         platform
         ${SLANG_LIB_TYPE}
@@ -340,7 +346,8 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB=1>
-        INCLUDE_FROM_PRIVATE imgui slang-rhi
+        INCLUDE_FROM_PRIVATE slang-rhi
+        INCLUDE_FROM_PUBLIC imgui
         INCLUDE_DIRECTORIES_PUBLIC
             .
             platform
@@ -370,6 +377,12 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         OUTPUT_NAME gfx-unit-test-tool
         REQUIRED_BY slang-test
         FOLDER test/tools
+    )
+    # The #11856 unit test drives DeviceCache::acquireDevice, so compile it into this module too.
+    target_sources(
+        gfx-unit-test
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/render-test/slang-test-device-cache.cpp
     )
 
     slang_add_target(
@@ -416,7 +429,14 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             SLANG_SHARED_LIBRARY_TOOL
             SLANG_NO_DEPRECATION
         USE_FEWER_WARNINGS
-        LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
+        LINK_WITH_PRIVATE
+            core
+            compiler-core
+            unit-test
+            slang
+            metal-cpp
+            Threads::Threads
+        LINK_WITH_FRAMEWORK Foundation Metal
         INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/source
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool

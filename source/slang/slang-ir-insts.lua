@@ -113,6 +113,18 @@ local insts = {
 					hoistable = true,
 				},
 			},
+			{
+				-- A vector with element alignment and no padding (12 bytes for a
+				-- 3-vector of 32-bit floats), used as the storage type for vectors
+				-- in Metal device buffers, which use natural (scalar-aligned,
+				-- tightly packed) layout. Emitted as MSL `packed_T<N>` (e.g.
+				-- `packed_float3`).
+				MetalPackedVec = {
+					struct_name = "MetalPackedVectorType",
+					operands = { { "elementType", "IRType" }, { "elementCount" } },
+					hoistable = true,
+				},
+			},
 			{ Conjunction = { struct_name = "ConjunctionType", hoistable = true } },
 			{
 				Attributed = {
@@ -216,6 +228,56 @@ local insts = {
 				},
 			},
 			{ Atomic = { struct_name = "AtomicType", operands = { { "elementType", "IRType" } }, hoistable = true } },
+			{
+				WorkGraphRecordTypeBase = {
+					hoistable = true,
+					{
+						DispatchNodeInputRecord = {
+							struct_name = "DispatchNodeInputRecordType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						ThreadNodeInputRecord = {
+							struct_name = "ThreadNodeInputRecordType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						GroupNodeInputRecords = {
+							struct_name = "GroupNodeInputRecordsType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{ EmptyNodeInput = { struct_name = "EmptyNodeInputType" } },
+					{
+						ThreadNodeOutputRecords = {
+							struct_name = "ThreadNodeOutputRecordsType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						GroupNodeOutputRecords = {
+							struct_name = "GroupNodeOutputRecordsType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						NodeOutput = {
+							struct_name = "NodeOutputType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{
+						NodeOutputArray = {
+							struct_name = "NodeOutputArrayType",
+							operands = { { "elementType", "IRType" } },
+						},
+					},
+					{ EmptyNodeOutput = { struct_name = "EmptyNodeOutputType" } },
+					{ EmptyNodeOutputArray = { struct_name = "EmptyNodeOutputArrayType" } },
+				},
+			},
 			{
 				BindExistentialsTypeBase = {
 					hoistable = true,
@@ -354,6 +416,25 @@ local insts = {
 					-- A DescriptorHandle<T> type represents a bindless handle to an opaue resource type.
 					struct_name = "DescriptorHandleType",
 					operands = { { "resourceType", "IRType" } },
+					hoistable = true,
+				},
+			},
+			{
+				UntypedResourceHandle = {
+					-- An opaque, untyped handle produced by `ResourceDescriptorHeap[i]`. It is nullary:
+					-- the heap index lives in the value, not the type. `lowerUntypedResourceHandleToUInt`
+					-- rewrites it to its underlying `uint` heap index before emit, so it never reaches
+					-- emit/layout (which treat a survivor as an internal error).
+					struct_name = "UntypedResourceHandleType",
+					hoistable = true,
+				},
+			},
+			{
+				UntypedSamplerHandle = {
+					-- An opaque, untyped handle produced by `SamplerDescriptorHeap[j]`. Nullary, like
+					-- `UntypedResourceHandle`; lowered to `uint` by the same
+					-- `lowerUntypedResourceHandleToUInt` pass and likewise never reaches emit/layout.
+					struct_name = "UntypedSamplerHandleType",
 					hoistable = true,
 				},
 			},
@@ -814,6 +895,23 @@ local insts = {
 	-- for linkage).
 	--
 	{ key = { struct_name = "StructKey", global = true } },
+	-- A requirement key for a recognized built-in interface requirement (e.g. an
+	-- `IDifferentiable` requirement identified by `BuiltinRequirementKind`).
+	-- Unlike an ordinary struct key -- which is a distinct `global` symbol per
+	-- field/requirement decl, unified across modules by its `key_<mangled>`
+	-- linkage name -- a built-in requirement key is `hoistable`, so it is
+	-- deduplicated *by construction* from its `kind` operand. This guarantees the
+	-- same logical built-in requirement always resolves to a single key inst,
+	-- even when referenced from several decls (the canonical interface constraint
+	-- and a constraint synthesized while building a type's `Differential`) or
+	-- across the precompiled-core-module boundary.
+	{
+		builtinRequirementKey = {
+			struct_name = "BuiltinRequirementKey",
+			operands = { { "kindOperand", "IRIntLit" } },
+			hoistable = true,
+		},
+	},
 	{ global_generic_param = { global = true } },
 	{ witness_table = { hoistable = true } },
 	{ indexedFieldKey = { operands = { { "baseType" }, { "index" } }, hoistable = true } },
@@ -890,7 +988,7 @@ local insts = {
 		--
 		-- Corresponds to the LLVM `poison` instruction.
 		--
-		{ Poison = {} },
+		{ Poison = { hoistable = true } },
 	}},
 
 	-- A `defaultConstruct` operation creates an initialized
@@ -1186,6 +1284,8 @@ local insts = {
 	},
 	-- Store into an Image.
 	{ imageStore = { operands = { { "image" }, { "coord" }, { "value" } } } },
+	-- Form a pointer to a texel of an image for atomic operations.
+	{ ImageTexelPointer = { operands = { { "image" }, { "coord" }, { "sample" } } } },
 	-- Load from a SubpassInput.
 	{ SubpassLoad = { operands = { { "subpassInput" }, { "sample", optional = true } } } },
 	-- Load (almost) arbitrary-type data from a byte-address buffer
@@ -1245,6 +1345,7 @@ local insts = {
 	{ nonUniformResourceIndex = { operands = { { "index" } } } },
 	{ getNaturalStride = { operands = { { "type" } } } },
 	{ meshOutputRef = { operands = { { "base" }, { "index" } } } },
+	{ nodeOutputRecordGetElementPtr = { operands = { { "base" }, { "index" } } } },
 	{ meshOutputSet = { operands = { { "base" }, { "index" }, { "elementValue" } } } },
 	-- only two parameters as they are effectively static
 	-- TODO: make them reference the _slang_mesh object directly
@@ -1413,6 +1514,7 @@ local insts = {
 	{ RequireComputeDerivative = {} },
 	{ StaticAssert = { operands = { { "condition" }, { "message" } } } },
 	{ Printf = { operands = { { "format" } } } },
+	{ Abort = { operands = { { "format" } } } },
 	-- Quad control execution modes.
 	{ RequireMaximallyReconverges = {} },
 	{ RequireQuadDerivatives = {} },
@@ -1794,6 +1896,15 @@ local insts = {
 			{ vulkanCallablePayload = { struct_name = "VulkanCallablePayloadDecoration" } },
 			{ vulkanCallablePayloadIn = { struct_name = "VulkanCallablePayloadInDecoration" } },
 			{ earlyDepthStencil = { struct_name = "EarlyDepthStencilDecoration" } },
+			-- Marks a fragment entry point whose `gl_FragDepth` output is constrained to
+			-- only ever increase / decrease the fixed-function depth (HLSL
+			-- SV_DepthGreaterEqual / SV_DepthLessEqual). Carried on the entry point so the
+			-- GLSL emitter can redeclare `layout(depth_greater)` / `layout(depth_less) out
+			-- float gl_FragDepth;`, which glslang maps to the DepthGreater / DepthLess
+			-- SPIR-V execution mode.
+			{ glslFragDepthGreater = { struct_name = "GLSLFragDepthGreaterDecoration" } },
+			{ glslFragDepthLess = { struct_name = "GLSLFragDepthLessDecoration" } },
+			{ shader64BitIndexing = { struct_name = "Shader64BitIndexingDecoration" } },
 			{ precise = { struct_name = "PreciseDecoration" } },
 			{ public = { struct_name = "PublicDecoration" } },
 			{ hlslExport = { struct_name = "HLSLExportDecoration" } },
@@ -1853,6 +1964,65 @@ local insts = {
 				waveSize = {
 					struct_name = "WaveSizeDecoration",
 					operands = { { "numLanes", "IRIntLit" } },
+				},
+			},
+			{
+				nodeLaunch = {
+					struct_name = "NodeLaunchDecoration",
+					operands = { { "mode", "IRStringLit" } },
+				},
+			},
+			{
+				nodeMaxDispatchGrid = {
+					struct_name = "NodeMaxDispatchGridDecoration",
+					operands = { { "x", "IRIntLit" }, { "y", "IRIntLit" }, { "z", "IRIntLit" } },
+				},
+			},
+			{
+				nodeDispatchGrid = {
+					struct_name = "NodeDispatchGridDecoration",
+					operands = { { "x", "IRIntLit" }, { "y", "IRIntLit" }, { "z", "IRIntLit" } },
+				},
+			},
+			{
+				maxRecords = {
+					struct_name = "MaxRecordsDecoration",
+					operands = { { "count", "IRIntLit" } },
+				},
+			},
+			{
+				nodeID = {
+					struct_name = "NodeIDDecoration",
+					operands = { { "name", "IRStringLit" }, { "arrayIndex", "IRIntLit" } },
+				},
+			},
+			{
+				nodeIsProgramEntry = {
+					struct_name = "NodeIsProgramEntryDecoration",
+				},
+			},
+			{
+				nodeArraySize = {
+					struct_name = "NodeArraySizeDecoration",
+					operands = { { "count", "IRIntLit" } },
+				},
+			},
+			{
+				allowSparseNodes = {
+					struct_name = "AllowSparseNodesDecoration",
+				},
+			},
+			{
+				-- Keep these decoration names reserved for stable IR serialization; new
+				-- workgraph records use dedicated Type.WorkGraphRecordTypeBase ops.
+				workGraphRecordType = {
+					struct_name = "WorkGraphRecordTypeDecoration",
+				},
+			},
+			{
+				workGraphRecordElementType = {
+					struct_name = "WorkGraphRecordElementTypeDecoration",
+					operands = { { "elementType", "IRType" } },
 				},
 			},
 			{
@@ -1936,6 +2106,16 @@ local insts = {
 					-- point.
 					struct_name = "EntryPointParamDecoration",
 					operands = { { "entryPoint", "IRFunc" } },
+				},
+			},
+			{
+				synthesizedParameterGroup = {
+					-- Marks a parameter-group element struct that was synthesized by the
+					-- compiler (e.g. by collecting entry-point `uniform`/resource parameters)
+					-- rather than written by the user. Diagnostics that only make sense for
+					-- source-authored groups (such as "special type leaks from parameter
+					-- group") are suppressed for these.
+					struct_name = "SynthesizedParameterGroupDecoration",
 				},
 			},
 			{
@@ -2087,6 +2267,16 @@ local insts = {
 					-- Attaches a name to this instruction so that it can be identified
 					-- later in the compiler reliably
 					operands = { { "nameOperand", "IRIntLit" } },
+				},
+			},
+			{
+				BuiltinRequirementDecoration = {
+					-- Marks an interface requirement key with the `BuiltinRequirementKind`
+					-- (stored as its integer value) of the built-in requirement it
+					-- represents. This lets consumers (e.g. autodiff) identify a built-in
+					-- requirement entry by its role rather than by its position in the
+					-- interface's requirement list, which is not semantically meaningful.
+					operands = { { "kindOperand", "IRIntLit" } },
 				},
 			},
 			{
@@ -2559,6 +2749,13 @@ local insts = {
 	-- already concrete types.
 	{ CastDescriptorHandleToResource = { operands = { { "handle" } } } },
 	{ CastResourceToDescriptorHandle = { operands = { { "resource" } } } },
+	-- Wrap/unwrap a `uint` heap index in an untyped descriptor-heap handle. This is an internal
+	-- representation only: the `lowerUntypedResourceHandleToUInt` pass forwards each cast to its
+	-- `uint` operand and removes it before emit, so these ops never reach a target emitter.
+	{ CastUIntToUntypedResourceHandle = { operands = { { "index" } } } },
+	{ CastUntypedResourceHandleToUInt = { operands = { { "handle" } } } },
+	{ CastUIntToUntypedSamplerHandle = { operands = { { "index" } } } },
+	{ CastUntypedSamplerHandleToUInt = { operands = { { "handle" } } } },
 	{ TreatAsDynamicUniform = { operands = { { "value" } } } },
 	{ sizeOf = { operands = { { "type" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },
 	{ alignOf = { operands = { { "baseOp" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },
@@ -2988,7 +3185,10 @@ local insts = {
 		--         discriminate which witness table to use, and the rest of the parameters.
 		--
 		hoistable = true,
-		operands = {{"witnessTableSet", "IRWitnessTableSet"}, {"lookupKey", "IRStructKey"}}
+		-- `lookupKey` is an `IRInst` (not `IRStructKey`) because a built-in interface
+		-- requirement reached through dynamic dispatch uses the hoistable
+		-- `IRBuiltinRequirementKey`, which is not an `IRStructKey`.
+		operands = {{"witnessTableSet", "IRWitnessTableSet"}, {"lookupKey", "IRInst"}}
 	} },
 	{ GetSpecializedDispatcher = {
 		-- Get a specialized dispatcher function for a given witness table set + key, where
@@ -3204,7 +3404,11 @@ local insts = {
 	{ constexprFloatCast = { operands = { { "value" } }, hoistable = true } },
 	{ constexprCastIntToEnum = { operands = { { "value" } }, hoistable = true } },
 	{ constexprCastEnumToInt = { operands = { { "value" } }, hoistable = true } },
-	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } }
+	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } },
+	-- Work-graph Barrier flag intrinsics: convert a compile-time BarrierMemoryTypeFlags/BarrierSemanticFlags
+	-- integer value to the corresponding target named-constant expression (e.g. "(UAV_MEMORY)").
+	{ getEnumBarrierMemoryTypeFlags = { operands = { { "flags" } }, hoistable = true } },
+	{ getEnumBarrierSemanticFlags = { operands = { { "flags" } }, hoistable = true } }
 }
 
 -- A function to calculate some useful properties and put it in the table,

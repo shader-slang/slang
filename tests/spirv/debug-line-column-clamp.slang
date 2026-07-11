@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -O0 -emit-spirv-directly -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -emit-spirv-directly -entry main -stage compute
 // Verifies DebugLine columns are clamped to the embedded DebugSource text when #line maps
 // space-indented generated source back to a tab-indented source file.
 

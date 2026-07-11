@@ -846,6 +846,88 @@ static LegalVal legalizePrintf(IRTypeLegalizationContext* context, ArrayView<Leg
         legalArgs.getArrayView().getBuffer()));
 }
 
+/// Validate abort payload argument types after variadic-pack and pair legalization.
+/// Scalar values and ordinary vectors with basic element types are accepted because
+/// they have printf-style format specifiers. Composite, pointer, resource, and other
+/// non-basic payloads are rejected with E55211 before target-specific lowering.
+static bool validateAbortArgumentTypes(
+    IRTypeLegalizationContext* context,
+    IRInst* abortInst,
+    ArrayView<IRInst*> args)
+{
+    ShortList<IRInst*> payloadArgs;
+    collectFlattenedVariadicOperands(args, 1, payloadArgs);
+
+    for (auto arg : payloadArgs)
+    {
+        auto argType = arg->getDataType();
+        auto elementType = argType;
+        if (auto vectorType = as<IRVectorType>(argType))
+            elementType = vectorType->getElementType();
+        if (as<IRBasicType>(elementType))
+            continue;
+
+        context->m_sink->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
+            .type = argType,
+            .location = abortInst->sourceLoc});
+        return false;
+    }
+    return true;
+}
+
+/// Legalize an `Abort` instruction by rebuilding it from its legalized operands.
+/// Operands that legalized to nothing (`none`) are dropped, `simple` operands are
+/// forwarded unchanged, and `pair` operands contribute only their ordinary
+/// (non-resource) side, since only ordinary data can be carried in an abort message.
+static LegalVal legalizeAbort(
+    IRTypeLegalizationContext* context,
+    IRInst* originalInst,
+    ArrayView<LegalVal> args)
+{
+    ShortList<IRInst*> legalArgs;
+    for (Index i = 0; i < args.getCount(); i++)
+    {
+        auto arg = args[i];
+        switch (arg.flavor)
+        {
+        case LegalVal::Flavor::none:
+            break;
+        case LegalVal::Flavor::simple:
+            legalArgs.add(arg.getSimple());
+            break;
+        case LegalVal::Flavor::pair:
+            {
+                auto ordinaryVal = arg.getPair()->ordinaryVal;
+                if (ordinaryVal.flavor != LegalVal::Flavor::simple)
+                {
+                    context->m_sink->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
+                        .type = originalInst->getOperand(i)->getDataType(),
+                        .location = originalInst->sourceLoc});
+                    return LegalVal::simple(context->builder->getVoidValue());
+                }
+                legalArgs.add(ordinaryVal.getSimple());
+            }
+            break;
+        default:
+            context->m_sink->diagnose(Diagnostics::AbortArgumentTypeNotSupported{
+                .type = originalInst->getOperand(i)->getDataType(),
+                .location = originalInst->sourceLoc});
+            return LegalVal::simple(context->builder->getVoidValue());
+        }
+    }
+    if (!validateAbortArgumentTypes(context, originalInst, legalArgs.getArrayView().arrayView))
+        return LegalVal::simple(context->builder->getVoidValue());
+
+    auto newAbort = context->builder->emitIntrinsicInst(
+        context->builder->getVoidType(),
+        kIROp_Abort,
+        (UInt)legalArgs.getCount(),
+        legalArgs.getArrayView().getBuffer());
+    newAbort->sourceLoc = originalInst->sourceLoc;
+    originalInst->transferDecorationsTo(newAbort);
+    return LegalVal::simple(newAbort);
+}
+
 static LegalVal legalizeDebugVar(
     IRTypeLegalizationContext* context,
     LegalType type,
@@ -2046,6 +2128,12 @@ static LegalVal legalizeInst(
         result = legalizeRetVal(context, args[0], (IRReturn*)inst);
         break;
     case kIROp_CastDescriptorHandleToResource:
+    // The untyped-handle casts need no type legalization: both operand and result legalize to
+    // a plain `uint`, so the cast is already a simple value (it forwards its operand at emit).
+    case kIROp_CastUIntToUntypedResourceHandle:
+    case kIROp_CastUntypedResourceHandleToUInt:
+    case kIROp_CastUIntToUntypedSamplerHandle:
+    case kIROp_CastUntypedSamplerHandleToUInt:
         result = LegalVal::simple(inst);
         break;
     case kIROp_DebugVar:
@@ -2080,6 +2168,9 @@ static LegalVal legalizeInst(
         break;
     case kIROp_Printf:
         result = legalizePrintf(context, args);
+        break;
+    case kIROp_Abort:
+        result = legalizeAbort(context, inst, args);
         break;
     case kIROp_LoadFromUninitializedMemory:
     case kIROp_Poison:
@@ -2357,6 +2448,10 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
         if (legalArg.flavor != LegalVal::Flavor::simple)
             anyComplex = true;
     }
+    // Always rebuild abort so its variadic payload is validated before
+    // target-specific legalization or emission.
+    if (inst->getOp() == kIROp_Abort)
+        anyComplex = true;
 
     // We must also legalize the type of the instruction, since that
     // is implicitly one of its operands.
@@ -3785,6 +3880,21 @@ struct IRTypeLegalizationPass
         // register the result of legalization as the proper value
         // for that instruction.
         //
+        // Capture the type before legalization: several legalization paths
+        // (params, local/global vars, funcs) mutate the instruction in place
+        // via `setFullType`/`setDataType` and still return it as a `simple`
+        // value, and such a mutation must count as a change below just as if
+        // the value had been replaced.
+        //
+        auto typeBeforeLegalize = inst->getFullType();
+#if _DEBUG
+        // Snapshot the operands so the debug build can enforce the invariant
+        // the change detection below relies on (see the comment there).
+        List<IRInst*> operandsBeforeLegalize;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+            operandsBeforeLegalize.add(inst->getOperand(i));
+#endif
+
         LegalVal legalVal = legalizeInst(context, inst);
         registerLegalizedValue(context, inst, legalVal);
 
@@ -3802,8 +3912,31 @@ struct IRTypeLegalizationPass
         // * `i` is a user of `inst`, or
         // * `i` is a child of `inst`.
         //
+        // Requeue already-queued users/children only when this step actually
+        // changed `inst`: re-adding them unconditionally re-legalizes almost
+        // everything every round, which is quadratic on long dependence
+        // chains (#12040). The skip is safe because a user processed before
+        // its operand assumed the identity mapping on the map miss, and an
+        // unchanged `simple` result registers exactly that identity. This
+        // relies on an invariant (asserted below in debug builds): a
+        // legalizer signals change only by returning a different `irValue`
+        // or mutating the full type, never by mutating an operand in place;
+        // non-`simple` flavors always count as changed.
+        //
+        bool changed = true;
         if (legalVal.flavor == LegalVal::Flavor::simple)
         {
+            changed = legalVal.irValue != inst || inst->getFullType() != typeBeforeLegalize;
+
+#if _DEBUG
+            if (!changed)
+            {
+                SLANG_ASSERT(inst->getOperandCount() == (UInt)operandsBeforeLegalize.getCount());
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                    SLANG_ASSERT(inst->getOperand(i) == operandsBeforeLegalize[i]);
+            }
+#endif
+
             // The resulting inst may be different from the one we added to the
             // worklist, so ensure that the appropriate flags are set.
             //
@@ -3815,11 +3948,13 @@ struct IRTypeLegalizationPass
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
             auto user = use->getUser();
-            maybeAddToWorkList(user);
+            if (changed || !hasBeenAddedToWorkListOrProcessed(user))
+                maybeAddToWorkList(user);
         }
         for (auto child : inst->getDecorationsAndChildren())
         {
-            maybeAddToWorkList(child);
+            if (changed || !hasBeenAddedToWorkListOrProcessed(child))
+                maybeAddToWorkList(child);
         }
     }
 

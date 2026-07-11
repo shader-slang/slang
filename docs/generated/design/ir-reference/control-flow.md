@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:32:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 4cd2b0ab91da080eb6a16ece95070e661cf2096b991cd6d164bfccb383236671
+model: claude-opus-4.8
+generated_at: 2026-06-29T15:53:34Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -24,10 +24,12 @@ break encoding of a Slang `loop` or `ifElse`.
 
 The control-flow opcodes live in two places in
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua):
-`block` is declared at line ~829 alongside the other module-level
+`block` is declared at line ~858 alongside the other module-level
 parent opcodes, and `TerminatorInst` plus its children occupy
-lines ~1291-1375. The `param` opcode is declared at line ~1055,
-`discard` at line ~1377, and `gpuForeach` at line ~1482.
+lines ~1354-1437. The `param` opcode is declared at line ~1084,
+`discard` at line ~1439, `gpuForeach` at line ~1545, and the
+backend-hint group (`Printf`, `Abort`, the `Require*` opcodes)
+follows `discard` at lines ~1441-1450.
 
 C++ wrappers are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). The
@@ -84,36 +86,36 @@ flowchart TD
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `return_val` | `Return` | `val` | | `ReturnStmt` in `slang-lower-to-ir.cpp` | Function return; ends the current block. |
-| `yield` | — | `val` | | `generic` body lowering in `slang-lower-to-ir.cpp` | Yields the result value of a `generic` (i.e. terminates the single block of a generic). |
+| `return_val` | `IRReturn` | `val` | | `ReturnStmt` in `slang-lower-to-ir.cpp` | Function return; ends the current block. |
+| `yield` | `IRYield` | `val` | | `generic` body lowering in `slang-lower-to-ir.cpp` | Yields the result value of a `generic` (i.e. terminates the single block of a generic). |
 
 ### Terminators: unconditional branches
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `unconditionalBranch` | `UnconditionalBranch` | (variadic, `min=1`) | | Sequential-statement lowering in `slang-lower-to-ir.cpp` | Jumps to a target block; any further operands are values bound to the target's `Param`s. |
-| `loop` | `Loop` | (variadic, `min=3`) | | `ForStmt`, `WhileStmt`, `DoWhileStmt` in `slang-lower-to-ir.cpp` | Loop entry; operands are `<target> <breakLabel> <continueLabel>` followed by per-`Param` arguments. |
+| `unconditionalBranch` | `IRUnconditionalBranch` | (variadic, `min=1`) | | Sequential-statement lowering in `slang-lower-to-ir.cpp` | Jumps to a target block; any further operands are values bound to the target's `Param`s. |
+| `loop` | `IRLoop` | (variadic, `min=3`) | | `ForStmt`, `WhileStmt`, `DoWhileStmt` in `slang-lower-to-ir.cpp` | Loop entry; operands are `<target> <breakLabel> <continueLabel>` followed by per-`Param` arguments. |
 
 ### Terminators: conditional branches
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `conditionalBranch` | `ConditionalBranch` | (variadic, `min=3`) | | (synthesized) | Two-way branch; operands are `condition, trueBlock, falseBlock`. Critical edges are forbidden — the targets cannot carry arguments. |
-| `ifElse` | `IfElse` | (variadic, `min=4`) | | `IfStmt` in `slang-lower-to-ir.cpp` | Structured two-way branch; operands are `condition, trueBlock, falseBlock, mergeBlock`, where the explicit `mergeBlock` records the structured join. |
+| `conditionalBranch` | `IRConditionalBranch` | (variadic, `min=3`) | | (synthesized) | Two-way branch; operands are `condition, trueBlock, falseBlock`. Critical edges are forbidden — the targets cannot carry arguments. |
+| `ifElse` | `IRIfElse` | (variadic, `min=4`) | | `IfStmt` in `slang-lower-to-ir.cpp` | Structured two-way branch; operands are `condition, trueBlock, falseBlock, mergeBlock`, where the explicit `mergeBlock` records the structured join. |
 
 ### Terminators: switches
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `switch` | `Switch` | (variadic, `min=3`) | | `SwitchStmt` in `slang-lower-to-ir.cpp` | Multi-way switch; operands are `value, breakLabel, defaultLabel, caseVal1, caseBlock1, ...`. |
-| `targetSwitch` | — | (variadic, `min=1`) | | (synthesized) | Target-dispatching switch used by the multi-target lowering; operands are `breakLabel, targetName1, block1, ...`. |
+| `switch` | `IRSwitch` | (variadic, `min=3`) | | `SwitchStmt` in `slang-lower-to-ir.cpp` | Multi-way switch; operands are `value, breakLabel, defaultLabel, caseVal1, caseBlock1, ...`. |
+| `targetSwitch` | `IRTargetSwitch` | (variadic, `min=1`) | | `TargetSwitchStmt` in `slang-lower-to-ir.cpp` | Target-dispatching switch used by the multi-target lowering; operands are `breakLabel, targetName1, block1, ...`. |
 
 ### Terminators: error flow
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `throw` | — | `value` | | `ThrowStmt` in `slang-lower-to-ir.cpp` | Throws the operand as an error value, terminating the current block. |
-| `tryCall` | — | (variadic, `min=3`) | | `TryExpr` in `slang-lower-to-ir.cpp` | Calls `callee` and branches to `successBlock` on a normal return or `failureBlock` on a throw. Operands: `successBlock: IRBlock, failureBlock: IRBlock, callee, args...`. |
+| `throw` | `IRThrow` | `value` | | `ThrowStmt` in `slang-lower-to-ir.cpp` | Throws the operand as an error value, terminating the current block. |
+| `tryCall` | `IRTryCall` | (variadic, `min=3`) | | `TryExpr` in `slang-lower-to-ir.cpp` | Calls `callee` and branches to `successBlock` on a normal return or `failureBlock` on a throw. Operands: `successBlock: IRBlock, failureBlock: IRBlock, callee, args...`. |
 
 ### Terminators: no-continuation
 
@@ -126,8 +128,8 @@ flowchart TD
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `defer` | — | `deferBlock: IRBlock, mergeBlock: IRBlock, scopeBlock: IRBlock` | | `DeferStmt` in `slang-lower-to-ir.cpp` | Records a deferred-action block whose body must run before the surrounding scope exits via `mergeBlock`. |
-| `GenericAsm` | — | (variadic, `min=1`) | | (synthesized) | A generic inline-asm instruction whose semantics include terminating control flow (e.g. a backend-specific exit). |
+| `defer` | `IRDefer` | `deferBlock: IRBlock, mergeBlock: IRBlock, scopeBlock: IRBlock` | | `DeferStmt` in `slang-lower-to-ir.cpp` | Records a deferred-action block whose body must run before the surrounding scope exits via `mergeBlock`. |
+| `GenericAsm` | `IRGenericAsm` | (variadic, `min=1`) | | `IntrinsicAsmStmt` in `slang-lower-to-ir.cpp` | A generic inline-asm instruction whose semantics include terminating control flow (e.g. a backend-specific exit). |
 
 ### Other control-flow opcodes
 
@@ -135,13 +137,14 @@ flowchart TD
 | --- | --- | --- | --- | --- | --- |
 | `discard` | — | — | | `DiscardStmt` in `slang-lower-to-ir.cpp` | HLSL `discard` for fragment shaders; ends pixel processing. Not technically a terminator in the IR sense — it sits in a block whose ordinary terminator follows. |
 | `gpuForeach` | — | (variadic, `min=3`) | | `GpuForeachStmt` in `slang-lower-to-ir.cpp` | GPU_FOREACH-style loop opcode used by the host-shader lowering; pairs with a backend-specific kernel launch. |
-| `RequirePrelude` | — | (variadic, `min=1`) | | (synthesized) | Marks an instruction as requiring a target-specific prelude snippet; technically a control-flow opcode by file position but functionally a backend hint. |
-| `RequireTargetExtension` | — | `extension` | | (synthesized) | Marks an instruction as requiring a named target extension be enabled. |
-| `RequireComputeDerivative` | — | — | | (synthesized) | Marks an entry point as needing compute-shader derivative support. |
-| `StaticAssert` | — | `condition, message` | | `StaticAssertDecl` in `slang-lower-to-ir.cpp` | Compile-time assertion; consumed by IR passes, never reaches emit. |
+| `RequirePrelude` | `IRRequirePrelude` | (variadic, `min=1`) | | (synthesized) | Marks an instruction as requiring a target-specific prelude snippet; technically a control-flow opcode by file position but functionally a backend hint. |
+| `RequireTargetExtension` | `IRRequireTargetExtension` | `extension` | | (synthesized) | Marks an instruction as requiring a named target extension be enabled. |
+| `RequireComputeDerivative` | `IRRequireComputeDerivative` | — | | (synthesized) | Marks an entry point as needing compute-shader derivative support. |
+| `StaticAssert` | `IRStaticAssert` | `condition, message` | | `StaticAssertDecl` in `slang-lower-to-ir.cpp` | Compile-time assertion; consumed by IR passes, never reaches emit. |
 | `Printf` | — | `format` | | `PrintfExpr` (HLSL `printf`) | Emits a runtime print operation; some backends model it as a side-effecting control-flow op. |
-| `RequireMaximallyReconverges` | — | — | | (synthesized) | Marks an entry point as requiring the maximally-reconverges quad execution mode. |
-| `RequireQuadDerivatives` | — | — | | (synthesized) | Marks an entry point as requiring the quad-derivatives execution mode. |
+| `Abort` | — | `format` | | `abort` builtin (`__intrinsic_op` in `hlsl.meta.slang`) | Terminates shader execution with a formatted message (`VK_KHR_shader_abort`). |
+| `RequireMaximallyReconverges` | `IRRequireMaximallyReconverges` | — | | (synthesized) | Marks an entry point as requiring the maximally-reconverges quad execution mode. |
+| `RequireQuadDerivatives` | `IRRequireQuadDerivatives` | — | | (synthesized) | Marks an entry point as requiring the quad-derivatives execution mode. |
 
 ## Notable opcodes
 
@@ -222,6 +225,16 @@ the pixel's *runtime* processing, it is *not* an IR terminator: it
 sits as an ordinary side-effecting instruction inside a block, and
 that block ends with whatever real terminator follows (typically
 `Return` or `unreachable`).
+
+### `Abort`
+
+`Abort` lowers from the `abort(format, args...)` builtin — an
+`__intrinsic_op($(kIROp_Abort))` declared in `hlsl.meta.slang` — and
+backs the `VK_KHR_shader_abort` extension. As emitted by the front
+end it carries the format string plus a variadic argument pack. Like
+`discard`, `Abort` is not an IR `TerminatorInst`: it sits in the
+post-`TerminatorInst` backend-hint group with `Printf` rather than
+inside the `TerminatorInst` range.
 
 ## See also
 

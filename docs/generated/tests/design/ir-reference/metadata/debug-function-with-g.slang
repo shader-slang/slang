@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:50:00Z
 //META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#debug-info-family
-//META: doc_section_digest=ac7b3f14612cf30d111a742d03f1dabae49c13bdd0024c69f90d82e36c1ecb8d
+//META: doc_section_digest=544a18f338334e8bfb492dc08ed632d5d70cc72e910ebafad7121c9deaaa530c
 //META: purpose=With -g, the debug-info pass emits a DebugFunction opcode for each function, declaring its name, scope, and file for the debugger.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

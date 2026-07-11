@@ -5,14 +5,15 @@
 //     extras/test-generators/generate-tests-capabilities-texture-types.py
 //
 // Texture types capability test: glsl-vk / DepthTexture2DMS
-// - Type supported since target version:  None
-// - Target version for positive test:     None
-// - Target version for negative test:     460
+// - Type supported since target version:  150
+// - Target version for positive test:     150
+// - Target version for negative test:     None
 //
 
-//DISABLE_TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target None
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): None
-//TEST:SIMPLE(filecheck=NEGATIVE): -restrictive-capability-check -entry fragMain -stage fragment -target glsl -profile glsl_460
+// Compute test disabled, see https://github.com/shader-slang/slang/issues/8786
+//TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target glsl -profile glsl_150
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -vk -emit-spirv-via-glsl
+//DISABLE_TEST:SIMPLE(filecheck=NEGATIVE): -restrictive-capability-check -entry fragMain -stage fragment -target None
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

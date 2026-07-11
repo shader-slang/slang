@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:20:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 81f47a822a99f93b8701131d76480cb13010b16d56d184d434ff385df559169e
+model: claude-opus-4.8
+generated_at: 2026-06-29T13:27:59Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: d89a8a5a54b52ca27bf1790e4d64b99d371b4099edbd608a872c47d632d6eb05
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -155,17 +155,27 @@ and labels accordingly.
 
 Legacy entries in
 [slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua)
-follow the simpler pattern:
+follow the simpler pattern of a kebab-case `name`, an integer `code`,
+a short title, and an optional primary `span` plus any additional
+spans / notes. The primary span is optional: locationless
+diagnostics (e.g. command-line errors such as
+`cannot-deduce-source-language`) omit it entirely:
 
 ```lua
-err("function return type mismatch", 30007,
-    "expression type ~expression.type does not match function's return type ~returnType:Type",
-    span({ loc = "expression:Expr", message = "expression type" }),
-    span({ loc = "function:Decl",   message = "function return type" }))
+err(
+    "function-redeclaration-with-different-return-type",
+    30202,
+    "function return type mismatch",
+    span { loc = "decl:Decl", message = "function '~decl' declared to return '~newReturnType:Type' was previously declared to return '~prevReturnType:Type'" }
+)
 ```
 
-`err`, `warning`, `span`, and `note` helpers are defined in
-[slang-diagnostics-helpers.lua](../../../../source/slang/slang-diagnostics-helpers.lua).
+The `err`, `warning`, `fatal`, `standalone_note`, `span`, and `note`
+helpers are defined in
+[slang-diagnostics-helpers.lua](../../../../source/slang/slang-diagnostics-helpers.lua);
+their signatures (e.g. `err(name, code, message, primary_span, ...)`)
+fix the argument order shown above. A `~name:Type` token in a message
+is a typed interpolation parameter the call site must supply.
 
 ## Source locations and message rendering
 
@@ -177,19 +187,30 @@ inside a macro point at both the use site and the macro body.
 
 The sink's writer (`StdWriters::stdError` by default, or any
 `ISlangWriter`) receives the formatted text. Tools that consume
-diagnostics in machine-readable form can install a JSON-emitting
-writer; the JSON schema is governed by
-[slang-json-diagnostic-defs.h](../../../../source/compiler-core/slang-json-diagnostic-defs.h)
-and
-[slang-json-diagnostics.cpp](../../../../source/compiler-core/slang-json-diagnostics.cpp).
+diagnostics in machine-readable form can set the
+`DiagnosticSink::Flag::MachineReadableDiagnostics` flag declared in
+[slang-diagnostic-sink.h](../../../../source/compiler-core/slang-diagnostic-sink.h),
+which switches rendering to a tab-separated record of the form
+`E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>`
+(this is not a JSON schema).
 
 ## Error codes and the `name` field
 
-Every diagnostic has a unique integer id (`code = "E30019"` or
-`30007` in the examples above) and a unique `name`. Tools that need
-to suppress a specific diagnostic can pass either the integer id, the
-name, or the `flag` group through `overrideDiagnostic` /
-`overrideDiagnostics` declared in
+Diagnostic ids live in a single shared integer namespace (`code =
+"E30019"` or `30007` in the examples above) that is intended to be
+managed centrally, alongside a unique `name`. Ids are normally
+unique, but some are intentionally shared by more than one
+diagnostic: `getDiagnosticById` in
+[slang-diagnostic-sink.h](../../../../source/compiler-core/slang-diagnostic-sink.h)
+notes that "it is possible for multiple diagnostics to have the same
+id" and returns only the first added, and
+[slang-diagnostics-helpers.lua](../../../../source/slang/slang-diagnostics-helpers.lua)
+keeps an `intentional_shared_code_list` exempting those ids from the
+uniqueness check. Because of this, a tool that needs to target a
+precise diagnostic should prefer the `name` or `flag` group over the
+integer id. Tools suppress diagnostics by passing the id, name, or
+`flag` group through `overrideDiagnostic` / `overrideDiagnostics`
+declared in
 [slang-diagnostics.h](../../../../source/slang/slang-diagnostics.h).
 
 The user-facing diagnostic style guide is
@@ -219,8 +240,15 @@ governed by the `SLANG_ASSERT` environment variable (see
 `system`, `debugbreak`, `release-assert-only`, or unset). On Windows
 the build option `SLANG_IGNORE_ABORT_MSG` further suppresses modal
 abort dialogs in unattended runs. These mechanisms are independent of
-the diagnostic sink but interact with it: a release-assert that fires
-typically calls into the sink before terminating.
+the diagnostic sink. `SLANG_ASSERT` / `SLANG_RELEASE_ASSERT` (and
+`SLANG_ASSERT_FAILURE`, which an assert expands to on failure) route
+through `::Slang::handleAssert`, while `SLANG_UNREACHABLE` routes
+through `::Slang::handleSignal` with `SignalType::Unreachable`; both
+are declared via the `slang-signal.h` include in
+[slang-common.h](../../../../source/core/slang-common.h) and bypass
+the sink entirely. The sink-based internal-error path is the
+`SLANG_INTERNAL_ERROR`, `SLANG_UNIMPLEMENTED`, and
+`SLANG_DIAGNOSE_UNEXPECTED` macros above.
 
 ## Adding a new diagnostic
 

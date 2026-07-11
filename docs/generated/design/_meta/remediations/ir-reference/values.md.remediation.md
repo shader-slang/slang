@@ -1,14 +1,14 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T17:30:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-30T14:14:24Z
 target_doc: ir-reference/values.md
 review_report: ../../reviews/ir-reference/values.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 actions:
-  fixed: 3
-  rejected_bogus: 0
+  fixed: 0
+  rejected_bogus: 5
   rejected_out_of_scope: 0
   deferred: 0
   escalated: 0
@@ -17,17 +17,22 @@ actions:
 # Remediation report for ir-reference/values.md
 
 ## Summary
-
-Three major findings addressed: removed the `Undefined`
-grouping-parent row, added the missing concrete value-like opcodes
-in two new sub-tables ("Strings and native pointers", "Object and
-CUDA helpers"), and added a comprehensive
-`### Constexpr arithmetic and casts` sub-table.
+All five review findings were re-derived from scratch against the current
+target document and the watched source at `c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8`,
+ignoring the prior (inconsistent) report content. Every finding describes a
+defect the current document does not exhibit: the opcode rows the review calls
+missing are present, the disputed flag and prose are already correct, and the
+AST-origin names it flags already match the lowering source. All five are
+therefore `rejected-bogus`. No edits were applied, so
+`target_doc_source_commit_after` equals `target_doc_source_commit_before` and
+`mark-fresh` should not be rerun.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `source/slang/slang-ir-insts.lua:857-894` shows `Undefined` as the grouping parent of `LoadFromUninitializedMemory` and `Poison`; it is not itself an opcode. | Removed the `Undefined` row from `### Undefined and default-construct` and added a one-sentence note above the table identifying it as the grouping parent of the two remaining concrete rows. |
-| F-002 | fixed | `source/slang/slang-ir-insts.lua:946`, `:1067`, and `:1139-1149` define `allocObj`, `CUDA_LDG`, `getNativeStr`, `makeString`, `getNativePtr`, `getManagedPtrWriteRef`, `ManagedPtrAttach`, and `ManagedPtrDetach` as concrete value-producing opcodes. | Added `### Strings and native pointers` with `makeString`, `getNativeStr`, `getNativePtr`, `getManagedPtrWriteRef`, `ManagedPtrAttach`, `ManagedPtrDetach`; added `### Object and CUDA helpers` with `allocObj` and `CUDA_LDG`. Both sub-tables inserted between "Memory" and "Aggregate constructors". |
-| F-003 | fixed | `source/slang/slang-ir-insts.lua:3142-3174` defines `constexprAdd` through `constexprEnumCast` as hoistable arithmetic / cast variants used for `IntVal`-class lowering. | Added `### Constexpr arithmetic and casts` between "Result / Optional / Conditional helpers" and "Notable opcodes", with rows for all 29 constexpr opcodes. |
+| F-001 | rejected-bogus | Doc already lists both opcodes the finding calls missing: `docs/generated/design/ir-reference/values.md:241` (`makeValuePack`) and `:242` (`makeCombinedTextureSampler`) in the aggregate-constructors table, matching `source/slang/slang-ir-insts.lua:998-999`. | — |
+| F-002 | rejected-bogus | Doc already covers the full conversion cluster: `values.md:175-181` lists `CastStorageToLogical`, `CastStorageToLogicalDeref`, `CastUInt64ToDescriptorHandle`, `CastDescriptorHandleToUInt64`, `CastDescriptorHandleToResource`, `CastResourceToDescriptorHandle`, and `TreatAsDynamicUniform`, matching `source/slang/slang-ir-insts.lua:2596-2611`. | — |
+| F-003 | rejected-bogus | Literal rows `values.md:91-97` carry no `H` flag, and prose `values.md:82-85` already states literals are "not marked with the `H` (hoistable) opcode flag, but are deduplicated through the constant map by `IRBuilder::_findOrEmitConstant`". Source confirms: `slang-ir-insts.lua:866-880` sets no `hoistable=true`; `slang-ir.cpp:2301` defines `_findOrEmitConstant`. | — |
+| F-004 | rejected-bogus | Doc already uses the correct AST classes: `values.md:94` cites `NullPtrLiteralExpr` and `:95` cites `NoneLiteralExpr` / `IRBuilder::getVoidValue`, matching `slang-lower-to-ir.cpp:6843` (`visitNullPtrLiteralExpr`) and `:6848-6850` (`visitNoneLiteralExpr` -> `getVoidValue`). The disputed `NullPtrExpr`/`VoidLiteralExpr` names are absent. | — |
+| F-005 | rejected-bogus | Doc already qualifies `select` lowering: `values.md:137` and the notable callout `values.md:374-384` state only vector-typed or global-scope selects (via `visitInvokeExpr`) produce the opcode, while scalar in-function ternaries lower to `ifElse` + block `Param`, matching `slang-lower-to-ir.cpp` `visitSelectExpr`. | — |

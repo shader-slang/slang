@@ -89,6 +89,7 @@ prelude/*.h.cpp
 /external/slangpy/
 /external/dxvk-remix/
 /external/SaschaWillems-Vulkan/
+/external/falcor/
 
 build/**/*.tlog
 build/**/*.lastbuildstate
@@ -151,3 +152,6 @@ __pycache__/
 .slang-replays*
 log*.txt
 replay-capture
+
+# Pre-staged AI-review artifacts (REVIEW.md Step 1)
+/tmp/

@@ -20,7 +20,6 @@ struct A : IFoo
     __init(float a) { this.a = a; }
 
     [Differentiable]
-    [NoDiffThis]
     float calc(float x)
     {
         // f(x) = a*x^3, f'(x) = 3*a*x^2
@@ -35,7 +34,6 @@ struct B : IFoo
     __init(float b) { this.b = b; }
 
     [Differentiable]
-    [NoDiffThis]
     float calc(float x)
     {
         // f(x) = b*x^4, f'(x) = 4*b*x^3

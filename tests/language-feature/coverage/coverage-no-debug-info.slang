@@ -31,7 +31,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // Counter increment materializes as the CPU prelude atomic helper —
 // this is stronger than just checking a counter-slot reference,
 // because it verifies the full AtomicAdd lowering path runs.
-//CHECK: _slang_atomic_add_u32
+//CHECK: _slang_atomic_add_u64
 
 // No placeholder IR ops should leak into the emitted C++ — they must
 // all have been rewritten by the coverage pass.

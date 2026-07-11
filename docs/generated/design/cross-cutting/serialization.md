@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-07T14:35:56+00:00
-source_commit: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
-watched_paths_digest: 5b25292bf14e2a45191187f721db5ff6afa45b617dfab12381292b32174d4546
+model: claude-opus-4.8
+generated_at: 2026-06-29T13:28:02Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: b2fdbecc7c8684a517087980212251808258fb9306248171e9069a3533bfec5b
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -24,7 +24,14 @@ Three flavors of payload exist, each with its own driver file:
   /
   [slang-serialize-ast.cpp](../../../../source/slang/slang-serialize-ast.cpp).
   The serialized form preserves the checked AST that backs an
-  `import`-able module.
+  `import`-able module. Most enum-valued AST fields are handled by a
+  FIDDLE template near the top of
+  [slang-serialize-ast.cpp](../../../../source/slang/slang-serialize-ast.cpp)
+  that generates a `serialize(...)` overload (delegating to
+  `serializeEnum`, which encodes the value as a `FossilUInt`) for each
+  name in a single `enumTypeNames` list. Serializing a new AST enum is
+  usually a matter of appending its type name to that list rather than
+  writing a bespoke `serialize` function.
 - **IR modules** — handled by
   [slang-serialize-ir.h](../../../../source/slang/slang-serialize-ir.h)
   /
@@ -58,7 +65,7 @@ The generic interface is
 [slang-serialize.h](../../../../source/slang/slang-serialize.h). The
 preamble of that header captures the central design choice: a single
 `serialize(serializer, value)` function handles both reading and
-writing, distinguished by a `SerializerMode` carried on the
+writing, distinguished by a `SerializationMode` carried on the
 `serializer` argument. Per the file's own example:
 
 ```cpp
@@ -117,11 +124,13 @@ types live in
 > mal-formed data.
 
 The validation cost is configurable via the macro
-`SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS` (default 1). When
-enabled, validation failures call `SLANG_UNEXPECTED("invalid format
-encountered in serialized data")`. When disabled — used for
-performance-critical paths such as loading the embedded core module —
-the same conditions become assertions.
+`SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS` (a compile-time
+define, default 1). When enabled, validation failures call
+`SLANG_UNEXPECTED("invalid format encountered in serialized data")`;
+when the define is set to 0 the same conditions become plain
+`SLANG_ASSERT`s. The header comment notes this toggle exists to
+measure the performance cost of validation on a key serialization
+path — loading the core module from the `slang.dll` binary.
 
 The format is designed for **memory-mapped** deserialization: pointers
 in the serialized data are relative offsets resolved against the start
@@ -145,16 +154,62 @@ The RIFF wrapping is what allows tools to inspect partial structure
 of a `.slang-module` file (chunk types, sizes) without parsing the
 inner serialized content — useful for sanity checks and recovery.
 
+## IR flat-module read path
+
+[slang-serialize-ir.cpp](../../../../source/slang/slang-serialize-ir.cpp)
+does not serialize the IR object graph directly. It first flattens a
+module into parallel arrays — one entry per instruction, walked in
+preorder by `traverseInstsInSerializationOrder` in
+[slang-serialize-ir.h](../../../../source/slang/slang-serialize-ir.h):
+`instAllocInfo`, `childCounts`, `sourceLocs`, plus a single
+`operandIndices` list (type-use slot followed by each operand, with a
+`nullptr` operand encoded as `-1`), `stringLengths`, and the
+concatenated `stringChars`. On load, `deserializeFromFlatModule`
+allocates every instruction up front and then a recursive lambda
+rebuilds the parent/child links and resolves operand pointers by
+indexing back into the allocated `insts` array.
+
+Because the flat tables come from a file that may be malformed,
+`deserializeFromFlatModule` treats their relationships as
+serialized invariants and validates them with `SLANG_RELEASE_ASSERT`
+before dereferencing — for example that `childCounts` and `sourceLocs`
+each have one entry per instruction, that every `operandIndices` read
+stays in range and resolves to a valid instruction index
+(`-1 <= index < numInsts`), and that string-literal lengths are
+non-negative, fit in `uint32_t`, and do not run past the end of
+`stringChars`. After the walk it asserts that every flat table was
+fully consumed (`instIndex == numInsts`,
+`operandIndex == operandIndicesCount`, and the literal/string cursors
+reach the end of their lists) and that the root is an `IRModuleInst`.
+The literal/string-consumption check is skipped when
+`readContext._foundUnrecognizedInstructions` is set, because the reader
+cannot know whether a future unknown opcode (mapped to `Unrecognized`,
+see [Versioning](#versioning-and-backwards-compatibility)) would have
+consumed literal or string payloads; that case is left to the
+recoverable read failure handled in
+[slang-serialize-container.cpp](../../../../source/slang/slang-serialize-container.cpp).
+
+The recursive rebuild and the matching write-side traversal share a
+fixed recursion budget, `kMaxIRSerializationDepth` (512) declared in
+[slang-serialize-ir.h](../../../../source/slang/slang-serialize-ir.h),
+asserted on each level of `go`/`traverseInstsInSerializationOrder` so a
+deeply-nested or adversarial module fails fast instead of overflowing
+the C++ stack. Keeping the bound on both sides keeps round-trips
+symmetric.
+
 ## Source-location serialization
 
 Source locations are tricky to round-trip because the integer encoding
 in
 [slang-source-loc.h](../../../../source/compiler-core/slang-source-loc.h)
 is meaningful only relative to the live `SourceManager` of the
-session that produced it. The serializer therefore captures the
-contributing `SourceFile` records (path, content, expansion stack)
-alongside the integer locations and reconstructs them into a fresh
-`SourceManager` on load.
+session that produced it. The serializer therefore captures, per
+contributing source file, its path, its source-location range, and
+its line-start tables (both unadjusted and `#line`-adjusted) alongside
+the integer locations, then reconstructs each file into a fresh
+`SourceManager` on load with `createSourceFileWithSize` (a
+placeholder-sized file plus a single view — the file's content is not
+serialized).
 
 Driver: [slang-serialize-source-loc.cpp](../../../../source/slang/slang-serialize-source-loc.cpp).
 

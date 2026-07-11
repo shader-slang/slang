@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#vocabulary
-//META: doc_section_digest=e6ee8d6a0ad9b6be0dfa1e2bef7fa142d6866067cb581476b3dadc1f13bb47e4
+//META: doc_section_digest=d4c57bd6813214df0ae2af571ba4d36023a16aae60f873721a9faf6530dab00a
 //META: purpose=A stage atom (`compute`) populates the `stage` keyhole; a target atom (`hlsl`, `glsl`, `spirv`, ...) populates the `target` keyhole. Because they populate different keyholes a `compute` entry point is compatible with every text-emit target.
 //META: intent=functional
 //META: pipeline_stage=emit

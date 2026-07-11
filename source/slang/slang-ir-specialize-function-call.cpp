@@ -63,6 +63,12 @@ bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(
         case kIROp_FieldAddress:
         case kIROp_FieldExtract:
         case kIROp_Load:
+        // A `CastDynamicResource` wraps a bindless/dynamic resource access in a
+        // concrete resource type. Like the indexing ops above, its result is
+        // suitable for specialization exactly when its underlying value (operand
+        // 0) is, so we trace through it to that base. Without this case a bindless
+        // resource argument would not be recognized as specializable.
+        case kIROp_CastDynamicResource:
             {
                 auto base = arg->getOperand(0);
 
@@ -642,6 +648,16 @@ struct FunctionParameterSpecializationContext
             auto oldBase = oldArg->getOperand(0);
             getCallInfoForArg(ioInfo, oldBase);
         }
+        else if (oldArg->getOp() == kIROp_CastDynamicResource)
+        {
+            // `CastDynamicResource` is a transparent wrapper that views a
+            // dynamic/bindless resource as a concrete resource type. It
+            // contributes nothing to the specialization key itself, so we just
+            // recurse into its underlying value (operand 0), mirroring the
+            // `Load`/`FieldAddress` cases above.
+            auto oldBase = oldArg->getOperand(0);
+            getCallInfoForArg(ioInfo, oldBase);
+        }
         else if (oldArg->getOp() == kIROp_CastDescriptorHandleToResource)
         {
             // We are accessing a resource from a bindless handle.
@@ -929,6 +945,31 @@ struct FunctionParameterSpecializationContext
             builder->setInsertInto(ioInfo.newBodyInsts);
             auto newVal = builder->emitLoad(oldArg->getFullType(), newPtr);
 
+            return newVal;
+        }
+        else if (oldArg->getOp() == kIROp_CastDynamicResource)
+        {
+            // Reconstruct the wrapper inside the specialized body: first obtain the
+            // specialized value for the wrapped operand, then re-apply the
+            // `CastDynamicResource` cast over it so the specialized callee sees the
+            // same concrete resource type the original argument had.
+            //
+            // Decorations (including IRSPIRVNonUniformResourceDecoration) are not
+            // copied from `oldArg` to `newVal` -- this is intentional.
+            // CastDynamicResource is inlined away before SPIR-V legalization;
+            // NonUniform reaches the consumed resource through the reconstructed
+            // access chain whose index already carries the decoration.
+            auto oldBase = oldArg->getOperand(0);
+            auto newBase = getSpecializedValueForArg(ioInfo, oldBase);
+
+            auto builder = getBuilder();
+            builder->setInsertInto(ioInfo.newBodyInsts);
+            IRInst* newOperands[] = {newBase};
+            auto newVal = builder->emitIntrinsicInst(
+                oldArg->getFullType(),
+                kIROp_CastDynamicResource,
+                1,
+                newOperands);
             return newVal;
         }
         else if (auto castHandleToResource = as<IRCastDescriptorHandleToResource>(oldArg))

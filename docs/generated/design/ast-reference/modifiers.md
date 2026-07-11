@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-28T08:21:36+00:00
-source_commit: 9cc1ac7cb67ffc5d742af5e8ded1381487ab6109
-watched_paths_digest: b73ab2763cf90e18015e6beb407b431f76d9344148801d3a27089be1611f45e2
+model: claude-opus-4.8
+generated_at: 2026-06-29T15:16:35Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: f26e2da5bc0040a0dfba76f743caea5d5bd4cb0277c616e126e276adefc2eb13
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -114,16 +114,16 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `InModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers-and-attributes) | `in` parameter direction. |
-| `OutModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers-and-attributes) | `out` parameter direction. |
-| `InOutModifier` | `OutModifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers-and-attributes) | `inout` parameter direction (a refinement of `out`). |
-| `RefModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers-and-attributes) | `ref` parameter passing mode. |
-| `BorrowModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers-and-attributes) | `borrow` parameter passing mode. |
-| `ConstModifier` | `Modifier` | (no additional state) | [storage class](../syntax-reference/grammar.md#modifiers-and-attributes) | `const`. |
-| `InlineModifier` | `Modifier` | (no additional state) | [storage class](../syntax-reference/grammar.md#modifiers-and-attributes) | `inline`. |
+| `InModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers) | `in` parameter direction. |
+| `OutModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers) | `out` parameter direction. |
+| `InOutModifier` | `OutModifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers) | `inout` parameter direction (a refinement of `out`). |
+| `RefModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers) | `ref` parameter passing mode. |
+| `BorrowModifier` | `Modifier` | (no additional state) | [parameter modifier](../syntax-reference/grammar.md#modifiers) | `borrow` parameter passing mode. |
+| `ConstModifier` | `Modifier` | (no additional state) | [storage class](../syntax-reference/grammar.md#modifiers) | `const`. |
+| `InlineModifier` | `Modifier` | (no additional state) | [storage class](../syntax-reference/grammar.md#modifiers) | `inline`. |
 | `ParamModifier` | `Modifier` | (no additional state) | (none) | Internal marker on synthesized parameters. |
-| `ConstExprModifier` | `Modifier` | (no additional state) | [storage class](../syntax-reference/grammar.md#modifiers-and-attributes) | `constexpr`. |
-| `ExternModifier` | `Modifier` | (no additional state) | [storage class](../syntax-reference/grammar.md#modifiers-and-attributes) | `extern` (link-time declaration). |
+| `ConstExprModifier` | `Modifier` | (no additional state) | [storage class](../syntax-reference/grammar.md#modifiers) | `constexpr`. |
+| `ExternModifier` | `Modifier` | (no additional state) | [storage class](../syntax-reference/grammar.md#modifiers) | `extern` (link-time declaration). |
 | `DynModifier` | `Modifier` | (no additional state) | (none) | Marks a dynamic-dispatch context. |
 | `ExternCppModifier` | `Modifier` | (no additional state) | (none) | Marks `extern "C++"` mapping for record/replay. |
 
@@ -131,9 +131,9 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `PublicModifier` | `VisibilityModifier` | (no additional state) | [visibility](../syntax-reference/grammar.md#modifiers-and-attributes) | `public`. |
-| `PrivateModifier` | `VisibilityModifier` | (no additional state) | [visibility](../syntax-reference/grammar.md#modifiers-and-attributes) | `private`. |
-| `InternalModifier` | `VisibilityModifier` | (no additional state) | [visibility](../syntax-reference/grammar.md#modifiers-and-attributes) | `internal` (default in modern Slang). |
+| `PublicModifier` | `VisibilityModifier` | (no additional state) | [visibility](../syntax-reference/grammar.md#modifiers) | `public`. |
+| `PrivateModifier` | `VisibilityModifier` | (no additional state) | [visibility](../syntax-reference/grammar.md#modifiers) | `private`. |
+| `InternalModifier` | `VisibilityModifier` | (no additional state) | [visibility](../syntax-reference/grammar.md#modifiers) | `internal` (default in modern Slang). |
 
 ### Override / require / export / import boilerplate
 
@@ -155,9 +155,9 @@ Abstract intermediates: `VisibilityModifier`,
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `HLSLEffectSharedModifier` | `Modifier` | (no additional state) | (none) | HLSL `shared` (effect-shared variable). |
-| `HLSLGroupSharedModifier` | `Modifier` | (no additional state) | [HLSL storage](../syntax-reference/grammar.md#modifiers-and-attributes) | `groupshared`. |
-| `HLSLStaticModifier` | `Modifier` | (no additional state) | [HLSL storage](../syntax-reference/grammar.md#modifiers-and-attributes) | `static`. |
-| `HLSLUniformModifier` | `Modifier` | (no additional state) | [HLSL storage](../syntax-reference/grammar.md#modifiers-and-attributes) | `uniform`. |
+| `HLSLGroupSharedModifier` | `Modifier` | (no additional state) | [HLSL storage](../syntax-reference/grammar.md#modifiers) | `groupshared`. |
+| `HLSLStaticModifier` | `Modifier` | (no additional state) | [HLSL storage](../syntax-reference/grammar.md#modifiers) | `static`. |
+| `HLSLUniformModifier` | `Modifier` | (no additional state) | [HLSL storage](../syntax-reference/grammar.md#modifiers) | `uniform`. |
 | `HLSLVolatileModifier` | `Modifier` | (no additional state) | (none) | `volatile`. |
 | `PreciseModifier` | `Modifier` | (no additional state) | (none) | `precise`. |
 
@@ -165,21 +165,21 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `HLSLNoInterpolationModifier` | `InterpolationModeModifier` | (no additional state) | [interpolation](../syntax-reference/grammar.md#modifiers-and-attributes) | `nointerpolation`. |
-| `HLSLNoPerspectiveModifier` | `InterpolationModeModifier` | (no additional state) | [interpolation](../syntax-reference/grammar.md#modifiers-and-attributes) | `noperspective`. |
-| `HLSLLinearModifier` | `InterpolationModeModifier` | (no additional state) | [interpolation](../syntax-reference/grammar.md#modifiers-and-attributes) | `linear`. |
-| `HLSLSampleModifier` | `InterpolationModeModifier` | (no additional state) | [interpolation](../syntax-reference/grammar.md#modifiers-and-attributes) | `sample`. |
-| `HLSLCentroidModifier` | `InterpolationModeModifier` | (no additional state) | [interpolation](../syntax-reference/grammar.md#modifiers-and-attributes) | `centroid`. |
-| `PerVertexModifier` | `InterpolationModeModifier` | (no additional state) | [interpolation](../syntax-reference/grammar.md#modifiers-and-attributes) | `pervertex`. |
+| `HLSLNoInterpolationModifier` | `InterpolationModeModifier` | (no additional state) | [interpolation](../syntax-reference/grammar.md#modifiers) | `nointerpolation`. |
+| `HLSLNoPerspectiveModifier` | `InterpolationModeModifier` | (no additional state) | [interpolation](../syntax-reference/grammar.md#modifiers) | `noperspective`. |
+| `HLSLLinearModifier` | `InterpolationModeModifier` | (no additional state) | [interpolation](../syntax-reference/grammar.md#modifiers) | `linear`. |
+| `HLSLSampleModifier` | `InterpolationModeModifier` | (no additional state) | [interpolation](../syntax-reference/grammar.md#modifiers) | `sample`. |
+| `HLSLCentroidModifier` | `InterpolationModeModifier` | (no additional state) | [interpolation](../syntax-reference/grammar.md#modifiers) | `centroid`. |
+| `PerVertexModifier` | `InterpolationModeModifier` | (no additional state) | [interpolation](../syntax-reference/grammar.md#modifiers) | `pervertex`. |
 
 ### Matrix layout modifiers
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `HLSLRowMajorLayoutModifier` | `RowMajorLayoutModifier` | (no additional state) | [matrix layout](../syntax-reference/grammar.md#modifiers-and-attributes) | HLSL `row_major`. |
-| `HLSLColumnMajorLayoutModifier` | `ColumnMajorLayoutModifier` | (no additional state) | [matrix layout](../syntax-reference/grammar.md#modifiers-and-attributes) | HLSL `column_major`. |
-| `GLSLRowMajorLayoutModifier` | `ColumnMajorLayoutModifier` | (no additional state) | [matrix layout](../syntax-reference/grammar.md#modifiers-and-attributes) | GLSL `row_major` (intentionally maps to *column* in Slang's convention). |
-| `GLSLColumnMajorLayoutModifier` | `RowMajorLayoutModifier` | (no additional state) | [matrix layout](../syntax-reference/grammar.md#modifiers-and-attributes) | GLSL `column_major` (intentionally maps to *row* in Slang's convention). |
+| `HLSLRowMajorLayoutModifier` | `RowMajorLayoutModifier` | (no additional state) | [matrix layout](../syntax-reference/grammar.md#modifiers) | HLSL `row_major`. |
+| `HLSLColumnMajorLayoutModifier` | `ColumnMajorLayoutModifier` | (no additional state) | [matrix layout](../syntax-reference/grammar.md#modifiers) | HLSL `column_major`. |
+| `GLSLRowMajorLayoutModifier` | `ColumnMajorLayoutModifier` | (no additional state) | [matrix layout](../syntax-reference/grammar.md#modifiers) | GLSL `row_major` (intentionally maps to *column* in Slang's convention). |
+| `GLSLColumnMajorLayoutModifier` | `RowMajorLayoutModifier` | (no additional state) | [matrix layout](../syntax-reference/grammar.md#modifiers) | GLSL `column_major` (intentionally maps to *row* in Slang's convention). |
 
 ### HLSL geometry-shader input-primitive modifiers
 
@@ -209,8 +209,8 @@ Abstract intermediates: `VisibilityModifier`,
 | `HLSLLayoutSemantic` | `HLSLSemantic` | register name, component mask | (none) | Base class for HLSL semantics that affect layout (register / packoffset). |
 | `RayPayloadAccessSemantic` | `HLSLSemantic` | stage-name tokens | (none) | Base class for ray-payload read/write access semantics. |
 | `HLSLSimpleSemantic` | `HLSLSemantic` | semantic name | [semantic](../syntax-reference/grammar.md#declarations) | `: NAME` (no parenthesized arguments). |
-| `HLSLRegisterSemantic` | `HLSLLayoutSemantic` | register class, index | [register binding](../syntax-reference/grammar.md#modifiers-and-attributes) | `: register(...)`. |
-| `HLSLPackOffsetSemantic` | `HLSLLayoutSemantic` | offset, element | [pack offset](../syntax-reference/grammar.md#modifiers-and-attributes) | `: packoffset(...)`. |
+| `HLSLRegisterSemantic` | `HLSLLayoutSemantic` | register class, index | [register binding](../syntax-reference/grammar.md#modifiers) | `: register(...)`. |
+| `HLSLPackOffsetSemantic` | `HLSLLayoutSemantic` | offset, element | [pack offset](../syntax-reference/grammar.md#modifiers) | `: packoffset(...)`. |
 | `RayPayloadReadSemantic` | `RayPayloadAccessSemantic` | (no additional state) | (none) | `: read(...)` ray-payload semantic. |
 | `RayPayloadWriteSemantic` | `RayPayloadAccessSemantic` | (no additional state) | (none) | `: write(...)` ray-payload semantic. |
 
@@ -225,10 +225,10 @@ Abstract intermediates: `VisibilityModifier`,
 | `GLSLExtensionDirective` | `GLSLPreprocessorDirective` | extension name, behavior | (none) | `#extension` directive. |
 | `GLSLLayoutModifierGroupBegin` | `GLSLLayoutModifierGroupMarker` | (no additional state) | (none) | Start marker of a `layout(...)` group. |
 | `GLSLLayoutModifierGroupEnd` | `GLSLLayoutModifierGroupMarker` | (no additional state) | (none) | End marker of a `layout(...)` group. |
-| `GLSLUnparsedLayoutModifier` | `Modifier` | text `Token` | (none) | Raw text of a layout qualifier deferred to later parsing. |
+| `GLSLUnparsedLayoutModifier` | `Modifier` | (no additional state) | (none) | Raw text of a layout qualifier deferred to later parsing. |
 | `GLSLBufferDataLayoutModifier` | `Modifier` | (no additional state) | (none) | Base for buffer-layout modifiers. |
-| `GLSLStd140Modifier` | `GLSLBufferDataLayoutModifier` | (no additional state) | [layout(std140)](../syntax-reference/grammar.md#modifiers-and-attributes) | `std140`. |
-| `GLSLStd430Modifier` | `GLSLBufferDataLayoutModifier` | (no additional state) | [layout(std430)](../syntax-reference/grammar.md#modifiers-and-attributes) | `std430`. |
+| `GLSLStd140Modifier` | `GLSLBufferDataLayoutModifier` | (no additional state) | [layout(std140)](../syntax-reference/grammar.md#modifiers) | `std140`. |
+| `GLSLStd430Modifier` | `GLSLBufferDataLayoutModifier` | (no additional state) | [layout(std430)](../syntax-reference/grammar.md#modifiers) | `std430`. |
 | `GLSLScalarModifier` | `GLSLBufferDataLayoutModifier` | (no additional state) | (none) | `scalar` layout. |
 | `GLSLBufferModifier` | `WrappingTypeModifier` | (no additional state) | (none) | `buffer` modifier on a type. |
 | `GLSLWriteOnlyModifier` | `SimpleModifier` | (no additional state) | (none) | `writeonly`. |
@@ -247,9 +247,9 @@ Abstract intermediates: `VisibilityModifier`,
 | `TypeModifier` | `Modifier` | (no additional state) | (none) | Base for modifiers that semantically attach to a type. |
 | `WrappingTypeModifier` | `TypeModifier` | (no additional state) | (none) | Type modifier that wraps a child type. |
 | `ResourceElementFormatModifier` | `TypeModifier` | (no additional state) | (none) | Base for resource-element format modifiers. |
-| `UNormModifier` | `ResourceElementFormatModifier` | (no additional state) | [unorm](../syntax-reference/grammar.md#modifiers-and-attributes) | `unorm`. |
-| `SNormModifier` | `ResourceElementFormatModifier` | (no additional state) | [snorm](../syntax-reference/grammar.md#modifiers-and-attributes) | `snorm`. |
-| `NoDiffModifier` | `TypeModifier` | (no additional state) | [no_diff](../syntax-reference/grammar.md#modifiers-and-attributes) | `no_diff` type modifier. |
+| `UNormModifier` | `ResourceElementFormatModifier` | (no additional state) | [unorm](../syntax-reference/grammar.md#modifiers) | `unorm`. |
+| `SNormModifier` | `ResourceElementFormatModifier` | (no additional state) | [snorm](../syntax-reference/grammar.md#modifiers) | `snorm`. |
+| `NoDiffModifier` | `TypeModifier` | (no additional state) | [no_diff](../syntax-reference/grammar.md#modifiers) | `no_diff` type modifier. |
 | `BitFieldModifier` | `Modifier` | bit width | (none) | C-style bitfield specification on a member variable. |
 | `DynamicUniformModifier` | `Modifier` | (no additional state) | (none) | Marks a parameter as dynamic-uniform. |
 
@@ -258,13 +258,13 @@ Abstract intermediates: `VisibilityModifier`,
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `ToBeSynthesizedModifier` | `Modifier` | (no additional state) | (none) | Placeholder marking a decl that the checker should synthesize. |
-| `SynthesizedModifier` | `Modifier` | (no additional state) | (none) | Marks decls produced by checker synthesis. |
+| `SynthesizedModifier` | `Modifier` | `op: uint32_t`, `operands: List<Val*>` | (none) | Marks decls produced by checker synthesis. |
 | `SynthesizedStaticLambdaFuncModifier` | `Modifier` | (no additional state) | (none) | Marks the static-lambda function synthesized for `LambdaDecl`. |
-| `ExplicitlyDeclaredCapabilityModifier` | `Modifier` | (no additional state) | (none) | Marks capability sets that were written by the user. |
+| `ExplicitlyDeclaredCapabilityModifier` | `Modifier` | `declaredCapabilityRequirements: CapabilitySetVal*` | (none) | Marks capability sets that were written by the user. |
 | `LocalTempVarModifier` | `Modifier` | (no additional state) | (none) | Marks compiler-introduced local temporaries. |
 | `ExistentialOpenedOnVarModifier` | `Modifier` | (no additional state) | (none) | Marks a variable as the result of opening an existential. |
 | `VarReassignedModifier` | `Modifier` | (no additional state) | (none) | Marks a variable that has been re-assigned (data-flow info). |
-| `ExtensionExternVarModifier` | `Modifier` | (no additional state) | (none) | Marks variables surfaced from an extension via `extern`. |
+| `ExtensionExternVarModifier` | `Modifier` | `originalDecl: DeclRef<Decl>` | (none) | Marks variables surfaced from an extension via `extern`. |
 | `ActualGlobalModifier` | `Modifier` | (no additional state) | (none) | Marks the real backing decl behind a global generic. |
 | `IgnoreForLookupModifier` | `Modifier` | (no additional state) | (none) | Hides a decl from ordinary name lookup. |
 | `OptionalConstraintModifier` | `Modifier` | (no additional state) | (none) | Marks a constraint as optional during inference. |
@@ -273,7 +273,7 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `IntrinsicOpModifier` | `Modifier` | `opcode: int`, `irOp: uint32_t` | (none) | Binds a decl to a Slang IR opcode (core-module intrinsics). |
+| `IntrinsicOpModifier` | `Modifier` | `opToken: Token`, `op: uint32_t` | (none) | Binds a decl to a Slang IR opcode (core-module intrinsics). |
 | `TargetIntrinsicModifier` | `Modifier` | target name, definition text, predicate | (none) | Binds a decl to a target-backend intrinsic. |
 | `SpecializedForTargetModifier` | `Modifier` | target token | (none) | Marks a decl as specialized for a target. |
 | `RequiredGLSLExtensionModifier` | `Modifier` | extension name | (none) | Marks a required GLSL extension. |
@@ -298,22 +298,22 @@ Abstract intermediates: `VisibilityModifier`,
 | `ImplicitParameterGroupElementTypeModifier` | `Modifier` | (no additional state) | (none) | Internal marker on auto-introduced element types. |
 | `ParameterGroupReflectionName` | `Modifier` | name | (none) | Carries the reflection name for an implicit parameter group. |
 | `SharedModifiers` | `Modifier` | (no additional state) | (none) | Aggregates modifiers shared between several decls (e.g. multiple declarators in one declaration). |
-| `HasInterfaceDefaultImplModifier` | `Modifier` | (no additional state) | (none) | Marks an interface as having default-implementation requirements. |
+| `HasInterfaceDefaultImplModifier` | `Modifier` | `defaultImplDecl: Decl*` | (none) | Marks an interface as having default-implementation requirements. |
 
 ### Attributes (`AttributeBase` and `UncheckedAttribute`)
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `UncheckedAttribute` | `AttributeBase` | raw token list | [attribute](../syntax-reference/grammar.md#modifiers-and-attributes) | Attribute as parsed before checking has resolved it to a concrete subclass. |
-| `Attribute` | `AttributeBase` | argument expressions, parsed values | [attribute](../syntax-reference/grammar.md#modifiers-and-attributes) | Base for all checker-resolved attribute classes. |
-| `UserDefinedAttribute` | `Attribute` | bound `AttributeDecl` | [user attribute](../syntax-reference/grammar.md#modifiers-and-attributes) | A user-declared attribute (introduced via `__attribute_syntax__`). |
-| `AttributeUsageAttribute` | `Attribute` | target syntax class | [AttributeUsage](../syntax-reference/grammar.md#modifiers-and-attributes) | `[AttributeUsage(...)]` declaring where an attribute may be applied. |
+| `UncheckedAttribute` | `AttributeBase` | raw token list | [attribute](../syntax-reference/grammar.md#attributes-and-decorations) | Attribute as parsed before checking has resolved it to a concrete subclass. |
+| `Attribute` | `AttributeBase` | argument expressions, parsed values | [attribute](../syntax-reference/grammar.md#attributes-and-decorations) | Base for all checker-resolved attribute classes. |
+| `UserDefinedAttribute` | `Attribute` | bound `AttributeDecl` | [user attribute](../syntax-reference/grammar.md#attributes-and-decorations) | A user-declared attribute (introduced via `__attribute_syntax__`). |
+| `AttributeUsageAttribute` | `Attribute` | target syntax class | [AttributeUsage](../syntax-reference/grammar.md#attributes-and-decorations) | `[AttributeUsage(...)]` declaring where an attribute may be applied. |
 
 ### Compile-time hint attributes (loops / branches / opt levels)
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `UnrollAttribute` | `Attribute` | optional unroll count | [unroll](../syntax-reference/grammar.md#modifiers-and-attributes) | `[unroll(N)]`. |
+| `UnrollAttribute` | `Attribute` | optional unroll count | [unroll](../syntax-reference/grammar.md#attributes-and-decorations) | `[unroll(N)]`. |
 | `ForceUnrollAttribute` | `Attribute` | optional unroll count | (none) | `[ForceUnroll]`. |
 | `MaxItersAttribute` | `Attribute` | iteration count | (none) | `[MaxIters(N)]`. |
 | `InferredMaxItersAttribute` | `Attribute` | inferred count | (none) | Inferred iteration bound. |
@@ -329,7 +329,7 @@ Abstract intermediates: `VisibilityModifier`,
 | `FlagsAttribute` | `Attribute` | (no additional state) | (none) | `[Flags]`. |
 | `NonDynamicUniformAttribute` | `Attribute` | (no additional state) | (none) | `[NonDynamicUniform]`. |
 | `UnsafeForceInlineEarlyAttribute` | `Attribute` | (no additional state) | (none) | `[UnsafeForceInlineEarly]`. |
-| `ForceInlineAttribute` | `Attribute` | (no additional state) | [ForceInline](../syntax-reference/grammar.md#modifiers-and-attributes) | `[ForceInline]`. |
+| `ForceInlineAttribute` | `Attribute` | (no additional state) | [ForceInline](../syntax-reference/grammar.md#attributes-and-decorations) | `[ForceInline]`. |
 | `NoInlineAttribute` | `Attribute` | (no additional state) | (none) | `[NoInline]`. |
 | `NoRefInlineAttribute` | `Attribute` | (no additional state) | (none) | `[NoRefInline]`. |
 | `PreferRecomputeAttribute` | `Attribute` | (no additional state) | (none) | `[PreferRecompute]`. |
@@ -353,13 +353,13 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `RequireCapabilityAttribute` | `Attribute` | capability atoms | [require_capability](../syntax-reference/grammar.md#modifiers-and-attributes) | `[require_capability(...)]`; ties to the capability system in [../cross-cutting/targets.md](../cross-cutting/targets.md). |
+| `RequireCapabilityAttribute` | `Attribute` | capability atoms | [require_capability](../syntax-reference/grammar.md#attributes-and-decorations) | `[require_capability(...)]`; ties to the capability system in [../cross-cutting/targets.md](../cross-cutting/targets.md). |
 | `RequiresNVAPIAttribute` | `Attribute` | (no additional state) | (none) | `[RequiresNVAPI]`. |
 | `RequirePreludeAttribute` | `Attribute` | prelude string | (none) | `[RequirePrelude]`. |
 | `AllowAttribute` | `Attribute` | (no additional state) | (none) | `[allow]` (capability allow). |
 | `FormatAttribute` | `Attribute` | format token | (none) | `[format(...)]`. |
 | `ExternAttribute` | `Attribute` | (no additional state) | (none) | `[extern]`. |
-| `ComInterfaceAttribute` | `Attribute` | UUID, options | (none) | `[ComInterface(...)]`. |
+| `ComInterfaceAttribute` | `Attribute` | `guid: String` | (none) | `[ComInterface(...)]`. |
 
 ### Layout / binding attributes
 
@@ -416,11 +416,11 @@ Abstract intermediates: `VisibilityModifier`,
 | `PatchConstantFuncAttribute` | `Attribute` | function name | (none) | `[patchconstantfunc(...)]`. |
 | `DomainAttribute` | `Attribute` | domain | (none) | `[domain(...)]`. |
 | `EarlyDepthStencilAttribute` | `Attribute` | (no additional state) | (none) | `[earlydepthstencil]`. |
-| `NumThreadsAttribute` | `Attribute` | x, y, z | [numthreads](../syntax-reference/grammar.md#modifiers-and-attributes) | `[numthreads(x,y,z)]`. |
-| `WaveSizeAttribute` | `Attribute` | preferred, min, max | (none) | `[WaveSize(...)]`. |
+| `NumThreadsAttribute` | `Attribute` | x, y, z | [numthreads](../syntax-reference/grammar.md#attributes-and-decorations) | `[numthreads(x,y,z)]`. |
+| `WaveSizeAttribute` | `Attribute` | `numLanes: IntVal*` | (none) | `[WaveSize(...)]`. |
 | `MaxVertexCountAttribute` | `Attribute` | count | (none) | `[maxvertexcount(...)]`. |
 | `InstanceAttribute` | `Attribute` | (no additional state) | (none) | `[instance(...)]`. |
-| `EntryPointAttribute` | `Attribute` | stage | [shader](../syntax-reference/grammar.md#modifiers-and-attributes) | `[shader("stage")]`. |
+| `EntryPointAttribute` | `Attribute` | `capabilitySet: CapabilitySetVal*` | [shader](../syntax-reference/grammar.md#attributes-and-decorations) | `[shader("stage")]`. |
 | `ExperimentalModuleAttribute` | `Attribute` | (no additional state) | (none) | `[ExperimentalModule]`. |
 | `FunctionInterfaceAttribute` | `Attribute` | (no additional state) | (none) | `[FunctionInterface]`. |
 
@@ -433,7 +433,7 @@ Abstract intermediates: `VisibilityModifier`,
 | `VulkanCallablePayloadAttribute` | `Attribute` | location | (none) | `[vk::callable_payload(...)]`. |
 | `VulkanCallablePayloadInAttribute` | `Attribute` | location | (none) | `[vk::callable_payload_in(...)]`. |
 | `VulkanHitAttributesAttribute` | `Attribute` | (no additional state) | (none) | `[vk::hit_attributes]`. |
-| `VulkanHitObjectAttributesAttribute` | `Attribute` | (no additional state) | (none) | `[vk::hit_object_attributes(...)]`. |
+| `VulkanHitObjectAttributesAttribute` | `Attribute` | `location: int` | (none) | `[vk::hit_object_attributes(...)]`. |
 | `RayPayloadAttribute` | `Attribute` | location | (none) | Older HLSL `[raypayload]`. |
 
 ### Mutability / autodiff annotations
@@ -442,6 +442,7 @@ Abstract intermediates: `VisibilityModifier`,
 | --- | --- | --- | --- | --- |
 | `MutatingAttribute` | `Attribute` | (no additional state) | (none) | `[mutating]`. |
 | `NonmutatingAttribute` | `Attribute` | (no additional state) | (none) | `[nonmutating]`. |
+| `NoDiscardAttribute` | `Attribute` | (no additional state) | [attribute](../syntax-reference/grammar.md#attributes-and-decorations) | `[NoDiscard]`; flags a function whose result must not be discarded. |
 | `ConstRefAttribute` | `Attribute` | (no additional state) | (none) | `[ConstRef]`. |
 | `RefAttribute` | `Attribute` | (no additional state) | (none) | `[Ref]`. |
 | `AnyValueSizeAttribute` | `Attribute` | size | (none) | `[AnyValueSize(...)]`. |
@@ -450,7 +451,7 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `DifferentiableAttribute` | `Attribute` | mode | [Differentiable](../syntax-reference/grammar.md#modifiers-and-attributes) | `[Differentiable]` / `[Differentiable(...)]`. |
+| `DifferentiableAttribute` | `Attribute` | `m_associatedValMapping: OrderedDictionary<Val*, OrderedDictionary<SlangInt, Val*>>` | [Differentiable](../syntax-reference/grammar.md#attributes-and-decorations) | `[Differentiable]` / `[Differentiable(...)]`. |
 | `TreatAsDifferentiableAttribute` | `DifferentiableAttribute` | (no additional state) | (none) | `[TreatAsDifferentiable]`. |
 | `HasTrivialForwardDerivativeAttribute` | `DifferentiableAttribute` | (no additional state) | (none) | `[HasTrivialForwardDerivative]`. |
 | `ForwardDifferentiableAttribute` | `DifferentiableAttribute` | (no additional state) | (none) | `[ForwardDifferentiable]`. |
@@ -458,7 +459,7 @@ Abstract intermediates: `VisibilityModifier`,
 | `ForwardDerivativeAttribute` | `UserDefinedDerivativeAttribute` | derivative function expr | (none) | `[ForwardDerivative(fn)]`. |
 | `DerivativeOfAttribute` | `DifferentiableAttribute` | primal function expr | (none) | Base for "X is the derivative of Y" attributes. |
 | `ForwardDerivativeOfAttribute` | `DerivativeOfAttribute` | primal function expr | (none) | `[ForwardDerivativeOf(fn)]`. |
-| `BackwardDifferentiableAttribute` | `DifferentiableAttribute` | (no additional state) | (none) | `[BackwardDifferentiable]`. |
+| `BackwardDifferentiableAttribute` | `DifferentiableAttribute` | `maxOrder: int` | (none) | `[BackwardDifferentiable]`. |
 | `BackwardDerivativeAttribute` | `UserDefinedDerivativeAttribute` | derivative function expr | (none) | `[BackwardDerivative(fn)]`. |
 | `BackwardDerivativeOfAttribute` | `DerivativeOfAttribute` | primal function expr | (none) | `[BackwardDerivativeOf(fn)]`. |
 | `PrimalSubstituteAttribute` | `Attribute` | substitute expr | (none) | `[PrimalSubstitute(fn)]`. |
@@ -478,13 +479,13 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `DllImportAttribute` | `Attribute` | library | (none) | `[DllImport(...)]`. |
+| `DllImportAttribute` | `Attribute` | `modulePath: String, functionName: String` | (none) | `[DllImport(...)]`. |
 | `DllExportAttribute` | `Attribute` | (no additional state) | (none) | `[DllExport]`. |
 | `TorchEntryPointAttribute` | `Attribute` | (no additional state) | (none) | `[TorchEntryPoint]`. |
 | `CudaDeviceExportAttribute` | `Attribute` | (no additional state) | (none) | `[CudaDeviceExport]`. |
 | `CudaKernelAttribute` | `Attribute` | (no additional state) | (none) | `[CudaKernel]`. |
 | `CudaHostAttribute` | `Attribute` | (no additional state) | (none) | `[CudaHost]`. |
-| `AutoPyBindCudaAttribute` | `Attribute` | options | (none) | `[AutoPyBindCuda]`. |
+| `AutoPyBindCudaAttribute` | `Attribute` | `fwdDiffFuncDeclRef: DeclRefExpr*, bwdDiffFuncDeclRef: DeclRefExpr*` | (none) | `[AutoPyBindCuda]`. |
 | `PyExportAttribute` | `Attribute` | name | (none) | `[PyExport]`. |
 | `DerivativeGroupQuadAttribute` | `Attribute` | (no additional state) | (none) | `[DerivativeGroupQuad]`. |
 | `DerivativeGroupLinearAttribute` | `Attribute` | (no additional state) | (none) | `[DerivativeGroupLinear]`. |
@@ -609,7 +610,7 @@ aggregated form when convenient.
   modifiers.
 - [values.md](values.md) — `ModifierVal` family used inside
   `ModifiedType`.
-- [../syntax-reference/grammar.md#modifiers-and-attributes](../syntax-reference/grammar.md#modifiers-and-attributes)
+- [../syntax-reference/grammar.md#modifiers](../syntax-reference/grammar.md#modifiers)
   — surface syntax for modifiers and attributes.
 - [../cross-cutting/targets.md](../cross-cutting/targets.md) —
   capability system that interprets `RequireCapabilityAttribute`,

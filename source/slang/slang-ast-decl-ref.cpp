@@ -57,6 +57,68 @@ DeclRefBase* _resolveAsDeclRef(DeclRefBase* declRefToResolve)
     return declRefToResolve;
 }
 
+static AccessorDecl* _tryGetCorrespondingAccessorDecl(Decl* memberDecl, Decl* substParentDecl)
+{
+    // Once substitution has resolved the parent requirement to a satisfying declaration, the child
+    // must be selected from that same parent. Accessors are anonymous role declarations (`get` or
+    // `set`) nested under a storage declaration, so a requirement getter can be mapped to the
+    // getter under the selected override/default subscript while preserving the selected parent's
+    // generic substitutions.
+    //
+    // Conceptually this is not quite an ordinary static `MemberDeclRef`; it is projecting an
+    // accessor role from the resolved storage declaration. Consider this example:
+    //
+    //     interface ITensor<T, int D>
+    //     {
+    //         __subscript<each TIndex>(TIndex indices)
+    //             where TIndex == int
+    //             where countof(TIndex) == D
+    //         {
+    //             [Differentiable]
+    //             get { return load(indices); }
+    //         }
+    //     }
+    //
+    // During conformance checking, the requirement getter is represented as:
+    //
+    //     MemberDeclRef(GenericAppDeclRef(Lookup(This, operator[]), TIndex), get)
+    //
+    // After `Lookup(This, operator[])` resolves through the witness table to the selected concrete
+    // or default subscript, the `get` accessor must be re-selected under that same resolved
+    // storage declaration while preserving the subscript's generic arguments. That behavior is
+    // closer to a possible future
+    // `AccessorProjectionDeclRef(parentStorageDeclRef, AccessorKind::Get)`. We encode that
+    // projection here to avoid adding a new decl-ref kind and the corresponding lookup/cache
+    // machinery on storage declarations. If this pattern grows beyond accessors, consider making
+    // that projection explicit instead of extending this remap.
+    auto accessorDecl = as<AccessorDecl>(memberDecl);
+    if (!accessorDecl)
+        return nullptr;
+
+    if (accessorDecl->parentDecl == substParentDecl)
+        return accessorDecl;
+
+    auto originalParentDecl = accessorDecl->parentDecl;
+    if (!originalParentDecl || originalParentDecl->astNodeType != substParentDecl->astNodeType)
+        return nullptr;
+
+    auto substParentContainer = as<ContainerDecl>(substParentDecl);
+    if (!substParentContainer)
+        return nullptr;
+
+    AccessorDecl* result = nullptr;
+    for (auto candidateDecl : substParentContainer->getDirectMemberDeclsOfType<AccessorDecl>())
+    {
+        if (candidateDecl->astNodeType != accessorDecl->astNodeType)
+            continue;
+        if (result)
+            return nullptr;
+        result = candidateDecl;
+    }
+
+    return result;
+}
+
 DeclRefBase* MemberDeclRef::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
@@ -68,22 +130,14 @@ DeclRefBase* MemberDeclRef::_substituteImplOverride(
     {
         (*ioDiff)++;
 
-        // We'll special case one specific pattern.
-        if (auto origGenericAppParent = as<GenericAppDeclRef>(substParent))
+        if (!getDecl()->isChildOf(substParent->getDecl()))
         {
-            if (auto origGenericLookedupVal = as<LookupDeclRef>(origGenericAppParent->getBase()))
+            if (auto correspondingAccessor =
+                    _tryGetCorrespondingAccessorDecl(getDecl(), substParent->getDecl()))
             {
-                auto resolvedWitness =
-                    as<SubtypeWitness>(origGenericLookedupVal->getWitness()->resolve());
-                // Otherwise, we need to get the effective inner decl-ref for the generic
-                // app.
-                auto resolvedTargetDecl =
-                    getUnspecializedLookupRec(getCurrentASTBuilder(), getDecl(), resolvedWitness);
-
-                if (resolvedTargetDecl.m_flavor == RequirementWitness::Flavor::declRef)
-                {
-                    return resolvedTargetDecl.getDeclRef();
-                }
+                return astBuilder
+                    ->getMemberDeclRef(DeclRef<Decl>(substParent), correspondingAccessor)
+                    .declRefBase;
             }
         }
 
@@ -112,32 +166,10 @@ Val* MemberDeclRef::_resolveImplOverride()
 
         if (newChild->parentDecl != resolvedParent->getDecl())
         {
-            // We'll special case one specific pattern.
-            if (auto origGenericAppParent = as<GenericAppDeclRef>(getParentOperand()))
+            if (auto correspondingAccessor =
+                    _tryGetCorrespondingAccessorDecl(newChild, resolvedParent->getDecl()))
             {
-                if (auto origGenericLookedupVal =
-                        as<LookupDeclRef>(origGenericAppParent->getBase()))
-                {
-                    auto resolvedWitness =
-                        as<SubtypeWitness>(origGenericLookedupVal->getWitness()->resolve());
-                    // Otherwise, we need to get the effective inner decl-ref for the generic
-                    // app.
-                    auto resolvedTargetDecl = getUnspecializedLookupRec(
-                        getCurrentASTBuilder(),
-                        getDecl(),
-                        resolvedWitness);
-
-                    if (resolvedTargetDecl.m_flavor == RequirementWitness::Flavor::declRef)
-                    {
-                        newChild = resolvedTargetDecl.getDeclRef().getDecl();
-                    }
-                    else if (resolvedTargetDecl.m_flavor == RequirementWitness::Flavor::val)
-                    {
-                        return resolvedTargetDecl.getVal()->substitute(
-                            getCurrentASTBuilder(),
-                            getParentOperand());
-                    }
-                }
+                newChild = correspondingAccessor;
             }
         }
 
@@ -394,10 +426,30 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
     bool isConstraint = false;
     if (!builtinReq)
     {
-        if (auto parentAssocType = as<AssocTypeDecl>(requirementKey->parentDecl))
+        // The requirement key is a constraint, not the associated type itself.
+        // Determine which associated type the constraint constrains. This must
+        // be answered from the constraint's endpoints, not from where the
+        // sibling constraint happens to be declared.
+        if (auto constraintDecl = as<GenericTypeConstraintDecl>(requirementKey))
         {
-            builtinReq = parentAssocType->findModifier<BuiltinRequirementModifier>();
-            isConstraint = true;
+            // Look for the built-in requirement modifier on *either* endpoint of the
+            // constraint. We search both sides for the modifier itself rather than
+            // committing to the first side that happens to be an associated type: a
+            // constraint such as `A == Differential` pairs a (non-built-in) assoc on
+            // one side with the built-in `Differential` assoc on the other, and `==`
+            // is symmetric, so `A == Differential` and `Differential == A` must
+            // resolve identically.
+            auto builtinReqFromExp = [](TypeExp const& exp) -> BuiltinRequirementModifier*
+            {
+                if (auto assoc = isDeclRefTypeOf<AssocTypeDecl>(exp.type))
+                    return assoc.getDecl()->findModifier<BuiltinRequirementModifier>();
+                return nullptr;
+            };
+            builtinReq = builtinReqFromExp(constraintDecl->sub);
+            if (!builtinReq)
+                builtinReq = builtinReqFromExp(constraintDecl->sup);
+            if (builtinReq)
+                isConstraint = true;
         }
         if (!builtinReq)
             return nullptr;
@@ -695,6 +747,33 @@ DeclRefBase* DeclRefBase::getParent()
     auto astBuilder = getCurrentASTBuilder();
     if (!getDecl()->parentDecl)
         return nullptr;
+
+    if (auto genericAppDeclRef = as<GenericAppDeclRef>(this))
+    {
+        auto parentDecl = getDecl()->parentDecl;
+        auto genericDeclRef = genericAppDeclRef->getGenericDeclRef();
+        auto genericDecl = genericDeclRef->getDecl();
+
+        if (parentDecl != genericDecl && parentDecl->isChildOf(genericDecl))
+        {
+            // A generic application can name a declaration nested under the generic's inner
+            // declaration, not only the inner declaration itself:
+            //
+            //     GenericAppDeclRef(Generic<T>, ..., inner = InnerNestedDecl)
+            //
+            // In that case, `getParent()` should preserve the same generic arguments while moving
+            // to the lexical parent of `InnerNestedDecl`. This is not a replacement for the normal
+            // `MemberDeclRef(GenericAppDeclRef(...), member)` projection form; that form is still
+            // what represents an ordinary member selected from a specialized parent. This branch
+            // only handles a decl-ref that is already a generic application to a nested `inner`
+            // decl, so parent traversal remains consistent with the decl-ref's existing shape.
+            return astBuilder->getGenericAppDeclRef(
+                genericDeclRef,
+                genericAppDeclRef->getArgs(),
+                parentDecl);
+        }
+    }
+
     auto parentDecl = getDecl()->parentDecl;
     for (auto base = getBase(); base; base = base->getBase())
     {
@@ -836,11 +915,17 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
             break;
         if (lastLookup && lastLookup->getDecl()->isChildOf(dd))
             break;
-        if ((as<GenericTypeConstraintDecl>(declRef.getDecl()) ||
-             as<TypeCoercionConstraintDecl>(declRef.getDecl()) ||
-             as<HasDiffTypeInfoConstraintDecl>(declRef.getDecl())) &&
+        if (isGenericConstraintParameterDecl(declRef.getDecl()) &&
             dd == declRef.getDecl()->parentDecl)
+        {
+            // A generic signature constraint is already represented as a witness argument of the
+            // surrounding generic app, so do not add the immediate generic parent as another
+            // default-substitution layer for the constraint decl itself. A standalone generic
+            // interface requirement has shape `GenericDecl { inner = ConstraintDecl }` and is not a
+            // generic constraint parameter; it must keep the generic parent so callers can form
+            // `constraint<T, proofs...>` through this helper.
             continue;
+        }
         if (auto gen = as<GenericDecl>(dd))
             genericParentDecls.add(gen);
     }
