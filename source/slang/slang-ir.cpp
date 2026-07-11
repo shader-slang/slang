@@ -9502,6 +9502,10 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_CastDescriptorHandleToUInt64:
     case kIROp_CastDescriptorHandleToResource:
     case kIROp_CastResourceToDescriptorHandle:
+    case kIROp_CastUIntToUntypedResourceHandle:
+    case kIROp_CastUntypedResourceHandleToUInt:
+    case kIROp_CastUIntToUntypedSamplerHandle:
+    case kIROp_CastUntypedSamplerHandleToUInt:
     case kIROp_GetDynamicResourceHeap:
     case kIROp_CastDynamicResource:
     case kIROp_AllocObj:

@@ -23801,6 +23801,15 @@ struct HitObject
             __InvokeHLSL_DXR(
                 HitOrMiss,
                 __forceVarIntoRayPayloadStructTemporarily(Payload));
+        case hlsl_nvapi:
+            // This 2-argument Invoke is DXR-1.3-native-SER-only; NVAPI SER has no equivalent
+            // (its Invoke requires an AccelerationStructure). Without this case the NVAPI target
+            // would select `case hlsl:` and emit `dx::HitObject::Invoke` applied to an
+            // `NvHitObject`, producing invalid HLSL. Diagnose cleanly instead. (#11903)
+            static_assert(false, "HitObject::Invoke(hitObject, payload) has no NVAPI form; on an "
+                "NVAPI shader-execution-reordering target call "
+                "HitObject::Invoke(accelerationStructure, hitObject, payload), or compile for a "
+                "native DXR 1.3 SER target.");
         }
     }
 
@@ -27359,6 +27368,14 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     {
         return getDescriptorFromHandle(bindless);
     }
+
+    // Convert a `ResourceDescriptorHeap[i]` handle to this texture type.
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(UntypedResourceHandle h)
+    {
+        return getDescriptorFromHandle(DescriptorHandle<This>(uint2(__getUntypedResourceHandleIndex(h), 0)));
+    }
 }
 
 ${
@@ -27391,6 +27408,9 @@ for (auto type : kDynamicResourceCastableTypes) {
     auto kind = type.kind;
     auto typeName = type.name;
     auto access = type.access;
+    bool isSampler = (strcmp(dynamicKind, "Sampler") == 0);
+    auto untypedHandleType = isSampler ? "UntypedSamplerHandle" : "UntypedResourceHandle";
+    auto untypedHandleIndexFn = isSampler ? "__getUntypedSamplerHandleIndex" : "__getUntypedResourceHandleIndex";
     if (strstr(typeName, "<T, L>"))
         sb << "__generic<T, L : IBufferDataLayout>\n";
     else if (strstr(typeName, "<T>"))
@@ -27413,6 +27433,14 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
     __init(DescriptorHandle<$(typeName)> bindless)
     {
         return getDescriptorFromHandle(bindless);
+    }
+
+    // Convert a `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` handle to this type.
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init($(untypedHandleType) h)
+    {
+        return getDescriptorFromHandle(DescriptorHandle<$(typeName)>(uint2($(untypedHandleIndexFn)(h), 0)));
     }
 }
 
@@ -27514,6 +27542,85 @@ __generic<T:IOpaqueDescriptor>
 __prefix T operator*(DescriptorHandle<T> value)
 {
     return getDescriptorFromHandle(value);
+}
+
+// HLSL SM6.6 `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]`. Indexing a heap yields an
+// untyped handle wrapping the `uint` heap index; the concrete resource/sampler type is recovered
+// from the conversion target by the implicit conversions defined above and below. Availability is
+// gated on the untyped-handle constructor (and repeated on the heap subscript so the diagnostic
+// lands at the indexing site).
+__magic_type(UntypedResourceHandleType)
+__intrinsic_type($(kIROp_UntypedResourceHandleType))
+struct UntypedResourceHandle
+{
+    [require(glsl_hlsl_spirv_wgsl, descriptor_handle)]
+    __intrinsic_op($(kIROp_CastUIntToUntypedResourceHandle))
+    __init(uint index);
+}
+
+__magic_type(UntypedSamplerHandleType)
+__intrinsic_type($(kIROp_UntypedSamplerHandleType))
+struct UntypedSamplerHandle
+{
+    [require(glsl_hlsl_spirv_wgsl, descriptor_handle)]
+    __intrinsic_op($(kIROp_CastUIntToUntypedSamplerHandle))
+    __init(uint index);
+}
+
+// Recover the `uint` heap index stored in an untyped handle.
+__intrinsic_op($(kIROp_CastUntypedResourceHandleToUInt))
+uint __getUntypedResourceHandleIndex(UntypedResourceHandle h);
+
+__intrinsic_op($(kIROp_CastUntypedSamplerHandleToUInt))
+uint __getUntypedSamplerHandleIndex(UntypedSamplerHandle h);
+
+// The subscript repeats the constructor's availability gate so unsupported targets are diagnosed
+// at the indexing site.
+struct __ResourceDescriptorHeapType
+{
+    [require(glsl_hlsl_spirv_wgsl, descriptor_handle)]
+    __subscript(uint index) -> UntypedResourceHandle
+    {
+        [ForceInline] get { return UntypedResourceHandle(index); }
+    }
+}
+
+struct __SamplerDescriptorHeapType
+{
+    [require(glsl_hlsl_spirv_wgsl, descriptor_handle)]
+    __subscript(uint index) -> UntypedSamplerHandle
+    {
+        [ForceInline] get { return UntypedSamplerHandle(index); }
+    }
+}
+
+static const __ResourceDescriptorHeapType ResourceDescriptorHeap = {};
+static const __SamplerDescriptorHeapType SamplerDescriptorHeap = {};
+
+// Convert an untyped heap handle to a `DescriptorHandle<T>` / `.Handle`. Split across two per-kind
+// extensions so the resource-vs-sampler distinction is enforced at compile time: a resource-heap
+// handle converts only to a General (CBV_SRV_UAV) `DescriptorHandle<T>` and a sampler-heap handle
+// only to a sampler `T`, so a mismatched assignment is a compile error, not a silent runtime bug.
+__generic<T : __IDynamicResourceCastable<__DynamicResourceKind.General> >
+extension DescriptorHandle<T>
+{
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(UntypedResourceHandle h)
+    {
+        return DescriptorHandle<T>(uint2(__getUntypedResourceHandleIndex(h), 0));
+    }
+}
+
+__generic<T : __IDynamicResourceCastable<__DynamicResourceKind.Sampler> >
+extension DescriptorHandle<T>
+{
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(UntypedSamplerHandle h)
+    {
+        return DescriptorHandle<T>(uint2(__getUntypedSamplerHandleIndex(h), 0));
+    }
 }
 
 // https://registry.khronos.org/vulkan/specs/latest/man/html/VkDescriptorType.html
