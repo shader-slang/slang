@@ -14,8 +14,19 @@ struct TransformParamsToConstRefContext
     IRBuilder builder;
     bool changed = false;
 
-    TransformParamsToConstRefContext(IRModule* module, DiagnosticSink* sink)
-        : module(module), sink(sink), builder(module)
+    // When set (CUDA only), a call argument that is an entry-point by-value uniform aggregate
+    // parameter is forwarded by address instead of via a temporary copy. See the header comment on
+    // `transformParamsToConstRef`.
+    bool forwardEntryPointUniformAddress = false;
+
+    TransformParamsToConstRefContext(
+        IRModule* module,
+        DiagnosticSink* sink,
+        bool forwardEntryPointUniformAddress = false)
+        : module(module)
+        , sink(sink)
+        , builder(module)
+        , forwardEntryPointUniformAddress(forwardEntryPointUniformAddress)
     {
     }
 
@@ -209,6 +220,74 @@ struct TransformParamsToConstRefContext
         return nullptr;
     }
 
+    // If `arg` is an entry-point by-value uniform aggregate parameter that is only read (never
+    // written) in its function, return that parameter; otherwise return nullptr.
+    //
+    // Such a parameter is left by-value in the kernel signature (the CUDA emitter marks it
+    // `__grid_constant__ const`), so its address can be forwarded directly into a `borrow in`
+    // callee instead of first copying the whole aggregate into a temporary. The read-only
+    // requirement is essential: `__grid_constant__` memory is immutable, so we may only take its
+    // address if no store or field/element-address write targets the parameter before the call.
+    IRParam* getForwardableEntryPointUniformParam(IRInst* arg)
+    {
+        auto param = as<IRParam>(arg);
+        if (!param)
+            return nullptr;
+
+        // The parameter must belong to an entry-point function's first block.
+        auto block = as<IRBlock>(param->getParent());
+        if (!block)
+            return nullptr;
+        auto parentFunc = as<IRFunc>(block->getParent());
+        if (!parentFunc || !parentFunc->findDecoration<IREntryPointDecoration>())
+            return nullptr;
+
+        // Only by-value aggregates are grid-constant candidates; a pointer-typed parameter is
+        // already forwardable and a scalar is not worth grid-constant treatment.
+        auto type = param->getDataType();
+        if (!type)
+            return nullptr;
+        switch (type->getOp())
+        {
+        case kIROp_StructType:
+        case kIROp_ArrayType:
+        case kIROp_TupleType:
+            break;
+        default:
+            return nullptr;
+        }
+
+        // Read-only guard: reject the parameter if any use writes through it (a store to the
+        // parameter, or a store to an address projected from it). Reads (loads, value
+        // projections, address projections that are only read) are fine.
+        for (auto use = param->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            switch (user->getOp())
+            {
+            case kIROp_Store:
+                if (as<IRStore>(user)->getPtr() == param)
+                    return nullptr;
+                break;
+            case kIROp_FieldAddress:
+            case kIROp_GetElementPtr:
+                // An address projected from the parameter could be stored through; be
+                // conservative and reject if any such address is a store destination.
+                for (auto addrUse = user->firstUse; addrUse; addrUse = addrUse->nextUse)
+                {
+                    if (auto store = as<IRStore>(addrUse->getUser()))
+                    {
+                        if (store->getPtr() == user)
+                            return nullptr;
+                    }
+                }
+                break;
+            }
+        }
+
+        return param;
+    }
+
     // Update call sites to pass an address instead of value for each updated-param
     void updateCallSites(IRFunc* func, HashSet<IRParam*>& updatedParams)
     {
@@ -236,6 +315,18 @@ struct TransformParamsToConstRefContext
                 {
                     // If existing argument is a load from an immutable buffer address,
                     // we can pass in the address as is, without making a temporary copy.
+                    newArgs.add(addr);
+                }
+                else if (
+                    forwardEntryPointUniformAddress &&
+                    getForwardableEntryPointUniformParam(arg))
+                {
+                    // The argument is a read-only entry-point by-value uniform aggregate
+                    // (`__grid_constant__ const` on CUDA). Forward its address directly instead of
+                    // copying the whole aggregate into a per-thread temporary. The CUDA emitter
+                    // renders this `IRGetAddress` as `const_cast<T*>(&param)`, since the callee's
+                    // `borrow in` parameter is a non-const pointer.
+                    auto addr = builder.emitGetAddress(builder.getPtrType(arg->getFullType()), arg);
                     newArgs.add(addr);
                 }
                 else
@@ -422,9 +513,12 @@ struct TransformParamsToConstRefContext
     }
 };
 
-SlangResult transformParamsToConstRef(IRModule* module, DiagnosticSink* sink)
+SlangResult transformParamsToConstRef(
+    IRModule* module,
+    DiagnosticSink* sink,
+    bool forwardEntryPointUniformAddress)
 {
-    TransformParamsToConstRefContext context(module, sink);
+    TransformParamsToConstRefContext context(module, sink, forwardEntryPointUniformAddress);
     return context.processModule();
 }
 

@@ -72,6 +72,21 @@
 #define SLANG_FORCE_INLINE inline
 #define SLANG_INLINE inline
 
+// Marks an entry-point (kernel) by-value uniform aggregate parameter as residing in
+// constant grid memory. `__grid_constant__` lets every thread read the parameter directly
+// from the kernel's `.param` space instead of first copying it into a per-thread `.local`
+// stack frame, which removes the per-thread depot copy for large struct/array uniforms.
+// The attribute requires CUDA 11.7+; on older toolkits it degrades to a no-op (the copy
+// behavior is unchanged but still correct).
+#ifndef SLANG_CUDA_GRID_CONSTANT
+#if defined(__CUDACC__) &&                    \
+    (__CUDACC_VER_MAJOR__ > 11 || (__CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINOR__ >= 7))
+#define SLANG_CUDA_GRID_CONSTANT __grid_constant__
+#else
+#define SLANG_CUDA_GRID_CONSTANT
+#endif
+#endif
+
 
 // Since we are using unsigned arithmatic care is need in this comparison.
 // It is *assumed* that sizeInBytes >= elemSize. Which means (sizeInBytes >= elemSize) >= 0

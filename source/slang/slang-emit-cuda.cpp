@@ -1419,6 +1419,20 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(").data)");
             return true;
         }
+    case kIROp_GetAddress:
+        {
+            // Take the address of a value. The only producer of `IRGetAddress` on the CUDA path is
+            // `transformParamsToConstRef` forwarding a `__grid_constant__ const` entry-point uniform
+            // parameter into a `borrow in` callee. That callee expects a non-const `T*`, so a
+            // `const_cast` is required to strip the `const` we placed on the parameter, e.g.
+            // `const_cast<Agg_0*>(&agg_1)`.
+            m_writer->emit("const_cast<");
+            emitType(inst->getDataType());
+            m_writer->emit(">(&");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::Prefix));
+            m_writer->emit(")");
+            return true;
+        }
     default:
         break;
     }
@@ -1494,6 +1508,32 @@ void CUDASourceEmitter::emitRateQualifiersAndAddressSpaceImpl(
     }
 }
 
+// Return true if `param` is an entry-point (kernel) by-value uniform aggregate parameter, i.e.
+// a struct/array/tuple passed by value in a kernel's `.param` argument space. Such a parameter
+// is a candidate to be qualified with `__grid_constant__ const` so all threads read it directly
+// from constant grid memory instead of each thread first copying it into its `.local` stack frame.
+// Varying parameters (thread inputs) and non-aggregate scalars are excluded.
+static bool isGridConstantCandidateParam(IRFunc* func, IRParam* param, IRVarLayout* varLayout)
+{
+    if (!func->findDecoration<IREntryPointDecoration>())
+        return false;
+    // A uniform parameter has layout information and is not varying (per-thread) input.
+    if (!varLayout || isVaryingParameter(varLayout))
+        return false;
+    auto type = param->getDataType();
+    if (!type)
+        return false;
+    switch (type->getOp())
+    {
+    case kIROp_StructType:
+    case kIROp_ArrayType:
+    case kIROp_TupleType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 void CUDASourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
 {
     m_writer->emit("(");
@@ -1511,6 +1551,9 @@ void CUDASourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
 
         if (hasEmittedParam)
             m_writer->emit(", ");
+
+        if (isGridConstantCandidateParam(func, pp, varLayout))
+            m_writer->emit("SLANG_CUDA_GRID_CONSTANT const ");
 
         emitSimpleFuncParamImpl(pp);
         hasEmittedParam = true;
