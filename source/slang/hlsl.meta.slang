@@ -28233,7 +28233,7 @@ struct CoopMat
         case metal:
             __intrinsic_asm "_slang_simdgroup_fill($0, $1)";
         case hlsl:
-            __intrinsic_asm ".Splat";
+            __intrinsic_asm "$0 = $0.Splat($1)";
         }
     }
 
