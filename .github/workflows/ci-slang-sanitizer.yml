@@ -61,11 +61,9 @@ jobs:
             changed_count=$(wc -l < /tmp/pr-changed-files.txt)
             echo "PR touches $changed_count file(s)"
             cat /tmp/pr-changed-files.txt
-            echo "HAS_PR_CHANGED_FILES=true" >> "$GITHUB_ENV"
           else
             echo "Not a PR event -- all sanitizer findings will be treated as errors"
             : > /tmp/pr-changed-files.txt
-            echo "HAS_PR_CHANGED_FILES=false" >> "$GITHUB_ENV"
           fi
 
       - name: Authenticate to Google Cloud
@@ -319,7 +317,10 @@ jobs:
             expected_files=""
             pr_related_files=""
             preexisting_files=""
-            has_pr_changed_files=${HAS_PR_CHANGED_FILES:-false}
+            has_pr_changed_files=false
+            if [ -s /tmp/pr-changed-files.txt ]; then
+              has_pr_changed_files=true
+            fi
 
             while IFS= read -r f; do
               # Check if all findings in this log are expected.
