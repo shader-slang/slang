@@ -457,6 +457,12 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
     Dictionary<IRInst*, Int64> instMap;
     instMap.add(nullptr, -1);
     List<IRInst*> insts;
+    SLANG_DEFER({
+        // Serialization temporarily owns the whole scratch word for instruction indices. Clear
+        // those indices at the pass boundary so later passes can safely use individual bits.
+        for (auto inst : insts)
+            inst->scratchData = 0;
+    });
 
     traverseInstsInSerializationOrder(
         moduleInst,

@@ -10,6 +10,7 @@
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-specialization-work-list.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-typeflow-set.h"
 #include "slang-ir-typeflow-specialize.h"
@@ -62,20 +63,14 @@ struct SpecializationContext
 
 
     SpecializationContext(IRModule* inModule, TargetProgram* target, SpecializationOptions options)
-        : workList(*inModule->getContainerPool().getList<IRInst>())
-        , workListSet(*inModule->getContainerPool().getHashSet<IRInst>())
+        : workList(inModule->getContainerPool())
         , cleanInsts(*inModule->getContainerPool().getHashSet<IRInst>())
         , module(inModule)
         , targetProgram(target)
         , options(options)
     {
     }
-    ~SpecializationContext()
-    {
-        module->getContainerPool().free(&workList);
-        module->getContainerPool().free(&workListSet);
-        module->getContainerPool().free(&cleanInsts);
-    }
+    ~SpecializationContext() { module->getContainerPool().free(&cleanInsts); }
 
     bool isUnsimplifiedArithmeticInst(IRInst* inst)
     {
@@ -283,16 +278,12 @@ struct SpecializationContext
     // to be considered for specialization or simplification,
     // whether generic, existential, etc.
     //
-    List<IRInst*>& workList;
-    HashSet<IRInst*>& workListSet;
+    SpecializationWorkList workList;
     HashSet<IRInst*>& cleanInsts;
     void addToWorkList(IRInst* inst)
     {
-        if (workListSet.add(inst))
+        if (workList.add(inst))
         {
-            workList.add(inst);
-
-
             addUsersToWorkList(inst);
         }
     }
@@ -1802,10 +1793,7 @@ struct SpecializationContext
                 break;
             }
 
-            IRInst* inst = workList.getLast();
-
-            workList.removeLast();
-            workListSet.remove(inst);
+            IRInst* inst = workList.pop();
 
             if (!inst->getParent() && inst->getOp() != kIROp_ModuleInst)
                 continue;
