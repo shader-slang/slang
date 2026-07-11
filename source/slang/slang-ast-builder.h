@@ -344,6 +344,30 @@ public:
         {
             return DeclRef<T>(getMemberDeclRef(parentMemberDeclRef->getParent(), memberDecl));
         }
+        else if (auto parentGenericAppDeclRef = as<GenericAppDeclRef>(parent.declRefBase))
+        {
+            auto parentGenericDecl = parentGenericAppDeclRef->getGenericDecl();
+
+            // Generic signature constraints are direct members of the `GenericDecl`, not of the
+            // generic inner declaration. Consider this example:
+            //
+            //     void f<T>(T value) where T : IBar;
+            //
+            // The `where T : IBar` proof is stored under the `GenericDecl` for `f<T>`, while the
+            // callable declaration is `GenericDecl.inner`. If substitution starts from
+            // `MemberDeclRef(GenericAppDeclRef(G, G.inner, args), constraintUnderG)`, keep the
+            // constraint under the same specialized generic environment instead of manufacturing a
+            // member reference through `G.inner`, because the constraint is not a member of the
+            // callable body.
+            if (isConstraintDecl(memberDecl) && memberDecl->parentDecl == parentGenericDecl)
+            {
+                return getGenericAppDeclRef(
+                           DeclRef<GenericDecl>(parentGenericAppDeclRef->getGenericDeclRef()),
+                           parentGenericAppDeclRef->getArgs(),
+                           memberDecl)
+                    .template as<T>();
+            }
+        }
         else if (auto lookupDeclRef = as<LookupDeclRef>(parent.declRefBase))
         {
             // Handle some specicial case rules due to the way some of our builtin decls are
@@ -414,13 +438,40 @@ public:
         return getOrCreate<ConstantIntVal>(type, value);
     }
 
-    TypeCastIntVal* getTypeCastIntVal(Type* type, Val* base)
+    IntVal* getTypeCastIntVal(Type* type, Val* base)
     {
         // Unwrap any existing type casts.
         while (auto baseTypeCast = as<TypeCastIntVal>(base))
             base = baseTypeCast->getBase();
 
+        if (auto foldedCast = as<IntVal>(TypeCastIntVal::tryFoldImpl(this, type, base, nullptr)))
+            return foldedCast;
+
+        if (auto baseIntVal = as<IntVal>(base))
+        {
+            if (baseIntVal->getType() == type)
+                return baseIntVal;
+        }
+
         return getOrCreate<TypeCastIntVal>(type, base);
+    }
+
+    // Convert a declaration reference to the `Val` form used in generic substitution arguments:
+    // type declarations are represented as `DeclRefType`, while generic value declarations are
+    // represented as `DeclRefIntVal`.
+    Val* getDeclRefVal(DeclRef<Decl> declRef)
+    {
+        if (isGenericValueParam(declRef) || declRef.as<GlobalGenericValueParamDecl>())
+        {
+            auto varDeclRef = declRef.as<VarDeclBase>();
+            return getOrCreate<DeclRefIntVal>(varDeclRef.getDecl()->getType(), varDeclRef);
+        }
+
+        auto decl = declRef.getDecl();
+        if (as<SimpleTypeDecl>(decl) || as<AggTypeDeclBase>(decl))
+            return DeclRefType::create(this, declRef);
+
+        return nullptr;
     }
 
     DeclRef<Decl> getGenericAppDeclRef(
@@ -725,7 +776,7 @@ public:
     DeclaredVariadicPackCountWitness* getDeclaredVariadicPackCountWitness(
         DeclRef<GenericVariadicPackCountConstraintDecl> declRef);
     ConcreteVariadicPackCountWitness* getConcreteVariadicPackCountWitness(
-        Val* pack,
+        IntVal* actualCount,
         IntVal* expectedCount);
     HasDiffTypeInfoWitness* getHasDiffTypeInfoWitness(
         DeclRef<HasDiffTypeInfoConstraintDecl> declRef);
