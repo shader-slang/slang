@@ -5742,6 +5742,10 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
 
 struct HigherOrderInvokeExprCheckingActions
 {
+    // Keep the operand syntax while its resolved form is built. Member checking types the
+    // original base expression in place before lookup adds any interface upcast.
+    Expr* originalFuncExpr = nullptr;
+
     virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) = 0;
     virtual void fillHigherOrderInvokeExpr(
         HigherOrderInvokeExpr* resultDiffExpr,
@@ -5788,14 +5792,17 @@ struct HigherOrderInvokeExprCheckingActions
     QualType getThisTypeForBaseFunc(SemanticsVisitor* semantics, Expr* funcExpr)
     {
         auto innerExpr = getInnerMostExprFromHigherOrderExpr(funcExpr);
+        auto declRefExpr = as<DeclRefExpr>(innerExpr);
+        auto originalMemberExpr =
+            as<MemberExpr>(getInnerMostExprFromHigherOrderExpr(originalFuncExpr));
 
         // Only member references can contribute an explicit `this` parameter. A plain
         // DeclRefExpr inside the same type still means "use the current implicit
         // this", so the differentiated function remains an instance member.
-        if (!as<MemberExpr>(innerExpr) && !as<StaticMemberExpr>(innerExpr))
+        if (!as<MemberExpr>(innerExpr) && !as<StaticMemberExpr>(innerExpr) && !originalMemberExpr)
             return QualType();
 
-        if (auto declRefExpr = as<DeclRefExpr>(innerExpr))
+        if (declRefExpr)
         {
             auto declRef = declRefExpr->declRef;
             // Unwrap GenericDecl to get to the inner callable.
@@ -5817,6 +5824,18 @@ struct HigherOrderInvokeExprCheckingActions
                     auto declaredThisType = getTypeForThisExpr(semantics, callableDeclRef);
                     if (!declaredThisType.type)
                         return QualType();
+
+                    // Consider `bwd_diff(dFunction.p.operator())` where the receiver has type
+                    // `F : IUnary`. Member lookup inserts an upcast to `IUnary`, and overload
+                    // expansion rebuilds the candidate without its bound base expression. The
+                    // original member expression still owns the checked `dFunction.p` expression,
+                    // so use its type to keep the explicit receiver parameter as `F`.
+                    if (originalMemberExpr)
+                    {
+                        return QualType(
+                            originalMemberExpr->baseExpression->type.type,
+                            declaredThisType.isLeftValue);
+                    }
 
                     if (auto memberExpr = as<MemberExpr>(innerExpr))
                     {
@@ -5980,6 +5999,7 @@ static Expr* _checkHigherOrderInvokeExpr(
     HigherOrderInvokeExprCheckingActions* actions)
 {
     // Check/Resolve inner function declaration.
+    actions->originalFuncExpr = expr->baseFunction;
     SemanticsVisitor subVisitor(semantics->getShared());
     subVisitor = subVisitor.withSink(semantics->getSink()).allowStaticReferenceToNonStaticMember();
     // expr->baseFunction = subVisitor.CheckExpr(expr->baseFunction);
