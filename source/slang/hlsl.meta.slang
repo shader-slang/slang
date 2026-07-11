@@ -31682,6 +31682,30 @@ extension<T : __BuiltinArithmeticType, let N : int> CoopVec<T, N>
 // The direct [Differentiable] annotation lets autodiff synthesize the constructor derivative.
 extension<T : __BuiltinFloatingPointType, let N : int> CoopVec<T, N>
 {
+    [ForceInline]
+    [require(cooperative_vector)]
+    [Differentiable]
+    __init(vector<T, N> value)
+    {
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+        {
+            this[i] = value[i];
+        }
+    }
+
+    [ForceInline]
+    [require(cooperative_vector)]
+    [Differentiable]
+    __init(T[N] value)
+    {
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+        {
+            this[i] = value[i];
+        }
+    }
+
     [OverloadRank(1)]
     [ForceInline]
     [require(cooperative_vector)]
