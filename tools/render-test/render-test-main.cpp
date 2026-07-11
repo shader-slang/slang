@@ -494,8 +494,11 @@ struct AssignValsFromLayoutContext
         const size_t bufferSize = Math::Max(
             (size_t)bufferData.getCount() * sizeof(uint32_t),
             (size_t)(srcBuffer.elementCount * srcBuffer.stride));
-        bufferData.reserve(bufferSize / sizeof(uint32_t));
-        for (size_t i = bufferData.getCount(); i < bufferSize / sizeof(uint32_t); i++)
+        // The RHI copies bufferSize bytes, so keep the final partial word initialized too.
+        const size_t wordSize = sizeof(uint32_t);
+        const size_t bufferWordCount = bufferSize / wordSize + (bufferSize % wordSize != 0);
+        bufferData.reserve(bufferWordCount);
+        for (size_t i = bufferData.getCount(); i < bufferWordCount; i++)
             bufferData.add(0);
 
         ComPtr<IBuffer> bufferResource;

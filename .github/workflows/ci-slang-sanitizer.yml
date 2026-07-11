@@ -49,17 +49,23 @@ jobs:
       - name: Compute PR changed files
         env:
           EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
-          if [ "$EVENT_NAME" = "pull_request" ]; then
+          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "merge_group" ]; then
+            if [ -z "$BASE_SHA" ]; then
+              echo "::error::The $EVENT_NAME event did not provide a base SHA"
+              exit 1
+            fi
             echo "Computing diff against PR base: $BASE_SHA"
             git diff --name-only "$BASE_SHA"...HEAD > /tmp/pr-changed-files.txt
             changed_count=$(wc -l < /tmp/pr-changed-files.txt)
             echo "PR touches $changed_count file(s)"
             cat /tmp/pr-changed-files.txt
+            echo "HAS_PR_CHANGED_FILES=true" >> "$GITHUB_ENV"
           else
             echo "Not a PR event -- all sanitizer findings will be treated as errors"
             : > /tmp/pr-changed-files.txt
+            echo "HAS_PR_CHANGED_FILES=false" >> "$GITHUB_ENV"
           fi
 
       - name: Authenticate to Google Cloud
@@ -174,8 +180,13 @@ jobs:
           int main(void) { volatile int *p = (int*)malloc(sizeof(int)); free((void*)p); return *p; }
           CANARY
           export ASAN_OPTIONS="log_path=/tmp/canary"
-          clang-18 -fsanitize=address -O0 /tmp/asan-canary.c -o /tmp/asan-canary
-          /tmp/asan-canary || true
+          ASAN_RUNTIME=$(clang-18 -print-file-name=libclang_rt.asan-x86_64.so)
+          if [ ! -f "$ASAN_RUNTIME" ]; then
+            echo "::error::Clang shared ASan runtime not found: $ASAN_RUNTIME"
+            exit 1
+          fi
+          clang-18 -fsanitize=address -shared-libsan -O0 /tmp/asan-canary.c -o /tmp/asan-canary
+          LD_PRELOAD="$ASAN_RUNTIME${LD_PRELOAD:+:$LD_PRELOAD}" /tmp/asan-canary || true
           if ls /tmp/canary.* 1>/dev/null 2>&1; then
             echo "Sanitizer runtime verified: log files produced"
           else
@@ -195,6 +206,16 @@ jobs:
           export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:log_path=$PWD/asan-logs/asan"
           export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:print_suppressions=0:log_path=$PWD/asan-logs/ubsan"
           export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
+
+          # CPU tests launch generated host programs that are not themselves
+          # ASan-linked. Preload the shared runtime so those programs load it
+          # before instrumented Slang libraries inherited from this build.
+          ASAN_RUNTIME=$(clang-18 -print-file-name=libclang_rt.asan-x86_64.so)
+          if [ ! -f "$ASAN_RUNTIME" ]; then
+            echo "::error::Clang shared ASan runtime not found: $ASAN_RUNTIME"
+            exit 1
+          fi
+          export LD_PRELOAD="$ASAN_RUNTIME${LD_PRELOAD:+:$LD_PRELOAD}"
 
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -298,10 +319,7 @@ jobs:
             expected_files=""
             pr_related_files=""
             preexisting_files=""
-            has_pr_changed_files=false
-            if [ -s /tmp/pr-changed-files.txt ]; then
-              has_pr_changed_files=true
-            fi
+            has_pr_changed_files=${HAS_PR_CHANGED_FILES:-false}
 
             while IFS= read -r f; do
               # Check if all findings in this log are expected.
