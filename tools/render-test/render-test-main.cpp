@@ -494,8 +494,15 @@ struct AssignValsFromLayoutContext
         const size_t bufferSize = Math::Max(
             (size_t)bufferData.getCount() * sizeof(uint32_t),
             (size_t)(srcBuffer.elementCount * srcBuffer.stride));
-        bufferData.reserve(bufferSize / sizeof(uint32_t));
-        for (size_t i = bufferData.getCount(); i < bufferSize / sizeof(uint32_t); i++)
+        // `bufferData` is a `List<uint32_t>`, so it can only cover `bufferSize` bytes when it
+        // holds at least ceil(bufferSize / 4) words. `bufferSize` need not be a multiple of 4
+        // (e.g. stride=2 with an odd element count), and the pointer we hand to createBuffer
+        // below is length-less, so the backend memcpys the full `bufferSize` bytes out of this
+        // backing store. Flooring the word count here would leave the store short of
+        // `bufferSize` and let that memcpy read past the end of the allocation (see #12058).
+        const size_t wordCount = (bufferSize + sizeof(uint32_t) - 1) / sizeof(uint32_t);
+        bufferData.reserve(wordCount);
+        for (size_t i = bufferData.getCount(); i < wordCount; i++)
             bufferData.add(0);
 
         ComPtr<IBuffer> bufferResource;
