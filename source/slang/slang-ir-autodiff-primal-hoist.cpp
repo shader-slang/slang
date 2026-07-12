@@ -1354,6 +1354,21 @@ void applyToInst(
                     }
                     if (inductionValueInfo.counterOffset)
                     {
+                        // `counterOffset` is the loop's initial (pre-loop) induction value. When the
+                        // loop start is a runtime expression (e.g. `for (int dx = -radius; ...)`) the
+                        // offset is a primal-region computation, but the reconstruction we are
+                        // emitting here lives in the reverse region — a separate function once the
+                        // unzip pass splits fwd/reverse. Referencing the offset directly would then
+                        // dangle (SPIR-V orphan-global ICE; CUDA/HLSL/Metal used-before-def). Register
+                        // it as a stored primal value so the later `ensurePrimalAvailability` pass
+                        // rewrites this use to a load from the checkpoint context. Constants (and
+                        // other module-scope values) are already in scope everywhere and need no
+                        // legalization, so skip them to preserve the constant-start fast path.
+                        if (!isIntegerConstantValue(inductionValueInfo.counterOffset) &&
+                            getBlock(inductionValueInfo.counterOffset) != nullptr)
+                        {
+                            hoistInfo->storeSet.add(inductionValueInfo.counterOffset);
+                        }
                         setInsertAfterOrdinaryInst(builder, replacement);
                         replacement = builder->emitAdd(
                             replacement->getDataType(),
