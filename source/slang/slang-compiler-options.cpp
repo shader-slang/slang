@@ -189,6 +189,15 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
         if (kv.key == CompilerOptionName::CoverageManifestOutput)
             continue;
 
+        // This is a load-time acceptance-policy knob, not generated shader code: it only decides
+        // whether loadModule runs isBinaryModuleUpToDate. There is no CLI spelling for it, so an
+        // offline `slangc -o *.slang-module` bakes a digest with the flag absent; a loader that
+        // enables it (its sole purpose) would otherwise fold it into the recompute and never match
+        // that baked digest, making the freshness check unable to accept any default-compiled
+        // module (issue #6557). Excluding it keeps the write/read digest symmetric.
+        if (kv.key == CompilerOptionName::UseUpToDateBinaryModule)
+            continue;
+
         builder.append(kv.key);
         builder.append(kv.value.getCount());
         for (auto& v : kv.value)
