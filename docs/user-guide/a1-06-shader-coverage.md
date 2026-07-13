@@ -12,8 +12,8 @@ report for LCOV compatible reporting tools such as `genhtml`, Codecov, or VS Cod
 This chapter walks through the pipeline: compile with coverage, read the generated manifest,
 dispatch from a small C++ host program, and produce a report. All steps use the offline
 workflow (`slangc` plus a sidecar manifest file) and run without a GPU; the dispatched kernel
-is compiled for Slang's CPU target. The closing section summarizes GPU targets and the
-in-process C++ API. The files to execute this tutorial are in
+is compiled for Slang's CPU target. The closing Further reading section summarizes GPU
+targets and the in-process C++ API. The files to execute this tutorial are in
 [`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial).
 
 ## Compiling with coverage
@@ -117,7 +117,8 @@ slangc hello-coverage.slang -target shader-sharedlib -stage compute -entry compu
 `slangc` invokes the system C++ compiler and produces a library that exports `computeMain`,
 plus a sidecar manifest. The only difference from the SPIR-V manifest is the `buffer` block:
 the CPU target has no descriptor sets, so the manifest reports a byte offset into the
-kernel's parameter payload instead (`space` and `binding` remain only as placeholders):
+kernel's parameter payload instead (`space` and `binding` remain only as placeholders, and
+`uniform_stride` is the size of the `(pointer, count)` slot itself, not a counter width):
 
 ```json
     "buffer": {
