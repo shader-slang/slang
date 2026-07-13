@@ -161,6 +161,26 @@ jobs:
               --commit-time "$COMMIT_TIME"
           fi
 
+      # The runner-built LTO binaries are otherwise discarded with the
+      # workspace. 30-day retention: enough to reproduce any point in the
+      # trend window locally (the api-driver can dlopen these like release
+      # binaries) or to compare build provenance, without a ~40-min rebuild
+      # of a historical commit. Trimmed to what the perf suite needs.
+      - name: Upload ToT slang binaries
+        if: always() && env.PERF_LABEL != ''
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: slang-binaries-${{ env.PERF_LABEL }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            build/Release/bin/slangc.exe
+            build/Release/bin/slang.dll
+            build/Release/bin/slang-compiler.dll
+            build/Release/bin/slang-glslang.dll
+            build/Release/bin/dxcompiler.dll
+            build/Release/bin/dxil.dll
+
       - name: Upload results artifact (publish=false)
         if: always() && env.PUBLISH != 'true'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
