@@ -614,8 +614,8 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                     f"<tr><td>{esc(t)}</td>"
                     f"<td align=right>{d_ms:+.1f}</td>"
                     f"<td align=right>{own:+.1f}%</td>"
-                    f"<td align=right>{share * 100:.0f}%</td></tr>"
-                    for t, d_ms, own, share in contributors)
+                    f"<td align=right>{contrib:+.1f}pp</td></tr>"
+                    for t, d_ms, own, contrib in contributors)
                 step_rows = "".join(
                     f"<tr><td>{esc(dp)} &rarr; {esc(d)}</td>"
                     f"<td align=right style='color:{'#1e8449' if spct < 0 else '#c0392b'};"
@@ -634,11 +634,12 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                     f"<span style='color:#666;font-size:13px'> &nbsp;({esc(d0)} {esc(c0)} "
                     f"&rarr; {esc(d1)} {esc(c1)})</span></p>"
                     f"<p style='color:#666;font-size:13px;margin:10px 0 4px'>"
-                    f"Main contributors over the window (leaf timers; own change and "
-                    f"share of the {esc(head)} delta):</p>"
+                    f"Main contributors over the window (leaf timers; own change, and "
+                    f"the contribution in percentage points of the starting "
+                    f"{esc(head)} — contributions sum to the overall %):</p>"
                     f"<table style='{tbl}' cellpadding=5>"
                     f"<tr><th style='text-align:left'>timer</th><th>&Delta; ms</th>"
-                    f"<th>own %</th><th>share</th></tr>{contrib_rows}</table>"
+                    f"<th>own %</th><th>of total</th></tr>{contrib_rows}</table>"
                     f"<p style='color:#666;font-size:13px;margin:14px 0 4px'>"
                     f"Largest day steps (&ge;5% of the previous day, both directions; "
                     f"bisect with <code>git log &lt;c0&gt;..&lt;c1&gt; -- source/</code>):</p>"

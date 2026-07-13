@@ -73,9 +73,14 @@ def workload_progress(points, workload, step_rel=0.05):
 
       overall       (d0, c0, v0, d1, c1, v1, pct) for the headline timer —
                     the 30-day-window "+/-%" answer.
-      contributors  [(timer, d_ms, pct_own, share)] — leaf timers ranked by
+      contributors  [(timer, d_ms, pct_own, contrib)] — leaf timers ranked by
                     |delta ms| over the window; pct_own is the timer's own
-                    change, share its fraction of the headline delta.
+                    change, contrib its contribution in percentage points of
+                    the STARTING headline total (d_ms / v0). Contributions sum
+                    to the overall %-change, and stay meaningful when the
+                    headline is nearly flat because opposing timer moves
+                    cancel — unlike a share-of-delta, which explodes on a
+                    near-zero denominator.
       steps         [(d_prev, d, c_prev, c, pct, top_timers)] — day boundaries
                     where the headline moved >= step_rel vs the PREVIOUS day
                     (both directions), with the top leaf timers of that step
@@ -100,14 +105,13 @@ def workload_progress(points, workload, step_rel=0.05):
     # minimum-delta filter: a flat counter is information too (it rules the
     # pass out as a contributor).
     contributors = []
-    hdelta = v1 - v0
     first, last = pts[0][2], pts[-1][2]
     for t in BOUNDARY_TIMERS:
         if t not in first or t not in last or first[t] < 0.5:
             continue
         d_ms = last[t] - first[t]
         contributors.append((t, d_ms, (last[t] / first[t] - 1) * 100,
-                             d_ms / hdelta if hdelta else 0.0))
+                             d_ms / v0 * 100 if v0 else 0.0))
     contributors.sort(key=lambda r: -abs(r[1]))
 
     steps = []
@@ -139,9 +143,10 @@ def workload_view(points, workload, step_rel):
     d0, c0, v0, d1, c1, v1, pct = overall
     print(f"== {workload} — {d0} ({c0}) -> {d1} ({c1}) ==")
     print(f"overall {headline(workload)}: {v0:.1f} -> {v1:.1f} ms  ({pct:+.1f}%)")
-    print("main contributors (leaf timers, window delta):")
-    for t, d_ms, own, share in contributors:
-        print(f"   {t:32s}{d_ms:+9.1f} ms  ({own:+6.1f}% own, {share * 100:4.0f}% of change)")
+    print("main contributors (leaf timers, window delta; contributions sum "
+          "to the overall %):")
+    for t, d_ms, own, contrib in contributors:
+        print(f"   {t:32s}{d_ms:+9.1f} ms  ({own:+6.1f}% own, {contrib:+5.1f}pp of total)")
     print(f"day steps >= {step_rel * 100:.0f}% vs previous day:")
     if not steps:
         print("   none")
