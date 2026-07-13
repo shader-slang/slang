@@ -165,8 +165,10 @@ Get-Content hello-coverage.lcov
 # Guard the numbers the chapter publishes: the LCOV records combine the
 # manifest's source attribution with the counter values, so this one
 # comparison catches instrumentation, attribution, or converter drift.
-# expected.lcov is the single checked-in copy both runner scripts use;
-# the comparison is order-exact, matching the bash runner's diff.
+# expected.lcov is the single checked-in copy both runner scripts use.
+# The comparison is order- and count-exact per line, but tolerates CRLF
+# and a trailing newline: on Windows the Python converter writes
+# platform line endings, so a byte-exact diff would fail spuriously.
 $expectedText = ((Get-Content expected.lcov) -join "`n").TrimEnd()
 $actualText = ((Get-Content hello-coverage.lcov) -join "`n").TrimEnd()
 if ($expectedText -ne $actualText)

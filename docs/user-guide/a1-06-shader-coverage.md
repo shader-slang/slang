@@ -218,7 +218,7 @@ attribution automatically.
 Pass the kernel's manifest and the counters to the LCOV converter:
 
 ```bash
-python3 tools/shader-coverage/slang-coverage-to-lcov.py \
+python3 <slang-repo>/tools/shader-coverage/slang-coverage-to-lcov.py \
     --manifest hello-coverage-kernel.so.coverage-manifest.json \
     --counters hello-coverage.counters.bin --output hello-coverage.lcov
 ```
@@ -254,7 +254,7 @@ Windows distribution. Where it is unavailable, the repository's own renderer pro
 an equivalent report using Python:
 
 ```bash
-python3 tools/coverage-html/slang-coverage-html.py hello-coverage.lcov --output-dir coverage-html
+python3 <slang-repo>/tools/coverage-html/slang-coverage-html.py hello-coverage.lcov --output-dir coverage-html
 ```
 
 Any other LCOV consumer works as well — for example, the VS Code Coverage Gutters extension

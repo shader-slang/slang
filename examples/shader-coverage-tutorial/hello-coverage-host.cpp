@@ -83,10 +83,15 @@ int main(int argc, char** argv)
     const bool coverageEnabled = !(argc > 1 && std::strcmp(argv[1], "--no-coverage") == 0);
 
     void* library = loadKernel(kKernelPath);
-    auto computeMain = library ? (ComputeFunc)findFunc(library, "computeMain") : nullptr;
-    if (!computeMain)
+    if (!library)
     {
         std::fprintf(stderr, "cannot load %s\n", kKernelPath);
+        return 1;
+    }
+    auto computeMain = (ComputeFunc)findFunc(library, "computeMain");
+    if (!computeMain)
+    {
+        std::fprintf(stderr, "%s exports no computeMain entry point\n", kKernelPath);
         return 1;
     }
 
