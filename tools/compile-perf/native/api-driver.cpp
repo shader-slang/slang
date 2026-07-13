@@ -26,8 +26,11 @@
 // stdout (bench.py's real_error() recognizes "error" lines) and the exit code
 // is 1.
 //
-// Timer contract: every `Scope(timers, ...)` below wraps exactly ONE public
-// API call (wall clock, driver side). The user-facing glossary — which call
+// Timer contract: leaf `Scope(timers, ...)` sites below wrap exactly ONE
+// public API call (wall clock, driver side); the composites are apiTotal
+// (a mode's whole timed section), apiReflection (getLayout + the reflection
+// walk), and apiCreateSession (findProfile + createSession). The user-facing
+// glossary — which call
 // each timer maps to, the apiTotal setup-exclusion rule, and how to read
 // apiGetCode against the library's own compileInner — lives in
 // ../README.md ("API timer glossary"). These names appear on the perf site
