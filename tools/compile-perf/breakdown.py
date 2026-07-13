@@ -605,23 +605,34 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
 
         movers_html = ""
         if len(_daily_pts) >= 2:
-            overall, contributors, steps = daily_movers.workload_progress(_daily_pts, wl)
+            overall, contributors, extras, steps = daily_movers.workload_progress(
+                _daily_pts, wl)
             if overall:
                 d0, c0, v0, d1, c1, v1, pct = overall
                 pcol = "#1e8449" if pct < 0 else "#c0392b"
                 head = daily_movers.headline(wl)
+
+                def own_cell(own):
+                    return f"{own:+.1f}%" if own is not None else "new"
+
                 contrib_rows = "".join(
                     f"<tr><td>{esc(t)}</td>"
                     f"<td align=right>{d_ms:+.1f}</td>"
-                    f"<td align=right>{own:+.1f}%</td>"
+                    f"<td align=right>{own_cell(own)}</td>"
                     f"<td align=right>{contrib:+.1f}pp</td></tr>"
                     for t, d_ms, own, contrib in contributors)
+                extra_rows = "".join(
+                    f"<tr><td>{esc(t)}</td>"
+                    f"<td align=right>{d_ms:+.1f}</td>"
+                    f"<td align=right>{own_cell(own)}</td>"
+                    f"<td align=right style='color:#aaa'>&ndash;</td></tr>"
+                    for t, d_ms, own in extras)
                 step_rows = "".join(
                     f"<tr><td>{esc(dp)} &rarr; {esc(d)}</td>"
                     f"<td align=right style='color:{'#1e8449' if spct < 0 else '#c0392b'};"
                     f"font-weight:600'>{spct:+.1f}%</td>"
                     f"<td><code>{esc(cp)}..{esc(c)}</code></td>"
-                    f"<td>{esc(', '.join(f'{t} {own:+.0f}%' for t, own in movers))}</td></tr>"
+                    f"<td>{esc(', '.join(f'{t} {own:+.0f}%' if own is not None else f'{t} new' for t, own in movers))}</td></tr>"
                     for dp, d, cp, c, spct, movers in steps) or (
                     "<tr><td colspan=4 style='color:#888'>none</td></tr>")
                 tbl = "border-collapse:collapse;font-size:13px"
@@ -634,19 +645,21 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                     f"<span style='color:#666;font-size:13px'> &nbsp;({esc(d0)} {esc(c0)} "
                     f"&rarr; {esc(d1)} {esc(c1)})</span></p>"
                     f"<p style='color:#666;font-size:13px;margin:10px 0 4px'>"
-                    f"Main contributors over the window (leaf timers; own change, and "
-                    f"the contribution in percentage points of the starting "
-                    f"{esc(head)} — contributions sum to the overall %):</p>"
+                    f"Contributors — the mutually-exclusive phase buckets (named leaves + "
+                    f"<code>(self)</code> residuals) that tile {esc(head)}, so the pp column "
+                    f"sums to the overall %. Below them, every other reported counter "
+                    f"(nested/overlapping, e.g. serialized-module reads — own change only):</p>"
                     f"<table style='{tbl}' cellpadding=5>"
-                    f"<tr><th style='text-align:left'>timer</th><th>&Delta; ms</th>"
-                    f"<th>own %</th><th>of total</th></tr>{contrib_rows}</table>"
+                    f"<tr><th style='text-align:left'>counter</th><th>&Delta; ms</th>"
+                    f"<th>own %</th><th>of total</th></tr>{contrib_rows}"
+                    f"{extra_rows}</table>"
                     f"<p style='color:#666;font-size:13px;margin:14px 0 4px'>"
                     f"Largest day steps (&ge;5% of the previous day, both directions; "
                     f"bisect with <code>git log &lt;c0&gt;..&lt;c1&gt; -- source/</code>):</p>"
                     f"<table style='{tbl}' cellpadding=5>"
                     f"<tr><th style='text-align:left'>boundary</th><th>% vs prev day</th>"
                     f"<th style='text-align:left'>commits</th>"
-                    f"<th style='text-align:left'>top timers (own %)</th></tr>"
+                    f"<th style='text-align:left'>top buckets (own %)</th></tr>"
                     f"{step_rows}</table>")
 
         _, srcfiles = _workload_source(spec) if spec else (0, [])

@@ -68,51 +68,86 @@ def daily_points(results_dir, metric):
     return out
 
 
+def _partition(workload):
+    """(bucket_fn, tree) for the workload's family — breakdown's mutually-
+    exclusive decomposition, whose buckets tile the headline exactly (named
+    leaves + `(self)` residuals). Imported lazily: breakdown imports this
+    module for the report pages, so a top-level import would be circular."""
+    import breakdown
+    spec = manifest.BY_NAME.get(workload)
+    if spec is not None and spec.mode == "api":
+        return breakdown.api_buckets, breakdown.API_TREE
+    return breakdown.buckets, breakdown.TREE
+
+
+def _tree_names(tree):
+    names = {tree[0]}
+    for child in tree[1]:
+        names |= _tree_names(child)
+    return names
+
+
+# Raw counters that duplicate another counter one-to-one; listing both would
+# be noise.
+_ALIASES = {"endToEndActions", "checkAllTranslationUnits",
+            "generateIRForTranslationUnit"}
+
+
 def workload_progress(points, workload, step_rel=0.05):
     """Percent-based progress summary for one workload's daily series:
 
       overall       (d0, c0, v0, d1, c1, v1, pct) for the headline timer —
                     the 30-day-window "+/-%" answer.
-      contributors  [(timer, d_ms, pct_own, contrib)] — leaf timers ranked by
-                    |delta ms| over the window; pct_own is the timer's own
-                    change, contrib its contribution in percentage points of
-                    the STARTING headline total (d_ms / v0). Contributions sum
-                    to the overall %-change, and stay meaningful when the
-                    headline is nearly flat because opposing timer moves
-                    cancel — unlike a share-of-delta, which explodes on a
-                    near-zero denominator.
-      steps         [(d_prev, d, c_prev, c, pct, top_timers)] — day boundaries
-                    where the headline moved >= step_rel vs the PREVIOUS day
-                    (both directions), with the top leaf timers of that step
-                    as (timer, own pct) pairs. Percent of previous day, not
-                    net ms: a 5% step means the same thing at every scale.
+      contributors  [(name, d_ms, pct_own_or_None, contrib_pp)] over the
+                    breakdown BUCKET partition (named leaves + `(self)`
+                    residuals): buckets tile the headline exactly, so the pp
+                    contributions (d_ms / starting headline) sum to the
+                    overall %-change. pct_own is None when the bucket starts
+                    at ~0 (no meaningful own-%).
+      extras        [(name, d_ms, pct_own)] — every OTHER reported counter
+                    (e.g. readSerializedModuleIR, loadBuiltinModule): they
+                    nest inside or extend beyond the partition, so they carry
+                    no pp column, but their own movement is still the signal
+                    for passes without a dedicated bucket.
+      steps         [(d_prev, d, c_prev, c, pct, top_buckets)] — day
+                    boundaries where the headline moved >= step_rel vs the
+                    PREVIOUS day (both directions), with the step's top
+                    buckets as (name, own pct or None) pairs.
 
-    Returns (None, [], []) with fewer than 2 daily points.
+    Returns (None, [], [], []) with fewer than 2 daily points.
     """
     pts = [(d, c, {t: v for (wl, t), v in vals.items() if wl == workload})
            for d, c, vals in points]
     pts = [p for p in pts if p[2]]
     if len(pts) < 2:
-        return None, [], []
+        return None, [], [], []
     head = headline(workload)
     hs = [(d, c, tm[head]) for d, c, tm in pts if head in tm]
     if len(hs) < 2:
-        return None, [], []
+        return None, [], [], []
     (d0, c0, v0), (d1, c1, v1) = hs[0], hs[-1]
     overall = (d0, c0, v0, d1, c1, v1, (v1 / v0 - 1) * 100 if v0 else 0.0)
 
-    # ALL leaf timers present at both endpoints — no top-N cap and no
-    # minimum-delta filter: a flat counter is information too (it rules the
-    # pass out as a contributor).
+    bucket_fn, tree = _partition(workload)
+    bks = [(d, c, bucket_fn(tm)) for d, c, tm in pts]
+    first_b, last_b = bks[0][2], bks[-1][2]
     contributors = []
-    first, last = pts[0][2], pts[-1][2]
-    for t in BOUNDARY_TIMERS:
-        if t not in first or t not in last or first[t] < 0.5:
-            continue
-        d_ms = last[t] - first[t]
-        contributors.append((t, d_ms, (last[t] / first[t] - 1) * 100,
-                             d_ms / v0 * 100 if v0 else 0.0))
+    for t in sorted(set(first_b) | set(last_b)):
+        a, b = first_b.get(t, 0.0), last_b.get(t, 0.0)
+        d_ms = b - a
+        own = (b / a - 1) * 100 if a >= 0.05 else None
+        contributors.append((t, d_ms, own, d_ms / v0 * 100 if v0 else 0.0))
     contributors.sort(key=lambda r: -abs(r[1]))
+
+    covered = _tree_names(tree) | {f"{n} (self)" for n in _tree_names(tree)}
+    first_t, last_t = pts[0][2], pts[-1][2]
+    extras = []
+    for t in sorted(set(first_t) & set(last_t)):
+        if t in covered or t in _ALIASES:
+            continue
+        a, b = first_t[t], last_t[t]
+        extras.append((t, b - a, (b / a - 1) * 100 if a >= 0.05 else None))
+    extras.sort(key=lambda r: -abs(r[1]))
 
     steps = []
     for i in range(1, len(hs)):
@@ -122,36 +157,41 @@ def workload_progress(points, workload, step_rel=0.05):
         pct = (v / vp - 1) * 100
         if abs(pct) < step_rel * 100:
             continue
-        p_prev = next(tm for dd, _c, tm in pts if dd == dp)
-        p_cur = next(tm for dd, _c, tm in pts if dd == d)
+        b_prev = next(bk for dd, _c, bk in bks if dd == dp)
+        b_cur = next(bk for dd, _c, bk in bks if dd == d)
         movers = []
-        for t in BOUNDARY_TIMERS:
-            if t in p_prev and t in p_cur and p_prev[t] >= 0.5:
-                movers.append((t, p_cur[t] - p_prev[t],
-                               (p_cur[t] / p_prev[t] - 1) * 100))
+        for t in set(b_prev) | set(b_cur):
+            a, b = b_prev.get(t, 0.0), b_cur.get(t, 0.0)
+            movers.append((t, b - a, (b / a - 1) * 100 if a >= 0.05 else None))
         movers.sort(key=lambda m: -abs(m[1]))
         steps.append((dp, d, cp, c, pct,
-                      [(t, own) for t, _dm, own in movers[:3] if abs(_dm) >= 1.0]))
+                      [(t, own) for t, dm, own in movers[:3] if abs(dm) >= 1.0]))
     steps.sort(key=lambda st: -abs(st[4]))
-    return overall, contributors, steps
+    return overall, contributors, extras, steps
 
 
 def workload_view(points, workload, step_rel):
-    overall, contributors, steps = workload_progress(points, workload, step_rel)
+    overall, contributors, extras, steps = workload_progress(points, workload, step_rel)
     if overall is None:
         raise SystemExit(f"fewer than 2 daily points for {workload}")
     d0, c0, v0, d1, c1, v1, pct = overall
     print(f"== {workload} — {d0} ({c0}) -> {d1} ({c1}) ==")
     print(f"overall {headline(workload)}: {v0:.1f} -> {v1:.1f} ms  ({pct:+.1f}%)")
-    print("main contributors (leaf timers, window delta; contributions sum "
-          "to the overall %):")
+    print("contributors (mutually-exclusive buckets; pp sums to the overall %):")
     for t, d_ms, own, contrib in contributors:
-        print(f"   {t:32s}{d_ms:+9.1f} ms  ({own:+6.1f}% own, {contrib:+5.1f}pp of total)")
+        o = f"{own:+6.1f}%" if own is not None else "   new"
+        print(f"   {t:32s}{d_ms:+9.1f} ms  ({o} own, {contrib:+5.1f}pp of total)")
+    if extras:
+        print("other reported counters (nested/overlapping; no pp):")
+        for t, d_ms, own in extras:
+            o = f"{own:+6.1f}%" if own is not None else "   new"
+            print(f"   {t:32s}{d_ms:+9.1f} ms  ({o} own)")
     print(f"day steps >= {step_rel * 100:.0f}% vs previous day:")
     if not steps:
         print("   none")
     for dp, d, cp, c, spct, movers in steps:
-        ms = ", ".join(f"{t} {own:+.0f}%" for t, own in movers)
+        ms = ", ".join(f"{t} {own:+.0f}%" if own is not None else f"{t} new"
+                       for t, own in movers)
         print(f"   {dp} -> {d}  {spct:+6.1f}%  ({cp}..{c})  {ms}")
 
 
