@@ -146,6 +146,7 @@ metadata query runs first the cache holds a form that a later
 host-callable request cannot use, failing with `E_INVALIDARG`.
 
 ```cpp
+// ... getEntryPointCode() / getEntryPointHostCallable() has already run ...
 ComPtr<slang::IMetadata> metadata;
 linked->getEntryPointMetadata(0, 0, metadata.writeRef(), ...);
 

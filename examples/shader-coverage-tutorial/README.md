@@ -55,8 +55,9 @@ counter[6] = 0
 counter[7] = 4
 ```
 
-The two zero slots are the lines the inputs never exercise — `value = 0.0` (line 19) and
-the `return value` fallthrough in `applyGain` (line 9) — which the LCOV report shows in red.
+The two zero slots are the lines the inputs never exercise — slot 2 is the `return value`
+fallthrough in `applyGain` (line 9), slot 6 is `value = 0.0` (line 19) — which the LCOV
+report shows in red.
 
 For GPU dispatch and the in-process (C++ API) workflow, see
 [`examples/shader-coverage-image-pipeline`](../shader-coverage-image-pipeline) and

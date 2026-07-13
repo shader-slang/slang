@@ -69,7 +69,9 @@ statement. The `.coverage-manifest.json` sidecar records which counter slot corr
 which source location, and where the buffer expects to be bound.
 
 Other targets work the same way; replace `-target spirv` with `hlsl`, `metal`, `cuda`, or
-`cpp`. Exceptions: WGSL and LLVM-emitted CPU are skipped with warning E45102.
+`cpp`. Exceptions: WGSL and the LLVM JIT CPU path are skipped with warning E45102 (the
+`cpp` and `shader-sharedlib` targets compile through a system C++ compiler and are
+supported).
 
 ## Reading the manifest
 
@@ -105,7 +107,8 @@ Other targets work the same way; replace `-target spirv` with `hlsl`, `metal`, `
   binding 0. Auto-allocation places the buffer in a new descriptor set after the shader's
   own sets, so enabling coverage can add one descriptor set to your pipeline layout (see
   [Current limitations](https://github.com/shader-slang/slang/blob/master/tools/shader-coverage/README.md#current-limitations)).
-- `entries`: counter-to-source mapping. Slot 0 counts executions of line 7, and so on.
+- `entries`: counter-to-source mapping. Slot 0 counts executions of line 7
+  (`if (gain > 1.0)`), and so on.
 
 ## Dispatching the precompiled kernel
 
@@ -122,7 +125,7 @@ slangc hello-coverage.slang -target shader-sharedlib -stage compute -entry compu
 `slangc` invokes the system C++ compiler and produces a library that exports `computeMain`,
 plus a sidecar manifest. The only difference from the SPIR-V manifest is the `buffer` block:
 the CPU target has no descriptor sets, so the manifest reports a byte offset into the
-kernel's parameter payload instead:
+kernel's parameter payload instead (`space` and `binding` remain only as placeholders):
 
 ```json
     "buffer": {
@@ -192,8 +195,9 @@ counter[6] = 0
 counter[7] = 4
 ```
 
-The manifest's `entries` array maps slots to lines: slot 2 is line 9, slot 6 is line 19.
-The report step below does this attribution automatically.
+The manifest's `entries` array maps slots to lines: slot 2 is line 9 (the `return value`
+fallthrough), slot 6 is line 19 (`value = 0.0`). The report step below does this
+attribution automatically.
 
 ## Generating a report
 
@@ -242,7 +246,8 @@ function. `-trace-branch-coverage` adds one entry per branch arm — `if`/`else`
 loop-condition outcomes, and `switch` arms; `&&`, `||`, and `?:` are not instrumented — so a
 report can give true/false counts per condition. The modes are independent. The converter
 emits `FN:`/`FNDA:` and `BRDA:` records for them. `-trace-coverage-boolean` replaces atomic
-counting with a plain store of 1; use it when hit/not-hit is enough.
+counting with a plain store of 1 in whichever modes are enabled; it enables no mode by
+itself. Use it when hit/not-hit is enough.
 
 On GPU targets the workflow is the same; only the binding location changes: a descriptor
 `(set, binding)` on Vulkan/D3D, a `[[buffer(N)]]` index on Metal, a payload offset on
