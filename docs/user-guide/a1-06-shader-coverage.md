@@ -106,7 +106,7 @@ read or modify. This is what it contains, trimmed to the relevant fields:
 ## Dispatching the precompiled kernel
 
 A host must bind storage for the counter buffer, dispatch, and read the counters back. The
-buffer is not visible to ordinary reflection; the manifest is how a host finds it.
+buffer is not visible to ordinary reflection and the manifest is how a host finds it.
 
 To dispatch without a GPU, compile the same shader to a CPU shared library:
 
@@ -134,7 +134,7 @@ kernel's parameter payload instead (`space` and `binding` remain only as placeho
 The host program,
 [`hello-coverage-host.cpp`](https://github.com/shader-slang/slang/blob/master/examples/shader-coverage-tutorial/hello-coverage-host.cpp),
 loads the kernel, binds the three buffers (the shader's two, plus coverage), dispatches one
-thread group, prints the computed outputs and the counter slots, and writes the counters to
+thread group, prints the computed outputs and the counter slots, and writes the coverage counters to
 a file. It is about 150 lines and uses no Slang headers or library. The constants `kCounterCount`, `kElementStride`, and
 `kUniformOffset` are the manifest values above; a production host would parse them from the
 JSON.
@@ -159,11 +159,11 @@ coverage adds: zero-initialized counter storage, bound at `uniform_offset`:
     // Coverage addition: counter storage sized from the manifest, bound
     // at the manifest-reported uniform_offset. Counters must start
     // zeroed.
-    static_assert(kElementStride == 8, "manifest says uint64 counters");
-    std::vector<uint64_t> counters(kCounterCount, 0);
+    static_assert(kElementStride == 8, "manifest says uint64 coverageCounters");
+    std::vector<uint64_t> coverageCounters(kCounterCount, 0);
     if (coverageEnabled)
     {
-        BufferView coverageView = {counters.data(), kCounterCount};
+        BufferView coverageView = {coverageCounters.data(), kCounterCount};
         std::memcpy(payload.data() + kUniformOffset, &coverageView, sizeof(coverageView));
     }
 ```

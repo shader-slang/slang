@@ -1,7 +1,7 @@
 // hello-coverage-host.cpp: load the kernel slangc precompiled into
 // hello-coverage-kernel.so, bind the hidden counter buffer where the
 // sidecar manifest says, dispatch one thread group, print the computed
-// outputs, and write the raw counters for the LCOV converter. Uses no
+// outputs, and write the raw coverageCounters for the LCOV converter. Uses no
 // Slang headers or library — the manifest is the whole contract.
 //
 // Pass --no-coverage to run as a plain CPU shared-library dispatch,
@@ -101,11 +101,11 @@ int main(int argc, char** argv)
     // Coverage addition: counter storage sized from the manifest, bound
     // at the manifest-reported uniform_offset. Counters must start
     // zeroed.
-    static_assert(kElementStride == 8, "manifest says uint64 counters");
-    std::vector<uint64_t> counters(kCounterCount, 0);
+    static_assert(kElementStride == 8, "manifest says uint64 coverageCounters");
+    std::vector<uint64_t> coverageCounters(kCounterCount, 0);
     if (coverageEnabled)
     {
-        BufferView coverageView = {counters.data(), kCounterCount};
+        BufferView coverageView = {coverageCounters.data(), kCounterCount};
         std::memcpy(payload.data() + kUniformOffset, &coverageView, sizeof(coverageView));
     }
 
@@ -123,9 +123,9 @@ int main(int argc, char** argv)
     // LCOV converter. Which source line each slot counts is the
     // manifest's "entries" job — the converter does that attribution.
     for (uint32_t i = 0; i < kCounterCount; ++i)
-        std::printf("counter[%u] = %llu\n", i, (unsigned long long)counters[i]);
+        std::printf("counter[%u] = %llu\n", i, (unsigned long long)coverageCounters[i]);
 
     std::ofstream("hello-coverage.counters.bin", std::ios::binary)
-        .write((const char*)counters.data(), kCounterCount * kElementStride);
+        .write((const char*)coverageCounters.data(), kCounterCount * kElementStride);
     return 0;
 }
