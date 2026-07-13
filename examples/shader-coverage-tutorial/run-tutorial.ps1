@@ -80,10 +80,10 @@ Invoke-Step $Slangc @("hello-coverage.slang", "-target", "spirv",
     "-trace-coverage", "-o", "hello-coverage.spv")
 Write-Host "wrote hello-coverage.spv and hello-coverage.spv.coverage-manifest.json"
 
-# --- Step 2: "Reading the manifest" -----------------------------------------
-# Pretty-print the sidecar. Note the buffer block: on SPIR-V the hidden
+# --- Step 2: "Manifest structure" --------------------------------------------
+# Show the sidecar. Note the buffer block: on SPIR-V the hidden
 # counter buffer binds at a descriptor (set, binding).
-(python -m json.tool hello-coverage.spv.coverage-manifest.json) | Select-Object -First 14
+Get-Content hello-coverage.spv.coverage-manifest.json
 
 # --- Step 3: "Dispatching the precompiled kernel" ---------
 # Compile the same shader once more, to a directly callable CPU shared
