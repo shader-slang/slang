@@ -38,7 +38,14 @@ jobs:
       compiler: clang
       platform: aarch64
       config: relwithdebinfo
-      runs-on: '["macos-latest"]'
+      # Pinned to macos-15: macos-latest currently serves a mix of
+      # macos-15 and macos-26 images, and on macos-26 slang-rhi's
+      # OS-version capability detection claims metallib_4_0 while the
+      # image's Metal toolchain cannot compile Metal 4 MSL, failing
+      # four Metal gfx tests (see issue #11985). A nondeterministic
+      # image also skews nightly coverage deltas. Unpin once #11985
+      # is resolved.
+      runs-on: '["macos-15"]'
       build-llvm: true
       deploy-pages: false
       server-count: 1
