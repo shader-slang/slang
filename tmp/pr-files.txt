@@ -1,0 +1,1 @@
+source/slang-core-module/slang-embedded-core-module-source.cpp
