@@ -221,22 +221,17 @@ def main():
             return (sum(v1[k] for k in common) - base) / base * 100 if base else 0.0
 
         bounds = [(suite_pct(b[5], b[6]),) + b for b in daily_movers.boundaries(dpoints)]
-        bounds = [b for b in bounds if abs(b[0]) >= 1.0]
         bounds.sort(key=lambda b: -abs(b[0]))
         rows_m = []
+        biggest_html = ""
         if bounds:
-            rows_m += ["<h2>Recent movers (daily series)</h2>",
-                       "<table><tr><th>boundary</th><th>commits</th>"
-                       "<th class=num>suite &Delta;</th><th>top timers</th></tr>"]
-            for pct, total, d0, d1, c0, c1, v0, v1 in bounds[:3]:
-                tds = daily_movers.timer_deltas(v0, v1, limit=3)
-                ts = ", ".join(f"{html_escape(t)} {d:+.0f}" for t, d in tds)
-                cls = "worse" if pct > 0 else "better"
-                rows_m.append(
-                    f"<tr><td>{html_escape(d0)} &rarr; {html_escape(d1)}</td>"
-                    f"<td><code>{html_escape(c0)}..{html_escape(c1)}</code></td>"
-                    f"<td class='num {cls}'>{pct:+.1f}%</td><td>{ts}</td></tr>")
-            rows_m.append("</table>")
+            pct, _total, bd0, bd1, bc0, bc1, _v0, _v1 = bounds[0]
+            cls = "worse" if pct > 0 else "better"
+            biggest_html = (
+                f'<p class="small">Largest daily change in the window: '
+                f"{html_escape(bd0)} &rarr; {html_escape(bd1)} "
+                f"(<code>{html_escape(bc0)}..{html_escape(bc1)}</code>), suite "
+                f"<b class='{cls}'>{pct:+.1f}%</b>.</p>")
 
         # Top-10 window movers: per-workload headline change over the whole
         # daily window, improved and regressed together, ranked by |%|.
@@ -254,6 +249,7 @@ def main():
             d1w = dpoints[-1][0]
             rows_m += [f"<h2>Top movers over the daily window "
                        f"({html_escape(d0w)} &rarr; {html_escape(d1w)})</h2>",
+                       biggest_html,
                        "<table><tr><th>benchmark</th><th class=num>start (ms)</th>"
                        "<th class=num>end (ms)</th><th class=num>change</th></tr>"]
             for pct, wl, v0w, v1w in movers10[:10]:
