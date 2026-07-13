@@ -118,8 +118,9 @@ slangc hello-coverage.slang -target shader-sharedlib -stage compute -entry compu
 `slangc` invokes the system C++ compiler and produces a library that exports `computeMain`,
 plus a sidecar manifest. The only difference from the SPIR-V manifest is the `buffer` block:
 the CPU target has no descriptor sets, so the manifest reports a byte offset into the
-kernel's parameter payload instead (`space` and `binding` remain only as placeholders, and
-`uniform_stride` is the size of the `(pointer, count)` slot itself, not a counter width):
+kernel's parameter payload instead. `space` and `binding` remain only as placeholders;
+`element_stride` is still the counter width, and `uniform_stride` is the size of the
+`(pointer, count)` slot itself, not a counter width:
 
 ```json
     "buffer": {

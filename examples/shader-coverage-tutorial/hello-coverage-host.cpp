@@ -67,6 +67,10 @@ struct BufferView
 constexpr uint32_t kCounterCount = 9;   // "counter_count"
 constexpr uint32_t kElementStride = 8;  // "buffer": "element_stride"
 constexpr uint32_t kUniformOffset = 32; // "buffer": "uniform_offset"
+// kUniformOffset places the coverage slot after two 16-byte BufferViews,
+// which only holds on a 64-bit host; a 32-bit host gets different
+// offsets from its own manifest.
+static_assert(sizeof(BufferView) == 16, "the manifest values above assume a 64-bit host");
 
 #ifdef _WIN32
 constexpr const char* kKernelPath = "hello-coverage-kernel.dll";
@@ -125,7 +129,12 @@ int main(int argc, char** argv)
     for (uint32_t i = 0; i < kCounterCount; ++i)
         std::printf("counter[%u] = %llu\n", i, (unsigned long long)coverageCounters[i]);
 
-    std::ofstream("hello-coverage.counters.bin", std::ios::binary)
-        .write((const char*)coverageCounters.data(), kCounterCount * kElementStride);
+    std::ofstream countersFile("hello-coverage.counters.bin", std::ios::binary);
+    countersFile.write((const char*)coverageCounters.data(), kCounterCount * kElementStride);
+    if (!countersFile)
+    {
+        std::fprintf(stderr, "failed to write hello-coverage.counters.bin\n");
+        return 1;
+    }
     return 0;
 }

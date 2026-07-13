@@ -165,13 +165,13 @@ Get-Content hello-coverage.lcov
 # Guard the numbers the chapter publishes: the LCOV records combine the
 # manifest's source attribution with the counter values, so this one
 # comparison catches instrumentation, attribution, or converter drift.
-$expectedLcov = @(
-    "TN:slang_coverage", "SF:hello-coverage.slang",
-    "DA:7,4", "DA:8,3", "DA:9,1", "DA:16,4", "DA:17,4", "DA:18,4",
-    "DA:19,0", "DA:20,4", "DA:21,4", "end_of_record")
-if (Compare-Object $expectedLcov (Get-Content hello-coverage.lcov))
+# expected.lcov is the single checked-in copy both runner scripts use;
+# the comparison is order-exact, matching the bash runner's diff.
+$expectedText = ((Get-Content expected.lcov) -join "`n").TrimEnd()
+$actualText = ((Get-Content hello-coverage.lcov) -join "`n").TrimEnd()
+if ($expectedText -ne $actualText)
 {
-    throw "hello-coverage.lcov does not match the tutorial published records"
+    throw "hello-coverage.lcov does not match expected.lcov"
 }
 Write-Host "LCOV records match the tutorial published values"
 

@@ -9,7 +9,8 @@ entirely from the command line — there is no CMake target to build.
 | --- | --- |
 | `hello-coverage.slang` | The compute shader the chapter instruments. |
 | `hello-coverage-host.cpp` | A minimal host program that loads the `slangc`-precompiled CPU kernel, binds the coverage buffer where the sidecar manifest says, dispatches, prints the outputs, and writes the raw counters. It uses no Slang headers or library. Pass `--no-coverage` to skip the counter report and run it as a plain CPU shared-library dispatch. |
-| `run-tutorial.sh` / `run-tutorial.ps1` | Commented scripts that execute every tutorial step in order — each step is labeled with the chapter section it comes from. |
+| `run-tutorial.sh` / `run-tutorial.ps1` | Commented scripts that execute every tutorial step in order — each step is labeled with the chapter section it comes from. Both verify the produced LCOV against `expected.lcov` and fail on mismatch. |
+| `expected.lcov` | The LCOV records the chapter publishes; the single copy both runner scripts assert against. |
 
 ## Quick run
 

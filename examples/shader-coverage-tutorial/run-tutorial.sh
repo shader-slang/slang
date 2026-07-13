@@ -112,20 +112,9 @@ cat hello-coverage.lcov
 # Guard the numbers the chapter publishes: the LCOV records combine the
 # manifest's source attribution with the counter values, so this one
 # comparison catches instrumentation, attribution, or converter drift.
-expected_lcov="TN:slang_coverage
-SF:hello-coverage.slang
-DA:7,4
-DA:8,3
-DA:9,1
-DA:16,4
-DA:17,4
-DA:18,4
-DA:19,0
-DA:20,4
-DA:21,4
-end_of_record"
-if ! diff <(printf '%s\n' "$expected_lcov") hello-coverage.lcov >&2; then
-  echo "error: hello-coverage.lcov does not match the tutorial published records" >&2
+# expected.lcov is the single checked-in copy both runner scripts use.
+if ! diff expected.lcov hello-coverage.lcov >&2; then
+  echo "error: hello-coverage.lcov does not match expected.lcov" >&2
   exit 1
 fi
 echo "LCOV records match the tutorial published values"
