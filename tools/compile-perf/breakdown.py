@@ -605,34 +605,48 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
 
         movers_html = ""
         if len(_daily_pts) >= 2:
-            rows, pts = daily_movers.workload_timer_rows(_daily_pts, wl)
-            if rows:
-                th = ("<tr><th style='text-align:left'>timer</th><th>start</th>"
-                      "<th>end</th><th>net</th><th>ratio</th>"
-                      "<th style='text-align:left'>biggest step (date, commits)</th></tr>")
-                trs = []
-                for net, t, v0, v1, best in rows:
-                    step = ""
-                    if best:
-                        d, a, b = best
-                        step = (f"{d:+.1f} ms on {esc(b[0])} "
-                                f"(<code>{esc(a[1])}..{esc(b[1])}</code>)")
-                    color = "#1e8449" if net < 0 else "#c0392b"
-                    trs.append(
-                        f"<tr><td>{esc(t)}</td><td align=right>{v0:.1f}</td>"
-                        f"<td align=right>{v1:.1f}</td>"
-                        f"<td align=right style='color:{color};font-weight:600'>{net:+.1f}</td>"
-                        f"<td align=right>{v1 / v0:.2f}x</td><td>{step}</td></tr>")
+            overall, contributors, steps = daily_movers.workload_progress(_daily_pts, wl)
+            if overall:
+                d0, c0, v0, d1, c1, v1, pct = overall
+                pcol = "#1e8449" if pct < 0 else "#c0392b"
+                head = daily_movers.headline(wl)
+                contrib_rows = "".join(
+                    f"<tr><td>{esc(t)}</td>"
+                    f"<td align=right>{d_ms:+.1f}</td>"
+                    f"<td align=right>{own:+.1f}%</td>"
+                    f"<td align=right>{share * 100:.0f}%</td></tr>"
+                    for t, d_ms, own, share in contributors[:6])
+                step_rows = "".join(
+                    f"<tr><td>{esc(dp)} &rarr; {esc(d)}</td>"
+                    f"<td align=right style='color:{'#1e8449' if spct < 0 else '#c0392b'};"
+                    f"font-weight:600'>{spct:+.1f}%</td>"
+                    f"<td><code>{esc(cp)}..{esc(c)}</code></td>"
+                    f"<td>{esc(', '.join(f'{t} {own:+.0f}%' for t, own in movers))}</td></tr>"
+                    for dp, d, cp, c, spct, movers in steps) or (
+                    "<tr><td colspan=4 style='color:#888'>none</td></tr>")
+                tbl = "border-collapse:collapse;font-size:13px"
                 movers_html = (
                     f"<h2 style='font-size:17px;margin:26px 0 8px;border-bottom:"
                     f"2px solid #eee;padding-bottom:4px'>Daily window progress</h2>"
-                    f"<p style='color:#666;font-size:13px'>Per-timer change over the daily "
-                    f"series {esc(pts[0][0])} ({esc(pts[0][1])}) &rarr; {esc(pts[-1][0])} "
-                    f"({esc(pts[-1][1])}), {len(pts)} points — net, end/start ratio, and each "
-                    f"timer's biggest single day step with the commit range to bisect "
-                    f"(<code>git log &lt;c0&gt;..&lt;c1&gt; -- source/</code>).</p>"
-                    f"<table style='border-collapse:collapse;font-size:13px' "
-                    f"cellpadding=5 border=0>{th}{''.join(trs)}</table>")
+                    f"<p style='font-size:15px'>Overall <code>{esc(head)}</code>: "
+                    f"{v0:.1f} &rarr; {v1:.1f} ms &nbsp;"
+                    f"<b style='color:{pcol}'>{pct:+.1f}%</b>"
+                    f"<span style='color:#666;font-size:13px'> &nbsp;({esc(d0)} {esc(c0)} "
+                    f"&rarr; {esc(d1)} {esc(c1)})</span></p>"
+                    f"<p style='color:#666;font-size:13px;margin:10px 0 4px'>"
+                    f"Main contributors over the window (leaf timers; own change and "
+                    f"share of the {esc(head)} delta):</p>"
+                    f"<table style='{tbl}' cellpadding=5>"
+                    f"<tr><th style='text-align:left'>timer</th><th>&Delta; ms</th>"
+                    f"<th>own %</th><th>share</th></tr>{contrib_rows}</table>"
+                    f"<p style='color:#666;font-size:13px;margin:14px 0 4px'>"
+                    f"Largest day steps (&ge;5% of the previous day, both directions; "
+                    f"bisect with <code>git log &lt;c0&gt;..&lt;c1&gt; -- source/</code>):</p>"
+                    f"<table style='{tbl}' cellpadding=5>"
+                    f"<tr><th style='text-align:left'>boundary</th><th>% vs prev day</th>"
+                    f"<th style='text-align:left'>commits</th>"
+                    f"<th style='text-align:left'>top timers (own %)</th></tr>"
+                    f"{step_rows}</table>")
 
         _, srcfiles = _workload_source(spec) if spec else (0, [])
         tail_txt = ("show the first 40 lines, the area around computeMain (±40), and the last "

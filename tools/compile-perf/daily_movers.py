@@ -68,50 +68,85 @@ def daily_points(results_dir, metric):
     return out
 
 
-def workload_timer_rows(points, workload, min_ms=2.0, min_rel=0.10):
-    """[(net, timer, v_start, v_end, biggest_step)] for one workload's daily
-    series, sorted improvements-first; biggest_step is (delta, (d,c,v)_before,
-    (d,c,v)_after) or None. Shared by the CLI view and the per-workload report
-    pages. Empty when the workload has fewer than 2 daily points."""
+def workload_progress(points, workload, step_rel=0.05):
+    """Percent-based progress summary for one workload's daily series:
+
+      overall       (d0, c0, v0, d1, c1, v1, pct) for the headline timer —
+                    the 30-day-window "+/-%" answer.
+      contributors  [(timer, d_ms, pct_own, share)] — leaf timers ranked by
+                    |delta ms| over the window; pct_own is the timer's own
+                    change, share its fraction of the headline delta.
+      steps         [(d_prev, d, c_prev, c, pct, top_timers)] — day boundaries
+                    where the headline moved >= step_rel vs the PREVIOUS day
+                    (both directions), with the top leaf timers of that step
+                    as (timer, own pct) pairs. Percent of previous day, not
+                    net ms: a 5% step means the same thing at every scale.
+
+    Returns (None, [], []) with fewer than 2 daily points.
+    """
     pts = [(d, c, {t: v for (wl, t), v in vals.items() if wl == workload})
            for d, c, vals in points]
     pts = [p for p in pts if p[2]]
     if len(pts) < 2:
-        return [], pts
-    rows = []
-    for t in sorted({t for *_x, tm in pts for t in tm}):
-        series = [(d, c, tm[t]) for d, c, tm in pts if t in tm]
-        if len(series) < 2 or series[0][2] < 1:
+        return None, [], []
+    head = headline(workload)
+    hs = [(d, c, tm[head]) for d, c, tm in pts if head in tm]
+    if len(hs) < 2:
+        return None, [], []
+    (d0, c0, v0), (d1, c1, v1) = hs[0], hs[-1]
+    overall = (d0, c0, v0, d1, c1, v1, (v1 / v0 - 1) * 100 if v0 else 0.0)
+
+    contributors = []
+    hdelta = v1 - v0
+    first, last = pts[0][2], pts[-1][2]
+    for t in BOUNDARY_TIMERS:
+        if t not in first or t not in last or first[t] < 0.5:
             continue
-        best = None
-        for i in range(1, len(series)):
-            a, b = series[i - 1], series[i]
-            step = b[2] - a[2]
-            if abs(step) < min_ms or abs(step) / max(a[2], 1e-9) < min_rel:
-                continue
-            if best is None or abs(step) > abs(best[0]):
-                best = (step, a, b)
-        net = series[-1][2] - series[0][2]
-        if abs(net) >= min_ms or best:
-            rows.append((net, t, series[0][2], series[-1][2], best))
-    rows.sort(key=lambda r: r[0])
-    return rows, pts
+        d_ms = last[t] - first[t]
+        if abs(d_ms) < 1.0:
+            continue
+        contributors.append((t, d_ms, (last[t] / first[t] - 1) * 100,
+                             d_ms / hdelta if hdelta else 0.0))
+    contributors.sort(key=lambda r: -abs(r[1]))
+
+    steps = []
+    for i in range(1, len(hs)):
+        (dp, cp, vp), (d, c, v) = hs[i - 1], hs[i]
+        if vp <= 0:
+            continue
+        pct = (v / vp - 1) * 100
+        if abs(pct) < step_rel * 100:
+            continue
+        p_prev = next(tm for dd, _c, tm in pts if dd == dp)
+        p_cur = next(tm for dd, _c, tm in pts if dd == d)
+        movers = []
+        for t in BOUNDARY_TIMERS:
+            if t in p_prev and t in p_cur and p_prev[t] >= 0.5:
+                movers.append((t, p_cur[t] - p_prev[t],
+                               (p_cur[t] / p_prev[t] - 1) * 100))
+        movers.sort(key=lambda m: -abs(m[1]))
+        steps.append((dp, d, cp, c, pct,
+                      [(t, own) for t, _dm, own in movers[:3] if abs(_dm) >= 1.0]))
+    steps.sort(key=lambda st: -abs(st[4]))
+    return overall, contributors, steps
 
 
-def workload_view(points, workload, min_ms, min_rel):
-    rows, pts = workload_timer_rows(points, workload, min_ms, min_rel)
-    if not rows:
+def workload_view(points, workload, step_rel):
+    overall, contributors, steps = workload_progress(points, workload, step_rel)
+    if overall is None:
         raise SystemExit(f"fewer than 2 daily points for {workload}")
-    print(f"== {workload}: {pts[0][0]} ({pts[0][1]}) -> {pts[-1][0]} "
-          f"({pts[-1][1]}), {len(pts)} points ==")
-    print(f"{'timer':30s}{'start':>9}{'end':>9}{'net':>9}{'ratio':>7}"
-          "  biggest step (date, commits)")
-    for net, t, v0, v1, best in rows:
-        step = ""
-        if best:
-            d, a, b = best
-            step = f"{d:+8.1f}ms on {b[0]} ({a[1]}..{b[1]})"
-        print(f"{t:30s}{v0:9.1f}{v1:9.1f}{net:+9.1f}{v1 / v0:6.2f}x  {step}")
+    d0, c0, v0, d1, c1, v1, pct = overall
+    print(f"== {workload} — {d0} ({c0}) -> {d1} ({c1}) ==")
+    print(f"overall {headline(workload)}: {v0:.1f} -> {v1:.1f} ms  ({pct:+.1f}%)")
+    print("main contributors (leaf timers, window delta):")
+    for t, d_ms, own, share in contributors[:6]:
+        print(f"   {t:32s}{d_ms:+9.1f} ms  ({own:+6.1f}% own, {share * 100:4.0f}% of change)")
+    print(f"day steps >= {step_rel * 100:.0f}% vs previous day:")
+    if not steps:
+        print("   none")
+    for dp, d, cp, c, spct, movers in steps:
+        ms = ", ".join(f"{t} {own:+.0f}%" for t, own in movers)
+        print(f"   {dp} -> {d}  {spct:+6.1f}%  ({cp}..{c})  {ms}")
 
 
 def boundaries(points):
@@ -173,15 +208,16 @@ def main():
     ap.add_argument("--top", type=int, default=3,
                     help="boundaries to decompose in the suite view")
     ap.add_argument("--min-ms", type=float, default=2.0)
-    ap.add_argument("--min-rel", type=float, default=0.10,
-                    help="per-timer step threshold in the workload view")
+    ap.add_argument("--step-rel", type=float, default=0.05,
+                    help="day-step threshold vs the previous day in the "
+                         "workload view (0.05 = 5%%)")
     args = ap.parse_args()
 
     points = daily_points(args.results, args.metric)
     if len(points) < 2:
         raise SystemExit("fewer than 2 daily points; nothing to summarize")
     if args.workload:
-        workload_view(points, args.workload, args.min_ms, args.min_rel)
+        workload_view(points, args.workload, args.step_rel)
     else:
         boundary_view(points, args.top, args.min_ms)
 
