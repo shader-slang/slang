@@ -202,7 +202,7 @@ def main():
         index.append(rec)
 
     ipath = os.path.join(args.out, "index.json")
-    with open(ipath, "w", encoding="utf-8") as fh:
+    with open(ipath, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(index, fh, indent=2)
     ok = sum(1 for r in index if "slangc" in r)
     print(f"\n{ok}/{len(index)} releases ready. wrote {ipath}")

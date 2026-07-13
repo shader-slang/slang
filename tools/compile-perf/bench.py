@@ -288,7 +288,7 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
     os.makedirs(gen_dir, exist_ok=True)
     files = spec.gen(size)
     for fn, src in files.items():
-        with open(os.path.join(gen_dir, fn), "w", encoding="utf-8") as fh:
+        with open(os.path.join(gen_dir, fn), "w", encoding="utf-8", newline="\n") as fh:
             fh.write(src)
 
     # An api workload without a driver+libslang must fail loudly (not silently
@@ -488,7 +488,7 @@ def main():
     for r in records:
         merged[(r["workload"], r["size"])] = r
     records = list(merged.values())
-    with open(jpath, "w", encoding="utf-8") as fh:
+    with open(jpath, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(records, fh, indent=2)
 
     # results.json is the single source of truth (all of median/min/mean/stdev per

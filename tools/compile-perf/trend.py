@@ -49,7 +49,7 @@ def write_step_summary(md):
     """Append markdown to the GitHub Actions step summary ($GITHUB_STEP_SUMMARY)."""
     path = os.environ.get("GITHUB_STEP_SUMMARY")
     if path:
-        with open(path, "a", encoding="utf-8") as fh:
+        with open(path, "a", encoding="utf-8", newline="\n") as fh:
             fh.write(md + "\n")
 
 
