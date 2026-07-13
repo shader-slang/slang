@@ -1470,6 +1470,10 @@ Compound Capabilities
 `ser_nvapi`
 > Capabilities needed for shader-execution-reordering (NVAPI path for HLSL)
 
+`ser_position_raygen_closesthit_miss`
+> Collection of capabilities for raytracing + shader execution reordering +
+> ray_tracing_position_fetch and the shader stages of raygen, closesthit, and miss.
+
 `ser_raygen`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stage of raygen.
 
