@@ -16,8 +16,9 @@ float applyGain(float value, float gain)
     return value;
 }
 
-[shader("compute")][numthreads(4, 1, 1)] void computeMain(uint3 threadId
-                                                          : SV_DispatchThreadID)
+[shader("compute")]
+[numthreads(4, 1, 1)]
+void computeMain(uint3 threadId: SV_DispatchThreadID)
 {
     uint index = threadId.x;
     float value = inputBuffer[index];

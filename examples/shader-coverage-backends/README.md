@@ -59,12 +59,16 @@ python3 tools/shader-coverage/slang-coverage-to-lcov.py \
 genhtml cpu.lcov --output-directory coverage-html
 ```
 
+`genhtml` has no common Windows distribution; where it is unavailable,
+`python3 tools/coverage-html/slang-coverage-html.py cpu.lcov --output-dir coverage-html`
+produces an equivalent report.
+
 ## Options
 
 - `--counter-width=32|64` — counter element width (default 32, which
   runs everywhere). `64` requires 64-bit shader atomics on the device
   for the Vulkan path (`shaderBufferInt64Atomics` — absent on MoltenVK
-  on Apple Silicon); Metal always caps to 32-bit (warning W45115 when
+  on Apple Silicon); Metal always caps to 32-bit (warning E45115 when
   64 is requested explicitly). The example reads the _effective_ width
   back from `CoverageBufferInfo::elementByteWidth` rather than trusting
   the request — do the same in your integration.
@@ -73,8 +77,10 @@ genhtml cpu.lcov --output-directory coverage-html
 
 ## Build requirements
 
-- CPU path: a C++ toolchain Slang can use for host-callable
-  compilation (present in normal development setups).
+- CPU path: a system C++ toolchain for host-callable compilation.
+  Required — coverage instrumentation is skipped on the slang-llvm JIT
+  path (warning E45102), so without one the run fails with a zero
+  counter count.
 - Vulkan path: a Vulkan loader at configure time (headers come from
   Slang's bundled Vulkan-Headers). Without it, the example still
   builds with the Vulkan path disabled.

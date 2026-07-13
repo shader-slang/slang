@@ -116,7 +116,7 @@ std::filesystem::path getDemoDirectory()
 // everywhere, and the counter width is passed through so the Vulkan
 // path can demonstrate both widths (`--counter-width 64` requires
 // 64-bit shader atomics on the device; see the pitfalls section of the
-// tutorial). Metal ignores a 64-bit request with warning W45115 and
+// tutorial). Metal ignores a 64-bit request with warning E45115 and
 // caps to 32-bit — which is why everything downstream reads the
 // *effective* width from the metadata instead of trusting the request.
 
@@ -141,11 +141,12 @@ CompiledProgram compileWithCoverage(
     ComPtr<slang::IGlobalSession> globalSession;
     checkSlang(slang::createGlobalSession(globalSession.writeRef()), "createGlobalSession");
 
-    // For the CPU path, prefer a real C++ toolchain for the
-    // host-callable compilation when one is available, matching the
-    // coverage runtime unit tests. (The bundled slang-llvm JIT also
-    // works in most environments; a system compiler is simply the more
-    // predictable default for an example.)
+    // For the CPU path, pick a real C++ toolchain for the
+    // host-callable compilation, matching the coverage runtime unit
+    // tests. This is a requirement, not a preference: coverage
+    // instrumentation is skipped on the slang-llvm JIT path (warning
+    // E45102), so without a system C++ compiler the dispatch below
+    // would run uninstrumented and fail the non-zero counter check.
     if (target == SLANG_SHADER_HOST_CALLABLE)
     {
         const SlangPassThrough cppCompilers[] = {
@@ -220,7 +221,7 @@ CompiledProgram compileWithCoverage(
     // metadata first would cache a non-shared-library artifact and a
     // later getEntryPointHostCallable would fail. The CPU path gets a
     // host-callable shared library; the code-emitting targets get a
-    // code blob. (Compile warnings, e.g. W45115 for a capped Metal
+    // code blob. (Compile warnings, e.g. E45115 for a capped Metal
     // width request, surface at this step.)
     diagnostics.setNull();
     if (target == SLANG_SHADER_HOST_CALLABLE)
@@ -460,6 +461,11 @@ void runVulkan(int counterByteWidth)
         fail("expected a descriptor (space, binding) for the coverage buffer on SPIR-V");
     const auto coverageSet = (uint32_t)program.resourceInfo.space;
     const auto coverageBinding = (uint32_t)program.resourceInfo.binding;
+    // The user's buffers occupy set 0; auto-allocation must have
+    // steered the coverage buffer into its own set (the Metal path
+    // makes the analogous buffer-index check).
+    if (coverageSet == 0)
+        fail("coverage descriptor set collides with the user buffers' set");
 
     vkdemo::Context ctx;
     // 64-bit counters need `shaderBufferInt64Atomics` at pipeline
@@ -533,7 +539,7 @@ void runVulkan(int counterByteWidth)
 // example needs a Metal device but no external toolchain. Counting-mode
 // counters are always 32-bit on Metal — MSL has no 64-bit atomic
 // fetch-add, and the compiler caps the width automatically (with
-// warning W45115 if 64 was requested explicitly).
+// warning E45115 if 64 was requested explicitly).
 
 #if defined(SLANG_EXAMPLE_HAS_METAL)
 void runMetal(int counterByteWidth)
@@ -634,7 +640,17 @@ int main(int argc, char** argv)
         if (arg.rfind("--backend=", 0) == 0)
             backend = arg.substr(10);
         else if (arg.rfind("--counter-width=", 0) == 0)
-            counterWidthBits = std::stoi(arg.substr(16));
+        {
+            try
+            {
+                counterWidthBits = std::stoi(arg.substr(16));
+            }
+            catch (const std::exception&)
+            {
+                printUsage();
+                return 1;
+            }
+        }
         else if (arg.rfind("--demo-dir=", 0) == 0)
             g_demoDirOverride = arg.substr(11);
         else
