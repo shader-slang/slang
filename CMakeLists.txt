@@ -625,6 +625,13 @@ install(
     EXCLUDE_FROM_ALL
 )
 install(
+    DIRECTORY "${slang_SOURCE_DIR}/LICENSES"
+    DESTINATION .
+    COMPONENT metadata
+    EXCLUDE_FROM_ALL
+    PATTERN ".*" EXCLUDE
+)
+install(
     DIRECTORY "${slang_SOURCE_DIR}/docs/"
     DESTINATION share/doc/slang
     PATTERN ".*" EXCLUDE
