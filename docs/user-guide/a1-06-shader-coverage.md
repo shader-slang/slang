@@ -243,9 +243,16 @@ genhtml hello-coverage.lcov --output-directory coverage-html
 ```
 
 `coverage-html/index.html` shows the source with executed lines in green and unexecuted
-lines in red. `genhtml` ships with the lcov package on Linux and macOS; it has no common
-Windows distribution, so on Windows open `hello-coverage.lcov` with an LCOV viewer such as
-the VS Code Coverage Gutters extension instead.
+lines in red. `genhtml` ships with the lcov package on Linux and macOS but has no common
+Windows distribution. Where it is unavailable, the repository's own renderer (the same tool
+Slang's CI uses) produces an equivalent report anywhere Python runs:
+
+```bash
+python3 tools/coverage-html/slang-coverage-html.py hello-coverage.lcov --output-dir coverage-html
+```
+
+Any other LCOV consumer works as well — for example, the VS Code Coverage Gutters extension
+reads `hello-coverage.lcov` directly.
 
 The counters file format is `counter_count` little-endian unsigned integers of
 `element_stride` bytes each — the raw buffer contents, on any target. `--counters-text`

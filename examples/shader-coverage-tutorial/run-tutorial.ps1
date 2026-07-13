@@ -5,8 +5,8 @@
 #
 # Prerequisites: slangc.exe (any Slang release, or a repo build), a C++
 # compiler (cl.exe from a Visual Studio developer prompt, or clang++/g++),
-# and Python 3. genhtml (from the lcov package) is optional — the HTML
-# step is skipped with a note when it is missing.
+# and Python 3. genhtml (from the lcov package) is optional — without
+# it the HTML report is rendered with the in-repo Python renderer.
 #
 # Usage:
 #   ./run-tutorial.ps1
@@ -131,13 +131,15 @@ Invoke-Step "python" @("../../tools/shader-coverage/slang-coverage-to-lcov.py",
     "--output", "hello-coverage.lcov")
 Get-Content hello-coverage.lcov
 
-# Render HTML when genhtml (lcov package) is installed.
+# Render HTML with genhtml (the de-facto LCOV tool) when installed;
+# otherwise fall back to the repository's own Python renderer.
 if (Get-Command genhtml -ErrorAction SilentlyContinue)
 {
     Invoke-Step "genhtml" @("hello-coverage.lcov", "--output-directory", "coverage-html")
-    Write-Host "open coverage-html/index.html to see the annotated source"
 }
 else
 {
-    Write-Host "genhtml not found - skipping HTML report (no common Windows lcov package; open hello-coverage.lcov in an LCOV viewer such as VS Code Coverage Gutters)"
+    Invoke-Step "python" @("../../tools/coverage-html/slang-coverage-html.py",
+        "hello-coverage.lcov", "--output-dir", "coverage-html")
 }
+Write-Host "open coverage-html/index.html to see the annotated source"

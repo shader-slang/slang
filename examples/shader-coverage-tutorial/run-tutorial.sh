@@ -5,8 +5,8 @@
 # comes from, so you can follow along in the text.
 #
 # Prerequisites: slangc (any Slang release, or a repo build), a C++
-# compiler, and Python 3. genhtml (from the lcov package) is optional —
-# the HTML step is skipped with a note when it is missing.
+# compiler, and Python 3. genhtml (from the lcov package) is optional — without it
+# the HTML report is rendered with the in-repo Python renderer.
 #
 # Usage:
 #   ./run-tutorial.sh
@@ -82,10 +82,12 @@ python3 ../../tools/shader-coverage/slang-coverage-to-lcov.py \
   --counters hello-coverage.counters.bin --output hello-coverage.lcov
 cat hello-coverage.lcov
 
-# Render HTML when genhtml (lcov package) is installed.
+# Render HTML with genhtml (the de-facto LCOV tool) when installed;
+# otherwise fall back to the repository's own Python renderer.
 if command -v genhtml >/dev/null; then
   genhtml hello-coverage.lcov --output-directory coverage-html >/dev/null
-  echo "open coverage-html/index.html to see the annotated source"
 else
-  echo "genhtml not found - skipping HTML report (install the lcov package, or open hello-coverage.lcov in an LCOV viewer such as VS Code Coverage Gutters)"
+  python3 ../../tools/coverage-html/slang-coverage-html.py hello-coverage.lcov \
+    --output-dir coverage-html
 fi
+echo "open coverage-html/index.html to see the annotated source"

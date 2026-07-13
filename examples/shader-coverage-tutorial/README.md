@@ -42,9 +42,11 @@ python3 <slang-repo>/tools/shader-coverage/slang-coverage-to-lcov.py \
 genhtml hello-coverage.lcov --output-directory coverage-html
 ```
 
-`genhtml` (lcov package) has no common Windows distribution; on Windows open
-`hello-coverage.lcov` with an LCOV viewer such as the VS Code Coverage Gutters extension
-instead.
+`genhtml` (lcov package) has no common Windows distribution. Where it is unavailable, the
+repository's own renderer produces an equivalent report anywhere Python runs:
+`python3 <slang-repo>/tools/coverage-html/slang-coverage-html.py hello-coverage.lcov --output-dir coverage-html`.
+LCOV viewers such as the VS Code Coverage Gutters extension read `hello-coverage.lcov`
+directly.
 
 Expected host-program output:
 
