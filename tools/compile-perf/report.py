@@ -74,14 +74,67 @@ PROVENANCE_NOTE = (
     "uniform few-% offset, and more on individual hot loops).</div>")
 
 
-def grid_page(path, title, sub, note, svg):
-    """One cadence page: per-workload panels, two per row."""
+def movers_block(dpoints, names):
+    """Top-movers HTML for ONE family's ToT page: the family's largest daily
+    change (date + commit window, % of the family's previous-day total) and
+    the top-10 benchmarks by |%-change| of their headline over the window.
+    Empty string when there are fewer than 2 daily points."""
+    if len(dpoints) < 2:
+        return ""
+    fam = set(names)
+
+    def fam_pct(v0, v1):
+        common = [(wl, t) for (wl, t) in v1
+                  if wl in fam and t == daily_movers.headline(wl) and (wl, t) in v0]
+        base = sum(v0[k] for k in common)
+        return (sum(v1[k] for k in common) - base) / base * 100 if base else 0.0
+
+    bounds = [(fam_pct(b[5], b[6]),) + b for b in daily_movers.boundaries(dpoints)]
+    bounds.sort(key=lambda b: -abs(b[0]))
+    biggest = ""
+    if bounds and abs(bounds[0][0]) > 0:
+        pct, _t, bd0, bd1, bc0, bc1, _v0, _v1 = bounds[0]
+        cls = "worse" if pct > 0 else "better"
+        biggest = (f'<p class="small">Largest daily change in the window: '
+                   f"{html_escape(bd0)} &rarr; {html_escape(bd1)} "
+                   f"(<code>{html_escape(bc0)}..{html_escape(bc1)}</code>), "
+                   f"<b class='{cls}'>{pct:+.1f}%</b>.</p>")
+
+    per_wl = {}
+    for _d, _c, vals in dpoints:
+        for (wl, t), v in vals.items():
+            if wl in fam and t == daily_movers.headline(wl):
+                per_wl.setdefault(wl, []).append(v)
+    movers = sorted(((vs[-1] / vs[0] - 1) * 100, wl, vs[0], vs[-1])
+                    for wl, vs in per_wl.items() if len(vs) >= 2 and vs[0] > 0)
+    movers.sort(key=lambda r: -abs(r[0]))
+    if not movers:
+        return ""
+    rows = [f"<h2>Top movers over the daily window "
+            f"({html_escape(dpoints[0][0])} &rarr; {html_escape(dpoints[-1][0])})</h2>",
+            biggest,
+            "<table><tr><th>benchmark</th><th class=num>start (ms)</th>"
+            "<th class=num>end (ms)</th><th class=num>change</th></tr>"]
+    for pct, wl, v0w, v1w in movers[:10]:
+        cls = "worse" if pct > 0 else "better"
+        rows.append(f"<tr><td><a href='workloads/{html_escape(wl)}.html'>"
+                    f"{html_escape(wl)}</a></td>"
+                    f"<td class=num>{v0w:.1f}</td><td class=num>{v1w:.1f}</td>"
+                    f"<td class='num {cls}'>{pct:+.1f}%</td></tr>")
+    rows.append("</table>")
+    return "".join(rows)
+
+
+def grid_page(path, title, sub, note, svg, extra_html=""):
+    """One cadence page: per-workload panels, two per row; `extra_html`
+    (e.g. the family's top-movers table) renders above the chart."""
     H = ['<!doctype html><meta charset="utf-8">',
          f"<title>{title}</title><style>{SECTION_CSS}</style>",
          '<div class="wrap">',
          '<p class="small"><a href="index.html">&larr; overview</a></p>',
          f"<h1>{title}</h1>", f'<p class="sub">{sub}</p>',
          f'<p class="small">{note}</p>',
+         extra_html,
          f'<div class="chart">{svg}</div>' if svg
          else '<p class="small">no data yet</p>',
          PROVENANCE_NOTE, "</div>"]
@@ -143,6 +196,12 @@ def main():
                 f"{args.daily_window} points. Click a workload name for its full "
                 "sub-counter breakdown.")
 
+    try:
+        dpoints_all = daily_movers.daily_points(args.results, args.metric)
+    except Exception as e:  # noqa: BLE001 — movers must never sink the report
+        print(f"note: movers tables skipped: {e}")
+        dpoints_all = []
+
     # Four cadence pages: {api, microbench} x {tot, releases}, each a single
     # stacked column of panels.
     PAGES = []
@@ -168,7 +227,9 @@ def main():
                       f"{title} — {cad_title}",
                       f"{len(names)} workloads · stacked phases, top edge = "
                       f"{edge} ({args.metric} ms)",
-                      note, svg)
+                      note, svg,
+                      extra_html=(movers_block(dpoints_all, names)
+                                  if cad == "tot" else ""))
 
     # Landing page: stacked section rows — API & RT on top, microbenchmarks,
     # then the sweeps archive.
@@ -208,62 +269,6 @@ def main():
     # timers that moved — attribution-ready (each row names the commit range
     # to bisect). Daily points only: release points differ in build
     # provenance and would masquerade as steps.
-    movers_html = ""
-    try:
-        dpoints = daily_movers.daily_points(args.results, args.metric)
-
-        # Suite boundary strip: % of the previous day's suite total, so a
-        # "big day" means the same thing whatever the suite's absolute size.
-        def suite_pct(v0, v1):
-            common = [(wl, t) for (wl, t) in v1
-                      if t == daily_movers.headline(wl) and (wl, t) in v0]
-            base = sum(v0[k] for k in common)
-            return (sum(v1[k] for k in common) - base) / base * 100 if base else 0.0
-
-        bounds = [(suite_pct(b[5], b[6]),) + b for b in daily_movers.boundaries(dpoints)]
-        bounds.sort(key=lambda b: -abs(b[0]))
-        rows_m = []
-        biggest_html = ""
-        if bounds:
-            pct, _total, bd0, bd1, bc0, bc1, _v0, _v1 = bounds[0]
-            cls = "worse" if pct > 0 else "better"
-            biggest_html = (
-                f'<p class="small">Largest daily change in the window: '
-                f"{html_escape(bd0)} &rarr; {html_escape(bd1)} "
-                f"(<code>{html_escape(bc0)}..{html_escape(bc1)}</code>), suite "
-                f"<b class='{cls}'>{pct:+.1f}%</b>.</p>")
-
-        # Top-10 window movers: per-workload headline change over the whole
-        # daily window, improved and regressed together, ranked by |%|.
-        per_wl = {}
-        for _d, _c, vals in dpoints:
-            for (wl, t), v in vals.items():
-                if t == daily_movers.headline(wl):
-                    per_wl.setdefault(wl, []).append(v)
-        movers10 = sorted(
-            ((vs[-1] / vs[0] - 1) * 100, wl, vs[0], vs[-1])
-            for wl, vs in per_wl.items() if len(vs) >= 2 and vs[0] > 0)
-        movers10.sort(key=lambda r: -abs(r[0]))
-        if movers10:
-            d0w = dpoints[0][0]
-            d1w = dpoints[-1][0]
-            rows_m += [f"<h2>Top movers over the daily window "
-                       f"({html_escape(d0w)} &rarr; {html_escape(d1w)})</h2>",
-                       biggest_html,
-                       "<table><tr><th>benchmark</th><th class=num>start (ms)</th>"
-                       "<th class=num>end (ms)</th><th class=num>change</th></tr>"]
-            for pct, wl, v0w, v1w in movers10[:10]:
-                cls = "worse" if pct > 0 else "better"
-                link = f"workloads/{html_escape(wl)}.html"
-                rows_m.append(
-                    f"<tr><td><a href='{link}'>{html_escape(wl)}</a></td>"
-                    f"<td class=num>{v0w:.1f}</td><td class=num>{v1w:.1f}</td>"
-                    f"<td class='num {cls}'>{pct:+.1f}%</td></tr>")
-            rows_m.append("</table>")
-        movers_html = "".join(rows_m)
-    except Exception as e:  # noqa: BLE001 — the strip must never sink the report
-        print(f"note: recent-movers strip skipped: {e}")
-
     H = ['<!doctype html><meta charset="utf-8">',
          f"<title>Slang compile-time performance</title><style>{SECTION_CSS}</style>",
          '<div class="wrap">', "<h1>Slang compile-time performance</h1>",
@@ -271,7 +276,6 @@ def main():
          f'latest release in charts: <b>{html_escape(last_rel)}</b> &nbsp;·&nbsp; '
          f'{n_rel} releases + {n_day} daily points · metric: {args.metric}</p>',
          *rows,
-         movers_html,
          '<p class="small">Data: <a href="https://github.com/shader-slang/slang-compile-perf">'
          "slang-compile-perf</a> · methodology: tools/compile-perf/DESIGN.md in the slang "
          "repo · alerts: the nightly trend check (daily-baseline, "
