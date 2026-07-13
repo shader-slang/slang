@@ -45,6 +45,10 @@ function Test-CoverageSupport
 
 if ($Slangc)
 {
+    if (-not (Get-Command $Slangc -ErrorAction SilentlyContinue))
+    {
+        throw "slangc not found at '$Slangc'"
+    }
     if (-not (Test-CoverageSupport $Slangc))
     {
         throw "$Slangc does not support -trace-coverage; use a newer Slang release"

@@ -27,6 +27,10 @@ supports_coverage() {
 }
 
 if [[ -n "${SLANGC:-}" ]]; then
+  command -v "$SLANGC" >/dev/null || {
+    echo "error: slangc not found at '$SLANGC'" >&2
+    exit 1
+  }
   supports_coverage "$SLANGC" || {
     echo "error: $SLANGC does not support -trace-coverage; use a newer Slang release" >&2
     exit 1
