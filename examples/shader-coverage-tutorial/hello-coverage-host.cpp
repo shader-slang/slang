@@ -5,7 +5,7 @@
 // Slang headers or library — the manifest is the whole contract.
 //
 // Pass --no-coverage to run as a plain CPU shared-library dispatch,
-// without binding or reporting the coverage buffer. The `withCoverage`
+// without binding or reporting the coverage buffer. The `coverageEnabled`
 // blocks below are exactly what coverage adds to a host; without them
 // the program also runs a kernel compiled without -trace-coverage.
 
@@ -74,7 +74,7 @@ constexpr const char* kKernelPath = "./hello-coverage-kernel.so";
 
 int main(int argc, char** argv)
 {
-    const bool withCoverage = !(argc > 1 && std::strcmp(argv[1], "--no-coverage") == 0);
+    const bool coverageEnabled = !(argc > 1 && std::strcmp(argv[1], "--no-coverage") == 0);
 
     void* library = loadKernel(kKernelPath);
     auto computeMain = library ? (ComputeFunc)findFunc(library, "computeMain") : nullptr;
@@ -93,7 +93,7 @@ int main(int argc, char** argv)
     BufferView outputView = {outputs, 4};
 
     std::vector<uint8_t> payload(
-        withCoverage ? kUniformOffset + sizeof(BufferView) : 2 * sizeof(BufferView),
+        coverageEnabled ? kUniformOffset + sizeof(BufferView) : 2 * sizeof(BufferView),
         0);
     std::memcpy(payload.data(), &inputView, sizeof(inputView));
     std::memcpy(payload.data() + sizeof(BufferView), &outputView, sizeof(outputView));
@@ -103,7 +103,7 @@ int main(int argc, char** argv)
     // zeroed.
     static_assert(kElementStride == 8, "manifest says uint64 counters");
     std::vector<uint64_t> counters(kCounterCount, 0);
-    if (withCoverage)
+    if (coverageEnabled)
     {
         BufferView coverageView = {counters.data(), kCounterCount};
         std::memcpy(payload.data() + kUniformOffset, &coverageView, sizeof(coverageView));
@@ -116,7 +116,7 @@ int main(int argc, char** argv)
     for (int i = 0; i < 4; ++i)
         std::printf("output[%d] = %g\n", i, outputs[i]);
 
-    if (!withCoverage)
+    if (!coverageEnabled)
         return 0;
 
     // Coverage addition: dump the counter slots and save them for the

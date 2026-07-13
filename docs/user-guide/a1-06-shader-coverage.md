@@ -141,7 +141,7 @@ JSON.
 
 The binding: `BufferView` is the 16-byte `{ void* data; size_t count; }` layout of a
 `(RW)StructuredBuffer` parameter on the CPU target. The shader's own buffers occupy the
-payload's leading fields in declaration order. The `withCoverage` block is everything
+payload's leading fields in declaration order. The `coverageEnabled` block is everything
 coverage adds: zero-initialized counter storage, bound at `uniform_offset`:
 
 ```cpp
@@ -151,7 +151,7 @@ coverage adds: zero-initialized counter storage, bound at `uniform_offset`:
     BufferView outputView = {outputs, 4};
 
     std::vector<uint8_t> payload(
-        withCoverage ? kUniformOffset + sizeof(BufferView) : 2 * sizeof(BufferView),
+        coverageEnabled ? kUniformOffset + sizeof(BufferView) : 2 * sizeof(BufferView),
         0);
     std::memcpy(payload.data(), &inputView, sizeof(inputView));
     std::memcpy(payload.data() + sizeof(BufferView), &outputView, sizeof(outputView));
@@ -161,7 +161,7 @@ coverage adds: zero-initialized counter storage, bound at `uniform_offset`:
     // zeroed.
     static_assert(kElementStride == 8, "manifest says uint64 counters");
     std::vector<uint64_t> counters(kCounterCount, 0);
-    if (withCoverage)
+    if (coverageEnabled)
     {
         BufferView coverageView = {counters.data(), kCounterCount};
         std::memcpy(payload.data() + kUniformOffset, &coverageView, sizeof(coverageView));
