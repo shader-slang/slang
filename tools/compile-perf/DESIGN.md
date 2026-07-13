@@ -66,6 +66,22 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   `force=true` to re-measure the whole history onto a new runner.** Inputs:
   `since`, `until`, `samples`, `sweep` (default `false`, opt-in), `force`.
 
+**Site structure (2026-07 redesign).** `report.py` renders a landing page
+(`index.html`: status strip + navigation cards) and two section pages —
+`microbench.html` (compiler workloads) and `api.html` (api/rt workloads) —
+each with an "Across releases" chart (release-only axis: official prebuilt
+binaries, minor releases plus patch releases from v2026.13 on) and a "Daily
+tip-of-tree" chart (runner-built, trailing 30 points). The cadences get
+separate axes because they differ in build provenance (official toolchain vs
+the runner's MSVC): each chart is internally comparable, the boundary is not —
+a methodology note on both pages says so. Per-workload detail pages carry the
+same two-chart split. trend.py's nightly judgment uses a DAILY-only baseline
+for the same reason (`--baseline-kind`). New releases (majors and patch
+releases from v2026.13) are swept into the history by the nightly's
+new-release check (`new_release_check.py`) the night they ship — no manual
+resync; a failed new-release sweep removes its partial results and retries the
+next night.
+
 **Sweep publication policy — a landing page plus every archived sweep.**
 Sweeping is opt-in on both workflows (`sweep=true`), so sweeps are few and all
 of them are served: `sweep_report.py --publish` (run by both workflows' report

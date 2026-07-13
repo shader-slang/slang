@@ -228,7 +228,8 @@ jobs:
           git config user.email "slang-perf-bot@users.noreply.github.com"
 
           cp -r "$ANALYSIS/." .
-          mv report_per_workload.html index.html
+          # report.py writes index.html (the landing page) directly;
+          # report_per_workload.html is kept as a redirect for old bookmarks.
           # _combined_index.json is a derived intermediate — no need to serve it
           rm -f _combined_index.json
           # Serve files verbatim: without this marker GitHub Pages runs the

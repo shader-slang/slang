@@ -551,11 +551,16 @@ def _workload_source(spec, head=40, tail=40, ctx=40):
     return n, out
 
 
-def write_workload_pages(results_dir, index_path, metric, outdir):
-    """One detail page per workload: the FULL sub-counter stacked-area history, the
-    workload's description (from its generator's docstring), and the exact compiled
-    Slang source. Returns {workload: href relative to outdir} for the index page."""
-    _, per = _series(results_dir, index_path, metric, buckets)
+def write_workload_pages(results_dir, sections, metric, outdir, back="../index.html"):
+    """One detail page per workload: the FULL sub-counter stacked-area history —
+    one chart per (title, index_path) SECTION, e.g. an "Across releases" chart
+    and a "Daily tip-of-tree" chart on separate time axes — plus the workload's
+    description (from its generator's docstring) and the exact compiled Slang
+    source. Returns {workload: href relative to outdir} for the index pages."""
+    per = {}
+    for _title, index_path in sections:
+        _, p = _series(results_dir, index_path, metric, buckets)
+        per.update(p)
     wdir = os.path.join(outdir, "workloads")
     os.makedirs(wdir, exist_ok=True)
     pre = ("background:#f6f8fa;border:1px solid #e3e6ea;border-radius:6px;padding:12px;"
@@ -564,17 +569,25 @@ def write_workload_pages(results_dir, index_path, metric, outdir):
     links = {}
     for wl in sorted(per):
         spec = manifest.BY_NAME.get(wl)
-        svgp = os.path.join(wdir, f"{wl}.svg")
         # api workloads decompose apiTotal (driver phases); everything else
         # decomposes compileInner (compiler phases).
         is_api = spec is not None and spec.mode == "api"
         border = API_BUCKET_ORDER if is_api else BUCKET_ORDER
         bfn = api_buckets if is_api else buckets
-        render_stacked_multiples(
-            results_dir, index_path, metric, svgp, border, bfn,
-            cols=1, names=[wl], panel=(1040, 440),
-            title=f"{esc(wl)} — full phase breakdown across releases ({esc(metric)} ms)")
-        svg = open(svgp, encoding="utf-8").read()
+        svg_sections = []
+        for si, (title, index_path) in enumerate(sections):
+            _, sp = _series(results_dir, index_path, metric, bfn)
+            if wl not in sp or not any(sp[wl]):
+                continue  # no data of this kind (e.g. api workload pre-enablement)
+            svgp = os.path.join(wdir, f"{wl}.{si}.svg")
+            render_stacked_multiples(
+                results_dir, index_path, metric, svgp, border, bfn,
+                cols=1, names=[wl], panel=(1040, 440),
+                title=f"{esc(wl)} — {esc(title)} ({esc(metric)} ms)")
+            svg_sections.append((title, open(svgp, encoding="utf-8").read()))
+        svg = "".join(
+            f"<h3 style='font-size:15px;margin:18px 0 4px;color:#333'>{esc(t)}</h3>{body}"
+            for t, body in svg_sections)
 
         desc = (inspect.getdoc(spec.gen) if spec and spec.gen else "") or "(no description)"
         flags = " ".join(spec.extra_flags) if spec and spec.extra_flags else "(none)"
@@ -597,7 +610,7 @@ def write_workload_pages(results_dir, index_path, metric, outdir):
         html = (f"<!doctype html><meta charset=utf-8><title>{esc(wl)} — phase breakdown</title>"
                 f"<body style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;"
                 f"margin:24px;color:#1a1a1a;max-width:1180px'>"
-                f"<p><a href='../index.html'>&larr; all workloads</a></p>"
+                f"<p><a href='{esc(back)}'>&larr; back</a></p>"
                 f"<h1 style='font-size:21px;margin:0 0 6px'>{esc(wl)}</h1>"
                 f"<p style='color:#444;max-width:900px;white-space:pre-wrap'>{esc(desc)}</p>"
                 f"<p style='color:#666;font-size:13px'>{meta}</p>"

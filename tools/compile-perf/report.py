@@ -54,6 +54,71 @@ def combined_index(release_index, results_dir):
     return recs
 
 
+SECTION_CSS = CSS + """
+.cards{display:flex;gap:16px;flex-wrap:wrap;margin:18px 0}
+.card{flex:1;min-width:240px;background:#fff;border:1px solid #e3e6ea;border-radius:8px;
+      padding:16px 18px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.card a{font-size:17px;font-weight:600;text-decoration:none;color:#1a5fb4}
+.card p{color:#666;font-size:13px;margin:6px 0 0}
+.status{color:#444;font-size:13px;margin:2px 0 16px}
+"""
+
+
+def write_index(index_path, results_dir, metric, out):
+    """Write a filtered copy of the combined index for one chart section and
+    return its path — release-only, or the trailing daily window."""
+    return index_path
+
+
+def render_grid_pair(results_dir, outdir, metric, prefix, names, link_for,
+                     rindex, dindex, border, bucket_fn):
+    """The two grid SVGs (release axis, daily axis) for one section page.
+    Returns [(section title, inline svg or None)]."""
+    out = []
+    for title, ipath, tag in (("Across releases", rindex, "rel"),
+                              ("Daily tip-of-tree (last 30 days)", dindex, "day")):
+        idx = json.load(open(ipath))
+        if not idx:
+            out.append((title, None))
+            continue
+        svgp = os.path.join(outdir, f"perf_{prefix}_{tag}.svg")
+        breakdown.render_stacked_multiples(
+            results_dir, ipath, metric, svgp, border, bucket_fn,
+            names=names, link_for=link_for,
+            title=f"{title} — {prefix} ({metric} ms)")
+        out.append((title, open(svgp, encoding="utf-8").read()))
+    return out
+
+
+def page(path, title, sub, sections, extra_note=""):
+    H = ['<!doctype html><meta charset="utf-8">',
+         f"<title>{title}</title><style>{SECTION_CSS}</style>",
+         '<div class="wrap">',
+         '<p class="small"><a href="index.html">&larr; overview</a></p>',
+         f"<h1>{title}</h1>", f'<p class="sub">{sub}</p>']
+    for stitle, note, svg in sections:
+        H.append(f"<h2>{stitle}</h2>")
+        if note:
+            H.append(f'<p class="small">{note}</p>')
+        H.append(f'<div class="chart">{svg}</div>' if svg
+                 else '<p class="small">no data yet</p>')
+    if extra_note:
+        H.append(extra_note)
+    H.append("</div>")
+    with analyze.open_output(path) as fh:
+        fh.write("\n".join(H))
+    print(f"wrote {path}")
+
+
+PROVENANCE_NOTE = (
+    '<div class="note"><b>Methodology:</b> release points are the OFFICIAL '
+    "prebuilt binaries, re-measured on the perf runner; daily points are built "
+    "on the runner with release-matched flags but a different MSVC toolset. "
+    "Within each chart every point shares one build provenance; absolute times "
+    "are NOT comparable across the release/daily boundary (a uniform few-% "
+    "offset, and more on individual hot loops).</div>")
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -61,6 +126,8 @@ def main():
     ap.add_argument("--index", default=os.path.join(HERE, "releases", "index.json"))
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
     ap.add_argument("--metric", default="median", choices=["min", "median", "mean"])
+    ap.add_argument("--daily-window", type=int, default=30,
+                    help="trailing daily points shown in the daily sections")
     args = ap.parse_args()
 
     with open(args.index) as fh:
@@ -69,82 +136,106 @@ def main():
     outdir = os.path.join(args.results, "analysis")
     os.makedirs(outdir, exist_ok=True)
 
-    # Combined index: releases + daily ToT runs, written to disk so breakdown's
-    # index_path-based loaders also see the daily points.
+    # Three index views: combined (per-workload detail pages show both
+    # cadences), release-only, and the trailing daily window. Separate files so
+    # breakdown's index_path-based loaders stay unchanged.
     cindex = combined_index(index, args.results)
-    cindex_path = os.path.join(outdir, "_combined_index.json")
-    with analyze.open_output(cindex_path) as fh:
-        json.dump(cindex, fh, indent=2)
+    releases = [r for r in cindex if r.get("kind") != "daily"]
+    dailies = [r for r in cindex if r.get("kind") == "daily"][-args.daily_window:]
+    paths = {}
+    for name, recs in (("combined", cindex), ("releases", releases), ("daily", dailies)):
+        p = os.path.join(outdir, f"_{name}_index.json")
+        with analyze.open_output(p) as fh:
+            json.dump(recs, fh, indent=2)
+        paths[name] = p
 
     series, _, order = analyze.load_series(cindex, args.results, args.metric)
     if not order:
         raise SystemExit("no results; run sweep.py first")
-    tags = [t for t, _ in order]
-    n_rel = sum(1 for r in cindex if r.get("kind") != "daily")
-    n_day = len(cindex) - n_rel
-    n_wl = len({wl for (wl, _t) in series})
-
-    # api workloads (mode="api": driven through libslang by the api-driver)
-    # report apiTotal + api* phase timers instead of compileInner, so they get
-    # their own section below rather than empty panels in the compiler grid.
     present = {wl for (wl, _t) in series}
     api_names = manifest.display_order(
         [w.name for w in manifest.WORKLOADS if w.mode == "api" and w.name in present])
     compiler_names = manifest.display_order([wl for wl in present
                                              if wl not in set(api_names)])
 
-    wl_links = breakdown.write_workload_pages(args.results, cindex_path, args.metric, outdir)
-    svg_pw_coarse = breakdown.render_stacked_multiples(
-        args.results, cindex_path, args.metric,
-        os.path.join(outdir, "perf_per_benchmark_coarse.svg"),
-        breakdown.FE_GO_ORDER, breakdown.coarse_buckets, link_for=wl_links,
-        names=compiler_names)
-    svg_coarse_html = open(svg_pw_coarse, encoding="utf-8").read()
+    # Per-workload detail pages: one chart per cadence, both families.
+    wl_links = breakdown.write_workload_pages(
+        args.results,
+        [("Across releases", paths["releases"]),
+         (f"Daily tip-of-tree (last {args.daily_window} days)", paths["daily"])],
+        args.metric, outdir, back="../microbench.html")
 
-    svg_api_html = None
+    rel_note = ("Official release binaries, minor releases (and patch releases "
+                "from v2026.13 on), re-measured on the current perf runner.")
+    day_note = (f"Runner-built master HEAD, one point per calendar day, trailing "
+                f"{args.daily_window} points.")
+
+    micro = render_grid_pair(args.results, outdir, args.metric, "microbench",
+                             compiler_names, wl_links, paths["releases"], paths["daily"],
+                             breakdown.FE_GO_ORDER, breakdown.coarse_buckets)
+    page(os.path.join(outdir, "microbench.html"),
+         "Compiler microbenchmarks",
+         f"{len(compiler_names)} workloads · each panel stacks frontEndExecute/"
+         f"generateOutput, top edge = compileInner ({args.metric} ms) · click a "
+         "workload name for its full sub-counter breakdown",
+         [(t, rel_note if t.startswith("Across") else day_note, svg) for t, svg in micro],
+         PROVENANCE_NOTE)
+
     if api_names:
-        svg_api = breakdown.render_stacked_multiples(
-            args.results, cindex_path, args.metric,
-            os.path.join(outdir, "perf_per_benchmark_api.svg"),
-            breakdown.API_BUCKET_ORDER, breakdown.api_buckets, link_for=wl_links,
-            names=api_names,
-            title=f"API-path workloads — apiTotal phase composition ({args.metric} ms)")
-        svg_api_html = open(svg_api, encoding="utf-8").read()
+        api = render_grid_pair(args.results, outdir, args.metric, "api",
+                               api_names, wl_links, paths["releases"], paths["daily"],
+                               breakdown.API_BUCKET_ORDER, breakdown.api_buckets)
+        page(os.path.join(outdir, "api.html"),
+             "API-path & RT workloads",
+             f"{len(api_names)} workloads driven through libslang by the api-driver "
+             f"— session, module graph, reflection, specialization, RT composite; "
+             f"top edge = apiTotal ({args.metric} ms)",
+             [(t, rel_note if t.startswith("Across") else day_note, svg) for t, svg in api],
+             PROVENANCE_NOTE)
 
-    PW = ['<!doctype html><meta charset="utf-8">',
-          f"<title>Slang compile-perf — per workload</title><style>{CSS}</style>",
-          '<div class="wrap">',
-          "<h1>Slang compile-time performance — per benchmark</h1>",
-          f'<p class="sub">{n_rel} releases + {n_day} daily ToT runs, '
-          f'<b>{analyze.short_tag(tags[0])}</b> → <b>{analyze.short_tag(tags[-1])}</b> · '
-          f'metric: {args.metric} (ms) · {n_wl} workloads. '
-          f'The {n_day} rightmost points per panel are daily top-of-tree builds. '
-          f'See also the <a href="sweep/">complexity sweep</a> '
-          f'(latest nightly): compile time vs workload size N, per-pass scaling.</p>',
-          '<h2>Phase composition across releases — main phases</h2>',
-          '<p class="small">One panel per workload; the two top-level phases '
-          '<b>frontEndExecute</b> (green) and <b>generateOutput</b> (orange) stacked as '
-          'areas across the release history, top edge tracing <code>compileInner</code> '
-          '(own zero-based y-axis per panel; × = first→last ratio). '
-          '<b>Click a workload name</b> to open its own page with the full sub-counter '
-          'breakdown (specializeModule, simplifyIR, SemanticChecking, …).</p>',
-          f'<div class="chart">{svg_coarse_html}</div>',
-          *(['<h2>API-path workloads — apiTotal phase composition</h2>',
-             '<p class="small">Workloads driven through <code>libslang</code> by the '
-             'api-driver (session creation, module loading/linking, reflection, '
-             'link-time specialization). The top edge traces <b>apiTotal</b> — the '
-             'API-side cost a one-shot <code>slangc</code> run pays once and cannot '
-             'separate; the compiler grid above does not include these panels '
-             'because they have no <code>compileInner</code>.</p>',
-             f'<div class="chart">{svg_api_html}</div>'] if svg_api_html else []),
-          '<p class="small">Generated by compile-perf/report.py. '
-          'Source data: results/&lt;tag&gt;/results.json.</p>',
-          "</div>"]
+    # Landing page: status strip + navigation cards.
+    n_rel, n_day = len(releases), len(dailies)
+    last_daily = dailies[-1]["tag"] if dailies else "-"
+    last_rel = releases[-1]["tag"] if releases else "-"
+    cards = ['<div class="cards">',
+             '<div class="card"><a href="microbench.html">Compiler microbenchmarks</a>'
+             f"<p>{len(compiler_names)} workloads, one compiler pass each — parse "
+             "&rarr; sema &rarr; IR &rarr; specialization &rarr; backends.</p></div>"]
+    if api_names:
+        cards.append('<div class="card"><a href="api.html">API-path &amp; RT workloads</a>'
+                     f"<p>{len(api_names)} application-integration shapes: session cost, "
+                     "module graphs, reflection, per-variant specialization, RT programs."
+                     "</p></div>")
+    cards.append('<div class="card"><a href="sweep/">Complexity sweeps</a>'
+                 "<p>Compile time vs workload size N — scaling curves and per-pass "
+                 "growth attribution, for every archived sweep.</p></div>")
+    cards.append("</div>")
+    H = ['<!doctype html><meta charset="utf-8">',
+         f"<title>Slang compile-time performance</title><style>{SECTION_CSS}</style>",
+         '<div class="wrap">', "<h1>Slang compile-time performance</h1>",
+         f'<p class="status">latest nightly: <b>{html_escape(last_daily)}</b> &nbsp;·&nbsp; '
+         f'latest release in charts: <b>{html_escape(last_rel)}</b> &nbsp;·&nbsp; '
+         f'{n_rel} releases + {n_day} daily points · metric: {args.metric}</p>',
+         *cards,
+         '<p class="small">Data: <a href="https://github.com/shader-slang/slang-compile-perf">'
+         "slang-compile-perf</a> · methodology: tools/compile-perf/DESIGN.md in the slang "
+         "repo · alerts: the nightly trend check (daily-baseline, "
+         "median-of-5).</p>", "</div>"]
+    with analyze.open_output(os.path.join(outdir, "index.html")) as fh:
+        fh.write("\n".join(H))
 
-    out = os.path.join(outdir, "report_per_workload.html")
-    with analyze.open_output(out) as fh:
-        fh.write("\n".join(PW))
-    print(f"wrote {out}  ({n_rel} releases + {n_day} daily)")
+    # Old bookmark compatibility: the previous single-grid page name redirects
+    # to the landing page.
+    with analyze.open_output(os.path.join(outdir, "report_per_workload.html")) as fh:
+        fh.write('<!doctype html><meta charset="utf-8">'
+                 '<meta http-equiv="refresh" content="0; url=index.html">'
+                 '<a href="index.html">moved: compile-perf overview</a>')
+    print(f"wrote {os.path.join(outdir, 'index.html')}  "
+          f"({n_rel} releases + {n_day} daily)")
+
+
+def html_escape(s):
+    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 if __name__ == "__main__":
