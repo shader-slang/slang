@@ -420,7 +420,7 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
         num = ["<table><tr><th class=num>N</th>"
                + "".join(f"<th class=num>{html.escape(t)}</th>" for t in cols_t) + "</tr>"]
         for sz in sizes:
-            cells = "".join(f"<td class=num>{bytimer[t].get(sz, float('nan')):.0f}</td>"
+            cells = "".join(f"<td class=num>{bytimer[t][sz]:.0f}</td>"
                             if bytimer[t].get(sz) is not None else "<td class=num>–</td>"
                             for t in cols_t)
             num.append(f"<tr><td class=num>{sz}</td>{cells}</tr>")
