@@ -16,6 +16,14 @@ on:
         # only; a short SHA fails with "branch or tag not found".
         description: "full commit SHA or branch to build (blank = master HEAD)"
         default: ""
+      suite-ref:
+        # Backfilling an old commit must still run the CURRENT suite: the
+        # checked-out ref's own tools/compile-perf predates newer workloads and
+        # does not accept the arguments this workflow passes (--api,
+        # track.py --commit-time, trend.py --label). Same model as the release
+        # sweep: modern suite measuring an older binary.
+        description: "ref for tools/compile-perf (blank = same as ref; use master when backfilling old commits)"
+        default: ""
       samples:
         description: "timed samples per run"
         default: "5"
@@ -57,6 +65,17 @@ jobs:
           persist-credentials: false
           submodules: "recursive"
           fetch-depth: "0"
+
+      - name: Checkout suite ref (backfill)
+        if: github.event.inputs.suite-ref != ''
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ github.event.inputs.suite-ref }}
+          persist-credentials: false
+          path: "suite-src"
+          sparse-checkout: |
+            tools/compile-perf
+            include
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
@@ -120,12 +139,30 @@ jobs:
         env:
           SAMPLES: ${{ github.event.inputs.samples || '5' }}
           ONLY: ${{ github.event.inputs.only }}
+          REF_INPUT: ${{ github.event.inputs.ref }}
+          SUITE_REF: ${{ github.event.inputs.suite-ref }}
         run: |
           set -euo pipefail
-          SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
+          # suite-ref set: measure with THAT suite (modern workloads + script
+          # arguments) while the build tree stays at the swept commit.
+          if [ -n "$SUITE_REF" ]; then
+            SUITE="$GITHUB_WORKSPACE/suite-src/tools/compile-perf"
+          else
+            SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
+          fi
           RESULTS="$GITHUB_WORKSPACE/perf-results"
           SLANGC="$GITHUB_WORKSPACE/build/Release/bin/slangc.exe"
-          LABEL="$(git log -1 --format=%cs HEAD)-$(git rev-parse --short HEAD)"
+          # Label rule: a scheduled / plain-dispatch run is "the nightly of
+          # today", keyed by the RUN date so every calendar day gets exactly
+          # one label even when master's HEAD carries an older commit date
+          # (weekend runs previously minted same-date sibling labels, e.g.
+          # two 2026-07-07 points). An explicit-ref backfill is keyed by the
+          # swept commit's own date so historical points sort by code order.
+          if [ -n "$REF_INPUT" ]; then
+            LABEL="$(git log -1 --format=%cs HEAD)-$(git rev-parse --short HEAD)"
+          else
+            LABEL="$(date -u +%F)-$(git rev-parse --short HEAD)"
+          fi
           COMMIT="$(git rev-parse HEAD)"
           # Full committer timestamp: same-date sibling points (labels carry
           # only the commit's DATE) sort by true code order in the series.
@@ -200,9 +237,17 @@ jobs:
         if: env.PUBLISH == 'true'
         continue-on-error: true
         shell: bash
+        env:
+          SUITE_REF: ${{ github.event.inputs.suite-ref }}
         run: |
           set -euo pipefail
-          SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
+          # Backfill runs must render/judge with the modern suite too — the old
+          # ref's report.py would redeploy the site pages in its older format.
+          if [ -n "$SUITE_REF" ]; then
+            SUITE="$GITHUB_WORKSPACE/suite-src/tools/compile-perf"
+          else
+            SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
+          fi
           RESULTS="$GITHUB_WORKSPACE/perf-results"
           if [ ! -f "$RESULTS/index.json" ]; then
             echo "No index.json in results repo; skipping report generation"
@@ -286,7 +331,16 @@ jobs:
       - name: Check trend (fail on regression)
         if: env.PUBLISH == 'true'
         shell: bash
+        env:
+          SUITE_REF: ${{ github.event.inputs.suite-ref }}
         run: |
           set -euo pipefail
-          cd "$GITHUB_WORKSPACE/tools/compile-perf"
+          # Backfill runs must render/judge with the modern suite too — the old
+          # ref's report.py would redeploy the site pages in its older format.
+          if [ -n "$SUITE_REF" ]; then
+            SUITE="$GITHUB_WORKSPACE/suite-src/tools/compile-perf"
+          else
+            SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
+          fi
+          cd "$SUITE"
           python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" --label "${PERF_LABEL:?}"
