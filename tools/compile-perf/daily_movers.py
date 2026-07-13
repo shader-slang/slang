@@ -96,6 +96,9 @@ def workload_progress(points, workload, step_rel=0.05):
     (d0, c0, v0), (d1, c1, v1) = hs[0], hs[-1]
     overall = (d0, c0, v0, d1, c1, v1, (v1 / v0 - 1) * 100 if v0 else 0.0)
 
+    # ALL leaf timers present at both endpoints — no top-N cap and no
+    # minimum-delta filter: a flat counter is information too (it rules the
+    # pass out as a contributor).
     contributors = []
     hdelta = v1 - v0
     first, last = pts[0][2], pts[-1][2]
@@ -103,8 +106,6 @@ def workload_progress(points, workload, step_rel=0.05):
         if t not in first or t not in last or first[t] < 0.5:
             continue
         d_ms = last[t] - first[t]
-        if abs(d_ms) < 1.0:
-            continue
         contributors.append((t, d_ms, (last[t] / first[t] - 1) * 100,
                              d_ms / hdelta if hdelta else 0.0))
     contributors.sort(key=lambda r: -abs(r[1]))
@@ -139,7 +140,7 @@ def workload_view(points, workload, step_rel):
     print(f"== {workload} — {d0} ({c0}) -> {d1} ({c1}) ==")
     print(f"overall {headline(workload)}: {v0:.1f} -> {v1:.1f} ms  ({pct:+.1f}%)")
     print("main contributors (leaf timers, window delta):")
-    for t, d_ms, own, share in contributors[:6]:
+    for t, d_ms, own, share in contributors:
         print(f"   {t:32s}{d_ms:+9.1f} ms  ({own:+6.1f}% own, {share * 100:4.0f}% of change)")
     print(f"day steps >= {step_rel * 100:.0f}% vs previous day:")
     if not steps:

@@ -615,7 +615,7 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                     f"<td align=right>{d_ms:+.1f}</td>"
                     f"<td align=right>{own:+.1f}%</td>"
                     f"<td align=right>{share * 100:.0f}%</td></tr>"
-                    for t, d_ms, own, share in contributors[:6])
+                    for t, d_ms, own, share in contributors)
                 step_rows = "".join(
                     f"<tr><td>{esc(dp)} &rarr; {esc(d)}</td>"
                     f"<td align=right style='color:{'#1e8449' if spct < 0 else '#c0392b'};"
