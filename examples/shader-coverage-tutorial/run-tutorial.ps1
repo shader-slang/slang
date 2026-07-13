@@ -1,5 +1,5 @@
 # run-tutorial.ps1 — execute every step of the Shader Execution Coverage
-# tutorial (docs/user-guide/a1-06-shader-coverage.md) in one go, from
+# tutorial (docs/user-guide/a3-01-shader-coverage.md) in one go, from
 # this directory. Each step below is named after the chapter section it
 # comes from, so you can follow along in the text.
 #

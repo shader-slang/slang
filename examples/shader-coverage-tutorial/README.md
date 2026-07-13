@@ -4,7 +4,7 @@
 > versions.
 
 These are the companion files for the user-guide chapter
-[Shader Execution Coverage](../../docs/user-guide/a1-06-shader-coverage.md), which walks
+[Shader Execution Coverage](../../docs/user-guide/a3-01-shader-coverage.md), which walks
 through them command by command. Unlike the other coverage examples, this one is driven
 entirely from the command line — there is deliberately no CMake target to build. A CI job
 that runs `run-tutorial.sh` (whose `expected.lcov` check fails on drift) is a planned

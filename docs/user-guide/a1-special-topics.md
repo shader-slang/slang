@@ -13,7 +13,6 @@ In this chapter:
 3. [Obfuscation](a1-03-obfuscation.md)
 4. [Interoperation with target-specific code](a1-04-interop.md)
 5. [Uniformity Analysis](a1-05-uniformity.md)
-6. [Shader Execution Coverage (Experimental)](a1-06-shader-coverage.md)
 
 <!-- RTD-TOC-START
 ```{toctree}
@@ -25,6 +24,5 @@ Using Slang to Write PyTorch Kernels <../deprecated/a1-02-slangpy>
 Obfuscation <a1-03-obfuscation>
 Interoperation with Target-Specific Code <a1-04-interop>
 Uniformity Analysis <a1-05-uniformity>
-Shader Execution Coverage (Experimental) <a1-06-shader-coverage>
 ```
 RTD-TOC-END -->

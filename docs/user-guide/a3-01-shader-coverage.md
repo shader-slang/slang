@@ -2,7 +2,7 @@
 layout: user-guide
 ---
 
-# Shader Execution Coverage (Experimental)
+# Shader Execution Coverage
 
 > **Note:** Shader coverage is an experimental feature. The manifest format, the metadata
 > interfaces, and the `-trace-coverage*` options may change in future versions.
