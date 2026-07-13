@@ -54,23 +54,24 @@ directly.
 Expected host-program output:
 
 ```
-output[0] = 2
+output[0] = 1
 output[1] = 4
 output[2] = 6
 output[3] = 8
 counter[0] = 4
-counter[1] = 4
-counter[2] = 0
+counter[1] = 3
+counter[2] = 1
 counter[3] = 4
 counter[4] = 4
 counter[5] = 4
 counter[6] = 0
 counter[7] = 4
+counter[8] = 4
 ```
 
-The two zero slots are the lines the inputs never exercise — slot 2 is the `return value`
-fallthrough in `applyGain` (line 9), slot 6 is `value = 0.0` (line 19) — which the LCOV
-report shows in red.
+Thread 0 uses a gain of 1.0 and the other three use 2.0, so `applyGain`'s branches split
+3/1 (slots 1 and 2). Slot 6 is `value = 0.0` (line 19), which no input exercises — the
+LCOV report shows it in red.
 
 For GPU dispatch and the in-process (C++ API) workflow, see
 [`examples/shader-coverage-image-pipeline`](../shader-coverage-image-pipeline) and

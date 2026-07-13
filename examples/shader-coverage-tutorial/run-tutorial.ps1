@@ -154,8 +154,8 @@ Invoke-Step "./hello-coverage-host.exe"
 
 # --- Step 4: "Generating a report" --------------------------------------------
 # The LCOV converter joins the raw counters with the manifest's source
-# attribution. Expect two zero-count lines: the negative-input clamp
-# and the applyGain fallthrough, which these inputs never reach.
+# attribution. Expect varied counts: applyGain's branches split 3/1
+# across the four threads, and the negative-input clamp never runs.
 Invoke-Step "python" @("../../tools/shader-coverage/slang-coverage-to-lcov.py",
     "--manifest", "$kernel.coverage-manifest.json",
     "--counters", "hello-coverage.counters.bin",

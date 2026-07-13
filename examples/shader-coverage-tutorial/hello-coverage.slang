@@ -17,5 +17,6 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
     float value = inputBuffer[index];
     if (value < 0.0)
         value = 0.0;
-    outputBuffer[index] = applyGain(value, 2.0);
+    float gain = index == 0 ? 1.0 : 2.0;
+    outputBuffer[index] = applyGain(value, gain);
 }

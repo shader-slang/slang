@@ -62,7 +62,7 @@ struct BufferView
 // Values from hello-coverage-kernel.so.coverage-manifest.json. A real
 // integration parses them out of the JSON; they are inlined here to
 // keep the listing dependency-free.
-constexpr uint32_t kCounterCount = 8;   // "counter_count"
+constexpr uint32_t kCounterCount = 9;   // "counter_count"
 constexpr uint32_t kElementStride = 8;  // "buffer": "element_stride"
 constexpr uint32_t kUniformOffset = 32; // "buffer": "uniform_offset"
 

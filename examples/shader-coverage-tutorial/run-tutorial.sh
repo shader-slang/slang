@@ -102,8 +102,8 @@ c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host -ldl
 
 # --- Step 4: "Generating a report" --------------------------------------------
 # The LCOV converter joins the raw counters with the manifest's source
-# attribution. Expect two zero-count lines: the negative-input clamp
-# and the applyGain fallthrough, which these inputs never reach.
+# attribution. Expect varied counts: applyGain's branches split 3/1
+# across the four threads, and the negative-input clamp never runs.
 python3 ../../tools/shader-coverage/slang-coverage-to-lcov.py \
   --manifest hello-coverage-kernel.so.coverage-manifest.json \
   --counters hello-coverage.counters.bin --output hello-coverage.lcov

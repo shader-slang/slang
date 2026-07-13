@@ -40,7 +40,8 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
     float value = inputBuffer[index];
     if (value < 0.0)
         value = 0.0;
-    outputBuffer[index] = applyGain(value, 2.0);
+    float gain = index == 0 ? 1.0 : 2.0;
+    outputBuffer[index] = applyGain(value, gain);
 }
 ```
 
@@ -74,7 +75,7 @@ need to read or modify it. This is what it contains, trimmed to the relevant fie
 
 ```json
 {
-    "counter_count": 8,
+    "counter_count": 9,
     "buffer": {
         "element_type": "uint64",
         "element_stride": 8,
@@ -189,27 +190,30 @@ c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host -ldl
 Alternatively, use `run-tutorial.sh` / `run-tutorial.ps1` from the tutorial directory
 to execute every tutorial step.
 
-All four inputs are positive and the gain is 2.0, so every statement runs 4 times except
-`value = 0.0` and the `return value` fallthrough in `applyGain`:
+All four inputs are positive, so the `value = 0.0` clamp never runs. Thread 0 uses a gain
+of 1.0 and the other three use 2.0, so `applyGain` takes the multiply branch 3 times and
+the `return value` fallthrough once:
 
 ```
-output[0] = 2
+output[0] = 1
 output[1] = 4
 output[2] = 6
 output[3] = 8
 counter[0] = 4
-counter[1] = 4
-counter[2] = 0
+counter[1] = 3
+counter[2] = 1
 counter[3] = 4
 counter[4] = 4
 counter[5] = 4
 counter[6] = 0
 counter[7] = 4
+counter[8] = 4
 ```
 
-The manifest's `entries` array maps slots to lines: slot 2 is line 9 (the `return value`
-fallthrough), slot 6 is line 19 (`value = 0.0`). The report step below does this
-attribution automatically.
+The manifest's `entries` array maps slots to lines: slot 1 is line 8 (the multiply, 3
+executions), slot 2 is line 9 (the fallthrough, 1 execution), slot 6 is line 19
+(`value = 0.0`, never executed). The report step below does this attribution
+automatically.
 
 ## Generating a report
 
@@ -227,18 +231,20 @@ The LCOV output is plain text:
 TN:slang_coverage
 SF:hello-coverage.slang
 DA:7,4
-DA:8,4
-DA:9,0
+DA:8,3
+DA:9,1
 DA:16,4
 DA:17,4
 DA:18,4
 DA:19,0
 DA:20,4
+DA:21,4
 end_of_record
 ```
 
-Each `DA:line,count` record gives the execution count of one source line; the two zero
-lines were never exercised. Render HTML with:
+Each `DA:line,count` record gives the execution count of one source line: the counts show
+how the four threads split across `applyGain`'s branches (3 and 1), and the zero line —
+the clamp — was never exercised. Render HTML with:
 
 ```bash
 genhtml hello-coverage.lcov --output-directory coverage-html
