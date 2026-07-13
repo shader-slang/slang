@@ -1,5 +1,8 @@
 # Shader Coverage Tutorial Files
 
+> **Note:** Shader coverage is an experimental feature; details may change in future
+> versions.
+
 These are the companion files for the user-guide chapter
 [Shader Execution Coverage](../../docs/user-guide/a1-06-shader-coverage.md), which walks
 through them command by command. Unlike the other coverage examples, this one is driven

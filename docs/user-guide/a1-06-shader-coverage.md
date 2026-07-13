@@ -2,7 +2,10 @@
 layout: user-guide
 ---
 
-# Shader Execution Coverage
+# Shader Execution Coverage (Experimental)
+
+> **Note:** Shader coverage is an experimental feature. The manifest format, the metadata
+> interfaces, and the `-trace-coverage*` options may change in future versions.
 
 Slang supports gcov-style code coverage for shaders, reporting execution counts for GPU
 and CPU kernels. The compiler instruments each executable statement to increment a
@@ -137,8 +140,8 @@ The host program,
 [`hello-coverage-host.cpp`](https://github.com/shader-slang/slang/blob/master/examples/shader-coverage-tutorial/hello-coverage-host.cpp),
 loads the kernel, binds the three buffers (the shader's two, plus coverage), dispatches one
 thread group, prints the computed outputs and the counter slots, and writes the coverage counters to
-a file. It is about 130 lines and uses no Slang headers or library. The manifest is its
-only connection to Slang. Three hardcoded constants in the host code carry the manifest values
+a file. It uses no Slang headers or library; the manifest is its only connection to
+Slang. Three hardcoded constants in the host code carry the manifest values
 shown above — `kCounterCount` from `counter_count`, `kElementStride` from `buffer.element_stride`, and
 `kUniformOffset` from `buffer.uniform_offset`. Hardcoding keeps the example simple and free of a
 JSON-parser dependency. A real host reads these from the manifest at run time.
