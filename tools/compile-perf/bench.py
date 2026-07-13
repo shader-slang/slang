@@ -288,6 +288,16 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
     os.makedirs(gen_dir, exist_ok=True)
     files = spec.gen(size)
     for fn, src in files.items():
+        # Fail-loud guard for the byte-determinism invariant (see _HEADER in
+        # workloads.py): a typographic character anywhere in a GENERATED
+        # source would silently make the corpus bytes platform-dependent.
+        # External corpora are exempt — they are third-party input read with
+        # a tolerant decode, not something our generators promise about.
+        # A raise, not an assert: the contract must hold under python -O too.
+        if not spec.external_corpus and not src.isascii():
+            raise ValueError(
+                f"generated source {fn} contains non-ASCII; generators must "
+                f"emit ASCII only so the corpus is byte-identical everywhere")
         with analyze.open_output(os.path.join(gen_dir, fn)) as fh:
             fh.write(src)
 

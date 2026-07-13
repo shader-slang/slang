@@ -151,6 +151,10 @@
 // CHECK-NEXT: 20.000000
 // CHECK-NEXT: 200.000000
 // CHECK-NEXT: 2000.000000
+// CHECK-NEXT: 1.000000
+// CHECK-NEXT: 10.000000
+// CHECK-NEXT: 100.000000
+// CHECK-NEXT: 1000.000000
 
 typealias FloatCoopVec4 = CoopVec<float, 4>;
 typealias DPFloatCoopVec4 = DifferentialPair<FloatCoopVec4>;
@@ -227,7 +231,17 @@ FloatCoopVec4 testInitializerListConstructor(float a, float b, float c, float d)
     return result * FloatCoopVec4(2.0);
 }
 
-//TEST_INPUT:ubuffer(data=[0], stride=4, count=148):out,name=outputBuffer
+// Exercises reverse-mode element updates when the assigned value has a `no_diff` attributed type.
+[Differentiable]
+FloatCoopVec4 testNoDiffElementUpdates(FloatCoopVec4 x, no_diff float value)
+{
+    FloatCoopVec4 result;
+    for (int i = 0; i < 4; ++i)
+        result[i] = value;
+    return x + result;
+}
+
+//TEST_INPUT:ubuffer(data=[0], stride=4, count=152):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -462,5 +476,15 @@ void computeMain()
 
         result.p.store(outputBuffer, 560);
         result.d.store(outputBuffer, 576);
+    }
+
+    {
+        // The no_diff value contributes no gradient, while the CoopVec input receives dOut.
+        let x = FloatCoopVec4(2.0, 2.0, 2.0, 2.0);
+        let dOut = FloatCoopVec4(1.0, 10.0, 100.0, 1000.0);
+        var dx = DPFloatCoopVec4(x, FloatCoopVec4(0.0, 0.0, 0.0, 0.0));
+        bwd_diff(testNoDiffElementUpdates)(dx, 3.0f, dOut);
+
+        dx.d.store(outputBuffer, 592);
     }
 }

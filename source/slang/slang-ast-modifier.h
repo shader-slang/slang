@@ -1987,6 +1987,7 @@ FIDDLE()
 class NoDiffThisAttribute : public Attribute
 {
     FIDDLE(...)
+    FIDDLE() bool isSynthesized = false;
 };
 
 /// Indicates that the modified declaration is one of the "magic" declarations

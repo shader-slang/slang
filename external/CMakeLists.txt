@@ -158,6 +158,23 @@ if(NOT TARGET Vulkan::Headers)
     endif()
 endif()
 
+# Reuse Slang's Vulkan-Headers checkout when slang-rhi requests the same dependency through
+# FetchContent. Callers can still provide their own FetchContent source directory explicitly.
+if(
+    NOT DEFINED FETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS
+    AND NOT SLANG_USE_SYSTEM_VULKAN_HEADERS
+)
+    if(NOT SLANG_OVERRIDE_VULKAN_HEADERS_PATH)
+        set(FETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS
+            "${CMAKE_CURRENT_SOURCE_DIR}/vulkan"
+        )
+    else()
+        set(FETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS
+            "${SLANG_OVERRIDE_VULKAN_HEADERS_PATH}/vulkan"
+        )
+    endif()
+endif()
+
 # metal-cpp headers
 add_library(metal-cpp INTERFACE)
 target_include_directories(

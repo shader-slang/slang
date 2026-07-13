@@ -54,6 +54,15 @@ def write_step_summary(md):
 
 
 def main():
+    # The Windows runner's Python defaults to a cp1252 console encoding, which
+    # cannot encode this report's non-ASCII table headers — and the flag table
+    # only prints when a regression IS found, so an encoding crash would mask
+    # exactly the output that matters. Force UTF-8 (errors="replace" so a
+    # future exotic character degrades instead of raising).
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--results", default=os.path.join(HERE, "results"))

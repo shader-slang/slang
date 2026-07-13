@@ -157,7 +157,11 @@ data branch). The deploy step pushes that output to the `gh-pages` branch of
 `shader-slang/slang-compile-perf`, which GitHub Pages serves at
 `https://shader-slang.org/slang-compile-perf/`. `report_per_workload.html` is
 renamed to `index.html` so that URL is the landing page. Per-workload detail
-pages live under `workloads/<name>.html`.
+pages live under `workloads/<name>.html`. Panels render in the CANONICAL order —
+the `manifest.WORKLOADS` list order (real-world first, then pipeline stages
+front end → back end; see `manifest.display_order`) — so the page layout stays
+constant instead of reshuffling with cost drift; workloads present in stored
+results but absent from the manifest render at the end rather than vanishing.
 
 Both steps use `continue-on-error: true` — a report failure never blocks the
 trend check (nightly) or marks the release sweep red.
@@ -257,6 +261,15 @@ ladder — the COM ABI is append-only by contract) and emits timers in the same
 `bench.py` gains an `api` mode (timed command = driver + libslang path derived
 from `--slangc`) and a build-once step for the driver; everything downstream
 (results.json, track/trend/report) is unchanged.
+
+**Enablement status:** the api workloads are part of the TRACKED nightly set
+(the nightly passes `--api`) and render in the report's own "API-path
+workloads" section, stacked by driver phase with `apiTotal` as the top edge
+(they have no `compileInner`, so they are excluded from the compiler grid).
+The release history baseline backfills through the normal
+**compile-perf-release-sweep** dispatch: `sweep.py --api` counts the api
+workloads as required, so releases measured before they existed are simply
+re-benched (full suite, same runner) on the next run — no `force` needed.
 
 **Planned API-path extensions (not yet implemented):**
 

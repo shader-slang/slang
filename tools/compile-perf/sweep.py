@@ -32,6 +32,9 @@ def main():
     ap.add_argument("--warmup", type=int, default=1)
     ap.add_argument("--only", default=None, help="comma-separated workloads")
     ap.add_argument("--sweep", action="store_true", help="pass --sweep (scaling sizes)")
+    ap.add_argument("--api", action="store_true",
+                    help="include the api-path workloads (the driver dlopens each "
+                         "release's libslang, so history backfill works)")
     ap.add_argument("--force", action="store_true", help="re-run releases already done")
     args = ap.parse_args()
 
@@ -48,8 +51,17 @@ def main():
     # (codegen_dxil/ptx need dxc/nvrtc) never run here off-platform, so counting
     # them as "needed" would make need <= present false forever and re-sweep
     # every release on such hosts.
+    # ... and its api gate: without --api, bench.py excludes mode="api"
+    # workloads from the default set, so counting them as "needed" here would
+    # mark every release permanently incomplete and re-bench it on every run.
+    # downstream_required workloads are excluded outright: release packages do
+    # not bundle the downstream compilers (dxcompiler.dll, nvrtc), so those
+    # workloads can never succeed against prebuilt release binaries — their
+    # history lives in the daily (tip-of-tree) series only.
     all_wls = {w.name for w in manifest.WORKLOADS
-               if not w.platforms or sys.platform in w.platforms}
+               if (not w.platforms or sys.platform in w.platforms)
+               and (args.api or w.mode != "api")
+               and not w.downstream_required}
     failures = []
     for i, rec in enumerate(ready, 1):
         tag = rec["tag"]
@@ -101,8 +113,16 @@ def main():
                "--samples", str(args.samples), "--warmup", str(args.warmup)]
         if args.only:
             cmd += ["--only", args.only]
+        else:
+            # Explicit list rather than bench's default set, so the exclusions
+            # above (downstream_required, the api gate) actually govern what
+            # runs — otherwise bench would still attempt e.g. codegen_dxil
+            # against a release that cannot load dxc, and fail every release.
+            cmd += ["--only", ",".join(sorted(all_wls))]
         if args.sweep:
             cmd.append("--sweep")
+        if args.api:
+            cmd.append("--api")
         try:
             rc = subprocess.run(cmd, timeout=3600).returncode
         except subprocess.TimeoutExpired:

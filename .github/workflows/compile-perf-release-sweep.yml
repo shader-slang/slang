@@ -58,6 +58,13 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\bin"
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\usr\bin"
 
+      # bench.py --api builds the api-driver once per release with the host
+      # cl; without a dev environment every api workload fails on every
+      # release (cl.exe not on PATH — this job has no common-setup because it
+      # never builds slang). Same pinned action common-setup uses.
+      - name: Set up MSVC dev tools on Windows
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
@@ -117,10 +124,15 @@ jobs:
           python3 fetch_releases.py --repo "$GITHUB_WORKSPACE" \
             --since "$SINCE" --until "$UNTIL" "${force[@]}"
           # Sweep every release into the results repo (history baseline).
+          # --api: api-path workloads are part of the tracked suite; the driver
+          # dlopens each release's libslang, so the whole window gets baselines.
+          # Releases measured before the api workloads existed count as
+          # incomplete and are re-benched (full suite, same runner) on the next
+          # dispatch — that IS the backfill path; no force needed.
           sweepflag=()
           [ "$SWEEP" = "true" ] && sweepflag=(--sweep)
           python3 sweep.py --index releases/index.json --results "$RESULTS" \
-            --samples "$SAMPLES" "${force[@]}" "${sweepflag[@]}"
+            --samples "$SAMPLES" --api "${force[@]}" "${sweepflag[@]}"
           # Merge newly swept releases into the full index (not overwrite) so
           # report.py uses all historical data, not just the swept window.
           python3 track.py merge-index --results "$RESULTS" --index releases/index.json
