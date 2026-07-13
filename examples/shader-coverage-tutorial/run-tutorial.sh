@@ -96,6 +96,12 @@ python3 -c 'import json; m = json.load(open("hello-coverage.spv.coverage-manifes
   -trace-coverage -o hello-coverage-kernel.so
 echo "wrote hello-coverage-kernel.so and its sidecar manifest"
 
+# Guard the CPU manifest fields the chapter publishes — the same nine
+# counters, marshaled at uniform_offset 32 with a 16-byte (pointer,
+# count) slot. These are the values the host program's constants and
+# the chapter's manifest listing rely on.
+python3 -c 'import json; m = json.load(open("hello-coverage-kernel.so.coverage-manifest.json")); b = m["buffer"]; got = (m["counter_count"], b["uniform_offset"], b["uniform_stride"]); assert got == (9, 32, 16), f"CPU manifest drifted from the published values (counter_count, uniform_offset, uniform_stride): {got}"'
+
 # Build the host program — an ordinary C++ compile with no Slang SDK
 # paths — then dispatch. It loads the precompiled kernel, binds the
 # coverage buffer at the manifest-reported uniform_offset, runs one
