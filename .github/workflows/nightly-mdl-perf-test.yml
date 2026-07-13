@@ -164,11 +164,14 @@ jobs:
       # The runner-built LTO binaries are otherwise discarded with the
       # workspace. Short 2-day retention: enough to grab the binary behind
       # the latest points (local repro, provenance comparison, api-driver
-      # dlopen) without a ~40-min historical rebuild; anything older is
-      # rebuilt on demand. error (not warn) on no files so a silently
-      # empty artifact cannot masquerade as an export.
+      # dlopen); error (not warn) on no files so a silently empty artifact
+      # cannot masquerade as an export. Skipped for backfill dispatches
+      # (ref set): historical binaries are not wanted as artifacts — they
+      # are rebuilt on demand. always(): a failed bench night is exactly
+      # when the binary is worth keeping; the PERF_LABEL guard skips runs
+      # that died before building (no binaries, no chart point to name).
       - name: Upload ToT slang binaries
-        if: always() && env.PERF_LABEL != ''
+        if: always() && env.PERF_LABEL != '' && github.event.inputs.ref == ''
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: slang-binaries-${{ env.PERF_LABEL }}
