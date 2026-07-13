@@ -16,6 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)  # allow running from any directory
 
 import breakdown
+import daily_movers
 from lib import analyze, manifest
 
 CSS = """
@@ -61,7 +62,7 @@ SECTION_CSS = CSS + """
 .secrow .links{margin:8px 0 0}
 .secrow a{font-weight:600;text-decoration:none;color:#1a5fb4}
 .secrow p{color:#666;font-size:13px;margin:6px 0 0}
-.status{color:#444;font-size:13px;margin:2px 0 16px}
+.status{color:#444;font-size:13px;margin:2px 0 16px}\n.worse{color:#c0392b;font-weight:600} .better{color:#1e8449;font-weight:600}\ntd.num,th.num{text-align:right}
 """
 
 PROVENANCE_NOTE = (
@@ -203,6 +204,32 @@ def main():
                 '<div class="links"><a href="sweep/">all sweeps</a></div>'
                 "<p>Compile time vs workload size N — scaling curves and per-pass "
                 "growth attribution; every archived sweep on one page.</p></div>")
+    # Recent movers: the day boundaries that moved the suite most, with the
+    # timers that moved — attribution-ready (each row names the commit range
+    # to bisect). Daily points only: release points differ in build
+    # provenance and would masquerade as steps.
+    movers_html = ""
+    try:
+        dpoints = daily_movers.daily_points(args.results, args.metric)
+        bounds = [b for b in daily_movers.boundaries(dpoints) if abs(b[0]) >= 50]
+        bounds.sort(key=lambda b: -abs(b[0]))
+        if bounds:
+            rows_m = ["<h2>Recent movers (daily series)</h2>",
+                      "<table><tr><th>boundary</th><th>commits</th>"
+                      "<th class=num>suite &Delta;</th><th>top timers</th></tr>"]
+            for total, d0, d1, c0, c1, v0, v1 in bounds[:3]:
+                tds = daily_movers.timer_deltas(v0, v1, limit=3)
+                ts = ", ".join(f"{html_escape(t)} {d:+.0f}" for t, d in tds)
+                cls = "worse" if total > 0 else "better"
+                rows_m.append(
+                    f"<tr><td>{html_escape(d0)} &rarr; {html_escape(d1)}</td>"
+                    f"<td><code>{html_escape(c0)}..{html_escape(c1)}</code></td>"
+                    f"<td class='num {cls}'>{total:+.0f} ms</td><td>{ts}</td></tr>")
+            rows_m.append("</table>")
+            movers_html = "".join(rows_m)
+    except Exception as e:  # noqa: BLE001 — the strip must never sink the report
+        print(f"note: recent-movers strip skipped: {e}")
+
     H = ['<!doctype html><meta charset="utf-8">',
          f"<title>Slang compile-time performance</title><style>{SECTION_CSS}</style>",
          '<div class="wrap">', "<h1>Slang compile-time performance</h1>",
@@ -210,6 +237,7 @@ def main():
          f'latest release in charts: <b>{html_escape(last_rel)}</b> &nbsp;·&nbsp; '
          f'{n_rel} releases + {n_day} daily points · metric: {args.metric}</p>',
          *rows,
+         movers_html,
          '<p class="small">Data: <a href="https://github.com/shader-slang/slang-compile-perf">'
          "slang-compile-perf</a> · methodology: tools/compile-perf/DESIGN.md in the slang "
          "repo · alerts: the nightly trend check (daily-baseline, "
