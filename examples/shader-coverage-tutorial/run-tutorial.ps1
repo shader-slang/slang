@@ -4,9 +4,10 @@
 # comes from, so you can follow along in the text.
 #
 # Prerequisites: slangc.exe (any Slang release, or a repo build), a C++
-# compiler (cl.exe from a Visual Studio developer prompt, or clang++/g++),
-# and Python 3. genhtml (from the lcov package) is optional — without
-# it the HTML report is rendered with the in-repo Python renderer.
+# compiler (a Visual Studio installation is found automatically via
+# vswhere; clang++/g++ on PATH also work), and Python 3. genhtml (from
+# the lcov package) is optional — without it the HTML report is
+# rendered with the in-repo Python renderer.
 #
 # Usage:
 #   ./run-tutorial.ps1
@@ -99,8 +100,32 @@ Invoke-Step $Slangc @("hello-coverage.slang", "-target", "shader-sharedlib",
 Write-Host "wrote $kernel and its sidecar manifest"
 
 # Build the host program — an ordinary C++ compile with no Slang SDK
-# paths — preferring cl.exe (Visual Studio developer prompt), then
-# clang++ or g++.
+# paths — preferring cl.exe, then clang++ or g++. When no compiler is
+# on PATH, locate Visual Studio with vswhere and enter its developer
+# shell, the same discovery slangc's shader-sharedlib compile just did;
+# running from a developer prompt is then unnecessary.
+if ($isWindowsHost -and
+    -not (Get-Command cl -ErrorAction SilentlyContinue) -and
+    -not (Get-Command clang++ -ErrorAction SilentlyContinue) -and
+    -not (Get-Command g++ -ErrorAction SilentlyContinue))
+{
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+    if (Test-Path $vswhere)
+    {
+        $vsRoot = & $vswhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+        if ($vsRoot)
+        {
+            # The dev-shell init scripts invoke vswhere.exe by bare name.
+            $env:Path = "$(Split-Path $vswhere);$env:Path"
+            Import-Module (Join-Path $vsRoot "Common7\Tools\Microsoft.VisualStudio.DevShell.dll")
+            Enter-VsDevShell -VsInstallPath $vsRoot -SkipAutomaticLocation `
+                -DevCmdArguments "-arch=x64" *> $null
+        }
+    }
+}
+
 if (Get-Command cl -ErrorAction SilentlyContinue)
 {
     Invoke-Step "cl" @("/nologo", "/std:c++17", "/EHsc",
@@ -116,7 +141,7 @@ elseif (Get-Command g++ -ErrorAction SilentlyContinue)
 }
 else
 {
-    throw "no C++ compiler found (cl, clang++, or g++); run from a Visual Studio developer prompt"
+    throw "no C++ compiler found (cl, clang++, or g++) and no Visual Studio installation located"
 }
 
 # Dispatch. The host loads the precompiled kernel, binds the coverage
