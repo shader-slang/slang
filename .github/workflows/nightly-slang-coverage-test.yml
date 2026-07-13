@@ -38,9 +38,9 @@ jobs:
       compiler: clang
       platform: aarch64
       config: relwithdebinfo
-      # Pinned: on macos-26 images (a macos-latest lottery) Metal gfx
-      # tests fail on a Metal 4 vs toolchain skew. Unpin once #11985
-      # is resolved.
+      # macos-latest includes different runner images; macos-15 is the
+      # one where Metal gfx tests work (macos-26 fails on a Metal 4 vs
+      # toolchain skew, see #11985). Unpin once #11985 is resolved.
       runs-on: '["macos-15"]'
       build-llvm: true
       deploy-pages: false
