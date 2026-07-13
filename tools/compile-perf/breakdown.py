@@ -282,7 +282,7 @@ def write_html(results_dir, label, metric):
     svg = render_stacked_svg(runs, label, metric)
     outdir = os.path.join(analyze.results_dir_for(results_dir, label), "breakdown")
     os.makedirs(outdir, exist_ok=True)
-    with open(os.path.join(outdir, "breakdown.svg"), "w", encoding="utf-8") as fh:
+    with analyze.open_output(os.path.join(outdir, "breakdown.svg")) as fh:
         fh.write(svg)
     html = (f"<!doctype html><meta charset=utf-8>"
             f"<title>Phase breakdown — {esc(label)}</title>"
@@ -292,7 +292,7 @@ def write_html(results_dir, label, metric):
             f"time not covered by a named child (e.g. the autodiff transform sits "
             f"in <code>linkAndOptimizeIR (self)</code>).</p>{svg}</body>")
     out = os.path.join(outdir, "breakdown.html")
-    with open(out, "w", encoding="utf-8") as fh:
+    with analyze.open_output(out) as fh:
         fh.write(html)
     print(f"wrote {out}  ({len(runs)} workloads)")
     return out
@@ -464,7 +464,7 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
         s.append(f'<rect x="{lx}" y="{yy}" width="12" height="12" fill="{color}"/>')
         s.append(f'<text x="{lx+16}" y="{yy+10}" fill="#222">{esc(name)}</text>')
     s.append("</svg>")
-    with open(out, "w", encoding="utf-8") as fh:
+    with analyze.open_output(out) as fh:
         fh.write("\n".join(s))
     return out
 
@@ -568,7 +568,7 @@ def write_workload_pages(results_dir, index_path, metric, outdir):
                 f"padding-bottom:4px'>Compiled Slang source</h2>"
                 f"<p style='color:#666;font-size:13px'>{esc(size_note)}</p>{code_html}"
                 f"</body>")
-        with open(os.path.join(wdir, f"{wl}.html"), "w", encoding="utf-8") as fh:
+        with analyze.open_output(os.path.join(wdir, f"{wl}.html")) as fh:
             fh.write(html)
         links[wl] = f"workloads/{wl}.html"
     return links
@@ -663,7 +663,7 @@ def render_stacked_sweep(results_dir, label, metric, out, cols=2, panel=(560, 30
         s.append(f'<rect x="{lx}" y="{yy}" width="12" height="12" fill="{color}"/>')
         s.append(f'<text x="{lx+16}" y="{yy+10}" fill="#222">{esc(name)}</text>')
     s.append("</svg>")
-    with open(out, "w") as fh:
+    with analyze.open_output(out) as fh:
         fh.write("\n".join(s))
     return out
 

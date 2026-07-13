@@ -31,6 +31,17 @@ LEAF_TIMERS = ["parseTranslationUnit", "SemanticChecking", "generateIR",
                "specializeModule", "simplifyIR", "linkIR", "unrollLoopsInModule"]
 
 
+def open_output(path, mode="w"):
+    """Open a suite output file for writing under the suite-wide policy:
+    UTF-8, LF-only line endings. Every artifact the suite writes — generated
+    .slang sources, results/tracking/meta json, rendered HTML/SVG — must be
+    byte-identical regardless of the platform that wrote it: Windows' default
+    text mode would otherwise write legacy-codepage bytes and CRLF, making the
+    corpus platform-dependent and churning the results repo. One helper so the
+    policy lives here instead of per-call keyword arguments."""
+    return open(path, mode, encoding="utf-8", newline="\n")
+
+
 def results_dir_for(results_dir, label):
     """Return the directory that holds `label`'s results.json.
 

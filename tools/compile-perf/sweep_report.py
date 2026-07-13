@@ -359,7 +359,7 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
             s.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.4" fill="#2171b5"/>')
 
     s.append("</svg>")
-    with open(out, "w") as fh:
+    with analyze.open_output(out) as fh:
         fh.write("\n".join(s))
     return out
 
@@ -440,7 +440,7 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
                 + render_growth_table(per_bucket.get(wl, {}), floor_b)
                 + f"<h2>Sweep numbers ({metric} ms)</h2>" + "".join(num)
                 + "</div>")
-        with open(os.path.join(wdir, f"{wl}.html"), "w") as fh:
+        with analyze.open_output(os.path.join(wdir, f"{wl}.html")) as fh:
             fh.write(body)
         links[wl] = f"workloads/{wl}.html"
     return links
@@ -548,7 +548,7 @@ def main():
     H.append("</div>")
 
     out = os.path.join(outdir, "sweep_report.html")
-    with open(out, "w") as fh:
+    with analyze.open_output(out) as fh:
         fh.write("\n".join(H))
     print(f"wrote {out}  ({len(names)} workloads)")
 

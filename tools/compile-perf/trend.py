@@ -27,7 +27,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)  # allow running from any directory
 
-from lib import manifest
+from lib import analyze, manifest
 
 
 def timers_for(workload):
@@ -49,7 +49,7 @@ def write_step_summary(md):
     """Append markdown to the GitHub Actions step summary ($GITHUB_STEP_SUMMARY)."""
     path = os.environ.get("GITHUB_STEP_SUMMARY")
     if path:
-        with open(path, "a") as fh:
+        with analyze.open_output(path, "a") as fh:
             fh.write(md + "\n")
 
 
