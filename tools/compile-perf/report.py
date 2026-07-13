@@ -73,7 +73,7 @@ def main():
     # index_path-based loaders also see the daily points.
     cindex = combined_index(index, args.results)
     cindex_path = os.path.join(outdir, "_combined_index.json")
-    with open(cindex_path, "w", encoding="utf-8") as fh:
+    with open(cindex_path, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(cindex, fh, indent=2)
 
     series, _, order = analyze.load_series(cindex, args.results, args.metric)
@@ -140,7 +140,7 @@ def main():
           "</div>"]
 
     out = os.path.join(outdir, "report_per_workload.html")
-    with open(out, "w", encoding="utf-8") as fh:
+    with open(out, "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(PW))
     print(f"wrote {out}  ({n_rel} releases + {n_day} daily)")
 
