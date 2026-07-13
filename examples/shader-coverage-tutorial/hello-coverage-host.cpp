@@ -101,7 +101,7 @@ int main(int argc, char** argv)
     // Coverage addition: counter storage sized from the manifest, bound
     // at the manifest-reported uniform_offset. Counters must start
     // zeroed.
-    static_assert(kElementStride == 8, "manifest says uint64 coverageCounters");
+    static_assert(kElementStride == 8, "manifest says uint64 counters");
     std::vector<uint64_t> coverageCounters(kCounterCount, 0);
     if (coverageEnabled)
     {

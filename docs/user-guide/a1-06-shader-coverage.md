@@ -135,11 +135,11 @@ The host program,
 [`hello-coverage-host.cpp`](https://github.com/shader-slang/slang/blob/master/examples/shader-coverage-tutorial/hello-coverage-host.cpp),
 loads the kernel, binds the three buffers (the shader's two, plus coverage), dispatches one
 thread group, prints the computed outputs and the counter slots, and writes the coverage counters to
-a file. It is about 150 lines and uses no Slang headers or library; the manifest is its
-only connection to Slang. Three hardcoded constants carry the manifest values shown above —
-`kCounterCount` from `counter_count`, `kElementStride` from `buffer.element_stride`, and
-`kUniformOffset` from `buffer.uniform_offset`. Hardcoding keeps the example free of a
-JSON-parser dependency; a real host reads these from the manifest at run time.
+a file. It is about 150 lines and uses no Slang headers or library. The manifest is its
+only connection to Slang. Three hardcoded constants in the host code carry the manifest values
+shown above — `kCounterCount` from `counter_count`, `kElementStride` from `buffer.element_stride`, and
+`kUniformOffset` from `buffer.uniform_offset`. Hardcoding keeps the example simple and free of a
+JSON-parser dependency. A real host reads these from the manifest at run time.
 
 The binding: `BufferView` is the 16-byte `{ void* data; size_t count; }` layout of a
 `(RW)StructuredBuffer` parameter on the CPU target. The shader's own buffers occupy the
@@ -161,7 +161,7 @@ coverage adds: zero-initialized counter storage, bound at `uniform_offset`:
     // Coverage addition: counter storage sized from the manifest, bound
     // at the manifest-reported uniform_offset. Counters must start
     // zeroed.
-    static_assert(kElementStride == 8, "manifest says uint64 coverageCounters");
+    static_assert(kElementStride == 8, "manifest says uint64 counters");
     std::vector<uint64_t> coverageCounters(kCounterCount, 0);
     if (coverageEnabled)
     {
@@ -178,7 +178,8 @@ without `-trace-coverage`.
 
 Copy the program from
 [`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial),
-build, and run:
+build, and run (or use `run-tutorial.sh` / `run-tutorial.ps1` from the same directory,
+which execute every tutorial step including this one):
 
 ```bash
 c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host -ldl
