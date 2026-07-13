@@ -81,6 +81,45 @@ BUCKET_ORDER = [
 ]
 BUCKET_COLOR = dict(BUCKET_ORDER)
 
+# API-path phase tree: the api-driver's timers nest under apiTotal the same way
+# the compiler timers nest under compileInner, so the same top-down allocator
+# renders api workloads (mode="api") as stacked areas with apiTotal as the top
+# edge. apiLoadModuleSource/apiWriteModule are deliberately absent: they time
+# module-graph-bin's SETUP, which runs outside the apiTotal scope.
+API_TREE = ("apiTotal", [
+    ("apiCreateGlobalSession", []),
+    ("apiCreateSession", []),
+    ("apiLoadModule", []),
+    ("apiFindEntryPoint", []),
+    ("apiComposite", []),
+    ("apiSpecialize", []),
+    ("apiLink", []),
+    ("apiGetCode", []),
+    ("apiReflection", []),
+])
+
+# Session setup = greens, module/entry resolution = blues, per-target work
+# (specialize/link/codegen) = oranges/purples, reflection + residual = greys —
+# fixed like BUCKET_ORDER so api panels stay comparable at a glance.
+API_BUCKET_ORDER = [
+    ("apiCreateGlobalSession", "#c7e9c0"),
+    ("apiCreateSession", "#41ab5d"),
+    ("apiLoadModule", "#2171b5"),
+    ("apiFindEntryPoint", "#6baed6"),
+    ("apiComposite", "#9e9ac8"),
+    ("apiSpecialize", "#807dba"),
+    ("apiLink", "#6a51a3"),
+    ("apiGetCode", "#fd8d3c"),
+    ("apiReflection", "#b5bdc4"),
+    ("apiTotal (self)", "#969696"),
+]
+
+
+def api_buckets(timers):
+    """buckets() over the API-path tree — {bucket: ms} tiling apiTotal."""
+    return buckets(timers, API_TREE)
+
+
 
 def esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -91,10 +130,11 @@ def _t(timers, name):
     return st if isinstance(st, (int, float)) else 0.0
 
 
-def buckets(timers):
-    """Mutually-exclusive {bucket: ms} that sum to compileInner, allocated TOP-DOWN
-    from the compileInner budget. Each parent places its measured children within
-    its budget; the remainder is '<parent> (self)'.
+def buckets(timers, tree=TREE):
+    """Mutually-exclusive {bucket: ms} that sum to the given tree's root total
+    (compileInner for the default compiler-phase TREE, apiTotal for API_TREE),
+    allocated TOP-DOWN from that budget. Each parent places its measured
+    children within its budget; the remainder is '<parent> (self)'.
 
     Slang's phase timers are not perfectly additive — named sub-timers can sum to
     MORE than their parent (e.g. specializeModule + simplifyIR + … exceed
@@ -133,7 +173,7 @@ def buckets(timers):
             if self_ms > 0.05:
                 out[f"{name} (self)"] = out.get(f"{name} (self)", 0.0) + self_ms
 
-    alloc(TREE, _t(timers, "compileInner"))
+    alloc(tree, _t(timers, tree[0]))
     return out
 
 
@@ -282,7 +322,7 @@ def write_html(results_dir, label, metric):
     svg = render_stacked_svg(runs, label, metric)
     outdir = os.path.join(analyze.results_dir_for(results_dir, label), "breakdown")
     os.makedirs(outdir, exist_ok=True)
-    with open(os.path.join(outdir, "breakdown.svg"), "w", encoding="utf-8") as fh:
+    with open(os.path.join(outdir, "breakdown.svg"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(svg)
     html = (f"<!doctype html><meta charset=utf-8>"
             f"<title>Phase breakdown — {esc(label)}</title>"
@@ -292,7 +332,7 @@ def write_html(results_dir, label, metric):
             f"time not covered by a named child (e.g. the autodiff transform sits "
             f"in <code>linkAndOptimizeIR (self)</code>).</p>{svg}</body>")
     out = os.path.join(outdir, "breakdown.html")
-    with open(out, "w", encoding="utf-8") as fh:
+    with open(out, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(html)
     print(f"wrote {out}  ({len(runs)} workloads)")
     return out
@@ -353,11 +393,12 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
     order, per = _series(results_dir, index_path, metric, bucket_fn)
     nrel = len(order)
 
-    def last_ci(wl):
-        return next((sum(bd.values()) for bd in reversed(per[wl]) if bd), 0) or 0
-
     if names is None:
-        names = sorted(per, key=lambda w: -last_ci(w))
+        # Canonical, CONSTANT panel order (manifest.WORKLOADS order): real-world
+        # first, then api workloads, then pipeline stages front end -> back end.
+        # A cost-based order was used before, but it reshuffled the page every
+        # time timings drifted, so panels were not stable anchors.
+        names = manifest.display_order(per.keys())
     n = len(names)
     rows = (n + cols - 1) // cols
     pw, ph = panel
@@ -464,7 +505,7 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
         s.append(f'<rect x="{lx}" y="{yy}" width="12" height="12" fill="{color}"/>')
         s.append(f'<text x="{lx+16}" y="{yy+10}" fill="#222">{esc(name)}</text>')
     s.append("</svg>")
-    with open(out, "w", encoding="utf-8") as fh:
+    with open(out, "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(s))
     return out
 
@@ -524,8 +565,13 @@ def write_workload_pages(results_dir, index_path, metric, outdir):
     for wl in sorted(per):
         spec = manifest.BY_NAME.get(wl)
         svgp = os.path.join(wdir, f"{wl}.svg")
+        # api workloads decompose apiTotal (driver phases); everything else
+        # decomposes compileInner (compiler phases).
+        is_api = spec is not None and spec.mode == "api"
+        border = API_BUCKET_ORDER if is_api else BUCKET_ORDER
+        bfn = api_buckets if is_api else buckets
         render_stacked_multiples(
-            results_dir, index_path, metric, svgp, BUCKET_ORDER, buckets,
+            results_dir, index_path, metric, svgp, border, bfn,
             cols=1, names=[wl], panel=(1040, 440),
             title=f"{esc(wl)} — full phase breakdown across releases ({esc(metric)} ms)")
         svg = open(svgp, encoding="utf-8").read()
@@ -568,7 +614,7 @@ def write_workload_pages(results_dir, index_path, metric, outdir):
                 f"padding-bottom:4px'>Compiled Slang source</h2>"
                 f"<p style='color:#666;font-size:13px'>{esc(size_note)}</p>{code_html}"
                 f"</body>")
-        with open(os.path.join(wdir, f"{wl}.html"), "w", encoding="utf-8") as fh:
+        with open(os.path.join(wdir, f"{wl}.html"), "w", encoding="utf-8", newline="\n") as fh:
             fh.write(html)
         links[wl] = f"workloads/{wl}.html"
     return links

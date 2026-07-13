@@ -1915,17 +1915,20 @@ struct ForwardDiffTranslationContext
             {
                 diffBase = getDifferentialZeroOfType(builder, origBase->getDataType());
             }
+
+            // TODO: Unwrapping the attributed type here is a workaround. Lowering should instead
+            // emit an explicit instruction such as IRNoDiffCast for the conversion to `no_diff`.
+            // AD could then use the differentiable type on the other side of that instruction to
+            // form the zero without implicitly discarding the conversion here.
+            auto primalElementType = (IRType*)unwrapAttributedType(primalVal->getDataType());
             if (auto diffVal = findOrTranslateDiffInst(builder, origVal))
             {
-                auto primalElementType = primalVal->getDataType();
-
                 diffUpdateElement =
                     builder->emitUpdateElement(diffBase, diffAccessChain.getArrayView(), diffVal);
                 builder->addPrimalElementTypeDecoration(diffUpdateElement, primalElementType);
             }
             else
             {
-                auto primalElementType = primalVal->getDataType();
                 auto zeroElementDiff = getDifferentialZeroOfType(builder, primalElementType);
                 diffUpdateElement = builder->emitUpdateElement(
                     diffBase,

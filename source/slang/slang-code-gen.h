@@ -72,6 +72,7 @@ struct RequiredLoweringPassSet
     bool byteAddressBuffer;
     bool dynamicResource;
     bool dynamicResourceHeap;
+    bool untypedResourceHandle;
     bool resolveVaryingInputRef;
     bool specializeStageSwitch;
     bool missingReturn;
