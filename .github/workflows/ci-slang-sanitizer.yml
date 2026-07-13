@@ -205,9 +205,9 @@ jobs:
           export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:print_suppressions=0:log_path=$PWD/asan-logs/ubsan"
           export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
 
-          # CPU tests launch generated host programs that are not themselves
-          # ASan-linked. Resolve the runtime here, then preload it only for the
-          # CPU test pass below.
+          # //TEST:EXECUTABLE: cases launch generated host programs that are not
+          # themselves ASan-linked. Resolve the runtime here so slang-test can
+          # preload it only when executing those programs.
           ASAN_RUNTIME=$(clang-18 -print-file-name=libclang_rt.asan-x86_64.so)
           if [ ! -f "$ASAN_RUNTIME" ]; then
             echo "::error::Clang shared ASan runtime not found: $ASAN_RUNTIME"
@@ -240,36 +240,19 @@ jobs:
             slang_test_args+=("-server-count" "$SERVER_COUNT")
           fi
 
-          non_cpu_test_args=("${slang_test_args[@]}" "-api" "-cpu")
-
           # Print the fully-resolved command so the CI log shows exactly which
           # arguments were used (the conditional logic only shows the source).
           printf '+ %q' "$bin_dir/slang-test"
-          printf ' %q' "${non_cpu_test_args[@]}"
+          printf ' %q' "${slang_test_args[@]}"
           printf '\n'
 
           # Non-zero exits are expected (sanitizer errors, test failures); this
           # job gates only on sanitizer log output in the Summary step.
-          "$bin_dir/slang-test" "${non_cpu_test_args[@]}" && non_cpu_test_exit=0 || non_cpu_test_exit=$?
-
-          # Preloading ASan for the entire suite also injects it into uninstrumented
-          # GCC and linker subprocesses, causing their process-lifetime allocations
-          # to appear as leaks. Keep leak detection enabled above, but disable it for
-          # this CPU-only pass where preloading is required. ASan memory checks and
-          # UBSan checks remain active.
-          cpu_test_args=("${slang_test_args[@]}" "-api" "cpu" "-api-only")
-          printf '+ %q' "$bin_dir/slang-test"
-          printf ' %q' "${cpu_test_args[@]}"
-          printf '\n'
-          cpu_asan_options=${ASAN_OPTIONS/detect_leaks=1/detect_leaks=0}
-          ASAN_OPTIONS="$cpu_asan_options" \
-            LD_PRELOAD="$ASAN_RUNTIME${LD_PRELOAD:+:$LD_PRELOAD}" \
-            "$bin_dir/slang-test" "${cpu_test_args[@]}" && cpu_test_exit=0 || cpu_test_exit=$?
-
-          slang_test_exit=$non_cpu_test_exit
-          if [ "$slang_test_exit" -eq 0 ]; then
-            slang_test_exit=$cpu_test_exit
-          fi
+          # Keep LD_PRELOAD out of slang-test's environment so uninstrumented
+          # compiler and linker subprocesses do not produce LeakSanitizer noise.
+          # slang-test converts this value to LD_PRELOAD only for generated executables.
+          SLANG_TEST_EXECUTABLE_LD_PRELOAD="$ASAN_RUNTIME${LD_PRELOAD:+:$LD_PRELOAD}" \
+            "$bin_dir/slang-test" "${slang_test_args[@]}" && slang_test_exit=0 || slang_test_exit=$?
           echo "SLANG_TEST_EXIT=$slang_test_exit" >> "$GITHUB_ENV"
           if [ "$slang_test_exit" -ne 0 ]; then
             echo "::warning::slang-test exited with code $slang_test_exit"
