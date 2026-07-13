@@ -58,7 +58,8 @@ SECTION_CSS = CSS + """
 .secrow{background:#fff;border:1px solid #e3e6ea;border-radius:8px;
         padding:16px 20px;box-shadow:0 1px 2px rgba(0,0,0,.06);margin:14px 0}
 .secrow b{font-size:17px}
-.secrow a{margin-left:14px;font-weight:600;text-decoration:none;color:#1a5fb4}
+.secrow .links{margin:8px 0 0}
+.secrow a{font-weight:600;text-decoration:none;color:#1a5fb4}
 .secrow p{color:#666;font-size:13px;margin:6px 0 0}
 .status{color:#444;font-size:13px;margin:2px 0 16px}
 """
@@ -173,22 +174,33 @@ def main():
     n_rel, n_day = len(releases), len(dailies)
     last_daily = dailies[-1]["tag"] if dailies else "-"
     last_rel = releases[-1]["tag"] if releases else "-"
+    d0 = dailies[0]["date"] if dailies else "-"
+    d1 = dailies[-1]["date"] if dailies else "-"
+    r0 = releases[0]["tag"] if releases else "-"
+    r1 = releases[-1]["tag"] if releases else "-"
+    daily_link = (f"Daily ToT: {html_escape(d0)} &rarr; {html_escape(d1)} "
+                  f"({n_day} days, trailing {args.daily_window})")
+    rel_link = f"Releases: {html_escape(r0)} &rarr; {html_escape(r1)} ({n_rel})"
+
+    def secrow(title, prefix, desc):
+        return ('<div class="secrow"><b>' + title + "</b>"
+                f'<div class="links"><a href="{prefix}-tot.html">{daily_link}</a></div>'
+                f'<div class="links"><a href="{prefix}-releases.html">{rel_link}</a></div>'
+                f"<p>{desc}</p></div>")
+
     rows = []
     if api_names:
-        rows.append('<div class="secrow"><b>API &amp; RT workloads</b>'
-                    '<a href="api-tot.html">ToT</a>'
-                    '<a href="api-releases.html">releases</a>'
-                    f"<p>{len(api_names)} application-integration shapes driven "
-                    "through libslang: session cost, module graphs, reflection, "
-                    "per-variant specialization, RT programs.</p></div>")
-    rows.append('<div class="secrow"><b>Compiler microbenchmarks</b>'
-                '<a href="microbench-tot.html">ToT</a>'
-                '<a href="microbench-releases.html">releases</a>'
-                f"<p>{len(compiler_names)} workloads, one compiler pass each — "
-                "parse &rarr; sema &rarr; IR &rarr; specialization &rarr; "
-                "backends.</p></div>")
+        rows.append(secrow(
+            "API &amp; RT workloads", "api",
+            f"{len(api_names)} application-integration shapes driven through "
+            "libslang: RT programs, session cost, module graphs, reflection, "
+            "per-variant specialization."))
+    rows.append(secrow(
+        "Compiler microbenchmarks", "microbench",
+        f"{len(compiler_names)} workloads, one compiler pass each — parse "
+        "&rarr; sema &rarr; IR &rarr; specialization &rarr; backends."))
     rows.append('<div class="secrow"><b>Complexity sweeps</b>'
-                '<a href="sweep/">all sweeps</a>'
+                '<div class="links"><a href="sweep/">all sweeps</a></div>'
                 "<p>Compile time vs workload size N — scaling curves and per-pass "
                 "growth attribution; every archived sweep on one page.</p></div>")
     H = ['<!doctype html><meta charset="utf-8">',
