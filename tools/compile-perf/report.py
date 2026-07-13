@@ -119,7 +119,7 @@ def main():
           f'<b>{analyze.short_tag(tags[0])}</b> → <b>{analyze.short_tag(tags[-1])}</b> · '
           f'metric: {args.metric} (ms) · {n_wl} workloads. '
           f'The {n_day} rightmost points per panel are daily top-of-tree builds. '
-          f'See also the <a href="sweep/sweep_report.html">complexity sweep</a> '
+          f'See also the <a href="sweep/">complexity sweep</a> '
           f'(latest nightly): compile time vs workload size N, per-pass scaling.</p>',
           '<h2>Phase composition across releases — main phases</h2>',
           '<p class="small">One panel per workload; the two top-level phases '

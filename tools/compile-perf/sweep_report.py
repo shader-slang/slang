@@ -446,84 +446,92 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
     return links
 
 
-def find_latest_swept(results_dir):
-    """Return the newest daily/<label> whose results contain swept (multi-size)
-    data. Daily labels are `YYYY-MM-DD-<shortsha>`, so reverse-lexicographic
-    order is date order; same-date siblings tie-break arbitrarily, which is
-    fine for a latest-sweep view that a nightly refreshes anyway. Exits when
-    no swept daily data exists yet (before the first nightly sweep=true run)."""
-    daily = os.path.join(results_dir, "daily")
-    labels = sorted(os.listdir(daily), reverse=True) if os.path.isdir(daily) else []
-    for label in labels:
-        path = os.path.join(daily, label, "results.json")
-        if not os.path.isfile(path):
-            continue
+def _swept_workload_count(path):
+    """Number of workloads with multi-size data in a results.json, or 0.
+    An unreadable file (corrupt json, permission change) counts as unswept
+    rather than aborting the scan — matching sweep.py's completeness loader."""
+    try:
+        runs = json.load(open(path))
+    except (ValueError, OSError):
+        return 0
+    per = {}
+    for r in runs:
+        if r.get("size", 0) > 0 and r.get("timers"):
+            per.setdefault(r["workload"], set()).add(r["size"])
+    return sum(1 for szs in per.values() if len(szs) >= 2)
+
+
+def find_swept_labels(results_dir):
+    """Every label with swept (multi-size) data, as two lists of
+    (label, n_swept_workloads): dailies newest-first (labels are
+    `YYYY-MM-DD-<shortsha>`, so reverse-lexicographic is date order) and
+    releases in index order (release order) when index.json exists,
+    directory order otherwise. Sweeps are opt-in, so these lists stay short."""
+    dailies, releases = [], []
+    ddir = os.path.join(results_dir, "daily")
+    if os.path.isdir(ddir):
+        for label in sorted(os.listdir(ddir), reverse=True):
+            n = _swept_workload_count(os.path.join(ddir, label, "results.json"))
+            if n:
+                dailies.append((label, n))
+    rdir = os.path.join(results_dir, "releases")
+    order = None
+    ipath = os.path.join(results_dir, "index.json")
+    if os.path.exists(ipath):
         try:
-            runs = json.load(open(path))
+            order = [r["tag"] for r in json.load(open(ipath))]
         except (ValueError, OSError):
-            # An unreadable daily (corrupt json, permission change) skips that
-            # one label rather than aborting the whole latest-sweep scan —
-            # matching sweep.py's completeness loader.
-            continue
-        per = {}
-        for r in runs:
-            if r.get("size", 0) > 0 and r.get("timers"):
-                per.setdefault(r["workload"], set()).add(r["size"])
-        if any(len(s) >= 2 for s in per.values()):
-            return label
-    raise SystemExit("no swept daily results found; run the nightly with sweep=true first")
+            order = None
+    if os.path.isdir(rdir):
+        tags = order if order is not None else sorted(os.listdir(rdir))
+        for tag in tags:
+            n = _swept_workload_count(os.path.join(rdir, tag, "results.json"))
+            if n:
+                releases.append((tag, n))
+    return dailies, releases
 
 
-def main():
-    ap = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    ap.add_argument("--results", default=os.path.join(HERE, "results"))
-    ap.add_argument("--label", default="dev", help="results/<label>/ to report on")
-    ap.add_argument("--latest", action="store_true",
-                    help="report on the newest daily/<label> that has swept "
-                         "(multi-size) data, ignoring --label")
-    ap.add_argument("--out", default=None,
-                    help="output directory (default: <label's results dir>/sweep). "
-                         "Used by CI to render the latest nightly sweep into the "
-                         "published analysis/ tree.")
-    ap.add_argument("--metric", default="median", choices=["min", "median", "mean"])
-    args = ap.parse_args()
+def find_latest_swept(results_dir):
+    """The newest swept daily label — the headline sweep the landing page
+    features. Exits when nothing is swept yet (before the first sweep=true run)."""
+    dailies, _ = find_swept_labels(results_dir)
+    if not dailies:
+        raise SystemExit("no swept daily results found; run the nightly with sweep=true first")
+    return dailies[0][0]
 
-    if args.latest:
-        args.label = find_latest_swept(args.results)
 
-    sweeps = load_sweeps(args.results, args.label, args.metric)
+def render_label(results_dir, label, metric, outdir):
+    """Render one label's full sweep page set (index + per-workload pages)
+    into `outdir`. Returns the number of swept workloads (0 = nothing swept,
+    nothing written)."""
+    sweeps = load_sweeps(results_dir, label, metric)
     if not sweeps:
-        raise SystemExit(f"no multi-size (swept) workloads in results/{args.label}; "
-                         "re-run bench.py with --sweep")
+        return 0
 
     # Fixed per-compile floor = the `minimal` workload's compileInner on this
     # build (the suite's floor canary). Subtracted before the power-law fit so the
     # exponent reflects feature work, not the floor. 0 if minimal wasn't run.
     floor = 0.0
-    raw = json.load(open(analyze.results_path(args.results, args.label)))
+    raw = json.load(open(analyze.results_path(results_dir, label)))
     for r in raw:
         if r["workload"] == "minimal" and r["timers"].get("compileInner"):
-            floor = r["timers"]["compileInner"][args.metric]
+            floor = r["timers"]["compileInner"][metric]
             break
 
-    outdir = args.out or os.path.join(
-        analyze.results_dir_for(args.results, args.label), "sweep")
     os.makedirs(outdir, exist_ok=True)
     # Per-workload pages (stacked sub-counters + analysis + numbers), then the
     # index's compileInner-only curves linking into them.
-    links = write_sweep_pages(args.results, args.label, args.metric, sweeps, floor, outdir)
-    svg = render_panels(sweeps, args.metric, os.path.join(outdir, "sweep_curves.svg"),
+    links = write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir)
+    svg = render_panels(sweeps, metric, os.path.join(outdir, "sweep_curves.svg"),
                         floor, link_for=links)
     inline = open(svg).read()
 
     names = canonical_order(sweeps)
     H = ['<!doctype html><meta charset="utf-8">',
-         f"<title>Slang compile-perf — complexity sweep ({html.escape(args.label)})</title>",
+         f"<title>Slang compile-perf — complexity sweep ({html.escape(label)})</title>",
          f"<style>{CSS}</style>", '<div class="wrap">',
          "<h1>Slang compile-time performance — complexity sweep</h1>",
-         f'<p class="sub">build <b>{html.escape(args.label)}</b> · metric: {args.metric} (ms) · '
+         f'<p class="sub">build <b>{html.escape(label)}</b> · metric: {metric} (ms) · '
          f'{len(names)} swept workload(s) · compile time vs workload size <code>N</code>, '
          "each curve a single binary scaled simple→complex.</p>",
          "<h2>Scaling curves (compileInner)</h2>",
@@ -543,7 +551,7 @@ def main():
              'standalone canary for "the stdlib got heavier". Per-workload pages carry the full '
              'analysis and numbers.</div>')
     H.append('<p class="small">Generated by perf-suite/sweep_report.py from '
-             f'results/{html.escape(args.label)}/results.json. Companion to report.py '
+             f'results/{html.escape(label)}/results.json. Companion to report.py '
              '(cross-release) and ladder_scaling.py (cross-release fit table).</p>')
     H.append("</div>")
 
@@ -551,6 +559,89 @@ def main():
     with analyze.open_output(out) as fh:
         fh.write("\n".join(H))
     print(f"wrote {out}  ({len(names)} workloads)")
+    return len(names)
+
+
+def publish_all(results_dir, metric, outdir):
+    """Render EVERY archived sweep (dailies + releases) under `outdir/<label>/`
+    plus a landing page `outdir/index.html` listing them — dailies newest-first
+    (the newest is the headline), releases in release order. Sweeps are opt-in
+    and therefore few, so rendering all of them per deploy is cheap and makes
+    the archive browsable instead of data-only."""
+    dailies, releases = find_swept_labels(results_dir)
+    os.makedirs(outdir, exist_ok=True)
+    rows_d, rows_r = [], []
+    for label, _n in dailies:
+        n = render_label(results_dir, label, metric, os.path.join(outdir, label))
+        if n:
+            rows_d.append((label, n))
+    for label, _n in releases:
+        n = render_label(results_dir, label, metric, os.path.join(outdir, label))
+        if n:
+            rows_r.append((label, n))
+
+    def table(rows):
+        if not rows:
+            return "<p class='small'>none yet</p>"
+        out = ["<table><tr><th>build</th><th class=num>swept workloads</th></tr>"]
+        for label, n in rows:
+            out.append(f"<tr><td><a href='{html.escape(label)}/sweep_report.html'>"
+                       f"{html.escape(label)}</a></td><td class=num>{n}</td></tr>")
+        out.append("</table>")
+        return "".join(out)
+
+    headline = (f'<p class="sub">Latest: <a href="{html.escape(rows_d[0][0])}/sweep_report.html">'
+                f"<b>{html.escape(rows_d[0][0])}</b></a></p>" if rows_d else
+                '<p class="sub">No sweeps recorded yet — dispatch a nightly or release '
+                "sweep with <code>sweep=true</code>.</p>")
+    H = ['<!doctype html><meta charset="utf-8">',
+         "<title>Slang compile-perf — complexity sweeps</title>",
+         f"<style>{CSS}</style>", '<div class="wrap">',
+         "<h1>Complexity sweeps</h1>", headline,
+         '<p class="small">Each sweep compiles every laddered workload at 4 sizes on one '
+         "binary and fits the floor-subtracted power law — the scaling view that separates "
+         "fixed-cost regressions from per-element and super-linear ones. Sweeps run on "
+         "demand (<code>sweep=true</code> on the nightly or release-sweep dispatch); every "
+         "archived sweep is listed here.</p>",
+         "<h2>Daily tip-of-tree sweeps</h2>", table(rows_d),
+         "<h2>Release sweeps</h2>", table(rows_r),
+         '<p class="small"><a href="../report_per_workload.html">back to the main report</a></p>',
+         "</div>"]
+    out = os.path.join(outdir, "index.html")
+    with analyze.open_output(out) as fh:
+        fh.write("\n".join(H))
+    print(f"wrote {out}  ({len(rows_d)} daily + {len(rows_r)} release sweeps)")
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument("--results", default=os.path.join(HERE, "results"))
+    ap.add_argument("--label", default="dev", help="results/<label>/ to report on")
+    ap.add_argument("--latest", action="store_true",
+                    help="report on the newest daily/<label> that has swept "
+                         "(multi-size) data, ignoring --label")
+    ap.add_argument("--publish", default=None, metavar="DIR",
+                    help="render EVERY archived sweep + a landing index into DIR "
+                         "(what CI deploys as the site's sweep/ section); "
+                         "succeeds with an empty index when nothing is swept yet")
+    ap.add_argument("--out", default=None,
+                    help="output directory (default: <label's results dir>/sweep)")
+    ap.add_argument("--metric", default="median", choices=["min", "median", "mean"])
+    args = ap.parse_args()
+
+    if args.publish:
+        publish_all(args.results, args.metric, args.publish)
+        return
+
+    if args.latest:
+        args.label = find_latest_swept(args.results)
+    outdir = args.out or os.path.join(
+        analyze.results_dir_for(args.results, args.label), "sweep")
+    if not render_label(args.results, args.label, args.metric, outdir):
+        raise SystemExit(f"no multi-size (swept) workloads in results/{args.label}; "
+                         "re-run bench.py with --sweep")
 
 
 if __name__ == "__main__":

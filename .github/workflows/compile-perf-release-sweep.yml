@@ -181,12 +181,11 @@ jobs:
           fi
           cd "$SUITE"
           python3 report.py --results "$RESULTS" --index "$RESULTS/index.json"
-          # Re-render the latest NIGHTLY sweep pages too: this deploy replaces
-          # the whole pages tree, so without this the release sweep would wipe
-          # the analysis/sweep/ set the nightly published.
-          python3 sweep_report.py --results "$RESULTS" --latest \
-            --out "$RESULTS/analysis/sweep" \
-            || echo "no swept nightly data yet; skipping sweep pages"
+          # Sweep landing page + every archived sweep (dailies + releases),
+          # regenerated from repo data on each deploy. Sweeps are opt-in and
+          # few, so rendering all of them is cheap; an empty archive still
+          # produces a valid index page.
+          python3 sweep_report.py --results "$RESULTS" --publish "$RESULTS/analysis/sweep"
 
       - name: Checkout gh-pages branch
         continue-on-error: true
