@@ -4,9 +4,10 @@ layout: user-guide
 
 # Shader Execution Coverage
 
-Slang can instrument shaders so that each executed statement increments a counter at runtime,
-like gcov does for CPU code. After a dispatch, read the counters back and convert them into
-an LCOV report for `genhtml`, Codecov, or VS Code Coverage Gutters.
+Slang can instrument shaders so that each executed statement increments a counter at
+runtime, giving gcov-style per-line execution counts for GPU (and CPU) kernels. After a
+dispatch, read the counters back and convert them into an LCOV report for `genhtml`,
+Codecov, or VS Code Coverage Gutters.
 
 This chapter walks through the pipeline: compile with coverage, read the generated manifest,
 dispatch from a small C++ host program, and produce a report. All steps use the offline
