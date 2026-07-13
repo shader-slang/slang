@@ -24,6 +24,7 @@ The metric is the median by default (the suite's reported statistic).
 """
 import argparse
 import inspect
+import daily_movers
 import json
 import os
 import sys
@@ -561,6 +562,13 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
     for _title, index_path in sections:
         _, p = _series(results_dir, index_path, metric, buckets)
         per.update(p)
+    # Daily-window movers table per workload (between the charts and the
+    # source dump): daily points only — release points differ in build
+    # provenance and would masquerade as steps.
+    try:
+        _daily_pts = daily_movers.daily_points(results_dir, metric)
+    except Exception:  # noqa: BLE001 — the table must never sink page rendering
+        _daily_pts = []
     wdir = os.path.join(outdir, "workloads")
     os.makedirs(wdir, exist_ok=True)
     pre = ("background:#f6f8fa;border:1px solid #e3e6ea;border-radius:6px;padding:12px;"
@@ -595,6 +603,37 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                 f"{esc(spec.mode)} &nbsp;·&nbsp; <b>flags:</b> <code>{esc(flags)}</code> "
                 f"&nbsp;·&nbsp; <b>default N:</b> {spec.default_size}") if spec else ""
 
+        movers_html = ""
+        if len(_daily_pts) >= 2:
+            rows, pts = daily_movers.workload_timer_rows(_daily_pts, wl)
+            if rows:
+                th = ("<tr><th style='text-align:left'>timer</th><th>start</th>"
+                      "<th>end</th><th>net</th><th>ratio</th>"
+                      "<th style='text-align:left'>biggest step (date, commits)</th></tr>")
+                trs = []
+                for net, t, v0, v1, best in rows:
+                    step = ""
+                    if best:
+                        d, a, b = best
+                        step = (f"{d:+.1f} ms on {esc(b[0])} "
+                                f"(<code>{esc(a[1])}..{esc(b[1])}</code>)")
+                    color = "#1e8449" if net < 0 else "#c0392b"
+                    trs.append(
+                        f"<tr><td>{esc(t)}</td><td align=right>{v0:.1f}</td>"
+                        f"<td align=right>{v1:.1f}</td>"
+                        f"<td align=right style='color:{color};font-weight:600'>{net:+.1f}</td>"
+                        f"<td align=right>{v1 / v0:.2f}x</td><td>{step}</td></tr>")
+                movers_html = (
+                    f"<h2 style='font-size:17px;margin:26px 0 8px;border-bottom:"
+                    f"2px solid #eee;padding-bottom:4px'>Daily window progress</h2>"
+                    f"<p style='color:#666;font-size:13px'>Per-timer change over the daily "
+                    f"series {esc(pts[0][0])} ({esc(pts[0][1])}) &rarr; {esc(pts[-1][0])} "
+                    f"({esc(pts[-1][1])}), {len(pts)} points — net, end/start ratio, and each "
+                    f"timer's biggest single day step with the commit range to bisect "
+                    f"(<code>git log &lt;c0&gt;..&lt;c1&gt; -- source/</code>).</p>"
+                    f"<table style='border-collapse:collapse;font-size:13px' "
+                    f"cellpadding=5 border=0>{th}{''.join(trs)}</table>")
+
         _, srcfiles = _workload_source(spec) if spec else (0, [])
         tail_txt = ("show the first 40 lines, the area around computeMain (±40), and the last "
                     "40 lines (gaps elided)")
@@ -623,6 +662,7 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                 f"band traces compileInner; hover a band for its phase.</p>"
                 f"<div style='border:1px solid #eee;border-radius:6px;padding:8px;overflow:auto'>"
                 f"{svg}</div>"
+                f"{movers_html}"
                 f"<h2 style='font-size:17px;margin:26px 0 8px;border-bottom:2px solid #eee;"
                 f"padding-bottom:4px'>Compiled Slang source</h2>"
                 f"<p style='color:#666;font-size:13px'>{esc(size_note)}</p>{code_html}"

@@ -68,14 +68,16 @@ def daily_points(results_dir, metric):
     return out
 
 
-def workload_view(points, workload, min_ms, min_rel):
+def workload_timer_rows(points, workload, min_ms=2.0, min_rel=0.10):
+    """[(net, timer, v_start, v_end, biggest_step)] for one workload's daily
+    series, sorted improvements-first; biggest_step is (delta, (d,c,v)_before,
+    (d,c,v)_after) or None. Shared by the CLI view and the per-workload report
+    pages. Empty when the workload has fewer than 2 daily points."""
     pts = [(d, c, {t: v for (wl, t), v in vals.items() if wl == workload})
            for d, c, vals in points]
     pts = [p for p in pts if p[2]]
     if len(pts) < 2:
-        raise SystemExit(f"fewer than 2 daily points for {workload}")
-    print(f"== {workload}: {pts[0][0]} ({pts[0][1]}) -> {pts[-1][0]} "
-          f"({pts[-1][1]}), {len(pts)} points ==")
+        return [], pts
     rows = []
     for t in sorted({t for *_x, tm in pts for t in tm}):
         series = [(d, c, tm[t]) for d, c, tm in pts if t in tm]
@@ -93,6 +95,15 @@ def workload_view(points, workload, min_ms, min_rel):
         if abs(net) >= min_ms or best:
             rows.append((net, t, series[0][2], series[-1][2], best))
     rows.sort(key=lambda r: r[0])
+    return rows, pts
+
+
+def workload_view(points, workload, min_ms, min_rel):
+    rows, pts = workload_timer_rows(points, workload, min_ms, min_rel)
+    if not rows:
+        raise SystemExit(f"fewer than 2 daily points for {workload}")
+    print(f"== {workload}: {pts[0][0]} ({pts[0][1]}) -> {pts[-1][0]} "
+          f"({pts[-1][1]}), {len(pts)} points ==")
     print(f"{'timer':30s}{'start':>9}{'end':>9}{'net':>9}{'ratio':>7}"
           "  biggest step (date, commits)")
     for net, t, v0, v1, best in rows:
