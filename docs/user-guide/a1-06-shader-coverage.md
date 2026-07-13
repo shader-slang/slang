@@ -70,8 +70,8 @@ compiler and are supported).
 
 ## Manifest structure
 
-The LCOV converter and the host application take care of the manifest — you do not need to
-read or modify it yourself. This is what it contains, trimmed to the relevant fields:
+The LCOV converter and the host application take care of the manifest. User does not need to
+read or modify. This is what it contains, trimmed to the relevant fields:
 
 ```json
 {
@@ -98,7 +98,7 @@ read or modify it yourself. This is what it contains, trimmed to the relevant fi
   `counter_count * element_stride` bytes.
 - `buffer`: where to bind it. On SPIR-V, a descriptor `(set, binding)`; here set 1,
   binding 0. Auto-allocation places the buffer in a new descriptor set after the shader's
-  own sets, so enabling coverage can add one descriptor set to your pipeline layout (see
+  own sets, so enabling coverage can add one descriptor set to the pipeline layout (see
   [Current limitations](https://github.com/shader-slang/slang/blob/master/tools/shader-coverage/README.md#current-limitations)).
 - `entries`: counter-to-source mapping. Slot 0 counts executions of line 7
   (`if (gain > 1.0)`), and so on.
@@ -134,35 +134,45 @@ kernel's parameter payload instead (`space` and `binding` remain only as placeho
 The host program,
 [`hello-coverage-host.cpp`](https://github.com/shader-slang/slang/blob/master/examples/shader-coverage-tutorial/hello-coverage-host.cpp),
 loads the kernel, binds the three buffers (the shader's two, plus coverage), dispatches one
-thread group, prints the counter slots, and writes them to a file. It is about 140 lines and
-uses no Slang headers or library. The constants `kCounterCount`, `kElementStride`, and
+thread group, prints the computed outputs and the counter slots, and writes the counters to
+a file. It is about 150 lines and uses no Slang headers or library. The constants `kCounterCount`, `kElementStride`, and
 `kUniformOffset` are the manifest values above; a production host would parse them from the
 JSON.
 
 The binding: `BufferView` is the 16-byte `{ void* data; size_t count; }` layout of a
 `(RW)StructuredBuffer` parameter on the CPU target. The shader's own buffers occupy the
-payload's leading fields in declaration order. The coverage buffer, zero-initialized, goes
-at `uniform_offset`:
+payload's leading fields in declaration order. The `withCoverage` block is everything
+coverage adds: zero-initialized counter storage, bound at `uniform_offset`:
 
 ```cpp
     float inputs[4] = {1.0f, 2.0f, 3.0f, 4.0f};
     float outputs[4] = {};
-    static_assert(kElementStride == 8, "manifest says uint64 counters");
-    std::vector<uint64_t> counters(kCounterCount, 0);
-
     BufferView inputView = {inputs, 4};
     BufferView outputView = {outputs, 4};
-    BufferView coverageView = {counters.data(), kCounterCount};
 
-    std::vector<uint8_t> payload(kUniformOffset + sizeof(BufferView), 0);
+    std::vector<uint8_t> payload(
+        withCoverage ? kUniformOffset + sizeof(BufferView) : 2 * sizeof(BufferView),
+        0);
     std::memcpy(payload.data(), &inputView, sizeof(inputView));
     std::memcpy(payload.data() + sizeof(BufferView), &outputView, sizeof(outputView));
-    std::memcpy(payload.data() + kUniformOffset, &coverageView, sizeof(coverageView));
+
+    // Coverage addition: counter storage sized from the manifest, bound
+    // at the manifest-reported uniform_offset. Counters must start
+    // zeroed.
+    static_assert(kElementStride == 8, "manifest says uint64 counters");
+    std::vector<uint64_t> counters(kCounterCount, 0);
+    if (withCoverage)
+    {
+        BufferView coverageView = {counters.data(), kCounterCount};
+        std::memcpy(payload.data() + kUniformOffset, &coverageView, sizeof(coverageView));
+    }
 ```
 
 The rest of the program loads the library (`dlopen`/`LoadLibrary`), calls `computeMain` with
-a one-thread-group dispatch range, prints the slots, and writes
-`hello-coverage.counters.bin`.
+a one-thread-group dispatch range, prints the outputs and the counter slots, and writes
+`hello-coverage.counters.bin`. Run it with `--no-coverage` to skip the coverage additions —
+it then works as a plain CPU shared-library dispatch, including against a kernel compiled
+without `-trace-coverage`.
 
 Copy the program from
 [`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial),
@@ -177,6 +187,10 @@ All four inputs are positive and the gain is 2.0, so every statement runs 4 time
 `value = 0.0` and the `return value` fallthrough in `applyGain`:
 
 ```
+output[0] = 2
+output[1] = 4
+output[2] = 6
+output[3] = 8
 counter[0] = 4
 counter[1] = 4
 counter[2] = 0

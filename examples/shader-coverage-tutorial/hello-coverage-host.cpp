@@ -1,8 +1,13 @@
 // hello-coverage-host.cpp: load the kernel slangc precompiled into
 // hello-coverage-kernel.so, bind the hidden counter buffer where the
-// sidecar manifest says, dispatch one thread group, and write the raw
-// counters for the LCOV converter. Uses no Slang headers or library —
-// the manifest is the whole contract.
+// sidecar manifest says, dispatch one thread group, print the computed
+// outputs, and write the raw counters for the LCOV converter. Uses no
+// Slang headers or library — the manifest is the whole contract.
+//
+// Pass --no-coverage to run as a plain CPU shared-library dispatch,
+// without binding or reporting the coverage buffer. The `withCoverage`
+// blocks below are exactly what coverage adds to a host; without them
+// the program also runs a kernel compiled without -trace-coverage.
 
 #include <cstdint>
 #include <cstdio>
@@ -67,8 +72,10 @@ constexpr const char* kKernelPath = "hello-coverage-kernel.dll";
 constexpr const char* kKernelPath = "./hello-coverage-kernel.so";
 #endif
 
-int main()
+int main(int argc, char** argv)
 {
+    const bool withCoverage = !(argc > 1 && std::strcmp(argv[1], "--no-coverage") == 0);
+
     void* library = loadKernel(kKernelPath);
     auto computeMain = library ? (ComputeFunc)findFunc(library, "computeMain") : nullptr;
     if (!computeMain)
@@ -79,28 +86,42 @@ int main()
 
     // Bind. On CPU, "binding" means writing a (pointer, count) pair
     // into the parameter payload. The shader's own buffers occupy the
-    // leading fields in declaration order; the coverage buffer goes at
-    // the manifest-reported uniform_offset. Counters must start zeroed.
+    // leading fields in declaration order.
     float inputs[4] = {1.0f, 2.0f, 3.0f, 4.0f};
     float outputs[4] = {};
-    static_assert(kElementStride == 8, "manifest says uint64 counters");
-    std::vector<uint64_t> counters(kCounterCount, 0);
-
     BufferView inputView = {inputs, 4};
     BufferView outputView = {outputs, 4};
-    BufferView coverageView = {counters.data(), kCounterCount};
 
-    std::vector<uint8_t> payload(kUniformOffset + sizeof(BufferView), 0);
+    std::vector<uint8_t> payload(
+        withCoverage ? kUniformOffset + sizeof(BufferView) : 2 * sizeof(BufferView),
+        0);
     std::memcpy(payload.data(), &inputView, sizeof(inputView));
     std::memcpy(payload.data() + sizeof(BufferView), &outputView, sizeof(outputView));
-    std::memcpy(payload.data() + kUniformOffset, &coverageView, sizeof(coverageView));
 
-    // Dispatch one thread group, then dump the counter slots. Which
-    // source line each slot counts is the manifest's "entries" job —
-    // the LCOV converter does that attribution for us.
+    // Coverage addition: counter storage sized from the manifest, bound
+    // at the manifest-reported uniform_offset. Counters must start
+    // zeroed.
+    static_assert(kElementStride == 8, "manifest says uint64 counters");
+    std::vector<uint64_t> counters(kCounterCount, 0);
+    if (withCoverage)
+    {
+        BufferView coverageView = {counters.data(), kCounterCount};
+        std::memcpy(payload.data() + kUniformOffset, &coverageView, sizeof(coverageView));
+    }
+
+    // Dispatch one thread group and show the computed outputs.
     ComputeVaryingInput varying = {{0, 0, 0}, {1, 1, 1}};
     computeMain(&varying, nullptr, payload.data());
 
+    for (int i = 0; i < 4; ++i)
+        std::printf("output[%d] = %g\n", i, outputs[i]);
+
+    if (!withCoverage)
+        return 0;
+
+    // Coverage addition: dump the counter slots and save them for the
+    // LCOV converter. Which source line each slot counts is the
+    // manifest's "entries" job — the converter does that attribution.
     for (uint32_t i = 0; i < kCounterCount; ++i)
         std::printf("counter[%u] = %llu\n", i, (unsigned long long)counters[i]);
 
