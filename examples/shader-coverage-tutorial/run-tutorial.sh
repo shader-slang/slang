@@ -83,6 +83,11 @@ echo "wrote hello-coverage.spv and hello-coverage.spv.coverage-manifest.json"
 # counter buffer binds at a descriptor (set, binding).
 cat hello-coverage.spv.coverage-manifest.json
 
+# Guard the manifest fields the chapter publishes: nine counter slots,
+# auto-allocated at (space 1, binding 0) — a new descriptor set after
+# the shader's own sets.
+python3 -c 'import json; m = json.load(open("hello-coverage.spv.coverage-manifest.json")); b = m["buffer"]; got = (m["counter_count"], b["space"], b["binding"]); assert got == (9, 1, 0), f"manifest drifted from the published values (counter_count, space, binding): {got}"'
+
 # --- Step 3: "Dispatching the precompiled kernel" -----------------------------
 # Compile the same shader once more, to a directly callable CPU shared
 # library. slangc drives the system C++ compiler; the new sidecar
@@ -98,7 +103,15 @@ echo "wrote hello-coverage-kernel.so and its sidecar manifest"
 # writes hello-coverage.counters.bin.
 # -ldl: dlopen lives in libdl on glibc older than 2.34; harmless elsewhere.
 c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host -ldl
-./hello-coverage-host
+./hello-coverage-host | tee host-output.txt
+
+# Guard the outputs and raw counter slots the chapter publishes. The
+# output[i] values never reach the LCOV report, so this is the only
+# check that catches a CPU-codegen regression in the computed results.
+if ! diff expected-host-output.txt host-output.txt >&2; then
+  echo "error: host output does not match expected-host-output.txt" >&2
+  exit 1
+fi
 
 # --- Step 4: "Generating a report" --------------------------------------------
 # The LCOV converter joins the raw counters with the manifest's source
@@ -113,6 +126,9 @@ cat hello-coverage.lcov
 # manifest's source attribution with the counter values, so this one
 # comparison catches instrumentation, attribution, or converter drift.
 # expected.lcov is the single checked-in copy both runner scripts use.
+# A byte-exact diff is safe here: on POSIX the converter writes LF, and
+# .gitattributes pins the golden to LF on every checkout. (Windows runs
+# delegate to the PowerShell runner, which tolerates CRLF instead.)
 if ! diff expected.lcov hello-coverage.lcov >&2; then
   echo "error: hello-coverage.lcov does not match expected.lcov" >&2
   exit 1

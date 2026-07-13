@@ -11,3 +11,4 @@ hello-coverage-host.obj
 hello-coverage.counters.bin
 hello-coverage.lcov
 coverage-html/
+host-output.txt

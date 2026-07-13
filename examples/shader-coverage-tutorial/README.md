@@ -7,15 +7,16 @@ These are the companion files for the user-guide chapter
 [Shader Execution Coverage](../../docs/user-guide/a3-01-shader-coverage.md), which walks
 through them command by command. Unlike the other coverage examples, this one is driven
 entirely from the command line — there is deliberately no CMake target to build. A CI job
-that runs `run-tutorial.sh` (whose `expected.lcov` check fails on drift) is a planned
+that runs `run-tutorial.sh` (whose golden-file checks fail on drift) is a planned
 follow-up; until then the check runs whenever a human runs the script.
 
 | File | Role |
 | --- | --- |
 | `hello-coverage.slang` | The compute shader the chapter instruments. |
 | `hello-coverage-host.cpp` | A minimal host program that loads the `slangc`-precompiled CPU kernel, binds the coverage buffer where the sidecar manifest says, dispatches, prints the outputs, and writes the raw counters. It uses no Slang headers or library. Pass `--no-coverage` to skip the counter report and run it as a plain CPU shared-library dispatch. |
-| `run-tutorial.sh` / `run-tutorial.ps1` | Commented scripts that execute every tutorial step in order — each step is labeled with the chapter section it comes from. Both verify the produced LCOV against `expected.lcov` and fail on mismatch. |
+| `run-tutorial.sh` / `run-tutorial.ps1` | Commented scripts that execute every tutorial step in order — each step is labeled with the chapter section it comes from. Both fail on drift from any number the chapter publishes: the SPIR-V manifest's `counter_count`/`space`/`binding`, the host program's printed outputs and counters, and the produced LCOV records. |
 | `expected.lcov` | The LCOV records the chapter publishes; the single copy both runner scripts assert against. |
+| `expected-host-output.txt` | The host program's stdout as the chapter publishes it (outputs and raw counter slots); both runner scripts assert against it. |
 
 ## Quick run
 

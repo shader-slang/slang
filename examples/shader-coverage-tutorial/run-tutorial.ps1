@@ -92,6 +92,12 @@ Write-Host "wrote hello-coverage.spv and hello-coverage.spv.coverage-manifest.js
 # counter buffer binds at a descriptor (set, binding).
 Get-Content hello-coverage.spv.coverage-manifest.json
 
+# Guard the manifest fields the chapter publishes: nine counter slots,
+# auto-allocated at (space 1, binding 0) — a new descriptor set after
+# the shader's own sets.
+Invoke-Step "python" @("-c",
+    'import json; m = json.load(open("hello-coverage.spv.coverage-manifest.json")); b = m["buffer"]; got = (m["counter_count"], b["space"], b["binding"]); assert got == (9, 1, 0), f"manifest drifted from the published values (counter_count, space, binding): {got}"')
+
 # --- Step 3: "Dispatching the precompiled kernel" -----------------------------
 # Compile the same shader once more, to a directly callable CPU shared
 # library. slangc drives the system C++ compiler; the new sidecar
@@ -150,7 +156,23 @@ else
 # buffer at the manifest-reported uniform_offset, runs one thread
 # group, prints the outputs and the raw counter slots, and writes
 # hello-coverage.counters.bin.
-Invoke-Step "./hello-coverage-host.exe"
+$hostOutput = & "./hello-coverage-host.exe"
+if ($LASTEXITCODE -ne 0)
+{
+    throw "command failed: ./hello-coverage-host.exe"
+}
+$hostOutput | Write-Host
+
+# Guard the outputs and raw counter slots the chapter publishes. The
+# output[i] values never reach the LCOV report, so this is the only
+# check that catches a CPU-codegen regression in the computed results.
+# Same line-exact, CRLF-tolerant comparison as the LCOV guard below.
+$expectedHostText = ((Get-Content expected-host-output.txt) -join "`n").TrimEnd()
+$actualHostText = (@($hostOutput) -join "`n").TrimEnd()
+if ($expectedHostText -ne $actualHostText)
+{
+    throw "host output does not match expected-host-output.txt"
+}
 
 # --- Step 4: "Generating a report" --------------------------------------------
 # The LCOV converter joins the raw counters with the manifest's source
