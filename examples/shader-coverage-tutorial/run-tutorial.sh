@@ -15,6 +15,16 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Git Bash / MSYS / Cygwin: Windows toolchain discovery (vswhere, the
+# Visual Studio developer shell) lives in the PowerShell runner, so
+# delegate to it instead of duplicating that logic here.
+case "$(uname -s)" in
+MINGW* | MSYS* | CYGWIN*)
+  exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File run-tutorial.ps1 \
+    ${SLANGC:+-Slangc "$SLANGC"}
+  ;;
+esac
+
 # --- Step 0: find the tools ---------------------------------------------------
 # slangc is taken from $SLANGC, then PATH, then a sibling repo build
 # (convenient when running from a shader-slang/slang checkout). An old

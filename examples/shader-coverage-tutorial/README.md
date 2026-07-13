@@ -17,7 +17,7 @@ Run all the steps at once. The scripts pick the first `slangc` with coverage sup
 from `PATH` or a sibling repo build (`../../build`), or take one explicitly:
 
 ```bash
-./run-tutorial.sh                            # Linux / macOS
+./run-tutorial.sh                            # Linux / macOS / Git Bash
 SLANGC=/path/to/slangc ./run-tutorial.sh     # explicit compiler
 
 ./run-tutorial.ps1                           # Windows (PowerShell)
