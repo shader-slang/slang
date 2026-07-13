@@ -108,6 +108,18 @@ def superlinear(k):
     return k is not None and k > SUPERLINEAR_K
 
 
+def anchored_slope(pts, floor):
+    """Through-origin OLS slope of (t − floor) over `pts`: the intercept is
+    PINNED to the measured floor rather than fitted, so at small N — where the
+    floor is 20-35% of the reading — the slope estimate is neither diluted nor
+    tilted by the low half's curvature. Used for every linear-expectation line
+    (panels) and per-bucket × lin ratio (growth attribution); one definition so
+    the two cannot drift."""
+    num = sum(x * (v - floor) for x, v in pts)
+    den = sum(x * x for x, _ in pts) or 1.0
+    return num / den
+
+
 def bucket_series(results_dir, label, metric):
     """Per-workload phase-bucket totals at each sweep size plus the per-bucket
     floor: ({workload: {size: {bucket: ms}}}, {bucket: floor_ms}), using
@@ -179,9 +191,7 @@ def growth_attribution(by_size, floor_b=None, top_n=5):
         lin = None
         if len(pts) >= 3:
             lo = pts[:max(2, (len(pts) + 1) // 2)]
-            slope = (sum(x * (v - fb) for x, v in lo)
-                     / (sum(x * x for x, _ in lo) or 1.0))
-            expect = fb + slope * pts[-1][0]
+            expect = fb + anchored_slope(lo, fb) * pts[-1][0]
             if expect > 0:
                 lin = v1 / expect
         entries.append({"name": name, "v0": v0, "v1": v1, "delta": v1 - v0,
@@ -296,9 +306,7 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
             h = max(2, (len(pts_ci) + 1) // 2)
             lo = pts_ci[:h]
             if floor > 0:
-                num = sum(x * (v - floor) for x, v in lo)
-                den = sum(x * x for x, _ in lo) or 1.0
-                lin_a, lin_b = floor, num / den
+                lin_a, lin_b = floor, anchored_slope(lo, floor)
             else:
                 lin_a, lin_b, _ = analyze.linfit([x for x, _ in lo], [v for _, v in lo])
             lin_end = lin_a + lin_b * nmax
@@ -314,7 +322,11 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
 
         ft = fit(pts_ci, floor)
         kk = ft["k"]
-        kcl = "#c0392b" if superlinear(kk) else "#888"
+        # pow_r2 == 0.0 is powfit's insufficient-data sentinel: fewer than two
+        # positive floor-subtracted points survived. Render a dash instead of
+        # a fake-precise ∝N^0.00 that reads as "genuinely flat".
+        fit_ok = ft["pow_r2"] != 0.0
+        kcl = "#c0392b" if (fit_ok and superlinear(kk)) else "#888"
         link = (link_for or {}).get(wl)
         nfill = "#1a5fb4" if link else "#1a1a1a"
         deco = ' text-decoration="underline"' if link else ""
@@ -324,7 +336,8 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
             ttl = f'<a xlink:href="{html.escape(link)}" href="{html.escape(link)}" target="_top">{ttl}</a>'
         s.append(ttl)
         s.append(f'<text x="{ox+ml+pw}" y="{oy+18}" text-anchor="end" font-size="11" '
-                 f'fill="{kcl}" font-weight="600">{html.escape(f"∝N^{kk:.2f}")}</text>')
+                 f'fill="{kcl}" font-weight="600">'
+                 f'{html.escape(f"∝N^{kk:.2f}" if fit_ok else "∝N^– (fit n/a)")}</text>')
 
         for frac in (0.0, 0.5, 1.0):
             yv = hi * frac
@@ -390,7 +403,8 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
 
         ft = fit(ci, floor)
         kk, top = ft["k"], ft["top"]
-        kcls = "reg" if superlinear(kk) else "flat"
+        fit_ok = ft["pow_r2"] != 0.0  # powfit's insufficient-data sentinel
+        kcls = "reg" if (fit_ok and superlinear(kk)) else "flat"
         topcls = "reg" if (top and top > SUPERLINEAR_TOP2X) else "flat"
         desc = (inspect.getdoc(spec.gen) if spec and spec.gen else "") or "(no description)"
         flags = " ".join(spec.extra_flags) if spec and spec.extra_flags else "(none)"
@@ -434,7 +448,7 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
                 f"<th class=num>t(N<sub>min</sub>)</th><th class=num>t(N<sub>max</sub>)</th>"
                 f"<th class=num>top-2×</th></tr>"
                 f"<tr><td class=num>{sizes[0]}–{sizes[-1]}</td><td class=num>{floor:.0f}</td>"
-                f"<td class='num {kcls}'>{kk:.2f}</td><td class=num>{ft['pow_r2']:.3f}</td>"
+                f"<td class='num {kcls}'>{(f'{kk:.2f}' if fit_ok else '–')}</td><td class=num>{ft['pow_r2']:.3f}</td>"
                 f"<td class=num>{ci[0][1]:.0f}</td><td class=num>{ci[-1][1]:.0f}</td>"
                 f"<td class='num {topcls}'>{(f'{top:.2f}×' if top else '–')}</td></tr></table>"
                 + render_growth_table(per_bucket.get(wl, {}), floor_b)
