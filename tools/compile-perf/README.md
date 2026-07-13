@@ -248,9 +248,6 @@ python3 breakdown.py --label <tag>          # phase attribution for one label (s
 
 ### Generated outputs (gitignored)
 
-| Path | What it is |
-| ---- | ---------- |
-
 The first group is stored in `slang-compile-perf` (the CI results repo). The
 second group is regenerable on demand and is gitignored from that repo — generate
 them locally by pointing the report scripts at a checkout of `slang-compile-perf`
