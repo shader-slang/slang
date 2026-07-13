@@ -52,6 +52,13 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\bin"
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\usr\bin"
 
+      # bench.py --api builds the api-driver once per release with the host
+      # cl; without a dev environment every api workload fails on every
+      # release (cl.exe not on PATH — this job has no common-setup because it
+      # never builds slang). Same pinned action common-setup uses.
+      - name: Set up MSVC dev tools on Windows
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
