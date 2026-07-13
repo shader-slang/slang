@@ -25,6 +25,35 @@
 // Exit code 0 on success; on any Slang failure, diagnostics are printed to
 // stdout (bench.py's real_error() recognizes "error" lines) and the exit code
 // is 1.
+//
+// Timer glossary — the CONTRACT for every `Scope(timers, ...)` below. Each
+// timer wraps exactly ONE public API call (wall clock, driver side); these
+// names are user-facing (report charts, trend alerts), so a timer's meaning
+// must not drift without updating this table:
+//
+//   apiTotal                whole timed section of the mode (excludes any
+//                           setup marked as running before the apiTotal scope
+//                           opens, e.g. module-graph-bin's source load +
+//                           IModule::writeToFile, timed separately as
+//                           apiLoadModuleSource / apiWriteModule)
+//   apiCreateGlobalSession  slang_createGlobalSession() — core-module
+//                           deserialization dominates it
+//   apiCreateSession        IGlobalSession::createSession()
+//   apiLoadModule           ISession::loadModule() (module-graph modes: by
+//                           name, resolving the import DAG) or
+//                           ISession::loadModuleFromSourceString()
+//                           (many-kernels) — import resolution + front end
+//   apiFindEntryPoint       IModule::findEntryPointByName()
+//   apiComposite            ISession::createCompositeComponentType()
+//   apiLink                 IComponentType::link()
+//   apiSpecialize           IComponentType::specialize() per conforming type
+//   apiGetCode              IComponentType::getEntryPointCode() on the linked
+//                           composite — per-entry-point target codegen; should
+//                           track the library's own compileInner, and a gap
+//                           between them is cost OUTSIDE compiler
+//                           instrumentation
+//   apiReflection           IComponentType::getLayout() + full
+//                           spReflection_* type-layout walks
 
 #include "slang.h"
 
