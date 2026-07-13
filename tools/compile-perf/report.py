@@ -55,68 +55,37 @@ def combined_index(release_index, results_dir):
 
 
 SECTION_CSS = CSS + """
-.cards{display:flex;gap:16px;flex-wrap:wrap;margin:18px 0}
-.card{flex:1;min-width:240px;background:#fff;border:1px solid #e3e6ea;border-radius:8px;
-      padding:16px 18px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
-.card a{font-size:17px;font-weight:600;text-decoration:none;color:#1a5fb4}
-.card p{color:#666;font-size:13px;margin:6px 0 0}
+.secrow{background:#fff;border:1px solid #e3e6ea;border-radius:8px;
+        padding:16px 20px;box-shadow:0 1px 2px rgba(0,0,0,.06);margin:14px 0}
+.secrow b{font-size:17px}
+.secrow a{margin-left:14px;font-weight:600;text-decoration:none;color:#1a5fb4}
+.secrow p{color:#666;font-size:13px;margin:6px 0 0}
 .status{color:#444;font-size:13px;margin:2px 0 16px}
 """
 
-
-def write_index(index_path, results_dir, metric, out):
-    """Write a filtered copy of the combined index for one chart section and
-    return its path — release-only, or the trailing daily window."""
-    return index_path
-
-
-def render_grid_pair(results_dir, outdir, metric, prefix, names, link_for,
-                     rindex, dindex, border, bucket_fn):
-    """The two grid SVGs (release axis, daily axis) for one section page.
-    Returns [(section title, inline svg or None)]."""
-    out = []
-    for title, ipath, tag in (("Across releases", rindex, "rel"),
-                              ("Daily tip-of-tree (last 30 days)", dindex, "day")):
-        idx = json.load(open(ipath))
-        if not idx:
-            out.append((title, None))
-            continue
-        svgp = os.path.join(outdir, f"perf_{prefix}_{tag}.svg")
-        breakdown.render_stacked_multiples(
-            results_dir, ipath, metric, svgp, border, bucket_fn,
-            names=names, link_for=link_for,
-            title=f"{title} — {prefix} ({metric} ms)")
-        out.append((title, open(svgp, encoding="utf-8").read()))
-    return out
+PROVENANCE_NOTE = (
+    '<div class="note"><b>Methodology:</b> release points are the OFFICIAL '
+    "prebuilt binaries, re-measured on the perf runner; daily tip-of-tree "
+    "points are built on the runner with release-matched flags but a "
+    "different MSVC toolset. Each page's points share one build provenance; "
+    "absolute times are NOT comparable between the release and ToT pages (a "
+    "uniform few-% offset, and more on individual hot loops).</div>")
 
 
-def page(path, title, sub, sections, extra_note=""):
+def grid_page(path, title, sub, note, svg):
+    """One cadence page: a single stacked column of per-workload panels."""
     H = ['<!doctype html><meta charset="utf-8">',
          f"<title>{title}</title><style>{SECTION_CSS}</style>",
          '<div class="wrap">',
          '<p class="small"><a href="index.html">&larr; overview</a></p>',
-         f"<h1>{title}</h1>", f'<p class="sub">{sub}</p>']
-    for stitle, note, svg in sections:
-        H.append(f"<h2>{stitle}</h2>")
-        if note:
-            H.append(f'<p class="small">{note}</p>')
-        H.append(f'<div class="chart">{svg}</div>' if svg
-                 else '<p class="small">no data yet</p>')
-    if extra_note:
-        H.append(extra_note)
-    H.append("</div>")
+         f"<h1>{title}</h1>", f'<p class="sub">{sub}</p>',
+         f'<p class="small">{note}</p>',
+         f'<div class="chart">{svg}</div>' if svg
+         else '<p class="small">no data yet</p>',
+         PROVENANCE_NOTE, "</div>"]
     with analyze.open_output(path) as fh:
         fh.write("\n".join(H))
     print(f"wrote {path}")
-
-
-PROVENANCE_NOTE = (
-    '<div class="note"><b>Methodology:</b> release points are the OFFICIAL '
-    "prebuilt binaries, re-measured on the perf runner; daily points are built "
-    "on the runner with release-matched flags but a different MSVC toolset. "
-    "Within each chart every point shares one build provenance; absolute times "
-    "are NOT comparable across the release/daily boundary (a uniform few-% "
-    "offset, and more on individual hot loops).</div>")
 
 
 def main():
@@ -127,7 +96,7 @@ def main():
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
     ap.add_argument("--metric", default="median", choices=["min", "median", "mean"])
     ap.add_argument("--daily-window", type=int, default=30,
-                    help="trailing daily points shown in the daily sections")
+                    help="trailing daily points shown on the ToT pages")
     args = ap.parse_args()
 
     with open(args.index) as fh:
@@ -163,60 +132,72 @@ def main():
         args.results,
         [("Across releases", paths["releases"]),
          (f"Daily tip-of-tree (last {args.daily_window} days)", paths["daily"])],
-        args.metric, outdir, back="../microbench.html")
+        args.metric, outdir, back="../index.html")
 
-    rel_note = ("Official release binaries, minor releases (and patch releases "
-                "from v2026.13 on), re-measured on the current perf runner.")
+    rel_note = ("Official release binaries — minor releases, plus patch releases "
+                "from v2026.13 on — re-measured on the current perf runner. "
+                "Click a workload name for its full sub-counter breakdown.")
     day_note = (f"Runner-built master HEAD, one point per calendar day, trailing "
-                f"{args.daily_window} points.")
+                f"{args.daily_window} points. Click a workload name for its full "
+                "sub-counter breakdown.")
 
-    micro = render_grid_pair(args.results, outdir, args.metric, "microbench",
-                             compiler_names, wl_links, paths["releases"], paths["daily"],
-                             breakdown.FE_GO_ORDER, breakdown.coarse_buckets)
-    page(os.path.join(outdir, "microbench.html"),
-         "Compiler microbenchmarks",
-         f"{len(compiler_names)} workloads · each panel stacks frontEndExecute/"
-         f"generateOutput, top edge = compileInner ({args.metric} ms) · click a "
-         "workload name for its full sub-counter breakdown",
-         [(t, rel_note if t.startswith("Across") else day_note, svg) for t, svg in micro],
-         PROVENANCE_NOTE)
-
+    # Four cadence pages: {api, microbench} x {tot, releases}, each a single
+    # stacked column of panels.
+    PAGES = []
     if api_names:
-        api = render_grid_pair(args.results, outdir, args.metric, "api",
-                               api_names, wl_links, paths["releases"], paths["daily"],
-                               breakdown.API_BUCKET_ORDER, breakdown.api_buckets)
-        page(os.path.join(outdir, "api.html"),
-             "API-path & RT workloads",
-             f"{len(api_names)} workloads driven through libslang by the api-driver "
-             f"— session, module graph, reflection, specialization, RT composite; "
-             f"top edge = apiTotal ({args.metric} ms)",
-             [(t, rel_note if t.startswith("Across") else day_note, svg) for t, svg in api],
-             PROVENANCE_NOTE)
+        PAGES += [("api", api_names, breakdown.API_BUCKET_ORDER, breakdown.api_buckets,
+                   "API-path & RT workloads", "apiTotal")]
+    PAGES += [("microbench", compiler_names, breakdown.FE_GO_ORDER,
+               breakdown.coarse_buckets, "Compiler microbenchmarks", "compileInner")]
+    for prefix, names, border, bfn, title, edge in PAGES:
+        for cad, ipath, cad_title, note in (
+                ("tot", paths["daily"], "daily tip-of-tree", day_note),
+                ("releases", paths["releases"], "across releases", rel_note)):
+            idx = json.load(open(ipath))
+            svg = None
+            if idx:
+                svgp = os.path.join(outdir, f"perf_{prefix}_{cad}.svg")
+                breakdown.render_stacked_multiples(
+                    args.results, ipath, args.metric, svgp, border, bfn,
+                    cols=1, names=names, link_for=wl_links,
+                    title=f"{title} — {cad_title} ({args.metric} ms)")
+                svg = open(svgp, encoding="utf-8").read()
+            grid_page(os.path.join(outdir, f"{prefix}-{cad}.html"),
+                      f"{title} — {cad_title}",
+                      f"{len(names)} workloads · stacked phases, top edge = "
+                      f"{edge} ({args.metric} ms)",
+                      note, svg)
 
-    # Landing page: status strip + navigation cards.
+    # Landing page: stacked section rows — API & RT on top, microbenchmarks,
+    # then the sweeps archive.
     n_rel, n_day = len(releases), len(dailies)
     last_daily = dailies[-1]["tag"] if dailies else "-"
     last_rel = releases[-1]["tag"] if releases else "-"
-    cards = ['<div class="cards">',
-             '<div class="card"><a href="microbench.html">Compiler microbenchmarks</a>'
-             f"<p>{len(compiler_names)} workloads, one compiler pass each — parse "
-             "&rarr; sema &rarr; IR &rarr; specialization &rarr; backends.</p></div>"]
+    rows = []
     if api_names:
-        cards.append('<div class="card"><a href="api.html">API-path &amp; RT workloads</a>'
-                     f"<p>{len(api_names)} application-integration shapes: session cost, "
-                     "module graphs, reflection, per-variant specialization, RT programs."
-                     "</p></div>")
-    cards.append('<div class="card"><a href="sweep/">Complexity sweeps</a>'
-                 "<p>Compile time vs workload size N — scaling curves and per-pass "
-                 "growth attribution, for every archived sweep.</p></div>")
-    cards.append("</div>")
+        rows.append('<div class="secrow"><b>API &amp; RT workloads</b>'
+                    '<a href="api-tot.html">ToT</a>'
+                    '<a href="api-releases.html">releases</a>'
+                    f"<p>{len(api_names)} application-integration shapes driven "
+                    "through libslang: session cost, module graphs, reflection, "
+                    "per-variant specialization, RT programs.</p></div>")
+    rows.append('<div class="secrow"><b>Compiler microbenchmarks</b>'
+                '<a href="microbench-tot.html">ToT</a>'
+                '<a href="microbench-releases.html">releases</a>'
+                f"<p>{len(compiler_names)} workloads, one compiler pass each — "
+                "parse &rarr; sema &rarr; IR &rarr; specialization &rarr; "
+                "backends.</p></div>")
+    rows.append('<div class="secrow"><b>Complexity sweeps</b>'
+                '<a href="sweep/">all sweeps</a>'
+                "<p>Compile time vs workload size N — scaling curves and per-pass "
+                "growth attribution; every archived sweep on one page.</p></div>")
     H = ['<!doctype html><meta charset="utf-8">',
          f"<title>Slang compile-time performance</title><style>{SECTION_CSS}</style>",
          '<div class="wrap">', "<h1>Slang compile-time performance</h1>",
          f'<p class="status">latest nightly: <b>{html_escape(last_daily)}</b> &nbsp;·&nbsp; '
          f'latest release in charts: <b>{html_escape(last_rel)}</b> &nbsp;·&nbsp; '
          f'{n_rel} releases + {n_day} daily points · metric: {args.metric}</p>',
-         *cards,
+         *rows,
          '<p class="small">Data: <a href="https://github.com/shader-slang/slang-compile-perf">'
          "slang-compile-perf</a> · methodology: tools/compile-perf/DESIGN.md in the slang "
          "repo · alerts: the nightly trend check (daily-baseline, "
