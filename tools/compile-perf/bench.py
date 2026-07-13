@@ -288,6 +288,12 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
     os.makedirs(gen_dir, exist_ok=True)
     files = spec.gen(size)
     for fn, src in files.items():
+        # Fail-loud guard for the byte-determinism invariant (see _HEADER in
+        # workloads.py): a typographic character anywhere in a generated
+        # source would silently make the corpus bytes platform-dependent.
+        assert src.isascii(), (
+            f"generated source {fn} contains non-ASCII; generators must emit "
+            f"ASCII only so the corpus is byte-identical on every platform")
         with open(os.path.join(gen_dir, fn), "w", encoding="utf-8", newline="\n") as fh:
             fh.write(src)
 

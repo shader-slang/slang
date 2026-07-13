@@ -77,7 +77,7 @@ jobs:
             tools/compile-perf
             include
 
-      # One resolution for every consumer (bench, report, trend): with
+      # One resolution for all suite tooling (bench, track, report, trend): with
       # suite-ref set, all suite tooling runs from the dedicated checkout
       # while the build tree stays at the swept commit.
       - name: Resolve suite path
