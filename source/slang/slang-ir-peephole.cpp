@@ -1682,6 +1682,33 @@ struct PeepholeContext : InstPassBase
             break;
         case kIROp_Swizzle:
             {
+                // Parameter-pack specialization temporarily reconstructs a concrete value pack
+                // from the flattened parameters. A scalar extraction from that reconstruction is
+                // just the corresponding parameter.
+                auto packSwizzle = as<IRSwizzle>(inst);
+                if (auto valuePack = as<IRMakeValuePack>(packSwizzle->getBase()))
+                {
+                    if (packSwizzle->getElementCount() != 1)
+                        break;
+
+                    auto indexLit = as<IRIntLit>(packSwizzle->getElementIndex(0));
+                    if (!indexLit)
+                        break;
+
+                    auto index = indexLit->getValue();
+                    if (index < 0 || UInt(index) >= valuePack->getOperandCount())
+                        break;
+
+                    auto replacement = valuePack->getOperand(UInt(index));
+                    if (replacement->getFullType() != inst->getFullType())
+                        break;
+
+                    inst->replaceUsesWith(replacement);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                    break;
+                }
+
                 // If we see a swizzle(scalar), we replace it with makeVectorFromScalar.
                 if (as<IRBasicType>(inst->getOperand(0)->getDataType()))
                 {

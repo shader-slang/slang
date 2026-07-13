@@ -5678,10 +5678,11 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
             {
                 if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
                 {
-                    if (as<DifferentialPairType>(diffPairValType))
-                        paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairValType));
-                    else if (as<DifferentialPtrPairType>(diffPairValType))
-                        paramTypes.add(diffPairValType);
+                    addBackwardDiffParameterTypes(
+                        m_astBuilder,
+                        paramTypes,
+                        diffPairValType,
+                        paramPassingMode);
                 }
                 else
                 {
@@ -5696,7 +5697,11 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
             {
                 if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
                 {
-                    paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairValType));
+                    addBackwardDiffParameterTypes(
+                        m_astBuilder,
+                        paramTypes,
+                        diffPairValType,
+                        paramPassingMode);
                 }
                 else
                 {
@@ -5711,7 +5716,11 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
             {
                 if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
                 {
-                    paramTypes.add(m_astBuilder->getConstRefParamType(diffPairValType));
+                    addBackwardDiffParameterTypes(
+                        m_astBuilder,
+                        paramTypes,
+                        diffPairValType,
+                        paramPassingMode);
                 }
                 else
                 {
