@@ -11,9 +11,21 @@
 # Usage:
 #   ./run-tutorial.sh
 #   SLANGC=/path/to/slangc ./run-tutorial.sh   # explicit compiler
+#   ./run-tutorial.sh --open-report            # also open the HTML report
 
 set -euo pipefail
 cd "$(dirname "$0")"
+
+open_report=""
+for arg in "$@"; do
+  case "$arg" in
+  --open-report) open_report="-OpenReport" ;;
+  *)
+    echo "usage: $0 [--open-report]" >&2
+    exit 2
+    ;;
+  esac
+done
 
 # Git Bash / MSYS / Cygwin: Windows toolchain discovery (vswhere, the
 # Visual Studio developer shell) lives in the PowerShell runner, so
@@ -21,7 +33,7 @@ cd "$(dirname "$0")"
 case "$(uname -s)" in
 MINGW* | MSYS* | CYGWIN*)
   exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File run-tutorial.ps1 \
-    ${SLANGC:+-Slangc "$SLANGC"}
+    ${SLANGC:+-Slangc "$SLANGC"} ${open_report:+-OpenReport}
   ;;
 esac
 
@@ -105,4 +117,14 @@ else
   python3 ../../tools/coverage-html/slang-coverage-html.py hello-coverage.lcov \
     --output-dir coverage-html
 fi
-echo "open coverage-html/index.html to see the annotated source"
+if [[ -n $open_report ]]; then
+  if command -v xdg-open >/dev/null; then
+    xdg-open coverage-html/index.html
+  elif command -v open >/dev/null; then
+    open coverage-html/index.html
+  else
+    echo "no xdg-open or open command found; open coverage-html/index.html manually" >&2
+  fi
+else
+  echo "open coverage-html/index.html to see the annotated source (or rerun with --open-report)"
+fi

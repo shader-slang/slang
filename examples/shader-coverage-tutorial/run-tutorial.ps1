@@ -12,9 +12,11 @@
 # Usage:
 #   ./run-tutorial.ps1
 #   ./run-tutorial.ps1 -Slangc C:/path/to/slangc.exe
+#   ./run-tutorial.ps1 -OpenReport   # also open the HTML report in the browser
 
 param(
-    [string]$Slangc = ""
+    [string]$Slangc = "",
+    [switch]$OpenReport
 )
 
 $ErrorActionPreference = "Stop"
@@ -171,4 +173,11 @@ else
     Invoke-Step "python" @("../../tools/coverage-html/slang-coverage-html.py",
         "hello-coverage.lcov", "--output-dir", "coverage-html")
 }
-Write-Host "open coverage-html/index.html to see the annotated source"
+if ($OpenReport)
+{
+    Invoke-Item (Join-Path "coverage-html" "index.html")
+}
+else
+{
+    Write-Host "open coverage-html/index.html to see the annotated source (or rerun with -OpenReport)"
+}

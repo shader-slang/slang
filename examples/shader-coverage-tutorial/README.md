@@ -19,9 +19,11 @@ from `PATH` or a sibling repo build (`../../build`), or take one explicitly:
 ```bash
 ./run-tutorial.sh                            # Linux / macOS / Git Bash
 SLANGC=/path/to/slangc ./run-tutorial.sh     # explicit compiler
+./run-tutorial.sh --open-report              # also open the HTML report
 
 ./run-tutorial.ps1                           # Windows (PowerShell)
 ./run-tutorial.ps1 -Slangc C:/path/to/slangc.exe
+./run-tutorial.ps1 -OpenReport               # also open the HTML report
 ```
 
 Or step by step, with `slangc` on your `PATH` (any Slang release) and Python 3:
