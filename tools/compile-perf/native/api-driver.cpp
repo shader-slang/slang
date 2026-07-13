@@ -26,34 +26,13 @@
 // stdout (bench.py's real_error() recognizes "error" lines) and the exit code
 // is 1.
 //
-// Timer glossary — the CONTRACT for every `Scope(timers, ...)` below. Each
-// timer wraps exactly ONE public API call (wall clock, driver side); these
-// names are user-facing (report charts, trend alerts), so a timer's meaning
-// must not drift without updating this table:
-//
-//   apiTotal                whole timed section of the mode (excludes any
-//                           setup marked as running before the apiTotal scope
-//                           opens, e.g. module-graph-bin's source load +
-//                           IModule::writeToFile, timed separately as
-//                           apiLoadModuleSource / apiWriteModule)
-//   apiCreateGlobalSession  slang_createGlobalSession() — core-module
-//                           deserialization dominates it
-//   apiCreateSession        IGlobalSession::createSession()
-//   apiLoadModule           ISession::loadModule() (module-graph modes: by
-//                           name, resolving the import DAG) or
-//                           ISession::loadModuleFromSourceString()
-//                           (many-kernels) — import resolution + front end
-//   apiFindEntryPoint       IModule::findEntryPointByName()
-//   apiComposite            ISession::createCompositeComponentType()
-//   apiLink                 IComponentType::link()
-//   apiSpecialize           IComponentType::specialize() per conforming type
-//   apiGetCode              IComponentType::getEntryPointCode() on the linked
-//                           composite — per-entry-point target codegen; should
-//                           track the library's own compileInner, and a gap
-//                           between them is cost OUTSIDE compiler
-//                           instrumentation
-//   apiReflection           IComponentType::getLayout() + full
-//                           spReflection_* type-layout walks
+// Timer contract: every `Scope(timers, ...)` below wraps exactly ONE public
+// API call (wall clock, driver side). The user-facing glossary — which call
+// each timer maps to, the apiTotal setup-exclusion rule, and how to read
+// apiGetCode against the library's own compileInner — lives in
+// ../README.md ("API timer glossary"). These names appear on the perf site
+// and in trend alerts: when adding or changing a timer, update that table in
+// the same commit.
 
 #include "slang.h"
 
