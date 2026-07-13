@@ -3,6 +3,7 @@
 
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
+#include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
 #include <assert.h>
@@ -1419,6 +1420,31 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(").data)");
             return true;
         }
+    case kIROp_GetAddress:
+        {
+            // The producer of `IRGetAddress` this emitter cares about is
+            // `transformParamsToConstRef` forwarding a `__grid_constant__ const` entry-point
+            // uniform parameter into a `borrow in` callee. That callee expects a non-const `T*`, so
+            // a `const_cast` is required to strip the `const` we placed on the parameter, e.g.
+            // `const_cast<Agg_0*>(&agg_1)`.
+            //
+            // The `const_cast` is only correct for that exact case (an operand we qualified
+            // `__grid_constant__ const`). For any other `GetAddress` operand, fall through to the
+            // base emitter's generic address handling rather than emitting a spurious `const_cast`;
+            // this degrades gracefully instead of aborting if some future pass routes a different
+            // `GetAddress` to CUDA emit.
+            auto addrOperand = inst->getOperand(0);
+            if (isEntryPointByValueUniformAggregateParam(as<IRParam>(addrOperand)))
+            {
+                m_writer->emit("const_cast<");
+                emitType(inst->getDataType());
+                m_writer->emit(">(&");
+                emitOperand(addrOperand, getInfo(EmitOp::Prefix));
+                m_writer->emit(")");
+                return true;
+            }
+            break;
+        }
     default:
         break;
     }
@@ -1511,6 +1537,14 @@ void CUDASourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
 
         if (hasEmittedParam)
             m_writer->emit(", ");
+
+        // Mark an entry-point by-value uniform aggregate `__grid_constant__ const` so all threads
+        // read it directly from constant grid memory instead of copying it into a per-thread
+        // `.local` frame. `transformParamsToConstRef` forwards the address of exactly this set of
+        // parameters (via the same `isEntryPointByValueUniformAggregateParam` predicate), so the
+        // qualifier and the forward stay in lockstep.
+        if (isEntryPointByValueUniformAggregateParam(pp))
+            m_writer->emit("SLANG_CUDA_GRID_CONSTANT const ");
 
         emitSimpleFuncParamImpl(pp);
         hasEmittedParam = true;

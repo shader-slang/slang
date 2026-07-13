@@ -463,6 +463,21 @@ IRBlock* getBlock(IRInst* inst);
 
 IRVarLayout* findVarLayout(IRInst* value);
 
+/// Return true if `param` is an entry-point (kernel) by-value uniform aggregate parameter, i.e. a
+/// non-varying uniform `struct`/`array` value passed in a kernel's argument space. On CUDA such a
+/// parameter is a candidate to be marked `__grid_constant__ const` and have its address forwarded
+/// into a `borrow in` callee instead of being copied per thread (see #11774). (Tuples are not
+/// listed: `lowerTuples` runs before this predicate's consumers, so a tuple has already been
+/// lowered to a struct and a `kIROp_TupleType` entry parameter cannot reach here.)
+///
+/// This is the single source of truth for that eligibility test, called directly by the CUDA
+/// emitter (`emitSimpleFuncParamsImpl` in slang-emit-cuda.cpp) and by the
+/// `transformParamsToConstRef` IR pass (`isForwardableEntryPointUniformParam`) so the two cannot
+/// drift: the emitter must qualify exactly the set of parameters the pass forwards, or a forwarded
+/// address would be `const_cast` against a non-const parameter (or a qualified parameter would be
+/// copied anyway).
+bool isEntryPointByValueUniformAggregateParam(IRParam* param);
+
 UnownedStringSlice getBuiltinFuncName(IRInst* callee);
 KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee);
 

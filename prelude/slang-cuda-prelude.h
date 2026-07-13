@@ -72,6 +72,28 @@
 #define SLANG_FORCE_INLINE inline
 #define SLANG_INLINE inline
 
+// Marks an entry-point (kernel) by-value uniform aggregate parameter as residing in
+// constant grid memory. `__grid_constant__` lets every thread read the parameter directly
+// from the kernel's `.param` space instead of first copying it into a per-thread `.local`
+// stack frame, which removes the per-thread depot copy for large struct/array uniforms.
+//
+// The attribute has two hard requirements from the CUDA toolchain: CUDA 11.7+ and a target
+// architecture of compute_70 (Volta) or later - using it below sm_70 is a compile error
+// ("__grid_constant__ annotation is only allowed for architecture compute_70 or later").
+// We therefore also gate on `__CUDA_ARCH__`, which the device compilation pass defines as
+// (major*100 + minor*10); it is undefined during a host pass, where the attribute is inert.
+// When any requirement is unmet the macro degrades to a no-op: the parameter stays a plain
+// by-value `const` (still correct, just with the per-thread copy the fix would have removed).
+#ifndef SLANG_CUDA_GRID_CONSTANT
+#if defined(__CUDACC__) &&                                                                      \
+    (__CUDACC_VER_MAJOR__ > 11 || (__CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINOR__ >= 7)) && \
+    (!defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 700)
+#define SLANG_CUDA_GRID_CONSTANT __grid_constant__
+#else
+#define SLANG_CUDA_GRID_CONSTANT
+#endif
+#endif
+
 
 // Since we are using unsigned arithmatic care is need in this comparison.
 // It is *assumed* that sizeInBytes >= elemSize. Which means (sizeInBytes >= elemSize) >= 0

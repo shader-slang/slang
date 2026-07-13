@@ -2171,6 +2171,50 @@ IRVarLayout* findVarLayout(IRInst* value)
     return nullptr;
 }
 
+bool isEntryPointByValueUniformAggregateParam(IRParam* param)
+{
+    if (!param)
+        return false;
+
+    // Must be a function parameter of an entry point, i.e. live in the entry-point function's
+    // first block. `IRParam` also models block/phi parameters in later blocks; those are not
+    // kernel parameters, so restrict to the first block to match the documented contract.
+    auto block = as<IRBlock>(param->getParent());
+    if (!block)
+        return false;
+    auto parentFunc = as<IRFunc>(block->getParent());
+    if (!parentFunc || block != parentFunc->getFirstBlock() ||
+        !parentFunc->findDecoration<IREntryPointDecoration>())
+        return false;
+
+    // Must be a uniform parameter: it has layout information and is not a varying (per-thread)
+    // input. Varying inputs are never grid-constant candidates.
+    auto varLayout = findVarLayout(param);
+    if (!varLayout || isVaryingParameter(varLayout))
+        return false;
+
+    // Must be a by-value aggregate. A pointer-typed parameter is already forwardable, a scalar is
+    // not worth grid-constant treatment, and an unsized array is not a fixed-size by-value
+    // aggregate that can live in the kernel argument space. Tuples are intentionally not listed:
+    // `lowerTuples` runs before this predicate's consumers (`transformParamsToConstRef` and CUDA
+    // emit), so a tuple has already been lowered to a struct by the time we get here and a
+    // `kIROp_TupleType` entry parameter cannot occur.
+    auto type = param->getDataType();
+    if (!type)
+        return false;
+    // Assert the "cannot occur" invariant so a pipeline reordering that let a tuple reach here
+    // fails loudly rather than being silently classified ineligible by the `default:` arm below.
+    SLANG_ASSERT(type->getOp() != kIROp_TupleType);
+    switch (type->getOp())
+    {
+    case kIROp_StructType:
+    case kIROp_ArrayType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 UnownedStringSlice getBuiltinFuncName(IRInst* callee)
 {
     auto decor = getResolvedInstForDecorations(callee)->findDecoration<IRKnownBuiltinDecoration>();

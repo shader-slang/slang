@@ -2241,11 +2241,16 @@ Result linkAndOptimizeIR(
         // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with
         // direct pointers
         SLANG_PASS(undoParameterCopy);
-        // Transform struct parameters to use ConstRef for better performance
+        // Transform struct parameters to use ConstRef for better performance.
+        // On CUDA, additionally forward the address of read-only entry-point uniform aggregates
+        // (marked `__grid_constant__ const` by the emitter) instead of copying them per-thread.
         if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) ||
             isMetalTarget(targetRequest))
         {
-            SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
+            SLANG_PASS(
+                transformParamsToConstRef,
+                codeGenContext->getSink(),
+                isCUDATarget(targetRequest));
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
         [[fallthrough]];

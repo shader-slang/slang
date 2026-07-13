@@ -14,8 +14,19 @@ struct TransformParamsToConstRefContext
     IRBuilder builder;
     bool changed = false;
 
-    TransformParamsToConstRefContext(IRModule* module, DiagnosticSink* sink)
-        : module(module), sink(sink), builder(module)
+    // When set (CUDA only), a call argument that is an entry-point by-value uniform aggregate
+    // parameter is forwarded by address instead of via a temporary copy. See the header comment on
+    // `transformParamsToConstRef`.
+    bool forwardEntryPointUniformAddress = false;
+
+    TransformParamsToConstRefContext(
+        IRModule* module,
+        DiagnosticSink* sink,
+        bool forwardEntryPointUniformAddress = false)
+        : module(module)
+        , sink(sink)
+        , builder(module)
+        , forwardEntryPointUniformAddress(forwardEntryPointUniformAddress)
     {
     }
 
@@ -209,6 +220,37 @@ struct TransformParamsToConstRefContext
         return nullptr;
     }
 
+    // Return true if `arg` is an entry-point by-value uniform aggregate parameter whose address may
+    // be forwarded (in place of a per-thread temporary copy) into the callee. This tests only the
+    // *argument* shape.
+    //
+    // PRECONDITION (established by the sole caller, not verified here): this is only called from
+    // `updateCallSites` for an argument passed to a callee slot the pass has already rewritten to
+    // `borrow in`. The forwarding is safe only because of that precondition combined with the
+    // argument shape:
+    //   1. The parameter is value-typed (a `struct`/`array` value, not a pointer). In SSA a value
+    //      cannot be the pointer operand of a `Store` nor the base of a `FieldAddress` /
+    //      `GetElementPtr`, so it is never written in place: Slang's by-value parameter semantics
+    //      lower every "mutation" of it as a copy into a fresh local that is written instead (e.g.
+    //      `Big b; ... b.v[i] = x;` becomes `Big _t = b; _t.v[i] = x;`, and passing the uniform to
+    //      an `inout` callee first materializes `Big local = big;` and forwards `&local`, not
+    //      `&big`). So the entry parameter itself is read-only by construction, and the CUDA
+    //      emitter can mark it `__grid_constant__ const`.
+    //   2. The callee slot (borrow-in per the precondition) is read-only by contract: the callee
+    //      copies the pointee before any write (see the `Big _t = *b;` prologue the emitter emits).
+    //
+    // The argument-shape test is shared with the CUDA emitter (which calls
+    // `isEntryPointByValueUniformAggregateParam` directly in `emitSimpleFuncParamsImpl`) so the
+    // parameter whose address we forward here is exactly the one the emitter qualifies
+    // `__grid_constant__ const`. A caller that invokes this outside `updateCallSites`, against a
+    // non-borrow-in slot, must not treat the result as "safe to forward"; the borrow-in-ness is the
+    // caller's responsibility.
+    bool isForwardableEntryPointUniformParam(IRInst* arg)
+    {
+        auto param = as<IRParam>(arg);
+        return param && isEntryPointByValueUniformAggregateParam(param);
+    }
+
     // Update call sites to pass an address instead of value for each updated-param
     void updateCallSites(IRFunc* func, HashSet<IRParam*>& updatedParams)
     {
@@ -237,6 +279,18 @@ struct TransformParamsToConstRefContext
                     // If existing argument is a load from an immutable buffer address,
                     // we can pass in the address as is, without making a temporary copy.
                     newArgs.add(addr);
+                }
+                else if (
+                    forwardEntryPointUniformAddress && isForwardableEntryPointUniformParam(arg))
+                {
+                    // The argument is a read-only entry-point by-value uniform aggregate
+                    // (`__grid_constant__ const` on CUDA). Forward its address directly instead of
+                    // copying the whole aggregate into a per-thread temporary. The CUDA emitter
+                    // renders this `IRGetAddress` as `const_cast<T*>(&param)`, since the callee's
+                    // `borrow in` parameter is a non-const pointer.
+                    auto paramAddr =
+                        builder.emitGetAddress(builder.getPtrType(arg->getFullType()), arg);
+                    newArgs.add(paramAddr);
                 }
                 else
                 {
@@ -422,9 +476,12 @@ struct TransformParamsToConstRefContext
     }
 };
 
-SlangResult transformParamsToConstRef(IRModule* module, DiagnosticSink* sink)
+SlangResult transformParamsToConstRef(
+    IRModule* module,
+    DiagnosticSink* sink,
+    bool forwardEntryPointUniformAddress)
 {
-    TransformParamsToConstRefContext context(module, sink);
+    TransformParamsToConstRefContext context(module, sink, forwardEntryPointUniformAddress);
     return context.processModule();
 }
 
