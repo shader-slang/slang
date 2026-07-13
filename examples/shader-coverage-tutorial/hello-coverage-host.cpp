@@ -4,10 +4,12 @@
 // outputs, and write the raw coverage counters for the LCOV converter.
 // Uses no Slang headers or library — the manifest is the whole contract.
 //
-// Pass --no-coverage to run as a plain CPU shared-library dispatch,
-// without binding or reporting the coverage buffer. The `coverageEnabled`
-// blocks below are exactly what coverage adds to a host; without them
-// the program also runs a kernel compiled without -trace-coverage.
+// Pass --no-coverage to skip the coverage report and file: the
+// program then behaves as a plain CPU shared-library dispatch. The
+// coverage slot itself stays bound either way — a kernel compiled
+// with -trace-coverage reads it unconditionally — and a kernel
+// compiled without it ignores the extra payload bytes, so both kernel
+// flavors run safely in both modes.
 
 #include <cstdint>
 #include <cstdio>
@@ -86,30 +88,28 @@ int main(int argc, char** argv)
 
     // Bind. On CPU, "binding" means writing a (pointer, count) pair
     // into the parameter payload. The shader's own buffers occupy the
-    // leading fields in declaration order.
+    // leading fields in declaration order. The coverage slot is bound
+    // unconditionally — a kernel compiled with -trace-coverage reads
+    // it no matter how this host is invoked, while a kernel compiled
+    // without it ignores the extra payload bytes. Counters must start
+    // zeroed.
     float inputs[4] = {1.0f, 2.0f, 3.0f, 4.0f};
     float outputs[4] = {};
     BufferView inputView = {inputs, 4};
     BufferView outputView = {outputs, 4};
-
-    std::vector<uint8_t> payload(
-        coverageEnabled ? kUniformOffset + sizeof(BufferView) : 2 * sizeof(BufferView),
-        0);
-    std::memcpy(payload.data(), &inputView, sizeof(inputView));
-    std::memcpy(payload.data() + sizeof(BufferView), &outputView, sizeof(outputView));
-
-    // Coverage addition: counter storage sized from the manifest, bound
-    // at the manifest-reported uniform_offset. Counters must start
-    // zeroed.
     static_assert(kElementStride == 8, "manifest says uint64 counters");
     std::vector<uint64_t> coverageCounters(kCounterCount, 0);
-    if (coverageEnabled)
-    {
-        BufferView coverageView = {coverageCounters.data(), kCounterCount};
-        std::memcpy(payload.data() + kUniformOffset, &coverageView, sizeof(coverageView));
-    }
+    BufferView coverageView = {coverageCounters.data(), kCounterCount};
 
-    // Dispatch one thread group and show the computed outputs.
+    std::vector<uint8_t> payload(kUniformOffset + sizeof(BufferView), 0);
+    std::memcpy(payload.data(), &inputView, sizeof(inputView));
+    std::memcpy(payload.data() + sizeof(BufferView), &outputView, sizeof(outputView));
+    std::memcpy(payload.data() + kUniformOffset, &coverageView, sizeof(coverageView));
+
+    // Dispatch one thread group and show the computed outputs. The
+    // entry-point-uniform argument is nullptr because computeMain
+    // declares no uniform entry-point parameters; a kernel that does
+    // needs a real payload there.
     ComputeVaryingInput varying = {{0, 0, 0}, {1, 1, 1}};
     computeMain(&varying, nullptr, payload.data());
 

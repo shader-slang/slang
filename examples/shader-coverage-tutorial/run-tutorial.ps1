@@ -162,6 +162,19 @@ Invoke-Step "python" @("../../tools/shader-coverage/slang-coverage-to-lcov.py",
     "--output", "hello-coverage.lcov")
 Get-Content hello-coverage.lcov
 
+# Guard the numbers the chapter publishes: the LCOV records combine the
+# manifest's source attribution with the counter values, so this one
+# comparison catches instrumentation, attribution, or converter drift.
+$expectedLcov = @(
+    "TN:slang_coverage", "SF:hello-coverage.slang",
+    "DA:7,4", "DA:8,3", "DA:9,1", "DA:16,4", "DA:17,4", "DA:18,4",
+    "DA:19,0", "DA:20,4", "DA:21,4", "end_of_record")
+if (Compare-Object $expectedLcov (Get-Content hello-coverage.lcov))
+{
+    throw "hello-coverage.lcov does not match the tutorial published records"
+}
+Write-Host "LCOV records match the tutorial published values"
+
 # Render HTML with genhtml (the de-facto LCOV tool) when installed;
 # otherwise fall back to the repository's own Python renderer.
 if (Get-Command genhtml -ErrorAction SilentlyContinue)

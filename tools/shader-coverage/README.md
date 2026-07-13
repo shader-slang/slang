@@ -149,14 +149,7 @@ sidecar file is created or read, and no extra runtime library is
 needed — the public metadata interface is everything you need to
 allocate, bind, and attribute counters.
 
-Request the compiled code (`getEntryPointCode` or
-`getEntryPointHostCallable`) before `getEntryPointMetadata`: an entry
-point compiles once and caches the resulting artifact, and if the
-metadata query runs first the cache holds a form that a later
-host-callable request cannot use, failing with `E_INVALIDARG`.
-
 ```cpp
-// ... getEntryPointCode() / getEntryPointHostCallable() has already run ...
 ComPtr<slang::IMetadata> metadata;
 linked->getEntryPointMetadata(0, 0, metadata.writeRef(), ...);
 

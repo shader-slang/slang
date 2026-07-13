@@ -136,7 +136,7 @@ The host program,
 [`hello-coverage-host.cpp`](https://github.com/shader-slang/slang/blob/master/examples/shader-coverage-tutorial/hello-coverage-host.cpp),
 loads the kernel, binds the three buffers (the shader's two, plus coverage), dispatches one
 thread group, prints the computed outputs and the counter slots, and writes the coverage counters to
-a file. It is about 150 lines and uses no Slang headers or library. The manifest is its
+a file. It is about 130 lines and uses no Slang headers or library. The manifest is its
 only connection to Slang. Three hardcoded constants in the host code carry the manifest values
 shown above — `kCounterCount` from `counter_count`, `kElementStride` from `buffer.element_stride`, and
 `kUniformOffset` from `buffer.uniform_offset`. Hardcoding keeps the example simple and free of a
@@ -144,38 +144,31 @@ JSON-parser dependency. A real host reads these from the manifest at run time.
 
 The binding: `BufferView` is the 16-byte `{ void* data; size_t count; }` layout of a
 `(RW)StructuredBuffer` parameter on the CPU target. The shader's own buffers occupy the
-payload's leading fields in declaration order. The `coverageEnabled` block is everything
-coverage adds: zero-initialized counter storage, bound at `uniform_offset`:
+payload's leading fields in declaration order. The coverage additions are the
+zero-initialized counter storage and one more `(pointer, count)` write at `uniform_offset`.
+The slot is bound even under `--no-coverage`: a kernel compiled with `-trace-coverage`
+reads it unconditionally, and a kernel compiled without it ignores the extra bytes:
 
 ```cpp
     float inputs[4] = {1.0f, 2.0f, 3.0f, 4.0f};
     float outputs[4] = {};
     BufferView inputView = {inputs, 4};
     BufferView outputView = {outputs, 4};
-
-    std::vector<uint8_t> payload(
-        coverageEnabled ? kUniformOffset + sizeof(BufferView) : 2 * sizeof(BufferView),
-        0);
-    std::memcpy(payload.data(), &inputView, sizeof(inputView));
-    std::memcpy(payload.data() + sizeof(BufferView), &outputView, sizeof(outputView));
-
-    // Coverage addition: counter storage sized from the manifest, bound
-    // at the manifest-reported uniform_offset. Counters must start
-    // zeroed.
     static_assert(kElementStride == 8, "manifest says uint64 counters");
     std::vector<uint64_t> coverageCounters(kCounterCount, 0);
-    if (coverageEnabled)
-    {
-        BufferView coverageView = {coverageCounters.data(), kCounterCount};
-        std::memcpy(payload.data() + kUniformOffset, &coverageView, sizeof(coverageView));
-    }
+    BufferView coverageView = {coverageCounters.data(), kCounterCount};
+
+    std::vector<uint8_t> payload(kUniformOffset + sizeof(BufferView), 0);
+    std::memcpy(payload.data(), &inputView, sizeof(inputView));
+    std::memcpy(payload.data() + sizeof(BufferView), &outputView, sizeof(outputView));
+    std::memcpy(payload.data() + kUniformOffset, &coverageView, sizeof(coverageView));
 ```
 
 The rest of the program loads the library (`dlopen`/`LoadLibrary`), calls `computeMain` with
 a one-thread-group dispatch range, prints the outputs and the counter slots, and writes
-`hello-coverage.counters.bin`. Run it with `--no-coverage` to skip the coverage additions —
-it then works as a plain CPU shared-library dispatch, including against a kernel compiled
-without `-trace-coverage`.
+`hello-coverage.counters.bin`. Run it with `--no-coverage` to skip the counter report —
+the program then behaves as a plain CPU shared-library dispatch (and also runs a kernel
+compiled without `-trace-coverage`).
 
 Copy the program from
 [`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial),
@@ -210,10 +203,11 @@ counter[7] = 4
 counter[8] = 4
 ```
 
-The manifest's `entries` array maps slots to lines: slot 1 is line 8 (the multiply, 3
-executions), slot 2 is line 9 (the fallthrough, 1 execution), slot 6 is line 19
-(`value = 0.0`, never executed). The report step below does this attribution
-automatically.
+In this compile, the manifest's `entries` array maps slots to lines: slot 1 is line 8
+(the multiply, 3 executions), slot 2 is line 9 (the fallthrough, 1 execution), slot 6 is
+line 19 (`value = 0.0`, never executed). Slot order is a property of the compile — always
+attribute through the manifest, never by slot index — and the report step below does that
+attribution automatically.
 
 ## Generating a report
 

@@ -1,0 +1,13 @@
+# Artifacts produced by running the tutorial in place.
+hello-coverage.spv
+hello-coverage.spv.coverage-manifest.json
+hello-coverage-kernel.so
+hello-coverage-kernel.so.coverage-manifest.json
+hello-coverage-kernel.dll
+hello-coverage-kernel.dll.coverage-manifest.json
+hello-coverage-host
+hello-coverage-host.exe
+hello-coverage-host.obj
+hello-coverage.counters.bin
+hello-coverage.lcov
+coverage-html/
