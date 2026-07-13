@@ -4,10 +4,10 @@ layout: user-guide
 
 # Shader Execution Coverage
 
-Slang supports gcov-style code coverage for shaders: per-line execution counts for GPU
-(and CPU) kernels. The compiler instruments each executable statement to increment a
+Slang supports gcov-style code coverage for shaders to report execution counts for GPU
+and CPU kernels. The compiler instruments each executable statement to increment a
 counter at runtime; after a dispatch, read the counters back and convert them into an LCOV
-report for `genhtml`, Codecov, or VS Code Coverage Gutters.
+report for LCOV compatible reporting tools such as `genhtml`, Codecov, or VS Code Coverage Gutters.
 
 This chapter walks through the pipeline: compile with coverage, read the generated manifest,
 dispatch from a small C++ host program, and produce a report. All steps use the offline
@@ -16,12 +16,6 @@ is compiled for Slang's CPU target. The closing section summarizes GPU targets a
 in-process C++ API. The files, together with `run-tutorial.sh` and
 `run-tutorial.ps1` scripts that execute every step, are in
 [`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial).
-
-Reference material:
-[`tools/shader-coverage/README.md`](https://github.com/shader-slang/slang/blob/master/tools/shader-coverage/README.md)
-(workflow, support matrix) and
-[`docs/design/shader-coverage-host-interface.md`](https://github.com/shader-slang/slang/blob/master/docs/design/shader-coverage-host-interface.md)
-(host binding contract, per-target recipes).
 
 ## Compiling with coverage
 
@@ -69,20 +63,21 @@ The `.spv` contains a hidden counter buffer and an atomic increment before each 
 statement. The `.coverage-manifest.json` sidecar records which counter slot corresponds to
 which source location, and where the buffer expects to be bound.
 
-Other targets work the same way; replace `-target spirv` with `hlsl`, `metal`, `cuda`, or
-`cpp`. Exceptions: WGSL and the LLVM JIT CPU path are skipped with warning E45102 (the
-`cpp` and `shader-sharedlib` targets compile through a system C++ compiler and are
-supported).
+Other targets work the same way. Replace `-target spirv` with `hlsl`, `metal`, `cuda`, or
+`cpp` to switch to a different target. Exceptions: WGSL and the LLVM JIT CPU path are skipped
+with warning E45102 (the `cpp` and `shader-sharedlib` targets compile through a system C++
+compiler and are supported).
 
 ## Reading the manifest
 
+Nothing in the workflow requires reading this file yourself — the LCOV converter consumes
+it directly — but its three parts (trimmed here to the relevant fields) explain everything
+the host does later:
+
 ```json
 {
-    "format": "slang-coverage",
-    "version": 2,
     "counter_count": 8,
     "buffer": {
-        "name": "__slang_coverage",
         "element_type": "uint64",
         "element_stride": 8,
         "space": 1,
@@ -92,10 +87,8 @@ supported).
         {
             "kind": "line",
             "counter": 0,
-            "mode": "count",
             "file": "hello-coverage.slang",
-            "line": 7,
-            "start_column": 5
+            "line": 7
         },
         ...
     ]
@@ -130,7 +123,6 @@ kernel's parameter payload instead (`space` and `binding` remain only as placeho
 
 ```json
     "buffer": {
-        "name": "__slang_coverage",
         "element_type": "uint64",
         "element_stride": 8,
         "space": 0,
