@@ -32,7 +32,8 @@ SLANGC=/path/to/slangc ./run-tutorial.sh     # explicit compiler
 ./run-tutorial.ps1 -OpenReport               # also open the HTML report
 ```
 
-Or step by step, with `slangc` on your `PATH` (any Slang release) and Python 3:
+Or step by step, with `slangc` on your `PATH` (v2026.13 or newer — the first release with
+CPU coverage support) and Python 3:
 
 ```bash
 # 1. Precompile the shader to a directly callable CPU kernel, with coverage.

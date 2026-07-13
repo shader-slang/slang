@@ -15,7 +15,8 @@ report for LCOV-compatible tools such as `genhtml`, Codecov, or VS Code Coverage
 This chapter walks through the pipeline: compile with coverage, read the generated manifest,
 dispatch from a small C++ host program, and produce a report. All steps use the offline
 workflow (`slangc` plus a sidecar manifest file) and run without a GPU; the dispatched kernel
-is compiled for Slang's CPU target. The closing Further reading section summarizes GPU
+is compiled for Slang's CPU target, which supports coverage starting with release v2026.13.
+The closing Further reading section summarizes GPU
 targets and the in-process C++ API. The files used in this tutorial are in
 [`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial).
 
