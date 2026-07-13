@@ -68,11 +68,10 @@ Other targets work the same way. Replace `-target spirv` with `hlsl`, `metal`, `
 with warning E45102 (the `cpp` and `shader-sharedlib` targets compile through a system C++
 compiler and are supported).
 
-## Reading the manifest
+## Manifest structure
 
-Nothing in the workflow requires reading this file yourself — the LCOV converter consumes
-it directly — but its three parts (trimmed here to the relevant fields) explain everything
-the host does later:
+The LCOV converter and the host application take care of the manifest — you do not need to
+read or modify it yourself. This is what it contains, trimmed to the relevant fields:
 
 ```json
 {
