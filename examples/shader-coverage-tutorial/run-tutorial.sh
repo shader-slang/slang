@@ -70,6 +70,7 @@ echo "wrote hello-coverage-kernel.so and its sidecar manifest"
 # coverage buffer at the manifest-reported uniform_offset, runs one
 # thread group, prints the raw counter slots, and writes
 # hello-coverage.counters.bin.
+# -ldl: dlopen lives in libdl on glibc older than 2.34; harmless elsewhere.
 c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host -ldl
 ./hello-coverage-host
 

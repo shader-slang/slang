@@ -180,6 +180,7 @@ Copy the program from
 build, and run:
 
 ```bash
+# -ldl: dlopen lives in libdl on glibc older than 2.34; harmless elsewhere.
 c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host -ldl
 ./hello-coverage-host
 ```
@@ -244,8 +245,8 @@ genhtml hello-coverage.lcov --output-directory coverage-html
 
 `coverage-html/index.html` shows the source with executed lines in green and unexecuted
 lines in red. `genhtml` ships with the lcov package on Linux and macOS but has no common
-Windows distribution. Where it is unavailable, the repository's own renderer (the same tool
-Slang's CI uses) produces an equivalent report anywhere Python runs:
+Windows distribution. Where it is unavailable, the repository's own renderer produces
+an equivalent report using Python:
 
 ```bash
 python3 tools/coverage-html/slang-coverage-html.py hello-coverage.lcov --output-dir coverage-html
