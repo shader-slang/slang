@@ -613,7 +613,7 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                 head = daily_movers.headline(wl)
 
                 def own_cell(own):
-                    return f"{own:+.1f}%" if own is not None else "new"
+                    return f"{own:+.1f}%" if own is not None else "&ndash;"
 
                 contrib_rows = "".join(
                     f"<tr><td>{esc(t)}</td>"
@@ -632,7 +632,7 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                     f"<td align=right style='color:{'#1e8449' if spct < 0 else '#c0392b'};"
                     f"font-weight:600'>{spct:+.1f}%</td>"
                     f"<td><code>{esc(cp)}..{esc(c)}</code></td>"
-                    f"<td>{esc(', '.join(f'{t} {own:+.0f}%' if own is not None else f'{t} new' for t, own in movers))}</td></tr>"
+                    f"<td>{esc(', '.join(f'{t} {own:+.0f}%' if own is not None else t for t, own in movers))}</td></tr>"
                     for dp, d, cp, c, spct, movers in steps) or (
                     "<tr><td colspan=4 style='color:#888'>none</td></tr>")
                 tbl = "border-collapse:collapse;font-size:13px"
@@ -646,8 +646,9 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                     f"&rarr; {esc(d1)} {esc(c1)})</span></p>"
                     f"<p style='color:#666;font-size:13px;margin:10px 0 4px'>"
                     f"Contributors — the mutually-exclusive phase buckets (named leaves + "
-                    f"<code>(self)</code> residuals) that tile {esc(head)}, so the pp column "
-                    f"sums to the overall %. Below them, every other reported counter "
+                    f"<code>(self)</code> residuals) that tile {esc(head)}; the pp column "
+                    f"sums to the overall %. Buckets moving the total by &ge;0.2% are "
+                    f"listed, the rest fold into the remainder row. Below them, every other reported counter "
                     f"(nested/overlapping, e.g. serialized-module reads — own change only):</p>"
                     f"<table style='{tbl}' cellpadding=5>"
                     f"<tr><th style='text-align:left'>counter</th><th>&Delta; ms</th>"

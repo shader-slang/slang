@@ -92,6 +92,12 @@ def _tree_names(tree):
 _ALIASES = {"endToEndActions", "checkAllTranslationUnits",
             "generateIRForTranslationUnit"}
 
+# A bucket earns a row when it moved the workload total by at least this many
+# percentage points; below it, the movement is folded into one remainder row.
+# ~Measurement noise for a small bucket lands under this too (median-of-5
+# noise is 1-3% of a timer, which is < 0.2pp unless the bucket dominates).
+CONTRIB_MIN_PP = 0.2
+
 
 def workload_progress(points, workload, step_rel=0.05):
     """Percent-based progress summary for one workload's daily series:
@@ -102,8 +108,12 @@ def workload_progress(points, workload, step_rel=0.05):
                     breakdown BUCKET partition (named leaves + `(self)`
                     residuals): buckets tile the headline exactly, so the pp
                     contributions (d_ms / starting headline) sum to the
-                    overall %-change. pct_own is None when the bucket starts
-                    at ~0 (no meaningful own-%).
+                    overall %-change. Only buckets with |contrib| >= 0.2pp are
+                    listed (they moved the workload total by at least 0.2%);
+                    the filtered tail folds into one final
+                    ("(remaining N buckets)", d_ms, None, pp) row so the sum
+                    property stays visible. pct_own is None when the bucket
+                    starts at ~0, where an own-% is undefined.
       extras        [(name, d_ms, pct_own)] — every OTHER reported counter
                     (e.g. readSerializedModuleIR, loadBuiltinModule): they
                     nest inside or extend beyond the partition, so they carry
@@ -131,13 +141,23 @@ def workload_progress(points, workload, step_rel=0.05):
     bucket_fn, tree = _partition(workload)
     bks = [(d, c, bucket_fn(tm)) for d, c, tm in pts]
     first_b, last_b = bks[0][2], bks[-1][2]
-    contributors = []
+    kept, rest_ms, rest_pp, rest_n = [], 0.0, 0.0, 0
     for t in sorted(set(first_b) | set(last_b)):
         a, b = first_b.get(t, 0.0), last_b.get(t, 0.0)
         d_ms = b - a
-        own = (b / a - 1) * 100 if a >= 0.05 else None
-        contributors.append((t, d_ms, own, d_ms / v0 * 100 if v0 else 0.0))
-    contributors.sort(key=lambda r: -abs(r[1]))
+        pp = d_ms / v0 * 100 if v0 else 0.0
+        if abs(pp) >= CONTRIB_MIN_PP:
+            own = (b / a - 1) * 100 if a >= 0.05 else None
+            kept.append((t, d_ms, own, pp))
+        else:
+            rest_ms += d_ms
+            rest_pp += pp
+            rest_n += 1
+    kept.sort(key=lambda r: -abs(r[1]))
+    contributors = kept
+    if rest_n:
+        contributors = kept + [(f"(remaining {rest_n} buckets)",
+                                rest_ms, None, rest_pp)]
 
     covered = _tree_names(tree) | {f"{n} (self)" for n in _tree_names(tree)}
     first_t, last_t = pts[0][2], pts[-1][2]
@@ -146,7 +166,10 @@ def workload_progress(points, workload, step_rel=0.05):
         if t in covered or t in _ALIASES:
             continue
         a, b = first_t[t], last_t[t]
-        extras.append((t, b - a, (b / a - 1) * 100 if a >= 0.05 else None))
+        own = (b / a - 1) * 100 if a >= 0.05 else None
+        # informational counters: shown only when they moved noticeably
+        if abs(b - a) >= 1.0 or (own is not None and abs(own) >= 5.0):
+            extras.append((t, b - a, own))
     extras.sort(key=lambda r: -abs(r[1]))
 
     steps = []
@@ -179,18 +202,18 @@ def workload_view(points, workload, step_rel):
     print(f"overall {headline(workload)}: {v0:.1f} -> {v1:.1f} ms  ({pct:+.1f}%)")
     print("contributors (mutually-exclusive buckets; pp sums to the overall %):")
     for t, d_ms, own, contrib in contributors:
-        o = f"{own:+6.1f}%" if own is not None else "   new"
+        o = f"{own:+6.1f}%" if own is not None else "     -"
         print(f"   {t:32s}{d_ms:+9.1f} ms  ({o} own, {contrib:+5.1f}pp of total)")
     if extras:
         print("other reported counters (nested/overlapping; no pp):")
         for t, d_ms, own in extras:
-            o = f"{own:+6.1f}%" if own is not None else "   new"
+            o = f"{own:+6.1f}%" if own is not None else "     -"
             print(f"   {t:32s}{d_ms:+9.1f} ms  ({o} own)")
     print(f"day steps >= {step_rel * 100:.0f}% vs previous day:")
     if not steps:
         print("   none")
     for dp, d, cp, c, spct, movers in steps:
-        ms = ", ".join(f"{t} {own:+.0f}%" if own is not None else f"{t} new"
+        ms = ", ".join(f"{t} {own:+.0f}%" if own is not None else t
                        for t, own in movers)
         print(f"   {dp} -> {d}  {spct:+6.1f}%  ({cp}..{c})  {ms}")
 
