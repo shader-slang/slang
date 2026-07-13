@@ -165,13 +165,15 @@ jobs:
       # workspace. Short 2-day retention: enough to grab the binary behind
       # the latest points (local repro, provenance comparison, api-driver
       # dlopen); error (not warn) on no files so a silently empty artifact
-      # cannot masquerade as an export. Skipped for backfill dispatches
-      # (ref set): historical binaries are not wanted as artifacts — they
-      # are rebuilt on demand. always(): a failed bench night is exactly
-      # when the binary is worth keeping; the PERF_LABEL guard skips runs
-      # that died before building (no binaries, no chart point to name).
+      # cannot masquerade as an export. Who exports: scheduled nightlies,
+      # plain dispatches, and DEBUG dispatches (ref=<suspect sha> with
+      # publish=false — the grab-a-binary-for-local-debugging case). Who
+      # does not: backfill dispatches (ref set AND publishing into the
+      # series) — historical binaries are rebuilt on demand. always(): a
+      # failed bench night is exactly when the binary is worth keeping;
+      # the PERF_LABEL guard skips runs that died before building.
       - name: Upload ToT slang binaries
-        if: always() && env.PERF_LABEL != '' && github.event.inputs.ref == ''
+        if: always() && env.PERF_LABEL != '' && (github.event.inputs.ref == '' || env.PUBLISH != 'true')
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: slang-binaries-${{ env.PERF_LABEL }}
