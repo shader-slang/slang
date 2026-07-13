@@ -80,20 +80,6 @@ jobs:
             tools/compile-perf
             include
 
-      # One resolution for all suite tooling (bench, track, report, trend): with
-      # suite-ref set, all suite tooling runs from the dedicated checkout
-      # while the build tree stays at the swept commit.
-      - name: Resolve suite path
-        shell: bash
-        env:
-          SUITE_REF: ${{ github.event.inputs.suite-ref }}
-        run: |
-          if [ -n "$SUITE_REF" ]; then
-            echo "SUITE=$GITHUB_WORKSPACE/suite-src/tools/compile-perf" >> "$GITHUB_ENV"
-          else
-            echo "SUITE=$GITHUB_WORKSPACE/tools/compile-perf" >> "$GITHUB_ENV"
-          fi
-
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
@@ -107,6 +93,22 @@ jobs:
           platform: x86_64
           config: release
           build-llvm: false
+
+      # One resolution for all suite tooling (bench, track, report, trend): with
+      # suite-ref set, all suite tooling runs from the dedicated checkout
+      # while the build tree stays at the swept commit.
+      # Placed AFTER common-setup: that is what puts git-bash on the
+      # Windows runner's PATH, and this step is the job's first bash use.
+      - name: Resolve suite path
+        shell: bash
+        env:
+          SUITE_REF: ${{ github.event.inputs.suite-ref }}
+        run: |
+          if [ -n "$SUITE_REF" ]; then
+            echo "SUITE=$GITHUB_WORKSPACE/suite-src/tools/compile-perf" >> "$GITHUB_ENV"
+          else
+            echo "SUITE=$GITHUB_WORKSPACE/tools/compile-perf" >> "$GITHUB_ENV"
+          fi
 
       - name: Build Slang (tip of tree)
         run: |
