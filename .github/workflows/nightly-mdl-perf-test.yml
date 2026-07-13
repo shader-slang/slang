@@ -73,6 +73,9 @@ jobs:
           ref: ${{ github.event.inputs.suite-ref }}
           persist-credentials: false
           path: "suite-src"
+          # include/ is a suite dependency, not build source: bench.py builds
+          # the api-driver against include/slang.h resolved relative to the
+          # suite root, so dropping it breaks --api backfills at bench time.
           sparse-checkout: |
             tools/compile-perf
             include

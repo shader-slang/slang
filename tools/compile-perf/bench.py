@@ -291,9 +291,11 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
         # Fail-loud guard for the byte-determinism invariant (see _HEADER in
         # workloads.py): a typographic character anywhere in a generated
         # source would silently make the corpus bytes platform-dependent.
-        assert src.isascii(), (
-            f"generated source {fn} contains non-ASCII; generators must emit "
-            f"ASCII only so the corpus is byte-identical on every platform")
+        # A raise, not an assert: the contract must hold under python -O too.
+        if not src.isascii():
+            raise ValueError(
+                f"generated source {fn} contains non-ASCII; generators must "
+                f"emit ASCII only so the corpus is byte-identical everywhere")
         with open(os.path.join(gen_dir, fn), "w", encoding="utf-8", newline="\n") as fh:
             fh.write(src)
 
