@@ -53,9 +53,14 @@ def main():
     # ... and its api gate: without --api, bench.py excludes mode="api"
     # workloads from the default set, so counting them as "needed" here would
     # mark every release permanently incomplete and re-bench it on every run.
+    # downstream_required workloads are excluded outright: release packages do
+    # not bundle the downstream compilers (dxcompiler.dll, nvrtc), so those
+    # workloads can never succeed against prebuilt release binaries — their
+    # history lives in the daily (tip-of-tree) series only.
     all_wls = {w.name for w in manifest.WORKLOADS
                if (not w.platforms or sys.platform in w.platforms)
-               and (args.api or w.mode != "api")}
+               and (args.api or w.mode != "api")
+               and not w.downstream_required}
     failures = []
     for i, rec in enumerate(ready, 1):
         tag = rec["tag"]
@@ -78,6 +83,12 @@ def main():
                "--samples", str(args.samples), "--warmup", str(args.warmup)]
         if args.only:
             cmd += ["--only", args.only]
+        else:
+            # Explicit list rather than bench's default set, so the exclusions
+            # above (downstream_required, the api gate) actually govern what
+            # runs — otherwise bench would still attempt e.g. codegen_dxil
+            # against a release that cannot load dxc, and fail every release.
+            cmd += ["--only", ",".join(sorted(all_wls))]
         if args.api:
             cmd.append("--api")
         try:

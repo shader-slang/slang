@@ -50,6 +50,12 @@ class WorkloadSpec:
     # them when named explicitly in --only, failing loudly if the tool is
     # genuinely absent (downstream_required below is what enforces that).
     platforms: list = None
+    # True for workloads whose sources come from an external (third-party)
+    # corpus rather than a generator. The ASCII byte-determinism guard in
+    # bench.py applies only to GENERATED sources; external corpora are read
+    # with a tolerant decode (errors="replace") and may legitimately contain
+    # non-ASCII (license headers, author names).
+    external_corpus: bool = False
     # The workload's number is meaningless without its downstream compiler:
     # missing-downstream diagnostics (E00100 etc.), which bench.py normally
     # treats as benign, fail this workload instead — otherwise a host without
@@ -82,6 +88,7 @@ WORKLOADS = [
         bucket="real_world",
         gen=workloads.gen_mdl_dxr,
         default_size=0,  # fixed corpus; size ignored
+        external_corpus=True,
         mode="target",
         extra_flags=SPIRV,
         main_file="hit.slang",
