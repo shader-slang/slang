@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#entry-point-and-parameter-handling
-//META: doc_section_digest=7d2dd721ab3c1d33497a937e79d182339817290b8e4a173ec5ce69d40d28ae8d
+//META: doc_section_digest=6dfdf376d754a2fd70f55482aa13c3bac397e45fb6f88efde98edefaf4cc87bd
 //META: purpose=Two `uniform` globals declared at module scope are collected into the same `GlobalParams` struct by the entry-point uniforms / collect-global-uniforms passes; both fields appear in the HLSL cbuffer body.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

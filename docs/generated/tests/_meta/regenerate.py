@@ -712,8 +712,12 @@ def lint_expected_failures() -> list[LintIssue]:
             if link_re.search(s):
                 active_link = True
             continue
-        # Non-comment, non-blank → must be a real path.
-        candidate = REPO_ROOT / s
+        # Non-comment, non-blank → must be a real path. slang-test matches
+        # expected-failure entries against the full test name, which for
+        # multi-config tests carries a trailing " (config)" suffix (e.g.
+        # "foo.slang (cpu)"); strip it before resolving the file path.
+        path_part = re.sub(r" \([a-z0-9-]+\)$", "", s)
+        candidate = REPO_ROOT / path_part
         if not candidate.exists():
             issues.append(
                 LintIssue(

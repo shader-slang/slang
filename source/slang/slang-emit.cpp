@@ -533,6 +533,14 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetDynamicResourceHeap:
         result.dynamicResourceHeap = true;
         break;
+    case kIROp_CastUIntToUntypedResourceHandle:
+    case kIROp_CastUntypedResourceHandleToUInt:
+    case kIROp_CastUIntToUntypedSamplerHandle:
+    case kIROp_CastUntypedSamplerHandleToUInt:
+    case kIROp_UntypedResourceHandleType:
+    case kIROp_UntypedSamplerHandleType:
+        result.untypedResourceHandle = true;
+        break;
     case kIROp_ResolveVaryingInputRef:
         result.resolveVaryingInputRef = true;
         break;
@@ -557,6 +565,14 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetEnumBarrierMemoryTypeFlags:
     case kIROp_GetEnumBarrierSemanticFlags:
         result.barrierFlagValidation = true;
+        break;
+    case kIROp_TaggedUnionType:
+    case kIROp_MakeTaggedUnion:
+    case kIROp_GetTagFromTaggedUnion:
+    case kIROp_GetTypeTagFromTaggedUnion:
+    case kIROp_GetValueFromTaggedUnion:
+    case kIROp_CastInterfaceToTaggedUnionPtr:
+        result.taggedUnion = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1489,8 +1505,18 @@ Result linkAndOptimizeIR(
     }
 
     // Tagged union type lowering typically generates more reinterpret instructions.
-    if (SLANG_PASS(lowerTaggedUnionTypes, sink))
-        requiredLoweringPassSet.reinterpret = true;
+    //
+    // Gated on `taggedUnion` to skip this whole-module walk when no tagged-union IR is present.
+    // The tagged-union opcodes are produced only by the typeflow specialization pass, which runs
+    // before the last `calcRequiredLoweringPassSet` scan, so the flag cannot be a false-negative
+    // (any tagged-union inst reaching here was seen by that scan). When the flag is false the pass
+    // would be a no-op and create no reinterpret insts, so leaving `reinterpret` untouched is
+    // correct. (Full producer trace in the PR for issue #11917.)
+    if (requiredLoweringPassSet.taggedUnion)
+    {
+        if (SLANG_PASS(lowerTaggedUnionTypes, sink))
+            requiredLoweringPassSet.reinterpret = true;
+    }
 
     SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
 
@@ -1822,6 +1848,15 @@ Result linkAndOptimizeIR(
         SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
     else
         SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
+
+    // Enforce that no untyped descriptor-heap handle (`ResourceDescriptorHeap[i]` /
+    // `SamplerDescriptorHeap[j]`) survives to emit: lower any that peephole did not collapse to its
+    // underlying `uint` index. Gated on `untypedResourceHandle` so the whole-module walk is skipped
+    // when no such handle is present. The producing intrinsics live in `hlsl.meta.slang` and are
+    // lowered at AST->IR time, before the last `calcRequiredLoweringPassSet` scan; no pass between
+    // that scan and here synthesizes these ops, so the flag cannot be a false-negative.
+    if (requiredLoweringPassSet.untypedResourceHandle)
+        SLANG_PASS(lowerUntypedResourceHandleToUInt);
 
     if (requiredLoweringPassSet.dynamicResourceHeap)
         SLANG_PASS(lowerDynamicResourceHeap, targetProgram, sink);

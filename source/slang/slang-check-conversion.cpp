@@ -2045,6 +2045,91 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    // Optional<T> can be implicitly cast to Optional<U> when T is coercible to U.
+    if (auto fromOptType = as<OptionalType>(fromType))
+    {
+        if (auto toOptType = as<OptionalType>(toType))
+        {
+            Type* fromInner = fromOptType->getValueType();
+            Type* toInner = toOptType->getValueType();
+
+            if (!fromInner->equals(toInner))
+            {
+                // Create a synthetic VarDecl of type fromInner as a placeholder for the
+                // extracted inner value. We build innerVarExpr here (even in cost-probe mode)
+                // because the inner _coerce call needs a properly-typed fromExpr; passing
+                // nullptr would risk a null-deref in the ExplicitRefType path.
+                auto innerVarDecl = getASTBuilder()->create<VarDecl>();
+                innerVarDecl->nameAndLoc.name = getName("__optInner");
+                innerVarDecl->type.type = fromInner;
+
+                auto innerVarExpr = getASTBuilder()->create<VarExpr>();
+                innerVarExpr->type = QualType(fromInner);
+                innerVarExpr->loc = fromExpr ? fromExpr->loc : SourceLoc();
+                innerVarExpr->declRef = makeDeclRef(innerVarDecl);
+
+                // Cost probe: suppress diagnostics on failure.
+                ConversionCost innerCost = kConversionCost_None;
+                bool innerCoercible = _coerce(
+                    site,
+                    toInner,
+                    nullptr,
+                    QualType(fromInner),
+                    innerVarExpr,
+                    nullptr,
+                    &innerCost,
+                    nullptr);
+
+                if (innerCoercible)
+                {
+                    if (outCost)
+                    {
+                        // +1 so that Optional<T>->Optional<U> (with T!=U) costs more than an
+                        // exact Optional<T>->Optional<T> match (cost 0), while still ranking
+                        // below any direct non-Optional conversion.
+                        *outCost = innerCost + 1;
+                    }
+                    if (outToExpr)
+                    {
+                        // Re-run the inner conversion in build mode to construct the
+                        // coerced expression. Note that a probe (outToExpr==nullptr) can
+                        // succeed for an *ambiguous* inner conversion while the build path
+                        // fails: _coerce returns true when probing an ambiguous conversion
+                        // but sets outToExpr to an error expr and returns false when asked
+                        // to reify it (see the AmbiguousConversion path). So do not assert
+                        // success here — on failure the inner call has already emitted the
+                        // specific diagnostic (via sink), so just propagate the failure.
+                        Expr* innerCoercedExpr = nullptr;
+                        bool ok = _coerce(
+                            site,
+                            toInner,
+                            &innerCoercedExpr,
+                            QualType(fromInner),
+                            innerVarExpr,
+                            sink,
+                            nullptr,
+                            nullptr);
+                        if (!ok)
+                        {
+                            *outToExpr = CreateErrorExpr(fromExpr);
+                            return false;
+                        }
+
+                        auto castExpr = getASTBuilder()->create<CastOptionalExpr>();
+                        castExpr->loc = fromExpr->loc;
+                        castExpr->type = QualType(toType);
+                        castExpr->checked = true;
+                        castExpr->valueArg = fromExpr;
+                        castExpr->innerVarDecl = innerVarDecl;
+                        castExpr->innerCoercedExpr = innerCoercedExpr;
+                        *outToExpr = castExpr;
+                    }
+                    return true;
+                }
+            }
+        }
+    }
+
     // A enum type can be converted into its underlying tag type.
     if (auto enumDecl = isEnumType(fromType))
     {
@@ -2064,6 +2149,46 @@ bool SemanticsVisitor::_coerce(
                 *outToExpr = rsExpr;
             }
             return true;
+        }
+    }
+
+    // The reverse direction is not an implicit conversion, but explicit cast/constructor syntax
+    // (`EnumTag(x)` or `(EnumTag)x`) should first coerce `x` to the enum's tag type and then wrap
+    // that tag value in the nominal enum type.
+    if (site == CoercionSite::ExplicitCoercion)
+    {
+        if (auto toEnumDeclRef = isDeclRefTypeOf<EnumDecl>(toType))
+        {
+            auto tagType = getTagType(m_astBuilder, toEnumDeclRef);
+            if (!tagType)
+                return false;
+
+            Expr* tagExpr = nullptr;
+            ConversionCost tagCost = kConversionCost_None;
+            if (_coerce(
+                    site,
+                    tagType,
+                    outToExpr ? &tagExpr : nullptr,
+                    fromType,
+                    fromExpr,
+                    sink,
+                    &tagCost,
+                    nullptr))
+            {
+                if (outCost)
+                    *outCost = tagCost + kConversionCost_Explicit;
+                if (outToExpr)
+                {
+                    auto enumExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                    enumExpr->type = toType;
+                    if (fromExpr)
+                        enumExpr->loc = fromExpr->loc;
+                    enumExpr->base = tagExpr;
+                    *outToExpr = enumExpr;
+                }
+                setWitnessOfConversionToBuiltinConversion();
+                return true;
+            }
         }
     }
 
@@ -2183,15 +2308,6 @@ bool SemanticsVisitor::_coerce(
                 *outCost = 0;
             return true;
         }
-    }
-
-    // Disallow converting to a ParameterGroupType.
-    //
-    // TODO(tfoley): Under what circumstances would this check ever be needed?
-    //
-    if (as<ParameterGroupType>(toType))
-    {
-        return _failedCoercion(toType, outToExpr, fromExpr, sink);
     }
 
     // If the type that we are converting from is a parameter group type
@@ -2372,6 +2488,41 @@ bool SemanticsVisitor::_coerce(
         if (outCost)
             *outCost = subCost + kConversionCost_ImplicitDereference;
         return true;
+    }
+
+    // Fast path: at an implicit coercion site, an opaque generic type parameter
+    // cannot convert to a concrete scalar builtin, so skip the initializer-based
+    // conversion search that makes up the rest of this function. Ranking an
+    // operator call on a constrained generic `T` against the many concrete
+    // scalar overloads otherwise runs one full (always-failing) conversion
+    // search per rejected candidate — the dominant semantic-checking cost in
+    // generic-heavy code (issue #11897). The `ImplicitCastMethodKey` failure
+    // cache below cannot absorb this: its key includes the `Type*`, and every
+    // generic declaration has a distinct `T` type object.
+    //
+    // Soundness: by this point the exact-match, subtype-witness, and
+    // type-equality-witness paths have all failed, and at an implicit site
+    // nested conversions are disallowed, so an initializer could only match
+    // `T` exactly — and no scalar builtin declares an implicit initializer
+    // with an opaque generic parameter type (a contingent core-module
+    // property, pinned by generic-arithmetic-coerce-diag.slang). The one
+    // exception is `bool` (`__init<T : __EnumType>(T)` in core.meta.slang),
+    // so `bool` targets are excluded. Everything else stays on the search
+    // path: explicit casts, vector/matrix/aggregate targets, and `DeclRefType`
+    // scalars such as `BFloat16`/FP8 (which do declare generic initializers).
+    // Pack elements never reach this test (`each T` has type `EachType`, not
+    // a decl-ref); a bare pack-parameter decl-ref, should a checker path ever
+    // form one at a coercion, is intentionally rejected under the same
+    // argument (no scalar builtin accepts a pack). The boundaries are pinned
+    // by tests/language-feature/generics/generic-arithmetic-coerce*.slang.
+    const auto toTypeBasic = as<BasicExpressionType>(toType);
+    const bool toTypeIsScalarBuiltin = toTypeBasic && toTypeBasic->getBaseType() != BaseType::Bool;
+    const auto fromTypeGenericParamDeclRef =
+        isDeclRefTypeOf<GenericTypeParamDeclBase>(fromType.type);
+    if (site != CoercionSite::ExplicitCoercion && toTypeIsScalarBuiltin &&
+        fromTypeGenericParamDeclRef)
+    {
+        return _failedCoercion(toType, outToExpr, fromExpr, sink);
     }
 
     // The main general-purpose approach for conversion is
