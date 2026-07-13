@@ -74,7 +74,7 @@ PROVENANCE_NOTE = (
 
 
 def grid_page(path, title, sub, note, svg):
-    """One cadence page: a single stacked column of per-workload panels."""
+    """One cadence page: per-workload panels, two per row."""
     H = ['<!doctype html><meta charset="utf-8">',
          f"<title>{title}</title><style>{SECTION_CSS}</style>",
          '<div class="wrap">',
@@ -160,7 +160,7 @@ def main():
                 svgp = os.path.join(outdir, f"perf_{prefix}_{cad}.svg")
                 breakdown.render_stacked_multiples(
                     args.results, ipath, args.metric, svgp, border, bfn,
-                    cols=1, names=names, link_for=wl_links,
+                    cols=2, names=names, link_for=wl_links,
                     title=f"{title} — {cad_title} ({args.metric} ms)")
                 svg = open(svgp, encoding="utf-8").read()
             grid_page(os.path.join(outdir, f"{prefix}-{cad}.html"),
