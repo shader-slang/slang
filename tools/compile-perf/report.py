@@ -211,22 +211,60 @@ def main():
     movers_html = ""
     try:
         dpoints = daily_movers.daily_points(args.results, args.metric)
-        bounds = [b for b in daily_movers.boundaries(dpoints) if abs(b[0]) >= 50]
+
+        # Suite boundary strip: % of the previous day's suite total, so a
+        # "big day" means the same thing whatever the suite's absolute size.
+        def suite_pct(v0, v1):
+            common = [(wl, t) for (wl, t) in v1
+                      if t == daily_movers.headline(wl) and (wl, t) in v0]
+            base = sum(v0[k] for k in common)
+            return (sum(v1[k] for k in common) - base) / base * 100 if base else 0.0
+
+        bounds = [(suite_pct(b[5], b[6]),) + b for b in daily_movers.boundaries(dpoints)]
+        bounds = [b for b in bounds if abs(b[0]) >= 1.0]
         bounds.sort(key=lambda b: -abs(b[0]))
+        rows_m = []
         if bounds:
-            rows_m = ["<h2>Recent movers (daily series)</h2>",
-                      "<table><tr><th>boundary</th><th>commits</th>"
-                      "<th class=num>suite &Delta;</th><th>top timers</th></tr>"]
-            for total, d0, d1, c0, c1, v0, v1 in bounds[:3]:
+            rows_m += ["<h2>Recent movers (daily series)</h2>",
+                       "<table><tr><th>boundary</th><th>commits</th>"
+                       "<th class=num>suite &Delta;</th><th>top timers</th></tr>"]
+            for pct, total, d0, d1, c0, c1, v0, v1 in bounds[:3]:
                 tds = daily_movers.timer_deltas(v0, v1, limit=3)
                 ts = ", ".join(f"{html_escape(t)} {d:+.0f}" for t, d in tds)
-                cls = "worse" if total > 0 else "better"
+                cls = "worse" if pct > 0 else "better"
                 rows_m.append(
                     f"<tr><td>{html_escape(d0)} &rarr; {html_escape(d1)}</td>"
                     f"<td><code>{html_escape(c0)}..{html_escape(c1)}</code></td>"
-                    f"<td class='num {cls}'>{total:+.0f} ms</td><td>{ts}</td></tr>")
+                    f"<td class='num {cls}'>{pct:+.1f}%</td><td>{ts}</td></tr>")
             rows_m.append("</table>")
-            movers_html = "".join(rows_m)
+
+        # Top-10 window movers: per-workload headline change over the whole
+        # daily window, improved and regressed together, ranked by |%|.
+        per_wl = {}
+        for _d, _c, vals in dpoints:
+            for (wl, t), v in vals.items():
+                if t == daily_movers.headline(wl):
+                    per_wl.setdefault(wl, []).append(v)
+        movers10 = sorted(
+            ((vs[-1] / vs[0] - 1) * 100, wl, vs[0], vs[-1])
+            for wl, vs in per_wl.items() if len(vs) >= 2 and vs[0] > 0)
+        movers10.sort(key=lambda r: -abs(r[0]))
+        if movers10:
+            d0w = dpoints[0][0]
+            d1w = dpoints[-1][0]
+            rows_m += [f"<h2>Top movers over the daily window "
+                       f"({html_escape(d0w)} &rarr; {html_escape(d1w)})</h2>",
+                       "<table><tr><th>benchmark</th><th class=num>start (ms)</th>"
+                       "<th class=num>end (ms)</th><th class=num>change</th></tr>"]
+            for pct, wl, v0w, v1w in movers10[:10]:
+                cls = "worse" if pct > 0 else "better"
+                link = f"workloads/{html_escape(wl)}.html"
+                rows_m.append(
+                    f"<tr><td><a href='{link}'>{html_escape(wl)}</a></td>"
+                    f"<td class=num>{v0w:.1f}</td><td class=num>{v1w:.1f}</td>"
+                    f"<td class='num {cls}'>{pct:+.1f}%</td></tr>")
+            rows_m.append("</table>")
+        movers_html = "".join(rows_m)
     except Exception as e:  # noqa: BLE001 — the strip must never sink the report
         print(f"note: recent-movers strip skipped: {e}")
 
