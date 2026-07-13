@@ -139,5 +139,5 @@ if (Get-Command genhtml -ErrorAction SilentlyContinue)
 }
 else
 {
-    Write-Host "genhtml not found - skipping HTML report (install the lcov package to enable it)"
+    Write-Host "genhtml not found - skipping HTML report (no common Windows lcov package; open hello-coverage.lcov in an LCOV viewer such as VS Code Coverage Gutters)"
 }

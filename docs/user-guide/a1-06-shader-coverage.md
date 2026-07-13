@@ -13,8 +13,7 @@ This chapter walks through the pipeline: compile with coverage, read the generat
 dispatch from a small C++ host program, and produce a report. All steps use the offline
 workflow (`slangc` plus a sidecar manifest file) and run without a GPU; the dispatched kernel
 is compiled for Slang's CPU target. The closing section summarizes GPU targets and the
-in-process C++ API. The files, together with `run-tutorial.sh` and
-`run-tutorial.ps1` scripts that execute every step, are in
+in-process C++ API. The files to execute this tutorial are in
 [`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial).
 
 ## Compiling with coverage
@@ -178,13 +177,15 @@ without `-trace-coverage`.
 
 Copy the program from
 [`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial),
-build, and run (or use `run-tutorial.sh` / `run-tutorial.ps1` from the same directory,
-which execute every tutorial step including this one):
+build, and run:
 
 ```bash
 c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host -ldl
 ./hello-coverage-host
 ```
+
+Alternatively, use `run-tutorial.sh` / `run-tutorial.ps1` from the tutorial directory
+to execute every tutorial step.
 
 All four inputs are positive and the gain is 2.0, so every statement runs 4 times except
 `value = 0.0` and the `return value` fallthrough in `applyGain`:
@@ -242,7 +243,9 @@ genhtml hello-coverage.lcov --output-directory coverage-html
 ```
 
 `coverage-html/index.html` shows the source with executed lines in green and unexecuted
-lines in red.
+lines in red. `genhtml` ships with the lcov package on Linux and macOS; it has no common
+Windows distribution, so on Windows open `hello-coverage.lcov` with an LCOV viewer such as
+the VS Code Coverage Gutters extension instead.
 
 The counters file format is `counter_count` little-endian unsigned integers of
 `element_stride` bytes each — the raw buffer contents, on any target. `--counters-text`

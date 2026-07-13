@@ -87,5 +87,5 @@ if command -v genhtml >/dev/null; then
   genhtml hello-coverage.lcov --output-directory coverage-html >/dev/null
   echo "open coverage-html/index.html to see the annotated source"
 else
-  echo "genhtml not found - skipping HTML report (install the lcov package to enable it)"
+  echo "genhtml not found - skipping HTML report (install the lcov package, or open hello-coverage.lcov in an LCOV viewer such as VS Code Coverage Gutters)"
 fi
