@@ -31,7 +31,7 @@ function Invoke-Step
     }
 }
 
-# --- Step 0: find the tools -------------------------------------------------
+# --- Step 0: find the tools ---------------------------------------------------
 # slangc is taken from -Slangc, then PATH, then a sibling repo build
 # (convenient when running from a shader-slang/slang checkout). An old
 # slangc without coverage support is skipped: releases that predate the
@@ -75,7 +75,7 @@ $isWindowsHost = $IsWindows -or $env:OS -eq "Windows_NT"
 $kernel = if ($isWindowsHost) { "hello-coverage-kernel.dll" } else { "hello-coverage-kernel.so" }
 $dlLib = if ($isWindowsHost) { @() } else { @("-ldl") }
 
-# --- Step 1: "Compiling with coverage" ------------------------------------
+# --- Step 1: "Compiling with coverage" ----------------------------------------
 # One flag, -trace-coverage, turns on line coverage. Two files appear:
 # the compiled shader and the .coverage-manifest.json sidecar that maps
 # counter slots back to source locations.
@@ -84,12 +84,12 @@ Invoke-Step $Slangc @("hello-coverage.slang", "-target", "spirv",
     "-trace-coverage", "-o", "hello-coverage.spv")
 Write-Host "wrote hello-coverage.spv and hello-coverage.spv.coverage-manifest.json"
 
-# --- Step 2: "Manifest structure" --------------------------------------------
+# --- Step 2: "Manifest structure" ---------------------------------------------
 # Show the sidecar. Note the buffer block: on SPIR-V the hidden
 # counter buffer binds at a descriptor (set, binding).
 Get-Content hello-coverage.spv.coverage-manifest.json
 
-# --- Step 3: "Dispatching the precompiled kernel" ---------
+# --- Step 3: "Dispatching the precompiled kernel" -----------------------------
 # Compile the same shader once more, to a directly callable CPU shared
 # library. slangc drives the system C++ compiler; the new sidecar
 # reports uniform_offset instead of a descriptor location.
@@ -121,11 +121,11 @@ else
 
 # Dispatch. The host loads the precompiled kernel, binds the coverage
 # buffer at the manifest-reported uniform_offset, runs one thread
-# group, prints the raw counter slots, and writes
+# group, prints the outputs and the raw counter slots, and writes
 # hello-coverage.counters.bin.
 Invoke-Step "./hello-coverage-host.exe"
 
-# --- Step 4: "Generating a report" ------------------------------------
+# --- Step 4: "Generating a report" --------------------------------------------
 # The LCOV converter joins the raw counters with the manifest's source
 # attribution. Expect two zero-count lines: the negative-input clamp
 # and the applyGain fallthrough, which these inputs never reach.

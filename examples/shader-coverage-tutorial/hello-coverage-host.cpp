@@ -1,8 +1,8 @@
 // hello-coverage-host.cpp: load the kernel slangc precompiled into
 // hello-coverage-kernel.so, bind the hidden counter buffer where the
 // sidecar manifest says, dispatch one thread group, print the computed
-// outputs, and write the raw coverageCounters for the LCOV converter. Uses no
-// Slang headers or library — the manifest is the whole contract.
+// outputs, and write the raw coverage counters for the LCOV converter.
+// Uses no Slang headers or library — the manifest is the whole contract.
 //
 // Pass --no-coverage to run as a plain CPU shared-library dispatch,
 // without binding or reporting the coverage buffer. The `coverageEnabled`

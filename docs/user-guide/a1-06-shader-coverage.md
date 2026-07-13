@@ -4,16 +4,16 @@ layout: user-guide
 
 # Shader Execution Coverage
 
-Slang supports gcov-style code coverage for shaders to report execution counts for GPU
+Slang supports gcov-style code coverage for shaders, reporting execution counts for GPU
 and CPU kernels. The compiler instruments each executable statement to increment a
-counter at runtime; after a dispatch, read the counters back and convert them into an LCOV
-report for LCOV compatible reporting tools such as `genhtml`, Codecov, or VS Code Coverage Gutters.
+counter at runtime; after a dispatch, read the counters back and convert them into a
+report for LCOV-compatible tools such as `genhtml`, Codecov, or VS Code Coverage Gutters.
 
 This chapter walks through the pipeline: compile with coverage, read the generated manifest,
 dispatch from a small C++ host program, and produce a report. All steps use the offline
 workflow (`slangc` plus a sidecar manifest file) and run without a GPU; the dispatched kernel
 is compiled for Slang's CPU target. The closing Further reading section summarizes GPU
-targets and the in-process C++ API. The files to execute this tutorial are in
+targets and the in-process C++ API. The files used in this tutorial are in
 [`examples/shader-coverage-tutorial`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-tutorial).
 
 ## Compiling with coverage
@@ -69,8 +69,8 @@ compiler and are supported).
 
 ## Manifest structure
 
-The LCOV converter and the host application take care of the manifest. User does not need to
-read or modify. This is what it contains, trimmed to the relevant fields:
+The LCOV converter and the host application take care of the manifest; the user does not
+need to read or modify it. This is what it contains, trimmed to the relevant fields:
 
 ```json
 {
