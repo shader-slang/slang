@@ -135,9 +135,11 @@ The host program,
 [`hello-coverage-host.cpp`](https://github.com/shader-slang/slang/blob/master/examples/shader-coverage-tutorial/hello-coverage-host.cpp),
 loads the kernel, binds the three buffers (the shader's two, plus coverage), dispatches one
 thread group, prints the computed outputs and the counter slots, and writes the coverage counters to
-a file. It is about 150 lines and uses no Slang headers or library. The constants `kCounterCount`, `kElementStride`, and
-`kUniformOffset` are the manifest values above; a production host would parse them from the
-JSON.
+a file. It is about 150 lines and uses no Slang headers or library; the manifest is its
+only connection to Slang. Three hardcoded constants carry the manifest values shown above —
+`kCounterCount` from `counter_count`, `kElementStride` from `buffer.element_stride`, and
+`kUniformOffset` from `buffer.uniform_offset`. Hardcoding keeps the example free of a
+JSON-parser dependency; a real host reads these from the manifest at run time.
 
 The binding: `BufferView` is the 16-byte `{ void* data; size_t count; }` layout of a
 `(RW)StructuredBuffer` parameter on the CPU target. The shader's own buffers occupy the
