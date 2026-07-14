@@ -73,7 +73,7 @@ def main():
     # index_path-based loaders also see the daily points.
     cindex = combined_index(index, args.results)
     cindex_path = os.path.join(outdir, "_combined_index.json")
-    with open(cindex_path, "w", encoding="utf-8", newline="\n") as fh:
+    with analyze.open_output(cindex_path) as fh:
         json.dump(cindex, fh, indent=2)
 
     series, _, order = analyze.load_series(cindex, args.results, args.metric)
@@ -118,7 +118,9 @@ def main():
           f'<p class="sub">{n_rel} releases + {n_day} daily ToT runs, '
           f'<b>{analyze.short_tag(tags[0])}</b> → <b>{analyze.short_tag(tags[-1])}</b> · '
           f'metric: {args.metric} (ms) · {n_wl} workloads. '
-          f'The {n_day} rightmost points per panel are daily top-of-tree builds.</p>',
+          f'The {n_day} rightmost points per panel are daily top-of-tree builds. '
+          f'See also the <a href="sweep/">complexity sweep</a> '
+          f'(latest nightly): compile time vs workload size N, per-pass scaling.</p>',
           '<h2>Phase composition across releases — main phases</h2>',
           '<p class="small">One panel per workload; the two top-level phases '
           '<b>frontEndExecute</b> (green) and <b>generateOutput</b> (orange) stacked as '
@@ -140,7 +142,7 @@ def main():
           "</div>"]
 
     out = os.path.join(outdir, "report_per_workload.html")
-    with open(out, "w", encoding="utf-8", newline="\n") as fh:
+    with analyze.open_output(out) as fh:
         fh.write("\n".join(PW))
     print(f"wrote {out}  ({n_rel} releases + {n_day} daily)")
 
