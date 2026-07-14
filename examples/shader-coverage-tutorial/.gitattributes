@@ -1,0 +1,5 @@
+# The runner scripts diff generated files against these goldens. Pin them
+# to LF so a CRLF checkout (core.autocrlf=true, WSL over a Windows working
+# tree) cannot make the bash runner's byte-exact diff fail spuriously.
+expected.lcov text eol=lf
+expected-host-output.txt text eol=lf
