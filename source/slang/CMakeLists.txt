@@ -65,6 +65,11 @@ target_include_directories(
     INTERFACE ${SLANG_FIDDLE_OUTPUT_DIR}
 )
 
+# A concrete, buildable target that completes only once slang-fiddle has written every .fiddle
+# header (the stamp). Source-compiling targets depend on this so a parallel build cannot start
+# object/PCH compiles before fiddle has finished generating the headers they include.
+add_custom_target(slang-fiddle-generate DEPENDS ${SLANG_FIDDLE_STAMP})
+
 # Optimize slang-rich-diagnostics.cpp for size regardless of build type.
 # This file includes generated fiddle code that can be large.
 # Use /O1;/Os for MSVC, -Oz for Clang, -Os for GCC.
@@ -353,6 +358,15 @@ else()
         NO_SOURCE
     )
 endif()
+
+# Force the target that actually compiles the sources (whichever of slang / slang-common-objects
+# exists in this configuration) to wait for fiddle generation, closing the --parallel race where a
+# from-source build's object/PCH compiles can start before the .fiddle headers are written.
+foreach(_slang_fiddle_consumer slang slang-common-objects)
+    if(TARGET ${_slang_fiddle_consumer})
+        add_dependencies(${_slang_fiddle_consumer} slang-fiddle-generate)
+    endif()
+endforeach()
 
 set_target_properties(
     slang
