@@ -52,7 +52,7 @@ if(TARGET CUDA::cuda_driver)
     # nvcuda.dll is then loaded on the first cuInit call.
     if(MSVC)
         list(APPEND _libs delayimp)
-        set(_link_options "/DELAYLOAD:nvcuda.dll")
+        list(APPEND _link_options "/DELAYLOAD:nvcuda.dll")
     endif()
 else()
     message(
