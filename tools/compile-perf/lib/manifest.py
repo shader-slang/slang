@@ -260,6 +260,43 @@ WORKLOADS = [
         sweep_sizes=[125, 250, 500, 1000],
     ),
     WorkloadSpec(
+        name="generic_nesting",
+        bucket="sema",
+        gen=workloads.gen_generic_nesting,
+        # size = nesting DEPTH, not declaration count: the known substitution
+        # blowup is exponential (~3-4x per level, knee ~depth 18), so the
+        # ladder stays at/below the knee to keep sweep runtime sane while the
+        # top rung still exposes the multiple over the linear expectation.
+        default_size=16,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[8, 12, 16, 20],
+    ),
+    WorkloadSpec(
+        name="generic_nesting_eval",
+        bucket="sema",
+        gen=workloads.gen_generic_nesting_eval,
+        # size = nesting depth, as in generic_nesting; the witness-method
+        # calls multiply the per-level cost, so the ladder tops out at 14
+        # (~0.5 s) where generic_nesting can afford 20.
+        default_size=12,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[8, 10, 12, 14],
+    ),
+    WorkloadSpec(
+        name="interface_depth",
+        bucket="sema",
+        gen=workloads.gen_interface_depth,
+        # size = interface inheritance chain depth (linear chain, not generic
+        # nesting); measured ~N^3.4 at 2026-07, so 128 (~0.4 s) caps the
+        # ladder.
+        default_size=64,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[16, 32, 64, 128],
+    ),
+    WorkloadSpec(
         name="conformance",
         bucket="sema",
         gen=workloads.gen_conformance,
