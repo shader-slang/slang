@@ -232,34 +232,18 @@ if(SLANG_BUILD_MIMALLOC)
         set(MIMALLOC_PATH "${SLANG_OVERRIDE_MIMALLOC_PATH}/mimalloc")
     endif()
 
+    # mimalloc is vendored as a submodule under external/mimalloc. A missing
+    # checkout means submodules were not initialized, so fail loudly at configure
+    # time, mirroring the fast_float override validation earlier in this file.
     if(NOT EXISTS "${MIMALLOC_PATH}/CMakeLists.txt")
         message(
-            STATUS
-            "mimalloc not found at ${MIMALLOC_PATH} - downloading..."
-        )
-        execute_process(
-            COMMAND
-                ${GIT_EXECUTABLE} clone --depth 1 --branch v2.1.7
-                https://github.com/microsoft/mimalloc.git "${MIMALLOC_PATH}"
-            OUTPUT_QUIET
-            ERROR_QUIET
+            FATAL_ERROR
+            "mimalloc source not found at ${MIMALLOC_PATH}. Run 'git submodule update --init --recursive', or set SLANG_OVERRIDE_MIMALLOC_PATH to a directory containing a 'mimalloc' checkout."
         )
     endif()
 
-    if(EXISTS "${MIMALLOC_PATH}/CMakeLists.txt")
-        set(mimalloc_SOURCE_DIR "${MIMALLOC_PATH}")
-        set(SLANG_MIMALLOC_AVAILABLE ON)
-    elseif(SLANG_ENABLE_MIMALLOC)
-        message(
-            FATAL_ERROR
-            "SLANG_ENABLE_MIMALLOC requires mimalloc, but it was not found at ${MIMALLOC_PATH} and could not be downloaded"
-        )
-    else()
-        message(
-            WARNING
-            "mimalloc was not found at ${MIMALLOC_PATH}. Building without mimalloc support."
-        )
-    endif()
+    set(mimalloc_SOURCE_DIR "${MIMALLOC_PATH}")
+    set(SLANG_MIMALLOC_AVAILABLE ON)
 endif()
 
 # SPIRV-Headers

@@ -85,7 +85,6 @@ prelude/*.h.cpp
 /multiple-definitions.hlsl
 /external/slang-llvm/
 /external/slang-glslang/
-/external/mimalloc/
 /external/slangpy/
 /external/dxvk-remix/
 /external/SaschaWillems-Vulkan/
