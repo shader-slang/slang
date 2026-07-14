@@ -2,7 +2,7 @@
 // GitHub Issue: https://github.com/shader-slang/slang/issues/8590
 // The compiler should add a dummy field to empty ray payload structs for HLSL/DXIL/SPIRV targets.
 
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -profile sm_6_5 -entry rayGenShaderMakeQueryInvokeNOP -stage raygeneration -capability hlsl_nvapi
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -profile sm_6_5 -entry rayGenShaderMakeQueryInvokeNOP -stage raygeneration -capability nvapi_hit_objects
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry rayGenShaderMakeQueryInvokeNOP -stage raygeneration -emit-spirv-directly -capability spvShaderInvocationReorderNV
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry rayGenShaderMakeQueryInvokeNOP -stage raygeneration
 

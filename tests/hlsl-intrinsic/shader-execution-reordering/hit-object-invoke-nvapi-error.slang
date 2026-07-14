@@ -3,12 +3,12 @@
 // emitting `dx::HitObject::Invoke` applied to an `NvHitObject` (invalid HLSL). See #11903.
 //
 // The NVAPI Invoke requires an AccelerationStructure (3-argument form), so the 2-argument
-// form has no NVAPI equivalent. On `-capability ser_nvapi` the HitObject type emits as
+// form has no NVAPI equivalent. On `-capability nvapi_hit_objects` the HitObject type emits as
 // NvHitObject, so selecting the native `dx::HitObject::Invoke` overload for it is invalid;
-// the fix adds `case hlsl_nvapi: static_assert(false, ...)` to the 2-argument overload's
+// the fix adds `case nvapi_hit_objects: static_assert(false, ...)` to the 2-argument overload's
 // __target_switch, which the target-switch specializer selects for an NVAPI target.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -entry rayGenerationMain -stage raygeneration -profile sm_6_9 -capability ser_nvapi
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -entry rayGenerationMain -stage raygeneration -profile sm_6_9 -capability nvapi_hit_objects
 
 //TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
