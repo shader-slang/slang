@@ -216,9 +216,6 @@ python3 sweep_report.py --label dev         # -> results/dev/sweep/sweep_report.
 
 ### Generated outputs (gitignored)
 
-| Path | What it is |
-| ---- | ---------- |
-
 The first group is stored in `slang-compile-perf` (the CI results repo). The
 second group is regenerable on demand and is gitignored from that repo — generate
 them locally by pointing the report scripts at a checkout of `slang-compile-perf`

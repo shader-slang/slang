@@ -92,11 +92,14 @@ def fit(pts, floor=0.0):
     return {"a": a, "k": k, "pow_r2": pow_r2, "top": top}
 
 
-# The 0.15 noise buffer shared by both super-linearity thresholds: a fit over
+# The 0.15 noise buffer shared by every super-linearity threshold: a fit over
 # 3-5 points is noisy, and readings within 15% of the linear expectation are
-# not actionable. K_NOISE_BUFFER couples the exponent cutoff (linear k=1.0)
-# and the top-step cutoff (linear = 2.0 on the suite's x2 doubling ladders) so
-# they move together if the ladders' spacing or length ever changes.
+# not actionable. K_NOISE_BUFFER couples three cutoffs so they move together
+# if the ladders' spacing or length ever changes: the exponent cutoff
+# (SUPERLINEAR_K vs linear k=1.0), the end-point x-lin RATIO cutoff (also
+# SUPERLINEAR_K — a ratio 15% above the linear expectation of 1.0, used by
+# render_panels and the growth table), and the top-step cutoff
+# (SUPERLINEAR_TOP2X vs linear = 2.0 on the suite's x2 doubling ladders).
 K_NOISE_BUFFER = 0.15
 SUPERLINEAR_K = 1.0 + K_NOISE_BUFFER
 SUPERLINEAR_TOP2X = 2.0 + K_NOISE_BUFFER
@@ -112,12 +115,23 @@ def anchored_slope(pts, floor):
     """Through-origin OLS slope of (t − floor) over `pts`: the intercept is
     PINNED to the measured floor rather than fitted, so at small N — where the
     floor is 20-35% of the reading — the slope estimate is neither diluted nor
-    tilted by the low half's curvature. Used for every linear-expectation line
-    (panels) and per-bucket × lin ratio (growth attribution); one definition so
-    the two cannot drift."""
+    tilted by the low half's curvature."""
     num = sum(x * (v - floor) for x, v in pts)
     den = sum(x * x for x, _ in pts) or 1.0
     return num / den
+
+
+def linear_expectation(pts, floor):
+    """The floor-anchored linear expectation for a sweep series: intercept =
+    the measured floor, slope = anchored_slope over the LOW-N HALF of `pts`
+    (at least 2 points — the high end is exactly what super-linearity bends,
+    so it must not steer the baseline). Returns (intercept, slope,
+    expectation_at_max_N). One helper for the panel expectation line and the
+    per-bucket × lin ratio, so the half-split and the extrapolation cannot
+    drift between them — not just the slope."""
+    lo = pts[:max(2, (len(pts) + 1) // 2)]
+    b = anchored_slope(lo, floor)
+    return floor, b, floor + b * pts[-1][0]
 
 
 def bucket_series(results_dir, label, metric):
@@ -190,8 +204,7 @@ def growth_attribution(by_size, floor_b=None, top_n=5):
             _, k, _ = analyze.powfit([x for x, _ in work], [w for _, w in work])
         lin = None
         if len(pts) >= 3:
-            lo = pts[:max(2, (len(pts) + 1) // 2)]
-            expect = fb + anchored_slope(lo, fb) * pts[-1][0]
+            _a, _b, expect = linear_expectation(pts, fb)
             if expect > 0:
                 lin = v1 / expect
         entries.append({"name": name, "v0": v0, "v1": v1, "delta": v1 - v0,
@@ -303,13 +316,12 @@ def render_panels(sweeps, metric, out, floor=0.0, cols=3, link_for=None):
         lin_a = lin_b = None
         lin_ratio = None
         if len(pts_ci) >= 3:
-            h = max(2, (len(pts_ci) + 1) // 2)
-            lo = pts_ci[:h]
             if floor > 0:
-                lin_a, lin_b = floor, anchored_slope(lo, floor)
+                lin_a, lin_b, lin_end = linear_expectation(pts_ci, floor)
             else:
+                lo = pts_ci[:max(2, (len(pts_ci) + 1) // 2)]
                 lin_a, lin_b, _ = analyze.linfit([x for x, _ in lo], [v for _, v in lo])
-            lin_end = lin_a + lin_b * nmax
+                lin_end = lin_a + lin_b * nmax
             if lin_end > 0:
                 lin_ratio = pts_ci[-1][1] / lin_end
         hi = max(vmax, (lin_a + lin_b * nmax) if lin_a is not None else 0.0) * 1.08 or 1.0
@@ -383,7 +395,6 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
     phase buckets the growth lands in), and the raw per-size sweep numbers.
     Returns {workload: href relative to the sweep report} for linking."""
     import inspect
-    from lib import manifest
     per_bucket, floor_b = bucket_series(results_dir, label, metric)
     wdir = os.path.join(outdir, "workloads")
     os.makedirs(wdir, exist_ok=True)

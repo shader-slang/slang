@@ -78,7 +78,13 @@ def main():
                 print(f"  (note: unreadable {done} ({e}); re-running)")
             sizes = {}
             for r in prev if isinstance(prev, list) else []:
-                if isinstance(r, dict) and "workload" in r:
+                # A record counts toward completeness only if it MEASURED:
+                # bench's failure isolation writes ok=False records for sizes
+                # whose generator/run failed, and counting those as present
+                # would leave a permanent hole in the scaling curve that only
+                # --force could refill. (ok defaults True for legacy records
+                # predating the field, so old baselines are not re-swept.)
+                if isinstance(r, dict) and "workload" in r and r.get("ok", True):
                     sizes.setdefault(r["workload"], set()).add(r.get("size"))
             need = want or all_wls
 
