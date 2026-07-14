@@ -272,7 +272,9 @@ def main():
         f"{len(compiler_names)} workloads, one compiler pass each — parse "
         "&rarr; sema &rarr; IR &rarr; specialization &rarr; backends."))
     rows.append('<div class="secrow"><b>Complexity sweeps</b>'
-                '<div class="links"><a href="sweep/">all sweeps</a></div>'
+                # explicit index.html so the link also works when the report
+                # is browsed from disk (file:// has no directory index)
+                '<div class="links"><a href="sweep/index.html">all sweeps</a></div>'
                 "<p>Compile time vs workload size N — scaling curves and per-pass "
                 "growth attribution; every archived sweep on one page.</p></div>")
     # Recent movers: the day boundaries that moved the suite most, with the
