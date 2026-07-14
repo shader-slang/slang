@@ -2173,6 +2173,16 @@ IRVarLayout* findVarLayout(IRInst* value)
 
 bool isEntryPointByValueUniformAggregateParam(IRParam* param)
 {
+    // DIAGNOSTIC (do-not-integrate): env kill-switch for the grid_constant/forward optimization.
+    // When SLANG_DISABLE_GRID_CONSTANT is set, this predicate returns false, disabling BOTH the
+    // CUDA `__grid_constant__ const` emit qualifier and the `transformParamsToConstRef`
+    // address-forward (both consumers call this). Lets a single slang binary produce variant A
+    // (unset = optimization on) or variant C (set = baseline temp-copy) on the SAME runner, to
+    // isolate "our codegen" from "NVRTC/HW". Not part of the real fix.
+    static const bool s_disableGridConstant = getenv("SLANG_DISABLE_GRID_CONSTANT") != nullptr;
+    if (s_disableGridConstant)
+        return false;
+
     if (!param)
         return false;
 
