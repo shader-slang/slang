@@ -296,9 +296,20 @@ function(slang_add_target dir type)
                 "$<$<CONFIG:${debug_configs}>:Embedded>"
     )
     if(MSVC)
+        # /DEBUG makes MSVC's linker flip the /OPT defaults from REF to NOREF and
+        # from ICF to NOICF, so a Release build that ships PDBs (the default when
+        # SLANG_ENABLE_RELEASE_DEBUG_INFO is ON) would silently lose dead-code
+        # elimination and identical-COMDAT folding. Re-assert /OPT:REF and /OPT:ICF
+        # to keep the optimized link. Scope this to Release only: Release's CMake
+        # default link flags already carry /INCREMENTAL:NO so there is no
+        # incremental/OPT conflict, and Debug/RelWithDebInfo link behavior is left
+        # unchanged.
         target_link_options(
             ${target}
-            PRIVATE "$<$<CONFIG:${debug_configs}>:/DEBUG>"
+            PRIVATE
+                "$<$<CONFIG:${debug_configs}>:/DEBUG>"
+                "$<$<CONFIG:Release>:/OPT:REF>"
+                "$<$<CONFIG:Release>:/OPT:ICF>"
         )
     else()
         target_compile_options(
