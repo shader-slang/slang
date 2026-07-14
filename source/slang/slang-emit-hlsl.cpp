@@ -1981,7 +1981,8 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             };
             if (impliesCap(CapabilityName::nvapi_hit_objects))
             {
-                // Explicit NVAPI opt-in: use NvHitObject (matches `case nvapi_hit_objects:` op calls).
+                // Explicit NVAPI opt-in: use NvHitObject (matches `case nvapi_hit_objects:` op
+                // calls).
                 m_writer->emit("NvHitObject");
                 // Ensure NVAPI header is included when using NvHitObject type.
                 m_extensionTracker->m_requiresNVAPI = true;
