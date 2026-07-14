@@ -5,7 +5,7 @@ versa.
 
 Slang supports the following kinds of type conversions:
 
-- _Explicit type conversion_ occurs with the _cast expression_ or an _initializer expression_ (see
+- _Explicit type conversion_ occurs with a _cast expression_ or an _initializer expression_ (see
   below). Explicit type conversion is used to convert a value to a specific type.
 - _Implicit type conversion_ occurs when a value of a certain type is passed to a context that requires another
   type. Implicit type conversion is sometimes referred to as _type coercion_.
@@ -45,7 +45,7 @@ The conversion rules between fundamental types are as follows:
 
 **The procedure for integer-integer conversions:**
 
-1. Match the width of value with the target type.
+1. Match the width of the value with the target type.
    - If the source value type is narrower than the target type, zero-extend (unsigned source type) or
      sign-extend (signed source type) the source value such that the widths match.
    - If the source value type width equals the target type width, do nothing.
@@ -72,7 +72,7 @@ the behavior is [undefined](basics-behavior.md).
 > MyStruct s = {};
 > ```
 >
-> This is a deprecated feature and subject to be removed in a future Slang language version.
+> This is a deprecated feature and subject to removal in a future Slang language version.
 > See also [GitHub issue 12045](https://github.com/shader-slang/slang/issues/12045).
 
 #### Examples
@@ -90,19 +90,19 @@ void main(uint3 tid : SV_DispatchThreadID)
     output[1] = (uint)valu16; // writes 0x00008000 (zero extension)
 
     uint64_t valu64 = 0x123456789ABCDEFLLU;
-    output[1] = (uint)valu64; // writes 0x89ABCDEF (discard high bits)
+    output[2] = (uint)valu64; // writes 0x89ABCDEF (discard high bits)
 
     if ((bool)vali16)
     {
-        // branch executed if vali16 != 0U (which it is)
-        output[2] = 123U;
+        // branch executed if vali16 != 0 (which it is)
+        output[3] = 123U;
     }
 
     // double -> uint conversion (truncates decimal fraction)
-    output[3] = (uint)doubleInputs[0];
+    output[4] = (uint)doubleInputs[0];
 
     // double -> uint conversion using the initializer syntax
-    output[4] = uint(doubleInputs[1]);
+    output[5] = uint(doubleInputs[1]);
 }
 ```
 
@@ -130,7 +130,7 @@ enum StatusCode
     ++val;
 
     // overflow detection
-    return prevVal > val ? StatusCode.Success : StatusCode.Overflow;
+    return prevVal < val ? StatusCode.Success : StatusCode.Overflow;
 }
 
 [numthreads(1,1,1)]
@@ -146,10 +146,9 @@ void main(uint3 tid : SV_DispatchThreadID)
 A scalar can be cast to a vector or matrix type. In this conversion, the scalar value is used to
 populate every element of the vector or matrix.
 
-A vector can be constructed from elements and smaller vectors. The elements are concatenated when the
-newly constructed vector is instantiated. In case the target vector type has more elements than supplied (but
-at least 2 were supplied), the newly constructed vector will be tail-padded by 0. However, see the warning
-below.
+A vector can be constructed from elements and smaller vectors. The elements are concatenated to form the new
+vector. If the target vector type has more elements than supplied (but at least 2 were supplied), the newly
+constructed vector will be tail-padded by 0. However, see the warning below.
 
 A matrix can be constructed from vectors in the following ways:
 
@@ -175,8 +174,8 @@ For details, see [vector initialization functions](../../../core-module-referenc
 >
 > ```hlsl
 > int4 v0 = 1;        // { 1, 1, 1, 1 } - duplicate
-> int4 v0 = { 1 };    // { 1, 1, 1, 1 } - duplicate
-> int4 v0 = { 1, 1 }; // { 1, 1, 0, 0 } - tail-pad with 0
+> int4 v1 = { 1 };    // { 1, 1, 1, 1 } - duplicate
+> int4 v2 = { 1, 1 }; // { 1, 1, 0, 0 } - tail-pad with 0
 > ```
 
 #### Examples
@@ -248,8 +247,8 @@ The following implicit type conversions are allowed:
 - scalar `T` to `matrix<T, R, C>` (where `R` and `C` are any legal values)
 - `vector<T, N>` to `vector<U, N>` where conversion `T` &rarr; `U` is allowed
 - `matrix<T, R, C>` to `matrix<U, R, C>` where conversion `T` &rarr; `U` is allowed
-- a type to its conformance type
-- `none` or value of `T` to `Optional<T>`
+- a type to an interface it conforms to
+- `none` or a value of `T` to `Optional<T>`
 - `nullptr` to any pointer type
 - sized array to unsized array of same element type
 - `enum` type to its tag type
@@ -258,7 +257,7 @@ The following implicit type conversions are allowed:
 The following implicit type conversions are allowed but not recommended. These implicit type conversions
 trigger a diagnostic warning.
 
-- `bool` to a floating point type
+- `bool` to a floating-point type
 - integer type to a `bool`
 - integer type to a narrower integer type, except integer literals whose values fit in the narrower type
 - integer type to same width integer type with different signedness, except integer literals whose values fit
@@ -270,7 +269,7 @@ trigger a diagnostic warning.
 - integer vector to a floating-point vector and vice versa
 - `enum` to integer type other than its tag type
 
-> 📝 **Remark:** Some usual contexts for implicit type conversions:
+> 📝 **Remark:** Some common contexts for implicit type conversions:
 >
 > - Assigning a value of one type to a variable of another type
 > - [Function](expressions-operators.md) call where the argument type does not match the parameter type
@@ -327,7 +326,8 @@ void maybeWriteToOutput(Optional<int> optVal)
     }
 }
 
-// bounds
+// Return an optional with a value if val64 is in bounds
+// for 'int', otherwise return an optional without a value
 Optional<int> boundsCheckForInt32(int64_t val64)
 {
     int val32 = (int)val64;
@@ -350,8 +350,8 @@ Optional<int> boundsCheckForInt32(int64_t val64)
 [numthreads(1,1,1)]
 void main()
 {
-    // write 256 entries from input to output,skipping
-    // skipping input values that are out of bounds
+    // write 256 entries from input to output, skipping
+    // input values that are out of bounds
     for (uint i = 0; i < 256; ++i)
         maybeWriteToOutput(boundsCheckForInt32(input[i]));
 }
@@ -391,7 +391,7 @@ RWStructuredBuffer<int> output;
 
 int2 someFunc(int3 v)
 {
-    // int2 has the (int, int) initializer, so we can create
+    // int2 has an (int, int) initializer, so we can create
     // the return value using an { int, int } initializer list.
     //
     // The list is converted to int2 by invoking int2.__init(int, int).
@@ -408,7 +408,7 @@ void main()
     // invoking the assignment operator function.
     a = { 9, 5 };
 
-    // Since int3 has (int2, int) initializer, { a, b } is converted
+    // Since int3 has an (int2, int) initializer, { a, b } is converted
     // to int3 when calling someFunc
     a = someFunc({ a, b });
 
@@ -443,7 +443,7 @@ A reinterpret cast is more general, and it allows reinterpreting a bit pattern o
 target type. A reinterpret cast is invoked using the
 [reinterpret](../../../core-module-reference/global-decls/reinterpret.html) function, and it uses the same
 union type emulation as [interface-conforming variants](types-interface.md). That is, the source value is
-packed to an AnyValue struct, which is then unpacked as the target type.
+packed into an AnyValue struct, which is then unpacked as the target type.
 
 
 #### Examples
