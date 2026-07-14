@@ -281,6 +281,7 @@ struct TransformParamsToConstRefContext
                     newArgs.add(addr);
                 }
                 else if (
+                    false && /* DIAGNOSTIC A1: forward DISABLED (qualifier stays ON) */
                     forwardEntryPointUniformAddress && isForwardableEntryPointUniformParam(arg))
                 {
                     // The argument is a read-only entry-point by-value uniform aggregate
