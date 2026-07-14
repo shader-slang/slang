@@ -2173,6 +2173,11 @@ IRVarLayout* findVarLayout(IRInst* value)
 
 bool isEntryPointByValueUniformAggregateParam(IRParam* param)
 {
+    // DIAGNOSTIC (do-not-integrate, variant C): grid_constant/forward optimization
+    // UNCONDITIONALLY DISABLED. Baseline temp-copy path everywhere. Pairs with the PR
+    // branch (variant A) to isolate our codegen from HW/NVRTC on the 5090. Not for merge.
+    return false;
+
     if (!param)
         return false;
 
