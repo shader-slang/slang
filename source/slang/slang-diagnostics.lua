@@ -5523,6 +5523,13 @@ fatal(
     span { loc = "location", message = "generic specialization for '~generic:IRInst' recursively re-entered the same specialization key." }
 )
 
+err(
+    "hit-object-requires-ser-capability",
+    55215,
+    "HitObject requires a shader-execution-reordering capability",
+    span { loc = "location", message = "cannot emit HitObject for the current target: shader-execution-reordering on HLSL requires either SM 6.9 (native DXR) or the explicit 'nvapi_hit_objects' capability." }
+)
+
 fatal(
     "generic-specialization-budget-exceeded",
     55207,
