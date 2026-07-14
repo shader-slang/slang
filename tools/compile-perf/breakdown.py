@@ -846,3 +846,23 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# Import-time self-check for the pp-sum tiling contract between this module's
+# buckets and daily_movers.workload_progress. It lives HERE, not in
+# daily_movers, because this is the only placement safe in both import
+# orders: by this line breakdown's bucket functions exist and daily_movers
+# (imported at the top) is fully initialized, so _partition's lazy
+# `import breakdown` resolves to a complete module.
+_T0 = ("2026-01-01", "aaaaaaaaa",
+       {("w", "compileInner"): 100.0, ("w", "SemanticChecking"): 60.0,
+        ("w", "generateIR"): 30.0})
+_T1 = ("2026-01-02", "bbbbbbbbb",
+       {("w", "compileInner"): 80.0, ("w", "SemanticChecking"): 45.0,
+        ("w", "generateIR"): 32.0})
+_ov, _contrib, _ex, _st = daily_movers.workload_progress([_T0, _T1], "w")
+assert _ov is not None and abs(_ov[6] - (-20.0)) < 1e-9, \
+    "workload_progress fixture: headline 100 -> 80 ms must be -20%"
+assert abs(sum(c[3] for c in _contrib) - _ov[6]) < 1e-9, \
+    "workload_progress fixture: contributor pp must sum to the overall %"
+del _T0, _T1, _ov, _contrib, _ex, _st

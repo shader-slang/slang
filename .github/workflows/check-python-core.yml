@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "extras/**/*.py"
+      - "tools/compile-perf/**/*.py"
       - ".github/workflows/check-python-core.yml"
   merge_group:
     types: [checks_requested]
@@ -34,7 +35,7 @@ jobs:
               echo "FAIL: $f"
               failed=1
             fi
-          done < <(find extras -type f -name '*.py' -print0)
+          done < <(find extras tools/compile-perf -type f -name '*.py' -print0)
           exit $failed
 
       - name: Check for non-stdlib imports
@@ -47,15 +48,16 @@ jobs:
 
           # Collect all .py stems and package dirs under extras/ so that
           # cross-directory project-local imports are recognized.
-          extras = Path('extras')
           project_modules = set()
-          for p in extras.rglob('*.py'):
-              project_modules.add(p.stem)
-          for p in extras.rglob('__init__.py'):
-              project_modules.add(p.parent.name)
+          for root in (Path('extras'), Path('tools/compile-perf')):
+              for p in root.rglob('*.py'):
+                  project_modules.add(p.stem)
+              for p in root.rglob('__init__.py'):
+                  project_modules.add(p.parent.name)
 
           errors = []
-          for filepath in sorted(extras.rglob('*.py')):
+          scan = [*Path('extras').rglob('*.py'), *Path('tools/compile-perf').rglob('*.py')]
+          for filepath in sorted(scan):
               with open(filepath) as f:
                   tree = ast.parse(f.read(), str(filepath))
               def check_module(top, desc):
@@ -95,3 +97,16 @@ jobs:
               sys.exit(1)
           print('All imports are stdlib-only (local sibling modules allowed).')
           "
+
+      # Importing the compile-perf suite executes its import-time self-check
+      # asserts (lib/manifest.py workload validation, daily_movers/report/
+      # breakdown fixtures, new_release_check cutoff pins) — without this the
+      # only thing that ever imports these modules is the nightly, so a
+      # broken import or failed self-check would merge cleanly and surface
+      # as a lost nightly data point instead of a PR failure.
+      - name: Import-check compile-perf suite (runs its self-check asserts)
+        run: |
+          cd tools/compile-perf
+          python3 -c "import bench, report, breakdown, daily_movers, \
+              new_release_check, sweep, sweep_report, track, trend, \
+              compare_repro, ladder_scaling, fetch_releases"

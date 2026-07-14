@@ -308,3 +308,16 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# Import-time self-check pinning movers_block's positional reads of
+# daily_movers.boundaries() rows (v0/v1 at indices 5/6 plus the 8-name
+# unpack): a layout change in boundaries() passes daily_movers' own
+# fixtures but would silently break this module's family movers table,
+# so the contract is exercised here where it is consumed.
+_M0 = ("2026-01-01", "aaaaaaaaa", {("w", "compileInner"): 100.0})
+_M1 = ("2026-01-02", "bbbbbbbbb", {("w", "compileInner"): 80.0})
+_html = movers_block([_M0, _M1], ["w"])
+assert "-20.0%" in _html and "aaaaaaaaa..bbbbbbbbb" in _html, \
+    "movers_block fixture: boundaries() tuple layout drifted"
+del _M0, _M1, _html
