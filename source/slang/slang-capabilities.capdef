@@ -38,7 +38,7 @@
 
 // - `alias`: this defines an alias and does not introduce actual atoms.
 
-// How auto-doc works (automatic filling of `a3-02-reference-capability-atoms.md`):
+// How auto-doc works (automatic filling of `a4-02-reference-capability-atoms.md`):
 //
 // 1. `def`/`alias` are considered 'documentable atoms'
 //
