@@ -168,6 +168,10 @@ def workload_progress(points, workload, step_rel=0.05):
     covered = _tree_names(tree) | {f"{n} (self)" for n in _tree_names(tree)}
     first_t, last_t = pts[0][2], pts[-1][2]
     extras = []
+    # Intersection, not union: a counter reported at only one endpoint has
+    # no meaningful net for this informational view (unlike buckets, where a
+    # missing endpoint IS a 0 ms phase), so it is dropped rather than
+    # defaulted — which is also why the direct indexing below cannot KeyError.
     for t in sorted(set(first_t) & set(last_t)):
         if t in covered or t in _ALIASES:
             continue

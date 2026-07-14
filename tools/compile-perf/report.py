@@ -5,7 +5,7 @@ One panel per workload: frontEndExecute / generateOutput stacked areas across th
 release + daily-ToT history, with per-workload detail pages linked from each panel
 title.
 
-    python3 report.py            # -> results/analysis/report_per_workload.html
+    python3 report.py            # -> results/analysis/index.html (landing page)
 """
 import argparse
 import json
@@ -94,10 +94,15 @@ def movers_block(dpoints, names):
         base = sum(v0[k] for k in common)
         return (sum(v1[k] for k in common) - base) / base * 100 if base else 0.0
 
+    # boundaries() rows are (suite_total, d0, d1, c0, c1, v0, v1); prepending
+    # the family-scoped pct makes each row
+    # (fam_pct, suite_total, d0, d1, c0, c1, v0, v1) — the unpack below and
+    # the b[5]/b[6] here must track that layout.
     bounds = [(fam_pct(b[5], b[6]),) + b for b in daily_movers.boundaries(dpoints)]
     bounds.sort(key=lambda b: -abs(b[0]))
     biggest = ""
     if bounds and abs(bounds[0][0]) > 0:
+        # _t is the suite-wide total that fam_pct deliberately replaces.
         pct, _t, bd0, bd1, bc0, bc1, _v0, _v1 = bounds[0]
         cls = "worse" if pct > 0 else "better"
         biggest = (f'<p class="small">Largest daily change in the window: '

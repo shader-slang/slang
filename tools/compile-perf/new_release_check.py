@@ -37,6 +37,8 @@ import fetch_releases
 # the cutoff at 2 elements — a 3-element cutoff silently changes which
 # releases enter the permanent tracked history.
 SUBRELEASE_CUTOFF = (2026, 13)
+assert len(SUBRELEASE_CUTOFF) == 2, \
+    "cutoff must be (year, minor); a 3-tuple changes patch-release selection"
 
 _VER = re.compile(r"^v(\d{4})\.(\d+)(?:\.(\d+))?$")
 
@@ -64,7 +66,8 @@ def main():
     # otherwise the tag stays in `known` forever and is never re-swept.
     index_before = None
     if os.path.exists(ipath):
-        index_before = open(ipath, "rb").read()
+        with open(ipath, "rb") as fh:
+            index_before = fh.read()
         known = {r["tag"] for r in json.loads(index_before)}
 
     candidates = [tag for _date, tag in fetch_releases.window_tags(
@@ -104,6 +107,10 @@ def main():
         if index_before is not None:
             with open(ipath, "wb") as fh:
                 fh.write(index_before)
+        elif os.path.exists(ipath):
+            # merge-index CREATED the index this run; a leftover copy would
+            # make the failed tags read as known and never retried.
+            os.remove(ipath)
         sys.exit(f"new-release sweep of {', '.join(new)} failed; "
                  f"partial results removed, next nightly retries")
     print(f"new-release check: {', '.join(new)} added to the tracked history")
