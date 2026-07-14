@@ -5,11 +5,11 @@
 #include "core/slang-common.h"
 #include "core/slang-dictionary.h"
 #include "core/slang-performance-profiler.h"
+#include "core/slang-riff.h"
 #include "slang-ir-insts-stable-names.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-validate.h"
 #include "slang-serialize-fossil.h"
-#include "slang-serialize-riff.h"
 #include "slang-serialize-source-loc.h"
 #include "slang-serialize.h"
 #include "slang-tag-version.h"
@@ -17,14 +17,6 @@
 
 //
 #include "slang-serialize-ir.cpp.fiddle"
-
-// If USE_RIFF is set, then we serialize using the RIFF backend, it's the
-// slowest option
-#define USE_RIFF 0
-// If we are serializing using Fossil, DIRECT_FROM_FOSSIL will make it so that
-// we unflatten directly from the fossilized representation rather than
-// deserializing everything first. It is the fastest option
-#define DIRECT_FROM_FOSSIL 0
 
 FIDDLE()
 namespace Slang
@@ -269,13 +261,8 @@ struct IRSerialWriteContext;
 
 // Specialize to the reader/writer for the specific backend we're targeting
 // instead of ISerializerImpl to avoid some virtual function calls
-#if USE_RIFF
-using IRWriteSerializer = Serializer<RIFFSerialWriter, IRSerialWriteContext>;
-using IRReadSerializer = Serializer<RIFFSerialReader, IRSerialReadContext>;
-#else
 using IRWriteSerializer = Serializer<Fossil::SerialWriter, IRSerialWriteContext>;
 using IRReadSerializer = Serializer<Fossil::SerialReader, IRSerialReadContext>;
-#endif
 
 struct IRSerialWriteContext : SourceLocSerialContext
 {
@@ -531,44 +518,18 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
     serialize(serializer, flat);
 }
 
-// A helper function to read one thing from a Fossil ref
-template<typename T>
-static T deserialize1(const IRReadSerializer& serializer, const Fossil::AnyValRef r)
-{
-    T t;
-    Fossil::ReadContext context;
-    Fossil::SerialReader reader(
-        context,
-        Fossil::getAddress(r),
-        Fossil::SerialReader::InitialStateType::PseudoPtr);
-    IRReadSerializer serializer_(&reader, serializer.getContext());
-    serialize(serializer_, t);
-    return t;
-}
-
 static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serializer, IRModule* module)
 {
     IRSerialReadContext& readContext = *serializer.getContext();
-#if DIRECT_FROM_FOSSIL
-    const auto flatPtr = as<Fossilized<FlatInstTable>>(serializer.getImpl()->readValPtr());
-    Fossilized<FlatInstTable>& flat = flatPtr->getDataRef();
-    // Read just the sourceLocs using normal deserialization
-    const auto sourceLocs = deserialize1<List<SourceLoc>>(serializer, flatPtr->getSourceLocs());
-#else
     FlatInstTable flat;
     serialize(serializer, flat);
     const List<SourceLoc>& sourceLocs = flat.sourceLocs;
     // dumpFlatInstTableStats(flat, "deserializing");
-#endif
 
     Int64 stringLengthIndex = 0;
     List<IRInst*> instsList;
 
-#if DIRECT_FROM_FOSSIL
-    const auto numInsts = flat.instAllocInfo.getElementCount();
-#else
     const auto numInsts = flat.instAllocInfo.getCount();
-#endif
 
     const auto operandIndicesCount = flat.operandIndices.getCount();
 
@@ -586,13 +547,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     for (Int64 instIndex = 0; instIndex < numInsts; ++instIndex)
     {
         const auto& a = flat.instAllocInfo[instIndex];
-        // The opcode is serialized as the stable name, so if we're reading
-        // directly we need to destabilize that
-#if DIRECT_FROM_FOSSIL
-        IROp op = getStableNameOpcode(a.op);
-#else
         IROp op = a.op;
-#endif
         if (op == kIROp_Invalid) [[unlikely]]
         {
             readContext._foundUnrecognizedInstructions = true;
@@ -784,18 +739,11 @@ void writeSerializedModuleIR(
     moduleInfo.fullVersion = SLANG_TAG_VERSION;
     moduleInfo.module = irModule;
 
-#if USE_RIFF
-    {
-        RIFFSerialWriter writer(cursor.getCurrentChunk());
-        IRSerialWriteContext context{sourceLocWriter};
-        IRWriteSerializer serializer(&writer, &context);
-        serialize(serializer, moduleInfo);
-    }
-
-    ComPtr<ISlangBlob> blob;
-#else
     BlobBuilder blobBuilder;
     {
+        // Note: `context` must be declared before `writer` so that it outlives
+        // it; ~SerialWriter flushes deferred writes that call back into the
+        // context.
         IRSerialWriteContext context{sourceLocWriter};
         Fossil::SerialWriter writer(blobBuilder);
         IRWriteSerializer serializer(&writer, &context);
@@ -808,7 +756,6 @@ void writeSerializedModuleIR(
     void const* data = blob->getBufferPointer();
     size_t size = blob->getBufferSize();
     cursor.addDataChunk(PropertyKeys<IRModule>::IRModule, data, size);
-#endif
 }
 
 Result readSerializedModuleInfo(
@@ -817,8 +764,6 @@ Result readSerializedModuleInfo(
     UInt& version,
     String& name)
 {
-    static_assert(!USE_RIFF); // unimplemented
-
     auto dataChunk = as<RIFF::DataChunk>(chunk);
     if (!dataChunk)
     {
@@ -848,22 +793,6 @@ Result readSerializedModuleInfo(
     SerialSourceLocReader* sourceLocReader,
     RefPtr<IRModule>& outIRModule)
 {
-#if USE_RIFF
-    auto dataChunk = as<RIFF::ListChunk>(chunk);
-    if (!dataChunk)
-    {
-        SLANG_UNEXPECTED("invalid format for serialized module IR");
-    }
-
-    IRModuleInfo info;
-    auto sharedDecodingContext = RefPtr(new IRSerialReadContext(session, sourceLocReader));
-    {
-        RIFFSerialReader reader(dataChunk);
-
-        IRReadSerializer serializer(&reader, sharedDecodingContext);
-        serialize(serializer, info);
-    }
-#else
     auto dataChunk = as<RIFF::DataChunk>(chunk);
     if (!dataChunk)
     {
@@ -896,7 +825,6 @@ Result readSerializedModuleInfo(
         IRReadSerializer serializer(&reader, sharedDecodingContext);
         serialize(serializer, info);
     }
-#endif
     if (!info.module)
         return SLANG_FAIL;
     outIRModule = info.module;

@@ -1715,13 +1715,31 @@ struct SpecializationContext
                 break;
 
             if (iterChanged)
-            {
                 this->changed = true;
-                eliminateDeadCode(module->getModuleInst());
-                peepholeOptimizeGlobalScope(targetProgram, this->module);
-                performMandatoryEarlyInlining(module);
-                applySparseConditionalConstantPropagation(this->module, targetProgram, this->sink);
-                unrollLoopsInModule(module, targetProgram, sink);
+
+            // This cleanup group must run on every round, not only after a round
+            // that performed specialization. `unrollLoopsInModule` in particular
+            // is semantics-bearing, not an optimization: it implements
+            // `[ForceUnroll]`/`[unroll]` and diagnoses loops that cannot be
+            // unrolled, and this is its only call site in the pipeline. Gating it
+            // on `iterChanged` used to be masked by every linked module containing
+            // auto-diff IR to specialize on the first round; with auto-diff
+            // link-time pruning a program with no specialization work would
+            // otherwise never have its loops unrolled.
+            eliminateDeadCode(module->getModuleInst());
+            peepholeOptimizeGlobalScope(targetProgram, this->module);
+            performMandatoryEarlyInlining(module);
+            applySparseConditionalConstantPropagation(this->module, targetProgram, this->sink);
+            bool unrolledAnyLoop = false;
+            unrollLoopsInModule(module, targetProgram, sink, &unrolledAnyLoop);
+            if (unrolledAnyLoop)
+            {
+                // Unrolling can expose new specialization opportunities (e.g. a
+                // `specialize` whose argument becomes a constant inside an
+                // unrolled body), so treat it as a change and take another
+                // round.
+                this->changed = true;
+                iterChanged = true;
             }
 
             if (sink && sink->getErrorCount() != 0)
@@ -3289,11 +3307,86 @@ struct SpecializationContext
             param->replaceUsesWith(val);
         }
         {
-            // Now that we've replaced any uses of global generic
-            // parameters, we will do a second pass to remove
-            // the parameters and any `bind_global_generic_param`
+            // Before removing anything, diagnose any global generic parameter
+            // (`type_param` or `__generic_value_param`) that still has uses. A
+            // leftover use means the user is referencing the param from shader
+            // code that needs a concrete binding (e.g. interface-method dispatch
+            // on a value typed by the param), which is not a supported
+            // shader-body construct (#5627).
+            //
+            // A single source-level declaration can lower to several
+            // `IRGlobalGenericParam`s: a constrained `type_param T : IFoo`
+            // produces a type-kind param plus a paired *witness-table* param,
+            // and either may retain the leftover use. To emit exactly one
+            // message per source declaration we report the user-written params
+            // (a `type_param`'s type-kind param, or a `__generic_value_param`'s
+            // value-typed param) and skip the synthesized witness-table params,
+            // which never correspond to a separate source declaration — unless a
+            // witness param is the *only* thing left with a use, in which case we
+            // must still report it (handled by the second pass below).
+            //
+            // `diagnosedLeftoverUse` records that this loop actually *emitted* a
+            // diagnostic, so the cleanup loop below can assert "a leftover use
+            // implies it was reported" without depending on the global error
+            // count (which keeps the assert correct even if the diagnostic is
+            // reclassified or suppressed).
+            bool diagnosedLeftoverUse = false;
+            if (sink)
+            {
+                // First pass: report each user-written param (type-kind or value
+                // param). A constrained `type_param T : IFoo` also produces a
+                // synthesized witness-table param; we skip it *here* so the pair
+                // yields a single message.
+                bool reportedNonWitness = false;
+                for (auto inst : moduleInst->getChildren())
+                {
+                    if (inst->getOp() != kIROp_GlobalGenericParam || !inst->firstUse)
+                        continue;
+                    if (inst->getDataType() &&
+                        inst->getDataType()->getOp() == kIROp_WitnessTableType)
+                        continue;
+                    reportedNonWitness = true;
+                    diagnosedLeftoverUse = true;
+                    sink->diagnose(Diagnostics::UnspecializedGlobalGenericParamWithUses{
+                        .location = inst->sourceLoc});
+                }
+
+                // Second pass: if the *only* leftover-use params are
+                // witness-table params (no user-written partner retained a use),
+                // report them too — otherwise such a param would be left in the
+                // IR with no diagnostic, breaking the cleanup loop's invariant.
+                //
+                // A single declaration can produce several witness-table params
+                // (e.g. a conjunction `type_param T : IFoo & IBar`), all sharing
+                // the declaration's source location, so dedup by location to
+                // still emit one message per declaration.
+                if (!reportedNonWitness)
+                {
+                    HashSet<SourceLoc::RawValue> reportedLocs;
+                    for (auto inst : moduleInst->getChildren())
+                    {
+                        if (inst->getOp() != kIROp_GlobalGenericParam || !inst->firstUse)
+                            continue;
+                        diagnosedLeftoverUse = true;
+                        if (inst->sourceLoc.isValid() &&
+                            !reportedLocs.add(inst->sourceLoc.getRaw()))
+                            continue;
+                        sink->diagnose(Diagnostics::UnspecializedGlobalGenericParamWithUses{
+                            .location = inst->sourceLoc});
+                    }
+                }
+            }
+
+            // Now remove the parameters and any `bind_global_generic_param`
             // instructions, since both should be dead/unused.
             //
+            // Exception: leave any still-used param (with its dangling uses) in
+            // place. We have diagnosed an error above, so `linkAndOptimizeIR`
+            // checks the error count right after this pass and discards the
+            // module — removal is unnecessary. And removing a still-used param
+            // here (replacing uses with a hoistable poison keyed on the param's
+            // own type while the param is torn down) corrupts the hoistable-inst
+            // dedup and crashes (issue #11316).
             IRInst* next = nullptr;
             for (auto inst = moduleInst->getFirstChild(); inst; inst = next)
             {
@@ -3305,11 +3398,31 @@ struct SpecializationContext
                     break;
 
                 case kIROp_GlobalGenericParam:
+                    if (inst->firstUse)
+                    {
+                        // A leftover-use param is left in place (not removed):
+                        // we have diagnosed it above, so `linkAndOptimizeIR`
+                        // bails on the error count right after this pass and
+                        // discards the module. Removing it here would replace its
+                        // uses with a hoistable poison keyed on the param's own
+                        // type while the param is torn down, corrupting the
+                        // hoistable-inst dedup and crashing (issue #11316).
+                        //
+                        // Fail loudly if we reach here without having diagnosed:
+                        // the sole production caller (`linkAndOptimizeIR`) always
+                        // supplies a sink, and the diagnose loop above sets
+                        // `diagnosedLeftoverUse` for any leftover-use param, so a
+                        // violation means a contract bug, not user input. Using
+                        // the local flag (not the global error count) keeps this
+                        // correct even if E38207 is reclassified or suppressed.
+                        SLANG_RELEASE_ASSERT(sink && diagnosedLeftoverUse);
+                        break;
+                    }
+                    inst->removeAndDeallocate();
+                    break;
                 case kIROp_BindGlobalGenericParam:
                     // A `bind_global_generic_param` instruction should
-                    // have no uses in the first place, and all the global
-                    // generic parameters should have had their uses replaced.
-                    //
+                    // have no uses in the first place.
                     SLANG_ASSERT(!inst->firstUse);
                     inst->removeAndDeallocate();
                     break;

@@ -1212,6 +1212,30 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_CastUntypedResourceHandleToUInt:
+            {
+                // unwrap(wrap(x)) --> x for an untyped resource-heap handle: after the
+                // descriptor-heap subscript and conversion ctor are inlined, the index
+                // round-trips through the untyped handle, so collapse it back to the index.
+                if (auto wrap = as<IRCastUIntToUntypedResourceHandle>(inst->getOperand(0)))
+                {
+                    inst->replaceUsesWith(wrap->getOperand(0));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_CastUntypedSamplerHandleToUInt:
+            {
+                // unwrap(wrap(x)) --> x for an untyped sampler-heap handle (see above).
+                if (auto wrap = as<IRCastUIntToUntypedSamplerHandle>(inst->getOperand(0)))
+                {
+                    inst->replaceUsesWith(wrap->getOperand(0));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
         case kIROp_UnpackAnyValue:
             {
                 if (inst->getOperand(0)->getOp() == kIROp_PackAnyValue)
@@ -1889,17 +1913,24 @@ struct PeepholeContext : InstPassBase
             }
         case kIROp_Store:
             {
-                // An attempt to store to an undefined pointer value is
-                // undefined behavior (just like a load), so we can conveniently
-                // decide to implement that behavior as a no-op.
+                // Storing an undefined value writes nothing meaningful, so the
+                // store can normally be dropped as a no-op -- with one
+                // exception. A `LoadFromUninitializedMemory` value is the
+                // compiler's record that the program read an uninitialized
+                // location; the uninitialized-use checker (a later,
+                // validation-only pass) needs this store to survive so it can
+                // diagnose the read (e.g. `x = uninit;`). Plain poison /
+                // synthesized `Undefined` values carry no such evidence, so
+                // those stores are still elided.
                 //
-                // TODO: While it is not the responsibility of a pass like this
-                // to diagnose errors (that is the front-end's job), it might
-                // be best to replace an invalid `store` like this with an
-                // instruction that represents a "panic" or similar exceptional
-                // situation.
-                //
-                if (as<IRUndefined>(as<IRStore>(inst)->getVal()))
+                // A preserved store can survive to codegen on textual targets
+                // (HLSL/GLSL/CPU emit a store of the undefined value); on
+                // SPIR-V the backend re-elides it. Either way it is benign: the
+                // program genuinely copied an undefined value, so emitting an
+                // undefined store faithfully preserves that meaning -- it is the
+                // same value any later load of the destination would observe.
+                auto storedVal = as<IRStore>(inst)->getVal();
+                if (as<IRUndefined>(storedVal) && !as<IRLoadFromUninitializedMemory>(storedVal))
                 {
                     maybeRemoveOldInst(inst);
                     changed = true;

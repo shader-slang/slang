@@ -88,6 +88,10 @@ bool isSimpleDecoration(IROp op)
     switch (op)
     {
     case kIROp_EarlyDepthStencilDecoration:
+    case kIROp_GLSLFragDepthGreaterDecoration:
+    case kIROp_GLSLFragDepthLessDecoration:
+    case kIROp_Shader64BitIndexingDecoration:
+    case kIROp_SynthesizedParameterGroupDecoration:
     case kIROp_KeepAliveDecoration:
     case kIROp_LineAdjInputPrimitiveTypeDecoration:
     case kIROp_LineInputPrimitiveTypeDecoration:
@@ -9251,7 +9255,9 @@ void IRInst::transferDecorationsTo(IRInst* target)
     }
 }
 
-bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
+bool IRInst::mightHaveSideEffects(
+    SideEffectAnalysisOptions options,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
     // TODO: We should drive this based on flags specified
     // in `ir-inst-defs.yaml` isntead of hard-coding things here,
@@ -9305,7 +9311,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
             //
             auto call = cast<IRCall>(this);
             return !(
-                isSideEffectFreeFunctionalCall(call, options) ||
+                isSideEffectFreeFunctionalCall(call, options, calleeSideEffectCache) ||
                 call->findDecoration<IRIgnoreSideEffectsDecoration>());
         }
         break;
@@ -9418,6 +9424,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetOptiXRayPayloadPtr:
     case kIROp_UpdateElement:
     case kIROp_MeshOutputRef:
+    case kIROp_NodeOutputRecordGetElementPtr:
     case kIROp_MakeVectorFromScalar:
     case kIROp_Swizzle:
     case kIROp_SwizzleSet: // Doesn't actually "set" anything - just returns the resulting
@@ -9495,6 +9502,10 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_CastDescriptorHandleToUInt64:
     case kIROp_CastDescriptorHandleToResource:
     case kIROp_CastResourceToDescriptorHandle:
+    case kIROp_CastUIntToUntypedResourceHandle:
+    case kIROp_CastUntypedResourceHandleToUInt:
+    case kIROp_CastUIntToUntypedSamplerHandle:
+    case kIROp_CastUntypedSamplerHandleToUInt:
     case kIROp_GetDynamicResourceHeap:
     case kIROp_CastDynamicResource:
     case kIROp_AllocObj:
@@ -9969,6 +9980,7 @@ bool isMovableInst(IRInst* inst)
     case kIROp_FieldAddress:
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
+    case kIROp_NodeOutputRecordGetElementPtr:
     case kIROp_GetOffsetPtr:
     case kIROp_UpdateElement:
     case kIROp_Specialize:

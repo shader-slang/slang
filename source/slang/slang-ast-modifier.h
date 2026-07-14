@@ -1249,6 +1249,13 @@ class EarlyDepthStencilAttribute : public Attribute
 };
 // `[earlydepthstencil]`
 
+FIDDLE()
+class Shader64BitIndexingAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+// `[Shader64BitIndexing]`
+
 // An HLSL `[numthreads(x,y,z)]` attribute
 FIDDLE()
 class NumThreadsAttribute : public Attribute
@@ -1275,6 +1282,67 @@ class WaveSizeAttribute : public Attribute
     // followings: 4, 8, 16, 32, 64 or 128.
     //
     FIDDLE() IntVal* numLanes;
+};
+
+// Work-graph node shader attributes
+
+FIDDLE()
+class NodeLaunchAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() String mode; // "broadcasting" | "thread" | "coalescing"
+};
+
+FIDDLE()
+class NodeMaxDispatchGridAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* x;
+    FIDDLE() IntVal* y;
+    FIDDLE() IntVal* z;
+};
+
+FIDDLE()
+class NodeDispatchGridAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* x;
+    FIDDLE() IntVal* y;
+    FIDDLE() IntVal* z;
+};
+
+FIDDLE()
+class MaxRecordsAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* value;
+};
+
+FIDDLE()
+class NodeIDAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() String name;
+    FIDDLE() IntVal* arrayIndex;
+};
+
+FIDDLE()
+class NodeIsProgramEntryAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class AllowSparseNodesAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class NodeArraySizeAttribute : public Attribute
+{
+    FIDDLE(...)
+    FIDDLE() IntVal* count;
 };
 
 FIDDLE()
@@ -1919,6 +1987,7 @@ FIDDLE()
 class NoDiffThisAttribute : public Attribute
 {
     FIDDLE(...)
+    FIDDLE() bool isSynthesized = false;
 };
 
 /// Indicates that the modified declaration is one of the "magic" declarations

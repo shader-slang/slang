@@ -9,6 +9,15 @@ on:
       runs-on:
         required: true
         type: string
+      container-user:
+        # UID:GID the build container runs as. The container must run as the
+        # user that owns the runner's _work directory, or actions/checkout
+        # cannot write the workspace. GitHub-hosted ubuntu runners own _work as
+        # UID 1001, but self-hosted runner images differ (the GCP build pool's
+        # runner is UID 1003), so this is overridable per runner pool.
+        required: false
+        type: string
+        default: "1001:1001"
 
 jobs:
   # Uses nvidia/cuda container for CUDA support.
@@ -21,10 +30,12 @@ jobs:
       packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
-      # EXPERIMENT: drop --user root and -v /:/host_root mount; host cleanup
-      # step removed below. If disk pressure resurfaces, slim the container
-      # image (issue #11339) rather than bringing host-root access back.
-      options: --user 1001:1001
+      # Drop --user root and -v /:/host_root mount; host cleanup step removed
+      # below. If disk pressure resurfaces, slim the container image (issue
+      # #11339) rather than bringing host-root access back. The UID:GID is an
+      # input because it must match the runner's _work owner, which differs
+      # between GitHub-hosted (1001) and self-hosted runner images.
+      options: --user ${{ inputs.container-user }}
 
     env:
       IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
@@ -63,7 +74,11 @@ jobs:
           min-disk-gb: "5"
 
       # Restore sccache local cache from master
+      # sccache is a build accelerator, not a correctness input: a cache miss
+      # or a transient cache-service error must degrade to a slower (cold)
+      # build, never fail the job.
       - name: Restore sccache cache
+        continue-on-error: true
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache
@@ -118,7 +133,6 @@ jobs:
             -DSLANG_ENABLE_CUDA=ON \
             -DSLANG_ENABLE_PCH=OFF \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
-            -DSLANG_ENABLE_SPIRV_OPT_MERGE_RETURN=ON \
             -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}"
 
@@ -136,6 +150,24 @@ jobs:
             ldd build/${cmake_config}/lib/librender-test-tool.so 2>/dev/null || true
           fi
 
+      - name: Verify Vulkan-Headers was not fetched
+        run: |
+          vulkan_headers_fetch_dir="build/_deps/vulkan_headers-src"
+          if [[ -e "$vulkan_headers_fetch_dir" ]]; then
+            echo "::error title=Unexpected Vulkan-Headers download::Found $vulkan_headers_fetch_dir"
+            cat <<'EOF'
+          Slang owns the Vulkan-Headers checkout in external/vulkan. external/CMakeLists.txt sets
+          FETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS so slang-rhi reuses that checkout instead of
+          downloading a second copy. Finding build/_deps/vulkan_headers-src means that redirect
+          stopped working. The two projects could then compile against different Vulkan header
+          versions.
+
+          Check that FETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS is set before add_subdirectory(slang-rhi)
+          and that slang-rhi still declares the FetchContent dependency as vulkan_headers.
+          EOF
+            exit 1
+          fi
+
       - name: Prepare artifacts for upload
         run: |
           # Create a staging directory for artifacts with config-specific subdirectory
@@ -149,6 +181,16 @@ jobs:
             if [ -d "build/${cmake_config}/bin" ]; then
               mkdir -p "artifacts-staging/${cmake_config}/bin"
               find "build/${cmake_config}/bin" -maxdepth 1 -type f ! -name "*.pdb" ! -name "*.ilk" ! -name "*.dwarf" ! -name "*.debug" ! -name "*.dSYM" -exec cp {} "artifacts-staging/${cmake_config}/bin/" \; || echo "Failed to copy bin directory"
+
+              # The capability atoms reference check reuses this artifact and
+              # needs the generator binary, which CMake places under the
+              # generator output directory instead of build/${cmake_config}/bin.
+              generator_path="build/generators/${cmake_config}/bin/slang-capability-generator"
+              if [[ ! -f "$generator_path" ]]; then
+                echo "Missing $generator_path"
+                exit 1
+              fi
+              cp "$generator_path" "artifacts-staging/${cmake_config}/bin/"
 
               cp -r "build/${cmake_config}/bin/D3D12" "artifacts-staging/${cmake_config}/bin/" 2>/dev/null || echo "No D3D12 directory (expected on Linux)"
               cp -r "build/${cmake_config}/bin/optix" "artifacts-staging/${cmake_config}/bin/" || echo "Failed to copy bin/optix directory"

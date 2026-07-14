@@ -11,7 +11,19 @@ concurrency:
 
 jobs:
   update-health:
-    runs-on: ubuntu-latest
+    # RUNNER SELECTION — switchable via the `ANALYTICS_RUNS_ON` repository
+    # variable, WITHOUT a code change (Settings → Secrets and variables →
+    # Actions → Variables): unset (default) → GitHub-hosted `ubuntu-latest`;
+    # set to a runs-on JSON string (e.g. `["Linux", "self-hosted",
+    # "analytics", "GCP"]`) → the GCP analytics pool.
+    #
+    # NOTE: this cap-health monitor was deliberately moved off the GitHub-hosted
+    # pool (June 2026) because running it on `ubuntu-latest` starves it on the
+    # very 20-runner cap it measures, biasing the samples. Prefer keeping it on
+    # the GCP analytics pool (set the variable) unless the Teams-tier cap has
+    # ample headroom. Same variable drives ci-analytics.yml and the ci.yml
+    # wait-for-human-priority gate.
+    runs-on: ${{ vars.ANALYTICS_RUNS_ON && fromJSON(vars.ANALYTICS_RUNS_ON) || fromJSON('["ubuntu-latest"]') }}
     permissions:
       contents: read
       actions: read

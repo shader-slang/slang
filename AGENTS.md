@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: The Khronos Group, Inc.
+SPDX-License-Identifier: CC-BY-4.0
+-->
+
 # Repository Guidelines
 
 ## Project Structure & Module Organization
@@ -128,6 +133,12 @@ Review conventions (recurring review feedback — following them avoids review r
 
 - Comment functions in complete sentences: what it does first, then why if non-obvious; include a
   concrete example for non-trivial logic.
+- Write explanatory comments in a conversational style. Prefer "Consider this example:" followed
+  by the relevant user code over abstract labels such as "Full source shape", "AST trace", or
+  "IR trace". After the example, explain what happens step by step in natural prose: which
+  producer creates the AST/IR/value shape, what invariant this code is preserving, and which
+  downstream consumer relies on it. Include enough of the original user code for the example to be
+  understood without reconstructing the surrounding program from memory.
 - Reuse before you write: check shared headers (`slang-ast-type.h`, `slang-ir-util.h`, the `*-util.h`
   files) for an existing helper (e.g. `isDeclRefTypeOf<T>`) before adding one. When the logic is
   genuinely new, extract it into a named, documented helper rather than an inline lambda/long block.
@@ -179,6 +190,55 @@ Follow the principled path, not the minimal-edit-distance path.
   (one fix exposing the next), the fix chosen for each and why it is principled (with a code trace),
   and rejected alternatives. Distill this log into the PR description; do not commit it.
 
+### Self-Review for Unprincipled Changes
+
+Before finalizing a non-trivial compiler change, review the diff for signs that the fix is
+compensating for a bad AST/IR/`Val`/witness representation. Treat the following patterns as
+high-risk until you can prove they are the right layer:
+
+- A new custom equivalence relation over `DeclRef`, `Val`, `Type`, `Witness`, or IR shapes, such as
+  recursive helpers named like `are...Equivalent`, `does...Match`, or `try...Match`. First ask why
+  normal `substitute`, `resolve`, `getCanonicalType`, `equals`, or an existing canonical builder
+  does not already make the two values identical.
+- A new helper, fallback, or "try..." function that exists only to make one failing test pass. Audit
+  every new helper, even small ones: if it redoes substitution, resolution, AST copy, generic
+  solving, lookup, or lowering, it is probably hiding the actual invariant break.
+- Code that converts checked semantic data back into syntax, such as rebuilding an `Expr` or
+  `TypeExp` from a `Val`, `Type`, `DeclRef`, or witness. The checked semantic field should usually
+  remain the source of truth; reconstructing syntax is a strong signal that a producer or copier is
+  storing the wrong representation.
+- Code that walks arbitrary operand graphs, substitution chains, witness chains, or lookup paths to
+  rediscover context such as generic arguments, requirement keys, canonical paths, or parent
+  declarations. The producer should usually store or construct the canonical form directly.
+- Lowering, emit, specialization, or typeflow logic that patches a malformed AST/IR shape from an
+  earlier phase. These consumers should be simple; if they need target-specific knowledge of a
+  front-end representation accident, trace the producer instead.
+- Hardcoded knowledge of particular `DeclRef` subclasses, builtin magic type names, generic
+  argument indices, witness-table entry order, or nested-vs-flat specialization shape. Such code
+  needs a strong invariant and should usually live at a canonical construction boundary.
+- Guards that silently return a default value for an "impossible" shape. Use an assertion when the
+  shape is truly out of contract; otherwise explain why the shape is valid input and add coverage.
+
+Start each review by making a short inventory of every new helper/fallback/special case in the
+diff. For each entry, record whether it survives, is reverted, or needs a producer-side fix. For
+every flagged change, write down the input-shape audit before keeping it:
+
+1. What exact shape reaches this code? Include a concrete example and the producing function.
+2. Is that shape canonical and intentionally allowed, or is it an accidental alternative spelling?
+3. If it is accidental, can the producer be fixed so downstream code uses the existing
+   `substitute`/`resolve`/canonicalization path?
+4. What semantic source of truth already exists, and is this code rebuilding syntax or structural
+   shape from it instead of preserving it?
+5. Which test fails if this change is removed, and does that test prove this layer is responsible?
+   Do the revert drill when practical: remove the helper/special case, run the smallest failing
+   test, and use the failure to identify the real producer-consumer break.
+6. Can the special case be replaced by an assertion plus a producer-side fix, or by reusing an
+   existing helper?
+
+Do not keep a flagged change merely because it makes tests pass. If it remains necessary, the
+`Process report` section of the PR description must justify why this input shape is valid and why
+this layer owns the logic, with a code trace from producer to consumer.
+
 ## Commit & Pull Request Guidelines
 
 - Use short, imperative commit subjects, for example `Reject invalid descriptor heap access`.
@@ -206,5 +266,9 @@ Write the PR description in this five-part format:
    correct and principled, or should its producer have been fixed instead? — so a reviewer can
    confirm the fix sits at the right layer.
 
-Write for a reviewer without the full context in their head: ground each abstract claim in a
-concrete example, and wire explanations to the source (function name and file, or `file.cpp:line`).
+Write for a reviewer without the full context in their head. Use the same conversational style
+expected in code comments: start from a concrete user-code example, include the full relevant
+snippet rather than just a type or function name, and explain the logical steps in order. Say what
+the compiler builds, how that representation flows through named functions or IR instructions, and
+why the chosen fix preserves the invariant. Avoid terse headings like "AST trace"; make the prose
+read like an explanation to a reviewer who is learning the scenario for the first time.

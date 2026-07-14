@@ -108,9 +108,17 @@ def _daily_points(results_dir):
             meta = json.load(open(mp))
         date = meta.get("date") or label[:10]  # label prefix is YYYY-MM-DD
         pts.append({"label": label, "date": date, "kind": "daily",
-                    "commit": meta.get("commit", ""), "runner": meta.get("runner", ""),
+                    "commit": meta.get("commit", ""),
+                    "commit_time": meta.get("commit_time", ""),
+                    "runner": meta.get("runner", ""),
                     "metrics": _point_metrics(rj)})
-    pts.sort(key=lambda p: (p["date"], p["label"]))
+    # Within one date the label tiebreak is the short SHA — lexicographic hex,
+    # unrelated to code order (labels carry only the commit's DATE, and e.g.
+    # master's HEAD is usually committed the previous day, so same-date
+    # siblings are common). Sort by the commit's full timestamp when meta
+    # carries it so siblings land in true code order; the label remains the
+    # deterministic fallback for points registered before commit_time existed.
+    pts.sort(key=lambda p: (p["date"], p.get("commit_time") or "", p["label"]))
     return pts
 
 
@@ -134,7 +142,7 @@ def rebuild(results_dir, index_path):
     outdir = os.path.join(results_dir, "tracking")
     os.makedirs(outdir, exist_ok=True)
     out = os.path.join(outdir, "tracking.json")
-    with open(out, "w") as fh:
+    with open(out, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(series, fh, indent=2)
     n_rel = sum(1 for p in series["points"] if p["kind"] == "release")
     n_day = sum(1 for p in series["points"] if p["kind"] == "daily")
@@ -143,7 +151,7 @@ def rebuild(results_dir, index_path):
     return out
 
 
-def register(results_dir, index_path, label, commit, date, corpus_sha=""):
+def register(results_dir, index_path, label, commit, date, corpus_sha="", commit_time=""):
     ddir = os.path.join(results_dir, "daily", label)
     rj = os.path.join(ddir, "results.json")
     if not os.path.exists(rj):
@@ -153,15 +161,43 @@ def register(results_dir, index_path, label, commit, date, corpus_sha=""):
             "runner": runner_id(), "kind": "daily"}
     if corpus_sha:
         meta["corpus_sha"] = corpus_sha
-    with open(os.path.join(ddir, "meta.json"), "w") as fh:
+    # Full committer timestamp (git log -1 --format=%cI): orders same-date
+    # sibling points by code chronology in the tracking series and reports.
+    if commit_time:
+        meta["commit_time"] = commit_time
+    with open(os.path.join(ddir, "meta.json"), "w", encoding="utf-8", newline="\n") as fh:
         json.dump(meta, fh, indent=2)
     print(f"registered daily {label} (commit {commit[:9] or '?'}, runner {meta['runner']})")
     rebuild(results_dir, index_path)
 
 
+def merge_index(results_dir, new_index_path):
+    """Merge newly swept release entries into the results repo index.
+
+    Reads the existing index.json (if any) from results_dir, merges in the
+    entries from new_index_path (new entries override existing ones by tag),
+    and writes the merged result back. This ensures the report is generated
+    from all historical data, not just the releases swept in this run.
+    """
+    dest = os.path.join(results_dir, "index.json")
+    existing = {}
+    if os.path.exists(dest):
+        for r in json.load(open(dest)):
+            existing[r["tag"]] = r
+    n_before = len(existing)
+    for r in json.load(open(new_index_path)):
+        existing[r["tag"]] = r
+    merged = sorted(existing.values(), key=lambda r: r.get("date", ""))
+    with open(dest, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(merged, fh, indent=2)
+    n_added = len(existing) - n_before
+    print(f"merged index: {len(merged)} releases total "
+          f"({n_added} new, {len(merged) - n_added} existing)")
+
+
 def stamp_runner(results_dir, label):
     rp = os.path.join(results_dir, "runner.json")
-    with open(rp, "w") as fh:
+    with open(rp, "w", encoding="utf-8", newline="\n") as fh:
         json.dump({"fingerprint": runner_id(), "label": label}, fh, indent=2)
     print(f"stamped {rp}: {runner_id()} (built by {label})")
 
@@ -179,13 +215,16 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd", choices=["register", "rebuild", "stamp-runner",
-                                    "runner-id", "summary"])
+                                    "runner-id", "summary", "merge-index"])
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
     ap.add_argument("--index", default=os.path.join(HERE, "releases", "index.json"))
     ap.add_argument("--label", default="")
     ap.add_argument("--commit", default="")
     ap.add_argument("--date", default="")
     ap.add_argument("--corpus-sha", default="", dest="corpus_sha")
+    ap.add_argument("--commit-time", default="", dest="commit_time",
+                    help="the swept commit's full committer timestamp "
+                         "(git log -1 --format=%%cI); orders same-date points")
     args = ap.parse_args()
 
     if args.cmd == "runner-id":
@@ -197,7 +236,12 @@ def main():
     elif args.cmd == "register":
         if not args.label:
             ap.error("register needs --label")
-        register(args.results, args.index, args.label, args.commit, args.date, args.corpus_sha)
+        register(args.results, args.index, args.label, args.commit, args.date,
+                 args.corpus_sha, args.commit_time)
+    elif args.cmd == "merge-index":
+        if not args.index or not os.path.exists(args.index):
+            ap.error("merge-index needs --index <new-index.json>")
+        merge_index(args.results, args.index)
     elif args.cmd == "stamp-runner":
         stamp_runner(args.results, args.label or "manual")
 

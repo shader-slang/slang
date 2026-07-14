@@ -82,6 +82,14 @@ docs/generated/tests/conformance/expressions-member-access/matrix-mij-zero-based
 # equivalent; `.` works in slangi, `::` does not.
 docs/generated/tests/conformance/expressions-member-access/static-dot-vs-colon-colon.slang
 
+# Pending: docs/generated/tests/_meta/findings/slangi-vm-optional-none-arg-wrong-value.yaml
+# slangi VM passes an `Optional<T>` argument given as `none` with a
+# garbage (truthy) hasValue, so the callee unwraps value 0 instead of
+# taking the no-value branch. CPU compute executes the same function
+# correctly; the bug is at the VM's argument-passing boundary. The
+# if-let test's negative case (b=-1) hits this and prints b=0.
+docs/generated/tests/design/name-resolution/scopes/if-let-unwrapped-visible-in-positive-branch.slang
+
 # Pending: docs/generated/tests/_meta/findings/slangi-vm-global-var-bytecode-unsupported.yaml
 # slangi VM aborts with "unsupported global inst for vm bytecode
 # emit" when any module-scope global variable is declared (e.g.
@@ -160,44 +168,6 @@ docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buff
 
 # Surfaced on nightly run 28004033987 (Linux agentic suite):
 # https://github.com/shader-slang/slang/actions/runs/28004033987
-# Awaiting regeneration — tracked in
-# https://github.com/shader-slang/slang/issues/11700
-#
-# Stale auto-generated bundles whose annotations predate recent compiler
-# diagnostic improvements; the compiler is now correct/better and the
-# generated CHECK / IR-LABEL lines need regenerating (hand-editing is
-# discouraged by the per-file warning). Platform-independent — reproduces
-# on macOS too. Three sub-clusters:
-#
-# Group 1 — PR #11656 ("Focused diagnostics for failed generic
-# specialization") replaced the generic `E39999` / "could not specialize
-# generic for arguments of type (...)" with focused messages such as
-# "cannot deduce generic argument for 'T': conflicting requirements" and
-# "could not infer generic argument for parameter 'T'".
-docs/generated/tests/conformance/generics/ambiguous-type-arg-negative.slang
-docs/generated/tests/conformance/generics/ambiguous-value-arg-negative.slang
-docs/generated/tests/conformance/generics/constraint-not-satisfied-negative.slang
-docs/generated/tests/conformance/generics/type-equality-constraint-negative.slang
-docs/generated/tests/design/ast-reference/declarations/generic-constraint-violation-rejected.slang
-docs/generated/tests/design/ast-reference/types/andtype-missing-conformance-rejected.slang
-docs/generated/tests/design/name-resolution/overload-resolution/generic-argument-inference-failed-diagnostic.slang
-#
-# Group 2 — PR #11576 ("Show argument type mismatch per candidate in
-# overload errors") added per-candidate notes ("candidate: func ...",
-# "argument N does not match: expected X, got Y"). These bundles use
-# exhaustive DIAGNOSTIC_TEST mode, so the new unannotated notes fail.
-docs/generated/tests/design/ast-reference/base/expr-type-mismatch-diagnoses.slang
-docs/generated/tests/design/cross-cutting/ir-instructions/negative-arithmetic-add-struct-no-overload.slang
-docs/generated/tests/design/name-resolution/overload-resolution/no-applicable-overload-diagnostic.slang
-docs/generated/tests/design/pipeline/03-semantic-check/no-applicable-overload-zero-candidate-rejected.slang
-#
-# Group 3 — coopvector init IR lowering changed; the
-# `IR-LABEL: func %CoopVecx5Fx24init` no longer matches (compile succeeds,
-# result code = 0). Confirm the new IR is intended before regenerating.
-docs/generated/tests/design/ir-reference/values/aggregate-makecoopvector.slang
-
-# Surfaced on nightly run 28004033987 (Linux agentic suite):
-# https://github.com/shader-slang/slang/actions/runs/28004033987
 # (no tracking issue filed yet; pending user triage). Test-server flake,
 # NOT a content bug: passes locally both standalone and under
 # `-use-test-server`. The CI "JSON RPC failure: waitForResult() /
@@ -207,3 +177,19 @@ docs/generated/tests/design/ir-reference/values/aggregate-makecoopvector.slang
 # not help; kept here so the next flip to FAILED doesn't turn the nightly
 # red.
 docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buffer-getelementptr-negative-index-literal.slang
+
+# Pending: docs/generated/tests/_meta/findings/slangi-vm-get-string-hash-bytecode-unimplemented.yaml
+# slangi VM aborts with "unimplemented: VM bytecode gen for inst" on
+# any `getStringHash("...")` call. The doc documents the opcode as a
+# compile-time-stable literal hash folded by the emitters; the C++
+# emit path folds it correctly, only the VM bytecode emitter lacks a
+# handler. (Will become a tracking issue after human triage.)
+docs/generated/tests/design/ir-reference/misc/string-hash-stable-value-interpret.slang
+
+# Pending: docs/generated/tests/_meta/findings/cpu-get-string-hash-slang-test-segfault.yaml
+# slang-test dies with SIGSEGV (exit 139) when executing a
+# COMPARE_COMPUTE -cpu kernel that calls `getStringHash`. Codegen is
+# healthy (-target cpp folds both call sites to the same constant);
+# the crash is in slang-test's CPU host-callable execution path.
+# (Will become a tracking issue after human triage.)
+docs/generated/tests/design/ir-reference/misc/string-hash-stable-value-cpu.slang (cpu)

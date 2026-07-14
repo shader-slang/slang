@@ -136,7 +136,7 @@ else
   # same merged profdata as the main pass.
   #
   # Failures are tolerated — the suite is still being de-bugged (see
-  # docs/generated/tests/_meta/findings/) and ci-agentic-tests-nightly.yml
+  # docs/generated/tests/_meta/findings/) and nightly-slang-test.yml
   # is the authoritative pass/fail gate. We're here for the coverage
   # numbers, not the verdict.
   if [[ "$WITH_AGENTIC_TESTS" == "true" ]]; then
@@ -224,12 +224,26 @@ else
     # runs once a day; data quality > runner-minute savings.
     AGENTIC_TEST_ARGS+=("-server-count" "1")
 
+    # Scope the agentic pass to docs/generated/tests only: exclude the
+    # built-in unit tests. slang-test always appends the
+    # `slang-unit-test-tool/*` unit tests even when `-test-dir` is
+    # given, and some of them (e.g. the record-replay `replayContext*`
+    # cases) throw C++ exceptions that are contained under the
+    # subprocess test-server but become an uncaught `terminate`/SIGABRT
+    # when this pass runs them in-process (`-server-count 1`). That
+    # abort kills slang-test before it flushes its .profraw, losing the
+    # coverage for the whole agentic pass. The unit tests are not part
+    # of the doc-anchored suite and their coverage is already collected
+    # by the main pass above (plus the focused `slang-unit-test-tool/
+    # RecordReplayApi` run), so skipping them here is non-lossy.
+    AGENTIC_TEST_ARGS+=("-exclude-prefix" "slang-unit-test-tool")
+
     # Read coverage-only exclude list from
     # docs/generated/tests/_meta/agentic-coverage-excludes.txt and add
     # one -exclude-prefix flag per entry. These are tests that crash
     # slang-test under coverage instrumentation (the orchestrator dies
     # SIGSEGV and loses the tail of the suite); they still run in
-    # ci-agentic-tests-nightly against the uninstrumented binary.
+    # nightly-slang-test.yml against the uninstrumented binary.
     AGENTIC_COVERAGE_EXCLUDES_FILE="$REPO_ROOT/docs/generated/tests/_meta/agentic-coverage-excludes.txt"
     if [ -f "$AGENTIC_COVERAGE_EXCLUDES_FILE" ]; then
       while IFS= read -r line || [ -n "$line" ]; do
@@ -273,7 +287,7 @@ else
     if [ "$AGENTIC_EXIT" -gt 128 ]; then
       echo "Warning: agentic-test pass crashed on all $AGENTIC_MAX_ATTEMPTS attempts (signal $((AGENTIC_EXIT - 128))). Partial coverage data still collected."
     elif [ "$AGENTIC_EXIT" -ne 0 ]; then
-      echo "Note: agentic-test pass had unexpected test failures (exit code $AGENTIC_EXIT). Coverage data still collected; see ci-agentic-tests-nightly.yml for the authoritative pass/fail gate."
+      echo "Note: agentic-test pass had unexpected test failures (exit code $AGENTIC_EXIT). Coverage data still collected; see nightly-slang-test.yml for the authoritative pass/fail gate."
     fi
   fi
 

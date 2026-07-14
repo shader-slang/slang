@@ -1871,6 +1871,10 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                                 .expected = int(paramCount),
                                 .got = int(argCount),
                                 .location = leftParen.loc});
+                        // The invocation was never pushed onto the input stream
+                        // stack (which owns and eventually deletes its streams),
+                        // so it must be freed here.
+                        delete invocation;
                         return;
                     }
                 }
@@ -1889,6 +1893,9 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                                 .expected = int(requiredArgCount),
                                 .got = int(argCount),
                                 .location = leftParen.loc});
+                        // See the non-variadic mismatch above: not pushed, so
+                        // freed here.
+                        delete invocation;
                         return;
                     }
                 }
@@ -4208,7 +4215,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         break;
 
     case TokenType::StringLiteral:
-        file = getStringLiteralTokenValue(AdvanceToken(context));
+        file = getStringLiteralTokenValue(AdvanceToken(context), GetSink(context));
         break;
 
     case TokenType::IntegerLiteral:

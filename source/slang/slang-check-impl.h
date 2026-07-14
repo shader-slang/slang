@@ -9,6 +9,9 @@
 #include "slang-compiler.h"
 #include "slang-visitor.h"
 
+#include <cstring>
+#include <type_traits>
+
 namespace Slang
 {
 template<typename P, typename... Args>
@@ -295,35 +298,32 @@ struct GenericArgumentInferenceFailure
         GenericParamUnificationConflict genericParamUnificationConflict;
     };
 
-    // Every payload must be trivially destructible: that is what makes the
-    // placement-new in `set*()` / `copyActiveMemberFrom` (which never destroys
-    // the previously active member first) well-defined.
+    // Every payload must be trivially copyable: that is what lets this struct
+    // use the implicitly-defaulted (trivial) copy/assignment, which copies the
+    // whole object representation instead of switching on `kind` to copy only
+    // the active member. A kind-switched copy performs conditional reads of
+    // individual payload fields, which GCC's -Werror=maybe-uninitialized
+    // rejects (it cannot prove the read member is the initialized one) once
+    // `OverloadCandidate` values are copied inside standard-library
+    // algorithms. Trivial copyability also implies trivial destructibility,
+    // which is what makes the placement-new in the `set*()` members (which
+    // never destroy the previously active member first) well-defined.
     static_assert(
-        std::is_trivially_destructible_v<VariadicPackCountMismatch> &&
-            std::is_trivially_destructible_v<GenericArityMismatch> &&
-            std::is_trivially_destructible_v<OrdinaryGenericParamNotInferred> &&
-            std::is_trivially_destructible_v<InterfaceConformanceNotSatisfied> &&
-            std::is_trivially_destructible_v<GenericConstraintNotSatisfied> &&
-            std::is_trivially_destructible_v<GenericParamUnificationConflict>,
-        "GenericArgumentInferenceFailure payloads must be trivially destructible");
+        std::is_trivially_copyable_v<VariadicPackCountMismatch> &&
+            std::is_trivially_copyable_v<GenericArityMismatch> &&
+            std::is_trivially_copyable_v<OrdinaryGenericParamNotInferred> &&
+            std::is_trivially_copyable_v<InterfaceConformanceNotSatisfied> &&
+            std::is_trivially_copyable_v<GenericConstraintNotSatisfied> &&
+            std::is_trivially_copyable_v<GenericParamUnificationConflict>,
+        "GenericArgumentInferenceFailure payloads must be trivially copyable");
 
-    GenericArgumentInferenceFailure()
-        : variadicPackCountMismatch()
-    {
-    }
-
-    GenericArgumentInferenceFailure(GenericArgumentInferenceFailure const& other)
-        : kind(other.kind)
-    {
-        copyActiveMemberFrom(other);
-    }
-
-    GenericArgumentInferenceFailure& operator=(GenericArgumentInferenceFailure const& other)
-    {
-        kind = other.kind;
-        copyActiveMemberFrom(other);
-        return *this;
-    }
+    // Zero the tag and the full union storage so every byte of the object is
+    // initialized from birth and the trivial copy above never reads an
+    // indeterminate byte. `Kind::None` is value zero, so the zeroed tag is the
+    // correct "no failure recorded" state; assert that so a reordering of the
+    // enum cannot silently break this constructor.
+    static_assert(int(Kind::None) == 0, "zero-initialized tag must mean Kind::None");
+    GenericArgumentInferenceFailure() { std::memset(static_cast<void*>(this), 0, sizeof(*this)); }
 
     // Select a union variant and return a reference for the caller to populate.
     // Each setter begins the chosen member's lifetime with placement-new and
@@ -361,51 +361,17 @@ struct GenericArgumentInferenceFailure
         kind = Kind::GenericParamUnificationConflict;
         return *new (&genericParamUnificationConflict) GenericParamUnificationConflict();
     }
-
-private:
-    // Begin the lifetime of whichever union member `kind` selects, copy-
-    // constructing it from `other`'s active member. The payloads embed a
-    // `SourceLoc`, which has a user-provided copy constructor and so is not
-    // trivially copyable; assigning into a union member whose lifetime has not
-    // begun would be undefined. Placement-new starts that lifetime correctly
-    // for both copy construction (no member live yet) and copy assignment (the
-    // previously active member is trivially destructible, so it needs no
-    // explicit destruction before the new member is constructed in place).
-    void copyActiveMemberFrom(GenericArgumentInferenceFailure const& other)
-    {
-        switch (other.kind)
-        {
-        case Kind::VariadicPackCountMismatch:
-            new (&variadicPackCountMismatch)
-                VariadicPackCountMismatch(other.variadicPackCountMismatch);
-            break;
-        case Kind::GenericArityMismatch:
-            new (&genericArityMismatch) GenericArityMismatch(other.genericArityMismatch);
-            break;
-        case Kind::OrdinaryGenericParamNotInferred:
-            new (&ordinaryGenericParamNotInferred)
-                OrdinaryGenericParamNotInferred(other.ordinaryGenericParamNotInferred);
-            break;
-        case Kind::InterfaceConformanceNotSatisfied:
-            new (&interfaceConformanceNotSatisfied)
-                InterfaceConformanceNotSatisfied(other.interfaceConformanceNotSatisfied);
-            break;
-        case Kind::GenericConstraintNotSatisfied:
-            new (&genericConstraintNotSatisfied)
-                GenericConstraintNotSatisfied(other.genericConstraintNotSatisfied);
-            break;
-        case Kind::GenericParamUnificationConflict:
-            new (&genericParamUnificationConflict)
-                GenericParamUnificationConflict(other.genericParamUnificationConflict);
-            break;
-        case Kind::None:
-            break;
-        }
-    }
 };
 
+// The zero-filling constructor and the implicitly-defaulted copy operations
+// above rely on the whole type — not just each payload — being trivially
+// copyable; assert it so a user-provided copy operation or a non-trivial
+// member cannot be reintroduced without failing the build.
+static_assert(
+    std::is_trivially_copyable_v<GenericArgumentInferenceFailure>,
+    "GenericArgumentInferenceFailure must be trivially copyable");
+
 DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal);
-bool arePackCountExpectedCountsEqual(ASTBuilder* astBuilder, IntVal* left, IntVal* right);
 
 struct OverloadCandidate
 {
@@ -2302,7 +2268,7 @@ public:
         RefPtr<WitnessTable> witnessTable);
 
     bool doesTypeSatisfyConstraintRequirements(
-        DeclRef<ContainerDecl> requiredAssociatedTypeDeclRef,
+        DeclRef<ContainerDecl> requirementDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
     bool doesTypeSatisfyAssociatedTypeRequirement(
@@ -2468,8 +2434,18 @@ public:
         RefPtr<WitnessTable> witnessTable,
         MethodWitnessSynthesisFailureDetails* outFailureDetails = nullptr);
 
-    /// Clone generic containers.
-    DeclRef<Decl> liftDeclFromGenericContainers(Decl* decl, SubstitutionSet& outSubst);
+    /// Clone the generic containers that make `decl` well-scoped after relocation.
+    ///
+    /// Generated interface requirements can be moved from a callable's local generic context to a
+    /// sibling requirement on the interface. This clones the enclosing generic signatures, rewrites
+    /// references from the source binders to the cloned binders, and returns a decl-ref that maps
+    /// the source environment to the relocated declaration. `destinationParentDecl` lets callers
+    /// place the cloned generic chain under the semantic owner that should contain the generated
+    /// declaration.
+    DeclRef<Decl> liftDeclFromGenericContainers(
+        Decl* decl,
+        SubstitutionSet& outSubst,
+        ContainerDecl* destinationParentDecl = nullptr);
 
     enum SynthesisPattern
     {
@@ -2839,9 +2815,25 @@ public:
 
     DeclRef<Decl> getRequirementAsLookedUpDecl(ASTBuilder* astBuilder, Decl* decl);
 
+    /// Calculate the builtin differentiable function interface type for a callable-as-type.
+    ///
+    /// The plain overloads derive the type-info witness from `baseFuncAsType`. The
+    /// `WithWitness` overloads are used when conformance checking already selected a specific
+    /// witness, so the computed interface type stays tied to that proof instead of re-synthesizing
+    /// a different one.
     FuncType* getCalculatedDiffFuncType(const char* magicCalcName, Type* baseFuncAsType)
     {
         Val* args[] = {baseFuncAsType, getDiffTypeInfoWitness(baseFuncAsType)};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, typeInfoWitness};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2856,6 +2848,17 @@ public:
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
 
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* operand1,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, operand1, typeInfoWitness};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
     FuncType* getCalculatedDiffFuncType(
         const char* magicCalcName,
         Type* baseFuncAsType,
@@ -2863,6 +2866,18 @@ public:
         Type* operand2)
     {
         Val* args[] = {baseFuncAsType, operand1, operand2, getDiffTypeInfoWitness(baseFuncAsType)};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* operand1,
+        Type* operand2,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, operand1, operand2, typeInfoWitness};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -3057,6 +3072,22 @@ public:
         // joining. The generic solver drains and clears this list whenever it
         // needs to pull newly discovered constraints into the iterative loop.
         ShortList<SolverConstraint, 8> discoveredConstraints;
+
+        // Hidden witness arguments discovered while unifying full generic-app
+        // decl-refs. Consider this example:
+        //
+        //     interface ITensor<T, int D>
+        //     {
+        //         T load<each TIndex>(TIndex indices)
+        //             where TIndex == int
+        //             where countof(TIndex) == D;
+        //     }
+        //
+        // A use site for this requirement already carries proof arguments for `load`'s source
+        // generic constraints. When that lookup resolves to a satisfying method, the solver should
+        // preserve those proof arguments instead of recomputing them from default declaration
+        // context.
+        Dictionary<Decl*, Val*> discoveredWitnessArgs;
 
         // Additional subtype witnesses available to the current constraint solving context.
         Type* subTypeForAdditionalWitnesses = nullptr;
@@ -3734,8 +3765,12 @@ public:
         ASTBuilder* astBuilder,
         DeclRef<InterfaceDecl> interfaceDeclRef);
 
-    bool doesCalleeHaveFwdDiff(DeclRef<CallableDecl> declRef);
-    bool doesCalleeHaveBwdDiff(DeclRef<CallableDecl> declRef);
+    // Differentiability of a function is represented by conformance of the function-as-type to
+    // `IForwardDifferentiable`/`IBackwardDifferentiable`. Query that conformance directly instead
+    // of probing for the `fwd_diff`/`bwd_diff` associated-function entries; those entries are
+    // witnesses produced by the conformance, not the source of truth.
+    SubtypeWitness* isFuncForwardDifferentiable(DeclRef<CallableDecl> declRef);
+    SubtypeWitness* isFuncBackwardDifferentiable(DeclRef<CallableDecl> declRef);
 };
 
 
@@ -3832,6 +3867,7 @@ public:
     CASE(ExtractExistentialValueExpr)
     CASE(OpenRefExpr)
     CASE(MakeOptionalExpr)
+    CASE(CastOptionalExpr)
     CASE(PartiallyAppliedGenericExpr)
     CASE(PackExpr)
 #undef CASE
@@ -4157,13 +4193,13 @@ Witness* findNonEmptyPackWitnessForConstraint(
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError);
 
-// Return the witness that proves `countof(constrainedArg) == expectedCount`,
-// or `nullptr` if the concrete count or an in-scope declared constraint cannot
-// prove that equality.
+// Return the witness that proves `actualCount == expectedCount`, or `nullptr`
+// if the concrete count or an in-scope declared constraint cannot prove that
+// equality.
 Witness* findVariadicPackCountWitnessForConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
-    Val* constrainedArg,
+    IntVal* actualCount,
     IntVal* expectedCount,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError);

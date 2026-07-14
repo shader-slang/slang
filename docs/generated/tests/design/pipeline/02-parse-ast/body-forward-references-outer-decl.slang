@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T15:00:00+00:00
 //META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#two-stage-parsing
-//META: doc_section_digest=533454eadd55380449930cf39d9145725c95943e6be5773e59633f3f506b93cf
+//META: doc_section_digest=1e3098e43035007be26d4096e8a805ad39b43b8df17f579801fdb13b75e7adba
 //META: purpose=Because function bodies are deferred to a second parse pass that runs after decl-stage has populated the outer scope, a body can forward-reference an outer declaration that appears later in the source file.
 //META: intent=functional
 //META: pipeline_stage=parse
