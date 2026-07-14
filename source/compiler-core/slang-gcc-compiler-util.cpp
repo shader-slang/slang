@@ -970,7 +970,22 @@ static SlangResult _parseGCCFamilyLine(
 
     if (targetDesc.payload == ArtifactDesc::Payload::MetalAIR)
     {
-        cmdLine.addArg("-std=metal3.1");
+        // The Metal language standard must be at least as high as the highest Metal feature the
+        // emitter used, otherwise the metal compiler rejects version-gated syntax (e.g. the
+        // `[[required_threads_per_threadgroup]]` attribute is metal4.0-only). Slang decides the
+        // version from the target's metallib capability and passes it here; when it is left unset
+        // we keep the historical default so no existing Metal compile changes behavior.
+        if (options.metalLanguageVersion.isSet())
+        {
+            StringBuilder std;
+            std << "-std=metal" << Int32(options.metalLanguageVersion.m_major) << "."
+                << Int32(options.metalLanguageVersion.m_minor);
+            cmdLine.addArg(std.produceString());
+        }
+        else
+        {
+            cmdLine.addArg("-std=metal3.1");
+        }
     }
 
     // Our generated code very often casts between dissimilar types with the
