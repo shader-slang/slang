@@ -72,8 +72,8 @@ bool TEST_texture<T>(
 
     float u = 0;
     float u2 = 0.5;
-    constexpr const float ddx = 0.0f;
-    constexpr const float ddy = 0.0f;
+    const float ddx = 0.0f;
+    const float ddy = 0.0f;
 
     bool result = true
         // ===============================

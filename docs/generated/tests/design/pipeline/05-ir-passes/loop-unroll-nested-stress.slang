@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#loop-transformations
-//META: doc_section_digest=2f4c4839739aa129e6a768311053d73d3691a989f5e00f77e04a70f426d5093f
+//META: doc_section_digest=352225772f21036f2bb726491a17e9298fba9124204787acc9180745246b4332
 //META: purpose=Stress: two nested `[ForceUnroll]` loops (4x4 = 16 iterations) both unroll fully — neither outer nor inner `for` keyword survives in the GLSL emit.
 //META: intent=stress
 //META: pipeline_stage=ir-pass

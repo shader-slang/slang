@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:50:00+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#compatibility-and-hlsl-storage-class-modifiers
-//META: doc_section_digest=0b146a7577c216d587114be607b7bee424fa867d45b9300854bbc44543473939
+//META: doc_section_digest=d5d29efa4fd4c91757e9dc8127be6c49e990a84d0af7778b5a7120d013c9c2f4
 //META: purpose=A function-scope `static` variable retains its value across calls to the function.
 //META: intent=functional
 //META: pipeline_stage=check

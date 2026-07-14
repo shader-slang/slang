@@ -6,7 +6,7 @@ if(SLANG_ENABLE_SLANGC)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/shader.o
         COMMAND
-            slangc -load-core-module ${core_module_archive} -target
+            slangc -load-core-module ${core_module_archive_without_timestamp} -target
             shader-object-code -emit-cpu-via-llvm -O3 -g0
             ${CMAKE_CURRENT_SOURCE_DIR}/shader.slang -o
             ${CMAKE_CURRENT_BINARY_DIR}/shader.o

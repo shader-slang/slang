@@ -26,5 +26,5 @@ void main()
 {
     OnlyA o;
     int r = combined(o);
-//CHECK:            ^ could not specialize generic for arguments of type (OnlyA)
+//CHECK:            ^ type argument 'OnlyA' does not conform to the required interface 'IB'
 }

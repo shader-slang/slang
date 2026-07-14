@@ -37,17 +37,27 @@ permissions:
 
 jobs:
   release-sweep:
-    # NVIDIA RGFX perf pool (runner group nvrgfx) — same machines as the nightly
-    # + PR-gate jobs, so release-history timings stay comparable.
+    # NVIDIA RGFX perf pool via the VM-based GitHub bridge (rtrci github-bridge
+    # target shader-slang/slang:windows-x64-perf) — same pool as the nightly
+    # job, so release-history timings stay comparable. The pre-VM pool (runner
+    # group nvrgfx, label nvrgfx-perf) was retired 2026-07; a re-sweep on this
+    # pool is needed to rebuild a baseline comparable with post-migration
+    # nightly points.
     runs-on:
-      group: nvrgfx
-      labels: [Windows, X64, nvrgfx-perf]
+      labels: [Windows, X64, nvrgfx-perf-kernelvm-bridge]
     steps:
       - name: Add bash to PATH (Windows)
         shell: pwsh
         run: |
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\bin"
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\usr\bin"
+
+      # bench.py --api builds the api-driver once per release with the host
+      # cl; without a dev environment every api workload fails on every
+      # release (cl.exe not on PATH — this job has no common-setup because it
+      # never builds slang). Same pinned action common-setup uses.
+      - name: Set up MSVC dev tools on Windows
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
@@ -107,8 +117,13 @@ jobs:
           python3 fetch_releases.py --repo "$GITHUB_WORKSPACE" \
             --since "$SINCE" --until "$UNTIL" "${force[@]}"
           # Sweep every release into the results repo (history baseline).
+          # --api: api-path workloads are part of the tracked suite; the driver
+          # dlopens each release's libslang, so the whole window gets baselines.
+          # Releases measured before the api workloads existed count as
+          # incomplete and are re-benched (full suite, same runner) on the next
+          # dispatch — that IS the backfill path; no force needed.
           python3 sweep.py --index releases/index.json --results "$RESULTS" \
-            --samples "$SAMPLES" "${force[@]}"
+            --samples "$SAMPLES" --api "${force[@]}"
           # Merge newly swept releases into the full index (not overwrite) so
           # report.py uses all historical data, not just the swept window.
           python3 track.py merge-index --results "$RESULTS" --index releases/index.json
@@ -202,6 +217,11 @@ jobs:
           mv report_per_workload.html index.html
           # _combined_index.json is a derived intermediate — no need to serve it
           rm -f _combined_index.json
+          # Serve files verbatim: without this marker GitHub Pages runs the
+          # generated report through legacy Jekyll, whose builds have failed
+          # or hung on this content. Must be re-created on every deploy
+          # because the `git rm -rf .` above removes it.
+          touch .nojekyll
 
           git add -A
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi

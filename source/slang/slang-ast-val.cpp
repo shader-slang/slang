@@ -898,49 +898,6 @@ breakLabel:;
     auto substSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
     auto substSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
 
-    // If we have a reference to a type constraint for an
-    // associated type declaration, then we can replace it
-    // with the concrete conformance witness for a concrete
-    // type implementing the outer interface.
-    //
-    // TODO: It is a bit gross that we use `GenericTypeConstraintDecl` for
-    // associated types, when they aren't really generic type *parameters*,
-    // so we'll need to change this location in the code if we ever clean
-    // up the hierarchy.
-    //
-    if (auto substTypeConstraintDecl = as<GenericTypeConstraintDecl>(getDeclRef().getDecl()))
-    {
-        if (auto substAssocTypeDecl = as<AssocTypeDecl>(substTypeConstraintDecl->parentDecl))
-        {
-            if (auto interfaceDecl = as<InterfaceDecl>(substAssocTypeDecl->parentDecl))
-            {
-                // At this point we have a constraint decl for an associated type,
-                // and we nee to see if we are dealing with a concrete substitution
-                // for the interface around that associated type.
-                if (auto thisTypeWitness = findThisTypeWitness(subst, interfaceDecl))
-                {
-                    // We need to look up the declaration that satisfies
-                    // the requirement named by the associated type.
-                    Decl* requirementKey = substTypeConstraintDecl;
-                    RequirementWitness requirementWitness =
-                        tryLookUpRequirementWitness(astBuilder, thisTypeWitness, requirementKey);
-                    switch (requirementWitness.getFlavor())
-                    {
-                    default:
-                        break;
-
-                    case RequirementWitness::Flavor::val:
-                        {
-                            auto satisfyingVal = requirementWitness.getVal();
-                            (*ioDiff)++;
-                            return satisfyingVal;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     auto substDeclRef = getDeclRef().substituteImpl(astBuilder, subst, &diff);
     auto rs = astBuilder->getDeclaredSubtypeWitness(substSub, substSup, substDeclRef);
 
@@ -1235,54 +1192,122 @@ Val* HigherOrderDiffTypeTranslationWitness::_resolveImplOverride()
         // Generate higher order diff-type-info witness.
         //
         // This is a little bit of a hack for the fact that diff-type-info witness
-        // only gets the witness for ParamType : IDifferentiable, but during higher-order
-        // autodiff, we may also need the witness for DifferentialPair<ParamType> : IDifferentiable.
+        // only gets the witness for ParamType : IDifferentiable/IDifferentiablePtrType, but
+        // during higher-order autodiff, we may also need the witness for
+        // DifferentialPair<ParamType> : IDifferentiable or
+        // DifferentialPtrPair<ParamType> : IDifferentiablePtrType.
         //
         // Unfortunately, there could be arbitrary number of nesting levels, so it's not tractable
         // to store all of them on the DiffTypeInfoWitness.
         //
         // Technically, this requires storing a higher-rank witness (i.e.
         // a witness of the form: forall T : IDifferentiable . DifferentialPair<T> :
-        // IDifferentiable) but our type (and decl-ref) system does not support this at the moment.
+        // IDifferentiable, and the corresponding pointer-pair form) but our type (and decl-ref)
+        // system does not support this at the moment.
         //
-        // Fortunately, in practice this is the only higher-rank witness we need to handle,
-        // so we'll just manually construct the DifferentialPair<T> : IDifferentiable witness here.
-        // by looking up the InheritanceDecl in the DifferentialPair declaration, and forming
-        // a specialized member-decl-ref to it.
+        // Fortunately, in practice these pair conformances are the only higher-rank witnesses we
+        // need to handle, so we'll manually construct the pair witness here by looking up the
+        // matching InheritanceDecl in the pair declaration, and forming a specialized
+        // member-decl-ref to it.
         //
 
+        auto astBuilder = getCurrentASTBuilder();
         auto diffPairGenericDecl = as<GenericDecl>(
-            getCurrentASTBuilder()->getSharedASTBuilder()->findMagicDecl("DifferentialPairType"));
+            astBuilder->getSharedASTBuilder()->findMagicDecl("DifferentialPairType"));
         SLANG_ASSERT(diffPairGenericDecl);
+        GenericDecl* diffPtrPairGenericDecl = nullptr;
 
-        InheritanceDecl* diffInheritanceDecl = nullptr;
-        for (auto inheritanceDecl : getMembersOfType<InheritanceDecl>(
-                 getCurrentASTBuilder(),
-                 as<ContainerDecl>(diffPairGenericDecl->inner)->getDefaultDeclRef()))
+        auto differentiableInterfaceType = astBuilder->getDifferentiableInterfaceType();
+        auto differentiablePtrInterfaceType = astBuilder->getDifferentiableRefInterfaceType();
+
+        auto findInheritanceDecl = [&](GenericDecl* pairGenericDecl,
+                                       Type* interfaceType) -> InheritanceDecl*
         {
-            if (inheritanceDecl.getDecl()->base.type ==
-                getCurrentASTBuilder()->getDifferentiableInterfaceType())
+            for (auto inheritanceDecl : getMembersOfType<InheritanceDecl>(
+                     astBuilder,
+                     as<ContainerDecl>(pairGenericDecl->inner)->getDefaultDeclRef()))
             {
-                diffInheritanceDecl = inheritanceDecl.getDecl();
-                break;
+                if (inheritanceDecl.getDecl()->base.type == interfaceType)
+                    return inheritanceDecl.getDecl();
             }
-        }
+            return nullptr;
+        };
+
+        InheritanceDecl* diffInheritanceDecl =
+            findInheritanceDecl(diffPairGenericDecl, differentiableInterfaceType);
         SLANG_ASSERT(diffInheritanceDecl);
+        InheritanceDecl* diffPtrInheritanceDecl = nullptr;
+
+        auto ensureDiffPtrPairDecls = [&]()
+        {
+            // Higher-order witnesses for value types can resolve while the core module is still
+            // being compiled. Only require the pointer-pair declaration when the base witness
+            // actually targets IDifferentiablePtrType.
+            if (!diffPtrPairGenericDecl)
+            {
+                diffPtrPairGenericDecl = as<GenericDecl>(
+                    astBuilder->getSharedASTBuilder()->findMagicDecl("DifferentialPtrPairType"));
+                SLANG_ASSERT(diffPtrPairGenericDecl);
+            }
+            if (!diffPtrInheritanceDecl)
+            {
+                diffPtrInheritanceDecl =
+                    findInheritanceDecl(diffPtrPairGenericDecl, differentiablePtrInterfaceType);
+                SLANG_ASSERT(diffPtrInheritanceDecl);
+            }
+        };
+
+        // The base witness determines the pair flavor. For pointer-differentiable `this`, reusing
+        // `DifferentialPairType` would form
+        // DiffPair(DifferentialPtrPair<T>, T:IDifferentiablePtrType), and IR lowering would later
+        // query an IDifferentiablePtrType witness table with IDifferentiable's value-pair
+        // requirement keys.
+        auto makeDiffPairType = [&](Type* baseType, SubtypeWitness* baseWitness) -> Type*
+        {
+            if (baseWitness->getSup() == differentiableInterfaceType)
+                return astBuilder->getDifferentialPairType(baseType, baseWitness);
+            if (baseWitness->getSup() == differentiablePtrInterfaceType)
+                return astBuilder->getDifferentialPtrPairType(baseType, baseWitness);
+
+            SLANG_UNEXPECTED("unsupported diff witness for higher-order diff pair type");
+            UNREACHABLE_RETURN(baseType);
+        };
 
         auto makeDiffPairWitness = [&](Type* baseType,
                                        SubtypeWitness* baseWitness) -> SubtypeWitness*
         {
+            GenericDecl* pairGenericDecl = nullptr;
+            InheritanceDecl* pairInheritanceDecl = nullptr;
+            Type* pairInterfaceType = nullptr;
+            if (baseWitness->getSup() == differentiableInterfaceType)
+            {
+                pairGenericDecl = diffPairGenericDecl;
+                pairInheritanceDecl = diffInheritanceDecl;
+                pairInterfaceType = differentiableInterfaceType;
+            }
+            else if (baseWitness->getSup() == differentiablePtrInterfaceType)
+            {
+                ensureDiffPtrPairDecls();
+                pairGenericDecl = diffPtrPairGenericDecl;
+                pairInheritanceDecl = diffPtrInheritanceDecl;
+                pairInterfaceType = differentiablePtrInterfaceType;
+            }
+            else
+            {
+                SLANG_UNEXPECTED("unsupported diff witness for higher-order diff pair witness");
+                UNREACHABLE_RETURN(baseWitness);
+            }
+
             Val* args[] = {baseType, baseWitness};
-            auto diffPairDeclRef = getCurrentASTBuilder()->getGenericAppDeclRef(
-                diffPairGenericDecl,
-                makeArrayView(args));
+            auto diffPairDeclRef =
+                astBuilder->getGenericAppDeclRef(pairGenericDecl, makeArrayView(args));
 
             auto inheritanceDeclRef =
-                getCurrentASTBuilder()->getMemberDeclRef(diffPairDeclRef, diffInheritanceDecl);
+                astBuilder->getMemberDeclRef(diffPairDeclRef, pairInheritanceDecl);
 
-            return getCurrentASTBuilder()->getDeclaredSubtypeWitness(
-                getCurrentASTBuilder()->getDifferentialPairType(baseType, baseWitness),
-                getCurrentASTBuilder()->getDifferentiableInterfaceType(),
+            return astBuilder->getDeclaredSubtypeWitness(
+                makeDiffPairType(baseType, baseWitness),
+                pairInterfaceType,
                 inheritanceDeclRef);
         };
 
@@ -1292,9 +1317,10 @@ Val* HigherOrderDiffTypeTranslationWitness::_resolveImplOverride()
 
         if (thisParamType && thisDiffWitness)
         {
-            thisParamType =
-                getCurrentASTBuilder()->getDifferentialPairType(thisParamType, thisDiffWitness);
-            thisDiffWitness = makeDiffPairWitness(thisParamType, thisDiffWitness);
+            auto originalThisParamType = thisParamType;
+            auto originalThisDiffWitness = thisDiffWitness;
+            thisParamType = makeDiffPairType(originalThisParamType, originalThisDiffWitness);
+            thisDiffWitness = makeDiffPairWitness(originalThisParamType, originalThisDiffWitness);
         }
 
         SubtypeWitness* resultDiffWitness = diffTypeInfoWitness->getReturnTypeDiffWitness();
@@ -1362,11 +1388,7 @@ Val* HasDiffTypeInfoWitness::_substituteImplOverride(
             Index index = 0;
             for (auto member : genericDecl->getDirectMemberDecls())
             {
-                if (as<GenericTypeConstraintDecl>(member) ||
-                    as<TypeCoercionConstraintDecl>(member) ||
-                    as<NonEmptyPackConstraintDecl>(member) ||
-                    as<GenericVariadicPackCountConstraintDecl>(member) ||
-                    as<HasDiffTypeInfoConstraintDecl>(member))
+                if (isGenericConstraintParameterDecl(member))
                 {
                     if (member == constraintDeclRef.getDecl())
                     {
@@ -1452,11 +1474,7 @@ Val* DeclaredVariadicPackCountWitness::_substituteImplOverride(
             Index index = 0;
             for (auto member : genericDecl->getDirectMemberDecls())
             {
-                if (as<GenericTypeConstraintDecl>(member) ||
-                    as<TypeCoercionConstraintDecl>(member) ||
-                    as<NonEmptyPackConstraintDecl>(member) ||
-                    as<GenericVariadicPackCountConstraintDecl>(member) ||
-                    as<HasDiffTypeInfoConstraintDecl>(member))
+                if (isGenericConstraintParameterDecl(member))
                 {
                     if (member == constraintDeclRef.getDecl())
                     {
@@ -1500,8 +1518,8 @@ Val* DeclaredVariadicPackCountWitness::_substituteImplOverride(
 void ConcreteVariadicPackCountWitness::_toTextOverride(StringBuilder& out)
 {
     out.append("pack_count_witness(");
-    if (auto pack = getPack())
-        pack->toText(out);
+    if (auto actualCount = getActualCount())
+        actualCount->toText(out);
     else
         out.append("<null>");
     out.append(", ");
@@ -1514,12 +1532,13 @@ void ConcreteVariadicPackCountWitness::_toTextOverride(StringBuilder& out)
 
 Val* ConcreteVariadicPackCountWitness::_resolveImplOverride()
 {
-    auto resolvedPack = getPack() ? getPack()->resolve() : nullptr;
-    auto resolvedCount = getExpectedCount() ? as<IntVal>(getExpectedCount()->resolve()) : nullptr;
-    if (resolvedPack != getPack() || resolvedCount != getExpectedCount())
+    auto resolvedActualCount = getActualCount() ? as<IntVal>(getActualCount()->resolve()) : nullptr;
+    auto resolvedExpectedCount =
+        getExpectedCount() ? as<IntVal>(getExpectedCount()->resolve()) : nullptr;
+    if (resolvedActualCount != getActualCount() || resolvedExpectedCount != getExpectedCount())
         return getCurrentASTBuilder()->getConcreteVariadicPackCountWitness(
-            resolvedPack,
-            resolvedCount);
+            resolvedActualCount,
+            resolvedExpectedCount);
     return this;
 }
 
@@ -1528,20 +1547,23 @@ Val* ConcreteVariadicPackCountWitness::_substituteImplOverride(
     SubstitutionSet subst,
     int* ioDiff)
 {
-    // Concrete witnesses are proof-only values, but the pack and count operands
-    // still participate in specialization. Substituting both operands keeps
-    // serialized/lowered witnesses tied to the exact specialized
-    // `countof(pack) == count` fact that the checker validated.
+    // Concrete witnesses are proof-only values, but both count operands still
+    // participate in specialization. Substituting them keeps serialized/lowered
+    // witnesses tied to the exact specialized `countof(pack) == count` fact
+    // that the checker validated.
     int diff = 0;
-    auto substPack = getPack() ? getPack()->substituteImpl(astBuilder, subst, &diff) : nullptr;
-    auto substCount = getExpectedCount()
-                          ? as<IntVal>(getExpectedCount()->substituteImpl(astBuilder, subst, &diff))
-                          : nullptr;
+    auto substActualCount =
+        getActualCount() ? as<IntVal>(getActualCount()->substituteImpl(astBuilder, subst, &diff))
+                         : nullptr;
+    auto substExpectedCount =
+        getExpectedCount()
+            ? as<IntVal>(getExpectedCount()->substituteImpl(astBuilder, subst, &diff))
+            : nullptr;
     if (!diff)
         return this;
 
     (*ioDiff)++;
-    return astBuilder->getConcreteVariadicPackCountWitness(substPack, substCount);
+    return astBuilder->getConcreteVariadicPackCountWitness(substActualCount, substExpectedCount);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NonEmptyPackWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

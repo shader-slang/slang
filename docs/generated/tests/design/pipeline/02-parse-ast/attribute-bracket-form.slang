@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T15:00:00+00:00
 //META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#modifier-parsing
-//META: doc_section_digest=19f0544fc4722bd28dd43a33e103486d87957caa89e6ec1608e33172cd506a6c
+//META: doc_section_digest=85307207e3b8f9c4a6840f45c1896c59f8f18e3bce3e9753d2b831e1d7ea443a
 //META: purpose=Attribute parsing is modifier parsing in disguise — the `[name(args)]` token sequence becomes an `AttributeBase` modifier attached to the declaration that follows.
 //META: intent=functional
 //META: pipeline_stage=parse
