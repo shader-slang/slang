@@ -295,6 +295,11 @@ For details:
   binding contract and per-target host recipes.
 - [`docs/design/shader-coverage-counter-placement.md`](https://github.com/shader-slang/slang/blob/master/docs/design/shader-coverage-counter-placement.md) —
   where each mode places its counters, with worked examples.
+- [`examples/shader-coverage-backends`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-backends) —
+  this tutorial's own kernel dispatched with `--backend cpu|cuda|vulkan|metal`: each path is
+  a compact, runnable implementation of the corresponding binding recipe, and all backends
+  produce identical counter values for the same inputs. The place to start when moving from
+  the tutorial's CPU dispatch to your own target.
 - [`examples/shader-coverage-image-pipeline`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-image-pipeline) —
   Vulkan, in-process API, auto-allocated binding: the compiler picks the coverage slot and
   the host reads it back from the metadata after compilation. Multi-stage image kernels
