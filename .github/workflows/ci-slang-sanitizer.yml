@@ -14,6 +14,13 @@ on:
         required: false
         type: number
         default: 120
+      upload-binaries:
+        # Publish the ASan-instrumented build as a `sanitizer-binaries`
+        # artifact so downstream projects can run their own ASan suites
+        # against ToT Slang without building from source.
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   sanitizer:
@@ -201,7 +208,17 @@ jobs:
           # halt_on_error=0: continue after each error to find more issues
           # per run. Using server-count > 1 isolates tests in separate
           # processes for better coverage.
-          export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:log_path=$PWD/asan-logs/asan"
+          #
+          # detect_stack_use_after_return=1: catch use-after-return (the
+          # instrumentation is compiled in by default with clang 13+; only
+          # this runtime flag is needed to activate it).
+          # check_initialization_order=1 + strict_init_order=1: catch static
+          # initialization order bugs.
+          # detect_odr_violation=2: pin the strictest ODR detection (the
+          # modern ASan default, made explicit). Findings across our own
+          # instrumented DSOs enumerate the header-defined globals that also
+          # break downstream mixed ASan builds.
+          export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_odr_violation=2:log_path=$PWD/asan-logs/asan"
           export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:print_suppressions=0:log_path=$PWD/asan-logs/ubsan"
           export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
 
@@ -261,7 +278,8 @@ jobs:
       - name: Run slangc tests with Sanitizers
         if: steps.build.outcome == 'success'
         run: |
-          export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:log_path=$PWD/asan-logs/asan-slangc"
+          # Same ASan checks as the slang-test step above; see the comment there.
+          export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_odr_violation=2:log_path=$PWD/asan-logs/asan-slangc"
           export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:print_suppressions=0:log_path=$PWD/asan-logs/ubsan-slangc"
           export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
 
@@ -644,6 +662,53 @@ jobs:
               echo "No sanitizer issues detected." >> "$GITHUB_STEP_SUMMARY"
             fi
           fi
+
+      - name: Package ASan-instrumented binaries
+        # Upload unconditionally (not just on findings): the binaries from a
+        # clean run let downstream users re-run their own ASan suites and
+        # catch anything this job's coverage missed. Public-repo artifact
+        # storage is not metered, and at ~226 MB with 3-day retention the
+        # rolling footprint stays under 1 GB. always() is needed because the
+        # summary step exits non-zero on violation.
+        if: always() && inputs.upload-binaries && steps.build.outcome == 'success'
+        run: |
+          # Bundle the instrumented build for downstream ASan users. Binaries
+          # are built with -shared-libsan, so ship the matching dynamic ASan
+          # runtime alongside them; consumers must put both lib/ and
+          # asan-runtime/ on LD_LIBRARY_PATH.
+          #
+          # Copies are strict on purpose: a missing binary or ASan runtime
+          # must fail this step loudly rather than upload an artifact that is
+          # silently unusable (MANIFEST.txt alone would defeat the upload
+          # step's if-no-files-found check).
+          staging=/tmp/sanitizer-binaries
+          mkdir -p "$staging/bin" "$staging/asan-runtime"
+          cp -a "$lib_dir" "$staging/lib"
+          cp -a "$bin_dir/slangc" "$bin_dir/slangd" "$staging/bin/"
+          cp -a include "$staging/include"
+          CLANG_RUNTIME_DIR=$(clang-18 -print-runtime-dir)
+          cp -a "$CLANG_RUNTIME_DIR"/libclang_rt.asan*.so* "$staging/asan-runtime/"
+          {
+            echo "commit: $GITHUB_SHA"
+            echo "clang: $(clang-18 --version | head -1)"
+            echo "config: releaseWithDebugInfo, SLANG_ENABLE_ASAN=ON (-shared-libsan)"
+            echo "usage: add lib/ and asan-runtime/ to LD_LIBRARY_PATH of an"
+            echo "       ASan-instrumented consumer application"
+          } > "$staging/MANIFEST.txt"
+          tar -C /tmp -czf sanitizer-binaries.tar.gz sanitizer-binaries
+          ls -lh sanitizer-binaries.tar.gz
+
+      - name: Upload ASan-instrumented binaries
+        if: always() && inputs.upload-binaries && steps.build.outcome == 'success'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: sanitizer-binaries
+          path: sanitizer-binaries.tar.gz
+          # The tarball is ~226 MB and each nightly supersedes the previous
+          # one; 3 days of fallback binaries while bounding the rolling
+          # footprint.
+          retention-days: 3
+          if-no-files-found: error
 
       - name: Upload Sanitizer Logs
         if: always()
