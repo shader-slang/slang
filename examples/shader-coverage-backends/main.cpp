@@ -1,9 +1,9 @@
-// shader-coverage-backends: one shader, three coverage dispatch paths.
+// shader-coverage-backends: one shader, four coverage dispatch paths.
 //
 // This example dispatches the user-guide coverage tutorial's kernel
-// (hello-coverage.slang) with `--backend cpu`, `--backend vulkan`, or
-// `--backend metal`, and shows that the coverage workflow is the same
-// everywhere:
+// (hello-coverage.slang) with `--backend cpu`, `--backend cuda`,
+// `--backend vulkan`, or `--backend metal`, and shows that the
+// coverage workflow is the same everywhere:
 //
 //   1. compile with coverage enabled (Slang C++ API),
 //   2. discover the hidden `__slang_coverage` buffer through
@@ -21,6 +21,11 @@
 //            the counter buffer is a (pointer, count) pair written into
 //            the kernel's global-parameter payload at the metadata's
 //            `uniformOffset`.
+//   cuda   — the same uniform-marshaling contract as cpu, with the
+//            differences inherent to the driver model: the pair holds a
+//            device pointer, the payload is copied into the module's
+//            `SLANG_globalParams` constant symbol, and readback is a
+//            device-to-host copy. Slang emits PTX through NVRTC.
 //   vulkan — the counter buffer is an ordinary storage buffer bound at
 //            the metadata's descriptor `(space, binding)`; uses the
 //            same raw-Vulkan helper as the other coverage examples.
@@ -52,6 +57,10 @@
 
 #if defined(SLANG_EXAMPLE_HAS_VULKAN)
 #include "vk_compute_demo.h"
+#endif
+
+#if defined(SLANG_EXAMPLE_HAS_CUDA)
+#include <cuda.h>
 #endif
 
 #include <cstdint>
@@ -111,7 +120,7 @@ std::filesystem::path getDemoDirectory()
 
 // ## Compilation
 //
-// One compile function serves all three backends; only the target
+// One compile function serves all four backends; only the target
 // format and profile differ. Coverage is requested the same way
 // everywhere, and the counter width is passed through so the Vulkan
 // path can demonstrate both widths (`--counter-width 64` requires
@@ -166,6 +175,16 @@ CompiledProgram compileWithCoverage(
                 break;
             }
         }
+    }
+
+    // For the CUDA path, PTX emission runs through NVRTC (which ships
+    // with the CUDA toolkit and is loaded at runtime). Precheck it so a
+    // missing toolkit surfaces as one clear message instead of a
+    // downstream-compiler diagnostic later in the compile.
+    if (target == SLANG_PTX)
+    {
+        if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
+            fail("the cuda backend needs NVRTC to emit PTX; install the CUDA toolkit");
     }
 
     slang::TargetDesc targetDesc = {};
@@ -441,6 +460,128 @@ void runCpu(int counterByteWidth)
     report(program, counters.data(), "cpu");
 }
 
+// ## Backend: CUDA
+//
+// CUDA uses the same uniform-marshaling contract as CPU: the coverage
+// buffer is one more (pointer, count) pair in the global-parameter
+// payload, at the byte offset the metadata reports in `uniformOffset`.
+// The differences are the ones inherent to the driver model: the
+// pointer in the pair is a device pointer from `cuMemAlloc`, the
+// payload is copied into the module's `SLANG_globalParams` constant
+// symbol rather than passed as a function argument (the emitted kernel
+// takes no launch-time parameters — this entry point has no uniform
+// parameters), and reading the counters back is a device-to-host copy.
+// Both counter widths work without any device opt-in: the backend
+// selects the matching CUDA atomic-add form directly.
+
+#if defined(SLANG_EXAMPLE_HAS_CUDA)
+void checkCuda(CUresult result, const char* what)
+{
+    if (result != CUDA_SUCCESS)
+    {
+        const char* name = nullptr;
+        cuGetErrorName(result, &name);
+        fail(std::string(what) + " failed with " + (name ? name : std::to_string(int(result))));
+    }
+}
+
+void runCuda(int counterByteWidth)
+{
+    auto program = compileWithCoverage(SLANG_PTX, "cuda_sm_7_0", counterByteWidth);
+
+    // On CUDA, as on CPU, the marshaling fields are the binding
+    // contract; the descriptor fields don't apply.
+    if (program.resourceInfo.uniformOffset < 0)
+        fail("expected a uniform marshaling offset for the coverage buffer on CUDA");
+
+    checkCuda(cuInit(0), "cuInit");
+    CUdevice device = 0;
+    checkCuda(cuDeviceGet(&device, 0), "cuDeviceGet");
+    CUcontext context = nullptr;
+    checkCuda(cuCtxCreate(&context, 0, device), "cuCtxCreate");
+
+    // cuModuleLoadData parses PTX as a NUL-terminated string, and the
+    // code blob is not guaranteed to carry the terminator; copying into
+    // a std::string appends one.
+    std::string ptx((const char*)program.code->getBufferPointer(), program.code->getBufferSize());
+    CUmodule module = nullptr;
+    checkCuda(cuModuleLoadData(&module, ptx.c_str()), "cuModuleLoadData");
+    CUfunction kernel = nullptr;
+    checkCuda(cuModuleGetFunction(&kernel, module, "computeMain"), "cuModuleGetFunction");
+
+    // Device storage for the shader's two buffers and the counters.
+    // The counters must start zeroed, exactly like every other backend.
+    CUdeviceptr inputBuffer = 0;
+    CUdeviceptr outputBuffer = 0;
+    CUdeviceptr counterBuffer = 0;
+    checkCuda(cuMemAlloc(&inputBuffer, sizeof(kInputs)), "cuMemAlloc(input)");
+    checkCuda(cuMemcpyHtoD(inputBuffer, kInputs, sizeof(kInputs)), "cuMemcpyHtoD(input)");
+    checkCuda(cuMemAlloc(&outputBuffer, kThreadCount * sizeof(float)), "cuMemAlloc(output)");
+    checkCuda(cuMemsetD8(outputBuffer, 0, kThreadCount * sizeof(float)), "cuMemsetD8(output)");
+    const size_t counterBytes = size_t(program.counterCount) * program.elementByteWidth;
+    checkCuda(cuMemAlloc(&counterBuffer, counterBytes), "cuMemAlloc(counters)");
+    checkCuda(cuMemsetD8(counterBuffer, 0, counterBytes), "cuMemsetD8(counters)");
+
+    // Build the global-parameter payload exactly like the CPU path —
+    // (pointer, count) pairs in declaration order, the coverage buffer
+    // appended at `uniformOffset` — and copy it into the module's
+    // SLANG_globalParams symbol, which is where the emitted kernel
+    // reads its global parameters from.
+    struct CudaBufferView
+    {
+        CUdeviceptr data = 0;
+        size_t count = 0;
+    };
+    static_assert(
+        sizeof(CudaBufferView) == 16,
+        "the CUDA prelude's (RW)StructuredBuffer is a 16-byte (pointer, count) pair");
+    CudaBufferView inputView = {inputBuffer, kThreadCount};
+    CudaBufferView outputView = {outputBuffer, kThreadCount};
+    CudaBufferView coverageView = {counterBuffer, program.counterCount};
+
+    std::vector<uint8_t> globalParams(
+        size_t(program.resourceInfo.uniformOffset) + sizeof(CudaBufferView),
+        0);
+    std::memcpy(globalParams.data(), &inputView, sizeof(inputView));
+    std::memcpy(globalParams.data() + sizeof(CudaBufferView), &outputView, sizeof(outputView));
+    std::memcpy(
+        globalParams.data() + program.resourceInfo.uniformOffset,
+        &coverageView,
+        sizeof(coverageView));
+
+    CUdeviceptr paramsSymbol = 0;
+    size_t paramsSymbolSize = 0;
+    checkCuda(
+        cuModuleGetGlobal(&paramsSymbol, &paramsSymbolSize, module, "SLANG_globalParams"),
+        "cuModuleGetGlobal(SLANG_globalParams)");
+    if (paramsSymbolSize < globalParams.size())
+        fail("SLANG_globalParams is smaller than the marshaled parameter payload");
+    checkCuda(
+        cuMemcpyHtoD(paramsSymbol, globalParams.data(), globalParams.size()),
+        "cuMemcpyHtoD(SLANG_globalParams)");
+
+    // Dispatch one thread group of kThreadCount threads.
+    checkCuda(
+        cuLaunchKernel(kernel, 1, 1, 1, kThreadCount, 1, 1, 0, nullptr, nullptr, nullptr),
+        "cuLaunchKernel");
+    checkCuda(cuCtxSynchronize(), "cuCtxSynchronize");
+
+    float outputs[kThreadCount] = {};
+    checkCuda(cuMemcpyDtoH(outputs, outputBuffer, sizeof(outputs)), "cuMemcpyDtoH(outputs)");
+    std::vector<uint8_t> counters(counterBytes);
+    checkCuda(cuMemcpyDtoH(counters.data(), counterBuffer, counterBytes), "cuMemcpyDtoH(counters)");
+
+    checkOutputs(outputs, "cuda");
+    report(program, counters.data(), "cuda");
+
+    cuMemFree(counterBuffer);
+    cuMemFree(outputBuffer);
+    cuMemFree(inputBuffer);
+    cuModuleUnload(module);
+    cuCtxDestroy(context);
+}
+#endif
+
 // ## Backend: Vulkan
 //
 // The counter buffer is an ordinary storage buffer at the descriptor
@@ -620,10 +761,11 @@ void runMetal(int counterByteWidth)
 
 void printUsage()
 {
-    std::cout << "usage: shader-coverage-backends --backend=<cpu|vulkan|metal> [options]\n"
+    std::cout << "usage: shader-coverage-backends --backend=<cpu|cuda|vulkan|metal> [options]\n"
               << "  --backend=<name>     dispatch path to run (required)\n"
               << "  --counter-width=<n>  32 (default) or 64. 64 needs 64-bit shader atomics on\n"
-              << "                       the device (Vulkan); Metal always caps to 32.\n"
+              << "                       the device (Vulkan); Metal always caps to 32; CPU and\n"
+              << "                       CUDA support both widths with no device opt-in.\n"
               << "  --demo-dir=<path>    directory containing hello-coverage.slang\n";
 }
 
@@ -670,6 +812,14 @@ int main(int argc, char** argv)
         if (backend == "cpu")
         {
             runCpu(counterByteWidth);
+        }
+        else if (backend == "cuda")
+        {
+#if defined(SLANG_EXAMPLE_HAS_CUDA)
+            runCuda(counterByteWidth);
+#else
+            fail("this build has no CUDA support (CUDA toolkit not found at configure time)");
+#endif
         }
         else if (backend == "vulkan")
         {

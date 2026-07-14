@@ -1,6 +1,6 @@
 # shader-coverage-backends
 
-One shader, three coverage dispatch paths. This example runs the user
+One shader, four coverage dispatch paths. This example runs the user
 guide coverage tutorial's kernel
 ([`docs/user-guide/a1-06-shader-coverage.md`](../../docs/user-guide/a1-06-shader-coverage.md))
 for real on a selectable backend, demonstrating that the coverage
@@ -9,11 +9,12 @@ workflow — compile, discover the hidden counter buffer through
 through `ICoverageTracingMetadata` — is identical everywhere, and that
 only the binding step's shape changes per backend:
 
-| Backend  | Binding model exercised                                                                             |
-| -------- | --------------------------------------------------------------------------------------------------- |
-| `cpu`    | host-callable kernel; `(pointer, count)` pair written into the parameter payload at `uniformOffset` |
-| `vulkan` | storage buffer at the descriptor `(space, binding)`; auto-allocation adds one descriptor set        |
-| `metal`  | `[[buffer(N)]]` index from `binding`; MSL compiled at runtime, counters always 32-bit               |
+| Backend  | Binding model exercised                                                                              |
+| -------- | ---------------------------------------------------------------------------------------------------- |
+| `cpu`    | host-callable kernel; `(pointer, count)` pair written into the parameter payload at `uniformOffset`  |
+| `cuda`   | same marshaling contract with a device pointer; payload copied to the `SLANG_globalParams` symbol    |
+| `vulkan` | storage buffer at the descriptor `(space, binding)`; auto-allocation adds one descriptor set         |
+| `metal`  | `[[buffer(N)]]` index from `binding`; MSL compiled at runtime, counters always 32-bit                |
 
 Each path is a compact implementation of the corresponding recipe in
 [`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md).
@@ -25,6 +26,7 @@ sibling examples `shader-coverage-image-pipeline` and
 
 ```bash
 shader-coverage-backends --backend=cpu
+shader-coverage-backends --backend=cuda       # NVIDIA GPU + CUDA toolkit
 shader-coverage-backends --backend=vulkan
 shader-coverage-backends --backend=metal      # Apple platforms
 ```
@@ -44,7 +46,7 @@ chosen to produce partial coverage on purpose:
   line 27: 4
 ```
 
-The three backends produce identical counter values for the same
+All backends produce identical counter values for the same
 inputs — line 16 is `applyGain`'s `return value;` fallthrough (the
 gain is always 2.0), and line 26 is the negative-input clamp, which
 runs exactly once.
@@ -69,7 +71,8 @@ produces an equivalent report.
   runs everywhere). `64` requires 64-bit shader atomics on the device
   for the Vulkan path (`shaderBufferInt64Atomics` — absent on MoltenVK
   on Apple Silicon); Metal always caps to 32-bit (warning E45115 when
-  64 is requested explicitly). The example reads the _effective_ width
+  64 is requested explicitly); CPU and CUDA support both widths with
+  no device opt-in. The example reads the _effective_ width
   back from `CoverageBufferInfo::elementByteWidth` rather than trusting
   the request — do the same in your integration.
 - `--demo-dir=<path>` — directory containing `hello-coverage.slang`,
@@ -81,6 +84,9 @@ produces an equivalent report.
   Required — coverage instrumentation is skipped on the slang-llvm JIT
   path (warning E45102), so without one the run fails with a zero
   counter count.
+- CUDA path: the CUDA toolkit at configure time (driver-API stub and
+  `cuda.h` for the build, NVRTC for Slang's PTX emission at runtime).
+  Without it, the example still builds with the CUDA path disabled.
 - Vulkan path: a Vulkan loader at configure time (headers come from
   Slang's bundled Vulkan-Headers). Without it, the example still
   builds with the Vulkan path disabled.

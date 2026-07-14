@@ -38,6 +38,29 @@ if(_vulkan_loader)
     list(APPEND _libs ${_vulkan_loader} Vulkan::Headers)
 endif()
 
+# CUDA path: only the driver API is needed at link time (the stub
+# cuda.lib / libcuda.so from the toolkit; the real library ships with
+# every NVIDIA driver). Slang loads NVRTC at runtime to emit PTX, so
+# running the cuda backend (unlike building it) also needs the
+# toolkit's NVRTC — the example prechecks and reports that clearly.
+find_package(CUDAToolkit QUIET)
+if(TARGET CUDA::cuda_driver)
+    list(APPEND _defines SLANG_EXAMPLE_HAS_CUDA=1)
+    list(APPEND _libs CUDA::cuda_driver)
+    # Delay-load the driver DLL on Windows so the process starts (and
+    # the cpu/vulkan backends run) on machines with no NVIDIA driver;
+    # nvcuda.dll is then loaded on the first cuInit call.
+    if(MSVC)
+        list(APPEND _libs delayimp)
+        set(_link_options "/DELAYLOAD:nvcuda.dll")
+    endif()
+else()
+    message(
+        STATUS
+        "examples: shader-coverage-backends builds without the cuda backend (CUDA toolkit not found)"
+    )
+endif()
+
 # Metal path: Apple platforms only; uses the vendored metal-cpp
 # headers and the Metal framework's runtime MSL compiler, so no
 # external Metal toolchain is required.
@@ -73,6 +96,9 @@ target_include_directories(
 )
 target_compile_definitions(shader-coverage-backends PRIVATE ${_defines})
 target_link_libraries(shader-coverage-backends PRIVATE ${_libs})
+if(DEFINED _link_options)
+    target_link_options(shader-coverage-backends PRIVATE ${_link_options})
+endif()
 target_compile_features(shader-coverage-backends PRIVATE cxx_std_17)
 set_target_properties(shader-coverage-backends PROPERTIES FOLDER examples)
 
