@@ -48,7 +48,10 @@ from llvm_cov_json import is_json_input, parse_llvm_cov_json  # noqa: E402
 
 MARKER_NAME = "slang-coverage-html.marker"
 GENERATOR_NAME = "slang-coverage-html"
-GENERATOR_URL = "https://github.com/shader-slang/slang"
+GENERATOR_URL = (
+    "https://github.com/shader-slang/slang"
+    "/blob/master/tools/coverage-html/README.md"
+)
 
 # ---------------------------------------------------------------------------
 # Style constants
@@ -428,10 +431,18 @@ def _dir_depth(dirpath: str) -> int:
     return 0 if dirpath == "" else dirpath.count("/") + 1
 
 
+def _indent_calc(depth: int) -> str:
+    """The CSS length expression for one tree-indent level. Shared by
+    the file/directory rows and the expanded function listing so the
+    listing's name column starts exactly under the file row's
+    chevron."""
+    return f"calc(10px + {1.4 * depth:.2f}em)"
+
+
 def _indent_style(depth: int) -> str:
     """Per-row left padding so the tree shape is visible even when
     row backgrounds are uniform."""
-    return f"padding-left: calc(10px + {1.4 * depth:.2f}em);"
+    return f"padding-left: {_indent_calc(depth)};"
 
 
 def _index_thead_html(
@@ -635,7 +646,7 @@ def _render_file_functions_row(
         + hashlib.sha1(rec.path.encode("utf-8"), usedforsecurity=False).hexdigest()[:10]
     )
     template_html = _render_inline_functions_table(
-        rec, file_href, show_fns=show_fns, show_br=show_br
+        rec, file_href, show_fns=show_fns, show_br=show_br, indent_depth=file_depth
     )
     row_html = (
         f'            <tr class="fileFunctions" data-dir="{dir_attr}" '
@@ -705,13 +716,6 @@ def render_index(
             f'style="text-align:center">No coverage data found in input.</td></tr>'
         )
 
-    prefix_note = ""
-    if prefix:
-        prefix_note = (
-            f'        <tr><td colspan="{cols_for_empty}" class="footnote">'
-            f"Common path prefix: <code>{html.escape(prefix)}</code></td></tr>\n"
-        )
-
     # Out-of-table <template>s for each file's expanded function
     # listing. Browsers parse <template> children as a DocumentFragment
     # without painting them, so initial DOM stays small even when we
@@ -736,7 +740,7 @@ def render_index(
     </thead>
     <tbody>
 {chr(10).join(rows_html)}
-{prefix_note}    </tbody>
+    </tbody>
   </table>
 {templates_html}
 """
@@ -923,6 +927,7 @@ def _render_inline_functions_table(
     file_href: str,
     show_fns: bool = False,
     show_br: bool = False,
+    indent_depth: int = 0,
 ) -> str:
     """Render the per-file Functions table embedded in an index
     `<td>` (lazy-loaded via <template>).
@@ -974,7 +979,12 @@ def _render_inline_functions_table(
         )
 
     return (
-        '<table class="fnInner" cellpadding="1" cellspacing="1" border="0">\n'
+        # --fn-indent aligns the Function column's text with the parent
+        # file row's chevron; the CSS rules on td.coverFn and the
+        # Function header consume it, so the metric columns keep their
+        # vertical alignment with the parent table.
+        f'<table class="fnInner" style="--fn-indent: {_indent_calc(indent_depth)};" '
+        'cellpadding="1" cellspacing="1" border="0">\n'
         + _fn_inner_colgroup(show_fns, show_br)
         + "\n"
         + _fn_inner_thead(show_fns, show_br)

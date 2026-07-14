@@ -231,6 +231,13 @@ table.fnInner td.tableHead { font-family: -apple-system, BlinkMacSystemFont,
    vertically with the file-summary row above. */
 table.fnInner col.fnNameCol  { width: 43%; }
 table.fnInner col.fnLineCol  { width: 4%; }
+/* Indent the Function column (names and its header) to the parent
+   file row's chevron position — the renderer sets --fn-indent per
+   table to the same tree-indent calc the file row uses. Only the
+   name column shifts; metric columns keep their vertical alignment
+   with the parent table. */
+table.fnInner td.coverFn { padding-left: var(--fn-indent, 10px); }
+table.fnInner td.tableHead:first-child { padding-left: var(--fn-indent, 10px); }
 
 .sourceUnavailable { color: var(--slang-orange); font-style: italic;
                      padding: 8px; }
