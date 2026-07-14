@@ -1,8 +1,8 @@
 // shader-coverage-backends: one shader, four coverage dispatch paths.
 //
 // This example dispatches the user-guide coverage tutorial's kernel
-// (hello-coverage.slang) with `--backend cpu`, `--backend cuda`,
-// `--backend vulkan`, or `--backend metal`, and shows that the
+// (hello-coverage.slang) with `--backend=cpu`, `--backend=cuda`,
+// `--backend=vulkan`, or `--backend=metal`, and shows that the
 // coverage workflow is the same everywhere:
 //
 //   1. compile with coverage enabled (Slang C++ API),
@@ -362,6 +362,23 @@ void report(const CompiledProgram& program, const void* counters, const std::str
                   << "\n";
     }
 
+    // Assert the two counts the shader arranges deliberately (see the
+    // header comment in hello-coverage.slang; line numbers are that
+    // file's). checkOutputs alone cannot catch a coverage regression
+    // that miscounts while the kernel results stay right — a wrong hit
+    // table must fail the run, not just print.
+    const auto expectHits = [&](uint32_t line, uint64_t expected)
+    {
+        const auto it = hitsByLine.find(line);
+        const uint64_t actual = (it == hitsByLine.end()) ? 0 : it->second;
+        if (actual != expected)
+            fail(
+                "[" + backendName + "] line " + std::to_string(line) + " has " +
+                std::to_string(actual) + " hits, expected " + std::to_string(expected));
+    };
+    expectHits(16, 0); // applyGain's `return value;` fallthrough: gain is fixed at 2.0
+    expectHits(26, 1); // the negative-input clamp: exactly one negative input
+
     // Write the manifest + counter snapshot for the offline pipeline.
     ComPtr<ISlangBlob> manifest;
     checkSlang(
@@ -425,9 +442,17 @@ void runCpu(int counterByteWidth)
         fail("findFuncByName(computeMain)");
 
     // On CPU the marshaling fields are the binding contract; the
-    // descriptor fields don't apply.
+    // descriptor fields don't apply. The fixed-offset writes below
+    // assume the two user buffers pack first in declaration order with
+    // the coverage view appended after them, so check that contract
+    // (like the coverage runtime unit tests do) instead of letting a
+    // regressed offset turn into an out-of-bounds write.
     if (program.resourceInfo.uniformOffset < 0)
         fail("expected a CPU uniform marshaling offset for the coverage buffer");
+    if (program.resourceInfo.uniformStride != int32_t(sizeof(CpuBufferView)))
+        fail("coverage buffer uniform stride is not the (pointer, count) pair size");
+    if (size_t(program.resourceInfo.uniformOffset) < 2 * sizeof(CpuBufferView))
+        fail("coverage buffer uniform offset overlaps the user buffers' payload");
 
     float inputs[kThreadCount];
     std::memcpy(inputs, kInputs, sizeof(kInputs));
@@ -542,6 +567,15 @@ void runCuda(int counterByteWidth)
     static_assert(
         sizeof(CudaBufferView) == 16,
         "the CUDA prelude's (RW)StructuredBuffer is a 16-byte (pointer, count) pair");
+    // The fixed-offset writes below assume the two user buffers pack
+    // first in declaration order with the coverage view appended after
+    // them, so check that contract (like the coverage runtime unit
+    // tests do) instead of letting a regressed offset turn into an
+    // out-of-bounds write.
+    if (program.resourceInfo.uniformStride != int32_t(sizeof(CudaBufferView)))
+        fail("coverage buffer uniform stride is not the (pointer, count) pair size");
+    if (size_t(program.resourceInfo.uniformOffset) < 2 * sizeof(CudaBufferView))
+        fail("coverage buffer uniform offset overlaps the user buffers' payload");
     CudaBufferView inputView = {inputBuffer, kThreadCount};
     CudaBufferView outputView = {outputBuffer, kThreadCount};
     CudaBufferView coverageView = {counterBuffer, program.counterCount};
