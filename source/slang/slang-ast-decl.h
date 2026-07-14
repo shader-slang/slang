@@ -1003,6 +1003,43 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
     const TypeExp& _getSupOverride() const { return sup; }
 };
 
+// A synthesized interface requirement that constrains a callable requirement as a type.
+//
+// Consider this example:
+//
+//     interface IFoo
+//     {
+//         [Differentiable]
+//         void f<T>(T value);
+//     }
+//
+// Header checking keeps the callable requirement as
+// `GenericDecl { inner = CallableDecl f }` and synthesizes a sibling requirement:
+//
+//     GenericDecl
+//     {
+//         inner = FuncConstraintDecl(
+//             callableRequirementDeclRef = This.f<T>,
+//             sub = This.f<T>,
+//             sup = IForward/BackwardDifferentiableFunc<This.f<T>>)
+//     }
+//
+// If `f` is generic, this decl is wrapped in a cloned standalone generic signature, and
+// `callableRequirementDeclRef` stores the `This.f<T>` decl-ref after substituting the callable's
+// generic parameters/proofs with that cloned signature.
+//
+// This intentionally remains a subtype of `GenericTypeConstraintDecl`: conformance checking and
+// witness-table lowering consume it through the same sibling subtype-constraint path used by
+// associated-type constraints. The extra checked decl-ref records the callable-as-type endpoint
+// being constrained, so later consumers can target that callable without structural rediscovery
+// through overloaded members.
+FIDDLE()
+class FuncConstraintDecl : public GenericTypeConstraintDecl
+{
+    FIDDLE(...)
+    FIDDLE() DeclRef<CallableDecl> callableRequirementDeclRef;
+};
+
 FIDDLE()
 class TypeCoercionConstraintDecl : public Decl
 {
@@ -1018,6 +1055,18 @@ class NonEmptyPackConstraintDecl : public Decl
     FIDDLE(...)
     SourceLoc whereTokenLoc = SourceLoc();
     FIDDLE() Expr* packExpr = nullptr;
+};
+
+FIDDLE()
+class GenericVariadicPackCountConstraintDecl : public Decl
+{
+    FIDDLE(...)
+    SourceLoc whereTokenLoc = SourceLoc();
+    FIDDLE() Expr* packExpr = nullptr;
+    FIDDLE() DeclRef<Decl> packDeclRef;
+    FIDDLE() IntVal* actualCountVal = nullptr;
+    FIDDLE() Expr* expectedCountExpr = nullptr;
+    FIDDLE() IntVal* expectedCountVal = nullptr;
 };
 
 FIDDLE()
@@ -1065,6 +1114,26 @@ inline bool isGenericParam(DeclRef<T> declRef)
     return isGenericParam(declRef.getDecl());
 }
 
+// Returns true for declarations that encode generic `where`-clause constraints.
+//
+// This is the broad syntactic set of constraint declarations. Use
+// `isGenericConstraintParameterDecl` instead when walking a generic's hidden substitution slots,
+// because a standalone generic interface requirement can have a constraint as its `GenericDecl`
+// inner decl without that constraint occupying an argument slot.
+inline bool isConstraintDecl(Decl* decl)
+{
+    return as<GenericTypeConstraintDecl>(decl) || as<TypeCoercionConstraintDecl>(decl) ||
+           as<NonEmptyPackConstraintDecl>(decl) ||
+           as<GenericVariadicPackCountConstraintDecl>(decl) ||
+           as<HasDiffTypeInfoConstraintDecl>(decl);
+}
+
+template<typename T>
+inline bool isConstraintDecl(DeclRef<T> declRef)
+{
+    return isConstraintDecl(declRef.getDecl());
+}
+
 // An empty declaration (which might still have modifiers attached).
 //
 // An empty declaration is uncommon in HLSL, but
@@ -1108,6 +1177,13 @@ class AttributeDecl : public ContainerDecl
 
 bool isInterfaceRequirement(Decl* decl);
 InterfaceDecl* findParentInterfaceDecl(Decl* decl);
+
+/// Return true for a generic constraint declaration that contributes a hidden
+/// argument to a generic application.
+///
+/// The generic's `inner` declaration is its result, not one of its signature
+/// operands, even if that inner declaration is itself a constraint.
+bool isGenericConstraintParameterDecl(Decl* decl);
 
 bool isLocalVar(const Decl* decl);
 

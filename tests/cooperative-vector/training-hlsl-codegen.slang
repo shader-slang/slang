@@ -7,6 +7,7 @@
 // CHECK609-DAG: __slang_linalg_OuterProductAccumulate<
 // CHECK609-DAG: __builtin_VectorAccumulate(
 // CHECK609-DAG: __slang_linalg_VectorAccumulate<
+// CHECK609-NOT: dx::linalg::ComponentType::F16
 
 // CHECK610-DAG: dx::linalg::OuterProduct<
 // CHECK610-DAG: acc.InterlockedAccumulate(matBuf, matOff);
@@ -18,6 +19,7 @@
 // CHECK610-NOT: ComponentTypeTraits<ElTy>
 // CHECK610-NOT: buffer.template Load<ElTy>
 // CHECK610-NOT: buffer.template Store<ElTy>
+// CHECK610-NOT: dx::linalg::DATA_TYPE_FLOAT16
 
 RWByteAddressBuffer outerProductOutput;
 RWByteAddressBuffer reduceSumOutput;

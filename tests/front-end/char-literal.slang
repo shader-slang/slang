@@ -12,9 +12,12 @@
 // CHECK-NEXT: 4E16
 // CHECK-NEXT: 754C
 // CHECK-NEXT: A
+// CHECK-NEXT: FF
+// CHECK-NEXT: ABCD
+// CHECK-NEXT: 12345678
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
-RWStructuredBuffer<int> outputBuffer;
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(1, 1, 1)]
 void computeMain()
@@ -27,4 +30,7 @@ void computeMain()
     outputBuffer[5] = '世';
     outputBuffer[6] = '界';
     outputBuffer[7] = '\n';
+    outputBuffer[8] = '\377';
+    outputBuffer[9] = '\uabcd';
+    outputBuffer[10] = '\U12345678';
 }

@@ -244,6 +244,8 @@ works for any given binary.
 | Option                                | Default                       | Description                                                                                                                              |
 | ------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `SLANG_VERSION`                       | Latest `v*` tag               | The project version, detected using git if available                                                                                     |
+| `SLANG_DXC_BINARY_URL`                | Stable DXC release URL        | URL of the prebuilt DXC binary archive to download; overrides the default release URL and skips GLIBC auto-detection on Linux            |
+| `SLANG_DXC_BUILD_FROM_SOURCE`         | Unset                         | `ON`: build DXC from source on Windows, Linux, and macOS; `OFF`: use prebuilt when available; unset: build from source on macOS and auto-select on native Linux x86_64 (see [DXC GLIBC auto-detection](#dxc-glibc-auto-detection)) |
 | `SLANG_EMBED_CORE_MODULE`             | `TRUE`                        | Build slang with an embedded version of the core module                                                                                  |
 | `SLANG_EMBED_CORE_MODULE_SOURCE`      | `TRUE`                        | Embed the core module source in the binary                                                                                               |
 | `SLANG_ENABLE_DXIL`                   | `TRUE`                        | Enable generating DXIL using DXC                                                                                                         |
@@ -258,6 +260,7 @@ works for any given binary.
 | `SLANG_ENABLE_SLANGI`                 | `TRUE`                        | Enable Slang interpreter target                                                                                                          |
 | `SLANG_ENABLE_SLANGRT`                | `TRUE`                        | Enable runtime target                                                                                                                    |
 | `SLANG_ENABLE_SLANG_GLSLANG`          | `TRUE`                        | Enable glslang dependency and slang-glslang wrapper target                                                                               |
+| `SLANG_ENABLE_SLANG_PROXY`            | `TRUE`                        | Build the legacy `slang.dll` proxy and `libslang` symlink backward-compatibility outputs for `slang-compiler`                           |
 | `SLANG_ENABLE_TESTS`                  | `TRUE`                        | Enable test targets, requires `SLANG_ENABLE_SLANG_RHI`; some tests require other CMake options                                           |
 | `SLANG_ENABLE_EXAMPLES`               | `TRUE`                        | Enable example targets, requires SLANG_ENABLE_SLANG_RHI                                                                                  |
 | `SLANG_ENABLE_REPLAYER`               | `TRUE`                        | Enable slang-replay tool                                                                                                                 |
@@ -272,6 +275,53 @@ works for any given binary.
 | `SLANG_USE_SCCACHE`                   | `FALSE`                       | Use sccache as compiler launcher (auto-disables PCH)                                                                                     |
 | `SLANG_GENERATORS_PATH`               | ``                            | Path to an installed `all-generators` target for cross compilation                                                                       |
 | `SLANG_IGNORE_ABORT_MSG`              | `FALSE`                       | Suppress the Windows modal abort dialog at compile time (baked into all built executables; recommended for unattended/LLM-driven builds) |
+
+#### DXC GLIBC auto-detection
+
+When `SLANG_DXC_BUILD_FROM_SOURCE` is unset on native Linux x86_64 (and
+`SLANG_DXC_BINARY_URL` is not set), CMake downloads the prebuilt DXC binary at
+configure time and inspects the GLIBC requirements of both `libdxcompiler.so`
+and `libdxil.so`. If either library requires a newer GLIBC than the system
+provides, or if the requirement or system GLIBC version cannot be detected, DXC
+is built from source instead. Successful detection results are cached in stamp
+files so subsequent reconfigures are fast. For example, if a DXC Linux prebuilt
+requires GLIBC 2.38 and the host provides an older GLIBC, CMake selects the
+source-build path. On macOS, Microsoft does not publish a prebuilt DXC package,
+so the default configuration builds DXC from source unless
+`SLANG_DXC_BINARY_URL` is set to a custom archive.
+
+```mermaid
+flowchart TD
+    Start["Configure DXC support"] --> BuildFromSource{"SLANG_DXC_BUILD_FROM_SOURCE"}
+    BuildFromSource -->|ON| Source["Build DXC from source"]
+    BuildFromSource -->|OFF| Prebuilt["Use a prebuilt binary when available"]
+    BuildFromSource -->|unset| CustomUrl{"SLANG_DXC_BINARY_URL set?"}
+    CustomUrl -->|yes| CustomPrebuilt["Use custom prebuilt URL and skip GLIBC detection"]
+    CustomUrl -->|no| MacOS{"macOS?"}
+    MacOS -->|yes| Source
+    MacOS -->|no| NativeLinux{"Native Linux x86_64?"}
+    NativeLinux -->|yes| Probe["Download Linux prebuilt and inspect GLIBC requirements"]
+    Probe --> Compatible{"Detected requirements are compatible with host GLIBC?"}
+    Compatible -->|yes| LinuxPrebuilt["Use Linux prebuilt binary"]
+    Compatible -->|no or unknown| Source
+    NativeLinux -->|no| OfficialPrebuilt{"Official prebuilt exists for platform?"}
+    OfficialPrebuilt -->|yes| Prebuilt
+    OfficialPrebuilt -->|no| Unavailable["DXC unavailable unless built from source"]
+```
+
+- `ON`: build DXC from source on Windows, Linux, and macOS; on other platforms, DXC is unavailable.
+- `OFF`: use the prebuilt binary when one is available and skip the GLIBC check; on
+  non-x86_64 Linux and macOS, DXC is unavailable unless `SLANG_DXC_BINARY_URL`
+  is set to a custom prebuilt for that architecture/platform.
+- unset on native non-x86_64 Linux (e.g. ARM64): DXC is unavailable because no official prebuilt binary exists; set `ON` to build DXC from source.
+- unset on macOS: build DXC from source unless `SLANG_DXC_BINARY_URL` is set to a custom prebuilt.
+- unset while cross-compiling for Linux x86_64: skip GLIBC detection because the target system cannot be probed at configure time.
+
+The source-build path clones DXC plus LLVM/Clang submodules on the first run
+and can take tens of minutes to configure and build; later reconfigures and
+incremental builds use stamp files and build outputs to skip repeated work.
+
+#### Optional backend and test dependencies
 
 The following options relate to optional dependencies for additional backends
 and running additional tests. Left unchanged they are auto detected, however
@@ -314,10 +364,12 @@ There are several options for getting llvm-support:
   - You can set `SLANG_SLANG_LLVM_BINARY_URL` to point to a local
     `libslang-llvm.so/slang-llvm.dll` or set it to a URL of an zip/archive
     containing such a file
-  - If this isn't set then the build system tries to download it from the
-    release on github matching the current tag. If such a tag doesn't exist
-    or doesn't have the correct os\*arch combination then the latest release
-    will be tried.
+  - If this isn't set then the build system constructs the download URL from
+    the current git tag (e.g. `v2025.21`). Git tags must be available locally;
+    if they are missing the build will warn and skip slang-llvm. Fetch them
+    with `git fetch --tags` (or
+    `git fetch https://github.com/shader-slang/slang.git 'refs/tags/*:refs/tags/*'`
+    when cloning from a fork).
   - If `SLANG_SLANG_LLVM_BINARY_URL` is `FETCH_BINARY_IF_POSSIBLE` then in
     the case that a prebuilt binary can't be found then the build will proceed
     as though `DISABLE` was chosen

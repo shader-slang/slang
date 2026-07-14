@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:30:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 30983b1eac237a20bb36b39636936cb7cb3bc5b003a6f2f819545a3ac80fb871
+model: claude-opus-4.8
+generated_at: 2026-06-29T13:37:45Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 02fa669b99e0a73ba4301f994b3212b5f9667ac9bffda7a1669c8780fdb96800
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -24,10 +24,12 @@ specific subsystem.
 ## Edges (intra-project only)
 
 External dependencies (`miniz`, `lz4_static`, `Threads::Threads`,
-`unordered_dense`, `SPIRV-Headers`, `SPIRV-Tools-opt`, `SPIRV-Tools-link`,
-`SPIRV`, `glslang`, `${CMAKE_DL_LIBS}`) are omitted from the diagram
-to keep it focused on internal structure. They are listed in the
-notes per node.
+`unordered_dense`, `fast_float`, `SPIRV-Headers`, `SPIRV-Tools-opt`,
+`SPIRV-Tools-link`, `SPIRV`, `glslang`, `${CMAKE_DL_LIBS}`) are omitted
+from the diagram
+to keep it focused on internal structure. The most significant ones
+are summarized in the notes per node below; the per-node notes are
+not an exhaustive list of every external link dependency.
 
 ```mermaid
 flowchart TB
@@ -81,6 +83,7 @@ flowchart TB
     slangWasm --> capabilityDefs
     slangWasm --> capabilityLookup
     slangWasm --> fiddleOutput
+    slangWasm --> lookupTables
 ```
 
 Three subsystems present in [module-map.md](module-map.md) appear
@@ -100,7 +103,7 @@ above without ordinary `LINK_WITH_*` edges:
 - **`source/slang-llvm/`** — has no `CMakeLists.txt` of its own.
   `slang-llvm` is produced out-of-tree (or downloaded as a prebuilt
   binary controlled by `SLANG_SLANG_LLVM_FLAVOR` in the root
-  [CMakeLists.txt](../../../../CMakeLists.txt) around line 355); no
+  [CMakeLists.txt](../../../../CMakeLists.txt) around line 366); no
   in-source target links against it directly.
 
 ## Edge citations
@@ -120,7 +123,7 @@ or `LINK_WITH_PRIVATE` clause in the cited file.
 | `slang → {core, prelude, compiler-core, capability-defs, capability-lookup, fiddle-output, lookup-tables, core-module}` | [source/slang/CMakeLists.txt](../../../../source/slang/CMakeLists.txt) | The `slang_add_target(slang ... LINK_WITH_*)` clause near the bottom of the file; `prelude` is a private include dep, not a static link, but is listed here to match `module-map.md` |
 | `slangc → core`, `slangc → slang` | [source/slangc/CMakeLists.txt](../../../../source/slangc/CMakeLists.txt) | `LINK_WITH_PRIVATE core slang` |
 | `slang-dispatcher → core` | [source/slang-dispatcher/CMakeLists.txt](../../../../source/slang-dispatcher/CMakeLists.txt) | `LINK_WITH_PRIVATE core` |
-| `slang-wasm → {slang, core, compiler-core, capability-defs, capability-lookup, fiddle-output}` | [source/slang-wasm/CMakeLists.txt](../../../../source/slang-wasm/CMakeLists.txt) | `LINK_WITH_PRIVATE` clause on the wasm target |
+| `slang-wasm → {slang, core, compiler-core, capability-defs, capability-lookup, fiddle-output, lookup-tables}` | [source/slang-wasm/CMakeLists.txt](../../../../source/slang-wasm/CMakeLists.txt) | `LINK_WITH_PRIVATE miniz lz4_static slang core compiler-core slang-capability-defs slang-capability-lookup slang-fiddle-output slang-lookup-tables` on the wasm target |
 
 The dashed edge `slang -.-> slang-record-replay` is justified by the
 source-list inclusion at
@@ -134,6 +137,10 @@ not shown in the diagram):
 
 - `coreLib` (`core`): `miniz`, `lz4_static`, `Threads::Threads`,
   `unordered_dense`, `${CMAKE_DL_LIBS}`.
+- `compilerCore` (`compiler-core`): `fast_float` (fast floating-point
+  parsing), in addition to its internal `core` link; see the
+  `LINK_WITH_PRIVATE core fast_float` clause in
+  [source/compiler-core/CMakeLists.txt](../../../../source/compiler-core/CMakeLists.txt).
 - `slangLib` (`slang`) and `slang-wasm`: `SPIRV-Headers`, plus
   `miniz` / `lz4_static` for the wasm target.
 - `slang-rt`: `miniz`, `lz4_static`, `Threads`, `unordered_dense`,

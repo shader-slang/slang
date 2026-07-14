@@ -1,11 +1,11 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.7
-remediated_at: 2026-05-15T21:00:00+00:00
+remediator_model: claude-opus-4.8
+remediated_at: 2026-06-30T13:58:20Z
 target_doc: architecture/module-map.md
 review_report: ../../reviews/architecture/module-map.md.review.md
-target_doc_source_commit_before: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_source_commit_after: 470b96e8c29ca660c537d4d0f88cc21a12f962e6
+target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 actions:
   fixed: 2
   rejected_bogus: 0
@@ -17,16 +17,10 @@ actions:
 # Remediation report for architecture/module-map.md
 
 ## Summary
-
-Both findings addressed: the manifest's `watched_paths` for the
-module-map page now covers `*.cpp` files in `source/{core,
-compiler-core, slang}/` so cited rows are inside the watched set,
-and the `Linkage` row points at `slang-session.h` / `.cpp` while a
-new `Linkable components` row covers the `slang-linkable.h` cluster.
+Both findings were valid and in-scope: the per-doc prompt requires a mechanical, exhaustive decomposition of the watched `source/*/*.{h,cpp}` files, and two file families were absent from the map. I fixed both by adding compact rows/subgroups for the omitted logical units, every cited file confirmed present in the resolved watched-path set. The document grew from 20.6 KB to 22.4 KB, still under the 32 KB cap.
 
 ## Actions
-
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Runbook "Manifest gaps" pattern: the page legitimately cites `slang-*.cpp` implementation files but they were not watched. | Expanded `architecture/module-map.md` `watched_paths` in `_meta/manifest.yaml` to add `source/slang/slang-*.cpp`, `source/compiler-core/slang-*.cpp`, and `source/core/slang-*.cpp`. |
-| F-002 | fixed | `Linkage` is declared in `slang-session.h`, not `slang-linkable.h`; the previous row mixed up the two concerns. | Split the `Linkage` row into three rows: `Linkage` (citing `slang-session.h` / `.cpp` as the per-configuration scope behind `slang::ISession`), `Linkable components` (citing `slang-linkable.h` / `slang-linkable-impl.cpp` for the `IComponentType` cluster), and `Session (global)` (citing `slang-global-session.h` / `.cpp` for the process-wide singleton). |
+| F-001 | fixed | `source/compiler-core/slang-json-{parser,value,native,rpc,rpc-connection,source-map-util}.*`, `slang-language-server-protocol.*`, `slang-rich-diagnostics-render.*`, `slang-source-map.*`, `slang-nvrtc-compiler.*`, and `slang-llvm-compiler.*` are all in the resolved watched paths but unrepresented. | Added compiler-core rows for JSON tokenizer/parser, JSON value model, JSON-RPC, LSP protocol types, rich diagnostic rendering, and source maps; folded NVRTC/LLVM into the per-vendor compilers row and dropped the stray `slang-json-lexer.cpp` from it. |
+| F-002 | fixed | `source/slang/slang-language-server*.{h,cpp}` and `slang-reflection-api.cpp` / `slang-reflection-json.*` are watched but had no row; confirmed at `source/slang/slang-language-server.cpp:3` and `source/slang/slang-reflection-api.cpp:27`. | Added a `### Reflection API` subsection (2 rows) and a `### Language server` subsection (server core plus per-feature helpers) under `source/slang/`. |

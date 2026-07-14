@@ -34,16 +34,18 @@ documents:
 
   architecture/module-map.md:
     prompt: prompts/architecture-module-map.md
+    # The module map is a file-level inventory of every logical unit under
+    # source/, so it watches each subproject's CMakeLists plus its top-level
+    # *.h / *.cpp sources. source/*/*.{h,cpp} covers the sibling subprojects
+    # (slangc, slang-llvm, slang-glslang, slang-dispatcher, slang-rt,
+    # slang-record-replay, slang-wasm, ...) whose representative files the
+    # table cites, and subsumes the narrower source/{slang,compiler-core,
+    # core}/slang-* globs it replaces.
     watched_paths:
       - source/*/CMakeLists.txt
-      - source/slang/CMakeLists.txt
       - prelude/*.h
-      - source/slang/slang-*.h
-      - source/slang/slang-*.cpp
-      - source/compiler-core/slang-*.h
-      - source/compiler-core/slang-*.cpp
-      - source/core/slang-*.h
-      - source/core/slang-*.cpp
+      - source/*/*.h
+      - source/*/*.cpp
     depends_on:
       - architecture/overview.md
     size_cap_bytes: 32768
@@ -223,6 +225,7 @@ documents:
       - source/slang/slang-parser.h
       - source/slang/slang-parser.cpp
       - source/compiler-core/slang-lexer.cpp
+      - source/slang/slang-ast-expr.h
     depends_on:
       - syntax-reference/tokens.md
       - syntax-reference/keywords-and-builtins.md
@@ -442,6 +445,7 @@ documents:
       - source/slang/slang-check-decl.cpp
       - source/slang/slang-check-modifier.cpp
       - source/slang/slang-check-expr.cpp
+      - source/slang/slang-check-overload.cpp
       - source/slang/slang-lookup.cpp
       - source/slang/slang-diagnostics.lua
       - include/slang.h

@@ -1,15 +1,15 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-05-15T16:50:36+00:00
+reviewed_at: 2026-06-12T13:38:13+00:00
 target_doc: name-resolution/index.md
-target_doc_source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-target_doc_watched_paths_digest: 6ebf89cec5003af621b64dff064087207dc7299f8872526b3a08d82df64fd1e6
-source_commit: 2580ad341db243d8bd27edd0327f08a29be906b3
+target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_watched_paths_digest: 4080bcfcf1b112fa3ace17207ae1272f8aa8c5e9ac63ab53a4746286f7f0d9b4
+source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
 checklist:
   factual_accuracy: pass
-  cross_references: partial
-  completeness: pass
+  cross_references: pass
+  completeness: partial
   style_consistency: pass
   source_alignment: pass
   front_matter_validity: pass
@@ -24,13 +24,16 @@ severity_breakdown:
 # Review report for name-resolution/index.md
 
 ## Summary
-The page is structurally lint-clean, but review found 1 finding; the most significant severity is minor. The main remediation need is to align the page with watched source evidence and the per-page prompt contract before marking this review cycle complete.
+The page is factually aligned with the sampled source and peer documents, and every relative link in the body resolves. I found one minor completeness issue: the navigation page links two peer pages only from the `## Pages` table, even though the per-doc checklist asks every peer page to be reachable from another section too.
 
 ## Items checked
-- Checked page table, flow diagram topic split, pipeline links, dependency links, glossary entries, and front matter.
+- Ran `regenerate.py show name-resolution/index.md` and checked the manifest entry, per-doc prompt, watched files, four depends-on peer docs, and current HEAD SHA.
+- Read the target front matter and verified required keys, source commit, watched-path digest shape, title, intro, `## Pages`, flow diagram, pipeline context, and glossary section.
+- Resolved all 27 relative link occurrences in the body, including peer name-resolution pages, pipeline pages, AST reference pages, syntax reference, glossary, and cross-cutting references.
+- Spot-checked more than 10 factual/source-alignment claims against `slang-lookup.h`, `slang-ast-support-types.h`, `slang-check-expr.cpp`, `slang-check-overload.cpp`, the four dependency pages, and `glossary.md`.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## Related glossary terms` | The required term `visibility modifier` is listed, but the glossary entry is named `visibility`. | `docs/generated/design/glossary.md` contains `**visibility**`, not `**visibility modifier**`. | Link/name the term as `visibility`, or add an exact glossary entry. |
+| F-001 | minor | `## Flow diagram` and `## Where this fits in the pipeline`, lines 45-88 | The page links all peers in `## Pages`, but `visibility.md` and `overload-resolution.md` are not reachable from another section; outside the table they appear only as Mermaid label text or are not mentioned as Markdown links. | `docs/generated/design/_meta/prompts/name-resolution-index.md:68-69` requires every peer page to be named in `## Pages` and reachable from at least one other section. | Add Markdown links to `visibility.md` and `overload-resolution.md` in the flow explanation or pipeline-context prose so every peer page is linked from a second section. |

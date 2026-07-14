@@ -29,6 +29,7 @@
 #include "directory-util.h"
 #include "options.h"
 #include "parse-diagnostic-util.h"
+#include "slang-test-optimization-options.h"
 #include "slangc-tool.h"
 #include "slangi-tool.h"
 #include "test-context.h"
@@ -2030,6 +2031,39 @@ static SlangResult _createArtifactFromHexDump(
     return SLANG_OK;
 }
 
+static SlangResult _executeBinaryFile(const UnownedStringSlice& fileName, ExecuteResult& outExeRes)
+{
+    CommandLine cmdLine;
+
+#if SLANG_LINUX_FAMILY
+    // Consider a //TEST:EXECUTABLE: case in sanitizer CI. slangc first invokes an
+    // uninstrumented host compiler to produce the binary, and slang-test then runs it.
+    // Applying LD_PRELOAD to slang-test would also inject the sanitizer into the compiler
+    // and linker. Keep the requested value inert until this exact execution boundary instead.
+    StringBuilder preloadValue;
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+            UnownedStringSlice("SLANG_TEST_EXECUTABLE_LD_PRELOAD"),
+            preloadValue)) &&
+        preloadValue.getLength())
+    {
+        cmdLine.setExecutableLocation(ExecutableLocation("env"));
+
+        StringBuilder preloadAssignment;
+        preloadAssignment << "LD_PRELOAD=" << preloadValue;
+        cmdLine.addArg(preloadAssignment.produceString());
+        cmdLine.addArg(fileName);
+
+        return ProcessUtil::execute(cmdLine, outExeRes);
+    }
+#endif
+
+    ExecutableLocation exe;
+    exe.setPath(fileName);
+    cmdLine.setExecutableLocation(exe);
+
+    return ProcessUtil::execute(cmdLine, outExeRes);
+}
+
 static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResult& outExeRes)
 {
     ComPtr<IArtifact> artifact;
@@ -2045,15 +2079,7 @@ static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResu
     SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, fileRep.writeRef()));
 
     const auto fileName = fileRep->getPath();
-
-    // Execute it
-    ExecutableLocation exe;
-    exe.setPath(fileName);
-
-    CommandLine cmdLine;
-    cmdLine.setExecutableLocation(exe);
-
-    return ProcessUtil::execute(cmdLine, outExeRes);
+    return _executeBinaryFile(UnownedStringSlice(fileName), outExeRes);
 }
 
 static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
@@ -2125,6 +2151,7 @@ TestResult runDocTest(TestContext* context, TestInput& input)
     }
 
     _initSlangCompiler(context, cmdLine);
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -2252,6 +2279,7 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
             cmdLine.addArg(arg);
         }
     }
+    SlangTest::addDefaultSlangOptimization(cmdLine);
     ExecuteResult exeRes;
 
     // TODO(Yong) HACK:
@@ -2274,15 +2302,8 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     else
     {
         // Execute the binary and see what we get
-        CommandLine cmdLine;
-
-        ExecutableLocation exe;
-        exe.setPath(moduleExePath);
-
-        cmdLine.setExecutableLocation(exe);
-
         ExecuteResult exeRes;
-        if (SLANG_FAILED(ProcessUtil::execute(cmdLine, exeRes)))
+        if (SLANG_FAILED(_executeBinaryFile(moduleExePath.getUnownedSlice(), exeRes)))
         {
             return TestResult::Fail;
         }
@@ -2671,6 +2692,8 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     {
         return TestResult::Ignored;
     }
+    // Keep compiler-based tests on the default optimization level unless a test opts out.
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -2733,6 +2756,7 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
     {
         cmdLine.addArg(arg);
     }
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -2891,6 +2915,7 @@ TestResult runCompile(TestContext* context, TestInput& input)
             cmdLine.addArg(arg);
         }
     }
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -2929,6 +2954,7 @@ TestResult runCompileTarget(TestContext* context, TestInput& input)
     }
 
     cmdLine.addArg("-compile-only");
+    SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3004,6 +3030,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
     {
         cmdLine.addArg(arg);
     }
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3099,6 +3126,7 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
     {
         cmdLine.addArg(arg);
     }
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3458,6 +3486,7 @@ static TestResult generateExpectedOutput(
     {
         expectedCmdLine.addArg(arg);
     }
+    SlangTest::addDefaultSlangOptimization(expectedCmdLine);
 
     ExecuteResult expectedExeRes;
     TEST_RETURN_ON_DONE(
@@ -3504,6 +3533,7 @@ TestResult generateActualOutput(
     {
         actualCmdLine.addArg(arg);
     }
+    SlangTest::addDefaultSlangOptimization(actualCmdLine);
 
     ExecuteResult actualExeRes;
     TEST_RETURN_ON_DONE(
@@ -3621,6 +3651,7 @@ TestResult generateHLSLBaseline(
     cmdLine.addArg(targetFormat);
     cmdLine.addArg("-pass-through");
     cmdLine.addArg(passThroughName);
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3680,6 +3711,7 @@ static TestResult _runHLSLComparisonTest(
 
     cmdLine.addArg("-target");
     cmdLine.addArg(targetFormat);
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3767,6 +3799,7 @@ TestResult doGLSLComparisonTestRun(
     {
         cmdLine.addArg(arg);
     }
+    SlangTest::addDefaultSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3920,6 +3953,7 @@ TestResult runPerformanceProfile(TestContext* context, TestInput& input)
     {
         cmdLine.addArg(arg);
     }
+    SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -4090,6 +4124,7 @@ TestResult runComputeComparisonImpl(
     cmdLine.addArg("-o");
     auto actualOutputFile = outputStem + ".actual.txt";
     cmdLine.addArg(actualOutputFile);
+    SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
 
     if (context->isExecuting())
     {
@@ -4194,6 +4229,7 @@ TestResult doRenderComparisonTestRun(
     cmdLine.addArg(langOption);
     cmdLine.addArg("-o");
     cmdLine.addArg(outputStem + outputKind + ".png");
+    SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -5556,16 +5592,17 @@ static SlangResult runUnitTestModule(
         return SLANG_FAIL;
 
     renderer_test::CoreDebugCallback coreDebugCallback;
-    renderer_test::CoreToRHIDebugBridge rhiDebugBridge;
-    rhiDebugBridge.setCoreCallback(&coreDebugCallback);
 
     UnitTestContext unitTestContext;
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
-    unitTestContext.enabledApis = context->options.enabledApis;
+    // Intersect with probed available APIs so unit tests skip instead of fail
+    // when the required device type is not present on the current machine.
+    unitTestContext.enabledApis =
+        context->options.enabledApis & _getAvailableRenderApiFlags(context);
     unitTestContext.enableDebugLayers = context->options.enableDebugLayers;
     unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
-    unitTestContext.debugCallback = &rhiDebugBridge;
+    unitTestContext.debugCallback = nullptr;
 
     auto testCount = testModule->getTestCount();
 
@@ -5613,7 +5650,7 @@ static SlangResult runUnitTestModule(
             spawnType == SpawnType::UseFullyIsolatedTestServer)
         {
             TestServerProtocol::ExecuteUnitTestArgs args;
-            args.enabledApis = context->options.enabledApis;
+            args.enabledApis = context->options.enabledApis & _getAvailableRenderApiFlags(context);
             args.enableDebugLayers = context->options.enableDebugLayers;
             args.moduleName = moduleName;
             args.testName = test.testName;
@@ -5638,6 +5675,7 @@ static SlangResult runUnitTestModule(
                 // If the rpc failed, output an error message
                 if (SLANG_FAILED(rpcRes))
                 {
+                    testResult = TestResult::Fail;
                     reporter->message(TestMessageType::RunError, "rpc failed");
                 }
 
@@ -5683,6 +5721,11 @@ static SlangResult runUnitTestModule(
 
             // Clear any previous debug messages
             coreDebugCallback.clear();
+            auto rhiDebugBridge = renderer_test::createRetainedCoreToRHIDebugBridge();
+            unitTestContext.debugCallback = rhiDebugBridge.Ptr();
+            renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
+                *rhiDebugBridge,
+                &coreDebugCallback);
 
             try
             {
@@ -5840,6 +5883,11 @@ SlangResult innerMain(int argc, char** argv)
         const auto hostCallableCompiler = session->getDownstreamCompilerForTransition(
             SLANG_CPP_SOURCE,
             SLANG_SHADER_HOST_CALLABLE);
+
+        if (hasLlvm)
+        {
+            SLANG_RETURN_ON_FAIL(context.locateLLVMFileCheck());
+        }
 
         if (hasLlvm && hostCallableCompiler == SLANG_PASS_THROUGH_LLVM && SLANG_PROCESSOR_X86)
         {

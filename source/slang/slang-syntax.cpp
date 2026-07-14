@@ -335,6 +335,9 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
     case ASTNodeType::NonEmptyPackConstraintDecl:
         sb << "NonEmptyPackConstraintDecl";
         break;
+    case ASTNodeType::GenericVariadicPackCountConstraintDecl:
+        sb << "GenericVariadicPackCountConstraintDecl";
+        break;
     case ASTNodeType::HasDiffTypeInfoConstraintDecl:
         sb << "__hasDiffTypeInfo";
         break;
@@ -895,16 +898,17 @@ Type* DeclRefType::create(ASTBuilder* astBuilder, DeclRef<Decl> declRef)
     }
     else if (as<ThisTypeDecl>(declRef.getDecl()))
     {
-        if (as<DirectDeclRef>(declRef.declRefBase))
-        {
-            declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
-
-            return astBuilder->getOrCreate<ThisType>(declRef.declRefBase);
-        }
-        else if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
+        // A reference to a `ThisTypeDecl` must always be represented as a `ThisType`,
+        // never as a plain `DeclRefType`. Otherwise the same logical `This` type can
+        // exist as two distinct `Type*`s (e.g. a `ThisType` built from a `DirectDeclRef`
+        // vs. a `DeclRefType` built from a `MemberDeclRef` for a substituted interface),
+        // breaking type-identity comparison. See issue #11465.
+        if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
         {
             return lookupDeclRef->getWitness()->getSub();
         }
+        declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
+        return astBuilder->getOrCreate<ThisType>(declRef.declRefBase);
     }
     else if (auto typedefDecl = as<TypeDefDecl>(declRef.getDecl()))
     {
@@ -1073,6 +1077,18 @@ std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
     }
 }
 
+bool doesTypeHaveNoDiffModifier(Type* type)
+{
+    if (auto modifiedType = as<ModifiedType>(type))
+    {
+        if (modifiedType->findModifier<NoDiffModifierVal>())
+            return true;
+        return doesTypeHaveNoDiffModifier(modifiedType->getBase());
+    }
+
+    return false;
+}
+
 FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)
 {
     List<Type*> paramTypes;
@@ -1091,6 +1107,12 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         }
 
         auto paramDecl = paramDeclRef.getDecl();
+        if (paramDecl->findModifier<NoDiffModifier>() &&
+            !doesTypeHaveNoDiffModifier(paramValueType))
+        {
+            paramValueType =
+                astBuilder->getModifiedType(paramValueType, astBuilder->getNoDiffModifierVal());
+        }
         auto paramMode = getParamPassingMode(paramDecl);
         auto paramType = getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
 
@@ -1109,8 +1131,8 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         visitParamDecl(paramDeclRef);
     }
 
-    FuncType* funcType = astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
-    return funcType;
+    auto funcType = astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
+    return as<FuncType>(funcType->substitute(astBuilder, SubstitutionSet(declRef))->resolve());
 }
 
 GenericDeclRefType* getGenericDeclRefType(

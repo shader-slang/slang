@@ -171,9 +171,12 @@ struct Lexer
 
 
 // Helper routines for extracting values from tokens
-String getStringLiteralTokenValue(Token const& token);
+String getStringLiteralTokenValue(Token const& token, DiagnosticSink* sink);
 String getFileNameTokenValue(Token const& token);
 
+// Note about integer literal values. This is the underlying storage type, but
+// integer literals are reinterpreted as unsigned when necessary, based on the
+// type expression.
 typedef int64_t IntegerLiteralValue;
 typedef double FloatingPointLiteralValue;
 
@@ -183,11 +186,54 @@ IntegerLiteralValue getIntegerLiteralValue(
     UnownedStringSlice* outSuffix = 0,
     bool* outIsDecimalBase = 0,
     bool* outHasOverflowed = 0);
+
+
+// The suffix type of the literal
+enum class FloatingPointLiteralType
+{
+    // Error: bad mantissa
+    BadSignificand,
+
+    // Error: bad suffix
+    BadSuffix,
+
+    // 16-bit half-float
+    Half,
+
+    // 32-bit float
+    Float,
+
+    // 64-bit double
+    Double,
+};
+
+// Reads a floating point value from a literal token.
+//
+// outLiteralType signals the literal type, including parsing errors. In case of
+// a parsing error, outErrorContent contains the bad part (significand or suffix).
+//
+// When outIsOutOfRange is true, the return value is either:
+// - 0        - underflow (between 0 and denormal min)
+// - INFINITY - overflow (above maximum value for the literal type)
+//
+// When outPrecisionLost is true, the significand was truncated. Reported only
+// for hex floats and when outIsOutOfRange is false.
+//
+// The returned value is rounded according to the suffix as reported by
+// outLiteralType.
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
-    UnownedStringSlice* outSuffix = 0);
+    FloatingPointLiteralType& outLiteralType,
+    bool& outIsOutOfRange,
+    bool& outPrecisionLost,
+    UnownedStringSlice& outErrorContent);
 
-IntegerLiteralValue getCharLiteralValue(Token const& token);
+// Returns a positive 32-bit code point in range [0, 0xffffffff] on success or
+// -1 on failure. A failure is also diagnosed.
+//
+// See docs/language-reference/expressions-literal.md for the literal format.
+IntegerLiteralValue getCharLiteralValue(Token const& token, DiagnosticSink* sink);
+
 } // namespace Slang
 
 #endif

@@ -35,6 +35,55 @@ inline Type* getBaseType(
     return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
 }
 
+inline SubstExpr<Expr> getPackCountConstraintPackExpr(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    if (!declRef)
+        return SubstExpr<Expr>();
+    return declRef.substitute(astBuilder, declRef.getDecl()->packExpr);
+}
+
+inline DeclRef<Decl> getPackCountConstraintPackDeclRef(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    // The declaration checker stores the checked pack target in `packDeclRef`;
+    // `packExpr` remains only as source syntax for diagnostics and printing.
+    if (!declRef)
+        return DeclRef<Decl>();
+
+    auto packDeclRef = declRef.getDecl()->packDeclRef;
+    if (!packDeclRef)
+        return DeclRef<Decl>();
+
+    return substituteDeclRef(SubstitutionSet(declRef), astBuilder, packDeclRef);
+}
+
+inline IntVal* getPackCountConstraintActualCount(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    if (!declRef)
+        return nullptr;
+    auto val = declRef.getDecl()->actualCountVal;
+    if (!val)
+        return nullptr;
+    return as<IntVal>(val->substitute(astBuilder, SubstitutionSet(declRef)));
+}
+
+inline IntVal* getPackCountConstraintExpectedCount(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    if (!declRef)
+        return nullptr;
+    auto val = declRef.getDecl()->expectedCountVal;
+    if (!val)
+        return nullptr;
+    return as<IntVal>(val->substitute(astBuilder, SubstitutionSet(declRef)));
+}
+
 // `Val`
 
 inline bool areValsEqual(Val* left, Val* right)
@@ -376,6 +425,9 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl);
 /// adjusted to something else.
 ///
 ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
+
+/// Returns true if `type` or one of its modified-type bases carries `no_diff`.
+bool doesTypeHaveNoDiffModifier(Type* type);
 
 inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> declRef)
 {

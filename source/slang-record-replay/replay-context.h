@@ -80,8 +80,15 @@ static_assert(
     sizeof(CallIndexEntry) == CallIndexEntry::kSize,
     "CallIndexEntry must have expected fixed size");
 
+// Replay exceptions can be thrown across the slang shared-library boundary
+// and caught by type in the test executable when slang-test runs in-process
+// (server-count=1). They therefore carry SLANG_EXCEPTION_TYPE_VISIBLE
+// (core/slang-exception.h), which exports the RTTI on Itanium-ABI
+// (non-Windows) targets so the typed catch matches across dynamic libraries;
+// see that header for the full explanation.
+
 /// Exception thrown when trying to record an untracked interface.
-class UntrackedInterfaceException : public Slang::Exception
+class SLANG_EXCEPTION_TYPE_VISIBLE UntrackedInterfaceException : public Slang::Exception
 {
 public:
     UntrackedInterfaceException(ISlangUnknown* obj)
@@ -95,7 +102,7 @@ private:
 };
 
 /// Exception thrown when a handle is not found during playback.
-class HandleNotFoundException : public Slang::Exception
+class SLANG_EXCEPTION_TYPE_VISIBLE HandleNotFoundException : public Slang::Exception
 {
 public:
     HandleNotFoundException(uint64_t handle)
@@ -108,8 +115,8 @@ private:
     uint64_t m_handle;
 };
 
-/// Exception thrown when a handle is not found during playback.
-class UnresolvedTypeException : public Slang::Exception
+/// Exception thrown when a TypeReflection cannot be resolved during playback.
+class SLANG_EXCEPTION_TYPE_VISIBLE UnresolvedTypeException : public Slang::Exception
 {
 public:
     UnresolvedTypeException(slang::TypeReflection* type)
@@ -185,24 +192,24 @@ enum class TypeId : uint8_t
 SLANG_API const char* getTypeIdName(TypeId id);
 
 /// Exception thrown when type mismatch occurs during deserialization.
-class TypeMismatchException : public Slang::Exception
+class SLANG_EXCEPTION_TYPE_VISIBLE TypeMismatchException : public Slang::Exception
 {
 public:
     SLANG_API TypeMismatchException(TypeId expected, TypeId actual);
-    SLANG_API TypeId getExpected() const { return m_expected; }
-    SLANG_API TypeId getActual() const { return m_actual; }
+    TypeId getExpected() const { return m_expected; }
+    TypeId getActual() const { return m_actual; }
 
 private:
     TypeId m_expected, m_actual;
 };
 
 /// Exception thrown when data mismatch occurs during sync mode verification.
-class DataMismatchException : public Slang::Exception
+class SLANG_EXCEPTION_TYPE_VISIBLE DataMismatchException : public Slang::Exception
 {
 public:
     SLANG_API DataMismatchException(size_t offset, size_t size);
-    SLANG_API size_t getOffset() const { return m_offset; }
-    SLANG_API size_t getSize() const { return m_size; }
+    size_t getOffset() const { return m_offset; }
+    size_t getSize() const { return m_size; }
 
 private:
     size_t m_offset, m_size;
@@ -392,6 +399,9 @@ public:
     {
         requireReplayArenaAllocation(offset, size);
     }
+
+    /// Allocates replay-owned arena storage from the module that owns the replay context.
+    SLANG_API void* allocateReplayArena(size_t sizeInBytes, size_t alignment);
 
     /// Lock the context for thread-safe access.
     /// Returns an RAII lock guard.
@@ -817,7 +827,7 @@ T* ReplayContext::readArrayInPlayback(RecordFlag flags, CountT& count)
     size_t sizeCount = static_cast<size_t>(arrayCount);
     size_t allocationSize = sizeCount * sizeof(T);
     requireReplayArenaAllocation(countOffset, allocationSize);
-    T* buf = m_arena.allocateArray<T>(sizeCount);
+    T* buf = reinterpret_cast<T*>(allocateReplayArena(allocationSize, alignof(T)));
     for (size_t i = 0; i < sizeCount; ++i)
     {
         new (&buf[i]) T{};

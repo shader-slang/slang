@@ -1,5 +1,16 @@
 -- Helper functions for defining diagnostics
 
+-- Warning-level (group) sentinels. These are passed positionally to warning()/err() alongside
+-- the spans (e.g. `warning("my-warning", 123, "msg", span{...}, pedantic)`), and recognised by
+-- add_diagnostic so they don't get mistaken for a span. They mirror the clang/gcc groups: a
+-- warning tagged with one of these is emitted only when the matching -Wall/-Wextra/-Wpedantic
+-- flag is enabled. Untagged warnings stay in the always-on "default" group.
+-- (There is no `default` sentinel because `default` is a Lua keyword and the absence of any
+-- sentinel already means the default group.)
+local warning_all = { is_warning_level = true, level = "all" }
+local warning_extra = { is_warning_level = true, level = "extra" }
+local warning_pedantic = { is_warning_level = true, level = "pedantic" }
+
 -- Calculate Levenshtein edit distance between two strings
 local function edit_distance(s1, s2)
   local len1, len2 = #s1, #s2
@@ -65,6 +76,102 @@ local allow_duplicate_diagnostic_codes = false
 -- Negative codes (e.g. -1) are excluded because they are internal sentinels
 -- that are never displayed to users and cannot be referenced by command-line options.
 local allow_severity_conflicts = false
+
+-- Integer diagnostic codes whose multi-binding is intentional, so the
+-- uniqueness / cross-catalog collision checks skip them. Keep each entry paired
+-- with a comment naming why (or the tracking issue).
+local intentional_shared_code_list = {
+  10000, -- `illegalCharacter*` printable/hex variants in slang-lexer-diagnostic-defs.h
+  39999, -- overload-resolution / lookup umbrella; many keyed templates fan in
+  99999, -- internal-compiler-error catch-all
+  -- TODO(#11318 follow-up): the E20001-E20012 range in
+  -- slang-json-diagnostic-defs.h collides with the lua-side names of the same
+  -- codes. Worse, 20011 is *itself* double-bound within that one catalog
+  -- (`fieldNotDefinedOnType` and `fieldRequiredOnType`), so even an
+  -- intra-catalog check would flag it. Renumbering the JSON catalog to a free
+  -- range (and splitting the 20011 pair) is tracked under the #11318 catalog-
+  -- hygiene effort; remove these suppressions once that lands.
+  20001,
+  20002,
+  20003,
+  20004,
+  20005,
+  20006,
+  20007,
+  20008,
+  20009,
+  20010,
+  20011,
+  20012,
+}
+
+-- Build a set for O(1) membership lookup from the list above.
+local intentional_shared_codes = {}
+for _, code in ipairs(intentional_shared_code_list) do
+  intentional_shared_codes[code] = true
+end
+
+-- True when an integer code is allowed to be bound to multiple distinct names,
+-- so the uniqueness / cross-catalog collision checks skip it. All negative codes
+-- are internal sentinels (e.g. -1 for decorating notes); named umbrellas are
+-- listed in `intentional_shared_code_list`.
+local function is_intentional_shared(code)
+  return code < 0 or intentional_shared_codes[code] == true
+end
+
+-- The C++ diagnostic catalogs that share the compiler's diagnostic code space
+-- (the same space as the Lua catalog here). Each uses the
+-- `DIAGNOSTIC(code, severity, name, messageFormat)` multi-include pattern. Paths
+-- are relative to this helper file's directory (source/slang/).
+--
+-- Only the `source/compiler-core/` catalogs are listed: those feed the unified
+-- compiler `DiagnosticInfo` catalog where a code clash is a real bug (this is
+-- the space the E29104 collision lived in). The `*-diagnostic-defs.h` files under
+-- `tools/` (slang-capability-generator, slang-fiddle, test-server) are
+-- deliberately excluded — each is a *separate*, self-contained enumeration for
+-- its own tool, numbered from ~0 and reusing values like 1/2/20001 independently,
+-- so they neither clash with nor are comparable to the compiler catalog.
+--
+-- A new `*-diagnostic-defs.h` that joins the compiler code space must be added
+-- here so its codes participate in the cross-catalog collision check.
+local cpp_diagnostic_defs_files = {
+  "../compiler-core/slang-misc-diagnostic-defs.h",
+  "../compiler-core/slang-lexer-diagnostic-defs.h",
+  "../compiler-core/slang-json-diagnostic-defs.h",
+}
+
+-- Directory containing this helper file, so we can resolve the C++ catalog
+-- paths above regardless of the process working directory.
+local helpers_dir = (debug.getinfo(1, "S").source:match("^@?(.*[/\\])")) or "./"
+
+-- Scan the C++ `*-diagnostic-defs.h` catalogs for `DIAGNOSTIC(code, severity,
+-- name, ...)` entries, returning a `code -> { [name] = "file:line", ... }` map.
+-- This lets `process_diagnostics` detect an integer code that is bound to
+-- different names across the Lua catalog and a C++ catalog (e.g. the E29104
+-- lua/`slang-misc-diagnostic-defs.h` collision, issue #11318). Missing files are
+-- a hard error: silently skipping them would let the invariant rot.
+local function scan_cpp_diagnostic_defs()
+  local codes = {}
+  for _, rel in ipairs(cpp_diagnostic_defs_files) do
+    local path = helpers_dir .. rel
+    local f = io.open(path, "r")
+    if not f then
+      error("diagnostic catalog file not found (update cpp_diagnostic_defs_files): " .. path)
+    end
+    -- A `DIAGNOSTIC(...)` call may wrap across lines, so read the whole file and
+    -- match the `(code, severity, name` prefix wherever it appears.
+    local text = f:read("*a")
+    f:close()
+    for code, name in
+      text:gmatch("DIAGNOSTIC%s*%(%s*(%-?%d+)%s*,%s*[%w_]+%s*,%s*([%w_]+)")
+    do
+      local n = tonumber(code)
+      codes[n] = codes[n] or {}
+      codes[n][name] = path
+    end
+  end
+  return codes
+end
 
 -- Helper function to check if a string is valid kebab-case
 -- Valid kebab-case: lowercase letters, numbers, and hyphens only
@@ -282,6 +389,8 @@ local function add_diagnostic(name, code, severity, message, primary_span, ...)
     severity = severity,
     message = message,
     primary_span = primary_span,
+    -- Warning group; "default" (always emitted) unless a sentinel below overrides it.
+    level = "default",
   }
 
   local extra_spans = { ... }
@@ -290,7 +399,11 @@ local function add_diagnostic(name, code, severity, message, primary_span, ...)
     local notes = {}
 
     for _, s in ipairs(extra_spans) do
-      if s.is_note then
+      if s.is_warning_level then
+        -- A warning-level sentinel (all/extra/pedantic): record the group and skip it; it is
+        -- not a span or note.
+        diag.level = s.level
+      elseif s.is_note then
         table.insert(notes, {
           location = s.location,
           message = s.message,
@@ -630,9 +743,9 @@ local function process_diagnostics(diagnostics_table)
         seen_names[diag.name] = i
       end
 
-      -- Codes that are intentionally shared: negative sentinels (-1) and
-      -- catch-all placeholders (39999, 99999) must be excluded from uniqueness checks.
-      local is_intentional_duplicate = diag.code < 0 or diag.code == 39999 or diag.code == 99999
+      -- Codes that are intentionally shared (negative sentinels, catch-all
+      -- placeholders, umbrellas) are excluded from uniqueness checks.
+      local is_intentional_duplicate = is_intentional_shared(diag.code)
 
       if seen_codes[diag.code] then
         if not allow_duplicate_diagnostic_codes and not is_intentional_duplicate then
@@ -959,6 +1072,7 @@ local function process_diagnostics(diagnostics_table)
         name = diag.name,
         code = diag.code,
         severity = diag.severity,
+        level = diag.level or "default",
         message = diag.message,
         message_parts = main_parts,
         message_required_params = main_required,
@@ -970,6 +1084,33 @@ local function process_diagnostics(diagnostics_table)
         secondary_spans = diag.secondary_spans or {},
         notes = diag.notes or {},
       })
+    end
+  end
+
+  -- Cross-catalog collision check: a single integer code must not be bound to
+  -- different names across the Lua catalog and the C++ `*-diagnostic-defs.h`
+  -- catalogs (the `m_idMap` lookup keeps only one entry per code, so a collision
+  -- makes -warnings-disable / -warnings-as-errors address the wrong diagnostic,
+  -- and reflection reports an ambiguous code). This is what caught the original
+  -- E29104 lua/`slang-misc-diagnostic-defs.h` double-bind, issue #11318.
+  local cpp_codes = scan_cpp_diagnostic_defs()
+  for _, diag in ipairs(diagnostics_table) do
+    if type(diag.code) == "number" and not is_intentional_shared(diag.code) then
+      local cpp_names = cpp_codes[diag.code]
+      if cpp_names then
+        for cpp_name, cpp_path in pairs(cpp_names) do
+          if cpp_name ~= diag.name then
+            table.insert(
+              all_errors,
+              "diagnostic code " .. diag.code .. " is bound to '" .. tostring(diag.name)
+                .. "' here and to '" .. cpp_name .. "' in " .. cpp_path
+                .. "; every integer code must map to a single name across all catalogs"
+                .. " (add the code to intentional_shared_code_list if the multi-binding is"
+                .. " deliberate)"
+            )
+          end
+        end
+      end
     end
   end
 
@@ -987,6 +1128,10 @@ return {
   warning = warning,
   internal = internal,
   fatal = fatal,
+  -- Warning-level (group) sentinels passed positionally to warning()/err().
+  all = warning_all,
+  extra = warning_extra,
+  pedantic = warning_pedantic,
   process_diagnostics = process_diagnostics,
   -- Utility functions for typo suggestions
   edit_distance = edit_distance,

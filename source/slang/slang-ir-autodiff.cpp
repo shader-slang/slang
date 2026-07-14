@@ -149,6 +149,59 @@ bool isNeverDiffFuncType(IRFuncType* const funcType)
     return true;
 }
 
+bool isBackwardDerivativeValue(IRInst* inst)
+{
+    if (!inst)
+        return false;
+    // Unwrap any `Specialize`/generic layers on the callee first (but not the differentiation op
+    // itself), so a specialized/generic backward-derivative value such as
+    // `Specialize(BackwardDifferentiate(g), float)` is still recognized.
+    inst = getResolvedInstForDecorations(inst, /*resolveThroughDifferentiation:*/ false);
+    switch (inst->getOp())
+    {
+    // The complete set of ops that yield a backward-derivative function (a `bwd_diff` result),
+    // covering the combined form, the primal/remat/propagate split, the legacy (pre-2.0) forms, and
+    // the trivial variants. The forward-mode ops (`ForwardDifferentiate`,
+    // `ForwardDifferentiatePropagate`, `TrivialForwardDifferentiate`) are deliberately excluded,
+    // since forward-mode derivatives may be nested.
+    case kIROp_BackwardDifferentiate:
+    case kIROp_BackwardDifferentiatePrimal:
+    case kIROp_BackwardRemat:
+    case kIROp_BackwardDifferentiatePropagate:
+    case kIROp_TrivialBackwardDifferentiate:
+    case kIROp_TrivialBackwardDifferentiatePrimal:
+    case kIROp_TrivialBackwardRemat:
+    case kIROp_TrivialBackwardDifferentiatePropagate:
+    case kIROp_LegacyBackwardDifferentiate:
+    case kIROp_BackwardFromLegacyBwdDiffFunc:
+    case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+    case kIROp_BackwardRematFromLegacyBwdDiffFunc:
+    case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool diagnoseDifferentiatingBackwardDiffResult(DiagnosticSink* sink, IRGlobalValueWithCode* func)
+{
+    bool found = false;
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            auto call = as<IRCall>(inst);
+            if (call && isBackwardDerivativeValue(call->getCallee()))
+            {
+                sink->diagnose(Diagnostics::CannotDifferentiateResultOfBackwardDifferentiation{
+                    .location = inst->sourceLoc});
+                found = true;
+            }
+        }
+    }
+    return found;
+}
+
 bool isExistentialOrRuntimeInst(IRInst* inst)
 {
     if (auto lookup = as<IRLookupWitnessMethod>(inst))
@@ -173,26 +226,33 @@ bool isRuntimeType(IRType* type)
     return false;
 }
 
-IRInterfaceRequirementEntry* getInterfaceEntryAtIndex(
-    IRModule* moduleInst,
+IRInterfaceRequirementEntry* getInterfaceEntryByBuiltinRequirement(
     IRInterfaceType* interface,
-    UInt index)
+    BuiltinRequirementKind kind)
 {
-    SLANG_UNUSED(moduleInst);
-    if (interface)
+    SLANG_RELEASE_ASSERT(interface);
+    for (UInt i = 0; i < interface->getOperandCount(); i++)
     {
-        // Assume for now that IDifferentiable has exactly five fields.
-        // SLANG_ASSERT(interface->getOperandCount() == 5);
-        if (auto entry = as<IRInterfaceRequirementEntry>(interface->getOperand(index)))
-            return entry;
-        else
+        auto entry = as<IRInterfaceRequirementEntry>(interface->getOperand(i));
+        if (!entry)
+            continue;
+        if (auto decor =
+                entry->getRequirementKey()->findDecoration<IRBuiltinRequirementDecoration>())
         {
-            SLANG_UNEXPECTED("IDifferentiable interface entry unexpected type");
+            if ((BuiltinRequirementKind)decor->getKind() == kind)
+                return entry;
         }
     }
-
-    return nullptr;
+    // Every caller looks up a *mandatory* built-in requirement (the
+    // `IDifferentiable`/`IBackwardDifferentiable`/`IBwdCallable` roles), so a
+    // missing role means the interface is malformed (e.g. a precompiled core
+    // module out of sync, or a `__builtin_requirement` annotation that wasn't
+    // emitted/linked). Fail loudly with the role's integer kind rather than
+    // returning null for callers to dereference -- this restores the diagnostic
+    // the previous index-based `getInterfaceEntryAtIndex` provided.
+    SLANG_UNEXPECTED("interface is missing an expected built-in requirement entry");
 }
+
 AutoDiffSharedContext::AutoDiffSharedContext(
     TargetProgram* targetProgram,
     IRModuleInst* inModuleInst)
@@ -249,21 +309,30 @@ AutoDiffSharedContext::AutoDiffSharedContext(
 
     if (differentiableInterfaceType)
     {
-        differentialAssocTypeStructKey = cast<IRStructKey>(
-            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 0)->getRequirementKey());
-        differentialAssocTypeWitnessStructKey = cast<IRStructKey>(
-            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 1)->getRequirementKey());
-        differentialAssocTypeWitnessTableType = cast<IRWitnessTableType>(
-            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 1)->getRequirementVal());
+        auto diffTypeEntry = getInterfaceEntryByBuiltinRequirement(
+            differentiableInterfaceType,
+            BuiltinRequirementKind::DifferentialType);
+        auto diffWitnessEntry = getInterfaceEntryByBuiltinRequirement(
+            differentiableInterfaceType,
+            BuiltinRequirementKind::DifferentialWitness);
+        auto zeroEntry = getInterfaceEntryByBuiltinRequirement(
+            differentiableInterfaceType,
+            BuiltinRequirementKind::DZeroFunc);
+        auto addEntry = getInterfaceEntryByBuiltinRequirement(
+            differentiableInterfaceType,
+            BuiltinRequirementKind::DAddFunc);
 
-        zeroMethodStructKey = cast<IRStructKey>(
-            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 2)->getRequirementKey());
-        zeroMethodType = cast<IRFuncType>(
-            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 2)->getRequirementVal());
-        addMethodStructKey = cast<IRStructKey>(
-            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 5)->getRequirementKey());
-        addMethodType = cast<IRFuncType>(
-            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 5)->getRequirementVal());
+        differentialAssocTypeStructKey =
+            cast<IRBuiltinRequirementKey>(diffTypeEntry->getRequirementKey());
+        differentialAssocTypeWitnessStructKey =
+            cast<IRBuiltinRequirementKey>(diffWitnessEntry->getRequirementKey());
+        differentialAssocTypeWitnessTableType =
+            cast<IRWitnessTableType>(diffWitnessEntry->getRequirementVal());
+
+        zeroMethodStructKey = cast<IRBuiltinRequirementKey>(zeroEntry->getRequirementKey());
+        zeroMethodType = cast<IRFuncType>(zeroEntry->getRequirementVal());
+        addMethodStructKey = cast<IRBuiltinRequirementKey>(addEntry->getRequirementKey());
+        addMethodType = cast<IRFuncType>(addEntry->getRequirementVal());
 
         if (nullDifferentialStructType)
         {
@@ -289,15 +358,19 @@ AutoDiffSharedContext::AutoDiffSharedContext(
 
     if (differentiablePtrInterfaceType)
     {
+        auto ptrTypeEntry = getInterfaceEntryByBuiltinRequirement(
+            differentiablePtrInterfaceType,
+            BuiltinRequirementKind::DifferentialPtrType);
+        auto ptrWitnessEntry = getInterfaceEntryByBuiltinRequirement(
+            differentiablePtrInterfaceType,
+            BuiltinRequirementKind::DifferentialPtrWitness);
+
         differentialAssocRefTypeStructKey =
-            cast<IRStructKey>(getInterfaceEntryAtIndex(module, differentiablePtrInterfaceType, 0)
-                                  ->getRequirementKey());
+            cast<IRBuiltinRequirementKey>(ptrTypeEntry->getRequirementKey());
         differentialAssocRefTypeWitnessStructKey =
-            cast<IRStructKey>(getInterfaceEntryAtIndex(module, differentiablePtrInterfaceType, 1)
-                                  ->getRequirementKey());
-        differentialAssocRefTypeWitnessTableType = cast<IRWitnessTableType>(
-            getInterfaceEntryAtIndex(module, differentiablePtrInterfaceType, 1)
-                ->getRequirementVal());
+            cast<IRBuiltinRequirementKey>(ptrWitnessEntry->getRequirementKey());
+        differentialAssocRefTypeWitnessTableType =
+            cast<IRWitnessTableType>(ptrWitnessEntry->getRequirementVal());
 
         isPtrInterfaceAvailable = true;
     }

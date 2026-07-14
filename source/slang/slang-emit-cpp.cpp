@@ -1358,32 +1358,58 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             // through the CPU prelude helpers. Matches HLSL/GLSL
             // semantics: returns the prior value as the inst result.
             //
-            // Only 32-bit integer widths are supported by the prelude
-            // helpers today; wider/narrower types fall through to the
-            // default unhandled-opcode diagnostic so the build fails
-            // loudly instead of producing bogus code.
+            // This is the general integer-AtomicAdd lowering for the
+            // CPU target, not coverage-specific: any user
+            // `InterlockedAdd` reaches it. Coverage is one client
+            // and only ever emits the unsigned variants (its
+            // synthesized buffer element type is uint/uint64); the
+            // signed variants are reachable from ordinary user code
+            // that calls `InterlockedAdd` on an `int`/`int64_t`
+            // slot, but the CPU target's existing `InterlockedAdd`
+            // tests (e.g. `tests/hlsl-intrinsic/atomic/atomic-
+            // intrinsics.slang`) disable the `-cpu` line, so the
+            // signed CPU paths here are not currently covered by
+            // a regression test.
+            //
+            // 32-bit and 64-bit integer widths are supported via the
+            // matching prelude helper pair
+            // (`_slang_atomic_add_{u,i}{32,64}`). Other widths /
+            // float types fall through to the default unhandled-
+            // opcode diagnostic so the build fails loudly instead
+            // of producing bogus code.
             auto dataType = inst->getDataType();
-            bool isSignedInt = dataType->getOp() == kIROp_IntType;
-            bool isUnsignedInt = dataType->getOp() == kIROp_UIntType;
-            if (!isSignedInt && !isUnsignedInt)
+            char const* helper;
+            switch (dataType->getOp())
+            {
+            case kIROp_UIntType:
+                helper = "_slang_atomic_add_u32";
+                break;
+            case kIROp_IntType:
+                helper = "_slang_atomic_add_i32";
+                break;
+            case kIROp_UInt64Type:
+                helper = "_slang_atomic_add_u64";
+                break;
+            case kIROp_Int64Type:
+                helper = "_slang_atomic_add_i64";
+                break;
+            default:
                 return false;
-            char const* helper = isSignedInt ? "_slang_atomic_add_i32" : "_slang_atomic_add_u32";
+            }
             emitInstResultDecl(inst);
             m_writer->emit(helper);
             m_writer->emit("(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(", ");
+            // The value-operand literal's C++ suffix (`U`/`ULL`) is
+            // chosen by `emitOperand` from the IR operand's type, so
+            // the literal width here matches the chosen `helper`
+            // signature automatically.
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
-            // Memory-order operand (operand 2) is intentionally
-            // ignored: the prelude helpers in `slang-cpp-prelude.h`
-            // pick the strongest ordering each toolchain provides
-            // out-of-the-box — `__ATOMIC_RELAXED` on GCC/Clang
-            // (which honors operand 2's intent), and
-            // `_InterlockedExchangeAdd` on MSVC (sequentially
-            // consistent on the supported architectures, stronger
-            // than relaxed but still correct under concurrency).
-            // Other backends (SPIR-V/Metal/CUDA) map operand 2 to
-            // native ordering; CPU's coupling lives in the prelude.
+            // Operand 2 (memory order) is consumed by the prelude
+            // helpers in `slang-cpp-prelude.h`, not threaded through
+            // here; see those helpers for the per-toolchain ordering
+            // choice.
             m_writer->emit(");\n");
             return true;
         }
@@ -1914,7 +1940,8 @@ bool CPPSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         // it.
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
-            switch (use->getUser()->getOp())
+            auto user = use->getUser();
+            switch (user->getOp())
             {
             case kIROp_MatrixReshape:
             case kIROp_VectorReshape:
@@ -1925,6 +1952,24 @@ bool CPPSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
                 return false;
             default:
                 break;
+            }
+
+            // A multi-component swizzle read has no native `.xyz` construction
+            // form in C++/CUDA, so the `kIROp_Swizzle` handler in `emitInstExpr`
+            // below builds the result element by element -- for example
+            // `float3{ base.x, base.y, base.z }` -- re-emitting the base operand
+            // once per component. If `base` is a value we would otherwise fold
+            // into its use site (a texture fetch or buffer load), that fold
+            // textually duplicates the fetch N times, producing N times the
+            // memory traffic. SPIR-V lowers the same swizzle to a single
+            // `OpVectorShuffle`, and HLSL emits a native `.xyz`, both evaluating
+            // the base once; keeping the base as its own temp here brings the
+            // C-family targets to that parity. This mirrors the reshape/cast
+            // guard above, whose rationale is likewise "multiple references."
+            if (auto swizzle = as<IRSwizzle>(user))
+            {
+                if (swizzle->getBase() == inst && swizzle->getElementCount() > 1)
+                    return false;
             }
         }
         switch (inst->getOp())

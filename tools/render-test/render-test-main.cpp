@@ -494,8 +494,12 @@ struct AssignValsFromLayoutContext
         const size_t bufferSize = Math::Max(
             (size_t)bufferData.getCount() * sizeof(uint32_t),
             (size_t)(srcBuffer.elementCount * srcBuffer.stride));
-        bufferData.reserve(bufferSize / sizeof(uint32_t));
-        for (size_t i = bufferData.getCount(); i < bufferSize / sizeof(uint32_t); i++)
+        // Round the backing storage up to a complete word because the RHI copies bufferSize bytes,
+        // including the final partial word.
+        const size_t wordSize = sizeof(uint32_t);
+        const size_t bufferWordCount = bufferSize / wordSize + (bufferSize % wordSize != 0);
+        bufferData.reserve(bufferWordCount);
+        for (size_t i = bufferData.getCount(); i < bufferWordCount; i++)
             bufferData.add(0);
 
         ComPtr<IBuffer> bufferResource;
@@ -862,6 +866,17 @@ struct AssignValsFromLayoutContext
         ShaderCursor const& dstCursor,
         ShaderInputLayout::AccelerationStructureVal* srcVal)
     {
+        SLANG_UNUSED(srcVal);
+        if (isDescriptorHandleType(dstCursor))
+        {
+            if (!accelerationStructure)
+                return SLANG_E_NOT_AVAILABLE;
+            DescriptorHandle handle;
+            SLANG_RETURN_ON_FAIL(accelerationStructure->getDescriptorHandle(&handle));
+            SLANG_RETURN_ON_FAIL(dstCursor.setDescriptorHandle(handle));
+            return SLANG_OK;
+        }
+
         dstCursor.setBinding(accelerationStructure);
         return SLANG_OK;
     }
@@ -1758,9 +1773,6 @@ static SlangResult _innerMain(
         }
     }
 
-    static renderer_test::CoreToRHIDebugBridge debugCallback;
-    debugCallback.setCoreCallback(stdWriters->getDebugCallback());
-
     // Use the profile name set on options if set
     input.profile = options.profileName.getLength() ? options.profileName : input.profile;
 
@@ -1891,12 +1903,13 @@ static SlangResult _innerMain(
     }
 
     CachedDeviceWrapper deviceWrapper;
+    // The acquired device's debug bridge; bound to this invocation's callback below (#11856).
+    Slang::RefPtr<renderer_test::CoreToRHIDebugBridge> deviceBridge;
     {
         DeviceDesc desc = {};
         desc.deviceType = options.deviceType;
 
         desc.enableValidation = options.enableDebugLayers;
-        desc.debugCallback = &debugCallback;
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)
@@ -1957,7 +1970,7 @@ static SlangResult _innerMain(
             SlangResult res;
             if (options.cacheRhiDevice)
             {
-                res = DeviceCache::acquireDevice(desc, rhiDevice.writeRef());
+                res = DeviceCache::acquireDevice(desc, rhiDevice.writeRef(), &deviceBridge);
                 if (SLANG_FAILED(res))
                 {
                     rhiDevice = nullptr;
@@ -1965,6 +1978,9 @@ static SlangResult _innerMain(
             }
             else
             {
+                // Not caching: create the device wired to a fresh retained bridge.
+                deviceBridge = renderer_test::createRetainedCoreToRHIDebugBridge();
+                desc.debugCallback = deviceBridge.Ptr();
                 res = rhi::getRHI()->createDevice(desc, rhiDevice.writeRef());
                 if (SLANG_FAILED(res))
                 {
@@ -2008,6 +2024,13 @@ static SlangResult _innerMain(
             }
         }
     }
+
+    // Bind this invocation's callback to the device's bridge for the adapter query and rendering;
+    // clearing on scope exit lets a later cached-device message with no active scope drop (#11785).
+    SLANG_ASSERT(deviceBridge);
+    renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
+        *deviceBridge,
+        stdWriters->getDebugCallback());
 
     // Print adapter info after device creation but before any other operations
     if (options.showAdapterInfo)

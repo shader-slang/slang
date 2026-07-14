@@ -222,6 +222,12 @@ enum GLSLSystemValueKind
     General,
     PositionOutput,
     PositionInput,
+    // The `FragDepth*` kinds are categorically different from `Position*`: their special
+    // treatment decorates the fragment *entry point* (a conservative-depth execution mode),
+    // not the `gl_FragDepth` global var. See the switch in
+    // `createVarLayoutForLegalizedGlobalParam`.
+    FragDepthGreater,
+    FragDepthLess,
 };
 
 struct GLSLSystemValueInfo
@@ -576,19 +582,34 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     }
     else if (semanticName == "sv_depthgreaterequal")
     {
-        // TODO: layout(depth_greater) out float gl_FragDepth;
+        // Same `gl_FragDepth` builtin as `SV_Depth`, but the depth value is constrained
+        // to only ever increase. We record this via `FragDepthGreater` so the GLSL
+        // emitter redeclares `layout(depth_greater) out float gl_FragDepth;` (glslang
+        // maps that to the DepthGreater SPIR-V execution mode).
 
         // Type is 'unknown' in hlsl
         name = "gl_FragDepth";
         requiredType = builder->getBasicType(BaseType::Float);
+        // The conservative-depth constraint applies to the depth *output* only. The
+        // front-end already rejects a depth semantic used as input (E30702), so this
+        // branch only legalizes the output varying; gating the kind on `VaryingOutput`
+        // (as `sv_position` does for `PositionOutput`) makes that output-only intent
+        // explicit and keeps the kind off any future non-output varying.
+        if (kind == LayoutResourceKind::VaryingOutput)
+            systemValueKind = GLSLSystemValueKind::FragDepthGreater;
     }
     else if (semanticName == "sv_depthlessequal")
     {
-        // TODO: layout(depth_greater) out float gl_FragDepth;
+        // Same `gl_FragDepth` builtin as `SV_Depth`, but constrained to only ever
+        // decrease; recorded via `FragDepthLess` so the GLSL emitter redeclares
+        // `layout(depth_less) out float gl_FragDepth;` (DepthLess execution mode).
 
         // 'unknown' in hlsl, float in glsl
         name = "gl_FragDepth";
         requiredType = builder->getBasicType(BaseType::Float);
+        // Output-only, gated as in the `sv_depthgreaterequal` branch above.
+        if (kind == LayoutResourceKind::VaryingOutput)
+            systemValueKind = GLSLSystemValueKind::FragDepthLess;
     }
     else if (semanticName == "sv_dispatchthreadid")
     {
@@ -1067,6 +1088,23 @@ void createVarLayoutForLegalizedGlobalParam(
             break;
         case GLSLSystemValueKind::PositionInput:
             builder->addGLPositionInputDecoration(globalParam);
+            break;
+        case GLSLSystemValueKind::FragDepthGreater:
+            // The depth-test condition is an execution-mode property of the fragment
+            // entry point (like `early_fragment_tests`), so we mark the entry point
+            // rather than the `gl_FragDepth` builtin var. Unlike the other cases here,
+            // this decorates the entry point, not `globalParam`. The decoration is
+            // idempotent by construction: the depth output is unique per entry point, the
+            // front-end rejects depth-as-input (E30702), and these ops are in
+            // `isSimpleDecoration` so `addDecoration` deduplicates a repeat attach
+            // (mirroring the `early_fragment_tests` precedent) — at most one qualifier
+            // reaches emit. The decoration is consumed only by the GLSL emitter; this
+            // legalization pass also runs for the direct-SPIR-V path, where the decoration
+            // is inert (the SPIR-V emitter derives the mode independently).
+            builder->addDecoration(context->entryPointFunc, kIROp_GLSLFragDepthGreaterDecoration);
+            break;
+        case GLSLSystemValueKind::FragDepthLess:
+            builder->addDecoration(context->entryPointFunc, kIROp_GLSLFragDepthLessDecoration);
             break;
         default:
             break;
@@ -4016,16 +4054,6 @@ void legalizeEntryPointParameterForGLSL(
         }
     }
 
-    if (stage == Stage::Geometry)
-    {
-        // If the user provided no parameters with a input primitive type qualifier, we
-        // default to `triangle`.
-        if (!func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
-        {
-            builder->addDecoration(func, kIROp_TriangleInputPrimitiveTypeDecoration);
-        }
-    }
-
     // There *can* be multiple streamout parameters, to an entry point (points if nothing else)
     {
         IRType* type = pp->getFullType();
@@ -4169,7 +4197,7 @@ void legalizeEntryPointParameterForGLSL(
         // operations like `TraceRay` are handled.
         //
         builder->setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
-        auto undefinedVal = builder->emitPoison(pp->getFullType());
+        auto undefinedVal = builder->getPoison(pp->getFullType());
         pp->replaceUsesWith(undefinedVal);
 
         return;
@@ -4944,6 +4972,18 @@ void legalizeEntryPointForGLSL(
             SLANG_ASSERT(paramLayout);
 
             legalizeEntryPointParameterForGLSL(&context, codeGenContext, func, pp, paramLayout);
+        }
+
+        // For geometry shaders, if none of the parameters carried an input
+        // primitive type qualifier (`triangle`, `point`, `line`, etc.), default
+        // to `triangle`. This must happen after all parameters have been
+        // processed; otherwise, if the input primitive parameter appears after
+        // another parameter, the default would be applied first and then clash
+        // with the real qualifier.
+        if (stage == Stage::Geometry &&
+            !func->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
+        {
+            builder.addDecoration(func, kIROp_TriangleInputPrimitiveTypeDecoration);
         }
 
         // At this point we should have eliminated all uses of the

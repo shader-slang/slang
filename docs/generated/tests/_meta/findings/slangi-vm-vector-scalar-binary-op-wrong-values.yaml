@@ -1,0 +1,39 @@
+schema_version: 1
+id: slangi-vm-vector-scalar-binary-op-wrong-values
+bundle: conformance/types-vector-and-matrix
+suspected_kind: wrong-codegen
+title: "[slangi] vector-scalar binary op (v - 1 etc.) returns wrong values"
+observed_at: 2026-06-01T15:30:00+00:00
+scope: cpp
+evidence:
+  command: ./build/Release/bin/slangi <repro.slang>
+  source_slang: docs/generated/tests/language-reference/types-vector-and-matrix/vector-binary-scalar-broadcast.slang
+  observed_summary: |
+    The language reference states that a binary op with a scalar
+    broadcasts the scalar across all vector elements. Slangi
+    computes `int4(1,2,3,4) - 1` as `int4(0, 0, 0, 0)` (every
+    element zeroed) and `4 - int4(1,2,3,4)` as `int4(3, 0, 0, 0)`
+    (only the first element correct, the rest zero). Documented
+    correct values: `(0, 1, 2, 3)` and `(3, 2, 1, 0)`. The wrong-
+    value pattern suggests the broadcast is applied only to the
+    first lane and zeros elsewhere — likely a missing splat in
+    the VM bytecode emitter.
+  exit_code: 0
+expected:
+  claim: |
+    Per the language reference, "When applying a binary arithmetic
+    operator where the other operand is scalar, the operation
+    applies to all vector elements with the scalar parameter."
+    `int4(1,2,3,4) - 1` must equal `int4(0, 1, 2, 3)`.
+  citation_kind: doc
+  citation: docs/language-reference/types-vector-and-matrix.md
+provenance:
+  agent_model: claude-opus-4-7
+  source_commit: d25453d7f0b4867db4cb5eabf34fb6cd088cf596
+  doc_anchor: docs/language-reference/types-vector-and-matrix.md#operators
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — same pattern fails for both `v - 1` and `4 - v`, with a wrong-but-internally-consistent pattern (first lane partly correct, others zero). The doc's claim is unambiguous."
+    - "Frontend bug: not yet verified via -target hlsl emit. Likely VM-only based on the symptom shape (slangi-emit-vm.cpp generally is the source of vector-handling bugs we've seen in this campaign)."
+    - "Related to #11402 / #11403 / pre-existing #11375: all four are slangi VM bugs surfaced by lang-ref-anchored tests; the operations differ but the pattern is consistent (VM doesn't handle some IR shape correctly)."

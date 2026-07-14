@@ -55,6 +55,76 @@ void makeParameterBlock(IRBuilder* inBuilder, IRFunc* func)
     builder.emitBranch(firstBlock);
 }
 
+// Diagnose `abort()` calls before reverse-mode translation reaches the unzip
+// and transpose passes, which do not currently model abort's control-flow exit.
+static bool diagnoseUnsupportedAbortForBackwardDiff(DiagnosticSink* sink, IRFunc* func)
+{
+    bool foundUnsupportedAbort = false;
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (inst->getOp() != kIROp_Abort)
+                continue;
+
+            sink->diagnose(
+                Diagnostics::AbortNotSupportedInReverseModeAutoDiff{.location = inst->sourceLoc});
+            foundUnsupportedAbort = true;
+        }
+    }
+    return foundUnsupportedAbort;
+}
+
+// Build a well-typed placeholder for `BackwardDifferentiate` after diagnosing
+// an unsupported function body, so later error-recovery paths do not inspect a
+// half-translated derivative result.
+static IRInst* emitPoisonBackwardDiffResult(
+    IRBuilder* builder,
+    IRInst* translateInst,
+    IRFunc* func,
+    DifferentiableTypeConformanceContext* diffTypeContext)
+{
+    builder->setInsertAfter(translateInst);
+    auto funcType = func->getDataType();
+    auto fullContextType = builder->createStructType();
+    auto minimalContextType = builder->createStructType();
+
+    IRInst* applyTypeOperands[] = {funcType, minimalContextType};
+    auto applyType = diffTypeContext->resolveType(
+        builder,
+        builder->emitIntrinsicInst(
+            builder->getTypeKind(),
+            kIROp_ApplyForBwdFuncType,
+            SLANG_COUNT_OF(applyTypeOperands),
+            applyTypeOperands));
+
+    IRInst* rematTypeOperands[] = {funcType, minimalContextType, fullContextType};
+    auto rematType = diffTypeContext->resolveType(
+        builder,
+        builder->emitIntrinsicInst(
+            builder->getTypeKind(),
+            kIROp_RematFuncType,
+            SLANG_COUNT_OF(rematTypeOperands),
+            rematTypeOperands));
+
+    IRInst* propagateTypeOperands[] = {funcType, fullContextType};
+    auto propagateType = diffTypeContext->resolveType(
+        builder,
+        builder->emitIntrinsicInst(
+            builder->getTypeKind(),
+            kIROp_BwdCallableFuncType,
+            SLANG_COUNT_OF(propagateTypeOperands),
+            propagateTypeOperands));
+
+    List<IRInst*> operands;
+    operands.add(builder->getPoison(applyType));
+    operands.add(builder->getPoison(rematType));
+    operands.add(builder->getPoison(propagateType));
+    operands.add(fullContextType);
+    operands.add(minimalContextType);
+    return builder->emitMakeTuple(operands);
+}
+
 SlangResult prepareFuncForBackwardDiff(
     DifferentiableTypeConformanceContext& diffTypeContext,
     DiagnosticSink* sink,
@@ -931,6 +1001,21 @@ IRInst* maybeTranslateBackwardDerivative(
         return translateInst;
 
     auto targetFunc = cast<IRFunc>(baseFunc);
+    if (diagnoseUnsupportedAbortForBackwardDiff(sink, targetFunc))
+        return emitPoisonBackwardDiffResult(
+            &builder,
+            translateInst,
+            targetFunc,
+            &translater.diffTypeContext);
+
+    // Backstop for when the front-end `checkAutoDiffUsages` validation is disabled: a function that
+    // itself calls a `bwd_diff` result is not differentiable and would crash the unzip pass below.
+    if (diagnoseDifferentiatingBackwardDiffResult(sink, targetFunc))
+        return emitPoisonBackwardDiffResult(
+            &builder,
+            translateInst,
+            targetFunc,
+            &translater.diffTypeContext);
 
     IRInst* bwdPrimalFunc;
     IRInst* bwdRematFunc;
@@ -976,6 +1061,20 @@ IRInst* maybeTranslateTrivialBackwardDerivative(
         return translateInst;
 
     auto targetFunc = cast<IRFunc>(baseFunc);
+    if (diagnoseUnsupportedAbortForBackwardDiff(sink, targetFunc))
+        return emitPoisonBackwardDiffResult(
+            &builder,
+            translateInst,
+            targetFunc,
+            &translater.diffTypeContext);
+
+    // Backstop (see maybeTranslateBackwardDerivative) for when front-end validation is disabled.
+    if (diagnoseDifferentiatingBackwardDiffResult(sink, targetFunc))
+        return emitPoisonBackwardDiffResult(
+            &builder,
+            translateInst,
+            targetFunc,
+            &translater.diffTypeContext);
 
     IRInst* bwdPrimalFunc;
     IRInst* bwdRematFunc;

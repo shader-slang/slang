@@ -1,0 +1,238 @@
+name: Compile Perf — Release Sweep (history resync)
+
+# Manually-triggered re-sweep of the per-release history on the CURRENT benchmark
+# runner. Absolute compile times are runner-specific, so when the benchmark
+# machine changes the whole release history must be re-measured on it for the
+# daily ToT points to stay comparable — run this with force=true to do that.
+# Downloads prebuilt slangc for each release (matching the runner's platform),
+# sweeps them into the perf-results repo, stamps the runner fingerprint, and
+# rebuilds the tracking series. See tools/compile-perf/DESIGN.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "earliest release date (YYYY-MM-DD)"
+        default: "2025-08-01"
+      until:
+        description: "latest release date (YYYY-MM-DD)"
+        default: "2026-12-31"
+      samples:
+        description: "timed samples per run"
+        default: "5"
+      force:
+        description: "re-sweep releases already present (set true to resync a new runner)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: compile-perf-release-sweep
+  cancel-in-progress: false
+
+env:
+  PERF_RESULTS_REPO: shader-slang/slang-compile-perf
+
+permissions:
+  contents: read # GITHUB_TOKEN read-only; writes use SLANG_COMPILE_PERF_PAT
+
+jobs:
+  release-sweep:
+    # NVIDIA RGFX perf pool via the VM-based GitHub bridge (rtrci github-bridge
+    # target shader-slang/slang:windows-x64-perf) — same pool as the nightly
+    # job, so release-history timings stay comparable. The pre-VM pool (runner
+    # group nvrgfx, label nvrgfx-perf) was retired 2026-07; a re-sweep on this
+    # pool is needed to rebuild a baseline comparable with post-migration
+    # nightly points.
+    runs-on:
+      labels: [Windows, X64, nvrgfx-perf-kernelvm-bridge]
+    steps:
+      - name: Add bash to PATH (Windows)
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\usr\bin"
+
+      # bench.py --api builds the api-driver once per release with the host
+      # cl; without a dev environment every api workload fails on every
+      # release (cl.exe not on PATH — this job has no common-setup because it
+      # never builds slang). Same pinned action common-setup uses.
+      - name: Set up MSVC dev tools on Windows
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.x"
+
+      # No Slang build here — we sweep prebuilt RELEASE binaries. fetch-depth 0
+      # is needed so fetch_releases.py can read release tags + dates from git.
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          fetch-depth: "0"
+
+      - name: Checkout MDL-SDK corpus
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: "shader-slang/MDL-SDK"
+          # Pin to the same commit as nightly-mdl-perf-test.yml so release-history
+          # and daily ToT runs use an identical corpus — a corpus change would
+          # otherwise make historical vs daily comparisons invalid.
+          ref: "446562493bed1b175e7cf105425ca3596764652f"
+          path: "external/MDL-SDK"
+          persist-credentials: false
+          sparse-checkout: |
+            ./examples/mdl_sdk/dxr/content/slangified
+
+      # NB: persist-credentials stays on (default) here — the "Push results" step
+      # below relies on the PAT credential this checkout persists in .git/config.
+      - name: Checkout perf results repo
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: ${{ env.PERF_RESULTS_REPO }}
+          path: "perf-results"
+          token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+
+      - name: Fetch release binaries + sweep on this runner
+        shell: bash
+        # Inputs arrive via env and are never interpolated into the script, so a
+        # value with shell metacharacters can't break out — it's just an argv item.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # API rate limit for asset downloads
+          SINCE: ${{ github.event.inputs.since || '2025-08-01' }}
+          UNTIL: ${{ github.event.inputs.until || '2026-12-31' }}
+          SAMPLES: ${{ github.event.inputs.samples || '5' }}
+          FORCE_ENABLED: ${{ github.event.inputs.force || 'false' }}
+        run: |
+          set -euo pipefail
+          SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
+          RESULTS="$GITHUB_WORKSPACE/perf-results"
+
+          mkdir -p "$SUITE/corpus/mdl"
+          cp external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang "$SUITE/corpus/mdl/"
+
+          cd "$SUITE"
+          force=(); [ "$FORCE_ENABLED" = "true" ] && force=(--force)
+          # Prebuilt slangc for each release, matching THIS runner's platform.
+          python3 fetch_releases.py --repo "$GITHUB_WORKSPACE" \
+            --since "$SINCE" --until "$UNTIL" "${force[@]}"
+          # Sweep every release into the results repo (history baseline).
+          # --api: api-path workloads are part of the tracked suite; the driver
+          # dlopens each release's libslang, so the whole window gets baselines.
+          # Releases measured before the api workloads existed count as
+          # incomplete and are re-benched (full suite, same runner) on the next
+          # dispatch — that IS the backfill path; no force needed.
+          python3 sweep.py --index releases/index.json --results "$RESULTS" \
+            --samples "$SAMPLES" --api "${force[@]}"
+          # Merge newly swept releases into the full index (not overwrite) so
+          # report.py uses all historical data, not just the swept window.
+          python3 track.py merge-index --results "$RESULTS" --index releases/index.json
+          python3 track.py stamp-runner --results "$RESULTS" --label "release-sweep-$(date -u +%Y-%m-%d)"
+          python3 track.py rebuild --results "$RESULTS" --index "$RESULTS/index.json"
+
+      - name: Push results
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/perf-results"
+          git config user.name "slang-perf-bot"
+          git config user.email "slang-perf-bot@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "release history resync $(date -u +%Y-%m-%d) (runner $(python3 "$GITHUB_WORKSPACE/tools/compile-perf/track.py" runner-id))"
+          git push
+
+      - name: Clean up downloaded release binaries
+        if: always()
+        shell: bash
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/tools/compile-perf/releases"
+          echo "cleaned up release binaries"
+
+      - name: Revoke PAT from perf-results git config
+        if: always()
+        shell: bash
+        run: |
+          git -C "$GITHUB_WORKSPACE/perf-results" config --unset \
+            http."https://github.com/".extraheader 2>/dev/null || true
+
+      # Generate HTML reports from ALL data in the results repo and deploy to
+      # the gh-pages branch of slang-compile-perf, served at
+      # shader-slang.org/slang-compile-perf.
+      - name: Generate HTML reports
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
+          RESULTS="$GITHUB_WORKSPACE/perf-results"
+          if [ ! -f "$RESULTS/index.json" ]; then
+            echo "No index.json in results repo; skipping report generation"
+            exit 0
+          fi
+          cd "$SUITE"
+          python3 report.py --results "$RESULTS" --index "$RESULTS/index.json"
+
+      - name: Checkout gh-pages branch
+        continue-on-error: true
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: ${{ env.PERF_RESULTS_REPO }}
+          ref: gh-pages
+          path: perf-pages
+          token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+
+      - name: Deploy HTML reports to GitHub Pages
+        continue-on-error: true
+        shell: bash
+        env:
+          SLANG_COMPILE_PERF_PAT: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+        run: |
+          set -euo pipefail
+          ANALYSIS="$GITHUB_WORKSPACE/perf-results/analysis"
+          PAGES="$GITHUB_WORKSPACE/perf-pages"
+
+          if [ ! -d "$ANALYSIS" ]; then
+            echo "No analysis dir; skipping pages deploy"
+            exit 0
+          fi
+
+          if [ -d "$PAGES/.git" ]; then
+            cd "$PAGES"
+            # Remove all tracked files so stale workload pages don't linger
+            git rm -rf . --quiet || true
+          else
+            # gh-pages branch doesn't exist yet — create it as an orphan
+            mkdir -p "$PAGES"
+            cd "$PAGES"
+            git init
+            git checkout --orphan gh-pages
+            git remote add origin "https://x-access-token:${SLANG_COMPILE_PERF_PAT}@github.com/${{ env.PERF_RESULTS_REPO }}.git"
+          fi
+
+          git config user.name "slang-perf-bot"
+          git config user.email "slang-perf-bot@users.noreply.github.com"
+
+          cp -r "$ANALYSIS/." .
+          mv report_per_workload.html index.html
+          # _combined_index.json is a derived intermediate — no need to serve it
+          rm -f _combined_index.json
+          # Serve files verbatim: without this marker GitHub Pages runs the
+          # generated report through legacy Jekyll, whose builds have failed
+          # or hung on this content. Must be re-created on every deploy
+          # because the `git rm -rf .` above removes it.
+          touch .nojekyll
+
+          git add -A
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "perf report $(date -u +%Y-%m-%d)"
+          git push origin gh-pages
+
+      - name: Revoke PAT from perf-pages git config
+        if: always()
+        shell: bash
+        run: |
+          git -C "$GITHUB_WORKSPACE/perf-pages" config --unset \
+            http."https://github.com/".extraheader 2>/dev/null || true
+          git -C "$GITHUB_WORKSPACE/perf-pages" remote set-url origin \
+            "https://github.com/${{ env.PERF_RESULTS_REPO }}.git" 2>/dev/null || true

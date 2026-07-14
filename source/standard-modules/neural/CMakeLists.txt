@@ -30,10 +30,10 @@ foreach(shader_file ${neural_shader_sources})
     list(APPEND neural_copied_files ${dest_file})
 endforeach()
 
-# Determine which compiler to use for building the module
+# Determine which bootstrap compiler to use for building the module.
 # For cross-compilation, use slang-bootstrap from SLANG_GENERATORS_PATH
 # (slang-bootstrap is a standalone tool with no external dependencies)
-# Otherwise, use the slangc built as part of this build
+# Otherwise, use the slang-bootstrap target built as part of this build.
 if(SLANG_GENERATORS_PATH)
     if(CMAKE_HOST_WIN32)
         set(CMAKE_HOST_EXECUTABLE_SUFFIX ".exe")
@@ -44,32 +44,14 @@ if(SLANG_GENERATORS_PATH)
         "${SLANG_GENERATORS_PATH}/slang-bootstrap${CMAKE_HOST_EXECUTABLE_SUFFIX}"
     )
     set(SLANG_COMPILER_DEPENDENCY)
-    set(SLANG_COMPILER_EXTRA_DEPS)
-elseif(NOT SLANG_EMBED_CORE_MODULE)
-    # When the binary core module is not embedded, slangc (isBootstrap=false) would
-    # try to load the binary GLSL module from slang-glsl-module.dll. That binary was
-    # compiled by slang-bootstrap against its own core-from-source compilation and may
-    # not be compatible with slangc's independently compiled core module, causing a
-    # crash. Use slang-bootstrap instead: it compiles core and GLSL from source
-    # (isBootstrap=true skips binary-module loading) so there is no mismatch.
-    # We also depend on generate_core_module_headers, which (on Windows shared builds)
-    # copies slang-compiler.dll into the generators/ directory so slang-bootstrap
-    # can find it at runtime.
-    set(SLANG_COMPILER slang-bootstrap)
-    set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
-    set(SLANG_COMPILER_EXTRA_DEPS generate_core_module_headers)
-elseif(SLANG_ENABLE_SLANGC)
-    set(SLANG_COMPILER "$<TARGET_FILE:slangc>")
-    set(SLANG_COMPILER_DEPENDENCY slangc slang)
-    set(SLANG_COMPILER_EXTRA_DEPS)
 else()
-    # When SLANG_ENABLE_SLANGC is OFF, slangc is not built as a target. Fall back
-    # to slang-bootstrap (a generator always built regardless of SLANG_ENABLE_SLANGC)
-    # rather than a system-installed slangc that may not be present.
+    # Build standard modules with slang-bootstrap so this target never requires
+    # slangc.exe. Load the generated core module so this step does not recompile it.
     set(SLANG_COMPILER slang-bootstrap)
     set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
-    set(SLANG_COMPILER_EXTRA_DEPS generate_core_module_headers)
 endif()
+set(SLANG_COMPILER_CORE_MODULE_ARGS -load-core-module ${core_module_archive_without_timestamp})
+set(SLANG_COMPILER_EXTRA_DEPS generate_core_module)
 
 # Determine compiler flags based on build type
 if(SLANG_STANDARD_MODULE_DEVELOP_BUILD)
@@ -83,8 +65,8 @@ endif()
 add_custom_command(
     OUTPUT ${neural_module_file}
     COMMAND
-        ${SLANG_COMPILER} ${NEURAL_MODULE_DEFINES} -I ${CMAKE_CURRENT_SOURCE_DIR}
-        neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
+        ${SLANG_COMPILER} ${SLANG_COMPILER_CORE_MODULE_ARGS} ${NEURAL_MODULE_DEFINES} -I
+        ${CMAKE_CURRENT_SOURCE_DIR} neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
     DEPENDS
         ${neural_copied_files}
         ${neural_unittest_sources}

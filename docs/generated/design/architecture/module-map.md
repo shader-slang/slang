@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:30:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: f11187e79ffaa9e1c1966046a9bb76df4bb33cabc81ba4f496d6f224fcf0ca12
+model: claude-opus-4.8
+generated_at: 2026-06-29T13:36:05Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 3fedec1d8eadc2bf2e0fb417739cd43fb662af67bb19d9334c40fa0168b98cc4
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -64,9 +64,14 @@ language. May depend on `source/core/` but not on `source/slang/`.
 | Artifact model | `slang-artifact.h`, `slang-artifact-impl.cpp`, `slang-artifact-handler-impl.cpp`, `slang-artifact-representation*` | Polymorphic compiled-output containers used by the public API |
 | Artifact utilities | `slang-artifact-associated-impl.cpp`, `slang-artifact-container-util.cpp`, `slang-artifact-desc-util.cpp`, `slang-artifact-diagnostic-util.cpp`, `slang-artifact-helper.cpp`, `slang-artifact-util.cpp` | Helpers and metadata accessors for artifacts |
 | Downstream-compiler glue | `slang-downstream-compiler.h`, `slang-downstream-compiler-set.h`, `slang-downstream-compiler-util.h` | Abstracts invocation of external compilers |
-| Per-vendor compilers | `slang-dxc-compiler.cpp`, `slang-fxc-compiler.cpp`, `slang-glslang-compiler.cpp`, `slang-gcc-compiler-util.cpp`, `slang-json-lexer.cpp` | Concrete bridges to DXC, FXC, glslang, GCC, JSON parsing |
+| Per-vendor compilers | `slang-dxc-compiler.cpp`, `slang-fxc-compiler.cpp`, `slang-glslang-compiler.cpp`, `slang-gcc-compiler-util.cpp`, `slang-nvrtc-compiler.cpp`, `slang-llvm-compiler.cpp` | Concrete bridges to DXC, FXC, glslang, GCC, NVRTC, and LLVM |
 | Include search | `slang-include-system.h`, `slang-include-system.cpp` | Path resolution for `#include` and `import` |
-| JSON lexer | `slang-json-lexer.h`, `slang-json-lexer.cpp` | JSON tokenizer used by some downstream tools |
+| JSON tokenizer/parser | `slang-json-lexer.{h,cpp}`, `slang-json-parser.{h,cpp}` | JSON lexer and parser used by some downstream tools |
+| JSON value model | `slang-json-value.{h,cpp}`, `slang-json-native.{h,cpp}` | In-memory JSON value tree and native-object reflection bridge |
+| JSON-RPC | `slang-json-rpc.{h,cpp}`, `slang-json-rpc-connection.{h,cpp}` | JSON-RPC framing and connection used by the language server |
+| Language-server protocol | `slang-language-server-protocol.{h,cpp}` | LSP message and parameter type definitions |
+| Rich diagnostic rendering | `slang-rich-diagnostics-render.{h,cpp}` | Source-snippet and caret rendering for diagnostics |
+| Source maps | `slang-source-map.{h,cpp}`, `slang-json-source-map-util.{h,cpp}` | Source-map model and JSON (de)serialization |
 | Command-line args | `slang-command-line-args.h`, `slang-command-line-args.cpp` | Generic argument extraction shared with frontends |
 
 ## source/slang/ — frontend, IR, passes, emit
@@ -82,10 +87,11 @@ lives in the [pipeline](../pipeline) and
 | --- | --- | --- |
 | Front-end compile request | [slang-compile-request.h](../../../../source/slang/slang-compile-request.h), `slang-compile-request.cpp` | Drives parsing, checking, lowering for a translation unit |
 | End-to-end compile request | `slang-end-to-end-request.cpp` | Backs a single `slangc` / public-API compile invocation |
+| Repro capture and replay | `slang-repro.h`, `slang-repro.cpp`, `slang-repro-validator.h`, `slang-repro-validator.cpp` | Serializes a compile request for `-extract-repro` / `-load-repro`; the validator checks repro inputs before they are used |
 | Module | [slang-module.h](../../../../source/slang/slang-module.h), `slang-module.cpp` | Holds AST + IR for a translation unit; implements `IModule` |
 | Module library | `slang-module-library.h`, `slang-module-library.cpp` | Bundles compiled modules into reusable libraries |
 | Linkage | `slang-session.h`, `slang-session.cpp` | The class behind the public `slang::ISession` — a per-configuration scope owning search paths, target settings, and the source manager |
-| Linkable components | `slang-linkable.h`, `slang-linkable-impl.cpp` (and friends) | `IComponentType` and its composite / specialized variants — the linkable-program abstraction used by the back-end |
+| Linkable components | `slang-linkable.h`, `slang-linkable.cpp`, `slang-linkable-impls.h`, `slang-linkable-impls.cpp` | `IComponentType` and its composite / specialized variants — the linkable-program abstraction used by the back-end |
 | Session (global) | `slang-global-session.h`, `slang-global-session.cpp` | Process-wide `Session` class behind `slang::IGlobalSession` |
 
 ### Frontend (lex / preprocess / parse)
@@ -226,6 +232,23 @@ These prefixes have their own dedicated docs in
 - Serialization (`slang-serialize*`) →
   [../cross-cutting/serialization.md](../cross-cutting/serialization.md).
 
+### Reflection API
+
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| Reflection conversions | `slang-reflection-api.cpp` | Conversion routines backing the strongly-typed `slang::Reflection*` API |
+| Reflection JSON | `slang-reflection-json.h`, `slang-reflection-json.cpp` | Serializes reflection data to JSON |
+
+### Language server
+
+Implements the Language Server Protocol; the entry file dispatches to
+per-feature helpers.
+
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| Server core | `slang-language-server.h`, `slang-language-server.cpp` | LSP request loop and dispatcher |
+| Per-feature helpers | `slang-language-server-ast-lookup.{h,cpp}`, `slang-language-server-completion.{h,cpp}`, `slang-language-server-document-symbols.{h,cpp}`, `slang-language-server-inlay-hints.{h,cpp}`, `slang-language-server-semantic-tokens.{h,cpp}`, `slang-language-server-auto-format.{h,cpp}` | AST lookup, completion, document symbols, inlay hints, semantic tokens, and auto-format |
+
 ### API surface helpers
 
 | Logical unit | Files | Responsibility |
@@ -274,14 +297,44 @@ output can be compiled by the downstream toolchain.
 | LLVM helpers | [slang-llvm.h](../../../../prelude/slang-llvm.h) | `slang-llvm` integration |
 | Torch prelude | [slang-torch-prelude.h](../../../../prelude/slang-torch-prelude.h) | PyTorch glue |
 
-## Other source/ subdirectories
+## source/slang-llvm/ — LLVM-based JIT and native compilation
 
-| Subdirectory | Role |
-| --- | --- |
-| [source/slang-llvm/](../../../../source/slang-llvm) | LLVM-based JIT / native compilation |
-| [source/slang-glslang/](../../../../source/slang-glslang) | Bridge to Khronos glslang for SPIR-V via GLSL |
-| [source/slang-dispatcher/](../../../../source/slang-dispatcher) | Common dispatcher for downstream-tool invocation |
-| [source/slang-rt/](../../../../source/slang-rt) | Runtime library used by emitted CPU/Torch/CUDA targets |
-| [source/slang-record-replay/](../../../../source/slang-record-replay) | Public-API call recorder/replayer |
-| [source/slang-wasm/](../../../../source/slang-wasm) | WebAssembly bindings |
-| [source/slangc/](../../../../source/slangc) | Command-line driver for the compiler |
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| LLVM bridge | [slang-llvm.cpp](../../../../source/slang-llvm/slang-llvm.cpp), `slang-llvm-builder.cpp`, `slang-llvm-jit-shared-library.cpp` | LLVM-based JIT / native compilation; built out-of-tree (see [dependency-graph.md](dependency-graph.md)) |
+
+## source/slang-glslang/ — Khronos glslang bridge
+
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| glslang shim | [slang-glslang.cpp](../../../../source/slang-glslang/slang-glslang.cpp), `slang-glslang.h` | Bridge to Khronos glslang for SPIR-V via GLSL |
+
+## source/slang-dispatcher/ — downstream-tool dispatcher
+
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| Dispatcher entry | [main.cpp](../../../../source/slang-dispatcher/main.cpp) | Common dispatcher for downstream-tool invocation |
+
+## source/slang-rt/ — runtime library
+
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| Runtime | [slang-rt.cpp](../../../../source/slang-rt/slang-rt.cpp), `slang-rt.h` | Runtime library used by emitted CPU/Torch/CUDA targets |
+
+## source/slang-record-replay/ — public-API record/replay
+
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| Recorder/replayer | [replay-context.cpp](../../../../source/slang-record-replay/replay-context.cpp), `replay-context-record.cpp`, `replay-handlers.cpp`, `replay-stream.cpp`, `replay-stream-decoder.cpp` | Public-API call recorder/replayer; sources are folded into `slang` (see [dependency-graph.md](dependency-graph.md)) |
+
+## source/slang-wasm/ — WebAssembly bindings
+
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| WASM bindings | [slang-wasm.cpp](../../../../source/slang-wasm/slang-wasm.cpp), `slang-wasm-bindings.cpp`, `slang-wasm.h` | WebAssembly bindings for the public API |
+
+## source/slangc/ — command-line driver
+
+| Logical unit | Files | Responsibility |
+| --- | --- | --- |
+| Driver entry | [main.cpp](../../../../source/slangc/main.cpp) | Command-line driver for the compiler |

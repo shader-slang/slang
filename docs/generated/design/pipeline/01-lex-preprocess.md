@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-07T14:35:56+00:00
-source_commit: 3da83a82d83ad1b0fbd58465ed3a89d2880533dd
-watched_paths_digest: ffca628ccbe37729fbf4b931ff5a00d755e36eb2c4c24e63869e5ee91bba63b3
+model: claude-opus-4.8
+generated_at: 2026-06-29T13:37:51Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: e9924a6d79a718b4f741ca99add14031255b67e8c578cc6bf6b39f89c956daaf
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -12,7 +12,7 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 This document covers the first compilation stage: turning a source
 buffer into a flat array of `Token` that the parser can consume. The
 intended reader is a developer modifying token classification, source-
-location encoding, or preprocessor directives.
+location encoding, literal-value extraction, or preprocessor directives.
 
 ## Inputs and outputs
 
@@ -82,22 +82,72 @@ The lexer handles several C-isms:
 
 - Backslash line continuations (the source location of the resulting
   token still maps back to the original physical line).
-- Special handling of `<...>` after a `#include` directive, so that
-  `<foo/bar.h>` lexes as a single string-like token instead of a
-  comparison expression.
 - No distinction between identifiers and keywords. Every keyword token
   arrives at the parser as `TokenType::Identifier` (see the X-macro
   list in
   [slang-token-defs.h](../../../../source/compiler-core/slang-token-defs.h));
   the parser resolves the keyword status via lookup, as described in
   [02-parse-ast.md](02-parse-ast.md).
-- Numeric literal suffixes are kept as part of the token's raw text;
-  the lexer does not extract literal values.
+- Numeric, string, and character literal text is kept verbatim in the
+  token's raw text. The lexer scans the literal's extent but does not
+  decode its value; value extraction is deferred to the helpers below.
+
+### Literal scanning and value extraction
+
+The lexer separates *scanning* a literal (recording its extent as raw
+token text) from *decoding* its value. Scanning happens in the lex
+driver — for example `_lexStringLiteralBody`
+([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp))
+handles both `"..."` and `'...'`, walking escape sequences far enough
+to find the closing quote. Scanning records the raw text but still
+validates enough literal structure to report malformed syntax: it
+diagnoses empty or multi-character character literals
+(`illegalCharacterLiteral`), an EOF or newline inside a literal
+(`endOfFileInLiteral`, `newlineInLiteral`), and ill-formed `\x`, `\u`,
+`\U`, or braced Unicode escapes (`invalidStringEscape`,
+`invalidUnicodeStringEscape`). Decoding into a value is done on demand
+by the helper routines declared in
+[slang-lexer.h](../../../../source/compiler-core/slang-lexer.h):
+
+- `getIntegerLiteralValue` — parses the integer, optionally returning
+  the suffix, decimal-base flag, and an overflow flag.
+- `getFloatingPointLiteralValue` — parses the floating-point value and
+  optionally reports `outIsOutOfRange` (underflow returns `0`,
+  overflow returns `INFINITY`) and `outPrecisionLost` (significand
+  truncated).
+- `getStringLiteralTokenValue(token, sink)` — decodes escapes into the
+  resulting bytes; `getFileNameTokenValue` is the variant for
+  `#include`-style filenames, which does not process escapes.
+- `getCharLiteralValue(token, sink)` — returns a 32-bit code point, or
+  `-1` on failure (which is also diagnosed).
+
+The string/char helpers take a `DiagnosticSink*` because value
+conversion errors — out-of-range code units or code points, and the
+escape decoding the helpers themselves perform — are reported at decode
+time, separately from the structural escape validation already done
+during scanning. Escape handling is centralized in `_decodeStringEscape`
+([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp))
+and follows the grammar in
+[docs/language-reference/expressions-literal.md](../../../../docs/language-reference/expressions-literal.md):
+octal (`\NNN`), hex (`\xNN`, any number of digits), and the Unicode
+escapes `\uNNNN` (4 hex digits), `\UNNNNNNNN` (8 hex digits), and
+`\u{...}` (braced, up to 32 bits). In string literals, `\xNN` maps to a
+single byte while Unicode code-point escapes are encoded as UTF-8 byte
+sequences (via `encodeUnicodePointToUTF8`); bare non-ASCII bytes are
+passed through without enforcing well-formed UTF-8. In character
+literals the source bytes are decoded with `getUnicodePointFromUTF8`
+and malformed UTF-8 is rejected, so there is no practical difference
+between `\x` and `\u` there. The corresponding diagnostics
+(`invalidUtf8ByteSequence`, `invalidStringEscape`,
+`invalidUnicodeStringEscape`, `outOfRangeCodeUnit`,
+`outOfRangeCodePointForUtf8`) are defined in
+[slang-lexer-diagnostic-defs.h](../../../../source/compiler-core/slang-lexer-diagnostic-defs.h).
 
 ### What the lexer does *not* do
 
 - It does not classify keywords (deferred to lookup).
-- It does not evaluate numeric literals.
+- It does not evaluate numeric literals during scanning; value
+  extraction is a separate, on-demand step (see above).
 - It does not skip whitespace or comments by default; whitespace and
   comments are emitted as their own token types so that downstream
   passes (preprocessor, parser) can decide whether to filter them.
@@ -133,11 +183,16 @@ disturbing the parent.
 
 ### Macro expansion
 
-Macro definitions store an already-lexed token sequence; expansion
-"replays" those tokens. Function-style macros allocate a fresh
-environment that maps parameter names to pseudo-macros for the
-arguments, so parameter expansion follows the same recursive
-expansion mechanism as ordinary macro expansion.
+Macro definitions store an already-lexed token sequence, pre-chopped
+into `MacroDefinition::Op` entries; expansion "replays" those ops. A
+parameter reference is compiled to a parameter op (`ExpandedParam`,
+`UnexpandedParam`, or `StringizedParam`) carrying the parameter index.
+At invocation, `MacroInvocation` replays the matching argument's token
+range by index (`_getArgTokens`,
+[slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)),
+wrapping it in an `ExpansionInputStream` for the `ExpandedParam` case so
+argument tokens are themselves macro-expanded — there is no per-invocation
+environment of pseudo-macros.
 
 Inactive `#if` branches still flow through the lexer (so column /
 line accounting stays correct), but their contents are not expanded;
@@ -159,10 +214,32 @@ verify by reading the directive table in
 
 `#include` strings are resolved by `IncludeSystem` from
 [slang-include-system.cpp](../../../../source/compiler-core/slang-include-system.cpp),
-which consults the `Linkage`'s search paths. Resolution returns a
+which consults the `Linkage`'s search paths. For angle-form includes,
+`HandleIncludeDirective`
+([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp))
+concatenates the raw tokens between `OpLess` and `OpGreater` into the
+path string and selects `IncludeSystem::Mode::System`; quoted includes
+take the path from a single `StringLiteral` token. Resolution returns a
 `SourceFile`; the preprocessor then pushes a fresh input stream for
 that file. The handler receives a `handleFileDependency` callback so
 the front-end can build dependency records for the build system.
+
+### `#pragma warning` state across files
+
+`#pragma warning(push/pop/disable/...)` state is tracked by a
+`WarningStateTracker`
+([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)),
+which records, per diagnostic id, a timeline keyed on an absolute
+source-location axis. Because each `__include`d file is preprocessed in
+its own `preprocessSource` pass with a fresh `Preprocessor`, the
+tracker carries a `persistedAbsoluteSourceLocCounter`: `preprocessSource`
+seeds its `absoluteSourceLocCounter` from the persisted value at entry
+and hands the advanced value back at exit, so the timeline's absolute
+axis stays globally monotonic across files instead of every pass
+restarting from 0 and colliding. A `SLANG_RELEASE_ASSERT` on the handed-
+back counter guards monotonicity (e.g. against `uint32_t` wrap on very
+large translation units), because a violation would silently mis-resolve
+`#pragma warning` state in shipping builds.
 
 ## Source-location preservation
 
@@ -173,19 +250,26 @@ source locations are chosen differently:
    definition. Their `SourceLoc` is the location of the corresponding
    token in the macro *definition*, replayed by
    `MacroInvocation::readToken`
-   ([slang-preprocessor.cpp lines
-   2435-2444](../../../../source/slang/slang-preprocessor.cpp)). The
-   `SourceManager` records that the resulting expansion is part of a
-   macro invocation, so diagnostics can walk back to the invocation
+   ([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)).
+   The `SourceManager` records that the resulting expansion is part of
+   a macro invocation, so diagnostics can walk back to the invocation
    site even though the spelling location points into the macro body.
 2. **Argument tokens** — tokens taken from the call-site argument
    list. They retain the call-site `SourceLoc`, since they are
    physically lexed from the invocation.
-3. **Constructed tokens** — `__LINE__`, `__FILE__`, stringized (`#x`)
-   and pasted (`x##y`) tokens, which are synthesized fresh. These use
-   `m_macroInvocationLoc` so they are attributed to the invocation
-   site ([slang-preprocessor.cpp lines
-   2332-2334](../../../../source/slang/slang-preprocessor.cpp)).
+3. **Constructed tokens** — synthesized fresh, with three different
+   source-location rules
+   ([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)):
+   - *Builtins* (`__LINE__`, `__FILE__`) are pushed by
+     `_pushStreamForSourceLocBuiltin`, which gives the synthesized token
+     `m_macroInvocationLoc`, attributing it to the invocation site (the
+     reported line/file value, however, derives from the initiating
+     top-level location).
+   - *Stringized parameters* (`#x`) take the location of the `#` token
+     in the macro *definition* (`m_macro->tokens.m_tokens[tokenIndex].loc`).
+   - *Pasted tokens* (`x##y`) are re-lexed from a fresh
+     `PathInfo::makeTokenPaste()` source view whose origin is the `##`
+     token location (`tokenPasteLoc`).
 
 This split is what lets diagnostics (see
 [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md))
@@ -198,13 +282,19 @@ diagnostics.
 
 ## Failure modes
 
-- Invalid characters and malformed numeric / string literals raise
-  diagnostics through the `DiagnosticSink` passed into the lexer's
-  `initialize`. With `kLexerFlag_SuppressDiagnostics` set, the lexer
-  still emits `TokenType::Invalid` tokens for these inputs but
-  suppresses the diagnostics — used inside skipped preprocessor
-  blocks where the tokens will be discarded by the inactive-branch
-  filter.
+- Invalid characters and malformed numeric / string / character
+  literals raise diagnostics through the `DiagnosticSink`. Scan-time
+  errors (invalid character, end-of-file / newline in a literal,
+  empty / multi-character character literal, and ill-formed escape
+  syntax) go through the sink passed into the lexer's `initialize`;
+  decode-time errors (malformed UTF-8, out-of-range code unit / code
+  point, helper-specific escape decoding) go
+  through the sink passed to the value-extraction helpers
+  (`getStringLiteralTokenValue`, `getCharLiteralValue`). With
+  `kLexerFlag_SuppressDiagnostics` set, the lexer still emits
+  `TokenType::Invalid` tokens for malformed input but suppresses the
+  diagnostics — used inside skipped preprocessor blocks where the
+  tokens will be discarded by the inactive-branch filter.
 - Preprocessor errors (unbalanced `#if`, unknown directive, missing
   include) likewise emit through the sink. When the preprocessor
   cannot recover, it produces an `EndOfFile` token early and the

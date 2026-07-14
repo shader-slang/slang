@@ -1,5 +1,9 @@
 {
   "include": [
+    {
+      "option": "SLANG_DXC_BUILD_FROM_SOURCE",
+      "value": "OFF"
+    },
     { "option": "SLANG_EMBED_CORE_MODULE_SOURCE" },
     { "option": "SLANG_EMBED_CORE_MODULE" },
     { "option": "SLANG_ENABLE_DXIL" },
@@ -16,6 +20,7 @@
     { "option": "SLANG_ENABLE_SLANGI" },
     { "option": "SLANG_ENABLE_SLANGRT" },
     { "option": "SLANG_ENABLE_SLANG_GLSLANG" },
+    { "option": "SLANG_ENABLE_SLANG_PROXY" },
     {
       "option": "SLANG_ENABLE_TESTS",
       "extra_cmake_flags": "-DSLANG_ENABLE_EXAMPLES=OFF"
@@ -48,7 +53,8 @@
     },
     {
       "option": "SLANG_LIB_TYPE",
-      "value": "STATIC"
+      "value": "STATIC",
+      "install_test": "true"
     },
     {
       "option": "SLANG_ENABLE_ASAN",

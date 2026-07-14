@@ -1378,6 +1378,19 @@ NonEmptyPackWitness* ASTBuilder::getNonEmptyPackWitness(Val* pack)
     return getOrCreate<NonEmptyPackWitness>(pack);
 }
 
+DeclaredVariadicPackCountWitness* ASTBuilder::getDeclaredVariadicPackCountWitness(
+    DeclRef<GenericVariadicPackCountConstraintDecl> declRef)
+{
+    return getOrCreate<DeclaredVariadicPackCountWitness>(declRef.declRefBase);
+}
+
+ConcreteVariadicPackCountWitness* ASTBuilder::getConcreteVariadicPackCountWitness(
+    IntVal* actualCount,
+    IntVal* expectedCount)
+{
+    return getOrCreate<ConcreteVariadicPackCountWitness>(actualCount, expectedCount);
+}
+
 HasDiffTypeInfoWitness* ASTBuilder::getHasDiffTypeInfoWitness(
     DeclRef<HasDiffTypeInfoConstraintDecl> declRef)
 {
