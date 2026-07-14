@@ -134,15 +134,19 @@ def workload_progress(points, workload, step_rel=0.05):
 
     Returns (None, [], [], []) with fewer than 2 daily points.
     """
+    head = headline(workload)
     pts = [(d, c, {t: v for (wl, t), v in vals.items() if wl == workload})
            for d, c, vals in points]
-    pts = [p for p in pts if p[2]]
+    # Keep only points that report the headline timer: every series below
+    # (headline, buckets, extras) is built from this one list, so the overall
+    # %-change and the contributor pp column share the same first/last points
+    # by construction — a partial point (sub-timers but no headline) at an
+    # endpoint would otherwise silently break the pp-sums-to-overall
+    # property.
+    pts = [p for p in pts if head in p[2]]
     if len(pts) < 2:
         return None, [], [], []
-    head = headline(workload)
-    hs = [(d, c, tm[head]) for d, c, tm in pts if head in tm]
-    if len(hs) < 2:
-        return None, [], [], []
+    hs = [(d, c, tm[head]) for d, c, tm in pts]
     (d0, c0, v0), (d1, c1, v1) = hs[0], hs[-1]
     overall = (d0, c0, v0, d1, c1, v1, (v1 / v0 - 1) * 100 if v0 else 0.0)
 
@@ -166,6 +170,12 @@ def workload_progress(points, workload, step_rel=0.05):
     if rest_n:
         contributors = kept + [(f"(remaining {rest_n} buckets)",
                                 rest_ms, None, rest_pp)]
+    # The buckets tile the headline (breakdown.py's contract), so the pp
+    # column must reconstruct the overall %-change; fail loudly if a future
+    # breakdown change stops tiling rather than publishing wrong attribution.
+    pp_sum = sum(c[3] for c in contributors)
+    assert abs(pp_sum - overall[6]) < 0.5, \
+        f"{workload}: bucket pp sum {pp_sum:.2f} != overall {overall[6]:.2f}"
 
     covered = _tree_names(tree) | {f"{n} (self)" for n in _tree_names(tree)}
     first_t, last_t = pts[0][2], pts[-1][2]
