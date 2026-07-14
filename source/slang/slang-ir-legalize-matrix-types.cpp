@@ -9,13 +9,6 @@
 namespace Slang
 {
 
-// Return true if `targetProgram`'s target ever lowers matrix types at all — i.e.
-// `legalizeMatrixTypes` can do work on it. CPU-via-LLVM lowers all matrices (LLVM has no built-in
-// matrix type); the SPIR-V / GLSL / WGSL / Metal family lowers bool/int/uint-element matrices;
-// every other target (HLSL, DXIL, CUDA, C++/host, ...) lowers none, so the whole pass is a
-// guaranteed no-op there. This is the single source of truth for the target-family decision, shared
-// by `shouldLowerMatrixType` (which refines it per element type) and the whole-pass early-out
-// below.
 static bool targetLegalizesMatrixTypes(TargetProgram* targetProgram)
 {
     if (isCPUTargetViaLLVM(targetProgram->getTargetReq()))
@@ -80,13 +73,6 @@ struct MatrixTypeLoweringContext
             return true;
         }
 
-        // Invariant: reaching here means the target both legalizes matrices and is not
-        // CPU-via-LLVM, which — given `targetLegalizesMatrixTypes`'s switch — is exactly the SPIR-V
-        // / GLSL / WGSL / Metal family. On that family only bool/int/uint-element matrices are
-        // lowered; float-element matrices are emitted as native matrix types. If a new lowering
-        // target is added to `targetLegalizesMatrixTypes`, revisit this branch: it will otherwise
-        // silently hand the new target the bool/int/uint element behavior with no signal that a
-        // decision was skipped.
         auto elementType = matrixType->getElementType();
         return as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
                as<IRIntType>(elementType);
