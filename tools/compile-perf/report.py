@@ -82,7 +82,8 @@ PROVENANCE_NOTE = (
 def movers_block(dpoints, names):
     """Top-movers HTML for ONE family's ToT page: the family's largest daily
     change (date + commit window, % of the family's previous-day total) and
-    the top-10 benchmarks by |%-change| of their headline over the window.
+    the top-10 benchmarks IN THIS FAMILY by |%-change| of their headline
+    over the window.
     Empty string when there are fewer than 2 daily points."""
     if len(dpoints) < 2:
         return ""
@@ -277,10 +278,9 @@ def main():
                 '<div class="links"><a href="sweep/index.html">all sweeps</a></div>'
                 "<p>Compile time vs workload size N — scaling curves and per-pass "
                 "growth attribution; every archived sweep on one page.</p></div>")
-    # Recent movers: the day boundaries that moved the suite most, with the
-    # timers that moved — attribution-ready (each row names the commit range
-    # to bisect). Daily points only: release points differ in build
-    # provenance and would masquerade as steps.
+    # The movers tables live on the *-tot cadence pages (attached via
+    # movers_block in the PAGES loop above), not here: the landing page stays
+    # a pure navigation hub.
     H = ['<!doctype html><meta charset="utf-8">',
          f"<title>Slang compile-time performance</title><style>{SECTION_CSS}</style>",
          '<div class="wrap">', "<h1>Slang compile-time performance</h1>",

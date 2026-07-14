@@ -87,8 +87,10 @@ def _tree_names(tree):
     return names
 
 
-# Raw counters that duplicate another counter one-to-one; listing both would
-# be noise.
+# Raw counters that duplicate another counter one-to-one (same measured span
+# under a second name), so listing both would be noise: endToEndActions ==
+# compileInner, checkAllTranslationUnits == SemanticChecking, and
+# generateIRForTranslationUnit == generateIR.
 _ALIASES = {"endToEndActions", "checkAllTranslationUnits",
             "generateIRForTranslationUnit"}
 
@@ -236,8 +238,8 @@ def workload_view(points, workload, step_rel):
 
 def boundaries(points):
     """[(total_headline_delta_ms, d0, d1, c0, c1, v0, v1)] per consecutive
-    daily pair — the data behind both the CLI boundary view and the landing
-    page's recent-movers strip."""
+    daily pair — the data behind the CLI boundary view and the largest-daily-
+    change line on the *-tot cadence pages (report.movers_block)."""
     wls = sorted({wl for *_x, vals in points for (wl, _t) in vals})
     out = []
     for i in range(1, len(points)):
@@ -267,6 +269,10 @@ def timer_deltas(v0, v1, limit=6, min_ms=2.0):
 
 
 def boundary_view(points, top, min_ms):
+    """Print every day boundary ranked by |net suite change|, then decompose
+    the `top` largest into their timer movers. `min_ms` gates twice: timer
+    rows below it are dropped, and a whole boundary whose net is below it is
+    skipped rather than decomposed."""
     bounds = boundaries(points)
 
     print(f"{'boundary':26s}{'commits':22s}{'net suite change':>18}")

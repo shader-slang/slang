@@ -50,6 +50,17 @@ def version_tuple(tag):
     return tuple(int(x) for x in m.groups(default="0"))
 
 
+# The selection boundary governs permanent tracked-history membership, so pin
+# the documented cases at import time (fail-loud, per this tool's idiom):
+# the cutoff release itself and its patches are in, older patches and
+# non-release tags are out.
+assert version_tuple("v2026.13") == (2026, 13, 0)
+assert version_tuple("v2026.13") >= SUBRELEASE_CUTOFF
+assert version_tuple("v2026.13.1") >= SUBRELEASE_CUTOFF
+assert not (version_tuple("v2026.12.5") >= SUBRELEASE_CUTOFF)
+assert version_tuple("2026.13") is None and version_tuple("v2026") is None
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--results", required=True, help="perf results repo checkout")
