@@ -200,10 +200,9 @@ struct ForwardDiffTranslationContext
             if (writeBack.value.differential)
             {
                 auto pairValType = cast<IRPtrTypeBase>(param->getFullType())->getValueType();
-                auto diffSlotType = cast<IRPtrTypeBase>(writeBack.value.differential->getDataType())
-                                        ->getValueType();
-                auto diffVal = zeroDifferentials ? builder.emitDefaultConstructRaw(diffSlotType)
-                                                 : builder.emitLoad(writeBack.value.differential);
+                auto diffVal = zeroDifferentials
+                                   ? getDifferentialZeroOfType(&builder, primalVal->getDataType())
+                                   : builder.emitLoad(writeBack.value.differential);
                 diffTypeContext.markDiffTypeInst(&builder, diffVal, primalVal->getFullType());
                 valToStore = emitMakeDiffPair(&builder, pairValType, primalVal, diffVal);
                 diffTypeContext.markDiffPairTypeInst(&builder, valToStore, pairValType);

@@ -7,7 +7,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 // Stand-in for a texture lookup: differentiable for type-checking, but its own
@@ -122,6 +122,29 @@ float useCounter(float x)
     return float(n);
 }
 
+// A differential zero is defined by dzero(), not by bitwise/default initialization.
+// Using a non-zero representation for the additive identity makes this observable:
+// the trivial derivative's inout write-back must produce 42 rather than raw zero.
+struct CustomZeroFloat : IDifferentiable
+{
+    typealias Differential = CustomZeroFloat;
+
+    [DerivativeMember(Differential.value)]
+    float value;
+
+    [Differentiable]
+    static Differential dzero()
+    {
+        return { 42.0 };
+    }
+}
+
+[TreatAsDifferentiable]
+void overwriteCustomZeroFloat(inout CustomZeroFloat value)
+{
+    value.value = 7.0;
+}
+
 // The other entry into the trivial-forward synthesis: a function that is
 // backward-differentiable ([BackwardDerivative]) but has *no* forward derivative.
 // Forward-diffing it hits the BackwardDerivativeApply branch in translateCall
@@ -173,6 +196,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // tangent forced to 0
     var dpCounter = __fwd_diff(useCounter)(diffPair(2.0, 1.0));
 
+    // CustomZeroFloat represents its differential zero as 42, so the trivial derivative
+    // must call CustomZeroFloat.dzero() rather than raw-defaulting the differential to 0.
+    CustomZeroFloat customZeroValue = { 1.0 };
+    CustomZeroFloat customZeroTangent = { 5.0 };
+    var dpCustomZero = diffPair(customZeroValue, customZeroTangent);
+    __fwd_diff(overwriteCustomZeroFloat)(dpCustomZero);
+
     outputBuffer[0] = dp.p;       // CHECK: 2.5
     outputBuffer[1] = dp.d;       // CHECK: -1.25
     outputBuffer[2] = dpIface.p;  // CHECK: 2.5
@@ -186,4 +216,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[10] = dpClassify.p; // CHECK: 1.0
     outputBuffer[11] = dpCounter.p;  // CHECK: 3.0
     outputBuffer[12] = dpCounter.d;  // CHECK: 0.0
+    outputBuffer[13] = dpCustomZero.p.value; // CHECK: 7.0
+    outputBuffer[14] = dpCustomZero.d.value; // CHECK: 42.0
 }
