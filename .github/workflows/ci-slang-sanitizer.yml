@@ -268,15 +268,10 @@ jobs:
           fi
 
       - name: Sanitizer Summary
-        id: summary
         if: always()
         env:
           BUILD_OUTCOME: ${{ steps.build.outcome }}
         run: |
-          # Default: no violation. Overwritten below when unexpected findings
-          # fail the job; a later write of the same output key wins.
-          echo "has_violation=false" >> "$GITHUB_OUTPUT"
-
           echo ""
           echo "========================================"
           echo "       SANITIZER REPORT"
@@ -612,7 +607,6 @@ jobs:
 
             # Only fail the job for unexpected PR-related findings
             if [ "$pr_count" -gt 0 ]; then
-              echo "has_violation=true" >> "$GITHUB_OUTPUT"
               echo "Failing: $pr_count unexpected sanitizer finding(s) in PR-changed files."
               exit 1
             else
@@ -648,13 +642,13 @@ jobs:
           fi
 
       - name: Package ASan-instrumented binaries
-        # Runs after the summary and only when it found a violation
-        # (unexpected findings, the kind that fails the job): the
-        # instrumented binaries are how downstream users reproduce those
-        # findings, and a clean run has nothing to reproduce, so skipping
-        # the ~226 MB upload keeps clean nightlies cheap. always() is
-        # needed because the summary step exits non-zero on violation.
-        if: always() && inputs.upload-binaries && steps.build.outcome == 'success' && steps.summary.outputs.has_violation == 'true'
+        # Upload unconditionally (not just on findings): the binaries from a
+        # clean run let downstream users re-run their own ASan suites and
+        # catch anything this job's coverage missed. Public-repo artifact
+        # storage is not metered, and at ~226 MB with 3-day retention the
+        # rolling footprint stays under 1 GB. always() is needed because the
+        # summary step exits non-zero on violation.
+        if: always() && inputs.upload-binaries && steps.build.outcome == 'success'
         run: |
           # Bundle the instrumented build for downstream ASan users. Binaries
           # are built with -shared-libsan, so ship the matching dynamic ASan
@@ -683,15 +677,15 @@ jobs:
           ls -lh sanitizer-binaries.tar.gz
 
       - name: Upload ASan-instrumented binaries
-        if: always() && inputs.upload-binaries && steps.build.outcome == 'success' && steps.summary.outputs.has_violation == 'true'
+        if: always() && inputs.upload-binaries && steps.build.outcome == 'success'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: sanitizer-binaries
           path: sanitizer-binaries.tar.gz
-          # The tarball is ~226 MB and each violating nightly supersedes the
-          # previous one; 2 days covers picking up a finding for repro while
-          # bounding the rolling footprint.
-          retention-days: 2
+          # The tarball is ~226 MB and each nightly supersedes the previous
+          # one; 3 days of fallback binaries while bounding the rolling
+          # footprint.
+          retention-days: 3
           if-no-files-found: error
 
       - name: Upload Sanitizer Logs
