@@ -111,7 +111,7 @@ add_custom_command(
     COMMAND
         slang-capability-generator ${SLANG_CAPABILITY_SOURCE} --target-directory
         ${SLANG_CAPABILITY_OUTPUT_DIR} --doc
-        "${slang_SOURCE_DIR}/docs/user-guide/a3-02-reference-capability-atoms.md"
+        "${slang_SOURCE_DIR}/docs/user-guide/a4-02-reference-capability-atoms.md"
     DEPENDS ${SLANG_CAPABILITY_SOURCE} slang-capability-generator
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
     VERBATIM
