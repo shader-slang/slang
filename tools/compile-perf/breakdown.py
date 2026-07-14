@@ -385,13 +385,17 @@ def _series(results_dir, index_path, metric, bucket_fn):
 
 def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
                              bucket_fn, cols=2, names=None, link_for=None,
-                             title=None, panel=(620, 300)):
+                             title=None, panel=(620, 300), series=None):
     """Small-multiples stacked-AREA chart: one panel per workload, a filled band
     per bucket across the release history (top edge traces compileInner; own
     zero-based y-axis per panel). `bucket_order`/`bucket_fn` pick the decomposition
     (coarse fe/go vs full sub-counters). If `link_for` maps workload -> href, the
     panel title becomes a link to that page."""
-    order, per = _series(results_dir, index_path, metric, bucket_fn)
+    # `series` lets a caller that already computed (order, per) — e.g.
+    # write_workload_pages rendering one panel per workload — skip the
+    # full-history re-read _series would otherwise do per call.
+    order, per = series if series is not None else _series(
+        results_dir, index_path, metric, bucket_fn)
     nrel = len(order)
 
     if names is None:
@@ -558,10 +562,15 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
     and a "Daily tip-of-tree" chart on separate time axes — plus the workload's
     description (from its generator's docstring) and the exact compiled Slang
     source. Returns {workload: href relative to outdir} for the index pages."""
+    # One _series per (section, decomposition family) — reused for the name
+    # union, the per-workload presence checks, and every panel render below.
+    # Without this, each (workload x section) pair re-read the full history.
+    cache = {}
     per = {}
-    for _title, index_path in sections:
-        _, p = _series(results_dir, index_path, metric, buckets)
-        per.update(p)
+    for si, (_title, index_path) in enumerate(sections):
+        for bfn_ in (buckets, api_buckets):
+            cache[(si, bfn_)] = _series(results_dir, index_path, metric, bfn_)
+        per.update(cache[(si, buckets)][1])
     # Daily-window movers table per workload (between the charts and the
     # source dump): daily points only — release points differ in build
     # provenance and would masquerade as steps.
@@ -584,14 +593,15 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
         bfn = api_buckets if is_api else buckets
         svg_sections = []
         for si, (title, index_path) in enumerate(sections):
-            _, sp = _series(results_dir, index_path, metric, bfn)
+            _, sp = cache[(si, bfn)]
             if wl not in sp or not any(sp[wl]):
                 continue  # no data of this kind (e.g. api workload pre-enablement)
             svgp = os.path.join(wdir, f"{wl}.{si}.svg")
             render_stacked_multiples(
                 results_dir, index_path, metric, svgp, border, bfn,
                 cols=1, names=[wl], panel=(1040, 440),
-                title=f"{esc(wl)} — {esc(title)} ({esc(metric)} ms)")
+                title=f"{esc(wl)} — {esc(title)} ({esc(metric)} ms)",
+                series=cache[(si, bfn)])
             svg_sections.append((title, open(svgp, encoding="utf-8").read()))
         svg = "".join(
             f"<h3 style='font-size:15px;margin:18px 0 4px;color:#333'>{esc(t)}</h3>{body}"
