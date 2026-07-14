@@ -12,8 +12,11 @@ set(_sources main.cpp)
 set(_defines "")
 set(_libs slang core)
 
-# Vulkan path: headers come from Slang's bundled Vulkan-Headers
-# submodule; only the loader library must be found on the machine.
+# Vulkan path: only the loader must be found on the machine. Slang's
+# bundled Vulkan-Headers target guarantees headers even when
+# find_library locates a bare loader; when the SDK's Vulkan::Vulkan
+# target is found instead, the SDK's own headers take precedence over
+# the bundled ones (the same pattern as the sibling coverage examples).
 find_package(Vulkan QUIET)
 if(TARGET Vulkan::Vulkan)
     set(_vulkan_loader Vulkan::Vulkan)

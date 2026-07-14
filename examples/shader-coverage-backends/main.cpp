@@ -216,13 +216,12 @@ CompiledProgram compileWithCoverage(
     checkSlang(composed->link(out.linked.writeRef(), diagnostics.writeRef()), "link");
     diagnoseIfNeeded(diagnostics);
 
-    // Fetch the compiled result BEFORE the metadata query. The entry
-    // point compiles once and the artifact is cached; requesting
-    // metadata first would cache a non-shared-library artifact and a
-    // later getEntryPointHostCallable would fail. The CPU path gets a
+    // Fetch the compiled result first, then the metadata. Either order
+    // works; the code fetch is where compile diagnostics surface (e.g.
+    // E45115 for a capped Metal width request), so doing it first keeps
+    // error reporting next to the compile. The CPU path gets a
     // host-callable shared library; the code-emitting targets get a
-    // code blob. (Compile warnings, e.g. E45115 for a capped Metal
-    // width request, surface at this step.)
+    // code blob.
     diagnostics.setNull();
     if (target == SLANG_SHADER_HOST_CALLABLE)
     {
@@ -663,30 +662,40 @@ int main(int argc, char** argv)
         fail("--counter-width must be 32 or 64");
     const int counterByteWidth = counterWidthBits / 8;
 
-    if (backend == "cpu")
+    // Failures below are terminal: the Vulkan/Metal helpers report
+    // errors by throwing, and the demo's answer to any of them is the
+    // same — print the message and exit nonzero.
+    try
     {
-        runCpu(counterByteWidth);
-    }
-    else if (backend == "vulkan")
-    {
+        if (backend == "cpu")
+        {
+            runCpu(counterByteWidth);
+        }
+        else if (backend == "vulkan")
+        {
 #if defined(SLANG_EXAMPLE_HAS_VULKAN)
-        runVulkan(counterByteWidth);
+            runVulkan(counterByteWidth);
 #else
-        fail("this build has no Vulkan support (Vulkan loader not found at configure time)");
+            fail("this build has no Vulkan support (Vulkan loader not found at configure time)");
 #endif
-    }
-    else if (backend == "metal")
-    {
+        }
+        else if (backend == "metal")
+        {
 #if defined(SLANG_EXAMPLE_HAS_METAL)
-        runMetal(counterByteWidth);
+            runMetal(counterByteWidth);
 #else
-        fail("the metal backend is only available on Apple platforms");
+            fail("the metal backend is only available on Apple platforms");
 #endif
+        }
+        else
+        {
+            printUsage();
+            return 1;
+        }
     }
-    else
+    catch (const std::exception& e)
     {
-        printUsage();
-        return 1;
+        fail(e.what());
     }
     return 0;
 }
