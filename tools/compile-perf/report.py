@@ -19,6 +19,11 @@ import breakdown
 import daily_movers
 from lib import analyze, manifest
 
+# One escaper for both report generators. Neither escapes quotes: the
+# interpolated values are controlled workload/tag/date names, never user
+# input, so the &, <, > set is sufficient.
+html_escape = breakdown.esc
+
 CSS = """
 body{font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;margin:0;color:#1a1a1a;background:#fafafa}
 .wrap{max-width:1240px;margin:0 auto;padding:28px}
@@ -291,10 +296,6 @@ def main():
                  '<a href="index.html">moved: compile-perf overview</a>')
     print(f"wrote {os.path.join(outdir, 'index.html')}  "
           f"({n_rel} releases + {n_day} daily)")
-
-
-def html_escape(s):
-    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 if __name__ == "__main__":

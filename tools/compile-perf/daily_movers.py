@@ -98,6 +98,12 @@ _ALIASES = {"endToEndActions", "checkAllTranslationUnits",
 # noise is 1-3% of a timer, which is < 0.2pp unless the bucket dominates).
 CONTRIB_MIN_PP = 0.2
 
+# Below this many ms a timer is effectively zero: an own-% change from such a
+# start would be undefined or explode (0.01 -> 0.06 ms reads as +500%), so
+# those rows render a dash instead. One constant keeps the contributor,
+# extras, and step-mover sites agreeing on what "starts at ~0" means.
+NEAR_ZERO_MS = 0.05
+
 
 def workload_progress(points, workload, step_rel=0.05):
     """Percent-based progress summary for one workload's daily series:
@@ -147,7 +153,7 @@ def workload_progress(points, workload, step_rel=0.05):
         d_ms = b - a
         pp = d_ms / v0 * 100 if v0 else 0.0
         if abs(pp) >= CONTRIB_MIN_PP:
-            own = (b / a - 1) * 100 if a >= 0.05 else None
+            own = (b / a - 1) * 100 if a >= NEAR_ZERO_MS else None
             kept.append((t, d_ms, own, pp))
         else:
             rest_ms += d_ms
@@ -166,26 +172,32 @@ def workload_progress(points, workload, step_rel=0.05):
         if t in covered or t in _ALIASES:
             continue
         a, b = first_t[t], last_t[t]
-        own = (b / a - 1) * 100 if a >= 0.05 else None
+        own = (b / a - 1) * 100 if a >= NEAR_ZERO_MS else None
         # informational counters: shown only when they moved noticeably
         if abs(b - a) >= 1.0 or (own is not None and abs(own) >= 5.0):
             extras.append((t, b - a, own))
     extras.sort(key=lambda r: -abs(r[1]))
 
+    # Key the step-boundary bucket lookup on the COMMIT: daily labels are
+    # keyed by the swept commit's date, so two points can share a date (see
+    # trend.py) and a date-keyed lookup could pair a step with the wrong
+    # sibling's decomposition.
+    bks_by_commit = {c: bk for _d, c, bk in bks}
     steps = []
     for i in range(1, len(hs)):
         (dp, cp, vp), (d, c, v) = hs[i - 1], hs[i]
         if vp <= 0:
             continue
         pct = (v / vp - 1) * 100
+        # step_rel is a fraction (0.05 = 5%); pct is in percent, so compare
+        # against step_rel * 100.
         if abs(pct) < step_rel * 100:
             continue
-        b_prev = next(bk for dd, _c, bk in bks if dd == dp)
-        b_cur = next(bk for dd, _c, bk in bks if dd == d)
+        b_prev, b_cur = bks_by_commit[cp], bks_by_commit[c]
         movers = []
         for t in set(b_prev) | set(b_cur):
             a, b = b_prev.get(t, 0.0), b_cur.get(t, 0.0)
-            movers.append((t, b - a, (b / a - 1) * 100 if a >= 0.05 else None))
+            movers.append((t, b - a, (b / a - 1) * 100 if a >= NEAR_ZERO_MS else None))
         movers.sort(key=lambda m: -abs(m[1]))
         steps.append((dp, d, cp, c, pct,
                       [(t, own) for t, dm, own in movers[:3] if abs(dm) >= 1.0]))
@@ -235,7 +247,12 @@ def boundaries(points):
 
 
 def timer_deltas(v0, v1, limit=6, min_ms=2.0):
-    """Top BOUNDARY_TIMERS movers between two points: [(timer, delta_ms)]."""
+    """Top BOUNDARY_TIMERS movers between two points: [(timer, delta_ms)].
+    delta_ms is the SIGNED SUITE-NET for the timer (summed across all
+    workloads), so opposite-sign moves in different workloads cancel; a timer
+    that regressed +5 ms in one workload and improved -5 ms in another nets
+    to ~0 and drops below min_ms by design — this view answers "where did the
+    suite total move", not "which workloads moved"."""
     per = {}
     for (wl, t), val in v1.items():
         if t in BOUNDARY_TIMERS and (wl, t) in v0:
@@ -259,6 +276,9 @@ def boundary_view(points, top, min_ms):
         print(f"\n-- {d0} -> {d1} ({c0}..{c1}): suite {total:+.0f} ms "
               f"-- bisect: git log {c0}..{c1} -- source/")
         for t, d in timer_deltas(v0, v1, min_ms=min_ms):
+            # The largest single-workload |delta| for the timer; because the
+            # printed net is a suite-wide sum, this can carry the opposite
+            # sign (one workload regressed while the net improved).
             wl_best = max(((wl, v1[(wl, tt)] - v0[(wl, tt)])
                            for (wl, tt) in v1 if tt == t and (wl, tt) in v0),
                           key=lambda x: abs(x[1]))

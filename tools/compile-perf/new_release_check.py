@@ -30,6 +30,12 @@ sys.path.insert(0, HERE)
 import fetch_releases
 
 # Track majors AND patch releases from here on; nothing older is backfilled.
+# The cutoff is deliberately a 2-tuple compared against version_tuple's
+# 3-tuple: Python compares the common prefix first and a longer tuple wins
+# ties, so (2026, 13, 0) >= (2026, 13) is True (v2026.13 itself is in) and
+# (2026, 12, 5) >= (2026, 13) is False (older patch releases stay out). Keep
+# the cutoff at 2 elements — a 3-element cutoff silently changes which
+# releases enter the permanent tracked history.
 SUBRELEASE_CUTOFF = (2026, 13)
 
 _VER = re.compile(r"^v(\d{4})\.(\d+)(?:\.(\d+))?$")
@@ -52,8 +58,14 @@ def main():
 
     ipath = os.path.join(args.results, "index.json")
     known = set()
+    # Snapshot of the tracked index BEFORE any step runs: merge-index (step 3)
+    # writes the new tags into it, so a failure in a LATER step (rebuild)
+    # must restore this snapshot along with removing the result dirs —
+    # otherwise the tag stays in `known` forever and is never re-swept.
+    index_before = None
     if os.path.exists(ipath):
-        known = {r["tag"] for r in json.load(open(ipath))}
+        index_before = open(ipath, "rb").read()
+        known = {r["tag"] for r in json.loads(index_before)}
 
     candidates = [tag for _date, tag in fetch_releases.window_tags(
         args.repo, "2000-01-01", "9999-12-31", include_patches=True)]
@@ -82,11 +94,16 @@ def main():
         rc = run("track.py", "rebuild", "--results", args.results,
                  "--index", os.path.join(args.results, "index.json"))
     if rc != 0:
-        # No partial baselines: drop whatever the failed attempt wrote so the
-        # tracked history stays clean; the next nightly retries from scratch.
+        # No partial baselines: drop whatever the failed attempt wrote AND
+        # restore the pre-run index.json (merge-index may already have added
+        # the new tags to it) so the tracked history stays clean and the tags
+        # still read as new; the next nightly retries from scratch.
         for t in new:
             shutil.rmtree(os.path.join(args.results, "releases", t),
                           ignore_errors=True)
+        if index_before is not None:
+            with open(ipath, "wb") as fh:
+                fh.write(index_before)
         sys.exit(f"new-release sweep of {', '.join(new)} failed; "
                  f"partial results removed, next nightly retries")
     print(f"new-release check: {', '.join(new)} added to the tracked history")

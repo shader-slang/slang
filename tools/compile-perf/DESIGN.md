@@ -67,11 +67,13 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   `since`, `until`, `samples`, `sweep` (default `false`, opt-in), `force`.
 
 **Site structure (2026-07 redesign).** `report.py` renders a landing page
-(`index.html`: status strip + navigation cards) and two section pages —
-`microbench.html` (compiler workloads) and `api.html` (api/rt workloads) —
-each with an "Across releases" chart (release-only axis: official prebuilt
-binaries, minor releases plus patch releases from v2026.13 on) and a "Daily
-tip-of-tree" chart (runner-built, trailing 30 points). The cadences get
+(`index.html`: status strip + navigation cards) and four cadence-split pages,
+one per family × cadence: `api-tot.html` / `api-releases.html` (api/rt
+workloads) and `microbench-tot.html` / `microbench-releases.html` (compiler
+workloads). The `*-releases` pages chart the release-only axis (official
+prebuilt binaries, minor releases plus patch releases from v2026.13 on); the
+`*-tot` pages chart the daily tip-of-tree axis (runner-built, trailing 30
+points) and open with the family's top-movers table. The cadences get
 separate axes because they differ in build provenance (official toolchain vs
 the runner's MSVC): each chart is internally comparable, the boundary is not —
 a methodology note on both pages says so. Per-workload detail pages carry the

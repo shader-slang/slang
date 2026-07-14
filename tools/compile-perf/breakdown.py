@@ -576,7 +576,8 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
     # provenance and would masquerade as steps.
     try:
         _daily_pts = daily_movers.daily_points(results_dir, metric)
-    except Exception:  # noqa: BLE001 — the table must never sink page rendering
+    except Exception as e:  # noqa: BLE001 — the table must never sink page rendering
+        print(f"note: daily-progress tables skipped: {e}")
         _daily_pts = []
     wdir = os.path.join(outdir, "workloads")
     os.makedirs(wdir, exist_ok=True)
@@ -602,7 +603,8 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                 cols=1, names=[wl], panel=(1040, 440),
                 title=f"{esc(wl)} — {esc(title)} ({esc(metric)} ms)",
                 series=cache[(si, bfn)])
-            svg_sections.append((title, open(svgp, encoding="utf-8").read()))
+            with open(svgp, encoding="utf-8") as f:
+                svg_sections.append((title, f.read()))
         svg = "".join(
             f"<h3 style='font-size:15px;margin:18px 0 4px;color:#333'>{esc(t)}</h3>{body}"
             for t, body in svg_sections)
