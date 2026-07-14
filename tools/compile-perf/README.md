@@ -284,6 +284,9 @@ via `--results <checkout-path>`.
 | Path                                        | What it is                                                |
 | ------------------------------------------- | --------------------------------------------------------- |
 | `results/analysis/*.svg`                    | charts                                                    |
+| `results/analysis/index.html`               | landing page (status strip + section navigation)          |
+| `results/analysis/{api,microbench}-{tot,releases}.html` | the four cadence pages (charts + ToT movers tables) |
+| `results/analysis/report_per_workload.html` | old-bookmark redirect to `index.html`                     |
 | `results/analysis/workloads/<name>.html`    | per-workload stacked-area history + drill-down pages      |
 | `results/releases/<tag>/sweep/`             | complexity-sweep report for swept releases                |
 | `releases/`                                 | cached prebuilt `slangc` per tag (large, gitignored)      |
