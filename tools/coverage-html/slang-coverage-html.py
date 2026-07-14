@@ -431,18 +431,12 @@ def _dir_depth(dirpath: str) -> int:
     return 0 if dirpath == "" else dirpath.count("/") + 1
 
 
-def _indent_calc(depth: int) -> str:
-    """The CSS length expression for one tree-indent level. Shared by
-    the file/directory rows and the expanded function listing so the
-    listing's name column starts exactly under the file row's
-    chevron."""
-    return f"calc(10px + {1.4 * depth:.2f}em)"
-
-
 def _indent_style(depth: int) -> str:
     """Per-row left padding so the tree shape is visible even when
-    row backgrounds are uniform."""
-    return f"padding-left: {_indent_calc(depth)};"
+    row backgrounds are uniform. Also applied to the expanded
+    function-listing cell so the listing starts under its file row's
+    chevron."""
+    return f"padding-left: calc(10px + {1.4 * depth:.2f}em);"
 
 
 def _index_thead_html(
@@ -646,12 +640,18 @@ def _render_file_functions_row(
         + hashlib.sha1(rec.path.encode("utf-8"), usedforsecurity=False).hexdigest()[:10]
     )
     template_html = _render_inline_functions_table(
-        rec, file_href, show_fns=show_fns, show_br=show_br, indent_depth=file_depth
+        rec, file_href, show_fns=show_fns, show_br=show_br
     )
     row_html = (
         f'            <tr class="fileFunctions" data-dir="{dir_attr}" '
         f'data-depth="{file_depth}" data-fn-tmpl="{tmpl_id}" hidden>\n'
-        f'              <td colspan="{cols_for_empty}"></td>\n'
+        # The same tree indent as the file row above, so the whole
+        # expanded listing starts under that row's chevron. This trades
+        # exact vertical alignment between the listing's metric columns
+        # and the parent table's (the listing shrinks by the indent);
+        # the listing has its own header row, so it stays readable.
+        f'              <td colspan="{cols_for_empty}" '
+        f'style="{_indent_style(file_depth)}"></td>\n'
         f"            </tr>"
     )
     return tmpl_id, template_html, row_html
@@ -927,7 +927,6 @@ def _render_inline_functions_table(
     file_href: str,
     show_fns: bool = False,
     show_br: bool = False,
-    indent_depth: int = 0,
 ) -> str:
     """Render the per-file Functions table embedded in an index
     `<td>` (lazy-loaded via <template>).
@@ -979,12 +978,7 @@ def _render_inline_functions_table(
         )
 
     return (
-        # --fn-indent aligns the Function column's text with the parent
-        # file row's chevron; the CSS rules on td.coverFn and the
-        # Function header consume it, so the metric columns keep their
-        # vertical alignment with the parent table.
-        f'<table class="fnInner" style="--fn-indent: {_indent_calc(indent_depth)};" '
-        'cellpadding="1" cellspacing="1" border="0">\n'
+        '<table class="fnInner" cellpadding="1" cellspacing="1" border="0">\n'
         + _fn_inner_colgroup(show_fns, show_br)
         + "\n"
         + _fn_inner_thead(show_fns, show_br)
