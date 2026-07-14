@@ -68,9 +68,9 @@ struct CudaDriverApi
     CudaResult (*cuInit)(unsigned int flags) = nullptr;
     CudaResult (*cuDeviceGetCount)(int* count) = nullptr;
     CudaResult (*cuDeviceGet)(CudaDevice* device, int ordinal) = nullptr;
-    CudaResult (*cuCtxCreate)(CudaContext* context, unsigned int flags, CudaDevice device) =
-        nullptr;
-    CudaResult (*cuCtxDestroy)(CudaContext context) = nullptr;
+    CudaResult (*cuDevicePrimaryCtxRetain)(CudaContext* context, CudaDevice device) = nullptr;
+    CudaResult (*cuDevicePrimaryCtxRelease)(CudaDevice device) = nullptr;
+    CudaResult (*cuCtxSetCurrent)(CudaContext context) = nullptr;
     CudaResult (*cuCtxSynchronize)() = nullptr;
     CudaResult (*cuModuleLoadData)(CudaModule* module, const void* image) = nullptr;
     CudaResult (*cuModuleUnload)(CudaModule module) = nullptr;
@@ -133,8 +133,9 @@ struct CudaDriverApi
         resolve(cuInit, "cuInit");
         resolve(cuDeviceGetCount, "cuDeviceGetCount");
         resolve(cuDeviceGet, "cuDeviceGet");
-        resolve(cuCtxCreate, "cuCtxCreate_v2");
-        resolve(cuCtxDestroy, "cuCtxDestroy_v2");
+        resolve(cuDevicePrimaryCtxRetain, "cuDevicePrimaryCtxRetain");
+        resolve(cuDevicePrimaryCtxRelease, "cuDevicePrimaryCtxRelease_v2");
+        resolve(cuCtxSetCurrent, "cuCtxSetCurrent");
         resolve(cuCtxSynchronize, "cuCtxSynchronize");
         resolve(cuModuleLoadData, "cuModuleLoadData");
         resolve(cuModuleUnload, "cuModuleUnload");
@@ -492,10 +493,15 @@ SLANG_UNIT_TEST(coverageCudaRuntimeDispatch)
         SLANG_IGNORE_TEST;
     }
 
+    // Use the device's primary context, the same pattern as the
+    // shader-coverage-backends example and slang-rhi's CUDA device.
+    // Unlike cuCtxCreate, retaining does not make the context current,
+    // so set it explicitly.
     CudaDevice device = 0;
     SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
     CudaContext context = nullptr;
-    SLANG_CHECK_ABORT(cuda.cuCtxCreate(&context, 0, device) == 0);
+    SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
+    SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
 
     // Default 64-bit counters exercise the 64-bit atomicAdd form; the
     // opt-down width exercises the 32-bit form. Neither needs a device
@@ -503,5 +509,5 @@ SLANG_UNIT_TEST(coverageCudaRuntimeDispatch)
     runCoverageCudaRuntimeTest(globalSession, cuda, 8);
     runCoverageCudaRuntimeTest(globalSession, cuda, 4);
 
-    cuda.cuCtxDestroy(context);
+    cuda.cuDevicePrimaryCtxRelease(device);
 }
