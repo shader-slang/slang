@@ -497,8 +497,15 @@ void runCuda(int counterByteWidth)
     checkCuda(cuInit(0), "cuInit");
     CUdevice device = 0;
     checkCuda(cuDeviceGet(&device, 0), "cuDeviceGet");
+    // Use the device's primary context rather than cuCtxCreate: the
+    // primary-context API is signature-stable across CUDA toolkits
+    // (cuCtxCreate grew a CUctxCreateParams parameter in CUDA 13) and
+    // is the same pattern slang-rhi's CUDA device uses. Unlike
+    // cuCtxCreate, retaining does not make the context current, so set
+    // it explicitly.
     CUcontext context = nullptr;
-    checkCuda(cuCtxCreate(&context, 0, device), "cuCtxCreate");
+    checkCuda(cuDevicePrimaryCtxRetain(&context, device), "cuDevicePrimaryCtxRetain");
+    checkCuda(cuCtxSetCurrent(context), "cuCtxSetCurrent");
 
     // cuModuleLoadData parses PTX as a NUL-terminated string, and the
     // code blob is not guaranteed to carry the terminator; copying into
@@ -578,7 +585,7 @@ void runCuda(int counterByteWidth)
     cuMemFree(outputBuffer);
     cuMemFree(inputBuffer);
     cuModuleUnload(module);
-    cuCtxDestroy(context);
+    cuDevicePrimaryCtxRelease(device);
 }
 #endif
 
