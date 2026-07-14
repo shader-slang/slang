@@ -49,57 +49,14 @@ struct SubstitutionCache
         SLANG_ASSERT(subst.substitutionCache == this);
     }
 
-    const Result* tryGet(const Key& key) const
-    {
-        if (m_usesDictionary)
-            return m_entries.tryGetValue(key);
+    const Result* tryGet(const Key& key) const { return m_entries.tryGetValue(key); }
 
-        for (Index i = 0; i < m_inlineEntryCount; ++i)
-        {
-            if (m_inlineEntries[i].key == key)
-                return &m_inlineEntries[i].result;
-        }
-        return nullptr;
-    }
-
-    void add(const Key& key, const Result& result)
-    {
-        if (m_usesDictionary)
-        {
-            m_entries.add(key, result);
-            return;
-        }
-
-        if (m_inlineEntryCount < kInlineEntryCount)
-        {
-            auto& entry = m_inlineEntries[m_inlineEntryCount++];
-            entry.key = key;
-            entry.result = result;
-            return;
-        }
-
-        m_entries.reserve(kInlineEntryCount + 1);
-        for (Index i = 0; i < m_inlineEntryCount; ++i)
-            m_entries.add(m_inlineEntries[i].key, m_inlineEntries[i].result);
-        m_entries.add(key, result);
-        m_usesDictionary = true;
-    }
+    void add(const Key& key, const Result& result) { m_entries.add(key, result); }
 
 private:
-    static const Index kInlineEntryCount = 8;
-
-    struct Entry
-    {
-        Key key;
-        Result result;
-    };
-
     ASTBuilder* m_astBuilder = nullptr;
     DeclRefBase* m_substitutionDeclRef = nullptr;
-    Entry m_inlineEntries[kInlineEntryCount];
-    Index m_inlineEntryCount = 0;
     Dictionary<Key, Result> m_entries;
-    bool m_usesDictionary = false;
 };
 
 /// Dispatches a Val substitution through the operation-local cache.
