@@ -194,11 +194,10 @@ def workload_progress(points, workload, step_rel=0.05):
             extras.append((t, b - a, own))
     extras.sort(key=lambda r: -abs(r[1]))
 
-    # Key the step-boundary bucket lookup on the COMMIT: daily labels are
-    # keyed by the swept commit's date, so two points can share a date (see
-    # trend.py) and a date-keyed lookup could pair a step with the wrong
-    # sibling's decomposition.
-    bks_by_commit = {c: bk for _d, c, bk in bks}
+    # hs and bks are both built from the same filtered `pts` list above, so
+    # they are index-aligned by construction — index the buckets directly.
+    # (Neither dates nor commits are safely unique across daily labels: dates
+    # collide per trend.py, and a commit can repeat under two labels.)
     steps = []
     for i in range(1, len(hs)):
         (dp, cp, vp), (d, c, v) = hs[i - 1], hs[i]
@@ -209,7 +208,7 @@ def workload_progress(points, workload, step_rel=0.05):
         # against step_rel * 100.
         if abs(pct) < step_rel * 100:
             continue
-        b_prev, b_cur = bks_by_commit[cp], bks_by_commit[c]
+        b_prev, b_cur = bks[i - 1][2], bks[i][2]
         movers = []
         for t in set(b_prev) | set(b_cur):
             a, b = b_prev.get(t, 0.0), b_cur.get(t, 0.0)
@@ -249,7 +248,9 @@ def workload_view(points, workload, step_rel):
 def boundaries(points):
     """[(total_headline_delta_ms, d0, d1, c0, c1, v0, v1)] per consecutive
     daily pair — the data behind the CLI boundary view and the largest-daily-
-    change line on the *-tot cadence pages (report.movers_block)."""
+    change line on the *-tot cadence pages. report.movers_block indexes this
+    tuple layout positionally (v0/v1 at 5/6, plus an 8-name unpack after
+    prepending a pct) — keep the two in sync if the layout ever changes."""
     wls = sorted({wl for *_x, vals in points for (wl, _t) in vals})
     out = []
     for i in range(1, len(points)):
@@ -329,6 +330,30 @@ def main():
         workload_view(points, args.workload, args.step_rel)
     else:
         boundary_view(points, args.top, args.min_ms)
+
+
+# Import-time self-checks over a tiny synthetic fixture, matching the
+# directory idiom (lib/manifest.py, new_release_check.py). Only the
+# breakdown-independent pieces can run here: workload_progress's bucket
+# partition imports breakdown lazily, and at module-import time that import
+# is only safe in one direction — its pp-sum invariant is therefore asserted
+# at runtime inside workload_progress instead.
+_P0 = ("2026-01-01", "aaaaaaaaa", {("w", "compileInner"): 100.0,
+                                   ("w", "SemanticChecking"): 50.0,
+                                   ("w", "generateIR"): 40.0})
+_P1 = ("2026-01-02", "bbbbbbbbb", {("w", "compileInner"): 90.0,
+                                   ("w", "SemanticChecking"): 40.0,
+                                   ("w", "generateIR"): 45.0})
+assert workload_progress([_P0], "w") == (None, [], [], []), \
+    "workload_progress must early-return with fewer than 2 points"
+_B = boundaries([_P0, _P1])
+assert len(_B) == 1 and abs(_B[0][0] - (-10.0)) < 1e-9, \
+    "boundaries: one consecutive pair, headline (compileInner) net -10 ms"
+# compileInner is deliberately absent from the result: it is a TOTAL, not a
+# BOUNDARY_TIMERS leaf, so only the leaves are attributed.
+assert timer_deltas(_P0[2], _P1[2]) == [("SemanticChecking", -10.0), ("generateIR", 5.0)], \
+    "timer_deltas: signed per-leaf suite-net, sorted by |delta|"
+del _P0, _P1, _B
 
 
 if __name__ == "__main__":

@@ -140,10 +140,10 @@ def grid_page(path, title, sub, note, svg, extra_html=""):
     """One cadence page: per-workload panels, two per row; `extra_html`
     (e.g. the family's top-movers table) renders above the chart."""
     H = ['<!doctype html><meta charset="utf-8">',
-         f"<title>{title}</title><style>{SECTION_CSS}</style>",
+         f"<title>{html_escape(title)}</title><style>{SECTION_CSS}</style>",
          '<div class="wrap">',
          '<p class="small"><a href="index.html">&larr; overview</a></p>',
-         f"<h1>{title}</h1>", f'<p class="sub">{sub}</p>',
+         f"<h1>{html_escape(title)}</h1>", f'<p class="sub">{html_escape(sub)}</p>',
          f'<p class="small">{note}</p>',
          extra_html,
          f'<div class="chart">{svg}</div>' if svg
@@ -257,7 +257,7 @@ def main():
     rel_link = f"Releases: {html_escape(r0)} &rarr; {html_escape(r1)} ({n_rel})"
 
     def secrow(title, prefix, desc):
-        return ('<div class="secrow"><b>' + title + "</b>"
+        return ('<div class="secrow"><b>' + html_escape(title) + "</b>"
                 f'<div class="links"><a href="{prefix}-tot.html">{daily_link}</a></div>'
                 f'<div class="links"><a href="{prefix}-releases.html">{rel_link}</a></div>'
                 f"<p>{desc}</p></div>")
@@ -265,7 +265,7 @@ def main():
     rows = []
     if api_names:
         rows.append(secrow(
-            "API &amp; RT workloads", "api",
+            "API & RT workloads", "api",
             f"{len(api_names)} application-integration shapes driven through "
             "libslang: RT programs, session cost, module graphs, reflection, "
             "per-variant specialization."))

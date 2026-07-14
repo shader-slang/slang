@@ -387,7 +387,8 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
                              bucket_fn, cols=2, names=None, link_for=None,
                              title=None, panel=(620, 300), series=None):
     """Small-multiples stacked-AREA chart: one panel per workload, a filled band
-    per bucket across the release history (top edge traces compileInner; own
+    per bucket across the point series named by `index_path`/`series` —
+    release-only or daily, the caller chooses (top edge traces compileInner; own
     zero-based y-axis per panel). `bucket_order`/`bucket_fn` pick the decomposition
     (coarse fe/go vs full sub-counters). If `link_for` maps workload -> href, the
     panel title becomes a link to that page."""
