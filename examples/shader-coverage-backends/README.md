@@ -2,7 +2,7 @@
 
 One shader, four coverage dispatch paths. This example runs the user
 guide coverage tutorial's kernel
-([`docs/user-guide/a1-06-shader-coverage.md`](../../docs/user-guide/a1-06-shader-coverage.md))
+([`docs/user-guide/a3-01-shader-coverage.md`](../../docs/user-guide/a3-01-shader-coverage.md))
 for real on a selectable backend, demonstrating that the coverage
 workflow — compile, discover the hidden counter buffer through
 `ISyntheticResourceMetadata`, bind, dispatch, attribute counters

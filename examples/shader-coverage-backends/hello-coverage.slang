@@ -1,5 +1,5 @@
 // hello-coverage.slang — the kernel from the user guide's shader
-// coverage tutorial (docs/user-guide/a1-06-shader-coverage.md),
+// coverage tutorial (docs/user-guide/a3-01-shader-coverage.md),
 // dispatched for real by this example on a selectable backend.
 //
 // The control flow is arranged so a small input set produces partial

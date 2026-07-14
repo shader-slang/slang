@@ -1,6 +1,6 @@
 # Selectable-backend coverage demo: one shader dispatched on CPU,
-# Vulkan, or Metal, each path implementing the corresponding binding
-# recipe from docs/design/shader-coverage-host-interface.md.
+# CUDA, Vulkan, or Metal, each path implementing the corresponding
+# binding recipe from docs/design/shader-coverage-host-interface.md.
 #
 # Unlike the sibling coverage examples, missing Vulkan does NOT skip
 # the whole example — the CPU path (and Metal on Apple platforms)
