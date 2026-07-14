@@ -23,12 +23,6 @@
 
 #define UNLIMITED 9999
 
-// Temporary workaround for the SPIRV-Tools MergeReturnPass issue tracked by
-// https://github.com/KhronosGroup/SPIRV-Tools/issues/6711 and Slang issue #11146.
-#ifndef SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
-#define SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN 1
-#endif
-
 static TBuiltInResource _calcBuiltinResources()
 {
     // NOTE! This is a bit of a hack - to set all the fields to true/UNLIMITED.
@@ -190,6 +184,7 @@ extern "C"
 }
 
 // Disassemble the given SPIRV-ASM instructions and return the result as a string.
+// The caller owns *outString and must release it with glslang_freeDisassembly().
 extern "C"
 #ifdef _MSC_VER
     _declspec(dllexport)
@@ -236,6 +231,18 @@ extern "C"
     }
 }
 
+// Free a disassembly buffer returned by glslang_disassembleSPIRVWithResult.
+extern "C"
+#ifdef _MSC_VER
+    _declspec(dllexport)
+#else
+    __attribute__((__visibility__("default")))
+#endif
+        void glslang_freeDisassembly(char* disassembly)
+{
+    delete[] disassembly;
+}
+
 
 // Disassemble the given SPIRV-ASM instructions.
 extern "C"
@@ -250,7 +257,7 @@ extern "C"
     auto succ = glslang_disassembleSPIRVWithResult(contents, contentsSize, &result);
     if (result)
         fprintf(stdout, "%s\n", result);
-    delete result;
+    glslang_freeDisassembly(result);
     return succ;
 }
 
@@ -317,10 +324,8 @@ static int glslang_optimizeSPIRV(
 
 #if 0
             // This is the previous 'default optimization' passes setting for glslang
-#if SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
             optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
-#endif
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
             optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(100));
@@ -343,10 +348,8 @@ static int glslang_optimizeSPIRV(
             optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());     // 1
             optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass()); // 2
 
-#if SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
             optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
-#endif
 
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass()); // 3
 
@@ -400,10 +403,8 @@ static int glslang_optimizeSPIRV(
             // size
             optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
             optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass()); // 15
-#if SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
             optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
-#endif
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass()); // 9
             optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
             // optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(0));   // 12
@@ -450,10 +451,8 @@ static int glslang_optimizeSPIRV(
 
             optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
             optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
-#if SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
             optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
-#endif
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass());
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());

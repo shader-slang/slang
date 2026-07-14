@@ -675,9 +675,9 @@ struct ForwardDiffTranslationContext
                     if (diffInst->getOp() != kIROp_VoidLit)
                         allVoid = false;
                 }
-                else if (auto operandDiffType = differentiateType(builder, operand->getDataType()))
+                else if (auto operandDiffType = differentiateType(builder, operand->getDataType());
+                         operandDiffType)
                 {
-                    SLANG_UNUSED(operandDiffType);
                     // Missing differentials for differentiable operands are constants with zero
                     // tangent, matching the generic construct fallback behavior.
                     auto operandDataType =
@@ -1915,17 +1915,20 @@ struct ForwardDiffTranslationContext
             {
                 diffBase = getDifferentialZeroOfType(builder, origBase->getDataType());
             }
+
+            // TODO: Unwrapping the attributed type here is a workaround. Lowering should instead
+            // emit an explicit instruction such as IRNoDiffCast for the conversion to `no_diff`.
+            // AD could then use the differentiable type on the other side of that instruction to
+            // form the zero without implicitly discarding the conversion here.
+            auto primalElementType = (IRType*)unwrapAttributedType(primalVal->getDataType());
             if (auto diffVal = findOrTranslateDiffInst(builder, origVal))
             {
-                auto primalElementType = primalVal->getDataType();
-
                 diffUpdateElement =
                     builder->emitUpdateElement(diffBase, diffAccessChain.getArrayView(), diffVal);
                 builder->addPrimalElementTypeDecoration(diffUpdateElement, primalElementType);
             }
             else
             {
-                auto primalElementType = primalVal->getDataType();
                 auto zeroElementDiff = getDifferentialZeroOfType(builder, primalElementType);
                 diffUpdateElement = builder->emitUpdateElement(
                     diffBase,
@@ -3557,6 +3560,13 @@ IRInst* maybeTranslateForwardDerivative(
         return inst;
 
     IRFunc* targetFunc = cast<IRFunc>(base);
+
+    // Backstop for when the front-end `checkAutoDiffUsages` validation is disabled: forward-
+    // differentiating a function that calls a `bwd_diff` result is unsupported (the result of
+    // `bwd_diff` is not differentiable) and would otherwise fail with an internal error downstream.
+    // Diagnose and leave the translate inst in place rather than producing a malformed derivative.
+    if (diagnoseDifferentiatingBackwardDiffResult(sink, targetFunc))
+        return inst;
 
     IRInst* fwdDiffFunc;
     IRBuilder builder(sharedContext->moduleInst);

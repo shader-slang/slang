@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:13:27Z
 //META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#generic-application
-//META: doc_section_digest=8f96c600fb4e9a50947a60ac22318e6fba6c6386abe0fabef983a2b0e0a9b785
+//META: doc_section_digest=f47c8552e4262e5413d4d3940bfd71f81dd53d798d76b0d93a435054717b9e60
 //META: purpose=Doubly-nested instantiation Box<Box<int>> lowers to a nested specialize(%Box, specialize(%Box, Int)) type-level value.
 //META: intent=boundary
 //META: pipeline_stage=lower

@@ -213,7 +213,23 @@ struct OptionalTypeLoweringContext
             // Synthesize a default-constructed placeholder for the payload.
             // The payload is semantically irrelevant when hasValue == false,
             // but we need a well-formed value to satisfy the struct layout.
-            auto defaultVal = builder->emitDefaultConstruct(info->valueType);
+            //
+            // Carry the `none`'s source location onto the synthesized insts so a
+            // later diagnostic (e.g. rejecting a default-constructed opaque
+            // handle on Khronos targets, issue #7878) points at the user's code.
+            // A source-loc scope is used rather than assigning `sourceLoc`
+            // directly because for an aggregate payload `emitDefaultConstruct`
+            // wraps the inner `DefaultConstruct` (the inst the diagnostic keys
+            // on) in a `MakeStruct`/`MakeTuple`/`MakeArray`; the scope applies to
+            // every freshly created inst, including those nested ones. Hoisted,
+            // deduplicated primitive constants (e.g. `getIntValue(0)` for an
+            // `Optional<int>` payload) do not inherit builder source locations,
+            // so shared constants are left untouched.
+            IRInst* defaultVal;
+            {
+                IRBuilderSourceLocRAII sourceLocScope(builder, inst->sourceLoc);
+                defaultVal = builder->emitDefaultConstruct(info->valueType);
+            }
             List<IRInst*> operands;
             operands.add(defaultVal);
             operands.add(builder->getBoolValue(false));

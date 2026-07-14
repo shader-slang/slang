@@ -351,21 +351,22 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     //
     bool success = true;
 
-    auto maybeReportGeneralError = [&]()
-    {
-        if (context.mode != OverloadResolveContext::Mode::JustTrying)
-        {
-            getSink()->diagnose(Diagnostics::CannotSpecializeGeneric{
-                .generic = candidate.item.declRef.getDecl(),
-                .location = context.loc});
-        }
-    };
+    // Collect the generic's parameter types up front; the error reporter below
+    // uses their count to report explicit-argument-list arity mismatches.
+    // `requiredCount` is the minimum number of explicit arguments the caller
+    // must supply: every parameter without a default value (defaults are
+    // trailing), so an explicit list shorter than this under-fills a required
+    // parameter, while one no longer than `paramTypes.getCount()` can have the
+    // remainder filled from defaults.
     List<QualType> paramTypes;
+    Index requiredCount = 0;
     for (auto memberRef : getMembers(m_astBuilder, genericDeclRef))
     {
         if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())
         {
             paramTypes.add(DeclRefType::create(m_astBuilder, typeParamRef));
+            if (!typeParamRef.getDecl()->initType.type)
+                requiredCount = paramTypes.getCount();
         }
         else if (auto valPackParam = memberRef.as<GenericValuePackParamDecl>())
         {
@@ -374,12 +375,55 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
         else if (auto valParamRef = memberRef.as<GenericValueParamDecl>())
         {
             paramTypes.add(getType(m_astBuilder, valParamRef));
+            if (!valParamRef.getDecl()->initExpr)
+                requiredCount = paramTypes.getCount();
         }
         else if (auto typePackParam = memberRef.as<GenericTypePackParamDecl>())
         {
             paramTypes.add(DeclRefType::create(m_astBuilder, typePackParam));
         }
     }
+
+    // A trailing type/value pack means the generic has no single expected
+    // argument count, so a variadic generic falls back to the general error.
+    bool hasParamPack = false;
+    for (auto& paramType : paramTypes)
+    {
+        if (isPackType(paramType.type))
+            hasParamPack = true;
+    }
+
+    // When an explicit generic-argument list has the wrong number of arguments
+    // (e.g. `Foo<int>` or `Foo<int, float, half>` for `Foo<T, U>`), report a
+    // focused arity diagnostic naming the expected and provided counts. The
+    // arity message only fires when the provided count is genuinely outside the
+    // generic's allowed range — fewer than `requiredCount` (under-fills a
+    // non-defaulted parameter) or more than `paramTypes.getCount()` (over-fills
+    // the whole list). A count within `[requiredCount, paramTypes.getCount()]`
+    // that still fails (e.g. a defaulted parameter whose default cannot be
+    // substituted) is not an arity problem, so it keeps the general "cannot
+    // specialize" error rather than misreporting the argument count.
+    auto maybeReportGeneralError = [&]()
+    {
+        if (context.mode == OverloadResolveContext::Mode::JustTrying)
+            return;
+        Index expectedCount = paramTypes.getCount();
+        Index providedCount = context.getArgCount();
+        if (!hasParamPack && (providedCount < requiredCount || providedCount > expectedCount))
+        {
+            getSink()->diagnose(Diagnostics::GenericArgumentListArityMismatch{
+                .generic = candidate.item.declRef.getDecl(),
+                .expectedCount = expectedCount,
+                .actualCount = providedCount,
+                .location = context.loc});
+        }
+        else
+        {
+            getSink()->diagnose(Diagnostics::CannotSpecializeGeneric{
+                .generic = candidate.item.declRef.getDecl(),
+                .location = context.loc});
+        }
+    };
     ShortList<OverloadResolveContext::MatchedArg> matchedArgs;
     if (!context.matchArgumentsToParams(this, paramTypes, false, matchedArgs))
     {
@@ -1326,8 +1370,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
             // `TryCheckOverloadCandidateConstraints` runs after ordinary
             // overload checks have selected a generic candidate. Rebuild the
             // constraint decl-ref with the candidate's current argument list so
-            // the shared proof helper sees the same substituted `(pack, count)`
-            // pair that lowering will later receive as a hidden witness arg.
+            // the shared proof helper sees the same substituted
+            // `(actualCount, expectedCount)` pair that lowering will later
+            // receive as a hidden witness arg.
             DeclRef<GenericVariadicPackCountConstraintDecl> constraintDeclRef =
                 m_astBuilder
                     ->getGenericAppDeclRef(
@@ -1336,33 +1381,13 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                         packCountConstraintDecl)
                     .as<GenericVariadicPackCountConstraintDecl>();
 
-            DeclRef<Decl> constrainedPackDeclRef;
-            if (auto declRefExpr = getPackCountConstraintPackExpr(m_astBuilder, constraintDeclRef)
-                                       .as<DeclRefExpr>())
-            {
-                constrainedPackDeclRef = getDeclRef(m_astBuilder, declRefExpr);
-            }
-
-            Val* constrainedArg = nullptr;
-            if (auto typePackDeclRef = constrainedPackDeclRef.as<GenericTypePackParamDecl>())
-            {
-                auto typePackDecl = typePackDeclRef.getDecl();
-                if (typePackDecl->parameterIndex < newArgs.getCount())
-                    constrainedArg = newArgs[typePackDecl->parameterIndex];
-            }
-            else if (auto valuePackDeclRef = constrainedPackDeclRef.as<GenericValuePackParamDecl>())
-            {
-                auto valuePackDecl = valuePackDeclRef.getDecl();
-                if (valuePackDecl->parameterIndex < newArgs.getCount())
-                    constrainedArg = newArgs[valuePackDecl->parameterIndex];
-            }
-
+            auto actualCount = getPackCountConstraintActualCount(m_astBuilder, constraintDeclRef);
             auto expectedCount =
                 getPackCountConstraintExpectedCount(m_astBuilder, constraintDeclRef);
             auto packCountWitness = findVariadicPackCountWitnessForConstraint(
                 m_astBuilder,
                 this,
-                constrainedArg,
+                actualCount,
                 expectedCount,
                 &context,
                 context.mode != OverloadResolveContext::Mode::JustTrying);
@@ -1475,24 +1500,116 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
     // special case for generic argument inference failure
     if (candidate.status == OverloadCandidate::Status::GenericArgumentInferenceFailed)
     {
-        // Pack-count mismatches can fail during generic argument solving before
-        // the candidate has a specialized decl-ref. The solver records the
-        // concrete `(expected, actual)` pair, and this final selected-candidate
-        // path emits the focused diagnostic instead of the generic fallback.
-        if (candidate.genericInferenceFailure.kind ==
-            GenericArgumentInferenceFailure::Kind::VariadicPackCountMismatch)
+        // The solver records the first concrete reason a generic candidate
+        // failed to specialize (in `candidate.genericInferenceFailure`). When a
+        // focused reason was captured, emit the corresponding specific
+        // diagnostic here, on the selected-candidate path, instead of the
+        // generic fallback. Each case needs its own block scope because the
+        // shared `goto error` below would otherwise cross variable
+        // initializations. A reason of `None` falls through to the fallback.
+        switch (candidate.genericInferenceFailure.kind)
         {
-            auto& failure = candidate.genericInferenceFailure.variadicPackCountMismatch;
-            getSink()->diagnose(Diagnostics::VariadicPackCountDoesNotMatch{
-                .expectedCount = failure.expectedCount,
-                .actualCount = failure.actualCount,
-                .location = failure.location});
+        case GenericArgumentInferenceFailure::Kind::VariadicPackCountMismatch:
+            {
+                auto& failure = candidate.genericInferenceFailure.variadicPackCountMismatch;
+                getSink()->diagnose(Diagnostics::VariadicPackCountDoesNotMatch{
+                    .expectedCount = failure.expectedCount,
+                    .actualCount = failure.actualCount,
+                    .location = failure.location});
 
-            String declString = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
-            getSink()->diagnose(Diagnostics::GenericSignatureTried{
-                .signature = declString,
-                .location = candidate.item.declRef.getLoc()});
-            goto error;
+                String declString =
+                    ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                getSink()->diagnose(Diagnostics::GenericSignatureTried{
+                    .signature = declString,
+                    .location = candidate.item.declRef.getLoc()});
+                goto error;
+            }
+        case GenericArgumentInferenceFailure::Kind::GenericArityMismatch:
+            {
+                auto& failure = candidate.genericInferenceFailure.genericArityMismatch;
+                getSink()->diagnose(Diagnostics::GenericSpecializationArityMismatch{
+                    .expectedCount = failure.expectedParamCount,
+                    .actualCount = failure.actualArgCount,
+                    .location = failure.location});
+
+                String declString =
+                    ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                getSink()->diagnose(Diagnostics::GenericSignatureTried{
+                    .signature = declString,
+                    .location = candidate.item.declRef.getLoc()});
+                goto error;
+            }
+        case GenericArgumentInferenceFailure::Kind::OrdinaryGenericParamNotInferred:
+            {
+                auto& failure = candidate.genericInferenceFailure.ordinaryGenericParamNotInferred;
+                getSink()->diagnose(Diagnostics::GenericParameterCouldNotBeInferred{
+                    .paramName = failure.member->getName(),
+                    .location = failure.location});
+
+                String declString =
+                    ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                getSink()->diagnose(Diagnostics::GenericSignatureTried{
+                    .signature = declString,
+                    .location = candidate.item.declRef.getLoc()});
+                goto error;
+            }
+        case GenericArgumentInferenceFailure::Kind::GenericConstraintNotSatisfied:
+            {
+                auto& failure = candidate.genericInferenceFailure.genericConstraintNotSatisfied;
+                getSink()->diagnose(Diagnostics::GenericArgumentDoesNotSatisfyConstraint{
+                    .constraint = ASTPrinter::getGenericConstraintString(
+                        failure.constraintDecl,
+                        m_astBuilder),
+                    .location = failure.location});
+                getSink()->diagnose(Diagnostics::SeeGenericConstraintDeclaration{
+                    .location = failure.constraintLoc});
+
+                String declString =
+                    ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                getSink()->diagnose(Diagnostics::GenericSignatureTried{
+                    .signature = declString,
+                    .location = candidate.item.declRef.getLoc()});
+                goto error;
+            }
+        case GenericArgumentInferenceFailure::Kind::GenericParamUnificationConflict:
+            {
+                auto& failure = candidate.genericInferenceFailure.genericParamUnificationConflict;
+                StringBuilder firstBuilder, secondBuilder;
+                if (failure.firstVal)
+                    failure.firstVal->toText(firstBuilder);
+                if (failure.secondVal)
+                    failure.secondVal->toText(secondBuilder);
+                getSink()->diagnose(Diagnostics::GenericParameterUnificationConflict{
+                    .paramName = failure.paramDecl->getName(),
+                    .firstCandidate = firstBuilder.produceString(),
+                    .secondCandidate = secondBuilder.produceString(),
+                    .location = failure.location});
+
+                String declString =
+                    ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                getSink()->diagnose(Diagnostics::GenericSignatureTried{
+                    .signature = declString,
+                    .location = candidate.item.declRef.getLoc()});
+                goto error;
+            }
+        case GenericArgumentInferenceFailure::Kind::InterfaceConformanceNotSatisfied:
+            {
+                auto& failure = candidate.genericInferenceFailure.interfaceConformanceNotSatisfied;
+                getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+                    .typeArg = failure.subType,
+                    .interface = failure.supType,
+                    .location = failure.location});
+
+                String declString =
+                    ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                getSink()->diagnose(Diagnostics::GenericSignatureTried{
+                    .signature = declString,
+                    .location = candidate.item.declRef.getLoc()});
+                goto error;
+            }
+        case GenericArgumentInferenceFailure::Kind::None:
+        default:
+            break;
         }
 
         String callString = getCallSignatureString(context);
@@ -2812,6 +2929,18 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
         // defaults, so the match is allowed to account for default values.
         if (!context.matchArgumentsToParams(this, *innerParameterTypes, true, matchedArgs))
         {
+            // Capture the focused arity reason for the selected-candidate path.
+            // We only record the offending counts here (the expected parameter
+            // count and the supplied value-argument count); the actual
+            // diagnostic is formatted in `CompleteOverloadCandidate` if this
+            // candidate is selected. First recorded reason wins.
+            if (outFailure && outFailure->kind == GenericArgumentInferenceFailure::Kind::None)
+            {
+                auto& mismatch = outFailure->setGenericArityMismatch();
+                mismatch.expectedParamCount = innerParameterTypes->getCount();
+                mismatch.actualArgCount = context.getArgCount();
+                mismatch.location = context.loc;
+            }
             return DeclRef<Decl>();
         }
 
@@ -3302,7 +3431,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     {
         if (const auto typeType = as<TypeType>(funcExpr->type))
         {
-            if (isDeclRefTypeOf<AggTypeDeclBase>(typeType->getType()))
+            auto targetType = typeType->getType();
+            if (isDeclRefTypeOf<AggTypeDeclBase>(targetType) ||
+                isDeclRefTypeOf<EnumDecl>(targetType))
             {
                 Expr* resultExpr = nullptr;
                 ConversionCost conversionCost = kConversionCost_None;
@@ -3310,7 +3441,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 auto coerceResult = SemanticsVisitor(withSink(&collectedErrorsSink))
                                         ._coerce(
                                             CoercionSite::ExplicitCoercion,
-                                            typeType->getType(),
+                                            targetType,
                                             &resultExpr,
                                             expr->arguments[0]->type,
                                             expr->arguments[0],

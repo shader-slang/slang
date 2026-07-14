@@ -1,43 +1,103 @@
 // slang-support.h
 #pragma once
 
+#include "core/slang-basic.h"
 #include "core/slang-std-writers.h"
 #include "options.h"
 #include "shader-input-layout.h"
 #include "slang.h"
 
+#include <mutex>
 #include <slang-rhi.h>
 
 namespace renderer_test
 {
 
-/// Bridge from core debug callback to RHI debug callback
-/// This allows core callbacks to receive messages from RHI systems
+/// Bridge from core debug callback to RHI debug callback.
+///
+/// RHI backends may invoke debug callbacks from backend or driver threads, so
+/// binding changes and forwarded messages are serialized.
 /// TODO: We should replace rhi::IDebugCallback with Slang::IDebugCallback.
-class CoreToRHIDebugBridge : public rhi::IDebugCallback
+class CoreToRHIDebugBridge : public Slang::RefObject, public rhi::IDebugCallback
 {
 public:
-    void setCoreCallback(Slang::IDebugCallback* coreCallback) { m_coreCallback = coreCallback; }
+    void setCoreCallback(Slang::IDebugCallback* coreCallback)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_coreCallback = coreCallback;
+    }
 
     virtual SLANG_NO_THROW void SLANG_MCALL handleMessage(
         rhi::DebugMessageType type,
         rhi::DebugMessageSource source,
         const char* message) override
     {
-        if (m_coreCallback)
+        std::lock_guard<std::mutex> lock(m_mutex);
+
+        auto coreCallback = m_coreCallback;
+        if (coreCallback)
         {
             // Convert RHI types to core types
             Slang::DebugMessageType coreType = static_cast<Slang::DebugMessageType>(type);
             Slang::DebugMessageSource coreSource = static_cast<Slang::DebugMessageSource>(source);
-            m_coreCallback->handleMessage(coreType, coreSource, message);
+            coreCallback->handleMessage(coreType, coreSource, message);
         }
     }
 
 private:
+    std::mutex m_mutex;
     Slang::IDebugCallback* m_coreCallback = nullptr;
 };
 
-/// Core debug callback that captures debug messages in a string buffer
+/// Creates an RHI debug bridge and keeps it alive for the lifetime of the process.
+///
+/// A device holds its bridge as a raw, creation-time-only `debugCallback` pointer,
+/// and retained RHI state may emit messages after the invocation that created the
+/// device; keeping every bridge alive process-wide means such a late message always
+/// reaches a live (possibly cleared) bridge rather than freed storage. This function
+/// only mints and retains the bridge - callers own how it is associated with a device
+/// and rebound to the active per-invocation callback (see DeviceCache::acquireDevice
+/// and #11856).
+inline Slang::RefPtr<CoreToRHIDebugBridge> createRetainedCoreToRHIDebugBridge()
+{
+    static std::mutex* mutex = new std::mutex;
+    static Slang::List<Slang::RefPtr<CoreToRHIDebugBridge>>* bridges =
+        new Slang::List<Slang::RefPtr<CoreToRHIDebugBridge>>();
+
+    Slang::RefPtr<CoreToRHIDebugBridge> bridge = new CoreToRHIDebugBridge();
+    std::lock_guard<std::mutex> lock(*mutex);
+    bridges->add(bridge);
+    return bridge;
+}
+
+/// Binds an RHI debug bridge to a core callback for one active test invocation.
+///
+/// The bridge may be retained by RHI device state after this scope exits, but the
+/// per-test core callback must not be retained. Messages that arrive while no
+/// scoped callback is active are intentionally dropped by the bridge instead of
+/// being written to dead callback storage.
+class ScopedCoreDebugCallback
+{
+public:
+    ScopedCoreDebugCallback(CoreToRHIDebugBridge& bridge, Slang::IDebugCallback* coreCallback)
+        : m_bridge(bridge)
+    {
+        m_bridge.setCoreCallback(coreCallback);
+    }
+
+    ~ScopedCoreDebugCallback() { m_bridge.setCoreCallback(nullptr); }
+
+    ScopedCoreDebugCallback(const ScopedCoreDebugCallback&) = delete;
+    ScopedCoreDebugCallback& operator=(const ScopedCoreDebugCallback&) = delete;
+
+private:
+    CoreToRHIDebugBridge& m_bridge;
+};
+
+/// Core debug callback that captures debug messages in a string buffer.
+///
+/// Message capture is thread-safe so backend debug callbacks can report while
+/// the test harness reads the collected messages.
 class CoreDebugCallback : public Slang::IDebugCallback
 {
 public:
@@ -51,6 +111,7 @@ public:
         // Only capture error messages
         if (type == Slang::DebugMessageType::Error)
         {
+            std::lock_guard<std::mutex> lock(m_mutex);
             m_buf << message;
             if (message[strlen(message) - 1] != '\n')
             {
@@ -59,10 +120,32 @@ public:
         }
     }
 
-    void clear() { m_buf.clear(); }
-    Slang::String getString() { return m_buf.toString(); }
+    void clear()
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_buf.clear();
+    }
+
+    /// Returns a snapshot of the captured messages that does not alias the
+    /// builder's storage, so a concurrent reader can safely inspect it after the
+    /// lock is released.
+    ///
+    /// `Slang::String`'s copy constructor shares the underlying reference-counted
+    /// `StringRepresentation`, so `m_buf.toString()` would hand back a `String`
+    /// pointing into the same char buffer that `handleMessage` keeps appending to.
+    /// Once this method returns and the lock is dropped, a later in-place append
+    /// (`String::appendInPlace`, taken whenever the buffer is uniquely referenced
+    /// again) would then race the reader's access to that buffer. Constructing a
+    /// fresh `String` from the builder's slice forces an independent allocation
+    /// while still under the lock, breaking the alias.
+    Slang::String getString()
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return Slang::String(m_buf.getUnownedSlice());
+    }
 
 private:
+    std::mutex m_mutex;
     Slang::StringBuilder m_buf;
 };
 

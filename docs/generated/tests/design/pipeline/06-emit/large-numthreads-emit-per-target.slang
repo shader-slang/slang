@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#backends
-//META: doc_section_digest=d646ec1bfe54ca64d7afa27f7a26e793849f961a190aeb5f3c004156a5cb2217
+//META: doc_section_digest=afa9da1872ac16bf6c1982347a2d10792a8dffe153564dac9ffdc097add1d689
 //META: purpose=Boundary: a large numthreads value (1024, 1, 1) round-trips through emit as the target's local-workgroup-size marker — HLSL `numthreads(1024,1,1)`, GLSL `local_size_x = 1024`, SPIR-V `LocalSize 1024 1 1`, WGSL `@workgroup_size(1024,1,1)`.
 //META: intent=boundary
 //META: pipeline_stage=emit

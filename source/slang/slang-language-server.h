@@ -265,6 +265,7 @@ private:
     void updateInlayHintOptions(const JSONValue& deducedTypes, const JSONValue& parameterNames);
     void updateTraceOptions(const JSONValue& value);
     void updateWorkspaceFlavor(const JSONValue& value);
+    void updatePredefinedLanguageVersion(const JSONValue& value);
 
     void sendConfigRequest();
     void registerCapability(const char* methodName);

@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:21:40Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
+generated_at: 2026-06-29T18:50:39Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -23,17 +23,17 @@ understand a partially-differentiated IR.
 ## Source
 
 The differential-pair construction / projection opcodes live in
-their own three Lua intermediate groups around lines 900-931 of
+their own three Lua intermediate groups around lines 930-958 of
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua):
 `MakeDifferentialPairBase`, `DifferentialPairGetDifferentialBase`,
 and `DifferentialPairGetPrimalBase`. The bulk of the
 differentiation-operator opcodes (`ForwardDifferentiate`,
 `BackwardDifferentiate`, the propagate / primal / remat variants,
 and the legacy-bridge opcodes) live under the `TranslateBase`
-hoistable group at line ~2592. Three additional opcodes that are
+hoistable group at line ~2642. Three additional opcodes that are
 specific to checkpointing — `checkpointObj`,
 `ReportCheckpointStore`, and `loopExitValue` — live in the
-value-producing section (around lines ~1480-1487). A handful of
+value-producing section (around lines ~1512-1519). A handful of
 related opcodes are documented in sibling pages: the differential
 pair *types* are in [types.md](types.md); generic-annotation opcodes
 that mark differentiable types (`DifferentiableTypeAnnotation`,
@@ -42,7 +42,7 @@ that mark differentiable types (`DifferentiableTypeAnnotation`,
 Two further opcodes that identify the built-in `IDifferentiable`
 family of interface requirements live just after the ordinary
 `StructKey` entry: `BuiltinRequirementKey` (a hoistable inst, line
-~829) and the `BuiltinRequirementDecoration` (line ~2112). These are
+~841) and the `BuiltinRequirementDecoration` (line ~2133). These are
 produced during AST lowering, not by the autodiff passes, but the
 autodiff passes are their primary consumer; they are described under
 [built-in requirement keys](#built-in-requirement-keys) below.
@@ -220,7 +220,7 @@ live or replaces them with rematerialized recomputations.
 | `checkpointObj` | `CheckpointObject` | (variadic, `min=1`) | | (synthesized) | Marks an object value as a candidate for primal-side checkpointing. |
 | `loopExitValue` | — | (variadic, `min=1`) | | (synthesized) | Records the value of an SSA variable at a loop-exit point so reverse mode can read it. |
 | `ReportCheckpointStore` | — | `storedType, originalFunc, storeRef` | | (synthesized) | Diagnostic-style marker that a checkpoint store was inserted; `storeRef` becomes `Poison` if the store is later eliminated. |
-| `detachDerivative` | — | `value` | | `DetachDerivativeExpr` (`detach(...)`) in `slang-lower-to-ir.cpp` | Returns the operand unchanged but blocks derivative propagation through it. |
+| `detachDerivative` | — | `value` | | `DetachExpr` (`detach(...)`) via `visitDetachExpr` in `slang-lower-to-ir.cpp` | Returns the operand unchanged but blocks derivative propagation through it. |
 
 ## Notable opcodes
 
@@ -232,6 +232,30 @@ pair `{primal, differential}`. Its result type is a
 forward-mode pass inserts `MakeDiffPair` calls whenever a primal
 flows alongside its derivative, and the reverse-mode pass uses it
 when stitching back together values that were temporarily split.
+
+### `GetDifferential` / `GetPrimal`
+
+`GetDifferential(pair)` and `GetPrimal(pair)` are the projections
+that reverse `MakeDiffPair`: given a `{primal, differential}` pair
+they read back the differential and primal halves respectively. The
+forward-mode pass emits them when it needs only one component of a
+pair it (or a callee) previously bundled, and the autodiff
+simplification passes fold a `GetPrimal`/`GetDifferential` applied
+directly to a `MakeDiffPair` back to the original operand. The
+`GetPrimalRef` / `GetDifferentialPtr` variants project pair-of-
+pointer values produced by `MakeDiffRefPair`.
+
+### Reverse-mode context
+
+The reverse-mode primal context is carried by *type* opcodes
+(`BackwardDiffIntermediateContextType`,
+`BackwardDiffMinimalContextType`, and their trivial / legacy
+variants) under the `TranslatedTypeBase` group of the Type family;
+they are documented in [types.md](types.md). No opcode spelled
+`BackwardDiffPropagateContext` exists in the current source — the
+context plumbing is the result type of
+`BackwardDifferentiatePropagate` (below) rather than a standalone
+context opcode.
 
 ### `ForwardDifferentiate`
 

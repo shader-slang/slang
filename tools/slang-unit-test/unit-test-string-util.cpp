@@ -296,3 +296,50 @@ SLANG_UNIT_TEST(stringUtilAppendFormat)
     StringUtil::appendFormat(buf, " v=%d", 7);
     SLANG_CHECK(buf.produceString() == "prefix: v=7");
 }
+
+// -- Levenshtein edit distance ----------------------------------------
+
+SLANG_UNIT_TEST(stringUtilLevenshteinDistance)
+{
+    // Identical strings have distance 0.
+    SLANG_CHECK(StringUtil::calcLevenshteinDistance(toSlice("length"), toSlice("length")) == 0);
+
+    // Either side empty: distance is the length of the other.
+    SLANG_CHECK(StringUtil::calcLevenshteinDistance(toSlice(""), toSlice("abc")) == 3);
+    SLANG_CHECK(StringUtil::calcLevenshteinDistance(toSlice("abc"), toSlice("")) == 3);
+    SLANG_CHECK(StringUtil::calcLevenshteinDistance(toSlice(""), toSlice("")) == 0);
+
+    // Single insertion / deletion.
+    SLANG_CHECK(StringUtil::calcLevenshteinDistance(toSlice("color"), toSlice("colour")) == 1);
+    SLANG_CHECK(StringUtil::calcLevenshteinDistance(toSlice("colour"), toSlice("color")) == 1);
+    // Single substitution.
+    SLANG_CHECK(StringUtil::calcLevenshteinDistance(toSlice("cat"), toSlice("cot")) == 1);
+    // Two adjacent substitutions (`in` -> `di`).
+    SLANG_CHECK(StringUtil::calcLevenshteinDistance(toSlice("instance"), toSlice("distance")) == 2);
+    // A transposition counts as two edits under plain Levenshtein.
+    SLANG_CHECK(StringUtil::calcLevenshteinDistance(toSlice("lenght"), toSlice("length")) == 2);
+
+    // Classic textbook example.
+    SLANG_CHECK(StringUtil::calcLevenshteinDistance(toSlice("kitten"), toSlice("sitting")) == 3);
+
+    // Symmetry.
+    SLANG_CHECK(
+        StringUtil::calcLevenshteinDistance(toSlice("abcdef"), toSlice("azced")) ==
+        StringUtil::calcLevenshteinDistance(toSlice("azced"), toSlice("abcdef")));
+
+    // Case-insensitive variant folds case during the comparison: differing only
+    // in case is distance 0, while genuine edits are still counted.
+    SLANG_CHECK(
+        StringUtil::calcLevenshteinDistanceCaseInsensitive(toSlice("Length"), toSlice("length")) ==
+        0);
+    SLANG_CHECK(
+        StringUtil::calcLevenshteinDistanceCaseInsensitive(toSlice("LENGHT"), toSlice("length")) ==
+        2);
+    SLANG_CHECK(
+        StringUtil::calcLevenshteinDistanceCaseInsensitive(toSlice("abXYef"), toSlice("abcdef")) ==
+        2);
+    // Case-sensitive vs case-insensitive differ when only case differs.
+    SLANG_CHECK(StringUtil::calcLevenshteinDistance(toSlice("ABC"), toSlice("abc")) == 3);
+    SLANG_CHECK(
+        StringUtil::calcLevenshteinDistanceCaseInsensitive(toSlice("ABC"), toSlice("abc")) == 0);
+}

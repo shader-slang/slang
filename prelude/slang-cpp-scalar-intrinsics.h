@@ -709,7 +709,34 @@ struct half
     bool operator==(half other) const { return load() == other.load(); }
     bool operator!=(half other) const { return load() != other.load(); }
 
+    // Scalar conversion operators. `half` only stores a bit-pattern, so every
+    // conversion routes through `load()` (half -> float) and then to the target
+    // scalar, matching the arithmetic/comparison operators above. These are needed
+    // because the emitter lowers a Slang cast like `(int8_t)h` to a functional-style
+    // cast `int8_t(h)`, and an `explicit operator float()` does not chain through a
+    // single cast to a non-float scalar; without a direct operator the downstream
+    // C++ compiler rejects the cast (shader-slang/slang#11996). Kept `explicit` so
+    // that half arithmetic (all operands `half`) stays unambiguous.
     explicit operator float() const { return load(); }
+    explicit operator double() const { return double(load()); }
+    explicit operator bool() const { return load() != 0.0f; }
+    explicit operator int8_t() const { return int8_t(load()); }
+    explicit operator uint8_t() const { return uint8_t(load()); }
+    explicit operator int16_t() const { return int16_t(load()); }
+    explicit operator uint16_t() const { return uint16_t(load()); }
+    explicit operator int32_t() const { return int32_t(load()); }
+    explicit operator uint32_t() const { return uint32_t(load()); }
+    explicit operator int64_t() const { return int64_t(load()); }
+    explicit operator uint64_t() const { return uint64_t(load()); }
+#if SLANG_INTPTR_TYPE_IS_DISTINCT
+    // On platforms where `intptr_t`/`uintptr_t` are distinct from the sized
+    // 64-bit integer types (e.g. Apple), the `int64_t`/`uint64_t` operators do
+    // not cover an emitted `intptr_t(h)` cast, so provide them explicitly. This
+    // guard mirrors the vector/matrix operator specializations in
+    // slang-cpp-types-core.h.
+    explicit operator intptr_t() const { return intptr_t(load()); }
+    explicit operator uintptr_t() const { return uintptr_t(load()); }
+#endif
 };
 #endif
 

@@ -543,8 +543,10 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 
     TestReporter testReporter;
     renderer_test::CoreDebugCallback coreDebugCallback;
-    renderer_test::CoreToRHIDebugBridge rhiDebugCallback;
-    rhiDebugCallback.setCoreCallback(&coreDebugCallback);
+    auto rhiDebugCallback = renderer_test::createRetainedCoreToRHIDebugBridge();
+    renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
+        *rhiDebugCallback,
+        &coreDebugCallback);
 
     testModule->setTestReporter(&testReporter);
 
@@ -561,7 +563,7 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     unitTestContext.enabledApis = RenderApiFlags(args.enabledApis);
     unitTestContext.executableDirectory = m_exeDirectory.getBuffer();
     unitTestContext.enableDebugLayers = args.enableDebugLayers;
-    unitTestContext.debugCallback = &rhiDebugCallback;
+    unitTestContext.debugCallback = rhiDebugCallback.Ptr();
 
     auto testCount = testModule->getTestCount();
     SLANG_ASSERT(testIndex >= 0 && testIndex < testCount);

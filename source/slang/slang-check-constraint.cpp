@@ -642,12 +642,17 @@ Witness* findNonEmptyPackWitnessForConstraint(
 
 static DeclRef<Decl> getDirectGenericPackParamDeclRefFromArg(Val* val)
 {
-    // Pack-count witnesses need declaration identity only while checking an
-    // abstract generic body such as `foo<each I>() where countof(I) == N`.
-    // In that path the pack argument for `I` is represented as either a
-    // `DeclRefType` or a `DeclRefIntVal`. Concrete pack values intentionally
-    // return an empty decl-ref because equality for those values is handled by
-    // comparing the pack value itself.
+    // Pack-count witnesses need declaration identity only while checking an abstract generic body:
+    //
+    //     void foo<let N, each I>(I values)
+    //         where countof(I) == N
+    //     {
+    //         bar<N, I>(values);
+    //     }
+    //
+    // In that path the pack argument for `I` is represented as either a `DeclRefType` or a
+    // `DeclRefIntVal`. Concrete pack values intentionally return an empty decl-ref because
+    // equality for those values is handled by comparing the pack value itself.
     auto tryGetPackParamDeclRef = [](DeclRef<Decl> const& declRef) -> DeclRef<Decl>
     {
         if (as<GenericTypePackParamDecl>(declRef.getDecl()) ||
@@ -668,49 +673,65 @@ static DeclRef<Decl> getDirectGenericPackParamDeclRefFromArg(Val* val)
     return DeclRef<Decl>();
 }
 
-static DeclRef<Decl> _getPackDeclRefForPackCountConstraint(
-    ASTBuilder* astBuilder,
-    DeclRef<GenericVariadicPackCountConstraintDecl> const& constraintDeclRef)
+static Val* getCountOfArgIgnoringCasts(IntVal* countVal)
 {
-    // `visitGenericVariadicPackCountConstraintDecl` accepts only direct pack
-    // parameter references. Keep this helper narrow so witness matching rejects
-    // unsupported symbolic pack expressions instead of treating them as proofs.
-    auto packExpr = getPackCountConstraintPackExpr(astBuilder, constraintDeclRef);
-    if (auto declRefExpr = packExpr.as<DeclRefExpr>())
-        return getDeclRef(astBuilder, declRefExpr);
-    return DeclRef<Decl>();
+    // Declared pack-count proofs are source constraints from generic bodies described above. Most
+    // proof checks can compare substituted `IntVal`s directly; this helper only peels the
+    // actual-count side when an abstract generic body still needs to find the declared source proof
+    // for `I`.
+    Val* val = countVal;
+    while (auto typeCastIntVal = as<TypeCastIntVal>(val))
+        val = typeCastIntVal->getBase();
+
+    if (auto countOfIntVal = as<CountOfIntVal>(val))
+        return countOfIntVal->getValArg();
+    return nullptr;
 }
 
 static DeclRef<GenericVariadicPackCountConstraintDecl> _findDeclaredPackCountConstraintForPackAndCount(
     ASTBuilder* astBuilder,
-    Val* constrainedArg,
+    IntVal* actualCount,
     IntVal* expectedCount)
 {
-    // A nested call such as `foo<let N, each I>() where countof(I) == N`
-    // calling `bar<N, I>() where countof(I) == N` has no concrete pack count
-    // during body checking. The proof is the source constraint declared on the
-    // generic that owns `I`; accept it only when both the pack declaration and
-    // substituted count `IntVal` match the callee's requirement exactly, aside
-    // from integer casts that semantic normalization may add around `N`.
+    // Consider this example:
+    //
+    //     void bar<let M, each J>(J values)
+    //         where countof(J) == M;
+    //
+    //     void foo<let N, each I>(I values)
+    //         where countof(I) == N
+    //     {
+    //         bar<N, I>(values);
+    //     }
+    //
+    // During `foo` body checking there is no concrete pack count for `I`. The proof is the source
+    // constraint declared on the generic that owns `I`; accept it only when both the pack
+    // declaration and substituted count `IntVal` match the callee's requirement exactly, aside from
+    // integer casts that semantic normalization may add around `N`.
+    auto constrainedArg = getCountOfArgIgnoringCasts(actualCount);
     auto constrainedPackDeclRef = getDirectGenericPackParamDeclRefFromArg(constrainedArg);
     auto constrainedPackDecl = constrainedPackDeclRef.getDecl();
     auto genericDecl =
         constrainedPackDecl ? as<GenericDecl>(constrainedPackDecl->parentDecl) : nullptr;
     if (!genericDecl || !expectedCount)
         return DeclRef<GenericVariadicPackCountConstraintDecl>();
-
     for (auto constraintDecl :
          genericDecl->getDirectMemberDeclsOfType<GenericVariadicPackCountConstraintDecl>())
     {
         auto constraintDeclRef =
-            astBuilder->getDirectDeclRef<GenericVariadicPackCountConstraintDecl>(constraintDecl);
-        auto packDeclRef = _getPackDeclRefForPackCountConstraint(astBuilder, constraintDeclRef);
+            substituteDeclRef(
+                SubstitutionSet(constrainedPackDeclRef),
+                astBuilder,
+                astBuilder->getDirectDeclRef<GenericVariadicPackCountConstraintDecl>(
+                    constraintDecl))
+                .as<GenericVariadicPackCountConstraintDecl>();
+        auto packDeclRef = getPackCountConstraintPackDeclRef(astBuilder, constraintDeclRef);
         if (packDeclRef.getDecl() != constrainedPackDecl)
             continue;
 
         auto declaredExpectedCount =
             getPackCountConstraintExpectedCount(astBuilder, constraintDeclRef);
-        if (arePackCountExpectedCountsEqual(astBuilder, declaredExpectedCount, expectedCount))
+        if (declaredExpectedCount == expectedCount)
             return constraintDeclRef;
     }
 
@@ -721,44 +742,42 @@ static DeclRef<GenericVariadicPackCountConstraintDecl> _findDeclaredPackCountCon
 Witness* findVariadicPackCountWitnessForConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
-    Val* constrainedArg,
+    IntVal* actualCount,
     IntVal* expectedCount,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError)
 {
     SLANG_ASSERT(!shouldEmitError || maybeContext);
-    if (!constrainedArg || !expectedCount)
+    if (!actualCount || !expectedCount)
         return nullptr;
-
     // Pack-count constraints are validation constraints. If `load<3>(1, 2, 3)`
     // reaches this helper, `N` is already solved to `3`; this block may compare
     // concrete counts or forward an in-scope declared proof, but it must not add
     // ordinary constraints such as inferring `N` from `countof(TIndex)`.
+    auto resolvedActualCount = as<IntVal>(actualCount->resolve());
+    if (!resolvedActualCount)
+        resolvedActualCount = actualCount;
+
     auto resolvedExpectedCount = as<IntVal>(expectedCount->resolve());
     if (!resolvedExpectedCount)
         resolvedExpectedCount = expectedCount;
 
-    auto foldedActualCount =
-        CountOfIntVal::tryFold(astBuilder, resolvedExpectedCount->getType(), constrainedArg);
-    auto actualCount = foldedActualCount ? as<IntVal>(foldedActualCount->resolve()) : nullptr;
-    if (actualCount && actualCount->equals(resolvedExpectedCount))
+    if (resolvedActualCount == resolvedExpectedCount)
     {
         return astBuilder->getConcreteVariadicPackCountWitness(
-            constrainedArg,
+            resolvedActualCount,
             resolvedExpectedCount);
     }
 
     if (auto declaredConstraintDeclRef = _findDeclaredPackCountConstraintForPackAndCount(
             astBuilder,
-            constrainedArg,
+            actualCount,
             resolvedExpectedCount))
-    {
         return astBuilder->getDeclaredVariadicPackCountWitness(declaredConstraintDeclRef);
-    }
 
     if (shouldEmitError)
     {
-        auto actualConstant = as<ConstantIntVal>(actualCount);
+        auto actualConstant = as<ConstantIntVal>(resolvedActualCount);
         auto expectedConstant = as<ConstantIntVal>(resolvedExpectedCount);
         if (actualConstant && expectedConstant)
         {
@@ -912,40 +931,6 @@ DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal)
     return as<DeclRefIntVal>(intVal);
 }
 
-static IntVal* coercePackCountExpectedCountToInt(ASTBuilder* astBuilder, IntVal* intVal)
-{
-    // Pack counts are conceptually integer counts, while generic value
-    // arguments can enter this path with different concrete integer types or
-    // with `TypeCastIntVal` wrappers inserted by `TryUnifyIntParam`. Reuse the
-    // normal `TypeCastIntVal` folding/canonicalization path to express both
-    // expected-count operands as `int`, then compare the canonical `Val*`.
-    auto intType = astBuilder->getIntType();
-    if (auto foldedCast =
-            as<IntVal>(TypeCastIntVal::tryFoldImpl(astBuilder, intType, intVal, nullptr)))
-    {
-        return foldedCast;
-    }
-    return astBuilder->getTypeCastIntVal(intType, intVal);
-}
-
-// Compare the expected-count `IntVal`s stored in pack-count witnesses and
-// constraint declarations. The source of truth is the same integer coercion
-// machinery used by constant folding: both operands are coerced to `int`, then
-// their canonical `Val*` identities are compared.
-bool arePackCountExpectedCountsEqual(ASTBuilder* astBuilder, IntVal* left, IntVal* right)
-{
-    if (!left || !right)
-        return left == right;
-    left = as<IntVal>(left->resolve());
-    right = as<IntVal>(right->resolve());
-    if (!left || !right)
-        return left == right;
-
-    left = coercePackCountExpectedCountToInt(astBuilder, left);
-    right = coercePackCountExpectedCountToInt(astBuilder, right);
-    return left == right;
-}
-
 // Return the ordinary-argument merge mode requested by unification.
 SemanticsVisitor::SolverConstraint::OrdinaryArgMergeMode getOrdinaryArgMergeMode(
     SemanticsVisitor::UnificationOptions const& unificationOptions)
@@ -987,7 +972,7 @@ static bool isDeferredValidationWitness(Val* witness)
     // objects.
     return as<TypeCoercionWitness>(witness) || as<NonEmptyPackWitness>(witness) ||
            as<DeclaredVariadicPackCountWitness>(witness) ||
-           as<ConcreteVariadicPackCountWitness>(witness);
+           as<ConcreteVariadicPackCountWitness>(witness) || as<DiffTypeInfoWitness>(witness);
 }
 
 // Return the outermost generic declaration in a nested generic declaration
@@ -1331,10 +1316,7 @@ private:
         // final generic application. `T : IFoo`, type coercions, non-empty-pack
         // checks, and differentiability constraints all need compiler-formed
         // witness values.
-        return as<GenericTypeConstraintDecl>(member) || as<TypeCoercionConstraintDecl>(member) ||
-               as<NonEmptyPackConstraintDecl>(member) ||
-               as<GenericVariadicPackCountConstraintDecl>(member) ||
-               as<HasDiffTypeInfoConstraintDecl>(member);
+        return isConstraintDecl(member);
     }
 
     // Add a solver constraint for one default generic argument.
@@ -1713,7 +1695,28 @@ private:
         // the same write path.
         Val* solvedWitness = trySolveWitnessForConstraint(constraint.genericDecl, constraint.decl);
         if (!solvedWitness)
+        {
+            // A null witness here is a genuine, readiness-confirmed failure: the
+            // dependency check above already returned `Blocked` for any
+            // not-yet-ready constraint, so reaching this point means this source
+            // constraint cannot be satisfied for the current arguments. Record
+            // the general "does not satisfy generic constraint" reason naming the
+            // source constraint (rendered adaptively per kind by
+            // `ASTPrinter::getGenericConstraintString`). This is the uniform fallback
+            // for every constraint kind; a more specific reason recorded earlier
+            // (e.g. the conformance message in `trySolveSubtypeWitnessForConstraint`
+            // or a variadic pack-count mismatch) wins via `kind == None`.
+            if (m_context.failure &&
+                m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
+                constraint.decl)
+            {
+                auto& unsat = m_context.failure->setGenericConstraintNotSatisfied();
+                unsat.constraintDecl = constraint.decl;
+                unsat.constraintLoc = constraint.decl->loc;
+                unsat.location = m_context.applicationLoc;
+            }
             return ConstraintSolvingState::Failed;
+        }
 
         // Store the proof in `m_args` immediately. Later ordinary defaults and
         // witness constraints substitute through this same array, so a solved
@@ -1899,6 +1902,23 @@ private:
         // constraints use the existing join behavior for call inference.
         else if (!mergeTypeConstraint(type, argInfo.getPriority(), c, cType))
         {
+            // Two ordinary constraints inferred conflicting types for this
+            // parameter with no common type (e.g. `foo<T>(T, T)` called with
+            // unrelated `A` and `B`). `mergeTypeConstraint` returns false before
+            // mutating `type`, so `type` still holds the first candidate and
+            // `cType` the second. Capture both for a focused diagnostic; the
+            // formatting is deferred to `CompleteOverloadCandidate`. First
+            // recorded reason wins.
+            if (m_context.failure &&
+                m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
+                typeParam && type.type && cType.type)
+            {
+                auto& conflict = m_context.failure->setGenericParamUnificationConflict();
+                conflict.paramDecl = typeParam;
+                conflict.firstVal = type.type;
+                conflict.secondVal = cType.type;
+                conflict.location = m_context.applicationLoc;
+            }
             return ConstraintSolvingState::Failed;
         }
 
@@ -2078,6 +2098,21 @@ private:
         }
         else if (valPriority == c.priority && !val->equals(cVal))
         {
+            // Two same-priority value constraints require this parameter to be
+            // two different values (e.g. `let N` forced to both `4` and `8`).
+            // `val` holds the first and `cVal` the second; capture them for a
+            // focused unification-conflict diagnostic. First recorded reason
+            // wins; formatting is deferred to `CompleteOverloadCandidate`.
+            if (m_context.failure &&
+                m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None && val &&
+                cVal)
+            {
+                auto& conflict = m_context.failure->setGenericParamUnificationConflict();
+                conflict.paramDecl = valParam;
+                conflict.firstVal = val;
+                conflict.secondVal = cVal;
+                conflict.location = m_context.applicationLoc;
+            }
             return ConstraintSolvingState::Failed;
         }
 
@@ -2139,31 +2174,16 @@ private:
             return true;
         }
 
-        // `where countof(I) == N` can only be validated after both `I` and
-        // `N` have been solved by other inputs. This is intentionally a
-        // dependency check, not an inference path;
-        // `trySolveVariadicPackCountWitnessForConstraint` will reject the
-        // constraint if those solved values do not prove equality.
+        // In a source shape like `bar<let M, each J>(J values) where countof(J) == M`, the
+        // pack-count proof can only be validated after both checked count operands have been
+        // solved by other inputs. This is intentionally a dependency check, not an inference path;
+        // `trySolveVariadicPackCountWitnessForConstraint` will reject the constraint if those
+        // solved values do not prove equality.
         if (auto packCountConstraintDecl =
                 as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
         {
-            auto packDeclRef = getPackDeclRefForPackCountConstraint(packCountConstraintDecl);
-            if (auto typePackDeclRef = packDeclRef.as<GenericTypePackParamDecl>())
-            {
-                if (!isArgReady(typePackDeclRef.getDecl()))
-                    return true;
-            }
-            else if (auto valuePackDeclRef = packDeclRef.as<GenericValuePackParamDecl>())
-            {
-                if (!isArgReady(valuePackDeclRef.getDecl()))
-                    return true;
-            }
-            else
-            {
-                return true;
-            }
-
-            return hasUnreadyDependenciesForVal(packCountConstraintDecl->expectedCountVal);
+            return hasUnreadyDependenciesForVal(packCountConstraintDecl->actualCountVal) ||
+                   hasUnreadyDependenciesForVal(packCountConstraintDecl->expectedCountVal);
         }
 
         // Diff-type-info witnesses wait for their substituted subject type.
@@ -2274,25 +2294,15 @@ private:
         }
 
         // When either side of `countof(I) == N` changes, the witness proof must
-        // be retried under the new argument list. The target pack is stored in
-        // `packExpr`; any value parameters used by the count are stored in the
-        // checked `expectedCountVal`.
+        // be retried under the new argument list. The declaration checker
+        // stores both sides as checked `IntVal`s, so the ordinary dependency
+        // walk can see `I` through `actualCountVal` and `N` through
+        // `expectedCountVal`.
         if (auto packCountConstraintDecl =
                 as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
         {
-            auto packDeclRef = getPackDeclRefForPackCountConstraint(packCountConstraintDecl);
-            if (auto typePackDeclRef = packDeclRef.as<GenericTypePackParamDecl>())
-            {
-                if (typePackDeclRef.getDecl() == changedArgDecl)
-                    return true;
-            }
-            else if (auto valuePackDeclRef = packDeclRef.as<GenericValuePackParamDecl>())
-            {
-                if (valuePackDeclRef.getDecl() == changedArgDecl)
-                    return true;
-            }
-
-            return valDependsOnArg(packCountConstraintDecl->expectedCountVal, changedArgDecl);
+            return valDependsOnArg(packCountConstraintDecl->actualCountVal, changedArgDecl) ||
+                   valDependsOnArg(packCountConstraintDecl->expectedCountVal, changedArgDecl);
         }
 
         // Diff-type-info constraints depend on the subject type they inspect.
@@ -2439,17 +2449,6 @@ private:
         // generic parameter rather than a `Val` tree. Keep the decl-ref intact
         // while classifying it so any substitution context on the expression is
         // still available to the caller.
-        if (auto declRefExpr = as<DeclRefExpr>(constraintDecl->packExpr))
-            return getDeclRef(m_astBuilder, declRefExpr);
-        return DeclRef<Decl>();
-    }
-
-    // Return the direct pack declaration named by a checked pack-count
-    // constraint. The declaration checker enforces that shape, so a missing
-    // decl-ref here means earlier errors already made the constraint invalid.
-    DeclRef<Decl> getPackDeclRefForPackCountConstraint(
-        GenericVariadicPackCountConstraintDecl* constraintDecl)
-    {
         if (auto declRefExpr = as<DeclRefExpr>(constraintDecl->packExpr))
             return getDeclRef(m_astBuilder, declRefExpr);
         return DeclRef<Decl>();
@@ -2688,6 +2687,23 @@ private:
                 {
                     if (isArgReady(member))
                         continue;
+                    // Capture the focused reason for the selected-candidate path:
+                    // an ordinary generic parameter never became ready. This is
+                    // where a type `T` used only in return position, or a value
+                    // `N` not mentioned in any parameter, fails — such a parameter
+                    // produces no ordinary solver constraint, so
+                    // `areOrdinaryConstraintsSatisfied` cannot flag it. We record
+                    // the parameter declaration; `CompleteOverloadCandidate`
+                    // formats the diagnostic if this candidate is selected. First
+                    // recorded reason wins.
+                    if (m_context.failure &&
+                        m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
+                        member)
+                    {
+                        auto& notInferred = m_context.failure->setOrdinaryGenericParamNotInferred();
+                        notInferred.member = member;
+                        notInferred.location = m_context.applicationLoc;
+                    }
                     return false;
                 }
             }
@@ -2702,7 +2718,16 @@ private:
                 if (!isGenericConstraintDecl(member))
                     continue;
                 if (!isArgReady(member))
+                {
+                    // A constraint witness argument that never became ready
+                    // rejects this candidate. The focused interface-conformance
+                    // reason (`T : IFoo` with a non-conforming `T`) is recorded
+                    // earlier, at the witness-proof site in
+                    // `trySolveSubtypeWitnessForConstraint`, because a required
+                    // subtype witness that cannot be proven fails the work list
+                    // before final validation ever runs.
                     return false;
+                }
             }
         }
         return true;
@@ -2868,6 +2893,13 @@ private:
         if (!markArgConstrainedBySubtypeConstraint(constraintDecl))
             return nullptr;
 
+        if (auto discoveredWitness = m_context.discoveredWitnessArgs.tryGetValue(constraintDecl))
+        {
+            if (constraintDecl->isEqualityConstraint && !isTypeEqualityWitness(*discoveredWitness))
+                return nullptr;
+            return *discoveredWitness;
+        }
+
         // Requirements declared inside an interface are checked while the
         // interface's abstract self type is still in scope. For example,
         // `interface INode { associatedtype Next : INode; }` can ask the solver
@@ -2935,6 +2967,44 @@ private:
 
         // A required subtype constraint with no acceptable proof rejects the
         // generic application.
+        //
+        // Capture the focused interface-conformance reason for the
+        // selected-candidate path: the inferred argument `sub` does not conform
+        // to the required interface `sup`. This is the authoritative failure
+        // site for `T : IFoo` with a non-conforming `T`, because a required
+        // subtype witness that cannot be proven fails here during the work list
+        // (`runWorkList` returns `Failed`), before final argument validation
+        // runs. The abstract-self-type guard above (and the optional-constraint
+        // cases) have already returned, so reaching this point means a genuine
+        // unsatisfiable required conformance. We record only the substituted
+        // `sub`/`sup` types; `CompleteOverloadCandidate` formats the diagnostic
+        // if this candidate is selected. First recorded reason wins.
+        //
+        // `trySolveSubtypeWitnessForConstraint` can run speculatively while the
+        // subject argument is still an unsolved generic parameter, so guard on
+        // `sub` being concrete (no free generic parameter of the generics being
+        // solved). Recording a stale, partially-solved `sub` would either name
+        // the wrong type or emit a spurious "does not conform" for a candidate
+        // that ultimately succeeds or fails for a different reason.
+        //
+        // This routine also serves equality constraints (`where T == X`), whose
+        // `sup` is the concrete right-hand type rather than an interface. The
+        // specific "does not conform to interface" framing applies only to
+        // conformance (`T : IFoo`) constraints, so only those are captured here;
+        // every other unsatisfied constraint kind (equality, coercion, ...) is
+        // captured uniformly by the general `GenericConstraintNotSatisfied`
+        // reason in `solveWitnessConstraint` at the readiness-confirmed failure
+        // point, so it is left for that path here.
+        if (m_context.failure &&
+            m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
+            !constraintDecl->isEqualityConstraint && sub && sup &&
+            !hasUnreadyDependenciesForVal(sub) && !hasUnreadyDependenciesForVal(sup))
+        {
+            auto& conformance = m_context.failure->setInterfaceConformanceNotSatisfied();
+            conformance.subType = sub;
+            conformance.supType = sup;
+            conformance.location = m_context.applicationLoc;
+        }
         return nullptr;
     }
 
@@ -3091,28 +3161,28 @@ private:
     // emits the diagnostic only after overload resolution selects this failed
     // candidate.
     void recordVariadicPackCountMismatchForSelectedCandidate(
-        Val* constrainedArg,
+        IntVal* actualCount,
         IntVal* expectedCount)
     {
-        if (!m_context.failure || !constrainedArg || !expectedCount)
+        if (!m_context.failure || !actualCount || !expectedCount)
             return;
         if (m_context.failure->kind != GenericArgumentInferenceFailure::Kind::None)
             return;
+
+        auto resolvedActualCount = as<IntVal>(actualCount->resolve());
+        if (!resolvedActualCount)
+            resolvedActualCount = actualCount;
 
         auto resolvedExpectedCount = as<IntVal>(expectedCount->resolve());
         if (!resolvedExpectedCount)
             resolvedExpectedCount = expectedCount;
 
-        auto foldedActualCount =
-            CountOfIntVal::tryFold(m_astBuilder, resolvedExpectedCount->getType(), constrainedArg);
-        auto actualCount = foldedActualCount ? as<IntVal>(foldedActualCount->resolve()) : nullptr;
-        auto actualConstant = as<ConstantIntVal>(actualCount);
+        auto actualConstant = as<ConstantIntVal>(resolvedActualCount);
         auto expectedConstant = as<ConstantIntVal>(resolvedExpectedCount);
         if (!actualConstant || !expectedConstant)
             return;
 
-        m_context.failure->kind = GenericArgumentInferenceFailure::Kind::VariadicPackCountMismatch;
-        auto& failure = m_context.failure->variadicPackCountMismatch;
+        auto& failure = m_context.failure->setVariadicPackCountMismatch();
         failure.expectedCount = (int64_t)expectedConstant->getValue();
         failure.actualCount = (int64_t)actualConstant->getValue();
         failure.location = m_context.applicationLoc;
@@ -3120,39 +3190,31 @@ private:
 
     // Try to solve the witness for a pack-count constraint from the current
     // generic-application arguments. `findVariadicPackCountWitnessForConstraint`
-    // owns the proof rules; this method only extracts the current target pack
-    // and substituted expected count from the solver state.
+    // owns the proof rules; this method only extracts the substituted checked
+    // count values from the solver state.
     Val* trySolveVariadicPackCountWitnessForConstraint(
         GenericDecl* genericDecl,
         GenericVariadicPackCountConstraintDecl* constraintDecl)
     {
         SLANG_UNUSED(genericDecl);
 
-        auto constrainedPackDeclRef = getPackDeclRefForPackCountConstraint(constraintDecl);
-
-        Val* constrainedArg = nullptr;
-        if (auto typePackDeclRef = constrainedPackDeclRef.as<GenericTypePackParamDecl>())
-        {
-            constrainedArg = getCurrentArg(typePackDeclRef.getDecl());
-        }
-        else if (auto valuePackDeclRef = constrainedPackDeclRef.as<GenericValuePackParamDecl>())
-        {
-            constrainedArg = getCurrentArg(valuePackDeclRef.getDecl());
-        }
-
         auto constraintDeclRef =
             buildSubstDeclRef(constraintDecl).as<GenericVariadicPackCountConstraintDecl>();
+        auto actualCount = getPackCountConstraintActualCount(m_astBuilder, constraintDeclRef);
         auto expectedCount = getPackCountConstraintExpectedCount(m_astBuilder, constraintDeclRef);
+
+        if (auto discoveredWitness = m_context.discoveredWitnessArgs.tryGetValue(constraintDecl))
+            return *discoveredWitness;
 
         auto witness = findVariadicPackCountWitnessForConstraint(
             m_astBuilder,
             m_visitor,
-            constrainedArg,
+            actualCount,
             expectedCount,
             nullptr,
             false);
         if (!witness)
-            recordVariadicPackCountMismatchForSelectedCandidate(constrainedArg, expectedCount);
+            recordVariadicPackCountMismatchForSelectedCandidate(actualCount, expectedCount);
         return witness;
     }
 
@@ -3201,7 +3263,23 @@ private:
             if (!isOrdinarySolverConstraint(constraint))
                 continue;
             if (!constraint.satisfied)
+            {
+                // Capture the focused reason for the selected-candidate path: an
+                // ordinary generic parameter was never determined from the call
+                // (for example a type `T` used only in return position, or a
+                // value `N` not mentioned in any parameter). We record the
+                // parameter declaration here; `CompleteOverloadCandidate` formats
+                // the diagnostic if this candidate is selected. First reason wins.
+                if (m_context.failure &&
+                    m_context.failure->kind == GenericArgumentInferenceFailure::Kind::None &&
+                    constraint.decl)
+                {
+                    auto& notInferred = m_context.failure->setOrdinaryGenericParamNotInferred();
+                    notInferred.member = constraint.decl;
+                    notInferred.location = m_context.applicationLoc;
+                }
                 return false;
+            }
         }
         return true;
     }
@@ -3397,14 +3475,19 @@ bool SemanticsVisitor::TryUnifyVals(
         auto fstParam = getDeclRefIntValIgnoringCasts(fstInt);
         auto sndParam = getDeclRefIntValIgnoringCasts(sndInt);
 
-        bool okay = false;
         if (fstParam)
-            okay |=
-                TryUnifyIntParam(constraints, unificationOptions, fstParam->getDeclRef(), sndInt);
+            TryUnifyIntParam(constraints, unificationOptions, fstParam->getDeclRef(), sndInt);
         if (sndParam)
-            okay |=
-                TryUnifyIntParam(constraints, unificationOptions, sndParam->getDeclRef(), fstInt);
-        return okay;
+            TryUnifyIntParam(constraints, unificationOptions, sndParam->getDeclRef(), fstInt);
+
+        // Direct generic value parameters above can add inference facts such as `N = M + 1`.
+        // Other non-constant integer values are harder: this routine does not solve arithmetic
+        // equations or prove symbolic inequality. For example, `N + 1` and `M + 1` may become
+        // equal after substitution, while `N + 1` and `N + 2` cannot; both are outside what this
+        // inference pass can decide. Since distinct constants were already rejected above, leave
+        // unresolved non-constant pairs to the later checking/proof path instead of rejecting them
+        // here.
+        return true;
     }
 
     if (auto fstWit = as<DeclaredSubtypeWitness>(fst))
@@ -3413,8 +3496,29 @@ bool SemanticsVisitor::TryUnifyVals(
         {
             auto constraintDecl1 = fstWit->getDeclRef().as<TypeConstraintDecl>();
             auto constraintDecl2 = sndWit->getDeclRef().as<TypeConstraintDecl>();
-            SLANG_ASSERT(constraintDecl1);
-            SLANG_ASSERT(constraintDecl2);
+            if (auto genericConstraintDecl1 = constraintDecl1.as<GenericTypeConstraintDecl>())
+            {
+                if (isGenericConstraintParameterDecl(genericConstraintDecl1.getDecl()))
+                    constraints.discoveredWitnessArgs[genericConstraintDecl1.getDecl()] = sndWit;
+            }
+            if (auto genericConstraintDecl2 = constraintDecl2.as<GenericTypeConstraintDecl>())
+            {
+                if (isGenericConstraintParameterDecl(genericConstraintDecl2.getDecl()))
+                    constraints.discoveredWitnessArgs[genericConstraintDecl2.getDecl()] = fstWit;
+            }
+            if (!constraintDecl1 || !constraintDecl2)
+            {
+                return TryUnifyTypes(
+                           constraints,
+                           unificationOptions,
+                           fstWit->getSub(),
+                           sndWit->getSub()) &&
+                       TryUnifyTypes(
+                           constraints,
+                           unificationOptions,
+                           fstWit->getSup(),
+                           sndWit->getSup());
+            }
             return TryUnifyTypes(
                 constraints,
                 unificationOptions,
@@ -3473,6 +3577,17 @@ bool SemanticsVisitor::TryUnifyVals(
 
     if (isDeferredValidationWitness(fst) && isDeferredValidationWitness(snd))
     {
+        if (auto fstPackCountWitness = as<DeclaredVariadicPackCountWitness>(fst))
+        {
+            if (auto sndPackCountWitness = as<DeclaredVariadicPackCountWitness>(snd))
+            {
+                constraints.discoveredWitnessArgs[fstPackCountWitness->getDeclRef().getDecl()] =
+                    sndPackCountWitness;
+                constraints.discoveredWitnessArgs[sndPackCountWitness->getDeclRef().getDecl()] =
+                    fstPackCountWitness;
+            }
+        }
+
         // Validation-only witnesses use the same control flow as ordinary
         // constraints: unification may solve their operands elsewhere, and the
         // generic solver later rebuilds the witness for the substituted

@@ -2709,6 +2709,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         SpvLiteralInteger::from32(2));
                 }
             }
+        case kIROp_UntypedResourceHandleType:
+        case kIROp_UntypedSamplerHandleType:
+            // `lowerUntypedResourceHandleToUInt` rewrites every untyped descriptor-heap handle to
+            // `uint` before emit, so one reaching here is an internal error (a leak from that
+            // pass).
+            SLANG_UNEXPECTED(
+                "untyped descriptor-heap handle type should have been lowered to uint");
         case kIROp_SubpassInputType:
             return ensureSubpassInputType(inst, cast<IRSubpassInputType>(inst));
         case kIROp_TextureType:
@@ -2835,6 +2842,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 registerInst(inst, inner);
                 return inner;
             }
+        case kIROp_CastUIntToUntypedResourceHandle:
+        case kIROp_CastUntypedResourceHandleToUInt:
+        case kIROp_CastUIntToUntypedSamplerHandle:
+        case kIROp_CastUntypedSamplerHandleToUInt:
+            // The untyped descriptor-heap handle wrap/unwrap casts are an internal representation
+            // that `lowerUntypedResourceHandleToUInt` forwards to their `uint` operand and removes
+            // before emit. Reaching this point means that pass did not run, so this is a bug.
+            SLANG_UNEXPECTED(
+                "untyped descriptor-heap handle cast should have been lowered to uint");
         case kIROp_GlobalParam:
             return emitGlobalParam(as<IRGlobalParam>(inst));
         case kIROp_GlobalVar:
@@ -4353,6 +4369,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                 case AddressSpace::StorageBuffer:
                 case AddressSpace::UserPointer:
+                case AddressSpace::Uniform:
                     memoryClass = SpvMemorySemanticsUniformMemoryMask;
                     break;
                 case AddressSpace::Image:
@@ -4679,6 +4696,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
         case AddressSpace::Global:
         case AddressSpace::StorageBuffer:
+        case AddressSpace::Uniform:
         case AddressSpace::UserPointer:
         case AddressSpace::GroupShared:
         case AddressSpace::Image:
@@ -4793,7 +4811,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     /// decorations (member `Offset`s and `ArrayStride`) the payload requires.
     SpvInst* emitAbort(SpvInstParent* parent, IRInst* inst)
     {
-        ensureExtensionDeclaration(toSlice("SPV_KHR_shader_abort"));
+        ensureExtensionDeclaration(toSlice("SPV_KHR_abort"));
         requireSPIRVCapability(SpvCapabilityAbortKHR);
 
         auto message = inst->getOperand(0);
@@ -5080,6 +5098,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 result = inner;
                 break;
             }
+        case kIROp_CastUIntToUntypedResourceHandle:
+        case kIROp_CastUntypedResourceHandleToUInt:
+        case kIROp_CastUIntToUntypedSamplerHandle:
+        case kIROp_CastUntypedSamplerHandleToUInt:
+            // The untyped descriptor-heap handle wrap/unwrap casts are an internal representation
+            // that `lowerUntypedResourceHandleToUInt` forwards to their `uint` operand and removes
+            // before emit. Reaching this point means that pass did not run, so this is a bug.
+            SLANG_UNEXPECTED(
+                "untyped descriptor-heap handle cast should have been lowered to uint");
         case kIROp_CastDescriptorHandleToResource:
             // Convert DescriptorHandle (uint64_t handle) to appropriate resource type
             {
@@ -6360,6 +6387,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             requireSPIRVCapability(SpvCapabilityQuadControlKHR);
             requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeRequireFullQuadsKHR);
             break;
+        case kIROp_Shader64BitIndexingDecoration:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_shader_64bit_indexing"));
+            requireSPIRVCapability(SpvCapabilityShader64BitIndexingEXT);
+            requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeShader64BitIndexingEXT);
+            break;
         case kIROp_SPIRVBufferBlockDecoration:
             {
                 emitOpDecorate(
@@ -6992,6 +7024,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     Dictionary<DescriptorRuntimeArrayKey, SpvInst*> m_descriptorHeapRuntimeArrayTypes;
     bool m_didDiagnoseAccelerationStructureDescriptorHeapStrideTooSmall = false;
 
+    // The single fixed `ArrayStrideIdEXT` stride shared by every resource descriptor-heap runtime
+    // array when `-spirv-unified-descriptor-heap-stride` is set. It is the canonical
+    // `max(sizeof(image descriptor), sizeof(buffer descriptor))` sequence from the
+    // SPV_EXT_descriptor_heap proposal (built by `getUnifiedResourceHeapStride`), not a value
+    // derived from the descriptor types a given shader happens to use: the host packs the resource
+    // heap at this stride over every resource descriptor category, so a shader that references only
+    // one category must still advertise the same stride. Emitted lazily on first use and memoized.
+    SpvInst* m_unifiedResourceHeapStride = nullptr;
+
 
     bool isInstUsedInStage(IRInst* inst, Stage s)
     {
@@ -7163,6 +7204,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return type;
     }
 
+    // Returns whether resource descriptor-heap runtime arrays should advertise a single unified
+    // maximum `ArrayStride` (opt-in via `-spirv-unified-descriptor-heap-stride`). This only affects
+    // the auto stride path, i.e. when `-spirv-resource-heap-stride` is 0. Combining it with a
+    // non-zero `-spirv-resource-heap-stride` is a conflict (the two express contradictory strides),
+    // rejected up front during option processing for the CLI (`OptionsParser` in
+    // `slang-options.cpp`) and re-checked here by `diagnoseConflictingDescriptorHeapStrideOptions`
+    // for the compile-API path; an explicit stride of 0 selects that same auto path, not a
+    // conflict.
+    bool isUnifiedResourceHeapStrideEnabled()
+    {
+        return m_targetProgram->getOptionSet().getBoolOption(
+            CompilerOptionName::SPIRVUnifiedDescriptorHeapStride);
+    }
+
     // Selects the configured heap stride for a non-acceleration-structure descriptor element.
     // Keeping this lookup at the call site makes `getDescriptorRuntimeArrayType` consume only a
     // caller-chosen stride; for example, sampler heaps use `SPIRVSamplerHeapStride`, while
@@ -7179,10 +7234,62 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             CompilerOptionName::SPIRVResourceHeapStride);
     }
 
+    // Emits (once, memoized) the fixed unified resource descriptor-heap stride from the
+    // SPV_EXT_descriptor_heap proposal: the canonical
+    // `max(sizeof(image descriptor), sizeof(buffer descriptor))`, emitted regardless of which
+    // descriptor categories the shader uses. `OpConstantSizeOfEXT` is device-defined, so the
+    // maximum is symbolic: `max(a, b) = Select(UGreaterThan(a, b), a, b)`.
+    SpvInst* getUnifiedResourceHeapStride()
+    {
+        if (m_unifiedResourceHeapStride)
+            return m_unifiedResourceHeapStride;
+
+        IRBuilder builder(m_irModule);
+        builder.setInsertInto(m_irModule->getModuleInst());
+        auto uintType = builder.getUIntType();
+        auto boolType = builder.getBoolType();
+
+        auto imageType = emitOpTypeImage(
+            nullptr,
+            builder.getFloatType(),
+            SpvDim2D,
+            SpvLiteralInteger::from32(ImageOpConstants::unknownDepthImage),
+            SpvLiteralInteger::from32(ImageOpConstants::notArrayed),
+            SpvLiteralInteger::from32(ImageOpConstants::notMultisampled),
+            SpvLiteralInteger::from32(ImageOpConstants::sampledImage),
+            SpvImageFormatUnknown);
+        auto bufferType = ensureDescriptorHeapBufferDescriptorType(SpvStorageClassUniform);
+
+        auto imageSize = emitOpConstantSizeOfEXT(nullptr, uintType, imageType);
+        auto bufferSize = emitOpConstantSizeOfEXT(nullptr, uintType, bufferType);
+        auto imageIsBigger = emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            nullptr,
+            SpvOpSpecConstantOp,
+            boolType,
+            kResultID,
+            SpvOpUGreaterThan,
+            imageSize,
+            bufferSize);
+        m_unifiedResourceHeapStride = emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            nullptr,
+            SpvOpSpecConstantOp,
+            uintType,
+            kResultID,
+            SpvOpSelect,
+            imageIsBigger,
+            imageSize,
+            bufferSize);
+        return m_unifiedResourceHeapStride;
+    }
+
     // Builds or reuses the descriptor runtime array for a specific element type and stride.
-    // A zero stride emits an `ArrayStrideIdEXT` from `OpConstantSizeOfEXT` for descriptor-typed
-    // resources, while acceleration-structure heap entries pass the explicit `uint64` stride
-    // computed by `getAccelerationStructureDescriptorHeapStride`.
+    // A zero stride emits an `ArrayStrideIdEXT`: in unified mode
+    // (`-spirv-unified-descriptor-heap-stride`) every resource heap array shares the single fixed
+    // stride from `getUnifiedResourceHeapStride`; otherwise the stride is this element type's own
+    // `OpConstantSizeOfEXT`. Acceleration-structure heap entries instead pass the explicit `uint64`
+    // stride computed by `getAccelerationStructureDescriptorHeapStride`.
     SpvInst* getDescriptorRuntimeArrayType(SpvInst* descriptorElementType, int arrayStride)
     {
         SLANG_RELEASE_ASSERT(
@@ -7195,8 +7302,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (auto found = m_descriptorHeapRuntimeArrayTypes.tryGetValue(key))
             return *found;
 
+        // In unified mode, every resource descriptor-heap array (anything other than the separate
+        // sampler heap; acceleration-structure heaps never reach the auto path because they pass a
+        // non-zero stride) shares the one fixed maximum stride. Build it before the array so its
+        // `<id>` precedes the array, satisfying the `ArrayStrideIdEXT` operand-ordering rule.
+        const bool isResourceElement = descriptorElementType->opcode != SpvOpTypeSampler;
+        const bool useUnifiedStride =
+            arrayStride == 0 && isResourceElement && isUnifiedResourceHeapStrideEnabled();
+        SpvInst* unifiedStride = useUnifiedStride ? getUnifiedResourceHeapStride() : nullptr;
+
         SpvInst* stride = nullptr;
-        if (arrayStride == 0)
+        if (arrayStride == 0 && !useUnifiedStride)
         {
             IRBuilder builder(m_irModule);
             builder.setInsertInto(m_irModule->getModuleInst());
@@ -7207,13 +7323,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto runtimeArrayType = emitOpTypeRuntimeArray(nullptr, descriptorElementType);
         m_descriptorHeapRuntimeArrayTypes[key] = runtimeArrayType;
 
-        if (stride)
+        SpvInst* strideId = useUnifiedStride ? unifiedStride : stride;
+        if (strideId)
         {
             emitOpDecorateArrayStrideIdEXT(
                 getSection(SpvLogicalSectionID::Annotations),
                 nullptr,
                 runtimeArrayType,
-                stride);
+                strideId);
         }
         else
         {
@@ -7224,6 +7341,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 SpvLiteralInteger::from32(arrayStride));
         }
         return runtimeArrayType;
+    }
+
+    // Diagnoses the `-spirv-resource-heap-stride` / `-spirv-unified-descriptor-heap-stride`
+    // conflict for the compile-API path. The CLI rejects this at option-parse time (`OptionsParser`
+    // in `slang-options.cpp`), which aborts before emission; but options set directly through the
+    // public compile API do not flow through that parser, so this re-checks at emit time and fails
+    // loudly rather than silently honoring the explicit stride. The condition matches the parser:
+    // unified enabled and a non-zero `SPIRVResourceHeapStride` (an explicit 0 selects the default
+    // `OpConstantSizeOfEXT` path the unified option modifies, so it is not a conflict).
+    void diagnoseConflictingDescriptorHeapStrideOptions()
+    {
+        if (isUnifiedResourceHeapStrideEnabled() &&
+            m_targetProgram->getOptionSet().getIntOption(
+                CompilerOptionName::SPIRVResourceHeapStride) != 0)
+        {
+            m_sink->diagnose(Diagnostics::SpirvConflictingDescriptorHeapStrideOptions{});
+        }
     }
 
     int getAccelerationStructureDescriptorHeapStride()
@@ -9182,7 +9316,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             // Float to bool cast.
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
-            auto zero = builder.getIntValue(fromType, 0);
+            auto zero = builder.getFloatValue(fromType, 0.0);
             if (auto vecType = as<IRVectorType>(toTypeV))
             {
                 auto zeroV =
@@ -10075,8 +10209,59 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
 
+    // Return true when floating-point contraction must be disabled for `inst`, i.e.
+    // the effective floating-point mode is `Precise`. The mode comes from the global
+    // `-fp-mode` option, but a function may override it via
+    // `IRFloatingPointModeOverrideDecoration` (e.g. auto-diff forces `Fast` on the
+    // derivative functions it generates), so an inst inside such a function honors the
+    // function's mode rather than the global one.
+    bool isFloatingPointModePrecise(IRInst* inst)
+    {
+        auto mode = m_targetProgram->getOptionSet().getFloatingPointMode();
+        if (auto func = getParentFunc(inst))
+        {
+            if (auto fpModeDecor = func->findDecoration<IRFloatingPointModeOverrideDecoration>())
+                mode = fpModeDecor->getFloatingPointMode();
+        }
+        return mode == FloatingPointMode::Precise;
+    }
+
+    // Under precise floating-point mode, decorate an emitted floating-point arithmetic
+    // instruction with `NoContraction` so the driver may not fuse it (e.g. into an FMA)
+    // or otherwise reassociate the computation -- this is what makes `-fp-mode precise`
+    // meaningful on the direct SPIR-V path (issue #11933). `NoContraction` is only valid
+    // on floating-point arithmetic opcodes, so we gate on the opcode actually emitted:
+    // integer/bitwise/logical ops and floating-point comparisons route through the same
+    // IR arithmetic path but emit other opcodes and are correctly skipped. Callers must
+    // pass only per-element arithmetic results; the `OpCompositeConstruct` that
+    // reassembles a matrix from its rows is not a valid target and is decorated nowhere.
+    void maybeEmitNoContraction(bool isPrecise, SpvInst* result)
+    {
+        if (!isPrecise || !result)
+            return;
+        switch (result->opcode)
+        {
+        case SpvOpFAdd:
+        case SpvOpFSub:
+        case SpvOpFMul:
+        case SpvOpFDiv:
+        case SpvOpFRem:
+        case SpvOpFNegate:
+        case SpvOpVectorTimesScalar:
+            emitOpDecorate(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                getID(result),
+                SpvDecorationNoContraction);
+            break;
+        default:
+            break;
+        }
+    }
+
     SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
     {
+        const bool isPrecise = isFloatingPointModePrecise(inst);
         if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
         {
             auto rowCount = getIntVal(matrixType->getRowCount());
@@ -10102,13 +10287,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         operands.add(originalOperand);
                     }
                 }
-                rows.add(emitVectorOrScalarArithmetic(
+                auto rowResult = emitVectorOrScalarArithmetic(
                     parent,
                     nullptr,
                     rowVectorType,
                     inst->getOp(),
                     inst->getOperandCount(),
-                    operands.getArrayView()));
+                    operands.getArrayView());
+                maybeEmitNoContraction(isPrecise, rowResult);
+                rows.add(rowResult);
             }
             return emitCompositeConstruct(parent, inst, inst->getDataType(), rows);
         }
@@ -10116,13 +10303,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         Array<IRInst*, 4> operands;
         for (UInt i = 0; i < inst->getOperandCount(); i++)
             operands.add(inst->getOperand(i));
-        return emitVectorOrScalarArithmetic(
+        auto result = emitVectorOrScalarArithmetic(
             parent,
             inst,
             inst->getDataType(),
             inst->getOp(),
             inst->getOperandCount(),
             operands.getView());
+        maybeEmitNoContraction(isPrecise, result);
+        return result;
     }
 
     SpvInst* emitDebugLine(SpvInstParent* parent, IRDebugLine* debugLine)
@@ -11874,6 +12063,8 @@ SlangResult emitSPIRVFromIR(
             parent->addInst(spvPtrType);
         }
     } while (context.m_forwardDeclaredPointers.getCount() != 0);
+
+    context.diagnoseConflictingDescriptorHeapStrideOptions();
 
     // Emit extensions and capabilities for which there are multiple options available.
     // This is delayed to avoid emitting unnecessary extensions and capabilities if

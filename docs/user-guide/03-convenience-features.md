@@ -329,7 +329,7 @@ int test()
     return rs.val; // returns 3.
 }
 ```
-Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators is not supported.
+Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `+`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators is not supported.
 
 In addition, you can overload operator `()` as a member method:
 ```csharp
@@ -634,6 +634,33 @@ void main()
 }
 ```
 
+### Direct Descriptor-Heap Indexing
+
+For source compatibility with HLSL Shader Model 6.6, Slang also accepts `ResourceDescriptorHeap[index]`
+and `SamplerDescriptorHeap[index]` directly as *input* syntax. Indexing either heap yields an untyped
+handle whose concrete type is recovered from the assignment target, so you can write:
+
+```slang
+[numthreads(1,1,1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    // Recover the resource/sampler type from the declared variable type:
+    Texture2D    t = ResourceDescriptorHeap[tid.x];
+    SamplerState s = SamplerDescriptorHeap[tid.y];
+
+    // Or recover a `DescriptorHandle<T>` (equivalently `T.Handle`):
+    Texture2D.Handle th = ResourceDescriptorHeap[tid.x];
+}
+```
+
+`ResourceDescriptorHeap` only converts to resource (CBV/SRV/UAV) types and `SamplerDescriptorHeap` only
+to sampler types; a heap-family mismatch (for example `SamplerState s = ResourceDescriptorHeap[i];`, or
+`Texture2D.Handle th = SamplerDescriptorHeap[j];`) is a compile error. The recovered value rides the
+existing `DescriptorHandle<T>` lowering, so this syntax is available on the same targets as the
+`DescriptorHandle<T>` representation it builds — HLSL, SPIR-V, GLSL, and WGSL — and lowers through the
+bindless path described below. On targets where that representation is unavailable (Metal, CUDA, CPU),
+using the syntax is diagnosed at compile time, exactly as explicit `DescriptorHandle<T>` construction is.
+
 By default, when targeting HLSL, `DescriptorHandle<T>` translates to uses of `ResourceDescriptorHeap[index]` and `SamplerDescriptorHeap[index]`.
 In particular, when combined with combined texture sampler types (e.g. `Sampler2D`), Slang will fetch the texture using the first
 component of the handle, and the sampler state from the second component of the handle. For example:
@@ -705,6 +732,14 @@ heap as an array of the requested resource type, whose stride is defined by the 
 from the `OpConstantSizeOfEXT` instruction. The user can override this behavior and specify a different
 stride with the `-spirv-resource-heap-stride` or `-spirv-sampler-heap-stride` compiler options. For
 acceleration-structure entries, an explicit resource heap stride must be at least 8 bytes.
+
+Alternatively, the `-spirv-unified-descriptor-heap-stride` option makes every resource descriptor-heap
+runtime array use a single shared stride equal to the maximum of the image and buffer descriptor sizes,
+so a heap that holds both buffers and images is indexed at the device's unified stride regardless of which
+descriptor type a particular shader accesses. This affects only the default `OpConstantSizeOfEXT` path
+(used when `-spirv-resource-heap-stride` is 0), so it is mutually exclusive with a non-zero
+`-spirv-resource-heap-stride` (combining the two is an error). The sampler heap and acceleration-structure
+entries are unaffected.
 
 > **Note on `RaytracingAccelerationStructure`:** When the `spvDescriptorHeapEXT` capability is active and
 > a `DescriptorHandle<RaytracingAccelerationStructure>` is dereferenced, Slang loads a 64-bit device address

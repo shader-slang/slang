@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:21:40Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 84097e639319e025582296c205ef440d38bd023139ac79f25b4042f2e2d3f2d4
+generated_at: 2026-06-29T18:20:41Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 720cbadffe0ddbcfd07c03b208f3f7cbad55f384b2abb3ca09da30eb7d155f95
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -37,10 +37,10 @@ the pipeline.
 | Metal Shading Language | `SLANG_METAL`, `SLANG_METAL_LIB`, `SLANG_METAL_LIB_ASM` | MSL text, Metal library, Metal library assembly | [slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp) (`*_LIB`/`*_LIB_ASM` go through Metal's downstream tools) |
 | WGSL | `SLANG_WGSL`, `SLANG_WGSL_SPIRV`, `SLANG_WGSL_SPIRV_ASM` | WGSL text, plus SPIR-V binary/assembly produced via WGSL | [slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp) |
 | C++ shader | `SLANG_CPP_SOURCE`, `SLANG_C_SOURCE`, `SLANG_CPP_HEADER` | C/C++ text linked against `slang-rt`; header variant emits a declarations-only file | [slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp) |
-| C++ host | `SLANG_HOST_CPP_SOURCE`, `SLANG_HOST_HOST_CALLABLE`, `SLANG_HOST_SHARED_LIBRARY`, `SLANG_SHADER_HOST_CALLABLE`, `SLANG_HOST_EXECUTABLE`, `SLANG_SHADER_SHARED_LIBRARY`, `SLANG_HOST_OBJECT_CODE`, `SLANG_OBJECT_CODE` | Host-side C++ source, callable code, shared libraries, executables, and object code | [slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp) (binaries are downstream-compiled) |
+| C++ host | `SLANG_HOST_CPP_SOURCE` | Host-side C++ source | [slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp) |
 | CUDA | `SLANG_CUDA_SOURCE`, `SLANG_PTX`, `SLANG_CUDA_OBJECT_CODE`, `SLANG_CUDA_HEADER` | CUDA text, PTX, object code, header | [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp) (PTX and object code via NVRTC / nvcc) |
 | Torch glue | `SLANG_CPP_PYTORCH_BINDING` | C++ PyTorch binding | [slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp) |
-| LLVM | `SLANG_HOST_LLVM_IR`, `SLANG_SHADER_LLVM_IR` | Native or LLVM-IR via `slang-llvm` | [slang-emit-llvm.cpp](../../../../source/slang/slang-emit-llvm.cpp) |
+| CPU binaries / host-callable | `SLANG_HOST_HOST_CALLABLE`, `SLANG_SHADER_HOST_CALLABLE`, `SLANG_HOST_OBJECT_CODE`, `SLANG_OBJECT_CODE`, `SLANG_HOST_SHARED_LIBRARY`, `SLANG_SHADER_SHARED_LIBRARY`, `SLANG_HOST_EXECUTABLE`, `SLANG_HOST_LLVM_IR`, `SLANG_SHADER_LLVM_IR` | LLVM-IR, object code, JIT-callable code, shared libraries, executables | [slang-emit-llvm.cpp](../../../../source/slang/slang-emit-llvm.cpp) via `emitLLVMForEntryPoints` when `isCPUTargetViaLLVM`; otherwise routed to a downstream C++ compiler from [slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp) |
 | VM | `SLANG_HOST_VM` | Slang interpreter bytecode | [slang-emit-vm.cpp](../../../../source/slang/slang-emit-vm.cpp) |
 | Slang round-trip | (no dedicated public target; used internally) | Re-emit Slang source | [slang-emit-slang.cpp](../../../../source/slang/slang-emit-slang.cpp) |
 
@@ -143,9 +143,22 @@ document does not duplicate it.
 A `///` doc-comment immediately preceding a `def` or `alias` in the
 `.capdef` is harvested into the auto-generated capability reference
 mentioned at the top of the file
-(`a3-02-reference-capability-atoms.md`). Comments interrupted by a
+(`a4-02-reference-capability-atoms.md`). Comments interrupted by a
 plain `//` line are dropped (per the rules near the top of
 [slang-capabilities.capdef](../../../../source/slang/slang-capabilities.capdef)).
+
+Aliases tagged `[Compound]` in those comments are the names the
+front-end uses to gate a user-visible builtin or operation against
+the active target/stage. For example `abort` expands to
+`GL_EXT_shader_abort` (GLSL `abortEXT` / SPIR-V `OpAbortKHR`), and
+`rayquery_sphere_nv` / `rayquery_lss_nv` each disjoin the per-target
+support for the NV sphere / linear-swept-spheres ray-query accessors
+(GLSL `_GL_NV_linear_swept_spheres`, HLSL/NVAPI `_sm_6_3`, or SPIR-V
+`spvRayQueryKHR` combined with the matching geometry capability). The
+restriction of `subgroup_workgroup_index` (the `WaveGetWaveIndex` /
+`WaveGetNumWaves` queries) to compute-class stages on GLSL / SPIR-V is
+likewise encoded as a compound alias, so misuse is rejected by the
+capability system rather than producing invalid output.
 
 ## Profiles
 

@@ -300,11 +300,9 @@ def _fetch_runs_window(
     )
 
     if err:
-        print(
-            f"  Warning: API error for {from_str}..{to_str}: {err}",
-            file=sys.stderr,
+        raise DataCompletenessError(
+            f"API error while fetching workflow runs for {from_str}..{to_str}: {err}"
         )
-        return []
 
     if not runs:
         return []

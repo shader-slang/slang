@@ -9,6 +9,9 @@
 #include "slang-compiler.h"
 #include "slang-visitor.h"
 
+#include <cstring>
+#include <type_traits>
+
 namespace Slang
 {
 template<typename P, typename... Args>
@@ -195,15 +198,24 @@ struct BasicTypeKeyPair
 };
 
 // Focused failure data produced while a generic candidate is still being
-// inferred. `inferGenericArguments` fills this optional record, and
-// `CompleteOverloadCandidate` emits it only if overload resolution selects that
-// failed generic candidate.
+// inferred. The generic solver fills this optional record with the first
+// concrete reason a candidate failed, and `CompleteOverloadCandidate` formats
+// it into a focused diagnostic only if overload resolution selects that failed
+// candidate. Each `Kind` captures just the offending fields (counts, a
+// parameter name, or the substituted sub/super types) at the failure site;
+// the more expensive diagnostic formatting is deferred to the selected-
+// candidate path so speculative candidates never pay for it.
 struct GenericArgumentInferenceFailure
 {
     enum class Kind
     {
         None,
         VariadicPackCountMismatch,
+        GenericArityMismatch,
+        OrdinaryGenericParamNotInferred,
+        InterfaceConformanceNotSatisfied,
+        GenericConstraintNotSatisfied,
+        GenericParamUnificationConflict,
     };
 
     struct VariadicPackCountMismatch
@@ -213,32 +225,153 @@ struct GenericArgumentInferenceFailure
         int64_t actualCount = 0;
     };
 
+    // The call supplied a number of value arguments that the generic function's
+    // parameter list could not match, so argument-to-parameter matching failed
+    // before any inference could run.
+    struct GenericArityMismatch
+    {
+        SourceLoc location = SourceLoc();
+        Int expectedParamCount = 0;
+        Int actualArgCount = 0;
+    };
+
+    // An ordinary generic parameter (such as a type `T` that appears only in
+    // return position, or a value `N` not mentioned in any parameter) was never
+    // determined from the call, so its solver constraint stayed unsatisfied.
+    // The parameter declaration itself is stored (not just its name) so the
+    // diagnostic can use the full declaration (name, type-vs-value kind, loc).
+    struct OrdinaryGenericParamNotInferred
+    {
+        SourceLoc location = SourceLoc();
+        Decl* member = nullptr;
+    };
+
+    // A source generic constraint `T : IFoo` could not be discharged: the
+    // inferred argument for `T` (`subType`) does not conform to the required
+    // interface (`supType`). The capture site records these only once both are
+    // concrete (its `hasUnreadyDependenciesForVal` guard), so they are always
+    // fully substituted under the current (failed) specialization when read.
+    struct InterfaceConformanceNotSatisfied
+    {
+        SourceLoc location = SourceLoc();
+        Type* subType = nullptr;
+        Type* supType = nullptr;
+    };
+
+    // A source generic constraint that is not an interface conformance could not
+    // be satisfied — the general fallback for every constraint kind handled by
+    // the witness solver other than conformance (today: equality `where T == X`,
+    // type coercion `where U(T)`, non-empty pack `where nonempty(P)`, ...).
+    // `constraintDecl` is the source constraint declaration, rendered to a
+    // readable form (e.g. `T == int`, `T : IFoo`, `int(T)`) by
+    // `ASTPrinter::getGenericConstraintString`; `constraintLoc` anchors a
+    // "see declaration" note. The declaration is captured (not a pre-rendered
+    // string) so formatting stays deferred to `CompleteOverloadCandidate`.
+    struct GenericConstraintNotSatisfied
+    {
+        SourceLoc location = SourceLoc();
+        Decl* constraintDecl = nullptr;
+        SourceLoc constraintLoc = SourceLoc();
+    };
+
+    // Two ordinary constraints inferred conflicting arguments for one generic
+    // parameter (e.g. `foo<T>(T, T)` with unrelated `A`/`B`, or `foo<let N:int>`
+    // required to be both `4` and `8`). Captures the parameter declaration and
+    // both candidate values; `Val*` covers both type parameters (the candidates
+    // are `Type`s) and value parameters (the candidates are `IntVal`s).
+    struct GenericParamUnificationConflict
+    {
+        SourceLoc location = SourceLoc();
+        Decl* paramDecl = nullptr;
+        Val* firstVal = nullptr;
+        Val* secondVal = nullptr;
+    };
+
     Kind kind = Kind::None;
     union
     {
         VariadicPackCountMismatch variadicPackCountMismatch;
+        GenericArityMismatch genericArityMismatch;
+        OrdinaryGenericParamNotInferred ordinaryGenericParamNotInferred;
+        InterfaceConformanceNotSatisfied interfaceConformanceNotSatisfied;
+        GenericConstraintNotSatisfied genericConstraintNotSatisfied;
+        GenericParamUnificationConflict genericParamUnificationConflict;
     };
 
-    GenericArgumentInferenceFailure()
-        : variadicPackCountMismatch()
-    {
-    }
+    // Every payload must be trivially copyable: that is what lets this struct
+    // use the implicitly-defaulted (trivial) copy/assignment, which copies the
+    // whole object representation instead of switching on `kind` to copy only
+    // the active member. A kind-switched copy performs conditional reads of
+    // individual payload fields, which GCC's -Werror=maybe-uninitialized
+    // rejects (it cannot prove the read member is the initialized one) once
+    // `OverloadCandidate` values are copied inside standard-library
+    // algorithms. Trivial copyability also implies trivial destructibility,
+    // which is what makes the placement-new in the `set*()` members (which
+    // never destroy the previously active member first) well-defined.
+    static_assert(
+        std::is_trivially_copyable_v<VariadicPackCountMismatch> &&
+            std::is_trivially_copyable_v<GenericArityMismatch> &&
+            std::is_trivially_copyable_v<OrdinaryGenericParamNotInferred> &&
+            std::is_trivially_copyable_v<InterfaceConformanceNotSatisfied> &&
+            std::is_trivially_copyable_v<GenericConstraintNotSatisfied> &&
+            std::is_trivially_copyable_v<GenericParamUnificationConflict>,
+        "GenericArgumentInferenceFailure payloads must be trivially copyable");
 
-    GenericArgumentInferenceFailure(GenericArgumentInferenceFailure const& other)
-        : kind(other.kind), variadicPackCountMismatch(other.variadicPackCountMismatch)
-    {
-    }
+    // Zero the tag and the full union storage so every byte of the object is
+    // initialized from birth and the trivial copy above never reads an
+    // indeterminate byte. `Kind::None` is value zero, so the zeroed tag is the
+    // correct "no failure recorded" state; assert that so a reordering of the
+    // enum cannot silently break this constructor.
+    static_assert(int(Kind::None) == 0, "zero-initialized tag must mean Kind::None");
+    GenericArgumentInferenceFailure() { std::memset(static_cast<void*>(this), 0, sizeof(*this)); }
 
-    GenericArgumentInferenceFailure& operator=(GenericArgumentInferenceFailure const& other)
+    // Select a union variant and return a reference for the caller to populate.
+    // Each setter begins the chosen member's lifetime with placement-new and
+    // updates `kind` in lockstep, so the invariant "`kind` names the live union
+    // member" holds by construction at every capture site. The previously
+    // active member is trivially destructible, so it needs no explicit
+    // destruction before the new member is constructed in place.
+    VariadicPackCountMismatch& setVariadicPackCountMismatch()
     {
-        kind = other.kind;
-        variadicPackCountMismatch = other.variadicPackCountMismatch;
-        return *this;
+        kind = Kind::VariadicPackCountMismatch;
+        return *new (&variadicPackCountMismatch) VariadicPackCountMismatch();
+    }
+    GenericArityMismatch& setGenericArityMismatch()
+    {
+        kind = Kind::GenericArityMismatch;
+        return *new (&genericArityMismatch) GenericArityMismatch();
+    }
+    OrdinaryGenericParamNotInferred& setOrdinaryGenericParamNotInferred()
+    {
+        kind = Kind::OrdinaryGenericParamNotInferred;
+        return *new (&ordinaryGenericParamNotInferred) OrdinaryGenericParamNotInferred();
+    }
+    InterfaceConformanceNotSatisfied& setInterfaceConformanceNotSatisfied()
+    {
+        kind = Kind::InterfaceConformanceNotSatisfied;
+        return *new (&interfaceConformanceNotSatisfied) InterfaceConformanceNotSatisfied();
+    }
+    GenericConstraintNotSatisfied& setGenericConstraintNotSatisfied()
+    {
+        kind = Kind::GenericConstraintNotSatisfied;
+        return *new (&genericConstraintNotSatisfied) GenericConstraintNotSatisfied();
+    }
+    GenericParamUnificationConflict& setGenericParamUnificationConflict()
+    {
+        kind = Kind::GenericParamUnificationConflict;
+        return *new (&genericParamUnificationConflict) GenericParamUnificationConflict();
     }
 };
 
+// The zero-filling constructor and the implicitly-defaulted copy operations
+// above rely on the whole type — not just each payload — being trivially
+// copyable; assert it so a user-provided copy operation or a non-trivial
+// member cannot be reintroduced without failing the build.
+static_assert(
+    std::is_trivially_copyable_v<GenericArgumentInferenceFailure>,
+    "GenericArgumentInferenceFailure must be trivially copyable");
+
 DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal);
-bool arePackCountExpectedCountsEqual(ASTBuilder* astBuilder, IntVal* left, IntVal* right);
 
 struct OverloadCandidate
 {
@@ -2135,7 +2268,7 @@ public:
         RefPtr<WitnessTable> witnessTable);
 
     bool doesTypeSatisfyConstraintRequirements(
-        DeclRef<ContainerDecl> requiredAssociatedTypeDeclRef,
+        DeclRef<ContainerDecl> requirementDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
     bool doesTypeSatisfyAssociatedTypeRequirement(
@@ -2301,8 +2434,18 @@ public:
         RefPtr<WitnessTable> witnessTable,
         MethodWitnessSynthesisFailureDetails* outFailureDetails = nullptr);
 
-    /// Clone generic containers.
-    DeclRef<Decl> liftDeclFromGenericContainers(Decl* decl, SubstitutionSet& outSubst);
+    /// Clone the generic containers that make `decl` well-scoped after relocation.
+    ///
+    /// Generated interface requirements can be moved from a callable's local generic context to a
+    /// sibling requirement on the interface. This clones the enclosing generic signatures, rewrites
+    /// references from the source binders to the cloned binders, and returns a decl-ref that maps
+    /// the source environment to the relocated declaration. `destinationParentDecl` lets callers
+    /// place the cloned generic chain under the semantic owner that should contain the generated
+    /// declaration.
+    DeclRef<Decl> liftDeclFromGenericContainers(
+        Decl* decl,
+        SubstitutionSet& outSubst,
+        ContainerDecl* destinationParentDecl = nullptr);
 
     enum SynthesisPattern
     {
@@ -2672,9 +2815,25 @@ public:
 
     DeclRef<Decl> getRequirementAsLookedUpDecl(ASTBuilder* astBuilder, Decl* decl);
 
+    /// Calculate the builtin differentiable function interface type for a callable-as-type.
+    ///
+    /// The plain overloads derive the type-info witness from `baseFuncAsType`. The
+    /// `WithWitness` overloads are used when conformance checking already selected a specific
+    /// witness, so the computed interface type stays tied to that proof instead of re-synthesizing
+    /// a different one.
     FuncType* getCalculatedDiffFuncType(const char* magicCalcName, Type* baseFuncAsType)
     {
         Val* args[] = {baseFuncAsType, getDiffTypeInfoWitness(baseFuncAsType)};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, typeInfoWitness};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2689,6 +2848,17 @@ public:
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
 
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* operand1,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, operand1, typeInfoWitness};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
     FuncType* getCalculatedDiffFuncType(
         const char* magicCalcName,
         Type* baseFuncAsType,
@@ -2696,6 +2866,18 @@ public:
         Type* operand2)
     {
         Val* args[] = {baseFuncAsType, operand1, operand2, getDiffTypeInfoWitness(baseFuncAsType)};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* operand1,
+        Type* operand2,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, operand1, operand2, typeInfoWitness};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2890,6 +3072,22 @@ public:
         // joining. The generic solver drains and clears this list whenever it
         // needs to pull newly discovered constraints into the iterative loop.
         ShortList<SolverConstraint, 8> discoveredConstraints;
+
+        // Hidden witness arguments discovered while unifying full generic-app
+        // decl-refs. Consider this example:
+        //
+        //     interface ITensor<T, int D>
+        //     {
+        //         T load<each TIndex>(TIndex indices)
+        //             where TIndex == int
+        //             where countof(TIndex) == D;
+        //     }
+        //
+        // A use site for this requirement already carries proof arguments for `load`'s source
+        // generic constraints. When that lookup resolves to a satisfying method, the solver should
+        // preserve those proof arguments instead of recomputing them from default declaration
+        // context.
+        Dictionary<Decl*, Val*> discoveredWitnessArgs;
 
         // Additional subtype witnesses available to the current constraint solving context.
         Type* subTypeForAdditionalWitnesses = nullptr;
@@ -3567,8 +3765,12 @@ public:
         ASTBuilder* astBuilder,
         DeclRef<InterfaceDecl> interfaceDeclRef);
 
-    bool doesCalleeHaveFwdDiff(DeclRef<CallableDecl> declRef);
-    bool doesCalleeHaveBwdDiff(DeclRef<CallableDecl> declRef);
+    // Differentiability of a function is represented by conformance of the function-as-type to
+    // `IForwardDifferentiable`/`IBackwardDifferentiable`. Query that conformance directly instead
+    // of probing for the `fwd_diff`/`bwd_diff` associated-function entries; those entries are
+    // witnesses produced by the conformance, not the source of truth.
+    SubtypeWitness* isFuncForwardDifferentiable(DeclRef<CallableDecl> declRef);
+    SubtypeWitness* isFuncBackwardDifferentiable(DeclRef<CallableDecl> declRef);
 };
 
 
@@ -3665,6 +3867,7 @@ public:
     CASE(ExtractExistentialValueExpr)
     CASE(OpenRefExpr)
     CASE(MakeOptionalExpr)
+    CASE(CastOptionalExpr)
     CASE(PartiallyAppliedGenericExpr)
     CASE(PackExpr)
 #undef CASE
@@ -3990,13 +4193,13 @@ Witness* findNonEmptyPackWitnessForConstraint(
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError);
 
-// Return the witness that proves `countof(constrainedArg) == expectedCount`,
-// or `nullptr` if the concrete count or an in-scope declared constraint cannot
-// prove that equality.
+// Return the witness that proves `actualCount == expectedCount`, or `nullptr`
+// if the concrete count or an in-scope declared constraint cannot prove that
+// equality.
 Witness* findVariadicPackCountWitnessForConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
-    Val* constrainedArg,
+    IntVal* actualCount,
     IntVal* expectedCount,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError);

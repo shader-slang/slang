@@ -171,5 +171,6 @@ typedef bool (*glslang_DisassembleSPIRVWithResultFunc)(
     const uint32_t* contents,
     int contentsSize,
     char** outString);
+typedef void (*glslang_FreeDisassemblyFunc)(char* disassembly);
 typedef int (*glslang_LinkSPIRVFunc)(glslang_LinkRequest* request);
 #endif

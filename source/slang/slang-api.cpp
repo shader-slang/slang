@@ -1,6 +1,7 @@
 // slang-api.cpp
 
 #include "../compiler-core/slang-artifact-associated-impl.h"
+#include "../core/slang-builtin-module-cache.h"
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-platform.h"
 #include "../core/slang-rtti-info.h"
@@ -53,18 +54,16 @@ SlangResult tryLoadBuiltinModuleFromCache(
         return SLANG_FAIL;
     }
     Slang::ScopedAllocation cacheData;
-    SLANG_RETURN_ON_FAIL(Slang::File::readAllBytes(cacheFileName, cacheData));
-
-    // The first 8 bytes stores the timestamp of the slang dll that created this core module cache.
-    if (cacheData.getSizeInBytes() < sizeof(uint64_t))
-        return SLANG_FAIL;
-    auto cacheTimestamp = *(uint64_t*)(cacheData.getData());
-    if (cacheTimestamp != currentLibTimestamp)
-        return SLANG_FAIL;
-    SLANG_RETURN_ON_FAIL(globalSession->loadBuiltinModule(
-        builtinModuleName,
-        (uint8_t*)cacheData.getData() + sizeof(uint64_t),
-        cacheData.getSizeInBytes() - sizeof(uint64_t)));
+    const void* moduleData = nullptr;
+    size_t moduleSize = 0;
+    SLANG_RETURN_ON_FAIL(Slang::BuiltinModuleCache::read(
+        cacheFileName,
+        currentLibTimestamp,
+        cacheData,
+        moduleData,
+        moduleSize));
+    SLANG_RETURN_ON_FAIL(
+        globalSession->loadBuiltinModule(builtinModuleName, moduleData, moduleSize));
     return SLANG_OK;
 }
 
@@ -144,13 +143,11 @@ SlangResult trySaveBuiltinModuleToCache(
             SLANG_ARCHIVE_TYPE_RIFF_LZ4,
             coreModuleBlobPtr.writeRef()));
 
-        Slang::FileStream fileStream;
-        SLANG_RETURN_ON_FAIL(fileStream.init(cacheFilename, Slang::FileMode::Create));
-
-        SLANG_RETURN_ON_FAIL(fileStream.write(&dllTimestamp, sizeof(dllTimestamp)));
-        SLANG_RETURN_ON_FAIL(fileStream.write(
+        SLANG_RETURN_ON_FAIL(Slang::BuiltinModuleCache::write(
+            cacheFilename,
+            dllTimestamp,
             coreModuleBlobPtr->getBufferPointer(),
-            coreModuleBlobPtr->getBufferSize()))
+            coreModuleBlobPtr->getBufferSize()));
     }
 
     return SLANG_OK;
@@ -1002,16 +999,18 @@ SLANG_API SlangResult spExtractRepro(
     DiagnosticSink sink;
     sink.init(nullptr, nullptr);
 
-    List<uint8_t> buffer;
-    {
-        MemoryStreamBase memoryStream(FileAccess::Read, reproData, reproDataSize);
-        SLANG_RETURN_ON_FAIL(ReproUtil::loadState(&memoryStream, &sink, buffer));
-    }
+    ComPtr<ISlangBlob> reproBlob;
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(
+        static_cast<const uint8_t*>(reproData),
+        reproDataSize,
+        &sink,
+        reproBlob.writeRef()));
 
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
-    ReproUtil::RequestState* requestState = ReproUtil::getRequest(buffer);
+    ReproUtil::RequestState* requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
     return ReproUtil::extractFiles(base, requestState, fileSystem);
 }
 
@@ -1029,14 +1028,17 @@ SLANG_API SlangResult spLoadReproAsFileSystem(
     DiagnosticSink sink;
     sink.init(nullptr, nullptr);
 
-    MemoryStreamBase stream(FileAccess::Read, reproData, reproDataSize);
+    ComPtr<ISlangBlob> reproBlob;
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(
+        static_cast<const uint8_t*>(reproData),
+        reproDataSize,
+        &sink,
+        reproBlob.writeRef()));
 
-    List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(&stream, &sink, buffer));
-
-    auto requestState = ReproUtil::getRequest(buffer);
+    auto requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
     ComPtr<ISlangFileSystemExt> fileSystem;
     SLANG_RETURN_ON_FAIL(

@@ -189,6 +189,15 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
         if (kv.key == CompilerOptionName::CoverageManifestOutput)
             continue;
 
+        // This is a load-time acceptance-policy knob, not generated shader code: it only decides
+        // whether loadModule runs isBinaryModuleUpToDate. There is no CLI spelling for it, so an
+        // offline `slangc -o *.slang-module` bakes a digest with the flag absent; a loader that
+        // enables it (its sole purpose) would otherwise fold it into the recompute and never match
+        // that baked digest, making the freshness check unable to accept any default-compiled
+        // module (issue #6557). Excluding it keeps the write/read digest symmetric.
+        if (kv.key == CompilerOptionName::UseUpToDateBinaryModule)
+            continue;
+
         builder.append(kv.key);
         builder.append(kv.value.getCount());
         for (auto& v : kv.value)
@@ -216,6 +225,7 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::DisableWarning:
     case CompilerOptionName::DisableWarnings:
     case CompilerOptionName::EnableWarning:
+    case CompilerOptionName::WarningLevel:
     case CompilerOptionName::Capability:
     case CompilerOptionName::DownstreamArgs:
     case CompilerOptionName::VulkanBindShift:
@@ -430,6 +440,24 @@ void applySettingsToDiagnosticSink(
                 Severity::Warning,
                 Severity::Error);
     }
+    // Enable each requested warning group (-Wall/-Wextra/-Wpedantic). These are additive, so a
+    // diagnostic tagged with any enabled group becomes visible. `intValue` is embedder-controlled
+    // through the public WarningLevel option, so validate it here at the API boundary and ignore
+    // anything outside the known groups (Default is the always-on baseline and needs no enabling).
+    auto warningLevelArray = options.getArray(CompilerOptionName::WarningLevel);
+    for (auto& element : warningLevelArray)
+    {
+        switch (element.intValue)
+        {
+        case SLANG_WARNING_LEVEL_ALL:
+        case SLANG_WARNING_LEVEL_EXTRA:
+        case SLANG_WARNING_LEVEL_PEDANTIC:
+            targetSink->enableWarningLevel((WarningLevel)element.intValue);
+            break;
+        default:
+            break;
+        }
+    }
     if (options.shouldEmitRichDiagnostics())
     {
         targetSink->setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
@@ -439,9 +467,16 @@ void applySettingsToDiagnosticSink(
         targetSink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
     }
 
-    // Handle diagnostic color setting
-    // The sink will handle AUTO by checking writer->isConsole()
-    targetSink->setDiagnosticColorMode(
-        (SlangDiagnosticColor)options.getIntOption(CompilerOptionName::DiagnosticColor));
+    // Handle diagnostic color setting.
+    // A sink may have settings applied from several option sets in sequence (e.g. a linkage option
+    // set followed by a component-type option set). Only apply the color mode when this set
+    // actually carries the option, so a set that does not specify it does not overwrite a mode a
+    // prior set already applied (which would reset it to the AUTO default).
+    // The sink will handle AUTO by checking writer->isConsole().
+    if (options.hasOption(CompilerOptionName::DiagnosticColor))
+    {
+        targetSink->setDiagnosticColorMode(
+            (SlangDiagnosticColor)options.getIntOption(CompilerOptionName::DiagnosticColor));
+    }
 }
 } // namespace Slang
