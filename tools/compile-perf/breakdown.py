@@ -556,7 +556,8 @@ def _workload_source(spec, head=40, tail=40, ctx=40):
     return n, out
 
 
-def write_workload_pages(results_dir, sections, metric, outdir, back="../index.html"):
+def write_workload_pages(results_dir, sections, metric, outdir, back="../index.html",
+                         daily_window=None):
     """One detail page per workload: the FULL sub-counter stacked-area history —
     one chart per (title, index_path) SECTION, e.g. an "Across releases" chart
     and a "Daily tip-of-tree" chart on separate time axes — plus the workload's
@@ -576,6 +577,10 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
     # provenance and would masquerade as steps.
     try:
         _daily_pts = daily_movers.daily_points(results_dir, metric)
+        if daily_window:
+            # match the daily charts' span (trailing N points) so the table's
+            # d0 -> d1 is the same window the reader sees plotted above it
+            _daily_pts = _daily_pts[-daily_window:]
     except Exception as e:  # noqa: BLE001 — the table must never sink page rendering
         print(f"note: daily-progress tables skipped: {e}")
         _daily_pts = []
@@ -617,8 +622,16 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
 
         movers_html = ""
         if len(_daily_pts) >= 2:
-            overall, contributors, extras, steps = daily_movers.workload_progress(
-                _daily_pts, wl)
+            # Same never-sink-the-render policy as the daily_points guard
+            # above: workload_progress asserts the pp-sum tiling invariant,
+            # and a violated invariant should cost one workload's table (with
+            # a loud note), not the whole page set.
+            try:
+                overall, contributors, extras, steps = daily_movers.workload_progress(
+                    _daily_pts, wl)
+            except Exception as e:  # noqa: BLE001
+                print(f"note: daily-progress table skipped for {wl}: {e}")
+                overall = None
             if overall:
                 d0, c0, v0, d1, c1, v1, pct = overall
                 pcol = "#1e8449" if pct < 0 else "#c0392b"

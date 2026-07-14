@@ -198,7 +198,8 @@ def main():
         args.results,
         [("Across releases", paths["releases"]),
          (f"Daily tip-of-tree (last {args.daily_window} days)", paths["daily"])],
-        args.metric, outdir, back="../index.html")
+        args.metric, outdir, back="../index.html",
+        daily_window=args.daily_window)
 
     rel_note = ("Official release binaries — minor releases, plus patch releases "
                 "from v2026.13 on — re-measured on the current perf runner. "
@@ -239,7 +240,7 @@ def main():
                       f"{len(names)} workloads · stacked phases, top edge = "
                       f"{edge} ({args.metric} ms)",
                       note, svg,
-                      extra_html=(movers_block(dpoints_all, names)
+                      extra_html=(movers_block(dpoints_all[-args.daily_window:], names)
                                   if cad == "tot" else ""))
 
     # Landing page: stacked section rows — API & RT on top, microbenchmarks,
