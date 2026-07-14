@@ -71,12 +71,7 @@ struct MatrixTypeLoweringContext
 
     bool shouldLowerMatrixType(IRMatrixType* matrixType)
     {
-        // Defensive: `legalizeMatrixTypes` already returns early for non-lowering targets, so under
-        // the current call graph every caller reaches here only on a lowering target and this guard
-        // never fires. It is kept so `shouldLowerMatrixType` stays a correct standalone predicate
-        // if ever called independently of the pass entry; the redundant re-check is cheap.
-        if (!targetLegalizesMatrixTypes(targetProgram))
-            return false;
+        SLANG_ASSERT(targetLegalizesMatrixTypes(targetProgram));
 
         if (isCPUTargetViaLLVM(targetProgram->getTargetReq()))
         {
