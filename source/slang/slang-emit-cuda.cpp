@@ -1543,7 +1543,10 @@ void CUDASourceEmitter::emitSimpleFuncParamsImpl(IRFunc* func)
         // `.local` frame. `transformParamsToConstRef` forwards the address of exactly this set of
         // parameters (via the same `isEntryPointByValueUniformAggregateParam` predicate), so the
         // qualifier and the forward stay in lockstep.
-        if (isEntryPointByValueUniformAggregateParam(pp))
+        // DIAGNOSTIC A2: qualifier DISABLED (forward stays ON). Entry param emitted plain
+        // by-value, but the call site still forwards its address via const_cast. Isolates whether
+        // the address-forward alone (without __grid_constant__) is the bug.
+        if (false && isEntryPointByValueUniformAggregateParam(pp))
             m_writer->emit("SLANG_CUDA_GRID_CONSTANT const ");
 
         emitSimpleFuncParamImpl(pp);
