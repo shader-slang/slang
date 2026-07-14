@@ -215,10 +215,11 @@ span.fnToggle:focus, span.dirToggle:focus { outline: 1px dotted var(--slang-oran
 tr.fileFunctions[hidden]  { display: none; }
 tr.fileSummary[hidden]    { display: none; }
 /* fileFunctions row's <td> matches the parent indexTable edges
-   (body padding already provides the 24px window inset).  A 3px
-   teal stripe on the left visually marks the expanded region. */
-tr.fileFunctions > td   { background-color: #fdfdfe; padding: 6px 0;
-                          border-left: 3px solid var(--slang-teal); }
+   (body padding already provides the 24px window inset). The teal
+   stripe marking the expanded region lives on the listing's spacer
+   column (below), not here — this cell still spans the full table
+   width, but the listing's visible edge starts at the tree indent. */
+tr.fileFunctions > td   { padding: 6px 0; }
 
 /* Embedded function table inside an expanded file row. The colgroup
    widths mirror the parent indexTable so cells line up vertically
@@ -244,7 +245,8 @@ table.fnInner col.fnLineCol  { width: 4%; }
    the parent file row's chevron; its width (and the matching
    reduction of fnNameCol) is set inline per table by the renderer.
    Transparent so the page background reads as indentation. */
-table.fnInner td.fnIndentSpacer { background: transparent; padding: 0; }
+table.fnInner td.fnIndentSpacer { background: transparent; padding: 0;
+                                  border-right: 3px solid var(--slang-teal); }
 
 .sourceUnavailable { color: var(--slang-orange); font-style: italic;
                      padding: 8px; }
