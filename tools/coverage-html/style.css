@@ -231,6 +231,11 @@ table.fnInner td.tableHead { font-family: -apple-system, BlinkMacSystemFont,
    vertically with the file-summary row above. */
 table.fnInner col.fnNameCol  { width: 43%; }
 table.fnInner col.fnLineCol  { width: 4%; }
+/* The spacer column that indents the listing's visible left edge to
+   the parent file row's chevron; its width (and the matching
+   reduction of fnNameCol) is set inline per table by the renderer.
+   Transparent so the page background reads as indentation. */
+table.fnInner td.fnIndentSpacer { background: transparent; padding: 0; }
 
 .sourceUnavailable { color: var(--slang-orange); font-style: italic;
                      padding: 8px; }
