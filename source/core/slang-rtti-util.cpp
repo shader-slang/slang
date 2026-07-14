@@ -1,5 +1,7 @@
 #include "slang-rtti-util.h"
 
+#include "slang-allocator.h"
+
 namespace Slang
 {
 
@@ -16,7 +18,7 @@ static void* _mallocArray(Index count, size_t elementSize)
         return nullptr;
     }
 
-    return ::malloc(unsignedCount * elementSize);
+    return StandardAllocator::allocate(unsignedCount * elementSize);
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RttiTypeFuncs Impls
@@ -96,7 +98,7 @@ struct ListFuncs
                 {
                     typeFuncs.dtorArray(typeMap, elementType, oldBuffer, dstCapacity);
 
-                    ::free(oldBuffer);
+                    StandardAllocator::deallocate(oldBuffer);
                 }
             }
             else
@@ -140,7 +142,7 @@ struct ListFuncs
             if (buffer)
             {
                 typeFuncs.dtorArray(typeMap, elementType, buffer, capacity);
-                ::free(buffer);
+                StandardAllocator::deallocate(buffer);
             }
         }
     }
