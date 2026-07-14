@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#runtime-representation
-//META: doc_section_digest=bd3a8a9e5737485c9a7ddbe47c464799f12940b6a68f5d5db5a85b41bbef6560
+//META: doc_section_digest=fae3c6ef7014af2bdec8e100159a7e70245328b5ad7fe9c05d4605254a8649a4
 //META: purpose=Using `RayQuery` (an `sm_6_3` feature) in an entry point with `-profile sm_6_0` under `-restrictive-capability-check` reports the Profile's Version is below the required capability and rejects with `E41013`.
 //META: intent=negative
 //META: pipeline_stage=check

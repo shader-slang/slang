@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T13:50:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/ir-reference/types.md#spir-v-literals-and-kinds
-//META: doc_section_digest=454a599fd6178f1993ba645f52b6ca4c0016c5f625f396e566bfbc740683a726
+//META: doc_section_digest=17e2a9383b03933bbfbe7aafa284636b66be9843616143d8755f421765182be6
 //META: purpose=Stress: an instantiation of a generic with a Vec type-argument still surfaces the type_t kind on the generic param.
 //META: intent=stress
 //META: pipeline_stage=lower

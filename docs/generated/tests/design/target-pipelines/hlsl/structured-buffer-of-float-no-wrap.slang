@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T20:31:07+00:00
 //META: source_commit=019ec0e5ddac1c14fbad141a3f03d50cf8a5e022
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#wrapstructuredbuffersofmatrices
-//META: doc_section_digest=99399bec1655fc5eb538f2f70fe7d6d9093a89bbf1f86fbe5246b36cbfc141d8
+//META: doc_section_digest=68e6f8fe2ef26c5eb509b197e00cfd6b92f20ff7baca61aabbd1d7d712edf820
 //META: purpose=Boundary: a StructuredBuffer<float> with a scalar (non-matrix) element type does NOT trigger the wrapper-struct rewrite.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

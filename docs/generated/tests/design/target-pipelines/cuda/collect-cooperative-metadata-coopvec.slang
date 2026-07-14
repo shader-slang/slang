@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-c-cuda-legalization-lowering-phi-elimination
-//META: doc_section_digest=2314d32203f54be9e61ab85654673e194c467242384d7feb583ce0587536f9da
+//META: doc_section_digest=53fa67e8e5b5b7cc0d09c737e54d406ba6f9a31c67e2efff85428bbfda70a405
 //META: purpose=collectCooperativeMetadata fires for CUDA when the target caps imply cooperative_vector; an optix_coopvec CoopVec emit preserves the OptixCoopVec primitive in the CUDA C++ text.
 //META: intent=expansion
 //META: pipeline_stage=emit

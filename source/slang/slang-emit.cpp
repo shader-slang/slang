@@ -434,6 +434,21 @@ void calcRequiredLoweringPassSet(
         result.conditionalType = true;
         break;
     case kIROp_EnumType:
+    // The enum-cast ops are lowered by the same `lowerEnumType` pass as the type
+    // itself, so flag `enumType` on them too. Constant folding can eliminate the
+    // last live `IREnumType` while leaving a degenerate cast behind (e.g. an
+    // enum-typed local holding a constant folds to `CastEnumToInt(1 : UInt)`);
+    // flagging only the type would then skip the pass and strand the cast at
+    // emit (#12048). `CastIntToEnum`/`EnumCast` produce an enum-typed result, so a
+    // surviving one keeps its `IREnumType` alive and the `kIROp_EnumType` arm
+    // already covers it; they are listed here for parity with `lowerEnumType`'s
+    // handled set. The `Constexpr*` cast variants are intentionally excluded: they
+    // arise only in constant `IntVal` contexts (`emitConstexprCast`, from
+    // `visitTypeCastIntVal`), never in runtime value flow that reaches emit, and
+    // `lowerEnumType` has no case for them.
+    case kIROp_CastEnumToInt:
+    case kIROp_CastIntToEnum:
+    case kIROp_EnumCast:
         result.enumType = true;
         break;
     case kIROp_TextureType:
@@ -533,6 +548,14 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetDynamicResourceHeap:
         result.dynamicResourceHeap = true;
         break;
+    case kIROp_CastUIntToUntypedResourceHandle:
+    case kIROp_CastUntypedResourceHandleToUInt:
+    case kIROp_CastUIntToUntypedSamplerHandle:
+    case kIROp_CastUntypedSamplerHandleToUInt:
+    case kIROp_UntypedResourceHandleType:
+    case kIROp_UntypedSamplerHandleType:
+        result.untypedResourceHandle = true;
+        break;
     case kIROp_ResolveVaryingInputRef:
         result.resolveVaryingInputRef = true;
         break;
@@ -557,6 +580,14 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetEnumBarrierMemoryTypeFlags:
     case kIROp_GetEnumBarrierSemanticFlags:
         result.barrierFlagValidation = true;
+        break;
+    case kIROp_TaggedUnionType:
+    case kIROp_MakeTaggedUnion:
+    case kIROp_GetTagFromTaggedUnion:
+    case kIROp_GetTypeTagFromTaggedUnion:
+    case kIROp_GetValueFromTaggedUnion:
+    case kIROp_CastInterfaceToTaggedUnionPtr:
+        result.taggedUnion = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1489,8 +1520,18 @@ Result linkAndOptimizeIR(
     }
 
     // Tagged union type lowering typically generates more reinterpret instructions.
-    if (SLANG_PASS(lowerTaggedUnionTypes, sink))
-        requiredLoweringPassSet.reinterpret = true;
+    //
+    // Gated on `taggedUnion` to skip this whole-module walk when no tagged-union IR is present.
+    // The tagged-union opcodes are produced only by the typeflow specialization pass, which runs
+    // before the last `calcRequiredLoweringPassSet` scan, so the flag cannot be a false-negative
+    // (any tagged-union inst reaching here was seen by that scan). When the flag is false the pass
+    // would be a no-op and create no reinterpret insts, so leaving `reinterpret` untouched is
+    // correct. (Full producer trace in the PR for issue #11917.)
+    if (requiredLoweringPassSet.taggedUnion)
+    {
+        if (SLANG_PASS(lowerTaggedUnionTypes, sink))
+            requiredLoweringPassSet.reinterpret = true;
+    }
 
     SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
 
@@ -1822,6 +1863,15 @@ Result linkAndOptimizeIR(
         SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
     else
         SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
+
+    // Enforce that no untyped descriptor-heap handle (`ResourceDescriptorHeap[i]` /
+    // `SamplerDescriptorHeap[j]`) survives to emit: lower any that peephole did not collapse to its
+    // underlying `uint` index. Gated on `untypedResourceHandle` so the whole-module walk is skipped
+    // when no such handle is present. The producing intrinsics live in `hlsl.meta.slang` and are
+    // lowered at AST->IR time, before the last `calcRequiredLoweringPassSet` scan; no pass between
+    // that scan and here synthesizes these ops, so the flag cannot be a false-negative.
+    if (requiredLoweringPassSet.untypedResourceHandle)
+        SLANG_PASS(lowerUntypedResourceHandleToUInt);
 
     if (requiredLoweringPassSet.dynamicResourceHeap)
         SLANG_PASS(lowerDynamicResourceHeap, targetProgram, sink);

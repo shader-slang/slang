@@ -27,7 +27,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)  # allow running from any directory
 
-from lib import manifest
+from lib import analyze, manifest
 
 
 def timers_for(workload):
@@ -49,11 +49,20 @@ def write_step_summary(md):
     """Append markdown to the GitHub Actions step summary ($GITHUB_STEP_SUMMARY)."""
     path = os.environ.get("GITHUB_STEP_SUMMARY")
     if path:
-        with open(path, "a") as fh:
+        with analyze.open_output(path, "a") as fh:
             fh.write(md + "\n")
 
 
 def main():
+    # The Windows runner's Python defaults to a cp1252 console encoding, which
+    # cannot encode this report's non-ASCII table headers — and the flag table
+    # only prints when a regression IS found, so an encoding crash would mask
+    # exactly the output that matters. Force UTF-8 (errors="replace" so a
+    # future exotic character degrades instead of raising).
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
@@ -74,6 +83,14 @@ def main():
     ap.add_argument("--min-baseline", type=int, default=3,
                     help="min trailing points required to judge a metric")
     ap.add_argument("--no-fail", action="store_true", help="report only; always exit 0")
+    # Daily labels are keyed by the SWEPT COMMIT's date, so several points can
+    # share one date (e.g. master's HEAD was committed yesterday, or a manual
+    # backfill re-measured a day). The series sort order then makes pts[-1]
+    # ambiguous — observed 2026-07-08, when the nightly judged a same-date
+    # sibling instead of the point it had just registered. The nightly passes
+    # the label it registered so the right point is judged unconditionally.
+    ap.add_argument("--label", default=None,
+                    help="judge the point with this label instead of the last point")
     args = ap.parse_args()
 
     tpath = os.path.join(args.results, "tracking", "tracking.json")
@@ -86,7 +103,15 @@ def main():
         return
 
     hist_runner = series.get("runner", "")
-    current = pts[-1]
+    if args.label:
+        cur_idx = next((i for i, p in enumerate(pts) if p.get("label") == args.label), None)
+        if cur_idx is None:
+            raise SystemExit(f"--label {args.label}: no such point in the tracking series "
+                             f"(was track.py register run for it?)")
+    else:
+        cur_idx = len(pts) - 1
+    current = pts[cur_idx]
+    earlier = pts[:cur_idx]
     # Release points carry no per-point runner field by design: they are all built
     # by the release-sweep job on the machine recorded in runner.json (hist_runner).
     # The `or hist_runner` below is not defensive fallback — it is that data-model
@@ -96,8 +121,9 @@ def main():
     print(f"trend: current={current['label']} ({current['date']}, {current['kind']})  "
           f"runner={cur_runner or 'unset'}")
 
-    # Restrict the baseline to points on the same runner.
-    prior = [p for p in pts[:-1] if (p.get("runner") or hist_runner) == cur_runner]
+    # Restrict the baseline to points on the same runner, strictly before the
+    # judged point in series order.
+    prior = [p for p in earlier if (p.get("runner") or hist_runner) == cur_runner]
     window = prior[-args.window:]
 
     if hist_runner and cur_runner and cur_runner != hist_runner:

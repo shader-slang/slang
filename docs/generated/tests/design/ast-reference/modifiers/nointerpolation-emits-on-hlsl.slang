@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:50:00+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#interpolation-modes
-//META: doc_section_digest=56ca9a126bcfd98630fa52ffd0fc6f78b7bc23d5faf39fecb7d0bfc4e9576da6
+//META: doc_section_digest=24e7271a64c5842b122da8c1f81403c6afa1794c0903bde19c22179fa5e608b4
 //META: purpose=`nointerpolation` on a pixel-shader varying input survives into emitted HLSL.
 //META: intent=functional
 //META: pipeline_stage=emit

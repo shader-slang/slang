@@ -12,7 +12,17 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "commit SHA or branch to build (blank = master HEAD)"
+        # actions/checkout resolves branches, tags, and full 40-char SHAs
+        # only; a short SHA fails with "branch or tag not found".
+        description: "full commit SHA or branch to build (blank = master HEAD)"
+        default: ""
+      suite-ref:
+        # Backfilling an old commit must still run the CURRENT suite: the
+        # checked-out ref's own tools/compile-perf predates newer workloads and
+        # does not accept the arguments this workflow passes (--api,
+        # track.py --commit-time, trend.py --label). Same model as the release
+        # sweep: modern suite measuring an older binary.
+        description: "ref for tools/compile-perf (blank = same as ref; use master when backfilling old commits)"
         default: ""
       samples:
         description: "timed samples per run"
@@ -20,6 +30,15 @@ on:
       only:
         description: "comma-separated workload subset (blank = full suite)"
         default: ""
+      sweep:
+        # Opt-in (~4x runtime): dispatch with sweep=true when fresh scaling
+        # curves are wanted; the published sweep page shows the newest sweep
+        # whenever one last ran.
+        description: "run each workload's sweep_sizes for scaling curves (~4x runtime; tracking still compares the default-size point)"
+        default: "false"
+      publish:
+        description: "push results + update tracking + deploy pages (set false for one-off measurements: results are uploaded as a run artifact only)"
+        default: "true"
 
 concurrency:
   group: nightly-mdl-perf-test
@@ -29,17 +48,22 @@ env:
   # Dedicated results repo (mirrors the MDL slang-material-modules-benchmark
   # pattern). Requires a PAT secret SLANG_COMPILE_PERF_PAT with push access.
   PERF_RESULTS_REPO: shader-slang/slang-compile-perf
+  # Scheduled runs have no inputs; default to publishing.
+  PUBLISH: ${{ github.event.inputs.publish || 'true' }}
 
 permissions:
   contents: read # GITHUB_TOKEN read-only; writes use SLANG_COMPILE_PERF_PAT
 
 jobs:
   nightly:
-    # The quiesced NVIDIA RGFX perf pool (runner group nvrgfx) — the SAME runner
-    # the release history is swept on, so absolute timings stay comparable.
+    # The NVIDIA RGFX perf pool, reached through the VM-based GitHub bridge
+    # (rtrci github-bridge target shader-slang/slang:windows-x64-perf) — the
+    # SAME pool the release history sweep targets, so absolute timings stay
+    # comparable. The pre-VM pool (runner group nvrgfx, label nvrgfx-perf)
+    # was retired 2026-07; timings recorded before the migration may show a
+    # step at the boundary.
     runs-on:
-      group: nvrgfx
-      labels: [Windows, X64, nvrgfx-perf]
+      labels: [Windows, X64, nvrgfx-perf-kernelvm-bridge]
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -47,6 +71,20 @@ jobs:
           persist-credentials: false
           submodules: "recursive"
           fetch-depth: "0"
+
+      - name: Checkout suite ref (backfill)
+        if: github.event.inputs.suite-ref != ''
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ github.event.inputs.suite-ref }}
+          persist-credentials: false
+          path: "suite-src"
+          # include/ is a suite dependency, not build source: bench.py builds
+          # the api-driver against include/slang.h resolved relative to the
+          # suite root, so dropping it breaks --api backfills at bench time.
+          sparse-checkout: |
+            tools/compile-perf
+            include
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
@@ -62,6 +100,22 @@ jobs:
           config: release
           build-llvm: false
 
+      # One resolution for all suite tooling (bench, track, report, trend): with
+      # suite-ref set, all suite tooling runs from the dedicated checkout
+      # while the build tree stays at the swept commit.
+      # Placed AFTER common-setup: that is what puts git-bash on the
+      # Windows runner's PATH, and this step is the job's first bash use.
+      - name: Resolve suite path
+        shell: bash
+        env:
+          SUITE_REF: ${{ github.event.inputs.suite-ref }}
+        run: |
+          if [ -n "$SUITE_REF" ]; then
+            echo "SUITE=$GITHUB_WORKSPACE/suite-src/tools/compile-perf" >> "$GITHUB_ENV"
+          else
+            echo "SUITE=$GITHUB_WORKSPACE/tools/compile-perf" >> "$GITHUB_ENV"
+          fi
+
       - name: Build Slang (tip of tree)
         run: |
           # Match release.yml flags so daily ToT timings are directly comparable to the
@@ -70,7 +124,7 @@ jobs:
           # at the release->daily boundary rather than a real regression.
           # SLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF also matches release.yml.
           # LLVM is disabled: the prebuilt slang-llvm artifact links against a newer
-          # MSVC CRT than is available on the nvrgfx-perf runner, causing LNK2001
+          # MSVC CRT than is available on the perf runner, causing LNK2001
           # linker errors. The perf suite only uses SPIRV/Metal/WGSL targets which
           # do not need the LLVM backend.
           cmake --preset default --fresh `
@@ -96,6 +150,7 @@ jobs:
       # NB: persist-credentials stays on (default) here — the "Push results" step
       # below relies on the PAT credential this checkout persists in .git/config.
       - name: Checkout perf results repo
+        if: env.PUBLISH == 'true'
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: ${{ env.PERF_RESULTS_REPO }}
@@ -109,29 +164,72 @@ jobs:
         env:
           SAMPLES: ${{ github.event.inputs.samples || '5' }}
           ONLY: ${{ github.event.inputs.only }}
+          SWEEP: ${{ github.event.inputs.sweep || 'false' }}
+          REF_INPUT: ${{ github.event.inputs.ref }}
         run: |
           set -euo pipefail
-          SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
           RESULTS="$GITHUB_WORKSPACE/perf-results"
           SLANGC="$GITHUB_WORKSPACE/build/Release/bin/slangc.exe"
-          LABEL="$(git log -1 --format=%cs HEAD)-$(git rev-parse --short HEAD)"
+          # Label rule: a scheduled / plain-dispatch run is "the nightly of
+          # today", keyed by the RUN date so every calendar day gets exactly
+          # one label even when master's HEAD carries an older commit date
+          # (weekend runs previously minted same-date sibling labels, e.g.
+          # two 2026-07-07 points). An explicit-ref backfill is keyed by the
+          # swept commit's own date so historical points sort by code order.
+          if [ -n "$REF_INPUT" ]; then
+            LABEL="$(git log -1 --format=%cs HEAD)-$(git rev-parse --short HEAD)"
+          else
+            LABEL="$(date -u +%F)-$(git rev-parse --short HEAD)"
+          fi
           COMMIT="$(git rev-parse HEAD)"
+          # Full committer timestamp: same-date sibling points (labels carry
+          # only the commit's DATE) sort by true code order in the series.
+          COMMIT_TIME="$(git log -1 --format=%cI HEAD)"
           CORPUS_SHA="$(git -C "$GITHUB_WORKSPACE/external/MDL-SDK" rev-parse HEAD)"
+          # The trend step below judges exactly the point this run registers
+          # (daily labels share the swept commit's DATE, so several points can
+          # share a date and series order alone cannot identify this run's).
+          echo "PERF_LABEL=$LABEL" >> "$GITHUB_ENV"
+
+          # publish=false: measure only — write results to a workspace dir that
+          # the artifact step uploads; no tracking registration.
+          if [ "$PUBLISH" != "true" ]; then
+            RESULTS="$GITHUB_WORKSPACE/bench-results"
+          fi
 
           # MDL corpus for the mdl_dxr workload.
           mkdir -p "$SUITE/corpus/mdl"
           cp external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang "$SUITE/corpus/mdl/"
 
           cd "$SUITE"
-          args=(--slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" --samples "$SAMPLES" --warmup 1)
+          # --api: the api-path workloads (session create, module graph,
+          # reflection, specialize, ...) are part of the tracked nightly set —
+          # the driver is built once per run with the host cl.
+          args=(--slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" --samples "$SAMPLES" --warmup 1 --api)
           [ -n "$ONLY" ] && args+=(--only "$ONLY")
+          # Swept multi-size data is collapsed to default_size by
+          # analyze.canonical_runs when the tracking series is rebuilt, so a
+          # swept night still contributes a like-with-like tracking point.
+          [ "$SWEEP" = "true" ] && args+=(--sweep)
           # Daily ToT sweep -> perf-results/daily/<label>/results.json
           python3 bench.py "${args[@]}"
-          # Stamp meta + rebuild perf-results/tracking/tracking.json
-          python3 track.py register --results "$RESULTS" --index "$RESULTS/index.json" \
-            --label "$LABEL" --commit "$COMMIT" --corpus-sha "$CORPUS_SHA"
+          if [ "$PUBLISH" = "true" ]; then
+            # Stamp meta + rebuild perf-results/tracking/tracking.json
+            python3 track.py register --results "$RESULTS" --index "$RESULTS/index.json" \
+              --label "$LABEL" --commit "$COMMIT" --corpus-sha "$CORPUS_SHA" \
+              --commit-time "$COMMIT_TIME"
+          fi
+
+      - name: Upload results artifact (publish=false)
+        if: always() && env.PUBLISH != 'true'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: bench-results-${{ github.sha }}
+          path: bench-results/
+          if-no-files-found: ignore
 
       - name: Push results
+        if: env.PUBLISH == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -147,7 +245,7 @@ jobs:
       # .git/config — on a persistent self-hosted runner this would otherwise
       # outlive the job and be readable by subsequent jobs.
       - name: Revoke PAT from perf-results git config
-        if: always()
+        if: always() && env.PUBLISH == 'true'
         shell: bash
         run: |
           git -C "$GITHUB_WORKSPACE/perf-results" config --unset \
@@ -158,11 +256,11 @@ jobs:
       # shader-slang.org/slang-compile-perf. continue-on-error so a report
       # failure never blocks the trend check below.
       - name: Generate HTML reports
+        if: env.PUBLISH == 'true'
         continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
-          SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
           RESULTS="$GITHUB_WORKSPACE/perf-results"
           if [ ! -f "$RESULTS/index.json" ]; then
             echo "No index.json in results repo; skipping report generation"
@@ -170,8 +268,14 @@ jobs:
           fi
           cd "$SUITE"
           python3 report.py --results "$RESULTS" --index "$RESULTS/index.json"
+          # Sweep landing page + every archived sweep (dailies + releases),
+          # regenerated from repo data on each deploy. Sweeps are opt-in and
+          # few, so rendering all of them is cheap; an empty archive still
+          # produces a valid index page.
+          python3 sweep_report.py --results "$RESULTS" --publish "$RESULTS/analysis/sweep"
 
       - name: Checkout gh-pages branch
+        if: env.PUBLISH == 'true'
         continue-on-error: true
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -181,6 +285,7 @@ jobs:
           token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
 
       - name: Deploy HTML reports to GitHub Pages
+        if: env.PUBLISH == 'true'
         continue-on-error: true
         shell: bash
         env:
@@ -215,6 +320,11 @@ jobs:
           mv report_per_workload.html index.html
           # _combined_index.json is a derived intermediate — no need to serve it
           rm -f _combined_index.json
+          # Serve files verbatim: without this marker GitHub Pages runs the
+          # generated report through legacy Jekyll, whose builds have failed
+          # or hung on this content. Must be re-created on every deploy
+          # because the `git rm -rf .` above removes it.
+          touch .nojekyll
 
           git add -A
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
@@ -222,7 +332,7 @@ jobs:
           git push origin gh-pages
 
       - name: Revoke PAT from perf-pages git config
-        if: always()
+        if: always() && env.PUBLISH == 'true'
         shell: bash
         run: |
           git -C "$GITHUB_WORKSPACE/perf-pages" config --unset \
@@ -232,10 +342,14 @@ jobs:
 
       # Runs AFTER the push so the data is stored even when this step fails the
       # job. trend.py exits non-zero (job red + ::error:: annotations) when a
-      # primary timer drifts past threshold vs the trailing median.
+      # primary timer drifts past threshold vs the trailing median. --label
+      # pins the judgement to the point THIS run registered: daily labels are
+      # keyed by the swept commit's date, so several points can share a date
+      # and the series' last point may be a sibling, not this run's.
       - name: Check trend (fail on regression)
+        if: env.PUBLISH == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          cd "$GITHUB_WORKSPACE/tools/compile-perf"
-          python3 trend.py --results "$GITHUB_WORKSPACE/perf-results"
+          cd "$SUITE"
+          python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" --label "${PERF_LABEL:?}"
