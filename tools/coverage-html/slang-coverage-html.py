@@ -888,7 +888,7 @@ def _fn_inner_colgroup(show_fns: bool, show_br: bool, indent_depth: int = 0) -> 
     indent = _indent_calc(indent_depth)
     cols = [
         f'          <col class="fnIndentCol" style="width: {indent};">',
-        f'          <col class="fnNameCol" style="width: calc(43% - {indent});">',
+        f'          <col class="fnNameCol" style="width: calc(48% - {indent});">',
         '          <col class="fnLineCol">',
         '          <col class="colLBar">',
         '          <col class="colLRate">',
