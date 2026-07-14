@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tempfile
 import time
 
-from lib import manifest
+from lib import analyze, manifest
 
 
 def parse_timers(text):
@@ -75,12 +75,105 @@ def stats(values):
 # window; the detailed flag was added mid-window and only adds finer sub-timers.
 PERF_FLAG = "-report-perf-benchmark"
 
+HERE = os.path.dirname(os.path.abspath(__file__))
 
-def build_commands(slangc, spec, gen_dir, files):
+
+# slangc infers the requested artifact from the -o extension for some targets
+# (and per-entry-point output binding for the text targets), so the output name
+# must match the -target rather than always being out.spv.
+_TARGET_EXT = {"spirv": "spv", "dxil": "dxil", "ptx": "ptx", "metal": "metal",
+               "wgsl": "wgsl", "hlsl": "hlsl", "glsl": "glsl", "cuda": "cu"}
+
+
+def _target_ext(extra_flags):
+    for i, flag in enumerate(extra_flags):
+        if flag == "-target" and i + 1 < len(extra_flags):
+            return _TARGET_EXT.get(extra_flags[i + 1], "out")
+    return "spv"
+
+
+def find_libslang(slangc):
+    """Locate the slang shared library belonging to a slangc binary, trying the
+    layouts of release packages (bin/ + ../lib/) and build trees (same dir).
+    The renamed slang-compiler library is preferred: on Windows the legacy
+    slang.dll is only a forwarding proxy, and resolving a forwarded export
+    requires the loader to find slang-compiler.dll through the normal DLL
+    search order — which does not include the proxy's own directory when the
+    driver loads it by absolute path from elsewhere. Loading the real library
+    directly avoids that; the legacy names remain as fallback for pre-rename
+    releases. Returns None when not found — api
+    workloads then fail with a clear error while slangc workloads run
+    normally."""
+    d = os.path.dirname(slangc)
+    for cand in (
+        os.path.join(d, "slang-compiler.dll"),
+        os.path.join(d, "slang.dll"),
+        os.path.join(d, "libslang-compiler.dylib"),
+        os.path.join(d, "libslang.dylib"),
+        os.path.join(d, "libslang-compiler.so"),
+        os.path.join(d, "libslang.so"),
+        os.path.join(d, "..", "lib", "libslang-compiler.dylib"),
+        os.path.join(d, "..", "lib", "libslang.dylib"),
+        os.path.join(d, "..", "lib", "libslang-compiler.so"),
+        os.path.join(d, "..", "lib", "libslang.so"),
+    ):
+        if os.path.exists(cand):
+            return os.path.abspath(cand)
+    return None
+
+
+def build_api_driver(out_dir):
+    """Compile native/api-driver.cpp once per bench invocation with the host
+    compiler. The driver dlopens whatever libslang it is pointed at, so one
+    host build measures every release in a sweep. Returns the binary path, or
+    None (with a message) when no host compiler is available."""
+    src = os.path.join(HERE, "native", "api-driver.cpp")
+    inc = os.path.join(HERE, "..", "..", "include")
+    if not os.path.exists(os.path.join(inc, "slang.h")):
+        sys.stderr.write(f"compile-perf: include/slang.h not found near {inc}\n")
+        return None
+    is_win = sys.platform == "win32"
+    out = os.path.join(out_dir, "api-driver.exe" if is_win else "api-driver")
+    if is_win:
+        # Dash-style flags: identical to /flags for cl, but immune to MSYS/Git-
+        # Bash path mangling if this command ever runs through a POSIX shell.
+        cmd = ["cl.exe", "-nologo", "-O2", "-std:c++17", "-EHsc", f"-I{inc}", src,
+               f"-Fe:{out}"]
+    else:
+        cmd = ["c++", "-O2", "-std=c++17", "-I", inc, src, "-o", out]
+        # dlopen/dlsym live in libdl on pre-2.34 glibc; harmless elsewhere.
+        if sys.platform.startswith("linux"):
+            cmd.append("-ldl")
+    try:
+        r = subprocess.run(cmd, cwd=out_dir, stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT, timeout=300)
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        sys.stderr.write(f"compile-perf: cannot build api-driver: {e}\n")
+        return None
+    if r.returncode != 0:
+        sys.stderr.write("compile-perf: api-driver build failed:\n"
+                         + r.stdout.decode("utf-8", "replace") + "\n")
+        return None
+    return out
+
+
+def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
     """Return (commands, primary_outfile_for_parsing_index).
 
     For "link" mode the timed command is the final main compile (last element);
-    module precompiles are setup and run once (not timed)."""
+    module precompiles are setup and run once (not timed).
+    For "api" mode the timed command is the api-driver (api = {"driver", "libslang"});
+    the driver emits [*] timer lines in the slangc report format."""
+    if spec.mode == "api":
+        timed = [api["driver"], api["libslang"], spec.api_cmd]
+        if spec.api_cmd == "session-create":
+            timed += ["--iters", str(size)]
+        else:
+            timed += ["--dir", gen_dir]
+        if spec.api_root:
+            timed += ["--root", spec.api_root]
+        timed += spec.api_flags
+        return {"setup": [], "timed": timed}
     main = next((f for f in files if "main" in f), None)
     if spec.mode == "module":
         f = list(files)[0]
@@ -108,7 +201,7 @@ def build_commands(slangc, spec, gen_dir, files):
     # per-run output path so the layout/reflection serializer is exercised without
     # polluting the results directory.
     f = spec.main_file or main or list(files)[0]
-    out = os.path.join(gen_dir, "out.spv")
+    out = os.path.join(gen_dir, "out." + _target_ext(spec.extra_flags))
     extra = list(spec.extra_flags)
     # reflection JSON needs a writable path; gen_dir is per-run and writable.
     if getattr(spec, "reflection_json", False):
@@ -167,30 +260,62 @@ def run_once(cmd):
 # hosts that lack it. Release tarballs bundle these, so they usually don't fire.
 _BENIGN = ("E00100", "E52002", "spirv-opt", "spirv-dis", "slang-glslang",
            "failed to load downstream", "pass-through compiler not found")
-# Matches both the modern "error[E30015]:" and the legacy "error 30015:" formats.
-_ERR_RE = re.compile(r"error\[|: error:|\berror \d+:")
+# For downstream_required workloads a missing downstream compiler is THE
+# failure being guarded against, not noise: slangc can emit its internal
+# timers before the downstream handoff, so without this the run would record
+# timers and report OK with no DXIL/PTX ever produced. Only genuinely
+# irrelevant tool noise stays benign.
+_BENIGN_DOWNSTREAM_REQUIRED = ("E52002", "spirv-opt", "spirv-dis", "slang-glslang")
+# Matches the modern "error[E30015]:" and legacy "error 30015:" slangc formats,
+# plus the api-driver's bare "error: ..." lines.
+_ERR_RE = re.compile(r"error\[|: error:|\berror \d+:|^error: ")
 
 
-def real_error(text):
+def real_error(text, benign=_BENIGN):
     """A genuine compile error in either the modern or legacy slangc format,
-    ignoring benign missing-downstream-tool diagnostics."""
+    ignoring the given benign diagnostics (by default, missing-downstream-tool
+    noise; downstream_required workloads pass a stricter set)."""
     for line in text.splitlines():
-        if _ERR_RE.search(line) and not any(b in line for b in _BENIGN):
+        if _ERR_RE.search(line) and not any(b in line for b in benign):
             return line.strip()
     return None
 
 
-def run_spec(slangc, spec, size, samples, warmup, gen_root):
+def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
     gen_dir = os.path.join(gen_root, spec.name + f"_n{size}")
     if os.path.exists(gen_dir):
         shutil.rmtree(gen_dir)
     os.makedirs(gen_dir, exist_ok=True)
     files = spec.gen(size)
     for fn, src in files.items():
-        with open(os.path.join(gen_dir, fn), "w") as fh:
+        # Fail-loud guard for the byte-determinism invariant (see _HEADER in
+        # workloads.py): a typographic character anywhere in a GENERATED
+        # source would silently make the corpus bytes platform-dependent.
+        # External corpora are exempt — they are third-party input read with
+        # a tolerant decode, not something our generators promise about.
+        # A raise, not an assert: the contract must hold under python -O too.
+        if not spec.external_corpus and not src.isascii():
+            raise ValueError(
+                f"generated source {fn} contains non-ASCII; generators must "
+                f"emit ASCII only so the corpus is byte-identical everywhere")
+        with analyze.open_output(os.path.join(gen_dir, fn)) as fh:
             fh.write(src)
 
-    cmds = build_commands(slangc, spec, gen_dir, files)
+    # An api workload without a driver+libslang must fail loudly (not silently
+    # skip): a missing host compiler or unrecognized package layout would
+    # otherwise drop the workload from the series with no visible signal.
+    if spec.mode == "api" and api is None:
+        return {
+            "workload": spec.name, "bucket": spec.bucket, "size": size,
+            "mode": spec.mode, "ok": False, "setup_ok": False,
+            "got_timers": False, "samples": samples, "warmup": warmup,
+            "wall_ms": None, "rss_kb": None, "timers": {},
+            "primary_timers": spec.primary_timers, "cmd": "",
+            "error": "api-driver or libslang unavailable (see stderr)",
+            "crash_codes": None,
+        }
+
+    cmds = build_commands(slangc, spec, gen_dir, files, size=size, api=api)
     # A failed setup step (e.g. a module that didn't precompile in link mode) must
     # fail the workload — otherwise the timed compile runs against missing inputs.
     setup_ok = True
@@ -202,6 +327,9 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
             rc = 1
         if rc != 0:
             setup_ok = False
+
+    benign = (_BENIGN_DOWNSTREAM_REQUIRED
+              if getattr(spec, "downstream_required", False) else _BENIGN)
 
     timed = cmds["timed"]
     for _ in range(warmup):
@@ -234,13 +362,19 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root):
         walls.append(wall)
         if rss is not None:
             rsses.append(rss)
-        err = real_error(text)
+        err = real_error(text, benign)
         sample_ok.append(err is None)  # ok when no compile error
         for name, ms in parse_timers(text).items():
             per_timer.setdefault(name, []).append(ms)
 
-    err = real_error(last_text)
+    err = real_error(last_text, benign)
     got_timers = bool(per_timer)
+    # A run that produced no timers and no recognizable diagnostic would report
+    # a bare "no timers" with the actual output lost — surface the first output
+    # line (e.g. a loader failure or crash banner) so remote CI runs are
+    # debuggable from results.json alone.
+    if err is None and not got_timers:
+        err = next((ln.strip()[:200] for ln in last_text.splitlines() if ln.strip()), None)
     ok = setup_ok and got_timers and all(sample_ok) and not crash_codes
 
     return {
@@ -274,11 +408,25 @@ def main():
     ap.add_argument("--warmup", type=int, default=1)
     ap.add_argument("--only", default=None,
                     help="comma-separated workload names to run (default all)")
+    ap.add_argument("--sweep", action="store_true",
+                    help="run each workload's sweep_sizes instead of default_size")
     ap.add_argument("--gen-dir", default=None,
                     help="scratch dir for generated sources + compiled outputs "
                          "(default: a tempdir, auto-removed — keeps the results dir, which "
                          "is committed to the perf-results repo, free of build scratch). "
                          "Pass a path to keep them for inspection.")
+    ap.add_argument("--api-driver", default=None,
+                    help="prebuilt api-driver binary (default: build it from "
+                         "native/api-driver.cpp with the host compiler)")
+    ap.add_argument("--libslang", default=None,
+                    help="slang shared library for api workloads (default: "
+                         "derived from --slangc's package layout)")
+    ap.add_argument("--api", action="store_true",
+                    help="include the api workloads in the default set. Until "
+                         "this is passed (or api workloads are named in --only) "
+                         "they are excluded, so existing CI series and published "
+                         "reports don't change shape before the history is "
+                         "resynced with them (see DESIGN.md 'API-path workloads').")
     args = ap.parse_args()
 
     slangc = os.path.abspath(args.slangc)
@@ -286,6 +434,19 @@ def main():
         sys.exit(f"slangc not found: {slangc}")
 
     specs = manifest.WORKLOADS
+    if not args.api and not args.only:
+        specs = [s for s in specs if s.mode != "api"]
+    # Platform-bound workloads (downstream toolchains like dxc/nvrtc) leave the
+    # default set on other platforms; naming one in --only runs it regardless —
+    # explicit intent fails loudly if the tool is genuinely absent.
+    if not args.only:
+        skipped = [s2.name for s2 in specs
+                   if s2.platforms and sys.platform not in s2.platforms]
+        if skipped:
+            print(f"[skip] platform-bound workloads not on {sys.platform}: "
+                  + ", ".join(skipped))
+        specs = [s2 for s2 in specs
+                 if not s2.platforms or sys.platform in s2.platforms]
     if args.only:
         want = set(args.only.split(","))
         specs = [s for s in specs if s.name in want]
@@ -301,12 +462,39 @@ def main():
     gen_root = os.path.abspath(args.gen_dir) if args.gen_dir else tempfile.mkdtemp(prefix="perfsuite_gen_")
     os.makedirs(gen_root, exist_ok=True)
 
+    # Resolve the api-driver + libslang once when any api workload is selected.
+    api = None
+    if any(s.mode == "api" for s in specs):
+        libslang = os.path.abspath(args.libslang) if args.libslang else find_libslang(slangc)
+        driver = os.path.abspath(args.api_driver) if args.api_driver else build_api_driver(gen_root)
+        if libslang and driver:
+            api = {"driver": driver, "libslang": libslang}
+        else:
+            sys.stderr.write("compile-perf: api workloads will FAIL "
+                             f"(libslang={libslang}, driver={driver})\n")
+
     records = []
     for spec in specs:
-        sizes = [spec.default_size]
+        sizes = spec.sweep_sizes if (args.sweep and spec.sweep_sizes) else [spec.default_size]
         for size in sizes:
             print(f"[run] {spec.name:18s} n={size:<5d} ", end="", flush=True)
-            rec = run_spec(slangc, spec, size, args.samples, args.warmup, gen_root)
+            # ANY generator/run failure (missing corpus, a generator bug, a
+            # bad manifest field) must cost ONE workload, not the whole run's
+            # results: everything measured before it would be lost, since
+            # results.json is written at the end. Record the failure and keep
+            # going; bench still exits non-zero at the end via the ok-count.
+            try:
+                rec = run_spec(slangc, spec, size, args.samples, args.warmup, gen_root,
+                               api=api)
+            except Exception as e:  # noqa: BLE001 — isolation is the contract
+                rec = {
+                    "workload": spec.name, "bucket": spec.bucket, "size": size,
+                    "mode": spec.mode, "ok": False, "setup_ok": False,
+                    "got_timers": False, "samples": args.samples,
+                    "warmup": args.warmup, "wall_ms": None, "rss_kb": None,
+                    "timers": {}, "primary_timers": spec.primary_timers,
+                    "cmd": "", "error": str(e), "crash_codes": None,
+                }
             rec["label"] = args.label
             rec["slangc"] = slangc
             records.append(rec)
@@ -328,7 +516,7 @@ def main():
     for r in records:
         merged[(r["workload"], r["size"])] = r
     records = list(merged.values())
-    with open(jpath, "w") as fh:
+    with analyze.open_output(jpath) as fh:
         json.dump(records, fh, indent=2)
 
     # results.json is the single source of truth (all of median/min/mean/stdev per

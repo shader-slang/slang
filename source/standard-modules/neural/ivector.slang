@@ -19,9 +19,14 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
     /// The compile-time size of the vector.
     public static const int Size;
 
-    /// The differential type for automatic differentiation.
-    /// @remarks Ensures the differential is also a vector with the same structure.
-    public associatedtype Differential : IVector<T>;
+    /// Ensures the differential is also a vector with the same structure.
+    __constraint Differential : IVector<T>;
+
+    public __subscript(int index) -> T
+    {
+        [Differentiable] get;
+        [Differentiable] set;
+    }
 
     /// Default constructor - initializes vector to zero.
     public __init();

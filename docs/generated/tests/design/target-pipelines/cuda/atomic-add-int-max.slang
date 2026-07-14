@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T21:00:00+00:00
 //META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-c-cuda-legalization-lowering-phi-elimination
-//META: doc_section_digest=2314d32203f54be9e61ab85654673e194c467242384d7feb583ce0587536f9da
+//META: doc_section_digest=53fa67e8e5b5b7cc0d09c737e54d406ba6f9a31c67e2efff85428bbfda70a405
 //META: purpose=Verifies an atomic operation at int MAX 2147483647 still lowers to atomicAdd on CUDA emit and the constant is wrapped in int(...).
 //META: intent=boundary
 //META: pipeline_stage=emit

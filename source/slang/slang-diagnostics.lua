@@ -4065,6 +4065,13 @@ err(
     span { loc = "location", message = "invalid suffix '~suffix' on floating-point literal" }
 )
 
+err(
+    "invalid-floating-point-literal-number",
+    39999,
+    "invalid floating-point number",
+    span { loc = "location", message = "invalid floating-point number '~number' on floating-point literal" }
+)
+
 warning(
     "integer-literal-too-large",
     40004,
@@ -4243,6 +4250,13 @@ standalone_note(
     -1,
     "member '~member:Decl' cannot satisfy differentiable interface requirement '~requirement:Decl' because it does not provide the required differentiability; it may be missing an appropriate differentiability attribute, such as [Differentiable]",
     span { loc = "member:Decl" }
+)
+
+err(
+    "callable-does-not-satisfy-differentiability-requirement",
+    38110,
+    "callable differentiability requirement not satisfied",
+    span { loc = "member:Decl", message = "member '~member:Decl' does not satisfy the required ~mode:String constraint for interface requirement '~requirement:Decl'." }
 )
 
 warning(

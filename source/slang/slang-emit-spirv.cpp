@@ -2709,6 +2709,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         SpvLiteralInteger::from32(2));
                 }
             }
+        case kIROp_UntypedResourceHandleType:
+        case kIROp_UntypedSamplerHandleType:
+            // `lowerUntypedResourceHandleToUInt` rewrites every untyped descriptor-heap handle to
+            // `uint` before emit, so one reaching here is an internal error (a leak from that
+            // pass).
+            SLANG_UNEXPECTED(
+                "untyped descriptor-heap handle type should have been lowered to uint");
         case kIROp_SubpassInputType:
             return ensureSubpassInputType(inst, cast<IRSubpassInputType>(inst));
         case kIROp_TextureType:
@@ -2835,6 +2842,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 registerInst(inst, inner);
                 return inner;
             }
+        case kIROp_CastUIntToUntypedResourceHandle:
+        case kIROp_CastUntypedResourceHandleToUInt:
+        case kIROp_CastUIntToUntypedSamplerHandle:
+        case kIROp_CastUntypedSamplerHandleToUInt:
+            // The untyped descriptor-heap handle wrap/unwrap casts are an internal representation
+            // that `lowerUntypedResourceHandleToUInt` forwards to their `uint` operand and removes
+            // before emit. Reaching this point means that pass did not run, so this is a bug.
+            SLANG_UNEXPECTED(
+                "untyped descriptor-heap handle cast should have been lowered to uint");
         case kIROp_GlobalParam:
             return emitGlobalParam(as<IRGlobalParam>(inst));
         case kIROp_GlobalVar:
@@ -5082,6 +5098,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 result = inner;
                 break;
             }
+        case kIROp_CastUIntToUntypedResourceHandle:
+        case kIROp_CastUntypedResourceHandleToUInt:
+        case kIROp_CastUIntToUntypedSamplerHandle:
+        case kIROp_CastUntypedSamplerHandleToUInt:
+            // The untyped descriptor-heap handle wrap/unwrap casts are an internal representation
+            // that `lowerUntypedResourceHandleToUInt` forwards to their `uint` operand and removes
+            // before emit. Reaching this point means that pass did not run, so this is a bug.
+            SLANG_UNEXPECTED(
+                "untyped descriptor-heap handle cast should have been lowered to uint");
         case kIROp_CastDescriptorHandleToResource:
             // Convert DescriptorHandle (uint64_t handle) to appropriate resource type
             {
@@ -9291,7 +9316,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             // Float to bool cast.
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
-            auto zero = builder.getIntValue(fromType, 0);
+            auto zero = builder.getFloatValue(fromType, 0.0);
             if (auto vecType = as<IRVectorType>(toTypeV))
             {
                 auto zeroV =
