@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Reproducibility check: compare a fresh sweep against a saved baseline.
 
-For every (release, workload) present in both runs, compare the `compileInner`
+For every (release, workload, size) present in both runs, compare the `compileInner`
 timer (min and median) and report the percent drift. Same binaries + same
 workloads run twice should reproduce within timing noise; large drift points to
 runner contention or a non-deterministic workload, not a real perf change.
