@@ -147,6 +147,36 @@ def grid_page(path, title, sub, note, svg, extra_html=""):
     print(f"wrote {path}")
 
 
+def memory_series(results_dir, recs, metric):
+    """Per-point kb-counter series for a cadence: (labels, {(workload,
+    counter): [kb_or_None per label]}). Reads every point's canonical
+    records once; points that predate memory collection yield gaps.
+
+    Invariant: every series in `per` has exactly len(labels) entries. The
+    back-fill length is len(labels) - 1 BECAUSE the label for the current
+    point is appended before the series loop runs — a brand-new key gets
+    len(labels)-1 Nones for the points it missed plus one appended value."""
+    labels, per = [], {}
+    for rec in recs:
+        tag = rec["tag"]
+        labels.append(rec["date"] if rec.get("kind") == "daily" else tag)
+        vals = {}
+        p = analyze.results_path(results_dir, tag)
+        if os.path.exists(p):
+            for run in analyze.canonical_runs(analyze.read_json(p)):
+                for cnt, st in (run.get("timers") or {}).items():
+                    if analyze.unit_of(cnt) == "kb" and st:
+                        vals[(run["workload"], cnt)] = st.get(metric)
+        for key in set(per) | set(vals):
+            per.setdefault(key, [None] * (len(labels) - 1)).append(vals.get(key))
+    return labels, per
+
+
+def mib(vs):
+    """kb series -> MiB series, preserving None gaps."""
+    return [v / 1024.0 if v is not None else None for v in vs]
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -236,33 +266,10 @@ def main():
                       extra_html=(movers_block(dpoints_all[-args.daily_window:], names)
                                   if cad == "tot" else ""))
 
-    # Memory cadence pages: line panels (memory components do not tile a
-    # total, so no stacked areas). Every point's canonical records are read
-    # once per cadence; points that predate memory collection render as gaps.
-    def memory_series(recs):
-        labels, per = [], {}
-        for rec in recs:
-            tag = rec["tag"]
-            labels.append(rec["date"] if rec.get("kind") == "daily" else tag)
-            vals = {}
-            p = analyze.results_path(args.results, tag)
-            if os.path.exists(p):
-                for run in analyze.canonical_runs(analyze.read_json(p)):
-                    for cnt, st in (run.get("timers") or {}).items():
-                        if analyze.unit_of(cnt) == "kb" and st:
-                            vals[(run["workload"], cnt)] = st.get(args.metric)
-            # Invariant: after this loop every series in `per` has exactly
-            # len(labels) entries — the union covers all existing keys (one
-            # append each) and setdefault back-fills new keys with Nones.
-            for key in set(per) | set(vals):
-                per.setdefault(key, [None] * (len(labels) - 1)).append(vals.get(key))
-        return labels, per
-
-    def mib(vs):
-        return [v / 1024.0 if v is not None else None for v in vs]
+    # Memory cadence pages: see module-level memory_series/mib.
 
     def memory_page(recs, fname, cad_title, note):
-        labels, per = memory_series(recs)
+        labels, per = memory_series(args.results, recs, args.metric)
         floor = per.get(("minimal", "peakRssKb"), [None] * len(labels))
         panels = []
         if any(v is not None for v in floor):

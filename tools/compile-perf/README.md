@@ -39,9 +39,10 @@ regression points at a specific release.
   steadier than the min when a build's run-to-run spread shifts). All of
   `median`/`min`/`mean`/`stdev` are kept in `results.json`; the reporting tools
   take `--metric` to switch (default `median`).
-- **Memory:** peak RSS per compile is always captured (`rss_kb`: `os.wait4`
-  `ru_maxrss` on POSIX, `GetProcessMemoryInfo` on Windows) — see the
-  Memory footprint section
+- **Memory:** peak RSS per compile is captured when the platform query
+  succeeds (`rss_kb`: `os.wait4` `ru_maxrss` on POSIX,
+  `GetProcessMemoryInfo` on Windows; `None` if it fails — a gap in the
+  memory charts is that, not a bug) — see the Memory footprint section
 - **Floor + slope:** `ladder_scaling.py --workload <name>` fits
   `time = floor + slope·N` per release from `--sweep` (multi-size) runs,
   separating a fixed-cost regression (heavier stdlib) from a per-element one
@@ -283,17 +284,17 @@ via `--results <checkout-path>`.
 
 **Regenerable / local only (gitignored from the results repo):**
 
-| Path                                                    | What it is                                                                                     |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `results/analysis/*.svg`                                | charts                                                                                         |
-| `results/analysis/index.html`                           | landing page (status strip + section navigation)                                               |
-| `results/analysis/{api,microbench}-{tot,releases}.html` | the four cadence pages (charts + ToT movers tables)                                            |
-| `results/analysis/memory-{tot,releases}.html`           | memory line panels: session floor, createGlobalSession deltas, per-workload RSS over the floor |
-| `results/analysis/report_per_workload.html`             | old-bookmark redirect to `index.html`                                                          |
-| `results/analysis/workloads/<name>.html`                | per-workload stacked-area history + drill-down pages                                           |
-| `results/releases/<tag>/sweep/`                         | complexity-sweep report for swept releases                                                     |
-| `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)                                           |
-| `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored)                                      |
+| Path                                                    | What it is                                                                                                       |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `results/analysis/*.svg`                                | charts                                                                                                           |
+| `results/analysis/index.html`                           | landing page (status strip + section navigation)                                                                 |
+| `results/analysis/{api,microbench}-{tot,releases}.html` | the four cadence pages (charts + ToT movers tables)                                                              |
+| `results/analysis/memory-{tot,releases}.html`           | memory line panels: session floor (absolute), createGlobalSession deltas, per-workload OWN memory (peak − floor) |
+| `results/analysis/report_per_workload.html`             | old-bookmark redirect to `index.html`                                                                            |
+| `results/analysis/workloads/<name>.html`                | per-workload stacked-area history + drill-down pages                                                             |
+| `results/releases/<tag>/sweep/`                         | complexity-sweep report for swept releases                                                                       |
+| `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)                                                             |
+| `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored)                                                        |
 
 ---
 
@@ -325,8 +326,9 @@ because most workloads' peaks are floor-bound and would just re-draw
 the floor across dozens of panels and alert series. The tracked series
 feed the nightly trend check (1 MiB absolute floor, same ratio gate)
 and the progress tables like timers; `analyze.unit_of`/`fmt_qty` keep
-kilobytes from rendering as milliseconds. The site presents memory on
-`memory-{tot,releases}.html` as a compact dashboard of line panels —
-session floor, the createGlobalSession delta, then the tracked
-workloads' absolute peaks with the floor alongside for scale — because
-memory components do not tile a total and a stacked area would lie.
+kilobytes from rendering as milliseconds. The site presents memory on `memory-{tot,releases}.html` as a compact
+dashboard of line panels — the session floor (the one absolute chart),
+the createGlobalSession delta, then each tracked workload's OWN memory
+(its peak minus the same point's floor, the pure workload signal) —
+because memory components do not tile a total and a stacked area would
+lie.

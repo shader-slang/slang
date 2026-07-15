@@ -155,6 +155,15 @@ def canonical_runs(runs):
     results.json may contain multiple size rows per workload; collapse to each
     workload's default_size so history and daily points compare like-with-like.
     Falls back to the first row seen for workloads not in the manifest.
+
+    The returned records' `timers` dict is a MIXED-UNIT counter map: ms phase
+    timers plus, for manifest track_memory workloads, the kb memory counters
+    (peakRssKb and the api-driver deltas). The units are distinguished by
+    unit_of()'s Kb-suffix convention — asserted where counters are
+    synthesized — which is what lets every consumer (tracking, trend,
+    pages) handle one uniform {counter: stats} shape without a second
+    channel, at the cost that display code must format through fmt_qty
+    rather than assuming milliseconds.
     """
     from . import manifest
     best = {}

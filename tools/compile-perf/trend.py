@@ -39,6 +39,14 @@ def timers_for(workload):
     return timers
 
 
+def abs_floor_for(counter, ms_floor):
+    """The absolute-delta gate for a counter: `ms_floor` (the --abs argument)
+    for time, a fixed 1 MiB for the kb-unit memory counters — a few-KB wobble
+    on a ~200 MB value must not page anyone (the ratio gate is the primary
+    filter for both units)."""
+    return 1024.0 if analyze.unit_of(counter) == "kb" else ms_floor
+
+
 def judged(workload, counter):
     """Whether the trend check judges this (workload, counter) series: the
     workload's alert timers, plus EVERY kb-unit memory counter — memory
@@ -175,10 +183,7 @@ def main():
             continue
         ratio = cur / med
         delta = cur - med
-        # args.abs is a millisecond floor; the kb-unit memory counters get a
-        # 1 MiB floor instead so a few-KB wobble on a ~200 MB value cannot
-        # page anyone (the ratio gate is the primary filter for both).
-        abs_floor = 1024.0 if analyze.unit_of(timer) == "kb" else args.abs
+        abs_floor = abs_floor_for(timer, args.abs)
         if ratio >= args.rel and delta >= abs_floor:
             regressions.append((wl, timer, med, cur, ratio, delta))
 
@@ -216,6 +221,17 @@ def main():
     print(f"\n{len(regressions)} regression(s) flagged.")
     if not args.no_fail:
         raise SystemExit(1)
+
+
+# Import-time self-checks (the directory idiom): judged() and the per-unit
+# absolute floor ARE the memory alert path — if either regressed, memory
+# alerting would silently never fire.
+assert judged("minimal", "peakRssKb"), "kb counters must always be judged"
+assert judged("minimal", "compileInner"), "compileInner is always judged"
+assert not judged("minimal", "emitEntryPointsSourceFromIR"), \
+    "non-primary ms timers are not judged for workloads that do not list them"
+assert abs_floor_for("peakRssKb", 2.0) == 1024.0, "memory floor is 1 MiB"
+assert abs_floor_for("compileInner", 2.0) == 2.0, "time floor is --abs"
 
 
 if __name__ == "__main__":
