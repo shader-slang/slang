@@ -31,6 +31,25 @@ import time
 from lib import analyze, manifest
 
 
+def parse_mem(text):
+    """Extract {name: kb} from the api-driver's "[MEM] name\tNNNkb" lines —
+    point-in-time RSS deltas recorded around selected API phases (see
+    native/api-driver.cpp), kept separate from the ms timers so nothing
+    downstream mistakes kilobytes for milliseconds."""
+    out = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("[MEM]"):
+            continue
+        toks = line.split()
+        if len(toks) >= 3 and toks[-1].endswith("kb"):
+            try:
+                out[toks[1]] = float(toks[-1][:-2])
+            except ValueError:
+                pass
+    return out
+
+
 def parse_timers(text):
     """Extract {phase: total_ms} from slangc -report*-perf-benchmark output.
 
@@ -329,7 +348,7 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
             "workload": spec.name, "bucket": spec.bucket, "size": size,
             "mode": spec.mode, "ok": False, "setup_ok": False,
             "got_timers": False, "samples": samples, "warmup": warmup,
-            "wall_ms": None, "rss_kb": None, "timers": {},
+            "wall_ms": None, "rss_kb": None, "memory": None, "timers": {},
             "primary_timers": spec.primary_timers, "cmd": "",
             "error": "api-driver or libslang unavailable (see stderr)",
             "crash_codes": None,
@@ -356,6 +375,7 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
         run_once(timed)
 
     per_timer = {}
+    per_mem = {}
     walls = []
     rsses = []
     last_text = ""
@@ -386,6 +406,8 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
         sample_ok.append(err is None)  # ok when no compile error
         for name, ms in parse_timers(text).items():
             per_timer.setdefault(name, []).append(ms)
+        for name, kb in parse_mem(text).items():
+            per_mem.setdefault(name, []).append(kb)
 
     err = real_error(last_text, benign)
     got_timers = bool(per_timer)
@@ -409,6 +431,8 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
         "warmup": warmup,
         "wall_ms": stats(walls),
         "rss_kb": stats(rsses) if rsses else None,
+        "memory": ({k: stats(v) for k, v in sorted(per_mem.items())}
+                   if per_mem else None),
         "timers": {k: stats(v) for k, v in sorted(per_timer.items())},
         "primary_timers": spec.primary_timers,
         "cmd": " ".join(timed),
@@ -512,7 +536,7 @@ def main():
                     "mode": spec.mode, "ok": False, "setup_ok": False,
                     "got_timers": False, "samples": args.samples,
                     "warmup": args.warmup, "wall_ms": None, "rss_kb": None,
-                    "timers": {}, "primary_timers": spec.primary_timers,
+                    "memory": None, "timers": {}, "primary_timers": spec.primary_timers,
                     "cmd": "", "error": str(e), "crash_codes": None,
                 }
             rec["label"] = args.label

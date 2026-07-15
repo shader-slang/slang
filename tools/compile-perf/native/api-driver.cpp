@@ -54,10 +54,15 @@
 #include <vector>
 
 #ifdef _WIN32
+#include <psapi.h>
 #include <windows.h>
 #else
 #include <dirent.h>
 #include <dlfcn.h>
+#include <unistd.h>
+#endif
+#ifdef __APPLE__
+#include <mach/mach.h>
 #endif
 
 using Clock = std::chrono::steady_clock;
@@ -96,6 +101,57 @@ struct Timers
             printf("[*] %s\t%ld\t%.4fms\n", e.name.c_str(), e.count, e.totalMs);
     }
 };
+
+// Current resident set size of this process in KB (working set on Windows),
+// or -1 if unavailable. Point-in-time, not peak: the caller differences two
+// readings around a phase, so what matters is that both use the same measure.
+static long currentRssKb()
+{
+#if defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS pmc;
+    pmc.cb = sizeof(pmc);
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+        return (long)(pmc.WorkingSetSize / 1024);
+    return -1;
+#elif defined(__APPLE__)
+    mach_task_basic_info info;
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &count) ==
+        KERN_SUCCESS)
+        return (long)(info.resident_size / 1024);
+    return -1;
+#else
+    FILE* f = fopen("/proc/self/statm", "r");
+    if (!f)
+        return -1;
+    long pages = 0, resident = 0;
+    int n = fscanf(f, "%ld %ld", &pages, &resident);
+    fclose(f);
+    if (n != 2)
+        return -1;
+    return resident * (sysconf(_SC_PAGESIZE) / 1024);
+#endif
+}
+
+// Memory deltas recorded around selected phases, reported next to the timers
+// as "[MEM] name\tNNNkb" lines that bench.py parses into the record's
+// `memory` dict. The RSS growth across createGlobalSession is the metric of
+// shader-slang/slang#9817. Reuses Timers as the accumulator (totalMs holds
+// KB); reportMemDeltas() runs wherever timers.report() does.
+static Timers g_memDeltas;
+
+static void recordSessionCreateRss(long rssBefore)
+{
+    long rssAfter = currentRssKb();
+    if (rssBefore >= 0 && rssAfter >= 0)
+        g_memDeltas.add("apiCreateGlobalSessionRssDeltaKb", (double)(rssAfter - rssBefore));
+}
+
+static void reportMemDeltas()
+{
+    for (const auto& e : g_memDeltas.entries)
+        printf("[MEM] %s\t%.0fkb\n", e.name.c_str(), e.totalMs);
+}
 
 // Times one phase: construct to start, call stop() (or destruct) to record.
 struct Scope
@@ -454,6 +510,7 @@ static int runSessionCreate(CreateGlobalSessionFn createGlobalSession, int iters
     for (int i = 0; i < iters; i++)
     {
         Slang::ComPtr<slang::IGlobalSession> globalSession;
+        long rssBeforeSession = currentRssKb();
         {
             Scope s(timers, "apiCreateGlobalSession");
             if (SLANG_FAILED(createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
@@ -462,6 +519,7 @@ static int runSessionCreate(CreateGlobalSessionFn createGlobalSession, int iters
                 return 1;
             }
         }
+        recordSessionCreateRss(rssBeforeSession);
         Slang::ComPtr<slang::ISession> session;
         {
             Scope s(timers, "apiCreateSession");
@@ -474,6 +532,7 @@ static int runSessionCreate(CreateGlobalSessionFn createGlobalSession, int iters
     }
     total.stop();
     timers.report();
+    reportMemDeltas();
     return 0;
 }
 
@@ -488,6 +547,7 @@ static int runManyKernels(const LibSlang& lib, const std::string& dir, bool refl
     Scope total(timers, "apiTotal");
 
     Slang::ComPtr<slang::IGlobalSession> globalSession;
+    long rssBeforeSession = currentRssKb();
     {
         Scope s(timers, "apiCreateGlobalSession");
         if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
@@ -496,6 +556,7 @@ static int runManyKernels(const LibSlang& lib, const std::string& dir, bool refl
             return 1;
         }
     }
+    recordSessionCreateRss(rssBeforeSession);
     Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
@@ -539,6 +600,7 @@ static int runManyKernels(const LibSlang& lib, const std::string& dir, bool refl
 
     total.stop();
     timers.report();
+    reportMemDeltas();
     return 0;
 }
 
@@ -557,6 +619,7 @@ static int runModuleGraph(
     Scope total(timers, "apiTotal");
 
     Slang::ComPtr<slang::IGlobalSession> globalSession;
+    long rssBeforeSession = currentRssKb();
     {
         Scope s(timers, "apiCreateGlobalSession");
         if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
@@ -565,6 +628,7 @@ static int runModuleGraph(
             return 1;
         }
     }
+    recordSessionCreateRss(rssBeforeSession);
     Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
@@ -589,6 +653,7 @@ static int runModuleGraph(
 
     total.stop();
     timers.report();
+    reportMemDeltas();
     return 0;
 }
 
@@ -606,6 +671,7 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
     Timers timers;
 
     Slang::ComPtr<slang::IGlobalSession> globalSession;
+    long rssBeforeSession = currentRssKb();
     {
         Scope s(timers, "apiCreateGlobalSession");
         if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
@@ -614,6 +680,7 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
             return 1;
         }
     }
+    recordSessionCreateRss(rssBeforeSession);
 
     // Setup pass: source load + serialize every module in the graph.
     {
@@ -707,6 +774,7 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
 
     total.stop();
     timers.report();
+    reportMemDeltas();
     return 0;
 }
 
@@ -731,6 +799,7 @@ static int runSpecialize(
     Scope total(timers, "apiTotal");
 
     Slang::ComPtr<slang::IGlobalSession> globalSession;
+    long rssBeforeSession = currentRssKb();
     {
         Scope s(timers, "apiCreateGlobalSession");
         if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
@@ -739,6 +808,7 @@ static int runSpecialize(
             return 1;
         }
     }
+    recordSessionCreateRss(rssBeforeSession);
     Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
@@ -838,6 +908,7 @@ static int runSpecialize(
 
     total.stop();
     timers.report();
+    reportMemDeltas();
     return 0;
 }
 
@@ -853,6 +924,7 @@ static int runRtComposite(const LibSlang& lib, const std::string& dir, const std
     Scope total(timers, "apiTotal");
 
     Slang::ComPtr<slang::IGlobalSession> globalSession;
+    long rssBeforeSession = currentRssKb();
     {
         Scope s(timers, "apiCreateGlobalSession");
         if (SLANG_FAILED(lib.createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())))
@@ -861,6 +933,7 @@ static int runRtComposite(const LibSlang& lib, const std::string& dir, const std
             return 1;
         }
     }
+    recordSessionCreateRss(rssBeforeSession);
     Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
@@ -934,6 +1007,7 @@ static int runRtComposite(const LibSlang& lib, const std::string& dir, const std
 
     total.stop();
     timers.report();
+    reportMemDeltas();
     return 0;
 }
 
