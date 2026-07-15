@@ -101,9 +101,10 @@ dominated by generic-constraint cost, so neither isolates this. These compile to
 
 ### Shared-infrastructure & scaling tests
 
-Added after a real investigation (PR #9808) showed that a _fixed per-compile_
-regression — the standard module growing, inflating `linkIR`/deserialization for
-**every** compile — was nearly invisible to feature-targeted tests. These
+Added after a real investigation (the v2026.7 compile-time regressions)
+showed that a _fixed per-compile_ regression — the standard module growing,
+inflating `linkIR`/deserialization for **every** compile — was nearly
+invisible to feature-targeted tests. These
 isolate the shared machinery and scaling behavior directly.
 
 | Test            | What it generates                                        | Targets                                            | Primary timer                                           |
