@@ -11,8 +11,8 @@
 
 static_assert(
     !SLANG_CUDA_RTC,
-    "compiled via NVRTC; this test only covers the non-RTC prelude branch, where the "
-    "explicit vec1 make helpers are used instead of the macro-generated ones");
+    "this fixture must be compiled with offline nvcc, not NVRTC; the vec1 "
+    "make helpers under test exist only in the non-RTC prelude branch");
 
 __global__ void testVec1MakeHelpers(
     const __half* halfInput,
