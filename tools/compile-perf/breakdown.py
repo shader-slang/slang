@@ -183,7 +183,7 @@ def _runs(results_dir, label, metric):
     if not os.path.exists(path):
         raise SystemExit(f"no results at {path}")
     out = []
-    for r in analyze.canonical_runs(json.load(open(path))):
+    for r in analyze.canonical_runs(analyze.read_json(path)):
         timers = {k: v[metric] for k, v in r["timers"].items() if v}
         out.append((r["workload"], r.get("size", 0), timers))
     return out
@@ -367,7 +367,7 @@ def coarse_buckets(timers):
 
 def _series(results_dir, index_path, metric, bucket_fn):
     """(order_tags, {workload: [bucketdict|None per release]}) using bucket_fn."""
-    index = json.load(open(index_path))
+    index = analyze.read_json(index_path)
     order, per = [], {}
     for rec in index:
         if "slangc" not in rec:
@@ -377,7 +377,7 @@ def _series(results_dir, index_path, metric, bucket_fn):
         if not os.path.exists(path):
             continue
         order.append(tag)
-        for r in analyze.canonical_runs(json.load(open(path))):
+        for r in analyze.canonical_runs(analyze.read_json(path)):
             timers = {k: v[metric] for k, v in r["timers"].items() if v}
             per.setdefault(r["workload"], {})[tag] = bucket_fn(timers)
     return order, {wl: [bytag.get(t) for t in order] for wl, bytag in per.items()}
@@ -737,7 +737,7 @@ def render_stacked_sweep(results_dir, label, metric, out, cols=2, panel=(560, 30
     phase sub-counters stacked across sweep sizes N (x-axis linear in N, top edge =
     compileInner), showing how each phase's share scales as the workload grows.
     Pass `names=[wl]` (with cols=1) to render a single workload for its own page."""
-    runs = json.load(open(analyze.results_path(results_dir, label)))
+    runs = analyze.read_json(analyze.results_path(results_dir, label))
     per = {}
     for r in runs:
         if r.get("size", 0) <= 0:

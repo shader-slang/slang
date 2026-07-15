@@ -54,7 +54,7 @@ def load_sweeps(results_dir, label, metric):
     path = analyze.results_path(results_dir, label)
     if not os.path.exists(path):
         raise SystemExit(f"no results at {path}; run bench.py --label {label} --sweep first")
-    runs = json.load(open(path))
+    runs = analyze.read_json(path)
     by_wl = {}
     for r in runs:
         if r["size"] <= 0:
@@ -146,7 +146,7 @@ def bucket_series(results_dir, label, metric):
     The floor is the `minimal` workload's bucket decomposition — the same
     fixed-per-compile canary the top-level panels anchor their linear
     expectation to, split by bucket ({} if minimal wasn't run)."""
-    runs = json.load(open(analyze.results_path(results_dir, label)))
+    runs = analyze.read_json(analyze.results_path(results_dir, label))
     per, floor_b = {}, {}
     for r in runs:
         if not r.get("timers"):
@@ -410,7 +410,7 @@ def write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir):
         breakdown.render_stacked_sweep(
             results_dir, label, metric, svgp, cols=1, names=[wl], panel=(1000, 420),
             title=f"{wl} — phase composition vs N ({label}, {metric} ms)")
-        svg = open(svgp).read()
+        svg = analyze.read_text(svgp)
 
         ft = fit(ci, floor)
         kk, top = ft["k"], ft["top"]
@@ -476,7 +476,7 @@ def _swept_workload_count(path):
     An unreadable file (corrupt json, permission change) counts as unswept
     rather than aborting the scan — matching sweep.py's completeness loader."""
     try:
-        runs = json.load(open(path))
+        runs = analyze.read_json(path)
     except (ValueError, OSError):
         return 0
     per = {}
@@ -504,7 +504,7 @@ def find_swept_labels(results_dir):
     ipath = os.path.join(results_dir, "index.json")
     if os.path.exists(ipath):
         try:
-            order = [r["tag"] for r in json.load(open(ipath))]
+            order = [r["tag"] for r in analyze.read_json(ipath)]
         except (ValueError, OSError):
             order = None
     if os.path.isdir(rdir):
@@ -537,7 +537,7 @@ def render_label(results_dir, label, metric, outdir):
     # build (the suite's floor canary). Subtracted before the power-law fit so the
     # exponent reflects feature work, not the floor. 0 if minimal wasn't run.
     floor = 0.0
-    raw = json.load(open(analyze.results_path(results_dir, label)))
+    raw = analyze.read_json(analyze.results_path(results_dir, label))
     for r in raw:
         if r["workload"] == "minimal" and r["timers"].get("compileInner"):
             floor = r["timers"]["compileInner"][metric]
@@ -549,7 +549,7 @@ def render_label(results_dir, label, metric, outdir):
     links = write_sweep_pages(results_dir, label, metric, sweeps, floor, outdir)
     svg = render_panels(sweeps, metric, os.path.join(outdir, "sweep_curves.svg"),
                         floor, link_for=links)
-    inline = open(svg).read()
+    inline = analyze.read_text(svg)
 
     names = canonical_order(sweeps)
     H = ['<!doctype html><meta charset="utf-8">',

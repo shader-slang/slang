@@ -47,7 +47,7 @@ def combined_index(release_index, results_dir):
             if not os.path.exists(os.path.join(ddir, label, "results.json")):
                 continue
             mp = os.path.join(ddir, label, "meta.json")
-            meta = json.load(open(mp)) if os.path.exists(mp) else {}
+            meta = analyze.read_json(mp) if os.path.exists(mp) else {}
             recs.append({"tag": label, "date": meta.get("date", label[:10]),
                          "version": meta.get("commit", ""), "slangc": "tot",
                          "kind": "daily",
@@ -226,7 +226,7 @@ def main():
         for cad, ipath, cad_title, note in (
                 ("tot", paths["daily"], "daily tip-of-tree", day_note),
                 ("releases", paths["releases"], "across releases", rel_note)):
-            idx = json.load(open(ipath))
+            idx = analyze.read_json(ipath)
             svg = None
             if idx:
                 svgp = os.path.join(outdir, f"perf_{prefix}_{cad}.svg")

@@ -245,7 +245,7 @@ def run_once(cmd):
     rss = None
     if memfile:
         try:
-            with open(memfile) as fh:
+            with open(memfile, encoding="utf-8", errors="replace") as fh:
                 for line in fh:
                     if "Maximum resident set size" in line:
                         rss = float(line.rsplit(":", 1)[1].strip())  # kbytes
@@ -510,7 +510,7 @@ def main():
     this_run = records  # workloads run this invocation (for the summary/exit)
     merged = {}
     if os.path.exists(jpath):
-        with open(jpath) as fh:
+        with open(jpath, encoding="utf-8") as fh:
             for r in json.load(fh):
                 merged[(r["workload"], r["size"])] = r
     for r in records:

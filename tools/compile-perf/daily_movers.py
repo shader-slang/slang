@@ -56,9 +56,9 @@ def daily_points(results_dir, metric):
         if not os.path.exists(rpath):
             continue
         mpath = os.path.join(ddir, label, "meta.json")
-        meta = json.load(open(mpath)) if os.path.exists(mpath) else {}
+        meta = analyze.read_json(mpath) if os.path.exists(mpath) else {}
         vals = {}
-        for r in analyze.canonical_runs(json.load(open(rpath))):
+        for r in analyze.canonical_runs(analyze.read_json(rpath)):
             for t, st in (r.get("timers") or {}).items():
                 if st:
                     vals[(r["workload"], t)] = st[metric]
