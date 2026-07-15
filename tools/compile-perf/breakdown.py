@@ -511,13 +511,13 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
 
                 contrib_rows = "".join(
                     f"<tr><td>{esc(t)}</td>"
-                    f"<td align=right>{d_ms:+.1f}</td>"
+                    f"<td align=right>{d_ms:+.1f} ms</td>"
                     f"<td align=right>{own_cell(own)}</td>"
                     f"<td align=right>{contrib:+.1f}pp</td></tr>"
                     for t, d_ms, own, contrib in contributors)
                 extra_rows = "".join(
                     f"<tr><td>{esc(t)}</td>"
-                    f"<td align=right>{d_ms:+.1f}</td>"
+                    f"<td align=right>{esc(analyze.fmt_qty(t, d_ms, signed=True))}</td>"
                     f"<td align=right>{own_cell(own)}</td>"
                     f"<td align=right style='color:#aaa'>&ndash;</td></tr>"
                     for t, d_ms, own in extras)
@@ -545,7 +545,7 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                     f"listed, the rest fold into the remainder row. Below them, every other reported counter "
                     f"(nested/overlapping, e.g. serialized-module reads — own change only):</p>"
                     f"<table style='{tbl}' cellpadding=5>"
-                    f"<tr><th style='text-align:left'>counter</th><th>&Delta; ms</th>"
+                    f"<tr><th style='text-align:left'>counter</th><th>&Delta;</th>"
                     f"<th>own %</th><th>of total</th></tr>{contrib_rows}"
                     f"{extra_rows}</table>"
                     f"<p style='color:#666;font-size:13px;margin:14px 0 4px'>"

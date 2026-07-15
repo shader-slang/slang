@@ -133,6 +133,22 @@ def leaf_deltas(lookup, ptag, tag, wl):
     return out
 
 
+def unit_of(counter):
+    """Unit of a per-workload counter series: "kb" for the memory counters
+    (their names end in Kb by convention — peakRssKb and the api-driver's
+    [MEM] deltas), "ms" for everything else. One classifier so display code
+    and filters cannot disagree about what a value means."""
+    return "kb" if counter.endswith("Kb") else "ms"
+
+
+def fmt_qty(counter, value, signed=False):
+    """Human form of a counter value: milliseconds stay ms, kb renders MiB."""
+    sign = "+" if signed else ""
+    if unit_of(counter) == "kb":
+        return f"{value / 1024:{sign}.1f} MiB"
+    return f"{value:{sign}.1f} ms"
+
+
 def canonical_runs(runs):
     """One row per workload for per-release/trend views.
 
@@ -148,7 +164,23 @@ def canonical_runs(runs):
         default = spec.default_size if spec else None
         if wl not in best or (r["size"] == default and best[wl]["size"] != default):
             best[wl] = r
-    return list(best.values())
+    out = []
+    for r in best.values():
+        # Surface the memory measurements as counter series next to the
+        # timers (a shallow copy; the record itself is not mutated): the
+        # tracking series, trend judgment, and per-workload pages all
+        # consume {counter: stats} uniformly, and unit_of() keeps kb from
+        # masquerading as ms in display code. The bucket partition is
+        # unaffected — these names are not in any TREE.
+        extra = {}
+        if r.get("rss_kb"):
+            extra["peakRssKb"] = r["rss_kb"]
+        for name, st in (r.get("memory") or {}).items():
+            extra[name] = st
+        if extra:
+            r = dict(r, timers=dict(r.get("timers") or {}, **extra))
+        out.append(r)
+    return out
 
 
 def load_series(index, results_dir, metric):

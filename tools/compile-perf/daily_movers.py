@@ -181,7 +181,9 @@ def workload_progress(points, workload, step_rel=0.05):
         a, b = first_t[t], last_t[t]
         own = (b / a - 1) * 100 if a >= NEAR_ZERO_MS else None
         # informational counters: shown only when they moved noticeably
-        if abs(b - a) >= 1.0 or (own is not None and abs(own) >= 5.0):
+        # (1 ms, or 1 MiB for the kb-unit memory counters)
+        floor = 1024.0 if analyze.unit_of(t) == "kb" else 1.0
+        if abs(b - a) >= floor or (own is not None and abs(own) >= 5.0):
             extras.append((t, b - a, own))
     extras.sort(key=lambda r: -abs(r[1]))
 
@@ -226,7 +228,7 @@ def workload_view(points, workload, step_rel):
         print("other reported counters (nested/overlapping; no pp):")
         for t, d_ms, own in extras:
             o = f"{own:+6.1f}%" if own is not None else "     -"
-            print(f"   {t:32s}{d_ms:+9.1f} ms  ({o} own)")
+            print(f"   {t:32s}{analyze.fmt_qty(t, d_ms, signed=True):>12s}  ({o} own)")
     print(f"day steps >= {step_rel * 100:.0f}% vs previous day:")
     if not steps:
         print("   none")

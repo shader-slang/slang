@@ -166,7 +166,11 @@ def main():
             continue
         ratio = cur / med
         delta = cur - med
-        if ratio >= args.rel and delta >= args.abs:
+        # args.abs is a millisecond floor; the kb-unit memory counters get a
+        # 1 MiB floor instead so a few-KB wobble on a ~200 MB value cannot
+        # page anyone (the ratio gate is the primary filter for both).
+        abs_floor = 1024.0 if analyze.unit_of(timer) == "kb" else args.abs
+        if ratio >= args.rel and delta >= abs_floor:
             regressions.append((wl, timer, med, cur, ratio, delta))
 
     regressions.sort(key=lambda r: -r[4])
@@ -184,14 +188,18 @@ def main():
     rows = ["### ⚠️ Compile-perf regressions — " + current["label"],
             f"\nvs trailing {len(window)}-point median (`{base_labels}`), "
             f"runner `{cur_runner}`.\n",
-            "| workload | timer | median (ms) | current (ms) | ratio | Δ ms |",
+            "| workload | timer | median | current | ratio | Δ |",
             "|---|---|--:|--:|--:|--:|"]
     for wl, timer, med, cur, ratio, delta in regressions:
         print(f"{wl:20s}{timer:26s}{med:10.1f}{cur:10.1f}{ratio:7.2f}x{delta:+9.1f}")
-        emit_gha_command(f"::error title=Perf regression {wl}/{timer}::"
-           f"{ratio:.2f}x ({med:.1f} -> {cur:.1f} ms, +{delta:.1f}) vs trailing median")
-        rows.append(f"| {wl} | {timer} | {med:.1f} | {cur:.1f} | "
-                    f"{ratio:.2f}× | +{delta:.1f} |")
+        emit_gha_command(
+            f"::error title=Perf regression {wl}/{timer}::"
+            f"{ratio:.2f}x ({analyze.fmt_qty(timer, med)} -> "
+            f"{analyze.fmt_qty(timer, cur)}, "
+            f"{analyze.fmt_qty(timer, delta, signed=True)}) vs trailing median")
+        rows.append(f"| {wl} | {timer} | {analyze.fmt_qty(timer, med)} | "
+                    f"{analyze.fmt_qty(timer, cur)} | {ratio:.2f}× | "
+                    f"{analyze.fmt_qty(timer, delta, signed=True)} |")
     write_step_summary("\n".join(rows))
 
     print(f"\n{len(regressions)} regression(s) flagged.")
