@@ -516,11 +516,12 @@ bool isSpirvExtensionAtom(CapabilityAtom name);
 ///
 /// This mirrors the capability fold in `TargetRequest::getTargetCaps()` (join the capability into
 /// the target caps, then read back the emitted version), rather than re-deriving realizability by
-/// hand. Deferring to the same `join` the emitter uses makes the test extension-inclusive for free:
-/// the diagnostic fires exactly when the emitted version would otherwise rise. Today
-/// `spvShaderInvocationReorderNV` has only a SPIR-V 1.5 realization, so folding it into a
-/// `spirv_1_4` profile raises the version and conflicts; once it gains a valid SPIR-V 1.4 extension
-/// realization, the fold keeps 1.4 and this stops conflicting, with no change here.
+/// hand. Because it re-derives the version through the same fold the emitter uses, the diagnostic
+/// fires exactly when — and only when — that fold would raise the emitted version above the pinned
+/// one. It hard-codes no capability's version requirement, so its behavior tracks the capability
+/// model: if a capability's requirement at the selected version changes, the check follows without
+/// edits here. Today, for example, folding `spvShaderInvocationReorderNV` into a `spirv_1_4`
+/// profile raises the version and conflicts.
 bool capabilityRaisesTargetVersionAboveProfile(
     const CapabilitySet& profileCaps,
     const CapabilitySet& capability);

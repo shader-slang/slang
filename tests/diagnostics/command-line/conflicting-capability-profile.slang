@@ -4,9 +4,11 @@
 // target version an explicit `-profile` selected must be rejected at the command line, rather
 // than silently raising the emitted SPIR-V version.
 //
-// `spvShaderInvocationReorderNV` has only a SPIR-V 1.5 realization today
+// `spvShaderInvocationReorderNV` today only has a SPIR-V 1.5 realization
 // (`SPV_EXT_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing`), so it genuinely
-// conflicts with `-profile spirv_1_4`. The check is order-independent and also covers the
+// conflicts with `-profile spirv_1_4`. The check keys off the emitted version rather than a
+// hard-coded requirement, so if the capability later gains a valid SPIR-V 1.4 realization these
+// cases would stop conflicting on their own. The check is order-independent and also covers the
 // appended `-profile <profile>+<capability>` form.
 
 // Case 1: `-profile` then `-capability`.
@@ -28,9 +30,9 @@
 //CHECK4: requires a higher target version than the explicitly requested profile 'spirv_1_4'
 
 // Control 1: the same capability at a profile that provides a high enough version is NOT a conflict.
-// SER requires SPIR-V 1.5, and `-profile spirv_1_5` selects exactly 1.5, so this must compile
-// with no conflict diagnostic. (Slang canonicalizes the NV request onto the EXT capability, so
-// only assert the shared substring rather than the NV/EXT spelling.)
+// This capability's realization is at SPIR-V 1.5, and `-profile spirv_1_5` selects exactly 1.5, so
+// this must compile with no conflict diagnostic. (Slang canonicalizes the NV request onto the EXT
+// capability, so only assert the shared substring rather than the NV/EXT spelling.)
 //TEST:SIMPLE(filecheck=OK):-target spirv-asm -emit-spirv-directly -profile spirv_1_5 -capability spvShaderInvocationReorderNV -entry main -stage raygeneration
 //OK-NOT: requires a higher target version
 //OK: OpCapability ShaderInvocationReorder

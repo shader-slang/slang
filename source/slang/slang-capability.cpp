@@ -215,9 +215,10 @@ bool capabilityRaisesTargetVersionAboveProfile(
     // emit for that target family. If the fold raises it above the pinned version, it is a
     // conflict.
     //
-    // Deferring to the same `join` the emitter uses makes this extension-inclusive for free: if
-    // `capability` has any realization (including a future extension-based one) that keeps the
-    // selected version, the join keeps that realization and the emitted version does not rise.
+    // Because the version is read back through the same fold/emission path, this check hard-codes
+    // no capability's requirement: it flags iff that fold would raise the emitted version. If a
+    // capability's requirement at the selected version changes, the check follows with no edit
+    // here.
     CapabilityAtom selectedVersion =
         getHighestTargetVersionAtomInFamily(profileCaps, CapabilityAtom::Invalid);
     if (selectedVersion == CapabilityAtom::Invalid)
