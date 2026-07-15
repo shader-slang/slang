@@ -1,4 +1,4 @@
-// Language feature test: void-cast to prevent a `[NoDiscard]` warning
+// Language feature test: void-cast to prevent a `[NoDiscard]` error
 //
 // A `(void)` cast is the idiomatic way to silence the `[NoDiscard]`
 // discarded-result error: casting the result to `void` counts as *using*
@@ -6,7 +6,7 @@
 //
 // This test verifies the following:
 // - a `(void)` cast compiles (which was not the case before GitHub issue 11315 was fixed)
-// - `void`-casting the return value of a `[NoDiscard]` function silences the related warning
+// - `void`-casting the return value of a `[NoDiscard]` function silences the related error (E30059)
 // - a `(void)` cast does not remove the side effects of the expression cast to void
 //
 // See also https://github.com/shader-slang/slang/issues/11315
