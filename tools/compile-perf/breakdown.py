@@ -38,8 +38,7 @@ from lib.buckets import (TREE, BUCKET_ORDER, BUCKET_COLOR, API_TREE,
                          API_BUCKET_ORDER, buckets, api_buckets, _t)
 
 
-def esc(s):
-    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+from lib.render import esc  # noqa: F401 — canonical escaper, re-exported
 
 
 

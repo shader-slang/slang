@@ -17,12 +17,12 @@ sys.path.insert(0, HERE)  # allow running from any directory
 
 import breakdown
 import daily_movers
-from lib import analyze, manifest
+from lib import analyze, manifest, render
 
 # One escaper for both report generators. Neither escapes quotes: the
 # interpolated values are controlled workload/tag/date names, never user
 # input, so the &, <, > set is sufficient.
-html_escape = breakdown.esc
+html_escape = render.esc
 
 CSS = """
 body{font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;margin:0;color:#1a1a1a;background:#fafafa}
