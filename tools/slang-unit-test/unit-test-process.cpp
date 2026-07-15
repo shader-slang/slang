@@ -430,14 +430,6 @@ static SlangResult _parentMonitorParentExitTest(UnitTestContext* context, bool t
     return SLANG_OK;
 }
 
-static SlangResult _parentMonitorTest(UnitTestContext* context)
-{
-    SLANG_RETURN_ON_FAIL(_parentMonitorParentExitTest(context, true));
-    SLANG_RETURN_ON_FAIL(_parentMonitorParentExitTest(context, false));
-    SLANG_RETURN_ON_FAIL(_parentMonitorFailureModeTests(context));
-    return SLANG_OK;
-}
-
 static SlangResult _findChildTestServerProcessIds(DWORD parentProcessId, List<DWORD>& outProcessIds)
 {
     ScopedWinHandle snapshot(CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0));
@@ -488,7 +480,8 @@ static SlangResult _testServerParentMonitorIntegrationTest(UnitTestContext* cont
     slangTestCmdLine.addArg("-use-test-server");
     slangTestCmdLine.addArg("-server-count");
     slangTestCmdLine.addArg("1");
-    slangTestCmdLine.addArg("slang-unit-test-tool/CommandLineProcess");
+    slangTestCmdLine.addArg(
+        "slang-unit-test-tool/CommandLineProcessReadCompleteLargeOutput");
 
     PROCESS_INFORMATION slangTestProcessInfo;
     {
@@ -611,18 +604,6 @@ static SlangResult _countTest(UnitTestContext* context, Index size, Index crashI
     return v == endIndex ? SLANG_OK : SLANG_FAIL;
 }
 
-static SlangResult _countTests(UnitTestContext* context)
-{
-    const Index sizes[] = {1, 10, 1000, 1000, 10000, 100000};
-    for (auto size : sizes)
-    {
-        SLANG_RETURN_ON_FAIL(_countTest(context, size));
-        SLANG_RETURN_ON_FAIL(_countTest(context, size, size / 2));
-    }
-
-    return SLANG_OK;
-}
-
 static SlangResult _reflectTest(UnitTestContext* context)
 {
     RefPtr<Process> process;
@@ -653,16 +634,75 @@ static SlangResult _reflectTest(UnitTestContext* context)
     return SLANG_OK;
 }
 
-SLANG_UNIT_TEST(CommandLineProcess)
+SLANG_UNIT_TEST(CommandLineProcessReadCompleteOutput)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(_countTests(unitTestContext)));
-    SLANG_CHECK(SLANG_SUCCEEDED(_reflectTest(unitTestContext)));
-    SLANG_CHECK(SLANG_SUCCEEDED(_httpReflectTest(unitTestContext)));
-    SLANG_CHECK(SLANG_SUCCEEDED(_httpCrashTest(unitTestContext)));
-#if defined(_WIN32)
-    SLANG_CHECK(SLANG_SUCCEEDED(_parentMonitorTest(unitTestContext)));
-#endif
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 1)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 10)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 1000)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 10000)));
 }
+
+SLANG_UNIT_TEST(CommandLineProcessReadImmediateCrash)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 1, 0)));
+}
+
+SLANG_UNIT_TEST(CommandLineProcessReadCrashAtIndexFiveOutput)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 10, 5)));
+}
+
+SLANG_UNIT_TEST(CommandLineProcessReadCrashAtIndexFiveHundredOutput)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 1000, 500)));
+}
+
+SLANG_UNIT_TEST(CommandLineProcessReadCrashAtIndexFiveThousandOutput)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 10000, 5000)));
+}
+
+SLANG_UNIT_TEST(CommandLineProcessReadCompleteLargeOutput)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 100000)));
+}
+
+SLANG_UNIT_TEST(CommandLineProcessReadCrashAtIndexFiftyThousandOutput)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 100000, 50000)));
+}
+
+SLANG_UNIT_TEST(CommandLineProcessReflect)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_reflectTest(unitTestContext)));
+}
+
+SLANG_UNIT_TEST(HTTPPacketConnectionReflect)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_httpReflectTest(unitTestContext)));
+}
+
+SLANG_UNIT_TEST(HTTPPacketConnectionPeerCrash)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_httpCrashTest(unitTestContext)));
+}
+
+#if defined(_WIN32)
+SLANG_UNIT_TEST(TestServerParentMonitorParentTermination)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_parentMonitorParentExitTest(unitTestContext, true)));
+}
+
+SLANG_UNIT_TEST(TestServerParentMonitorParentExit)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_parentMonitorParentExitTest(unitTestContext, false)));
+}
+
+SLANG_UNIT_TEST(TestServerParentMonitorInvalidArguments)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_parentMonitorFailureModeTests(unitTestContext)));
+}
+#endif
 
 SLANG_UNIT_TEST(HTTPHeaderContentLengthValidation)
 {
