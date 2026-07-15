@@ -641,9 +641,10 @@ Extensions
 
 `SPV_EXT_shader_invocation_reorder`
 > Represents the SPIR-V extension for shader invocation reorder (cross-vendor standard).
-> Requires SPV_KHR_ray_tracing and SPIR-V 1.4. Per the spec, SER at 1.4 also needs a
-> physical-storage-buffer extension declared; the SPIR-V emitter adds
-> `SPV_KHR_physical_storage_buffer` on the pre-1.5 path (it is core from 1.5 on).
+> Requires SPV_KHR_ray_tracing and SPIR-V 1.4, plus a physical-storage-buffer extension
+> per the SER spec's 1.4 dependency. The SPIR-V emitter declares
+> `SPV_KHR_physical_storage_buffer` on the pre-1.5 path (it is core from 1.5 on); this
+> dependency records the relationship in the capability model.
 
 `SPV_GOOGLE_user_type`
 > Represents the SPIR-V extension for SPV_GOOGLE_user_type.
