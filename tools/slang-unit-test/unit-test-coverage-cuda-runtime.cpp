@@ -164,6 +164,32 @@ struct CudaDriverApi
 // is a device pointer. This is the value a host must store at
 // `uniformOffset` inside the global-params payload to bind the coverage
 // counter buffer.
+// RAII releases for driver-owned resources. SLANG_CHECK_ABORT throws
+// through the test body, and the test server runs several tests in one
+// process, so a failing assertion must not leak device memory, the
+// loaded module, or the retained primary context — a leaked context in
+// particular can undermine the diagnosis of whichever test runs next.
+struct CudaBufferGuard
+{
+    const CudaDriverApi& api;
+    CudaDevicePtr ptr;
+    ~CudaBufferGuard() { api.cuMemFree(ptr); }
+};
+
+struct CudaModuleGuard
+{
+    const CudaDriverApi& api;
+    CudaModule module;
+    ~CudaModuleGuard() { api.cuModuleUnload(module); }
+};
+
+struct CudaPrimaryContextGuard
+{
+    const CudaDriverApi& api;
+    CudaDevice device;
+    ~CudaPrimaryContextGuard() { api.cuDevicePrimaryCtxRelease(device); }
+};
+
 struct CudaStructuredBufferView
 {
     CudaDevicePtr data = 0;
@@ -346,6 +372,7 @@ static void runCoverageCudaRuntimeTest(
         UnownedStringSlice((const char*)ptxBlob->getBufferPointer(), ptxBlob->getBufferSize()));
     CudaModule cudaModule = nullptr;
     SLANG_CHECK_ABORT(cuda.cuModuleLoadData(&cudaModule, ptx.getBuffer()) == 0);
+    CudaModuleGuard moduleGuard{cuda, cudaModule};
     CudaFunction kernel = nullptr;
     SLANG_CHECK_ABORT(cuda.cuModuleGetFunction(&kernel, cudaModule, "computeMain") == 0);
 
@@ -353,10 +380,12 @@ static void runCoverageCudaRuntimeTest(
     // zero-initialized (counters must start zeroed).
     CudaDevicePtr outputBuffer = 0;
     SLANG_CHECK_ABORT(cuda.cuMemAlloc(&outputBuffer, kThreadCount * sizeof(uint32_t)) == 0);
+    CudaBufferGuard outputGuard{cuda, outputBuffer};
     SLANG_CHECK_ABORT(cuda.cuMemsetD8(outputBuffer, 0, kThreadCount * sizeof(uint32_t)) == 0);
     const size_t counterBytes = size_t(counterCount) * reportedCounterByteWidth;
     CudaDevicePtr counterBuffer = 0;
     SLANG_CHECK_ABORT(cuda.cuMemAlloc(&counterBuffer, counterBytes) == 0);
+    CudaBufferGuard counterGuard{cuda, counterBuffer};
     SLANG_CHECK_ABORT(cuda.cuMemsetD8(counterBuffer, 0, counterBytes) == 0);
 
     // Build the global-params payload. `outputBuffer` is the only
@@ -455,10 +484,6 @@ static void runCoverageCudaRuntimeTest(
         SLANG_CHECK(entriesOnLine == 1);
         SLANG_CHECK(totalCount == expected.expectedCount);
     }
-
-    cuda.cuMemFree(counterBuffer);
-    cuda.cuMemFree(outputBuffer);
-    cuda.cuModuleUnload(cudaModule);
 }
 
 } // anonymous namespace
@@ -501,6 +526,7 @@ SLANG_UNIT_TEST(coverageCudaRuntimeDispatch)
     SLANG_CHECK_ABORT(cuda.cuDeviceGet(&device, 0) == 0);
     CudaContext context = nullptr;
     SLANG_CHECK_ABORT(cuda.cuDevicePrimaryCtxRetain(&context, device) == 0);
+    CudaPrimaryContextGuard contextGuard{cuda, device};
     SLANG_CHECK_ABORT(cuda.cuCtxSetCurrent(context) == 0);
 
     // Default 64-bit counters exercise the 64-bit atomicAdd form; the
@@ -508,6 +534,4 @@ SLANG_UNIT_TEST(coverageCudaRuntimeDispatch)
     // opt-in on CUDA.
     runCoverageCudaRuntimeTest(globalSession, cuda, 8);
     runCoverageCudaRuntimeTest(globalSession, cuda, 4);
-
-    cuda.cuDevicePrimaryCtxRelease(device);
 }

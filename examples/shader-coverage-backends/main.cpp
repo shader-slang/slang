@@ -351,6 +351,16 @@ void report(const CompiledProgram& program, const void* counters, const std::str
         // code) are skipped, matching the LCOV converter's behavior.
         if (!entry.file || entry.line == 0)
             continue;
+        // The metadata contract allows entries with no counter slot of
+        // their own (kInvalidCoverageCounterIndex, for counts derived
+        // from other counters) — skip those, like the sibling examples
+        // and the manifest writer do. Any other index outside the
+        // buffer is a malformed artifact; fail instead of reading out
+        // of bounds.
+        if (entry.counterIndex == slang::kInvalidCoverageCounterIndex)
+            continue;
+        if (entry.counterIndex >= program.counterCount)
+            fail("coverage entry has a counter index outside the counter buffer");
         hitsByLine[entry.line] +=
             readCounter(counters, program.elementByteWidth, entry.counterIndex);
     }
