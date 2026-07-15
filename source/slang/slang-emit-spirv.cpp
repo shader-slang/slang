@@ -2709,6 +2709,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         SpvLiteralInteger::from32(2));
                 }
             }
+        case kIROp_UntypedResourceHandleType:
+        case kIROp_UntypedSamplerHandleType:
+            // `lowerUntypedResourceHandleToUInt` rewrites every untyped descriptor-heap handle to
+            // `uint` before emit, so one reaching here is an internal error (a leak from that
+            // pass).
+            SLANG_UNEXPECTED(
+                "untyped descriptor-heap handle type should have been lowered to uint");
         case kIROp_SubpassInputType:
             return ensureSubpassInputType(inst, cast<IRSubpassInputType>(inst));
         case kIROp_TextureType:
@@ -2835,6 +2842,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 registerInst(inst, inner);
                 return inner;
             }
+        case kIROp_CastUIntToUntypedResourceHandle:
+        case kIROp_CastUntypedResourceHandleToUInt:
+        case kIROp_CastUIntToUntypedSamplerHandle:
+        case kIROp_CastUntypedSamplerHandleToUInt:
+            // The untyped descriptor-heap handle wrap/unwrap casts are an internal representation
+            // that `lowerUntypedResourceHandleToUInt` forwards to their `uint` operand and removes
+            // before emit. Reaching this point means that pass did not run, so this is a bug.
+            SLANG_UNEXPECTED(
+                "untyped descriptor-heap handle cast should have been lowered to uint");
         case kIROp_GlobalParam:
             return emitGlobalParam(as<IRGlobalParam>(inst));
         case kIROp_GlobalVar:
@@ -5082,6 +5098,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 result = inner;
                 break;
             }
+        case kIROp_CastUIntToUntypedResourceHandle:
+        case kIROp_CastUntypedResourceHandleToUInt:
+        case kIROp_CastUIntToUntypedSamplerHandle:
+        case kIROp_CastUntypedSamplerHandleToUInt:
+            // The untyped descriptor-heap handle wrap/unwrap casts are an internal representation
+            // that `lowerUntypedResourceHandleToUInt` forwards to their `uint` operand and removes
+            // before emit. Reaching this point means that pass did not run, so this is a bug.
+            SLANG_UNEXPECTED(
+                "untyped descriptor-heap handle cast should have been lowered to uint");
         case kIROp_CastDescriptorHandleToResource:
             // Convert DescriptorHandle (uint64_t handle) to appropriate resource type
             {
@@ -9291,7 +9316,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             // Float to bool cast.
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
-            auto zero = builder.getIntValue(fromType, 0);
+            auto zero = builder.getFloatValue(fromType, 0.0);
             if (auto vecType = as<IRVectorType>(toTypeV))
             {
                 auto zeroV =
@@ -10184,8 +10209,59 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
 
+    // Return true when floating-point contraction must be disabled for `inst`, i.e.
+    // the effective floating-point mode is `Precise`. The mode comes from the global
+    // `-fp-mode` option, but a function may override it via
+    // `IRFloatingPointModeOverrideDecoration` (e.g. auto-diff forces `Fast` on the
+    // derivative functions it generates), so an inst inside such a function honors the
+    // function's mode rather than the global one.
+    bool isFloatingPointModePrecise(IRInst* inst)
+    {
+        auto mode = m_targetProgram->getOptionSet().getFloatingPointMode();
+        if (auto func = getParentFunc(inst))
+        {
+            if (auto fpModeDecor = func->findDecoration<IRFloatingPointModeOverrideDecoration>())
+                mode = fpModeDecor->getFloatingPointMode();
+        }
+        return mode == FloatingPointMode::Precise;
+    }
+
+    // Under precise floating-point mode, decorate an emitted floating-point arithmetic
+    // instruction with `NoContraction` so the driver may not fuse it (e.g. into an FMA)
+    // or otherwise reassociate the computation -- this is what makes `-fp-mode precise`
+    // meaningful on the direct SPIR-V path (issue #11933). `NoContraction` is only valid
+    // on floating-point arithmetic opcodes, so we gate on the opcode actually emitted:
+    // integer/bitwise/logical ops and floating-point comparisons route through the same
+    // IR arithmetic path but emit other opcodes and are correctly skipped. Callers must
+    // pass only per-element arithmetic results; the `OpCompositeConstruct` that
+    // reassembles a matrix from its rows is not a valid target and is decorated nowhere.
+    void maybeEmitNoContraction(bool isPrecise, SpvInst* result)
+    {
+        if (!isPrecise || !result)
+            return;
+        switch (result->opcode)
+        {
+        case SpvOpFAdd:
+        case SpvOpFSub:
+        case SpvOpFMul:
+        case SpvOpFDiv:
+        case SpvOpFRem:
+        case SpvOpFNegate:
+        case SpvOpVectorTimesScalar:
+            emitOpDecorate(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                getID(result),
+                SpvDecorationNoContraction);
+            break;
+        default:
+            break;
+        }
+    }
+
     SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
     {
+        const bool isPrecise = isFloatingPointModePrecise(inst);
         if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
         {
             auto rowCount = getIntVal(matrixType->getRowCount());
@@ -10211,13 +10287,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         operands.add(originalOperand);
                     }
                 }
-                rows.add(emitVectorOrScalarArithmetic(
+                auto rowResult = emitVectorOrScalarArithmetic(
                     parent,
                     nullptr,
                     rowVectorType,
                     inst->getOp(),
                     inst->getOperandCount(),
-                    operands.getArrayView()));
+                    operands.getArrayView());
+                maybeEmitNoContraction(isPrecise, rowResult);
+                rows.add(rowResult);
             }
             return emitCompositeConstruct(parent, inst, inst->getDataType(), rows);
         }
@@ -10225,13 +10303,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         Array<IRInst*, 4> operands;
         for (UInt i = 0; i < inst->getOperandCount(); i++)
             operands.add(inst->getOperand(i));
-        return emitVectorOrScalarArithmetic(
+        auto result = emitVectorOrScalarArithmetic(
             parent,
             inst,
             inst->getDataType(),
             inst->getOp(),
             inst->getOperandCount(),
             operands.getView());
+        maybeEmitNoContraction(isPrecise, result);
+        return result;
     }
 
     SpvInst* emitDebugLine(SpvInstParent* parent, IRDebugLine* debugLine)

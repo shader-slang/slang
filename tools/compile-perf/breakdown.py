@@ -24,6 +24,7 @@ The metric is the median by default (the suite's reported statistic).
 """
 import argparse
 import inspect
+import daily_movers
 import json
 import os
 import sys
@@ -81,6 +82,45 @@ BUCKET_ORDER = [
 ]
 BUCKET_COLOR = dict(BUCKET_ORDER)
 
+# API-path phase tree: the api-driver's timers nest under apiTotal the same way
+# the compiler timers nest under compileInner, so the same top-down allocator
+# renders api workloads (mode="api") as stacked areas with apiTotal as the top
+# edge. apiLoadModuleSource/apiWriteModule are deliberately absent: they time
+# module-graph-bin's SETUP, which runs outside the apiTotal scope.
+API_TREE = ("apiTotal", [
+    ("apiCreateGlobalSession", []),
+    ("apiCreateSession", []),
+    ("apiLoadModule", []),
+    ("apiFindEntryPoint", []),
+    ("apiComposite", []),
+    ("apiSpecialize", []),
+    ("apiLink", []),
+    ("apiGetCode", []),
+    ("apiReflection", []),
+])
+
+# Session setup = greens, module/entry resolution = blues, per-target work
+# (specialize/link/codegen) = oranges/purples, reflection + residual = greys —
+# fixed like BUCKET_ORDER so api panels stay comparable at a glance.
+API_BUCKET_ORDER = [
+    ("apiCreateGlobalSession", "#c7e9c0"),
+    ("apiCreateSession", "#41ab5d"),
+    ("apiLoadModule", "#2171b5"),
+    ("apiFindEntryPoint", "#6baed6"),
+    ("apiComposite", "#9e9ac8"),
+    ("apiSpecialize", "#807dba"),
+    ("apiLink", "#6a51a3"),
+    ("apiGetCode", "#fd8d3c"),
+    ("apiReflection", "#b5bdc4"),
+    ("apiTotal (self)", "#969696"),
+]
+
+
+def api_buckets(timers):
+    """buckets() over the API-path tree — {bucket: ms} tiling apiTotal."""
+    return buckets(timers, API_TREE)
+
+
 
 def esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -91,10 +131,11 @@ def _t(timers, name):
     return st if isinstance(st, (int, float)) else 0.0
 
 
-def buckets(timers):
-    """Mutually-exclusive {bucket: ms} that sum to compileInner, allocated TOP-DOWN
-    from the compileInner budget. Each parent places its measured children within
-    its budget; the remainder is '<parent> (self)'.
+def buckets(timers, tree=TREE):
+    """Mutually-exclusive {bucket: ms} that sum to the given tree's root total
+    (compileInner for the default compiler-phase TREE, apiTotal for API_TREE),
+    allocated TOP-DOWN from that budget. Each parent places its measured
+    children within its budget; the remainder is '<parent> (self)'.
 
     Slang's phase timers are not perfectly additive — named sub-timers can sum to
     MORE than their parent (e.g. specializeModule + simplifyIR + … exceed
@@ -133,7 +174,7 @@ def buckets(timers):
             if self_ms > 0.05:
                 out[f"{name} (self)"] = out.get(f"{name} (self)", 0.0) + self_ms
 
-    alloc(TREE, _t(timers, "compileInner"))
+    alloc(tree, _t(timers, tree[0]))
     return out
 
 
@@ -282,7 +323,7 @@ def write_html(results_dir, label, metric):
     svg = render_stacked_svg(runs, label, metric)
     outdir = os.path.join(analyze.results_dir_for(results_dir, label), "breakdown")
     os.makedirs(outdir, exist_ok=True)
-    with open(os.path.join(outdir, "breakdown.svg"), "w", encoding="utf-8") as fh:
+    with analyze.open_output(os.path.join(outdir, "breakdown.svg")) as fh:
         fh.write(svg)
     html = (f"<!doctype html><meta charset=utf-8>"
             f"<title>Phase breakdown — {esc(label)}</title>"
@@ -292,7 +333,7 @@ def write_html(results_dir, label, metric):
             f"time not covered by a named child (e.g. the autodiff transform sits "
             f"in <code>linkAndOptimizeIR (self)</code>).</p>{svg}</body>")
     out = os.path.join(outdir, "breakdown.html")
-    with open(out, "w", encoding="utf-8") as fh:
+    with analyze.open_output(out) as fh:
         fh.write(html)
     print(f"wrote {out}  ({len(runs)} workloads)")
     return out
@@ -344,20 +385,29 @@ def _series(results_dir, index_path, metric, bucket_fn):
 
 def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
                              bucket_fn, cols=2, names=None, link_for=None,
-                             title=None, panel=(620, 300)):
+                             title=None, panel=(620, 300), series=None):
     """Small-multiples stacked-AREA chart: one panel per workload, a filled band
-    per bucket across the release history (top edge traces compileInner; own
+    per bucket across the point series named by `index_path`/`series` —
+    release-only or daily, the caller chooses (top edge traces compileInner; own
     zero-based y-axis per panel). `bucket_order`/`bucket_fn` pick the decomposition
     (coarse fe/go vs full sub-counters). If `link_for` maps workload -> href, the
     panel title becomes a link to that page."""
-    order, per = _series(results_dir, index_path, metric, bucket_fn)
+    # `series` lets a caller that already computed (order, per) — e.g.
+    # write_workload_pages rendering one panel per workload — skip the
+    # full-history re-read _series would otherwise do per call. When passed
+    # it fully SUPERSEDES the (results_dir, index_path, metric, bucket_fn)
+    # read, so it must have been computed with the same bucket_fn as
+    # `bucket_order`, or the bands and the legend would disagree.
+    order, per = series if series is not None else _series(
+        results_dir, index_path, metric, bucket_fn)
     nrel = len(order)
 
-    def last_ci(wl):
-        return next((sum(bd.values()) for bd in reversed(per[wl]) if bd), 0) or 0
-
     if names is None:
-        names = sorted(per, key=lambda w: -last_ci(w))
+        # Canonical, CONSTANT panel order (manifest.WORKLOADS order): real-world
+        # first, then api workloads, then pipeline stages front end -> back end.
+        # A cost-based order was used before, but it reshuffled the page every
+        # time timings drifted, so panels were not stable anchors.
+        names = manifest.display_order(per.keys())
     n = len(names)
     rows = (n + cols - 1) // cols
     pw, ph = panel
@@ -464,7 +514,7 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
         s.append(f'<rect x="{lx}" y="{yy}" width="12" height="12" fill="{color}"/>')
         s.append(f'<text x="{lx+16}" y="{yy+10}" fill="#222">{esc(name)}</text>')
     s.append("</svg>")
-    with open(out, "w", encoding="utf-8") as fh:
+    with analyze.open_output(out) as fh:
         fh.write("\n".join(s))
     return out
 
@@ -510,11 +560,34 @@ def _workload_source(spec, head=40, tail=40, ctx=40):
     return n, out
 
 
-def write_workload_pages(results_dir, index_path, metric, outdir):
-    """One detail page per workload: the FULL sub-counter stacked-area history, the
-    workload's description (from its generator's docstring), and the exact compiled
-    Slang source. Returns {workload: href relative to outdir} for the index page."""
-    _, per = _series(results_dir, index_path, metric, buckets)
+def write_workload_pages(results_dir, sections, metric, outdir, back="../index.html",
+                         daily_window=None):
+    """One detail page per workload: the FULL sub-counter stacked-area history —
+    one chart per (title, index_path) SECTION, e.g. an "Across releases" chart
+    and a "Daily tip-of-tree" chart on separate time axes — plus the workload's
+    description (from its generator's docstring) and the exact compiled Slang
+    source. Returns {workload: href relative to outdir} for the index pages."""
+    # One _series per (section, decomposition family) — reused for the name
+    # union, the per-workload presence checks, and every panel render below.
+    # Without this, each (workload x section) pair re-read the full history.
+    cache = {}
+    per = {}
+    for si, (_title, index_path) in enumerate(sections):
+        for bfn_ in (buckets, api_buckets):
+            cache[(si, bfn_)] = _series(results_dir, index_path, metric, bfn_)
+        per.update(cache[(si, buckets)][1])
+    # Daily-window movers table per workload (between the charts and the
+    # source dump): daily points only — release points differ in build
+    # provenance and would masquerade as steps.
+    try:
+        _daily_pts = daily_movers.daily_points(results_dir, metric)
+        if daily_window:
+            # match the daily charts' span (trailing N points) so the table's
+            # d0 -> d1 is the same window the reader sees plotted above it
+            _daily_pts = _daily_pts[-daily_window:]
+    except Exception as e:  # noqa: BLE001 — the table must never sink page rendering
+        print(f"note: daily-progress tables skipped: {e}")
+        _daily_pts = []
     wdir = os.path.join(outdir, "workloads")
     os.makedirs(wdir, exist_ok=True)
     pre = ("background:#f6f8fa;border:1px solid #e3e6ea;border-radius:6px;padding:12px;"
@@ -523,18 +596,101 @@ def write_workload_pages(results_dir, index_path, metric, outdir):
     links = {}
     for wl in sorted(per):
         spec = manifest.BY_NAME.get(wl)
-        svgp = os.path.join(wdir, f"{wl}.svg")
-        render_stacked_multiples(
-            results_dir, index_path, metric, svgp, BUCKET_ORDER, buckets,
-            cols=1, names=[wl], panel=(1040, 440),
-            title=f"{esc(wl)} — full phase breakdown across releases ({esc(metric)} ms)")
-        svg = open(svgp, encoding="utf-8").read()
+        # api workloads decompose apiTotal (driver phases); everything else
+        # decomposes compileInner (compiler phases).
+        is_api = spec is not None and spec.mode == "api"
+        border = API_BUCKET_ORDER if is_api else BUCKET_ORDER
+        bfn = api_buckets if is_api else buckets
+        svg_sections = []
+        for si, (title, index_path) in enumerate(sections):
+            _, sp = cache[(si, bfn)]
+            if wl not in sp or not any(sp[wl]):
+                continue  # no data of this kind (e.g. api workload pre-enablement)
+            svgp = os.path.join(wdir, f"{wl}.{si}.svg")
+            render_stacked_multiples(
+                results_dir, index_path, metric, svgp, border, bfn,
+                cols=1, names=[wl], panel=(1040, 440),
+                title=f"{esc(wl)} — {esc(title)} ({esc(metric)} ms)",
+                series=cache[(si, bfn)])
+            with open(svgp, encoding="utf-8") as f:
+                svg_sections.append((title, f.read()))
+        svg = "".join(
+            f"<h3 style='font-size:15px;margin:18px 0 4px;color:#333'>{esc(t)}</h3>{body}"
+            for t, body in svg_sections)
 
         desc = (inspect.getdoc(spec.gen) if spec and spec.gen else "") or "(no description)"
         flags = " ".join(spec.extra_flags) if spec and spec.extra_flags else "(none)"
         meta = (f"<b>bucket:</b> {esc(spec.bucket)} &nbsp;·&nbsp; <b>compile mode:</b> "
                 f"{esc(spec.mode)} &nbsp;·&nbsp; <b>flags:</b> <code>{esc(flags)}</code> "
                 f"&nbsp;·&nbsp; <b>default N:</b> {spec.default_size}") if spec else ""
+
+        movers_html = ""
+        if len(_daily_pts) >= 2:
+            # Same never-sink-the-render policy as the daily_points guard
+            # above: workload_progress asserts the pp-sum tiling invariant,
+            # and a violated invariant should cost one workload's table (with
+            # a loud note), not the whole page set.
+            try:
+                overall, contributors, extras, steps = daily_movers.workload_progress(
+                    _daily_pts, wl)
+            except Exception as e:  # noqa: BLE001
+                print(f"note: daily-progress table skipped for {wl}: {e}")
+                overall = None
+            if overall:
+                d0, c0, v0, d1, c1, v1, pct = overall
+                pcol = "#1e8449" if pct < 0 else "#c0392b"
+                head = daily_movers.headline(wl)
+
+                def own_cell(own):
+                    return f"{own:+.1f}%" if own is not None else "&ndash;"
+
+                contrib_rows = "".join(
+                    f"<tr><td>{esc(t)}</td>"
+                    f"<td align=right>{d_ms:+.1f}</td>"
+                    f"<td align=right>{own_cell(own)}</td>"
+                    f"<td align=right>{contrib:+.1f}pp</td></tr>"
+                    for t, d_ms, own, contrib in contributors)
+                extra_rows = "".join(
+                    f"<tr><td>{esc(t)}</td>"
+                    f"<td align=right>{d_ms:+.1f}</td>"
+                    f"<td align=right>{own_cell(own)}</td>"
+                    f"<td align=right style='color:#aaa'>&ndash;</td></tr>"
+                    for t, d_ms, own in extras)
+                step_rows = "".join(
+                    f"<tr><td>{esc(dp)} &rarr; {esc(d)}</td>"
+                    f"<td align=right style='color:{'#1e8449' if spct < 0 else '#c0392b'};"
+                    f"font-weight:600'>{spct:+.1f}%</td>"
+                    f"<td><code>{esc(cp)}..{esc(c)}</code></td>"
+                    f"<td>{esc(', '.join(f'{t} {own:+.0f}%' if own is not None else t for t, own in movers))}</td></tr>"
+                    for dp, d, cp, c, spct, movers in steps) or (
+                    "<tr><td colspan=4 style='color:#888'>none</td></tr>")
+                tbl = "border-collapse:collapse;font-size:13px"
+                movers_html = (
+                    f"<h2 style='font-size:17px;margin:26px 0 8px;border-bottom:"
+                    f"2px solid #eee;padding-bottom:4px'>Daily window progress</h2>"
+                    f"<p style='font-size:15px'>Overall <code>{esc(head)}</code>: "
+                    f"{v0:.1f} &rarr; {v1:.1f} ms &nbsp;"
+                    f"<b style='color:{pcol}'>{pct:+.1f}%</b>"
+                    f"<span style='color:#666;font-size:13px'> &nbsp;({esc(d0)} {esc(c0)} "
+                    f"&rarr; {esc(d1)} {esc(c1)})</span></p>"
+                    f"<p style='color:#666;font-size:13px;margin:10px 0 4px'>"
+                    f"Contributors — the mutually-exclusive phase buckets (named leaves + "
+                    f"<code>(self)</code> residuals) that tile {esc(head)}; the pp column "
+                    f"sums to the overall %. Buckets moving the total by &ge;0.2% are "
+                    f"listed, the rest fold into the remainder row. Below them, every other reported counter "
+                    f"(nested/overlapping, e.g. serialized-module reads — own change only):</p>"
+                    f"<table style='{tbl}' cellpadding=5>"
+                    f"<tr><th style='text-align:left'>counter</th><th>&Delta; ms</th>"
+                    f"<th>own %</th><th>of total</th></tr>{contrib_rows}"
+                    f"{extra_rows}</table>"
+                    f"<p style='color:#666;font-size:13px;margin:14px 0 4px'>"
+                    f"Largest day steps (&ge;5% of the previous day, both directions; "
+                    f"bisect with <code>git log &lt;c0&gt;..&lt;c1&gt; -- source/</code>):</p>"
+                    f"<table style='{tbl}' cellpadding=5>"
+                    f"<tr><th style='text-align:left'>boundary</th><th>% vs prev day</th>"
+                    f"<th style='text-align:left'>commits</th>"
+                    f"<th style='text-align:left'>top buckets (own %)</th></tr>"
+                    f"{step_rows}</table>")
 
         _, srcfiles = _workload_source(spec) if spec else (0, [])
         tail_txt = ("show the first 40 lines, the area around computeMain (±40), and the last "
@@ -551,7 +707,7 @@ def write_workload_pages(results_dir, index_path, metric, outdir):
         html = (f"<!doctype html><meta charset=utf-8><title>{esc(wl)} — phase breakdown</title>"
                 f"<body style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;"
                 f"margin:24px;color:#1a1a1a;max-width:1180px'>"
-                f"<p><a href='../index.html'>&larr; all workloads</a></p>"
+                f"<p><a href='{esc(back)}'>&larr; back</a></p>"
                 f"<h1 style='font-size:21px;margin:0 0 6px'>{esc(wl)}</h1>"
                 f"<p style='color:#444;max-width:900px;white-space:pre-wrap'>{esc(desc)}</p>"
                 f"<p style='color:#666;font-size:13px'>{meta}</p>"
@@ -564,16 +720,109 @@ def write_workload_pages(results_dir, index_path, metric, outdir):
                 f"band traces compileInner; hover a band for its phase.</p>"
                 f"<div style='border:1px solid #eee;border-radius:6px;padding:8px;overflow:auto'>"
                 f"{svg}</div>"
+                f"{movers_html}"
                 f"<h2 style='font-size:17px;margin:26px 0 8px;border-bottom:2px solid #eee;"
                 f"padding-bottom:4px'>Compiled Slang source</h2>"
                 f"<p style='color:#666;font-size:13px'>{esc(size_note)}</p>{code_html}"
                 f"</body>")
-        with open(os.path.join(wdir, f"{wl}.html"), "w", encoding="utf-8") as fh:
+        with analyze.open_output(os.path.join(wdir, f"{wl}.html")) as fh:
             fh.write(html)
         links[wl] = f"workloads/{wl}.html"
     return links
 
 
+def render_stacked_sweep(results_dir, label, metric, out, cols=2, panel=(560, 300),
+                         names=None, title=None):
+    """Stacked-AREA small multiples for ONE build's --sweep run: per workload, the
+    phase sub-counters stacked across sweep sizes N (x-axis linear in N, top edge =
+    compileInner), showing how each phase's share scales as the workload grows.
+    Pass `names=[wl]` (with cols=1) to render a single workload for its own page."""
+    runs = json.load(open(analyze.results_path(results_dir, label)))
+    per = {}
+    for r in runs:
+        if r.get("size", 0) <= 0:
+            continue
+        timers = {k: v[metric] for k, v in r["timers"].items() if v}
+        per.setdefault(r["workload"], {})[r["size"]] = buckets(timers)
+    series = {wl: sorted(bs.items()) for wl, bs in per.items() if len(bs) >= 2}
+    if names is None:
+        names = sorted(series, key=lambda w: -sum(series[w][-1][1].values()))
+    else:
+        names = [w for w in names if w in series]
+    n = len(names)
+    cols = min(cols, n) or 1
+    rows = (n + cols - 1) // cols
+    pw, ph = panel
+    ml, mt, mr, mb = 60, 32, 16, 44
+    cw, chh = ml + pw + mr, mt + ph + mb
+    W = cols * cw + 16
+    legend_cols = min(len(BUCKET_ORDER), 4)
+    legend_rows = (len(BUCKET_ORDER) + legend_cols - 1) // legend_cols
+    H = rows * chh + 56 + legend_rows * 18 + 24
+
+    if title is None:
+        title = f"Phase composition vs size N — stacked sub-counters ({esc(label)}, {esc(metric)} ms)"
+    s = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
+         f'viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet" '
+         f'font-family="sans-serif" font-size="13">',
+         f'<rect width="{W}" height="{H}" fill="white"/>',
+         f'<text x="12" y="30" font-size="20" font-weight="bold">{title}</text>']
+
+    for k, wl in enumerate(names):
+        pts = series[wl]
+        sizes = [sz for sz, _ in pts]
+        nmin, nmax = sizes[0], sizes[-1]
+        cis = [sum(bd.values()) for _, bd in pts]
+        hi = (max(cis) or 1.0) * 1.08
+        r, c = divmod(k, cols)
+        ox, oy = 8 + c * cw, 44 + r * chh
+        ymap = lambda v: oy + mt + ph - (v / hi) * ph
+        xmap = lambda x: ox + ml + ((x - nmin) / (nmax - nmin) * pw if nmax > nmin else pw / 2)
+
+        ratio = cis[-1] / cis[0] if cis[0] else None
+        rtxt = f"  {ratio:.1f}× over N {nmin}→{nmax}" if ratio else ""
+        s.append(f'<text x="{ox+ml}" y="{oy+16}" font-size="15" font-weight="600">'
+                 f'{esc(wl)}<tspan fill="#888" font-weight="400">{esc(rtxt)}</tspan></text>')
+
+        for frac in (0.0, 0.5, 1.0):
+            yv = hi * frac
+            y = ymap(yv)
+            s.append(f'<line x1="{ox+ml:.1f}" y1="{y:.1f}" x2="{ox+ml+pw:.1f}" y2="{y:.1f}" stroke="#eee"/>')
+            lbl = f"{yv:.0f}" if yv >= 10 else f"{yv:.1f}"
+            s.append(f'<text x="{ox+ml-4:.1f}" y="{y+3:.1f}" text-anchor="end" fill="#999">{lbl}</text>')
+        s.append(f'<line x1="{ox+ml:.1f}" y1="{oy+mt:.1f}" x2="{ox+ml:.1f}" y2="{oy+mt+ph:.1f}" stroke="#333"/>')
+        s.append(f'<line x1="{ox+ml:.1f}" y1="{oy+mt+ph:.1f}" x2="{ox+ml+pw:.1f}" y2="{oy+mt+ph:.1f}" stroke="#333"/>')
+        for sz in sizes:
+            x = xmap(sz)
+            s.append(f'<line x1="{x:.1f}" y1="{oy+mt+ph:.1f}" x2="{x:.1f}" y2="{oy+mt+ph+3:.1f}" stroke="#999"/>')
+            s.append(f'<text x="{x:.1f}" y="{oy+mt+ph+16:.1f}" text-anchor="middle" fill="#666">{sz}</text>')
+        s.append(f'<text x="{ox+ml+pw/2:.0f}" y="{oy+mt+ph+34:.0f}" text-anchor="middle" fill="#444">N</text>')
+
+        m = len(pts)
+        lower = [0.0] * m
+        for name, color in BUCKET_ORDER:
+            if all(bd.get(name, 0.0) <= 0 for _, bd in pts):
+                continue
+            upper = [lower[i] + pts[i][1].get(name, 0.0) for i in range(m)]
+            top = [f"{xmap(sizes[i]):.1f},{ymap(upper[i]):.1f}" for i in range(m)]
+            bot = [f"{xmap(sizes[i]):.1f},{ymap(lower[i]):.1f}" for i in reversed(range(m))]
+            s.append(f'<polygon points="{" ".join(top + bot)}" fill="{color}" '
+                     f'fill-opacity="0.9" stroke="#fff" stroke-width="0.4">'
+                     f'<title>{esc(wl)} — {esc(name)}</title></polygon>')
+            lower = upper
+
+    ly = 44 + rows * chh + 6
+    s.append(f'<text x="12" y="{ly}" fill="#666" font-weight="600">phase buckets</text>')
+    for i, (name, color) in enumerate(BUCKET_ORDER):
+        col, row = i % legend_cols, i // legend_cols
+        lx = 12 + col * ((W - 24) // legend_cols)
+        yy = ly + 8 + row * 18
+        s.append(f'<rect x="{lx}" y="{yy}" width="12" height="12" fill="{color}"/>')
+        s.append(f'<text x="{lx+16}" y="{yy+10}" fill="#222">{esc(name)}</text>')
+    s.append("</svg>")
+    with analyze.open_output(out) as fh:
+        fh.write("\n".join(s))
+    return out
 
 
 def main():
@@ -600,3 +849,31 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# Import-time self-check for the pp-sum tiling contract between this module's
+# buckets and daily_movers.workload_progress. It lives HERE, not in
+# daily_movers, because this is the only placement safe in both import
+# orders: by this line breakdown's bucket functions exist and daily_movers
+# (imported at the top) is fully initialized, so _partition's lazy
+# `import breakdown` resolves to a complete module.
+# The fixture includes compileInner's DIRECT children (frontEndExecute,
+# generateOutput) so alloc() actually descends: named-leaf buckets, (self)
+# residuals at two levels, and the pp sum are all exercised, not just a
+# single degenerate compileInner (self) bucket.
+_T0 = ("2026-01-01", "aaaaaaaaa",
+       {("w", "compileInner"): 100.0, ("w", "frontEndExecute"): 70.0,
+        ("w", "SemanticChecking"): 40.0, ("w", "generateIR"): 20.0,
+        ("w", "generateOutput"): 25.0})
+_T1 = ("2026-01-02", "bbbbbbbbb",
+       {("w", "compileInner"): 80.0, ("w", "frontEndExecute"): 60.0,
+        ("w", "SemanticChecking"): 30.0, ("w", "generateIR"): 25.0,
+        ("w", "generateOutput"): 15.0})
+_ov, _contrib, _ex, _st = daily_movers.workload_progress([_T0, _T1], "w")
+assert _ov is not None and abs(_ov[6] - (-20.0)) < 1e-9, \
+    "workload_progress fixture: headline 100 -> 80 ms must be -20%"
+assert len(_contrib) >= 4, \
+    "workload_progress fixture must produce a MULTI-bucket partition"
+assert abs(sum(c[3] for c in _contrib) - _ov[6]) < 1e-9, \
+    "workload_progress fixture: contributor pp must sum to the overall %"
+del _T0, _T1, _ov, _contrib, _ex, _st

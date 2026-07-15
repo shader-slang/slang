@@ -7560,7 +7560,7 @@ __device__ inline void mmaStore(void* ptr, const uint32_t* regs, int stride)
 //     __CUDA_NO_HALF2_OPERATORS__ so the prelude can supply HLSL-friendly versions).
 //   - __nv_bfloat162 ops come straight from <cuda_bf16.h>.
 // So this trait only needs to expose the pair type and the per-type broadcast
-// intrinsic — arithmetic in the WmmaFragment operator overloads can use native
+// intrinsic - arithmetic in the WmmaFragment operator overloads can use native
 // `+`, `-`, `*`, `/`, unary `-` directly.
 // ====================================================================================
 
@@ -8024,7 +8024,7 @@ struct WmmaFragment
     __device__ unsigned FragmentRead(int regIndex) const { return regs[regIndex]; }
 
     // Uses movmatrix.sync.aligned.m8n8.trans.b16 to transpose each 8x8 sub-block
-    // independently. Does NOT swap off-diagonal blocks — this reinterprets
+    // independently. Does NOT swap off-diagonal blocks - this reinterprets
     // row-major as column-major (and vice versa) without a full 16x16 transpose.
     //
     // Before:  reg0=A00, reg1=A10, reg2=A01, reg3=A11
@@ -8103,7 +8103,7 @@ struct WmmaFragment
 //
 // Register layout for m16n16k16 = 2x m16n8k16:
 //   A: 4 regs (shared between both calls)
-//   B: 4 regs (b[0:1] → lo N-half, b[2:3] → hi N-half)
+//   B: 4 regs (b[0:1] -> lo N-half, b[2:3] -> hi N-half)
 //   C/D half:  4 regs (2 per sub-tile)
 //   C/D float: 8 regs (4 per sub-tile)
 //
@@ -8195,7 +8195,7 @@ __device__ inline void mma<__nv_bfloat16, float, 16, 8, 16>(
 //
 // Override the generic WMMA-based Fp16MMAHelper for the m16n16k16 shape.
 // Each specialization fixes CType, DType AND M=16,N=16,K=16, making it
-// strictly more specialized than the corresponding generic — no ambiguity.
+// strictly more specialized than the corresponding generic - no ambiguity.
 // ====================================================================================
 
 template<typename CType, typename DType, int M, int N, int K>
@@ -8399,7 +8399,7 @@ __device__ inline void mma_sat<unsigned char, int32_t, 16, 8, 16>(
 // Int8MMAHelper m16n16k16 (via 2x mma.sync.m16n8k16)
 //
 // Register layout for m16n16k16 = 2x m16n8k16 with 8-bit inputs / 32-bit accum:
-//   A: 2 regs per thread (shared between both calls — A is full-width for both N halves)
+//   A: 2 regs per thread (shared between both calls - A is full-width for both N halves)
 //   B: 2 regs per thread (b[0] -> lo N-half cols 0..7, b[1] -> hi N-half cols 8..15)
 //   C/D: 8 regs per thread (4 per sub-tile)
 // ====================================================================================
@@ -8562,7 +8562,7 @@ struct Fp8MMAHelper<AInputT, half, half, 16, 16, 16>
 // Selects between Fp16MMAHelper (half x half), Bf16MMAHelper (bfloat16 x bfloat16),
 // Int8MMAHelper (s8/u8 x s32 accumulator), and Fp8MMAHelper (e4m3/e5m2 x f16/f32
 // accumulator) based on the input element type.  AType is required to equal BType
-// — the supported PTX shapes always have matching A/B element types.
+// - the supported PTX shapes always have matching A/B element types.
 // ====================================================================================
 
 template<

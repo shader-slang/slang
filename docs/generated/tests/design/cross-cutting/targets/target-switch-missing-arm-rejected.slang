@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#how-target-choice-affects-ir
-//META: doc_section_digest=96146019aaea16661ac66159cf8328c2ae1406fa65d0708df73480a207c02e9c
+//META: doc_section_digest=6f7f7ef77b73b73b7a036bdae99ff624ab46818ddb538ebde1c189c05207c5c0
 //META: purpose=A `__target_switch` with no arm matching the active target and no `default:` is rejected with a stage / capability diagnostic when reached from an entry point on the unmatched target.
 //META: intent=negative
 //META: pipeline_stage=check

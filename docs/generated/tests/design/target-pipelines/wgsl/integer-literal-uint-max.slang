@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T21:00:00Z
 //META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#phase-d-wgsl-emit-and-downstream-tools
-//META: doc_section_digest=287321dc153823860396c030325e4ad4c0f6064005fa37b19c8ba53087dcd3e6
+//META: doc_section_digest=602dd96dd9a5139f2ccd4e3f857107fe47c9705a3ba52eae7e88a90893f9d664
 //META: purpose=The uint literal 0xFFFFFFFFu emits as u32(4294967295) at the upper edge of the unsigned integer range
 //META: intent=boundary
 //META: pipeline_stage=emit
