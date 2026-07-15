@@ -5523,13 +5523,6 @@ fatal(
     span { loc = "location", message = "generic specialization for '~generic:IRInst' recursively re-entered the same specialization key." }
 )
 
-err(
-    "hit-object-requires-ser-capability",
-    55215,
-    "HitObject requires a shader-execution-reordering capability",
-    span { loc = "location", message = "cannot emit HitObject for the current target: shader-execution-reordering on HLSL requires either SM 6.9 (native DXR) or the explicit 'nvapi_hit_objects' capability." }
-)
-
 fatal(
     "generic-specialization-budget-exceeded",
     55207,
@@ -5577,6 +5570,13 @@ err(
     55214,
     "shader-terminating intrinsic in non-inlinable callee",
     span { loc = "location", message = "a shader-terminating intrinsic ('IgnoreHit' or 'AcceptHitAndEndSearch') is reachable from this ray entry point only through a call that could not be inlined (for example, recursion); mark the intervening function(s) '[ForceInline]' or call the intrinsic directly in the entry point so the ray payload is written back before the ray terminates." }
+)
+
+err(
+    "hit-object-requires-ser-capability",
+    55215,
+    "HitObject requires a shader-execution-reordering capability",
+    span { loc = "location", message = "cannot emit HitObject for the current target: shader-execution-reordering on HLSL requires either SM 6.9 (native DXR) or the explicit 'nvapi_hit_objects' capability." }
 )
 
 err(

@@ -6,6 +6,10 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile sm_6_5 -entry main -stage raygeneration -capability nvapi_hit_objects
 
+// Negative: on a plain native SM 6.9 target (no nvapi_hit_objects) GetClusterID has no arm — it is
+// an NVAPI/SPIRV/CUDA-only extension — so it is a clean capability error, not native DXR codegen.
+//DIAGNOSTIC_TEST:SIMPLE(diag=NATIVE_ERR,non-exhaustive): -target hlsl -profile sm_6_9 -entry main -stage raygeneration
+
 //TEST_INPUT: set scene = AccelerationStructure
 uniform RaytracingAccelerationStructure scene;
 
@@ -30,5 +34,6 @@ void main()
     // CHECK: NvHitObject
     // CHECK: .GetClusterID
     // CHECK-NOT: dx::HitObject
+    // NATIVE_ERR: 41011
     outputBuffer[0] = ht.IsHit() ? (uint)ht.GetClusterID() : 0u;
 }
