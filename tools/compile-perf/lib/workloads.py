@@ -443,6 +443,103 @@ def gen_sema_generics(n):
     return {"sema_generics.slang": "".join(s)}
 
 
+def gen_generic_nesting(n):
+    """One generic struct instantiated with itself n levels deep: a chain of
+    `typealias T_i = Pair<Leaf, T_{i-1}>` where `Pair` is constrained to an
+    interface that extends another. Every other generic workload in the suite
+    scales BREADTH (many shallow instantiations); this one scales DEPTH, the
+    axis on which the front-end's substitution / inheritance-witness work is
+    known to multiply per level. The shape arises in real code that composes
+    generic "model"/"module" types recursively (e.g. chained ML evaluator
+    stacks), where each wrapper layer adds one level of nesting.
+
+    Scaling null: each level adds O(1) declarations, so ideal front-end cost
+    is O(n). Measured behavior when this was added (2026-07): substitution
+    work grows ~3-4x PER LEVEL (exponential), with the wall-clock knee near
+    depth 18 — v2025.14 through tip-of-tree all take ~17-20 s at depth 24.
+    The sweep ladder deliberately stays at or below the knee; the finding to
+    watch is the top rung's multiple of the linear expectation moving.
+    """
+    s = [_HEADER]
+    s.append("interface IBase {}\n")
+    s.append("interface IModel : IBase {}\n")
+    s.append("struct Leaf : IModel {}\n\n")
+    s.append("struct Pair<First : IModel, Second : IModel> : IModel\n")
+    s.append("{\n    First first;\n    Second second;\n}\n\n")
+    s.append("typealias T0 = Leaf;\n")
+    for i in range(1, n + 1):
+        s.append(f"typealias T{i} = Pair<Leaf, T{i-1}>;\n")
+    s.append(f"\nT{n} value;\n\n")
+    s.append('[shader("compute")]\n[numthreads(1, 1, 1)]\n')
+    s.append("void computeMain() {}\n")
+    return {"generic_nesting.slang": "".join(s)}
+
+
+def gen_generic_nesting_eval(n):
+    """The generic_nesting chain with a method REQUIRED by the constraint
+    interface and called recursively through the witnesses (`first.eval() +
+    second.eval()`), so overload resolution and inheritance-witness lookup run
+    at every nesting level instead of only type checking the aliases. Same
+    depth axis as generic_nesting, much steeper constant: measured ~2.9x per
+    level when added (2026-07), vs ~3-4x per level from substitution alone
+    but starting an order of magnitude higher at equal depth.
+
+    Scaling null: each level adds O(1) declarations and one call site, so
+    ideal front-end cost is O(n). The ladder tops out below generic_nesting's
+    because the per-level multiplier bites sooner.
+    """
+    s = [_HEADER]
+    s.append("interface IBase {}\n")
+    s.append("interface IModel : IBase { float eval(); }\n")
+    s.append("struct Leaf : IModel { float eval() { return 1.0; } }\n\n")
+    s.append("struct Pair<First : IModel, Second : IModel> : IModel\n")
+    s.append("{\n    First first;\n    Second second;\n")
+    s.append("    float eval() { return first.eval() + second.eval(); }\n}\n\n")
+    s.append("typealias T0 = Leaf;\n")
+    for i in range(1, n + 1):
+        s.append(f"typealias T{i} = Pair<Leaf, T{i-1}>;\n")
+    s.append("\nRWStructuredBuffer<float> outBuf;\n\n")
+    s.append('[shader("compute")]\n[numthreads(1, 1, 1)]\n')
+    s.append(f"void computeMain() {{ T{n} v; outBuf[0] = v.eval(); }}\n")
+    return {"generic_nesting_eval.slang": "".join(s)}
+
+
+def gen_interface_depth(n):
+    """A linear interface inheritance chain n deep (`interface I_k : I_{k-1}`)
+    with one struct conforming to the most-derived interface (`I_n`) and one
+    generic function constrained to the ROOT (`I0`), so satisfying the
+    constraint walks the inheritance chain through all n levels.
+    Scales the interface-hierarchy depth axis of calcInheritanceInfo — a
+    different graph than generic_nesting's type-argument nesting.
+
+    Scaling null: each level adds O(1) declarations, so ideal inheritance-
+    info cost is O(n) (or O(n^2) for an all-pairs facet walk); measured
+    ~N^3.4 when added (2026-07).
+    """
+    s = [_HEADER]
+    s.append("interface I0 { float get(); }\n")
+    for i in range(1, n + 1):
+        s.append(f"interface I{i} : I{i-1} {{ }}\n")
+    s.append(f"\nstruct S : I{n} {{ float get() {{ return 1.0; }} }}\n\n")
+    s.append("float use<T : I0>(T t) { return t.get(); }\n\n")
+    s.append("RWStructuredBuffer<float> outBuf;\n\n")
+    s.append('[shader("compute")]\n[numthreads(1, 1, 1)]\n')
+    s.append("void computeMain() { S s; outBuf[0] = use(s); }\n")
+    return {"interface_depth.slang": "".join(s)}
+
+
+# Import-time smoke checks: these generators' output is only ever compiled by
+# the nightly bench, so a broken template (bad f-string, malformed chain)
+# would otherwise merge cleanly and surface as a lost nightly data point.
+assert "typealias T4 = Pair<Leaf, T3>;" in \
+    gen_generic_nesting(4)["generic_nesting.slang"]
+assert "T4 v; outBuf[0] = v.eval();" in \
+    gen_generic_nesting_eval(4)["generic_nesting_eval.slang"]
+_id_src = gen_interface_depth(4)["interface_depth.slang"]
+assert "interface I4 : I3 { }" in _id_src and "struct S : I4" in _id_src
+del _id_src
+
+
 # --------------------------------------------------------------------------- #
 # Type checking: operator overload resolution + implicit conversions
 # --------------------------------------------------------------------------- #

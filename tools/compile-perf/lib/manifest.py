@@ -122,6 +122,33 @@ WORKLOADS = [
     # exactly once and cannot separate: session creation (core-module load),
     # per-compile fixed overhead across many small kernels, and import
     # resolution over a deep module graph.
+    # ---- rt_renderer: generated renderer-shaped corpus (DESIGN.md Phase 2) --
+    # Few×HEAVY programs over a ~100-module utility/scene/material library
+    # behind IMaterial/IBSDF interfaces — the real-application shape where each
+    # program pays the whole library's import cost. n = material count.
+    WorkloadSpec(
+        name="rt_renderer",
+        bucket="rt_renderer",
+        gen=workloads.gen_rt_renderer,
+        default_size=24,
+        mode="api",
+        api_cmd="rt-composite",
+        api_root="rt_kernels",
+        primary_timers=["apiTotal", "apiLoadModule", "apiGetCode"],
+    ),
+    # One compute-kernel variant per material via IEntryPoint::specialize —
+    # link-time specialization against interface-heavy cross-module code.
+    WorkloadSpec(
+        name="rt_renderer_specialize",
+        bucket="rt_renderer",
+        gen=workloads.gen_rt_renderer,
+        default_size=24,
+        mode="api",
+        api_cmd="specialize",
+        api_root="rt_compute",
+        api_flags=["--impl-prefix", "Material_"],
+        primary_timers=["apiTotal", "apiGetCode", "apiSpecialize"],
+    ),
     WorkloadSpec(
         name="api_session_create",
         bucket="api_overhead",
@@ -189,33 +216,6 @@ WORKLOADS = [
         api_root="spec_root",
         primary_timers=["apiSpecialize", "apiLink", "apiGetCode", "apiTotal"],
     ),
-    # ---- rt_renderer: generated renderer-shaped corpus (DESIGN.md Phase 2) --
-    # Few×HEAVY programs over a ~100-module utility/scene/material library
-    # behind IMaterial/IBSDF interfaces — the real-application shape where each
-    # program pays the whole library's import cost. n = material count.
-    WorkloadSpec(
-        name="rt_renderer",
-        bucket="rt_renderer",
-        gen=workloads.gen_rt_renderer,
-        default_size=24,
-        mode="api",
-        api_cmd="rt-composite",
-        api_root="rt_kernels",
-        primary_timers=["apiTotal", "apiLoadModule", "apiGetCode"],
-    ),
-    # One compute-kernel variant per material via IEntryPoint::specialize —
-    # link-time specialization against interface-heavy cross-module code.
-    WorkloadSpec(
-        name="rt_renderer_specialize",
-        bucket="rt_renderer",
-        gen=workloads.gen_rt_renderer,
-        default_size=24,
-        mode="api",
-        api_cmd="specialize",
-        api_root="rt_compute",
-        api_flags=["--impl-prefix", "Material_"],
-        primary_timers=["apiTotal", "apiGetCode", "apiSpecialize"],
-    ),
 
     # ---- per-compile floor (core-module load + link) ---------------------
     WorkloadSpec(
@@ -258,6 +258,43 @@ WORKLOADS = [
         mode="module",
         primary_timers=["SemanticChecking", "frontEndExecute"],
         sweep_sizes=[125, 250, 500, 1000],
+    ),
+    WorkloadSpec(
+        name="generic_nesting",
+        bucket="sema",
+        gen=workloads.gen_generic_nesting,
+        # size = nesting DEPTH, not declaration count: the known substitution
+        # blowup is exponential (~3-4x per level, knee ~depth 18), so the
+        # ladder stays at/below the knee to keep sweep runtime sane while the
+        # top rung still exposes the multiple over the linear expectation.
+        default_size=16,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[8, 12, 16, 20],
+    ),
+    WorkloadSpec(
+        name="generic_nesting_eval",
+        bucket="sema",
+        gen=workloads.gen_generic_nesting_eval,
+        # size = nesting depth, as in generic_nesting; the witness-method
+        # calls multiply the per-level cost, so the ladder tops out at 14
+        # (~0.5 s) where generic_nesting can afford 20.
+        default_size=12,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[8, 10, 12, 14],
+    ),
+    WorkloadSpec(
+        name="interface_depth",
+        bucket="sema",
+        gen=workloads.gen_interface_depth,
+        # size = interface inheritance chain depth (linear chain, not generic
+        # nesting); measured ~N^3.4 at 2026-07, so 128 (~0.4 s) caps the
+        # ladder.
+        default_size=64,
+        mode="module",
+        primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[16, 32, 64, 128],
     ),
     WorkloadSpec(
         name="conformance",

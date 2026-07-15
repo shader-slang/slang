@@ -228,9 +228,10 @@ jobs:
           git config user.email "slang-perf-bot@users.noreply.github.com"
 
           cp -r "$ANALYSIS/." .
-          mv report_per_workload.html index.html
-          # _combined_index.json is a derived intermediate — no need to serve it
-          rm -f _combined_index.json
+          # report.py writes index.html (the landing page) directly;
+          # report_per_workload.html is kept as a redirect for old bookmarks.
+          # the _*_index.json files are derived intermediates — no need to serve them
+          rm -f _combined_index.json _releases_index.json _daily_index.json
           # Serve files verbatim: without this marker GitHub Pages runs the
           # generated report through legacy Jekyll, whose builds have failed
           # or hung on this content. Must be re-created on every deploy

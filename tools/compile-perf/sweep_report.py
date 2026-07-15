@@ -630,7 +630,7 @@ def publish_all(results_dir, metric, outdir):
          "archived sweep is listed here.</p>",
          "<h2>Daily tip-of-tree sweeps</h2>", table(rows_d),
          "<h2>Release sweeps</h2>", table(rows_r),
-         '<p class="small"><a href="../report_per_workload.html">back to the main report</a></p>',
+         '<p class="small"><a href="../index.html">back to the main report</a></p>',
          "</div>"]
     out = os.path.join(outdir, "index.html")
     with analyze.open_output(out) as fh:
