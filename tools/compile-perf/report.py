@@ -236,9 +236,91 @@ def main():
                       extra_html=(movers_block(dpoints_all[-args.daily_window:], names)
                                   if cad == "tot" else ""))
 
+    # Memory cadence pages: line panels (memory components do not tile a
+    # total, so no stacked areas). Every point's canonical records are read
+    # once per cadence; points that predate memory collection render as gaps.
+    def memory_series(recs):
+        labels, per = [], {}
+        for rec in recs:
+            tag = rec["tag"]
+            labels.append(rec["date"] if rec.get("kind") == "daily" else tag)
+            vals = {}
+            p = analyze.results_path(args.results, tag)
+            if os.path.exists(p):
+                for run in analyze.canonical_runs(analyze.read_json(p)):
+                    for cnt, st in (run.get("timers") or {}).items():
+                        if analyze.unit_of(cnt) == "kb" and st:
+                            vals[(run["workload"], cnt)] = st.get(args.metric)
+            for key in set(per) | set(vals):
+                per.setdefault(key, [None] * (len(labels) - 1)).append(vals.get(key))
+            for key in per:
+                if len(per[key]) < len(labels):
+                    per[key].append(None)
+        return labels, per
+
+    def mib(vs):
+        return [v / 1024.0 if v is not None else None for v in vs]
+
+    def memory_page(recs, fname, cad_title, note):
+        labels, per = memory_series(recs)
+        floor = per.get(("minimal", "peakRssKb"), [None] * len(labels))
+        panels = []
+        if any(v is not None for v in floor):
+            panels.append(render.line_panel(
+                labels, [("minimal peak RSS", "#2171b5", mib(floor))],
+                "Session floor — minimal workload peak RSS", unit="MiB"))
+        sc = [(wl, vs) for (wl, cnt), vs in per.items()
+              if cnt == "apiCreateGlobalSessionRssDeltaKb"
+              and any(v is not None for v in vs)]
+        if sc:
+            colors = ["#e6550d", "#6a51a3", "#41ab5d", "#2171b5"]
+            series = [(wl, colors[i % len(colors)], mib(vs))
+                      for i, (wl, vs) in enumerate(sorted(sc)[:4])]
+            panels.append(render.line_panel(
+                labels, series,
+                "createGlobalSession RSS delta (api driver)", unit="MiB"))
+        deltas = []
+        for (wl, cnt), vs in per.items():
+            if cnt != "peakRssKb" or wl == "minimal":
+                continue
+            dv = [v - f if v is not None and f is not None else None
+                  for v, f in zip(vs, floor)]
+            if any(v is not None for v in dv):
+                last = next((v for v in reversed(dv) if v is not None), 0.0)
+                deltas.append((abs(last), wl, dv))
+        for _mag, wl, dv in sorted(deltas, reverse=True):
+            panels.append(render.line_panel(
+                labels, [(f"{wl} − minimal", "#e6550d", mib(dv))],
+                f"{wl} — peak RSS over the session floor", unit="MiB"))
+        body = "".join(f'<span style="display:inline-block;margin:6px">{p}</span>'
+                       for p in panels)
+        grid_page(os.path.join(outdir, fname),
+                  f"Memory — {cad_title}",
+                  "peak RSS per workload (delta over the minimal-workload "
+                  "session floor) and api-driver RSS deltas; components do "
+                  "not tile a total, so panels are line charts, not stacks",
+                  note, body or None)
+        return bool(panels)
+
+    have_memory = memory_page(dailies, "memory-tot.html",
+                              "daily tip-of-tree", day_note)
+    have_memory |= memory_page(releases, "memory-releases.html",
+                               "across releases", rel_note)
+
     # Landing page: stacked section rows — API & RT on top, microbenchmarks,
     # then the sweeps archive.
     n_rel, n_day = len(releases), len(dailies)
+    # latest daily point's minimal-workload peak RSS — the #9817 headline
+    floor_mib = None
+    if dailies:
+        p = analyze.results_path(args.results, dailies[-1]["tag"])
+        if os.path.exists(p):
+            for run in analyze.canonical_runs(analyze.read_json(p)):
+                if run["workload"] == "minimal":
+                    st = (run.get("timers") or {}).get("peakRssKb")
+                    if st and st.get(args.metric):
+                        floor_mib = st[args.metric] / 1024.0
+                    break
     last_daily = dailies[-1]["tag"] if dailies else "-"
     last_rel = releases[-1]["tag"] if releases else "-"
     d0 = dailies[0]["date"] if dailies else "-"
@@ -266,6 +348,12 @@ def main():
         "Compiler microbenchmarks", "microbench",
         f"{len(compiler_names)} workloads, one compiler pass each — parse "
         "&rarr; sema &rarr; IR &rarr; specialization &rarr; backends."))
+    rows.append(secrow(
+        "Memory footprint", "memory",
+        "peak RSS per workload and createGlobalSession deltas — see "
+        "shader-slang/slang#9817 / #12113." +
+        ("" if have_memory else " No data yet: points appear from the first "
+         "nightly after memory collection landed.")))
     rows.append('<div class="secrow"><b>Complexity sweeps</b>'
                 # explicit index.html so the link also works when the report
                 # is browsed from disk (file:// has no directory index)
@@ -280,7 +368,9 @@ def main():
          '<div class="wrap">', "<h1>Slang compile-time performance</h1>",
          f'<p class="status">latest nightly: <b>{html_escape(last_daily)}</b> &nbsp;·&nbsp; '
          f'latest release in charts: <b>{html_escape(last_rel)}</b> &nbsp;·&nbsp; '
-         f'{n_rel} releases + {n_day} daily points · metric: {args.metric}</p>',
+         f'{n_rel} releases + {n_day} daily points · metric: {args.metric}'
+         + (f" &nbsp;·&nbsp; session floor: <b>{floor_mib:.0f} MiB</b>"
+            if floor_mib else "") + "</p>",
          *rows,
          '<p class="small">Data: <a href="https://github.com/shader-slang/slang-compile-perf">'
          "slang-compile-perf</a> · methodology: tools/compile-perf/DESIGN.md in the slang "

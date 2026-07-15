@@ -281,16 +281,17 @@ via `--results <checkout-path>`.
 
 **Regenerable / local only (gitignored from the results repo):**
 
-| Path                                                    | What it is                                                |
-| ------------------------------------------------------- | --------------------------------------------------------- |
-| `results/analysis/*.svg`                                | charts                                                    |
-| `results/analysis/index.html`                           | landing page (status strip + section navigation)          |
-| `results/analysis/{api,microbench}-{tot,releases}.html` | the four cadence pages (charts + ToT movers tables)       |
-| `results/analysis/report_per_workload.html`             | old-bookmark redirect to `index.html`                     |
-| `results/analysis/workloads/<name>.html`                | per-workload stacked-area history + drill-down pages      |
-| `results/releases/<tag>/sweep/`                         | complexity-sweep report for swept releases                |
-| `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)      |
-| `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored) |
+| Path                                                    | What it is                                                                                     |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `results/analysis/*.svg`                                | charts                                                                                         |
+| `results/analysis/index.html`                           | landing page (status strip + section navigation)                                               |
+| `results/analysis/{api,microbench}-{tot,releases}.html` | the four cadence pages (charts + ToT movers tables)                                            |
+| `results/analysis/memory-{tot,releases}.html`           | memory line panels: session floor, createGlobalSession deltas, per-workload RSS over the floor |
+| `results/analysis/report_per_workload.html`             | old-bookmark redirect to `index.html`                                                          |
+| `results/analysis/workloads/<name>.html`                | per-workload stacked-area history + drill-down pages                                           |
+| `results/releases/<tag>/sweep/`                         | complexity-sweep report for swept releases                                                     |
+| `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)                                           |
+| `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored)                                      |
 
 ---
 
@@ -303,3 +304,21 @@ via `--results <checkout-path>`.
   compare such timers version-over-version, not as a fraction of the total.
 - **Cross-version error formats:** the runner recognizes both modern
   (`error[E30015]:`) and legacy (`error 30015:`) slangc diagnostics.
+
+## Memory footprint
+
+Every sample also records the child process's **peak RSS** (`rss_kb`:
+`ru_maxrss` via `os.wait4` on POSIX, `PeakWorkingSetSize` via
+`GetProcessMemoryInfo` on Windows), and the api driver reports the RSS
+delta across its **first** `createGlobalSession` (`[MEM]` output lines,
+parsed into the record's `memory` dict) — the cold-session footprint of
+#9817. `analyze.canonical_runs` surfaces both as counter series
+(`peakRssKb`, `apiCreateGlobalSessionRssDeltaKb`) so the tracking series,
+the nightly trend check (1 MiB absolute floor, same ratio gate), and the
+per-workload progress tables consume them like timers;
+`analyze.unit_of`/`fmt_qty` keep kilobytes from rendering as
+milliseconds. The site presents memory on `memory-{tot,releases}.html`
+as line panels — session floor first (the `minimal` workload's absolute
+peak RSS), then api session-create deltas, then per-workload RSS **over
+the floor** — because memory components do not tile a total and a
+stacked area would lie.

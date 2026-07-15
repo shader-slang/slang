@@ -142,6 +142,13 @@ static Timers g_memDeltas;
 
 static void recordSessionCreateRss(long rssBefore)
 {
+    // Only the FIRST createGlobalSession of the process is recorded: that is
+    // the cold-session footprint of shader-slang/slang#9817. Workloads that
+    // create many sessions (api_session_create) warm the allocator and core
+    // module on the first call, so summing or averaging later deltas would
+    // dilute the number the issue is about.
+    if (g_memDeltas.get("apiCreateGlobalSessionRssDeltaKb").count > 0)
+        return;
     long rssAfter = currentRssKb();
     if (rssBefore >= 0 && rssAfter >= 0)
         g_memDeltas.add("apiCreateGlobalSessionRssDeltaKb", (double)(rssAfter - rssBefore));
