@@ -94,6 +94,14 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
 
     outOptions = Options();
 
+    // Accept every `-X<compiler>` name that slangc accepts (dxc, fxc, glslang, nvrtc, ...),
+    // not just `-Xslang`. The default Options() ctor registers only "slang", so `-Xdxc ...`
+    // would be rejected as an unknown downstream name. Constructing DownstreamArgs with the
+    // command-line context auto-registers all pass-through names (as slangc does in
+    // slang-options.cpp); "slang" is not a pass-through enum value, so re-add it explicitly.
+    outOptions.downstreamArgs = DownstreamArgs(cmdLineContext);
+    outOptions.downstreamArgs.addName("slang");
+
     CommandLineArgs args(cmdLineContext);
 
     if (argc > 0)

@@ -84,7 +84,9 @@ struct Options
 
     Slang::String nvapiExtnSlot; ///< The nvapiRegister to use.
 
-    Slang::DownstreamArgs downstreamArgs; ///< Args to downstream tools. Here it's just slang
+    Slang::DownstreamArgs
+        downstreamArgs; ///< Args to downstream tools ("slang" plus every
+                        ///< -X<compiler> pass-through name; populated in parse()).
 
     bool generateSPIRVDirectly = true;
 
