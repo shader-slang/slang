@@ -969,6 +969,15 @@ LoweredValInfo emitCallToDeclRef(
         case kIROp_GetOffsetPtr:
             SLANG_ASSERT(argCount == 2);
             return LoweredValInfo::simple(builder->emitGetOffsetPtr(args[0], args[1]));
+        case kIROp_CastToVoid:
+            // A `(void)expr` cast (the builtin `__init(T)` on `void`) has no data
+            // content: it evaluates `expr` for its side effects and yields `void`.
+            // Those side effects are already lowered into `args[0]`, so we discard
+            // the operand and produce the canonical void value (`IRVoidLit`) rather
+            // than a `kIROp_CastToVoid` instruction, which no backend can emit and
+            // which would only duplicate the one canonical spelling of a void value.
+            SLANG_ASSERT(argCount == 1);
+            return LoweredValInfo::simple(builder->getVoidValue());
         default:
             return LoweredValInfo::simple(
                 builder->emitIntrinsicInst(type, intrinsicOp, argCount, args));
