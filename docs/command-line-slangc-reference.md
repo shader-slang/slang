@@ -1369,6 +1369,7 @@ A capability describes an optional feature that a target may or may not support.
 * `dispatch` 
 * `SPV_EXT_fragment_shader_interlock` : enables the SPV_EXT_fragment_shader_interlock extension 
 * `SPV_EXT_physical_storage_buffer` : enables the SPV_EXT_physical_storage_buffer extension 
+* `SPV_KHR_physical_storage_buffer` : enables the SPV_KHR_physical_storage_buffer extension 
 * `SPV_EXT_fragment_fully_covered` : enables the SPV_EXT_fragment_fully_covered extension 
 * `SPV_EXT_descriptor_indexing` : enables the SPV_EXT_descriptor_indexing extension 
 * `SPV_EXT_shader_atomic_float_add` : enables the SPV_EXT_shader_atomic_float_add extension 
