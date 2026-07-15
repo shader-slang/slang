@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -O0 -emit-spirv-directly -entry main -stage compute -preserve-embedded-source
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -emit-spirv-directly -entry main -stage compute -preserve-embedded-source
 // Verifies that a UTF-8 BOM is stripped from the embedded DebugSource text when a #line directive
 // references a file that has no loaded SourceFile (so the DebugSource is read fresh from disk).
 // The referenced file (debug-source-bom-original.slang) starts with a UTF-8 BOM (EF BB BF); the

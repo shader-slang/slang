@@ -619,7 +619,7 @@ int SourceFile::calcColumnIndex(int lineIndex, int offset, int tabSize)
 ComPtr<ISlangBlob> SourceFile::decodeContentBlob(ISlangBlob* rawBlob)
 {
     const UInt rawContentSize = rawBlob->getBufferSize();
-    Byte* rawContentBegin = (Byte*)rawBlob->getBufferPointer();
+    const Byte* rawContentBegin = (const Byte*)rawBlob->getBufferPointer();
 
     // Query the encoding type and discard the Unicode Byte-Order-Marker before decoding
     size_t offset;
