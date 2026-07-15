@@ -41,17 +41,10 @@ def combined_index(release_index, results_dir):
     release charts span the post-release daily ToT runs too: daily recs carry a
     placeholder 'slangc' so they pass the loaders' presence filter."""
     recs = [dict(r, kind="release") for r in release_index]
-    ddir = os.path.join(results_dir, "daily")
-    if os.path.isdir(ddir):
-        for label in sorted(os.listdir(ddir)):
-            if not os.path.exists(os.path.join(ddir, label, "results.json")):
-                continue
-            mp = os.path.join(ddir, label, "meta.json")
-            meta = analyze.read_json(mp) if os.path.exists(mp) else {}
-            recs.append({"tag": label, "date": meta.get("date", label[:10]),
-                         "version": meta.get("commit", ""), "slangc": "tot",
-                         "kind": "daily",
-                         "commit_time": meta.get("commit_time", "")})
+    for d in analyze.daily_labels(results_dir):
+        recs.append({"tag": d["label"], "date": d["date"],
+                     "version": d["commit"], "slangc": "tot",
+                     "kind": "daily", "commit_time": d["commit_time"]})
     # Same-date daily points order by the commit's full timestamp (true code
     # order) when meta carries it; the tag is the deterministic fallback for
     # points registered before commit_time existed. See track.py.

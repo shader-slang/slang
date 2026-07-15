@@ -42,6 +42,30 @@ def open_output(path, mode="w"):
     return open(path, mode, encoding="utf-8", newline="\n")
 
 
+def daily_labels(results_dir):
+    """One record per daily/<label>/ directory that has a results.json:
+    [{label, date, commit, commit_time, path}], label-sorted. The single
+    place that knows the daily storage layout and its meta.json fields —
+    report.py's combined index, daily_movers' point loader, and any future
+    consumer enumerate through here so layout knowledge cannot fork.
+    `date` falls back to the label prefix and `commit` to the label suffix
+    for points registered before meta carried them."""
+    out = []
+    ddir = os.path.join(results_dir, "daily")
+    for label in sorted(os.listdir(ddir)) if os.path.isdir(ddir) else []:
+        rpath = os.path.join(ddir, label, "results.json")
+        if not os.path.exists(rpath):
+            continue
+        mpath = os.path.join(ddir, label, "meta.json")
+        meta = read_json(mpath) if os.path.exists(mpath) else {}
+        out.append({"label": label,
+                    "date": meta.get("date", label[:10]),
+                    "commit": (meta.get("commit") or label.split("-")[-1]),
+                    "commit_time": meta.get("commit_time", ""),
+                    "path": rpath})
+    return out
+
+
 def read_json(path):
     """json.load with explicit UTF-8, the read-side twin of open_output.
 

@@ -50,21 +50,14 @@ def headline(wl):
 def daily_points(results_dir, metric):
     """[(date, commit9, {(workload, timer): value})], one per daily label."""
     out = []
-    ddir = os.path.join(results_dir, "daily")
-    for label in sorted(os.listdir(ddir)) if os.path.isdir(ddir) else []:
-        rpath = os.path.join(ddir, label, "results.json")
-        if not os.path.exists(rpath):
-            continue
-        mpath = os.path.join(ddir, label, "meta.json")
-        meta = analyze.read_json(mpath) if os.path.exists(mpath) else {}
+    for lab in analyze.daily_labels(results_dir):
         vals = {}
-        for r in analyze.canonical_runs(analyze.read_json(rpath)):
+        for r in analyze.canonical_runs(analyze.read_json(lab["path"])):
             for t, st in (r.get("timers") or {}).items():
                 if st:
                     vals[(r["workload"], t)] = st[metric]
         if vals:
-            out.append((meta.get("date", label[:10]),
-                        (meta.get("commit") or label.split("-")[-1])[:9], vals))
+            out.append((lab["date"], lab["commit"][:9], vals))
     return out
 
 
