@@ -804,12 +804,10 @@ SLANG_MAKE_VECTOR_FROM_SCALAR(double)
 #if SLANG_CUDA_ENABLE_HALF
 SLANG_MAKE_VECTOR_FROM_SCALAR(__half)
 #if !SLANG_CUDA_RTC
-// The non-RTC branch of SLANG_MAKE_VECTOR_FROM_SCALAR omits the 1-wide form
-// because the CUDA SDK owns the make_* names for the standard vector types,
-// so each extended float type spells out its own 1-wide helper here. Every
-// such helper must mirror the macro's RTC form: return `T1{x}`; returning
-// the scalar type instead is a compile error at nvcc call sites (see
-// tests/cuda/cuda-prelude-vec1-make.cu, which pins the whole family).
+// The non-RTC branch of SLANG_MAKE_VECTOR_FROM_SCALAR omits the 1-wide
+// form (the CUDA SDK owns make_* for the standard vector types), so the
+// extended float types spell theirs out here. They must return T1{x},
+// not the scalar; tests/cuda/cuda-prelude-vec1-make.cu pins the family.
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half1 make___half1(__half x)
 {
     return __half1{x};

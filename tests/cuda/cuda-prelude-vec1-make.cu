@@ -1,10 +1,8 @@
-// This file is compiled directly by nvcc in ci-slang-test.yml. Do not add a slang-test
-// directive here: slang-test's CUDA pass-through uses NVRTC, which takes the other prelude path.
-//
-// Compiling is the whole test: the guarded regressions are the 1-wide vector make helpers
-// returning the scalar element type instead of the T1 struct, which is a type error at the
-// assignments below. The kernel is never launched, so there is no host code or result check.
-// __half is included alongside the once-broken types to pin the known-good sibling pattern.
+// Compiled directly by nvcc in ci-slang-test.yml; no slang-test directive
+// on purpose (slang-test's CUDA path uses NVRTC, the other prelude branch).
+// Compiling is the whole test: the guarded regression is a vec1 make helper
+// returning the scalar instead of T1, a type error at the assignments below.
+// __half is included to pin the known-good sibling pattern.
 
 #define SLANG_CUDA_ENABLE_HALF 1
 #define SLANG_CUDA_ENABLE_BF16 1
