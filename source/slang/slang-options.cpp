@@ -4467,6 +4467,44 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     .target =
                         TypeTextUtil::getCompileTargetName(SlangCompileTarget(rawTarget.format))});
             }
+
+            // An explicit `-profile` (e.g. `spirv_1_4`) pins a concrete output target version, so
+            // an explicit `-capability` that can only be realized at a higher version is a genuine
+            // command-line conflict. Left undiagnosed, `TargetRequest::getTargetCaps()` silently
+            // folds the capability in and raises the emitted version (a version raise is a
+            // "compatible" join), which is exactly what the user asked us not to do. This mirrors
+            // the atom folding in `getTargetCaps()`, but rejects instead of raising. It is
+            // order-independent and also covers the appended `-profile <profile>+<capability>`
+            // form, whose trailing atoms are recorded as capabilities too.
+            Profile profile = rawTarget.optionSet.getProfile();
+            if (profile != Profile::Unknown)
+            {
+                CapabilitySet profileCaps = profile.getCapabilityName();
+                for (auto atomVal : rawTarget.optionSet.getArray(CompilerOptionName::Capability))
+                {
+                    CapabilityName capabilityName = CapabilityName::Invalid;
+                    switch (atomVal.kind)
+                    {
+                    case CompilerOptionValueKind::Int:
+                        capabilityName = CapabilityName(atomVal.intValue);
+                        break;
+                    case CompilerOptionValueKind::String:
+                        capabilityName = findCapabilityName(atomVal.stringValue.getUnownedSlice());
+                        break;
+                    }
+                    if (capabilityName == CapabilityName::Invalid)
+                        continue;
+
+                    if (capabilityRaisesTargetVersionAboveProfile(
+                            profileCaps,
+                            CapabilitySet(capabilityName)))
+                    {
+                        m_sink->diagnose(Diagnostics::ConflictingExplicitCapabilityAndProfile{
+                            .capability = capabilityNameToString(capabilityName),
+                            .profile = profile.getName()});
+                    }
+                }
+            }
         }
 
         // `-spirv-unified-descriptor-heap-stride` and an explicit non-zero

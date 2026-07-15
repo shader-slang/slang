@@ -509,6 +509,22 @@ bool isStageAtom(CapabilityName name, CapabilityName& outCanonicalStage);
 bool isTargetVersionAtom(CapabilityAtom name);
 bool isSpirvExtensionAtom(CapabilityAtom name);
 
+/// Determine whether folding `capability` into `profileCaps` raises the concrete target version the
+/// compiler would emit above the version `profileCaps` pins. Returns false when `profileCaps` pins
+/// no concrete target version, or when `capability` targets a different family and so is not folded
+/// into this target at all.
+///
+/// This mirrors the capability fold in `TargetRequest::getTargetCaps()` (join the capability into
+/// the target caps, then read back the emitted version), rather than re-deriving realizability by
+/// hand. Deferring to the same `join` the emitter uses makes the test extension-inclusive for free:
+/// the diagnostic fires exactly when the emitted version would otherwise rise. Today
+/// `spvShaderInvocationReorderNV` has only a SPIR-V 1.5 realization, so folding it into a
+/// `spirv_1_4` profile raises the version and conflicts; once it gains a valid SPIR-V 1.4 extension
+/// realization, the fold keeps 1.4 and this stops conflicting, with no change here.
+bool capabilityRaisesTargetVersionAboveProfile(
+    const CapabilitySet& profileCaps,
+    const CapabilitySet& capability);
+
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);
 void printDiagnosticArg(StringBuilder& sb, const CapabilityAtomSet& atomSet);
