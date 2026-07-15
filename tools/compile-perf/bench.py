@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tempfile
 import time
 
-from lib import manifest
+from lib import analyze, manifest
 
 
 def parse_timers(text):
@@ -288,7 +288,17 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
     os.makedirs(gen_dir, exist_ok=True)
     files = spec.gen(size)
     for fn, src in files.items():
-        with open(os.path.join(gen_dir, fn), "w") as fh:
+        # Fail-loud guard for the byte-determinism invariant (see _HEADER in
+        # workloads.py): a typographic character anywhere in a GENERATED
+        # source would silently make the corpus bytes platform-dependent.
+        # External corpora are exempt — they are third-party input read with
+        # a tolerant decode, not something our generators promise about.
+        # A raise, not an assert: the contract must hold under python -O too.
+        if not spec.external_corpus and not src.isascii():
+            raise ValueError(
+                f"generated source {fn} contains non-ASCII; generators must "
+                f"emit ASCII only so the corpus is byte-identical everywhere")
+        with analyze.open_output(os.path.join(gen_dir, fn)) as fh:
             fh.write(src)
 
     # An api workload without a driver+libslang must fail loudly (not silently
@@ -398,6 +408,8 @@ def main():
     ap.add_argument("--warmup", type=int, default=1)
     ap.add_argument("--only", default=None,
                     help="comma-separated workload names to run (default all)")
+    ap.add_argument("--sweep", action="store_true",
+                    help="run each workload's sweep_sizes instead of default_size")
     ap.add_argument("--gen-dir", default=None,
                     help="scratch dir for generated sources + compiled outputs "
                          "(default: a tempdir, auto-removed — keeps the results dir, which "
@@ -463,10 +475,26 @@ def main():
 
     records = []
     for spec in specs:
-        sizes = [spec.default_size]
+        sizes = spec.sweep_sizes if (args.sweep and spec.sweep_sizes) else [spec.default_size]
         for size in sizes:
             print(f"[run] {spec.name:18s} n={size:<5d} ", end="", flush=True)
-            rec = run_spec(slangc, spec, size, args.samples, args.warmup, gen_root, api=api)
+            # ANY generator/run failure (missing corpus, a generator bug, a
+            # bad manifest field) must cost ONE workload, not the whole run's
+            # results: everything measured before it would be lost, since
+            # results.json is written at the end. Record the failure and keep
+            # going; bench still exits non-zero at the end via the ok-count.
+            try:
+                rec = run_spec(slangc, spec, size, args.samples, args.warmup, gen_root,
+                               api=api)
+            except Exception as e:  # noqa: BLE001 — isolation is the contract
+                rec = {
+                    "workload": spec.name, "bucket": spec.bucket, "size": size,
+                    "mode": spec.mode, "ok": False, "setup_ok": False,
+                    "got_timers": False, "samples": args.samples,
+                    "warmup": args.warmup, "wall_ms": None, "rss_kb": None,
+                    "timers": {}, "primary_timers": spec.primary_timers,
+                    "cmd": "", "error": str(e), "crash_codes": None,
+                }
             rec["label"] = args.label
             rec["slangc"] = slangc
             records.append(rec)
@@ -488,7 +516,7 @@ def main():
     for r in records:
         merged[(r["workload"], r["size"])] = r
     records = list(merged.values())
-    with open(jpath, "w") as fh:
+    with analyze.open_output(jpath) as fh:
         json.dump(records, fh, indent=2)
 
     # results.json is the single source of truth (all of median/min/mean/stdev per

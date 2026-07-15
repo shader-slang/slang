@@ -434,6 +434,21 @@ void calcRequiredLoweringPassSet(
         result.conditionalType = true;
         break;
     case kIROp_EnumType:
+    // The enum-cast ops are lowered by the same `lowerEnumType` pass as the type
+    // itself, so flag `enumType` on them too. Constant folding can eliminate the
+    // last live `IREnumType` while leaving a degenerate cast behind (e.g. an
+    // enum-typed local holding a constant folds to `CastEnumToInt(1 : UInt)`);
+    // flagging only the type would then skip the pass and strand the cast at
+    // emit (#12048). `CastIntToEnum`/`EnumCast` produce an enum-typed result, so a
+    // surviving one keeps its `IREnumType` alive and the `kIROp_EnumType` arm
+    // already covers it; they are listed here for parity with `lowerEnumType`'s
+    // handled set. The `Constexpr*` cast variants are intentionally excluded: they
+    // arise only in constant `IntVal` contexts (`emitConstexprCast`, from
+    // `visitTypeCastIntVal`), never in runtime value flow that reaches emit, and
+    // `lowerEnumType` has no case for them.
+    case kIROp_CastEnumToInt:
+    case kIROp_CastIntToEnum:
+    case kIROp_EnumCast:
         result.enumType = true;
         break;
     case kIROp_TextureType:
@@ -573,6 +588,17 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetValueFromTaggedUnion:
     case kIROp_CastInterfaceToTaggedUnionPtr:
         result.taggedUnion = true;
+        break;
+    case kIROp_InOutImplicitCast:
+    case kIROp_OutImplicitCast:
+        result.lValueCast = true;
+        break;
+    case kIROp_SumVectorElements:
+    case kIROp_SumMatrixElements:
+        result.sumVectorMatrix = true;
+        break;
+    case kIROp_LateRequireCapability:
+        result.lateRequireCapability = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1276,7 +1302,16 @@ Result linkAndOptimizeIR(
     }
 
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)
-    SLANG_PASS(lowerLValueCast, targetProgram);
+    //
+    // #11917: Gated on `lValueCast` to skip this whole-module walk when no
+    // out/inout implicit-cast IR is present. `kIROp_InOutImplicitCast` and
+    // `kIROp_OutImplicitCast` are produced only by the front end
+    // (`emitInOutImplicitCast`/`emitOutImplicitCast` in slang-lower-to-ir.cpp),
+    // so any instance is present before the `calcRequiredLoweringPassSet` scan
+    // that governs this call site; no pass in between synthesizes them, so the
+    // flag cannot be a false-negative.
+    if (requiredLoweringPassSet.lValueCast)
+        SLANG_PASS(lowerLValueCast, targetProgram);
 
     // Lower enum types early since enums and enum casts may appear in
     // specialization & not resolving them here would block specialization.
@@ -1493,7 +1528,15 @@ Result linkAndOptimizeIR(
     //
     SLANG_PASS(unpinWitnessTables);
 
-    SLANG_PASS(lowerSumVectorMatrixInsts);
+    // #11917: Gated on `sumVectorMatrix` to skip this whole-module walk when no
+    // sum-reduction IR is present. `kIROp_SumVectorElements` and
+    // `kIROp_SumMatrixElements` are produced only by the autodiff transpose pass
+    // (slang-ir-autodiff-transpose.cpp), which runs via `finalizeAutoDiffPass`
+    // before the last `calcRequiredLoweringPassSet` scan; no autodiff/transpose
+    // pass runs between that scan and this call site, so the flag cannot be a
+    // false-negative (any sum inst reaching here was seen by that scan).
+    if (requiredLoweringPassSet.sumVectorMatrix)
+        SLANG_PASS(lowerSumVectorMatrixInsts);
 
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
@@ -2307,7 +2350,16 @@ Result linkAndOptimizeIR(
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
     // Check the remaining LateRequireCapability IR insts
-    SLANG_PASS(processLateRequireCapabilityInsts, codeGenContext, sink);
+    //
+    // #11917: Gated on `lateRequireCapability` to skip this whole-module walk
+    // (and its entry-point reference-graph build) when no
+    // `kIROp_LateRequireCapability` IR is present. That opcode is produced only
+    // by the front end (slang-lower-to-ir.cpp), so it is present before the last
+    // `calcRequiredLoweringPassSet` scan; the flag cannot be a false-negative.
+    // The pass diagnoses only from these insts, so when the flag is false it is a
+    // pure no-op and gating drops no diagnostic.
+    if (requiredLoweringPassSet.lateRequireCapability)
+        SLANG_PASS(processLateRequireCapabilityInsts, codeGenContext, sink);
 
     SLANG_PASS(cleanUpVoidType);
 

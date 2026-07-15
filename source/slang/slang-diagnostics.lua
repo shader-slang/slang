@@ -4252,6 +4252,13 @@ standalone_note(
     span { loc = "member:Decl" }
 )
 
+err(
+    "callable-does-not-satisfy-differentiability-requirement",
+    38110,
+    "callable differentiability requirement not satisfied",
+    span { loc = "member:Decl", message = "member '~member:Decl' does not satisfy the required ~mode:String constraint for interface requirement '~requirement:Decl'." }
+)
+
 warning(
     "non-copyable-type-cannot-conform-to-interface",
     38109,

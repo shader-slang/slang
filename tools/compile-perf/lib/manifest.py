@@ -36,6 +36,10 @@ class WorkloadSpec:
     extra_flags: list = field(default_factory=list)
     # phase timers that best localize this bucket's cost
     primary_timers: list = field(default_factory=lambda: ["compileInner"])
+    # additional sizes worth sweeping for scaling curves (optional; used by
+    # bench.py --sweep). default_size must be a member so a swept run also
+    # yields the canonical point used for cross-release comparison.
+    sweep_sizes: list = field(default_factory=list)
     # emit reflection JSON (bench.py supplies a writable per-run path). Exercises
     # the reflection serializer in addition to the layout engine.
     reflection_json: bool = False
@@ -50,6 +54,15 @@ class WorkloadSpec:
     # them when named explicitly in --only, failing loudly if the tool is
     # genuinely absent (downstream_required below is what enforces that).
     platforms: list = None
+    # True for workloads whose sources come from an external (third-party)
+    # corpus rather than a generator. The ASCII byte-determinism guard in
+    # bench.py applies only to GENERATED sources; external corpora are read
+    # with a tolerant decode (errors="replace") and may legitimately contain
+    # non-ASCII (license headers, author names).
+    # Contract: set True ONLY when `gen` reads a third-party corpus from disk;
+    # generators that emit source must leave it False so the determinism guard
+    # applies to them.
+    external_corpus: bool = False
     # The workload's number is meaningless without its downstream compiler:
     # missing-downstream diagnostics (E00100 etc.), which bench.py normally
     # treats as benign, fail this workload instead — otherwise a host without
@@ -82,6 +95,7 @@ WORKLOADS = [
         bucket="real_world",
         gen=workloads.gen_mdl_dxr,
         default_size=0,  # fixed corpus; size ignored
+        external_corpus=True,
         mode="target",
         extra_flags=SPIRV,
         main_file="hit.slang",
@@ -100,6 +114,7 @@ WORKLOADS = [
         extra_flags=SPIRV,
         primary_timers=["compileInner", "frontEndExecute", "linkAndOptimizeIR",
                         "simplifyIR"],
+        sweep_sizes=[160, 320, 640, 1280],
     ),
     # ---- API-path workloads (application-integration dimension) -----------
     # Driven by native/api-driver.cpp against libslang (see DESIGN.md
@@ -223,6 +238,7 @@ WORKLOADS = [
         default_size=2000,
         mode="module",
         primary_timers=["parseTranslationUnit", "frontEndExecute"],
+        sweep_sizes=[250, 500, 1000, 2000],
     ),
     WorkloadSpec(
         name="diagnostics_clean",
@@ -232,6 +248,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["frontEndExecute", "SemanticChecking", "compileInner"],
+        sweep_sizes=[400, 800, 1600, 3200],
     ),
     WorkloadSpec(
         name="sema_generics",
@@ -240,6 +257,7 @@ WORKLOADS = [
         default_size=1000,
         mode="module",
         primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[125, 250, 500, 1000],
     ),
     WorkloadSpec(
         name="conformance",
@@ -248,6 +266,7 @@ WORKLOADS = [
         default_size=600,
         mode="module",
         primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[600, 1200, 2400, 4800],
     ),
     # ---- type checking: operator overload resolution + implicit conversion -
     # Front-end-only (module mode) stressors for the quietly expensive part of
@@ -261,6 +280,7 @@ WORKLOADS = [
         default_size=800,
         mode="module",
         primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[200, 400, 800, 1600],
     ),
     WorkloadSpec(
         name="implicit_conversion",
@@ -269,6 +289,7 @@ WORKLOADS = [
         default_size=600,
         mode="module",
         primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[300, 600, 1200, 2400],
     ),
     WorkloadSpec(
         name="overload_resolution",
@@ -277,6 +298,7 @@ WORKLOADS = [
         default_size=600,
         mode="module",
         primary_timers=["SemanticChecking", "frontEndExecute"],
+        sweep_sizes=[600, 1200, 2400, 4800],
     ),
     # ---- shared-infrastructure / scaling stressors -----------------------
     WorkloadSpec(
@@ -287,6 +309,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["generateIR", "simplifyIR", "compileInner"],
+        sweep_sizes=[500, 1000, 2000, 4000],
     ),
     WorkloadSpec(
         name="serialize",
@@ -295,6 +318,7 @@ WORKLOADS = [
         default_size=1500,
         mode="module",
         primary_timers=["writeSerializedModuleAST", "writeSerializedModuleIR", "compileInner"],
+        sweep_sizes=[375, 750, 1500, 3000],
     ),
     WorkloadSpec(
         name="module_link",
@@ -304,6 +328,7 @@ WORKLOADS = [
         mode="link",
         extra_flags=SPIRV,
         primary_timers=["linkIR", "compileInner"],
+        sweep_sizes=[50, 100, 200, 400],
     ),
     WorkloadSpec(
         name="specialization",
@@ -313,6 +338,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["specializeModule", "linkAndOptimizeIR", "compileInner"],
+        sweep_sizes=[75, 150, 300, 600],
     ),
     WorkloadSpec(
         name="dynamic_dispatch",
@@ -325,6 +351,7 @@ WORKLOADS = [
         # here — dispatch lowering cost is captured via specializeModule anyway.
         extra_flags=SPIRV,
         primary_timers=["compileInner", "specializeModule", "linkIR", "linkAndOptimizeIR"],
+        sweep_sizes=[50, 100, 200, 400],
     ),
     WorkloadSpec(
         name="existential_aggregate",
@@ -338,6 +365,7 @@ WORKLOADS = [
         # signal of the bare-local dynamic_dispatch workload.
         primary_timers=["compileInner", "specializeModule",
                         "legalizeExistentialTypeLayout", "simplifyIR"],
+        sweep_sizes=[50, 100, 200, 400],
     ),
     # ---- suspected-regression features -----------------------------------
     WorkloadSpec(
@@ -348,6 +376,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["compileInner", "linkAndOptimizeIR", "frontEndExecute"],
+        sweep_sizes=[25, 50, 100, 200],
     ),
     WorkloadSpec(
         name="inlining",
@@ -357,6 +386,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["simplifyIR", "linkAndOptimizeIR", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
     ),
     WorkloadSpec(
         name="loop_unroll",
@@ -366,6 +396,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["unrollLoopsInModule", "simplifyIR", "compileInner"],
+        sweep_sizes=[75, 150, 300, 600],
     ),
     WorkloadSpec(
         name="control_flow_ssa",
@@ -375,6 +406,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["simplifyIR", "frontEndExecute", "compileInner"],
+        sweep_sizes=[60, 120, 240, 480],
     ),
     # ---- coverage-gap stressors (passes / paths no other workload hits) ---
     WorkloadSpec(
@@ -385,6 +417,10 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["legalizeResourceTypes", "linkAndOptimizeIR", "compileInner"],
+        # Window starts at default_size: below N=80 the total is dominated by a
+        # quasi-fixed front-end cost (type sharing makes per-item sema cheap)
+        # that would floor-distort the fit; [80..640] measures the pass, not it.
+        sweep_sizes=[80, 160, 320, 640],
     ),
     WorkloadSpec(
         name="reflection_layout",
@@ -395,6 +431,7 @@ WORKLOADS = [
         extra_flags=SPIRV,
         reflection_json=True,
         primary_timers=["compileInner", "frontEndExecute", "generateOutput"],
+        sweep_sizes=[30, 60, 120, 240],
     ),
     WorkloadSpec(
         name="codegen_spirv",
@@ -404,6 +441,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=SPIRV,
         primary_timers=["generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
     ),
     # ---- source-target emission (the text backends spirv-directly skips) --
     # Same shader as codegen_spirv, but emitted to a textual GPU language so the
@@ -418,6 +456,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=["-target", "metal"],
         primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
     ),
     WorkloadSpec(
         name="emit_wgsl",
@@ -427,6 +466,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=["-target", "wgsl"],
         primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
     ),
     WorkloadSpec(
         name="emit_hlsl",
@@ -436,6 +476,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=["-target", "hlsl", "-entry", "computeMain"],
         primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
     ),
     WorkloadSpec(
         name="emit_glsl",
@@ -445,6 +486,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=["-target", "glsl", "-entry", "computeMain"],
         primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
     ),
     WorkloadSpec(
         name="emit_cuda",
@@ -454,6 +496,7 @@ WORKLOADS = [
         mode="target",
         extra_flags=["-target", "cuda"],
         primary_timers=["emitEntryPointsSourceFromIR", "generateOutput", "compileInner"],
+        sweep_sizes=[100, 200, 400, 800],
     ),
     # ---- downstream compilers (Windows perf runner only) -------------------
     # These measure the full pipeline INCLUDING the downstream compiler (dxc
@@ -471,6 +514,7 @@ WORKLOADS = [
         primary_timers=["generateOutput", "compileInner"],
         platforms=["win32"],
         downstream_required=True,
+        sweep_sizes=[100, 200, 400, 800],
     ),
     WorkloadSpec(
         name="codegen_ptx",
@@ -482,10 +526,19 @@ WORKLOADS = [
         primary_timers=["generateOutput", "compileInner"],
         platforms=["win32"],
         downstream_required=True,
+        sweep_sizes=[100, 200, 400, 800],
     ),
 ]
 
 BY_NAME = {w.name: w for w in WORKLOADS}
+
+# default_size must be a member of every sweep ladder so a swept run also
+# yields the canonical point: analyze.canonical_runs collapses multi-size runs
+# by `size == default_size`, and a ladder that omits it would silently feed a
+# wrong-N point into the cross-release tracking series.
+for _w in WORKLOADS:
+    assert not _w.sweep_sizes or _w.default_size in _w.sweep_sizes, (
+        f"{_w.name}: default_size {_w.default_size} not in sweep_sizes {_w.sweep_sizes}")
 
 
 def display_order(names):

@@ -2164,8 +2164,9 @@ void SemanticsVisitor::maybeCheckMissingNoDiffThis(Expr* expr)
         auto thisExpr = as<ThisExpr>(memberExpr->baseExpression);
         if (thisExpr && isTypeDifferentiable(memberExpr->type.type))
         {
+            auto noDiffThisAttr = this->m_parentFunc->findModifier<NoDiffThisAttribute>();
             if (isTypeDifferentiable(calcThisType(thisExpr->type.type)) ||
-                this->m_parentFunc->findModifier<NoDiffThisAttribute>())
+                (noDiffThisAttr && !noDiffThisAttr->isSynthesized))
             {
                 return;
             }
@@ -3578,7 +3579,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     // Default behavior is to look at all available `__subscript`
     // declarations on the type and try to call one of them.
 
-    auto operatorName = getName("operator[]");
+    auto operatorName = getSubscriptOperatorName(m_astBuilder);
 
     LookupResult lookupResult = lookUpMember(
         m_astBuilder,
@@ -7386,13 +7387,10 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
         arg = CheckTerm(arg);
     }
 
-    // LEGACY FEATURE: As a backwards-compatibility feature
-    // for HLSL, we will allow for a cast to a `struct` type
-    // from a literal zero, with the semantics of default
-    // initialization.
-    //
     if (auto declRefType = as<DeclRefType>(typeExp.type))
     {
+        // LEGACY FEATURE: As a backwards-compatibility feature for HLSL, we will allow for a cast
+        // to a `struct` type from a literal zero, with the semantics of default initialization.
         if (const auto structDeclRef = as<StructDecl>(declRefType->getDeclRef()))
         {
             if (expr->arguments.getCount() == 1)
@@ -8557,6 +8555,27 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
                 AddToLookupResult(globalLookupResult, lookupResult);
                 base = baseExpression;
             }
+        }
+        else if (auto subscriptDeclRef = baseDeclRef.as<SubscriptDecl>())
+        {
+            // Accessors are declarations nested in a subscript, so a qualified lookup such as
+            // `Type::__subscript::get` should look directly in the resolved subscript rather than
+            // in its function type.
+            LookupResult lookupResult = lookUpDirectAndTransparentMembers(
+                m_astBuilder,
+                this,
+                expr->name,
+                subscriptDeclRef.getDecl(),
+                subscriptDeclRef,
+                LookupMask::Default,
+                getDeclToExcludeFromLookup());
+
+            AddToLookupResult(globalLookupResult, lookupResult);
+            // `baseExpression` is the checked inner `Type::__subscript` reference, so it must
+            // retain the original type expression as its base. The accessor reference must use
+            // that type as its unbound base instead of the function-valued subscript expression.
+            base = GetBaseExpr(baseExpression);
+            SLANG_RELEASE_ASSERT(base);
         }
         else if (auto callableDecl = as<CallableDecl>(baseDeclRef))
         {
