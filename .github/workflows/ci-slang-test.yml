@@ -78,10 +78,15 @@ jobs:
       # Requires nvcc, which the full-gpu-tests Windows runners provide as
       # part of the CUDA toolkit. -std pins a fixed language mode so a
       # toolkit-default change cannot silently alter what this step tests.
+      # -arch pins compute_80: the fixture enables the prelude's half, bf16,
+      # and fp8 sections, whose CUDA intrinsics require __CUDA_ARCH__ >= 530
+      # (fp16 math) and >= 800 (bf16 math); nvcc's default (sm_52) has
+      # neither. Compile-only, so the arch does not need to match the
+      # runner's physical GPU.
       - name: Compile offline (non-NVRTC) CUDA prelude test
         if: inputs.os == 'windows' && inputs.full-gpu-tests
         run: >-
-          nvcc -std=c++17 -c tests/cuda/cuda-prelude-vec1-make.cu
+          nvcc -std=c++17 -arch=compute_80 -c tests/cuda/cuda-prelude-vec1-make.cu
           -I prelude -o "${{ runner.temp }}/cuda-prelude-vec1-make.obj"
 
       - name: Test Slang
