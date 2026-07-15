@@ -62,6 +62,12 @@
 //    Bubbles the NonUniformResourceIndex wrapper outward through the
 //    use-def chain (GetElement, Load, MakeCombinedTextureSampler,
 //    CombinedTextureSamplerGetTexture, ImageTexelPointer, etc.).
+//    This also includes the DescriptorHandle round-trip that SPIR-V
+//    legalization builds for a ResourceDescriptorHeap / DescriptorHandle<T>
+//    subscript (MakeVector -> CastUInt2ToDescriptorHandle ->
+//    CastDescriptorHandleToUInt2 -> Swizzle -> GetElement), whose
+//    MakeVector / CastUInt2ToDescriptorHandle steps the switch handles
+//    SPIR-V-only (see those cases in processNonUniformResourceIndex).
 //    When the wrapper reaches an instruction the pass cannot float
 //    through (e.g. the spirv_asm boundary), the decoration phase
 //    walks back through the chain via decorateNonUniformChain to
@@ -255,6 +261,89 @@ void processNonUniformResourceIndex(
                             &operand);
                     }
                     break;
+                case kIROp_CastUInt2ToDescriptorHandle:
+                    {
+                        // Replace castIntToBindless(nonUniformRes(x)), into
+                        // nonUniformRes(castIntToBindless(x)). Together with the MakeVector
+                        // case below, this floats the wrapper across the DescriptorHandle
+                        // round-trip SPIR-V legalization builds for a ResourceDescriptorHeap
+                        // / DescriptorHandle<T> subscript (see the MakeVector case for the
+                        // full shape).
+                        //
+                        // This is gated to SPIR-V even though the inverse
+                        // CastDescriptorHandleToUInt2 case above is not, because floating
+                        // here moves the wrapper onto a DescriptorHandle-typed intermediate
+                        // of that round-trip. Only the SPIR-V decoration pipeline consumes
+                        // the wrapper once it reaches the getElement access index; textual
+                        // targets (HLSL/GLSL) instead re-emit the marker on the scalar
+                        // source index (`NonUniformResourceIndex(i)` / `nonuniformEXT(i)`)
+                        // and delegate propagation to DXC/glslang, so for them the wrapper
+                        // must stay on the source index, not migrate onto these
+                        // SPIR-V-only intermediates. This matches the SPIR-V-only gating on
+                        // the GetElement-index / GetElementPtr / GetLegalizedSPIRVGlobalParamAddr
+                        // cases, not the value-preserving casts that run for all targets.
+                        if (floatMode != NonUniformResourceIndexFloatMode::SPIRV)
+                            break;
+                        auto operand = inst->getOperand(0);
+                        newUser = builder.emitIntrinsicInst(
+                            user->getFullType(),
+                            kIROp_CastUInt2ToDescriptorHandle,
+                            1,
+                            &operand);
+                    }
+                    break;
+                case kIROp_MakeVector:
+                    // A ResourceDescriptorHeap[NonUniformResourceIndex(i)] access is
+                    // lowered by SPIR-V legalization into a DescriptorHandle round-trip
+                    // that buries the wrapper inside a vector:
+                    //   nonUniformRes(i)
+                    //   makeVector(nonUniformRes(i), 0)      <- wrapper is an operand here
+                    //   CastUInt2ToDescriptorHandle(...)
+                    //   CastDescriptorHandleToUInt2(...)
+                    //   swizzle(..., 0)                       <- extracts the index lane
+                    //   getElement(heap, ...)                 <- the resource access
+                    // Without a case here the wrapper's only user is this makeVector, so
+                    // it hits the switch default and the wrapper never floats out to the
+                    // getElement index -- leaving the SPIR-V access undecorated
+                    // (VUID-RuntimeSpirv-None-10148). Float it by rebuilding the vector
+                    // with the wrapped operand(s) unwrapped, then re-wrap the result:
+                    // makeVector(..., nonUniformRes(x), ...) into
+                    // nonUniformRes(makeVector(..., x, ...)). SPIR-V only, because the
+                    // SPIR-V decoration pipeline is the only consumer that needs it.
+                    if (floatMode != NonUniformResourceIndexFloatMode::SPIRV)
+                        break;
+                    {
+                        // Wrapping the whole vector marks every lane non-uniform, so only
+                        // do it when every non-wrapped lane is a constant. That is exactly
+                        // the descriptor-handle shape -- makeVector(nonUniformRes(i), 0) --
+                        // and a constant lane is dynamically uniform, so it is skipped by
+                        // addSPIRVNonUniformResourceDecoration and cannot be over-decorated.
+                        // For a makeVector with a non-constant uniform sibling we must not
+                        // bubble out (a later swizzle of that uniform lane would inherit the
+                        // wrapper and spuriously decorate a uniform index); leave the wrapper
+                        // where it is for that shape, mirroring the combined-sampler case's
+                        // care not to decorate a uniform sibling.
+                        bool onlyConstantSiblings = true;
+                        for (UInt i = 0; i < user->getOperandCount(); i++)
+                            if (user->getOperand(i) != inst && !as<IRConstant>(user->getOperand(i)))
+                            {
+                                onlyConstantSiblings = false;
+                                break;
+                            }
+                        if (!onlyConstantSiblings)
+                            break;
+                        ShortList<IRInst*> operands;
+                        for (UInt i = 0; i < user->getOperandCount(); i++)
+                            operands.add(
+                                user->getOperand(i) == inst ? inst->getOperand(0)
+                                                            : user->getOperand(i));
+                        newUser = builder.emitIntrinsicInst(
+                            user->getFullType(),
+                            kIROp_MakeVector,
+                            operands.getCount(),
+                            operands.getArrayView().getBuffer());
+                    }
+                    break;
                 case kIROp_GetElementPtr:
                     // Ignore when `NonUniformResourceIndex` is not on the index
                     if (floatMode != NonUniformResourceIndexFloatMode::SPIRV)
@@ -406,6 +495,8 @@ void processNonUniformResourceIndex(
                 case kIROp_GetLegalizedSPIRVGlobalParamAddr:
                 case kIROp_NonUniformResourceIndex:
                 case kIROp_CastDescriptorHandleToUInt2:
+                case kIROp_CastUInt2ToDescriptorHandle:
+                case kIROp_MakeVector:
                 case kIROp_GetElement:
                 case kIROp_Swizzle:
                 case kIROp_MakeCombinedTextureSampler:
