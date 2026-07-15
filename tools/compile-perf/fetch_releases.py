@@ -125,9 +125,10 @@ def _safe_extract(archive, names, dest):
         if target != base and not target.startswith(base + os.sep):
             raise SystemExit(f"refusing unsafe archive member '{name}' (escapes {dest})")
     if isinstance(archive, zipfile.ZipFile) and os.name != "nt":
-        links = [i for i in archive.infolist()
-                 if (i.external_attr >> 16) & 0o170000 == 0o120000]
-        regular = [i for i in archive.infolist() if i not in links]
+        links, regular = [], []
+        for i in archive.infolist():
+            (links if (i.external_attr >> 16) & 0o170000 == 0o120000
+             else regular).append(i)
         archive.extractall(dest, members=regular)
         for i in links:
             linkto = archive.read(i).decode("utf-8")

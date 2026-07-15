@@ -178,6 +178,9 @@ def canonical_runs(runs):
         for name, st in (r.get("memory") or {}).items():
             extra[name] = st
         if extra:
+            for name in extra:
+                assert name.endswith("Kb"), \
+                    f"memory counter '{name}' must end in Kb (unit_of contract)"
             r = dict(r, timers=dict(r.get("timers") or {}, **extra))
         out.append(r)
     return out
@@ -316,3 +319,22 @@ def short_tag(tag):
 def is_daily(tag):
     """True for a daily ToT label '<YYYY-MM-DD>-<sha>' (vs a release 'vX.Y')."""
     return bool(re.match(r"\d{4}-\d{2}-\d{2}-", tag))
+
+
+# Import-time self-checks (the directory idiom): the memory pivot in
+# canonical_runs is the hinge every consumer relies on, and unit_of/fmt_qty
+# are what keep kilobytes from rendering as milliseconds.
+assert unit_of("peakRssKb") == "kb" and unit_of("SemanticChecking") == "ms"
+assert fmt_qty("peakRssKb", 215040) == "210.0 MiB"
+assert fmt_qty("simplifyIR", 12.34, signed=True) == "+12.3 ms"
+_mr = canonical_runs([{
+    "workload": "w", "size": 1,
+    "rss_kb": {"median": 5.0},
+    "memory": {"apiCreateGlobalSessionRssDeltaKb": {"median": 7.0}},
+    "timers": {"compileInner": {"median": 1.0}},
+}])
+assert _mr[0]["timers"]["peakRssKb"] == {"median": 5.0}
+assert _mr[0]["timers"]["apiCreateGlobalSessionRssDeltaKb"] == {"median": 7.0}
+assert _mr[0]["timers"]["compileInner"] == {"median": 1.0}, "originals preserved"
+assert _mr[0]["rss_kb"] == {"median": 5.0}, "source fields not consumed"
+del _mr

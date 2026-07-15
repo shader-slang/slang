@@ -251,11 +251,11 @@ def main():
                     for cnt, st in (run.get("timers") or {}).items():
                         if analyze.unit_of(cnt) == "kb" and st:
                             vals[(run["workload"], cnt)] = st.get(args.metric)
+            # Invariant: after this loop every series in `per` has exactly
+            # len(labels) entries — the union covers all existing keys (one
+            # append each) and setdefault back-fills new keys with Nones.
             for key in set(per) | set(vals):
                 per.setdefault(key, [None] * (len(labels) - 1)).append(vals.get(key))
-            for key in per:
-                if len(per[key]) < len(labels):
-                    per[key].append(None)
         return labels, per
 
     def mib(vs):

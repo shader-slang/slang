@@ -39,8 +39,9 @@ regression points at a specific release.
   steadier than the min when a build's run-to-run spread shifts). All of
   `median`/`min`/`mean`/`stdev` are kept in `results.json`; the reporting tools
   take `--metric` to switch (default `median`).
-- **Memory:** when GNU `/usr/bin/time` is present, peak RSS per compile is also
-  captured (`rss_kb`) — a heavier core module inflates memory, not just time.
+- **Memory:** peak RSS per compile is always captured (`rss_kb`: `os.wait4`
+  `ru_maxrss` on POSIX, `GetProcessMemoryInfo` on Windows) — see the
+  Memory footprint section
 - **Floor + slope:** `ladder_scaling.py --workload <name>` fits
   `time = floor + slope·N` per release from `--sweep` (multi-size) runs,
   separating a fixed-cost regression (heavier stdlib) from a per-element one

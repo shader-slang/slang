@@ -54,8 +54,10 @@
 #include <vector>
 
 #ifdef _WIN32
-#include <psapi.h>
+// windows.h MUST precede psapi.h: psapi.h uses DWORD/HANDLE/BOOL without
+// including their definitions itself.
 #include <windows.h>
+#include <psapi.h>
 #else
 #include <dirent.h>
 #include <dlfcn.h>
@@ -129,7 +131,7 @@ static long currentRssKb()
     fclose(f);
     if (n != 2)
         return -1;
-    return resident * (sysconf(_SC_PAGESIZE) / 1024);
+    return resident * sysconf(_SC_PAGESIZE) / 1024;
 #endif
 }
 
@@ -138,7 +140,11 @@ static long currentRssKb()
 // `memory` dict. The RSS growth across createGlobalSession is the metric of
 // shader-slang/slang#9817. Reuses Timers as the accumulator (totalMs holds
 // KB); reportMemDeltas() runs wherever timers.report() does.
+// Each g_memDeltas counter is written AT MOST ONCE per process; entries are
+// only inserted after both RSS readings succeed, so a failed reading yields
+// no data point rather than a real-looking 0kb sample.
 static Timers g_memDeltas;
+static bool g_sessionRssRecorded = false;
 
 static void recordSessionCreateRss(long rssBefore)
 {
@@ -146,9 +152,12 @@ static void recordSessionCreateRss(long rssBefore)
     // the cold-session footprint of shader-slang/slang#9817. Workloads that
     // create many sessions (api_session_create) warm the allocator and core
     // module on the first call, so summing or averaging later deltas would
-    // dilute the number the issue is about.
-    if (g_memDeltas.get("apiCreateGlobalSessionRssDeltaKb").count > 0)
+    // dilute the number the issue is about. The flag (not a Timers::get()
+    // lookup) tracks this: get() would INSERT a phantom zero entry that
+    // reportMemDeltas() would print as a genuine 0kb delta.
+    if (g_sessionRssRecorded)
         return;
+    g_sessionRssRecorded = true;
     long rssAfter = currentRssKb();
     if (rssBefore >= 0 && rssAfter >= 0)
         g_memDeltas.add("apiCreateGlobalSessionRssDeltaKb", (double)(rssAfter - rssBefore));

@@ -31,12 +31,21 @@ from lib import analyze, manifest
 
 
 def timers_for(workload):
-    """The timers worth alerting on for a workload: its manifest primary timers,
-    always including compileInner (the holistic signal)."""
+    """The counters worth alerting on for a workload: its manifest primary
+    timers, always including compileInner (the holistic signal)."""
     spec = manifest.BY_NAME.get(workload)
     timers = set(spec.primary_timers) if spec else set()
     timers.add("compileInner")
     return timers
+
+
+def judged(workload, counter):
+    """Whether the trend check judges this (workload, counter) series: the
+    workload's alert timers, plus EVERY kb-unit memory counter — memory
+    counters are not in any primary_timers list (they are synthesized by
+    canonical_runs, not declared per workload), and without this the memory
+    alert path would be unreachable."""
+    return counter in timers_for(workload) or analyze.unit_of(counter) == "kb"
 
 
 def emit_gha_command(line):
@@ -156,7 +165,7 @@ def main():
     regressions = []
     for key, cur in sorted(current.get("metrics", {}).items()):
         wl, _, timer = key.partition("|")
-        if timer not in timers_for(wl):
+        if not judged(wl, timer):
             continue
         baseline = [p["metrics"][key] for p in window if key in p.get("metrics", {})]
         if len(baseline) < args.min_baseline:
@@ -184,14 +193,16 @@ def main():
                 f"(`{base_labels}`).")
         return
 
-    print(f"{'workload':20s}{'timer':26s}{'median':>10}{'current':>10}{'ratio':>8}{'Δms':>9}")
+    print(f"{'workload':20s}{'timer':26s}{'median':>12}{'current':>12}{'ratio':>8}{'Δ':>12}")
     rows = ["### ⚠️ Compile-perf regressions — " + current["label"],
             f"\nvs trailing {len(window)}-point median (`{base_labels}`), "
             f"runner `{cur_runner}`.\n",
             "| workload | timer | median | current | ratio | Δ |",
             "|---|---|--:|--:|--:|--:|"]
     for wl, timer, med, cur, ratio, delta in regressions:
-        print(f"{wl:20s}{timer:26s}{med:10.1f}{cur:10.1f}{ratio:7.2f}x{delta:+9.1f}")
+        print(f"{wl:20s}{timer:26s}{analyze.fmt_qty(timer, med):>12s}"
+              f"{analyze.fmt_qty(timer, cur):>12s}{ratio:7.2f}x"
+              f"{analyze.fmt_qty(timer, delta, signed=True):>12s}")
         emit_gha_command(
             f"::error title=Perf regression {wl}/{timer}::"
             f"{ratio:.2f}x ({analyze.fmt_qty(timer, med)} -> "

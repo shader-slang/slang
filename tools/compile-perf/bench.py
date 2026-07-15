@@ -34,19 +34,25 @@ from lib import analyze, manifest
 def parse_mem(text):
     """Extract {name: kb} from the api-driver's "[MEM] name\tNNNkb" lines —
     point-in-time RSS deltas recorded around selected API phases (see
-    native/api-driver.cpp), kept separate from the ms timers so nothing
-    downstream mistakes kilobytes for milliseconds."""
+    native/api-driver.cpp reportMemDeltas, the producing printf), kept
+    separate from the ms timers so nothing downstream mistakes kilobytes for
+    milliseconds. Fields are TAB-delimited, matching the producer exactly.
+    Counter names must end in "Kb" — that suffix is what analyze.unit_of
+    keys the kb-vs-ms display classification on."""
     out = {}
     for line in text.splitlines():
         line = line.strip()
         if not line.startswith("[MEM]"):
             continue
-        toks = line.split()
-        if len(toks) >= 3 and toks[-1].endswith("kb"):
+        toks = line[len("[MEM]"):].strip().split("\t")
+        if len(toks) == 2 and toks[1].endswith("kb"):
             try:
-                out[toks[1]] = float(toks[-1][:-2])
+                val = float(toks[1][:-2])
             except ValueError:
-                pass
+                continue
+            assert toks[0].endswith("Kb"), \
+                f"memory counter '{toks[0]}' must end in Kb (analyze.unit_of contract)"
+            out[toks[0]] = val
     return out
 
 
@@ -233,7 +239,8 @@ def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
     }
 
 
-# GNU /usr/bin/time -v gives per-process peak RSS; detect once.
+# Peak RSS collection: per-child ru_maxrss via os.wait4 on POSIX,
+# PeakWorkingSetSize via GetProcessMemoryInfo on Windows (below).
 def _windows_peak_rss_kb(popen):
     """PeakWorkingSetSize of a finished subprocess in KB via
     GetProcessMemoryInfo — the Windows equivalent of POSIX ru_maxrss. Reads
@@ -258,8 +265,12 @@ def _windows_peak_rss_kb(popen):
         pmc = PMC()
         pmc.cb = ctypes.sizeof(PMC)
         psapi = ctypes.WinDLL("psapi")
-        if psapi.GetProcessMemoryInfo(int(popen._handle), ctypes.byref(pmc),
-                                      pmc.cb):
+        fn = psapi.GetProcessMemoryInfo
+        # Declare the signature: without argtypes ctypes coerces the handle
+        # through a C int, which can truncate 64-bit HANDLE values.
+        fn.argtypes = [wintypes.HANDLE, ctypes.POINTER(PMC), wintypes.DWORD]
+        fn.restype = wintypes.BOOL
+        if fn(wintypes.HANDLE(int(popen._handle)), ctypes.byref(pmc), pmc.cb):
             return pmc.PeakWorkingSetSize / 1024.0
     except Exception:  # noqa: BLE001
         pass
@@ -573,6 +584,15 @@ def main():
     print(f"wrote {jpath}")
     if n_ok != len(this_run):
         sys.exit(1)
+
+
+# Import-time self-check pinning the [MEM] line contract to api-driver.cpp's
+# printf format (TAB-delimited, kb suffix): a format drift would otherwise
+# silently degrade the memory feature to "no data" with nothing failing.
+assert parse_mem("[MEM] apiCreateGlobalSessionRssDeltaKb\t20480kb\nnoise\n[*] x\t1\t2ms") == \
+    {"apiCreateGlobalSessionRssDeltaKb": 20480.0}, \
+    "parse_mem: [MEM] line contract drifted vs api-driver.cpp"
+assert parse_mem("[MEM] malformed") == {}, "parse_mem must ignore malformed lines"
 
 
 if __name__ == "__main__":

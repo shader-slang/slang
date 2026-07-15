@@ -141,10 +141,13 @@ def buckets(timers, tree=TREE):
                 if v > 0:
                     alloc(c, v)
             self_ms = budget - csum
-            # 0.05 ms: suppress rounding-noise residuals. Timers have 4-decimal-
-            # place ms precision; a self-time below ~0.05 ms is within measurement
-            # noise and would clutter the stacked chart with invisible slivers.
-            if self_ms > 0.05:
+            # Keep EVERY positive residual: the partition's contract is that
+            # buckets tile the root exactly (daily_movers' pp column sums to
+            # the overall % because of it). Sub-0.05 ms residuals used to be
+            # dropped as chart noise, but a band that thin is invisible in
+            # the stacked view anyway, and on a very short workload the
+            # dropped slivers could break the tiling invariant.
+            if self_ms > 0:
                 out[f"{name} (self)"] = out.get(f"{name} (self)", 0.0) + self_ms
 
     alloc(tree, _t(timers, tree[0]))
