@@ -520,9 +520,9 @@ bool isSpirvExtensionAtom(CapabilityAtom name);
 /// fires exactly when — and only when — that fold would raise the emitted version above the pinned
 /// one. It hard-codes no capability's version requirement, so its behavior tracks the capability
 /// model: if a capability's requirement at the selected version changes, the check follows without
-/// edits here. Today, for example, folding `spvShaderInvocationReorderNV` into a `spirv_1_4`
-/// profile raises the version and conflicts.
-bool capabilityRaisesTargetVersionAboveProfile(
+/// edits here. Today, for example, folding `SPV_KHR_cooperative_matrix` (which requires SPIR-V 1.6)
+/// into a `spirv_1_4` profile raises the version and conflicts.
+bool doesCapabilityRaiseTargetVersionAboveProfile(
     const CapabilitySet& profileCaps,
     const CapabilitySet& capability);
 

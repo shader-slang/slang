@@ -204,7 +204,7 @@ static CapabilityAtom getHighestTargetVersionAtomInFamily(
     return highest;
 }
 
-bool capabilityRaisesTargetVersionAboveProfile(
+bool doesCapabilityRaiseTargetVersionAboveProfile(
     const CapabilitySet& profileCaps,
     const CapabilitySet& capability)
 {

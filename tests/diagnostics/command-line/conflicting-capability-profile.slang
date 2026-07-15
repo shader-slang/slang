@@ -4,38 +4,38 @@
 // target version an explicit `-profile` selected must be rejected at the command line, rather
 // than silently raising the emitted SPIR-V version.
 //
-// `spvShaderInvocationReorderNV` today only has a SPIR-V 1.5 realization
-// (`SPV_EXT_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing`), so it genuinely
-// conflicts with `-profile spirv_1_4`. The check keys off the emitted version rather than a
-// hard-coded requirement, so if the capability later gains a valid SPIR-V 1.4 realization these
-// cases would stop conflicting on their own. The check is order-independent and also covers the
-// appended `-profile <profile>+<capability>` form.
+// `SPV_KHR_cooperative_matrix` requires SPIR-V 1.6 (capdef:
+// `SPV_KHR_cooperative_matrix : _spirv_1_6 + ...`), so it genuinely conflicts with
+// `-profile spirv_1_4`. The check keys off the version the compiler would emit rather than a
+// hard-coded per-capability requirement, so it needs no update if a capability's requirement ever
+// changes. The check is order-independent and also covers the appended
+// `-profile <profile>+<capability>` form.
 
 // Case 1: `-profile` then `-capability`.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK1):-target spirv-asm -emit-spirv-directly -profile spirv_1_4 -capability spvShaderInvocationReorderNV -entry main -stage raygeneration
-//CHECK1: the capability 'spvShaderInvocationReorderNV' requires a higher target version than the explicitly requested profile 'spirv_1_4'
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK1):-target spirv-asm -emit-spirv-directly -profile spirv_1_4 -capability SPV_KHR_cooperative_matrix -entry main -stage raygeneration
+//CHECK1: the capability 'SPV_KHR_cooperative_matrix' requires a higher target version than the explicitly requested profile 'spirv_1_4'
 
 // Case 2: `-capability` before `-profile` (order-independent).
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2):-target spirv-asm -emit-spirv-directly -capability spvShaderInvocationReorderNV -profile spirv_1_4 -entry main -stage raygeneration
-//CHECK2: the capability 'spvShaderInvocationReorderNV' requires a higher target version than the explicitly requested profile 'spirv_1_4'
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2):-target spirv-asm -emit-spirv-directly -capability SPV_KHR_cooperative_matrix -profile spirv_1_4 -entry main -stage raygeneration
+//CHECK2: the capability 'SPV_KHR_cooperative_matrix' requires a higher target version than the explicitly requested profile 'spirv_1_4'
 
 // Case 3: appended `-profile <profile>+<capability>` form.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK3):-target spirv-asm -emit-spirv-directly -profile spirv_1_4+spvShaderInvocationReorderNV -entry main -stage raygeneration
-//CHECK3: the capability 'spvShaderInvocationReorderNV' requires a higher target version than the explicitly requested profile 'spirv_1_4'
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK3):-target spirv-asm -emit-spirv-directly -profile spirv_1_4+SPV_KHR_cooperative_matrix -entry main -stage raygeneration
+//CHECK3: the capability 'SPV_KHR_cooperative_matrix' requires a higher target version than the explicitly requested profile 'spirv_1_4'
 
-// Case 4: the GLSL-facing alias of the same capability. Its GLSL realization carries no SPIR-V
-// version atom, but folding it into a SPIR-V target still forces SPIR-V 1.5 (its SPIR-V realization
-// is `spvShaderInvocationReorderNV`), so it must conflict too rather than silently emitting 1.5.
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK4):-target spirv-asm -emit-spirv-directly -profile spirv_1_4 -capability GL_NV_shader_invocation_reorder -entry main -stage raygeneration
+// Case 4: a GLSL-facing alias whose SPIR-V realization requires a higher version. Its GLSL
+// realization carries no SPIR-V version atom, but folding it into a SPIR-V target still forces
+// SPIR-V 1.6 (its SPIR-V side is `spvCooperativeVectorNV`, which needs 1.6), so it must conflict
+// too rather than the GLSL side silently masking the requirement.
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK4):-target spirv-asm -emit-spirv-directly -profile spirv_1_4 -capability GL_NV_cooperative_vector -entry main -stage raygeneration
 //CHECK4: requires a higher target version than the explicitly requested profile 'spirv_1_4'
 
 // Control 1: the same capability at a profile that provides a high enough version is NOT a conflict.
-// This capability's realization is at SPIR-V 1.5, and `-profile spirv_1_5` selects exactly 1.5, so
-// this must compile with no conflict diagnostic. (Slang canonicalizes the NV request onto the EXT
-// capability, so only assert the shared substring rather than the NV/EXT spelling.)
-//TEST:SIMPLE(filecheck=OK):-target spirv-asm -emit-spirv-directly -profile spirv_1_5 -capability spvShaderInvocationReorderNV -entry main -stage raygeneration
+// `SPV_KHR_cooperative_matrix` requires SPIR-V 1.6, and `-profile spirv_1_6` selects exactly 1.6, so
+// this must compile with no conflict diagnostic and emit a 1.6 module.
+//TEST:SIMPLE(filecheck=OK):-target spirv-asm -emit-spirv-directly -profile spirv_1_6 -capability SPV_KHR_cooperative_matrix -entry main -stage raygeneration
 //OK-NOT: requires a higher target version
-//OK: OpCapability ShaderInvocationReorder
+//OK: ; Version: 1.6
 
 // Control 2: a capability that is satisfiable at the requested version must not be rejected.
 // `SPV_KHR_ray_tracing` requires exactly SPIR-V 1.4 (capdef: `SPV_KHR_ray_tracing : _spirv_1_4`),

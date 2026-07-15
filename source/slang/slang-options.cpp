@@ -4495,7 +4495,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     if (capabilityName == CapabilityName::Invalid)
                         continue;
 
-                    if (capabilityRaisesTargetVersionAboveProfile(
+                    if (doesCapabilityRaiseTargetVersionAboveProfile(
                             profileCaps,
                             CapabilitySet(capabilityName)))
                     {
