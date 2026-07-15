@@ -480,7 +480,7 @@ static SlangResult _testServerParentMonitorIntegrationTest(UnitTestContext* cont
     slangTestCmdLine.addArg("-use-test-server");
     slangTestCmdLine.addArg("-server-count");
     slangTestCmdLine.addArg("1");
-    slangTestCmdLine.addArg("slang-unit-test-tool/CommandLineProcessReadCompleteLargeOutput");
+    slangTestCmdLine.addArg("slang-unit-test-tool/CommandLineProcessReadLargeStreamToCompletion");
 
     PROCESS_INFORMATION slangTestProcessInfo;
     {
@@ -633,7 +633,7 @@ static SlangResult _reflectTest(UnitTestContext* context)
     return SLANG_OK;
 }
 
-SLANG_UNIT_TEST(CommandLineProcessReadCompleteOutput)
+SLANG_UNIT_TEST(CommandLineProcessReadToCompletion)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 1)));
     SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 10)));
@@ -641,34 +641,35 @@ SLANG_UNIT_TEST(CommandLineProcessReadCompleteOutput)
     SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 10000)));
 }
 
-SLANG_UNIT_TEST(CommandLineProcessReadImmediateCrash)
+SLANG_UNIT_TEST(CommandLineProcessReadAfterImmediateCrash)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 1, 0)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 1, 1 / 2)));
 }
 
-SLANG_UNIT_TEST(CommandLineProcessReadCrashAtIndexFiveOutput)
+// Crash halfway through increasingly large output streams to exercise partial pipe reads.
+SLANG_UNIT_TEST(CommandLineProcessReadAfterSmallStreamCrash)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 10, 5)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 10, 10 / 2)));
 }
 
-SLANG_UNIT_TEST(CommandLineProcessReadCrashAtIndexFiveHundredOutput)
+SLANG_UNIT_TEST(CommandLineProcessReadAfterMediumStreamCrash)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 1000, 500)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 1000, 1000 / 2)));
 }
 
-SLANG_UNIT_TEST(CommandLineProcessReadCrashAtIndexFiveThousandOutput)
+SLANG_UNIT_TEST(CommandLineProcessReadAfterLargeStreamCrash)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 10000, 5000)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 10000, 10000 / 2)));
 }
 
-SLANG_UNIT_TEST(CommandLineProcessReadCompleteLargeOutput)
+SLANG_UNIT_TEST(CommandLineProcessReadLargeStreamToCompletion)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 100000)));
 }
 
-SLANG_UNIT_TEST(CommandLineProcessReadCrashAtIndexFiftyThousandOutput)
+SLANG_UNIT_TEST(CommandLineProcessReadAfterVeryLargeStreamCrash)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 100000, 50000)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTest(unitTestContext, 100000, 100000 / 2)));
 }
 
 SLANG_UNIT_TEST(CommandLineProcessReflect)
@@ -687,12 +688,12 @@ SLANG_UNIT_TEST(HTTPPacketConnectionPeerCrash)
 }
 
 #if defined(_WIN32)
-SLANG_UNIT_TEST(TestServerParentMonitorParentTermination)
+SLANG_UNIT_TEST(TestServerParentMonitorForcefulTermination)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_parentMonitorParentExitTest(unitTestContext, true)));
 }
 
-SLANG_UNIT_TEST(TestServerParentMonitorParentExit)
+SLANG_UNIT_TEST(TestServerParentMonitorGracefulExit)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_parentMonitorParentExitTest(unitTestContext, false)));
 }
