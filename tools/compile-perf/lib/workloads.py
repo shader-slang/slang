@@ -506,8 +506,9 @@ def gen_generic_nesting_eval(n):
 
 def gen_interface_depth(n):
     """A linear interface inheritance chain n deep (`interface I_k : I_{k-1}`)
-    with one struct conforming at the bottom and one generic function
-    constrained to the TOP, so conformance checking walks the whole chain.
+    with one struct conforming to the most-derived interface (`I_n`) and one
+    generic function constrained to the ROOT (`I0`), so satisfying the
+    constraint walks the inheritance chain through all n levels.
     Scales the interface-hierarchy depth axis of calcInheritanceInfo — a
     different graph than generic_nesting's type-argument nesting.
 
@@ -525,6 +526,18 @@ def gen_interface_depth(n):
     s.append('[shader("compute")]\n[numthreads(1, 1, 1)]\n')
     s.append("void computeMain() { S s; outBuf[0] = use(s); }\n")
     return {"interface_depth.slang": "".join(s)}
+
+
+# Import-time smoke checks: these generators' output is only ever compiled by
+# the nightly bench, so a broken template (bad f-string, malformed chain)
+# would otherwise merge cleanly and surface as a lost nightly data point.
+assert "typealias T4 = Pair<Leaf, T3>;" in \
+    gen_generic_nesting(4)["generic_nesting.slang"]
+assert "T4 v; outBuf[0] = v.eval();" in \
+    gen_generic_nesting_eval(4)["generic_nesting_eval.slang"]
+_id_src = gen_interface_depth(4)["interface_depth.slang"]
+assert "interface I4 : I3 { }" in _id_src and "struct S : I4" in _id_src
+del _id_src
 
 
 # --------------------------------------------------------------------------- #

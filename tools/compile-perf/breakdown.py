@@ -394,7 +394,10 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
     panel title becomes a link to that page."""
     # `series` lets a caller that already computed (order, per) — e.g.
     # write_workload_pages rendering one panel per workload — skip the
-    # full-history re-read _series would otherwise do per call.
+    # full-history re-read _series would otherwise do per call. When passed
+    # it fully SUPERSEDES the (results_dir, index_path, metric, bucket_fn)
+    # read, so it must have been computed with the same bucket_fn as
+    # `bucket_order`, or the bands and the legend would disagree.
     order, per = series if series is not None else _series(
         results_dir, index_path, metric, bucket_fn)
     nrel = len(order)
@@ -854,15 +857,23 @@ if __name__ == "__main__":
 # orders: by this line breakdown's bucket functions exist and daily_movers
 # (imported at the top) is fully initialized, so _partition's lazy
 # `import breakdown` resolves to a complete module.
+# The fixture includes compileInner's DIRECT children (frontEndExecute,
+# generateOutput) so alloc() actually descends: named-leaf buckets, (self)
+# residuals at two levels, and the pp sum are all exercised, not just a
+# single degenerate compileInner (self) bucket.
 _T0 = ("2026-01-01", "aaaaaaaaa",
-       {("w", "compileInner"): 100.0, ("w", "SemanticChecking"): 60.0,
-        ("w", "generateIR"): 30.0})
+       {("w", "compileInner"): 100.0, ("w", "frontEndExecute"): 70.0,
+        ("w", "SemanticChecking"): 40.0, ("w", "generateIR"): 20.0,
+        ("w", "generateOutput"): 25.0})
 _T1 = ("2026-01-02", "bbbbbbbbb",
-       {("w", "compileInner"): 80.0, ("w", "SemanticChecking"): 45.0,
-        ("w", "generateIR"): 32.0})
+       {("w", "compileInner"): 80.0, ("w", "frontEndExecute"): 60.0,
+        ("w", "SemanticChecking"): 30.0, ("w", "generateIR"): 25.0,
+        ("w", "generateOutput"): 15.0})
 _ov, _contrib, _ex, _st = daily_movers.workload_progress([_T0, _T1], "w")
 assert _ov is not None and abs(_ov[6] - (-20.0)) < 1e-9, \
     "workload_progress fixture: headline 100 -> 80 ms must be -20%"
+assert len(_contrib) >= 4, \
+    "workload_progress fixture must produce a MULTI-bucket partition"
 assert abs(sum(c[3] for c in _contrib) - _ov[6]) < 1e-9, \
     "workload_progress fixture: contributor pp must sum to the overall %"
 del _T0, _T1, _ov, _contrib, _ex, _st
