@@ -296,7 +296,7 @@ For details:
 - [`docs/design/shader-coverage-counter-placement.md`](https://github.com/shader-slang/slang/blob/master/docs/design/shader-coverage-counter-placement.md) —
   where each mode places its counters, with worked examples.
 - [`examples/shader-coverage-backends`](https://github.com/shader-slang/slang/tree/master/examples/shader-coverage-backends) —
-  this tutorial's own kernel dispatched with `--backend cpu|cuda|vulkan|metal`: each path is
+  a variant of this tutorial's kernel dispatched with `--backend=cpu|cuda|vulkan|metal`: each path is
   a compact, runnable implementation of the corresponding binding recipe, and all backends
   produce identical counter values for the same inputs. The place to start when moving from
   the tutorial's CPU dispatch to your own target.

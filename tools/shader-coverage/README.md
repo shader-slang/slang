@@ -21,7 +21,7 @@ Related documentation and examples:
   [`examples/shader-coverage-bvh-traversal`](../../examples/shader-coverage-bvh-traversal/) —
   runnable end-to-end example programs (see Quick start below).
 - [`examples/shader-coverage-backends`](../../examples/shader-coverage-backends/) —
-  one shader dispatched with `--backend cpu|cuda|vulkan|metal`,
+  one shader dispatched with `--backend=cpu|cuda|vulkan|metal`,
   implementing each backend's binding recipe from the host-interface
   doc.
 
@@ -78,8 +78,8 @@ render a report:
   a software BVH ray-traversal kernel showing how coverage exposes
   input-shape gaps in test data (rare-case paths that never run).
 - [`examples/shader-coverage-backends`](../../examples/shader-coverage-backends/) —
-  the user-guide tutorial's kernel dispatched with
-  `--backend cpu|cuda|vulkan|metal`, showing that only the
+  a variant of the user-guide tutorial's kernel dispatched with
+  `--backend=cpu|cuda|vulkan|metal`, showing that only the
   binding step differs per backend and that all four produce
   identical counters.
 

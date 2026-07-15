@@ -158,12 +158,6 @@ struct CudaDriverApi
     }
 };
 
-// The device-side representation of a (RW)StructuredBuffer<T> parameter, as
-// declared in `prelude/slang-cuda-prelude.h`: a data pointer followed by an
-// element count — the same 16-byte shape as the CPU path, except the pointer
-// is a device pointer. This is the value a host must store at
-// `uniformOffset` inside the global-params payload to bind the coverage
-// counter buffer.
 // RAII releases for driver-owned resources. SLANG_CHECK_ABORT throws
 // through the test body, and the test server runs several tests in one
 // process, so a failing assertion must not leak device memory, the
@@ -190,6 +184,12 @@ struct CudaPrimaryContextGuard
     ~CudaPrimaryContextGuard() { api.cuDevicePrimaryCtxRelease(device); }
 };
 
+// The device-side representation of a (RW)StructuredBuffer<T> parameter, as
+// declared in `prelude/slang-cuda-prelude.h`: a data pointer followed by an
+// element count — the same 16-byte shape as the CPU path, except the pointer
+// is a device pointer. This is the value a host must store at
+// `uniformOffset` inside the global-params payload to bind the coverage
+// counter buffer.
 struct CudaStructuredBufferView
 {
     CudaDevicePtr data = 0;

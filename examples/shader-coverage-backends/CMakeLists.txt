@@ -89,6 +89,11 @@ set_target_properties(
 )
 
 add_executable(shader-coverage-backends ${_sources})
+# Apply the project-default compile/link options, as the sibling coverage
+# demos do. In particular this adds the SLANG_ENABLE_ASAN sanitizer flags
+# to the link line; without them the executable fails to link against the
+# ASAN-instrumented slang libraries in sanitizer builds.
+set_default_compile_options(shader-coverage-backends USE_FEWER_WARNINGS)
 add_dependencies(shader-coverage-backends shader-coverage-backends-copy-assets)
 target_include_directories(
     shader-coverage-backends

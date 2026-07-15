@@ -1,7 +1,8 @@
 # shader-coverage-backends
 
-One shader, four coverage dispatch paths. This example runs the user
-guide coverage tutorial's kernel
+One shader, four coverage dispatch paths. This example runs a variant
+of the user-guide coverage tutorial's kernel (gain fixed at 2.0, so one
+line provably never runs)
 ([`docs/user-guide/a3-01-shader-coverage.md`](../../docs/user-guide/a3-01-shader-coverage.md))
 for real on a selectable backend, demonstrating that the coverage
 workflow — compile, discover the hidden counter buffer through

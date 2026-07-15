@@ -1,7 +1,8 @@
 // shader-coverage-backends: one shader, four coverage dispatch paths.
 //
-// This example dispatches the user-guide coverage tutorial's kernel
-// (hello-coverage.slang) with `--backend=cpu`, `--backend=cuda`,
+// This example dispatches a variant of the user-guide coverage
+// tutorial's kernel (hello-coverage.slang; gain fixed at 2.0 so one
+// line provably never runs) with `--backend=cpu`, `--backend=cuda`,
 // `--backend=vulkan`, or `--backend=metal`, and shows that the
 // coverage workflow is the same everywhere:
 //
@@ -379,12 +380,19 @@ void report(const CompiledProgram& program, const void* counters, const std::str
     // table must fail the run, not just print.
     const auto expectHits = [&](uint32_t line, uint64_t expected)
     {
+        // A line missing from hitsByLine has no coverage entry at all —
+        // that is an instrumentation regression, distinct from an
+        // instrumented line that executed zero times (the map holds a
+        // zero-valued entry for those).
         const auto it = hitsByLine.find(line);
-        const uint64_t actual = (it == hitsByLine.end()) ? 0 : it->second;
-        if (actual != expected)
+        if (it == hitsByLine.end())
+            fail(
+                "[" + backendName + "] line " + std::to_string(line) +
+                " is not instrumented (no coverage entry)");
+        if (it->second != expected)
             fail(
                 "[" + backendName + "] line " + std::to_string(line) + " has " +
-                std::to_string(actual) + " hits, expected " + std::to_string(expected));
+                std::to_string(it->second) + " hits, expected " + std::to_string(expected));
     };
     expectHits(16, 0); // applyGain's `return value;` fallthrough: gain is fixed at 2.0
     expectHits(26, 1); // the negative-input clamp: exactly one negative input
