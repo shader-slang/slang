@@ -175,30 +175,26 @@ bool isSpirvExtensionAtom(CapabilityAtom name)
     return _getInfo(name).name.startsWith("SPV_");
 }
 
-// Return the highest concrete target-version atom in `capabilities`, restricted to the same target
-// family (SPIR-V or Metal) as `family`; when `family` is `Invalid`, the family is taken from the
-// first version atom found. Returns `Invalid` if `capabilities` selects no target version. The
-// family restriction keeps the `>` comparison meaningful: version ordering matches enum ordering
-// only within one family, since the families occupy disjoint enum ranges.
+// Return the highest concrete target-version atom in `capabilities` that belongs to the same family
+// (SPIR-V or Metal) as `family`, or `CapabilityAtom::Invalid` if there is none. `family` must
+// itself be a target-version atom naming the family of interest (e.g. `_spirv_1_0` for SPIR-V).
+// Restricting to one family keeps the `>` comparison meaningful: version order matches enum order
+// only within a family, since the SPIR-V and Metal version atoms occupy disjoint enum ranges.
 static CapabilityAtom getHighestTargetVersionAtomInFamily(
     const CapabilitySet& capabilities,
     CapabilityAtom family)
 {
+    SLANG_ASSERT(isTargetVersionAtom(family));
     CapabilityAtom highest = CapabilityAtom::Invalid;
     for (auto& atomSet : capabilities.getAtomSets())
     {
         for (auto atomVal : atomSet)
         {
             CapabilityAtom atom = asAtom(atomVal);
-            if (!isTargetVersionAtom(atom))
+            if (!isTargetVersionAtom(atom) || !isSameTargetVersionFamily(atom, family))
                 continue;
-            if (family != CapabilityAtom::Invalid && !isSameTargetVersionFamily(atom, family))
-                continue;
-            if (highest == CapabilityAtom::Invalid ||
-                (isSameTargetVersionFamily(atom, highest) && atom > highest))
-            {
+            if (highest == CapabilityAtom::Invalid || atom > highest)
                 highest = atom;
-            }
         }
     }
     return highest;
@@ -206,35 +202,36 @@ static CapabilityAtom getHighestTargetVersionAtomInFamily(
 
 bool doesCapabilityRaiseTargetVersionAboveProfile(
     const CapabilitySet& profileCaps,
-    const CapabilitySet& capability)
+    const CapabilitySet& capabilityCaps,
+    CapabilityAtom targetVersionFamily)
 {
-    // The profile pins a concrete output version (the highest target-version atom it selects). We
-    // must reject `capability` only when it cannot be realized at that version. Rather than
-    // re-deriving realizability, we fold the capability into the profile caps exactly as
-    // `TargetRequest::getTargetCaps()` does, then read back the version the compiler would actually
-    // emit for that target family. If the fold raises it above the pinned version, it is a
-    // conflict.
-    //
-    // Because the version is read back through the same fold/emission path, this check hard-codes
-    // no capability's requirement: it flags iff that fold would raise the emitted version. If a
-    // capability's requirement at the selected version changes, the check follows with no edit
-    // here.
+    // The profile pins a concrete output version within `targetVersionFamily` — the highest version
+    // atom of that family it selects. We reject `capabilityCaps` only when folding it in would
+    // raise the emitted version above that pin. Rather than re-deriving realizability by hand, we
+    // perform the same join `TargetRequest::getTargetCaps()` performs to fold a `-capability` into
+    // the target caps, and read the resulting version the way emission does (the highest version
+    // atom of the family). The base set differs from `getTargetCaps()` — we fold into `profileCaps`
+    // rather than its target-atom-seeded set — but the parts that decide a version *raise* (the
+    // version atoms present and the max-atom read-back) are the same, so the answer matches.
+    // Deferring to that join hard-codes no capability's requirement: if a capability's requirement
+    // at the selected version changes, this check follows with no edit here.
     CapabilityAtom selectedVersion =
-        getHighestTargetVersionAtomInFamily(profileCaps, CapabilityAtom::Invalid);
+        getHighestTargetVersionAtomInFamily(profileCaps, targetVersionFamily);
     if (selectedVersion == CapabilityAtom::Invalid)
-        return false; // the profile does not pin a concrete target version, so nothing to conflict.
+        return false; // the profile does not pin a concrete version of this family — nothing to
+                      // conflict.
 
-    // A capability whose targets are entirely disjoint from the profile is not folded in by
-    // `getTargetCaps()` (the `!isIncompatibleWith` guard), so it cannot raise this target's
-    // version. This also drops a capability's realizations for other targets (e.g. the GLSL side of
-    // a GL_*-aliased SPIR-V capability), which must not mask the SPIR-V version requirement.
-    if (profileCaps.isIncompatibleWith(capability))
-        return false;
-
+    // A capability whose targets are entirely disjoint from the profile is dropped by `join`
+    // (equivalently the `!isIncompatibleWith` guard in `getTargetCaps()`), so it cannot raise this
+    // target's version. For a capability that is target-compatible but has realizations for other
+    // targets too (e.g. the GLSL side of a `GL_*`-aliased SPIR-V capability), the join is
+    // target-scoped: only the matching-target realization is folded in, so the off-target
+    // realization cannot mask this family's version requirement.
     CapabilitySet combined = profileCaps;
-    combined.join(capability);
+    combined.join(capabilityCaps);
 
-    CapabilityAtom emittedVersion = getHighestTargetVersionAtomInFamily(combined, selectedVersion);
+    CapabilityAtom emittedVersion =
+        getHighestTargetVersionAtomInFamily(combined, targetVersionFamily);
     return emittedVersion != CapabilityAtom::Invalid && emittedVersion > selectedVersion;
 }
 

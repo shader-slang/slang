@@ -509,22 +509,24 @@ bool isStageAtom(CapabilityName name, CapabilityName& outCanonicalStage);
 bool isTargetVersionAtom(CapabilityAtom name);
 bool isSpirvExtensionAtom(CapabilityAtom name);
 
-/// Determine whether folding `capability` into `profileCaps` raises the concrete target version the
-/// compiler would emit above the version `profileCaps` pins. Returns false when `profileCaps` pins
-/// no concrete target version, or when `capability` targets a different family and so is not folded
-/// into this target at all.
+/// Determine whether folding `capabilityCaps` into `profileCaps` raises the concrete target version
+/// the compiler would emit above the version `profileCaps` pins, within `targetVersionFamily` (a
+/// version atom naming the family of interest, e.g. `_spirv_1_0`). Returns false when `profileCaps`
+/// pins no concrete version of that family.
 ///
-/// This mirrors the capability fold in `TargetRequest::getTargetCaps()` (join the capability into
-/// the target caps, then read back the emitted version), rather than re-deriving realizability by
-/// hand. Because it re-derives the version through the same fold the emitter uses, the diagnostic
-/// fires exactly when — and only when — that fold would raise the emitted version above the pinned
-/// one. It hard-codes no capability's version requirement, so its behavior tracks the capability
-/// model: if a capability's requirement at the selected version changes, the check follows without
-/// edits here. Today, for example, folding `SPV_KHR_cooperative_matrix` (which requires SPIR-V 1.6)
-/// into a `spirv_1_4` profile raises the version and conflicts.
+/// The version-raise decision is made by the same `join` `TargetRequest::getTargetCaps()` uses to
+/// fold a `-capability` in, with the emitted version read back as emission reads it (the highest
+/// version atom of the family). The base set folded into differs from `getTargetCaps()` (this uses
+/// `profileCaps`, not its target-atom-seeded set), but the parts that decide a raise are the same,
+/// so the answer matches — the diagnostic fires exactly when that fold would raise the emitted
+/// version. It hard-codes no capability's requirement, so its behavior tracks the capability model:
+/// if a capability's requirement at the selected version changes, the check follows without edits
+/// here. Today, for example, folding `SPV_KHR_cooperative_matrix` (which requires SPIR-V 1.6) into
+/// a `spirv_1_4` profile raises the version and conflicts.
 bool doesCapabilityRaiseTargetVersionAboveProfile(
     const CapabilitySet& profileCaps,
-    const CapabilitySet& capability);
+    const CapabilitySet& capabilityCaps,
+    CapabilityAtom targetVersionFamily);
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);

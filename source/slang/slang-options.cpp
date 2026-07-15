@@ -4468,16 +4468,40 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                         TypeTextUtil::getCompileTargetName(SlangCompileTarget(rawTarget.format))});
             }
 
-            // An explicit `-profile` (e.g. `spirv_1_4`) pins a concrete output target version, so
-            // an explicit `-capability` that can only be realized at a higher version is a genuine
-            // command-line conflict. Left undiagnosed, `TargetRequest::getTargetCaps()` silently
-            // folds the capability in and raises the emitted version (a version raise is a
-            // "compatible" join), which is exactly what the user asked us not to do. This mirrors
-            // the atom folding in `getTargetCaps()`, but rejects instead of raising. It is
-            // order-independent and also covers the appended `-profile <profile>+<capability>`
-            // form, whose trailing atoms are recorded as capabilities too.
+            // A `-profile` that explicitly names a concrete output version of the target's own
+            // family (e.g. `spirv_1_4` for a SPIR-V target) pins that version, so a `-capability`
+            // that can only be realized at a higher version is a genuine command-line conflict.
+            // Left undiagnosed, `TargetRequest::getTargetCaps()` silently folds the capability in
+            // and raises the emitted version (a version raise is a "compatible" join). The check
+            // below rejects that instead; it is order-independent and also covers the appended
+            // `-profile <profile>+<capability>` form, whose trailing atoms are recorded as
+            // capabilities.
+            //
+            // Two gates keep this from firing on non-conflicts, mirroring `getTargetCaps()`, which
+            // only folds the profile when it is target-compatible (`atLeastOneSetImpliedInOther`):
+            //  - Skip when profiles already conflict — `ConflictingProfilesSpecifiedForTarget`
+            //    (above) owns that error and the pinned version is meaningless.
+            //  - Require the profile's family to match the target's version family. Otherwise a
+            //    cross-family profile still contributes version atoms that would misread as a pin:
+            //    e.g. `-profile glsl_450` (GLSL family) implies a SPIR-V floor, so on a SPIR-V
+            //    target `-profile glsl_450+spirv_1_4` (a valid request to emit SPIR-V 1.4) must not
+            //    be flagged, and `-profile spirv_1_4` on a Metal target must not be flagged either.
             Profile profile = rawTarget.optionSet.getProfile();
-            if (profile != Profile::Unknown)
+            CapabilityAtom targetVersionFamily = CapabilityAtom::Invalid;
+            switch (profile.getFamily())
+            {
+            case ProfileFamily::SPIRV:
+                if (isKhronosTarget(rawTarget.format))
+                    targetVersionFamily = CapabilityAtom::_spirv_1_0;
+                break;
+            case ProfileFamily::METAL:
+                if (isMetalTarget(rawTarget.format))
+                    targetVersionFamily = CapabilityAtom::metallib_2_3;
+                break;
+            default:
+                break;
+            }
+            if (!rawTarget.conflictingProfilesSet && targetVersionFamily != CapabilityAtom::Invalid)
             {
                 CapabilitySet profileCaps = profile.getCapabilityName();
                 for (auto atomVal : rawTarget.optionSet.getArray(CompilerOptionName::Capability))
@@ -4497,7 +4521,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
                     if (doesCapabilityRaiseTargetVersionAboveProfile(
                             profileCaps,
-                            CapabilitySet(capabilityName)))
+                            CapabilitySet(capabilityName),
+                            targetVersionFamily))
                     {
                         m_sink->diagnose(Diagnostics::ConflictingExplicitCapabilityAndProfile{
                             .capability = capabilityNameToString(capabilityName),

@@ -3248,9 +3248,9 @@ bool isD3DTarget(TargetRequest* targetReq)
     }
 }
 
-bool isMetalTarget(TargetRequest* targetReq)
+bool isMetalTarget(CodeGenTarget target)
 {
-    switch (targetReq->getTarget())
+    switch (target)
     {
     default:
         return false;
@@ -3260,6 +3260,11 @@ bool isMetalTarget(TargetRequest* targetReq)
     case CodeGenTarget::MetalLibAssembly:
         return true;
     }
+}
+
+bool isMetalTarget(TargetRequest* targetReq)
+{
+    return isMetalTarget(targetReq->getTarget());
 }
 
 bool isKhronosTarget(CodeGenTarget target)
