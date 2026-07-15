@@ -209,6 +209,43 @@ target_include_directories(
     INTERFACE "${_fast_float_include}"
 )
 
+# Slang and SPIRV-Tools share one mimalloc target. Resolve the checkout before either consumer is
+# configured so slang-compiler can use mimalloc even when SPIRV-Tools is disabled or provided by
+# the system.
+set(SLANG_BUILD_MIMALLOC OFF)
+if(SLANG_ENABLE_MIMALLOC)
+    set(SLANG_BUILD_MIMALLOC ON)
+elseif(
+    SLANG_ENABLE_SLANG_GLSLANG
+    AND NOT SLANG_USE_SYSTEM_SPIRV_TOOLS
+    AND SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
+)
+    set(SLANG_BUILD_MIMALLOC ON)
+endif()
+
+set(SLANG_MIMALLOC_AVAILABLE OFF)
+if(SLANG_BUILD_MIMALLOC)
+    if(NOT SLANG_OVERRIDE_MIMALLOC_PATH)
+        # Place mimalloc in slang/external instead of spirv-tools/external for better organization.
+        set(MIMALLOC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/mimalloc")
+    else()
+        set(MIMALLOC_PATH "${SLANG_OVERRIDE_MIMALLOC_PATH}/mimalloc")
+    endif()
+
+    # mimalloc is vendored as a submodule under external/mimalloc. A missing
+    # checkout means submodules were not initialized, so fail loudly at configure
+    # time, mirroring the fast_float override validation earlier in this file.
+    if(NOT EXISTS "${MIMALLOC_PATH}/CMakeLists.txt")
+        message(
+            FATAL_ERROR
+            "mimalloc source not found at ${MIMALLOC_PATH}. Run 'git submodule update --init --recursive', or set SLANG_OVERRIDE_MIMALLOC_PATH to a directory containing a 'mimalloc' checkout."
+        )
+    endif()
+
+    set(mimalloc_SOURCE_DIR "${MIMALLOC_PATH}")
+    set(SLANG_MIMALLOC_AVAILABLE ON)
+endif()
+
 # SPIRV-Headers
 # Avoid using ${system} intentionally in `add_subdirectory`, because if we do, it will end up using
 # spirv.h installed in the system directory on MacOS.
@@ -256,56 +293,20 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
 
         # Enable mimalloc for SPIRV-Tools to improve compilation performance
         # Based on SPIRV-Tools PR #6267: https://github.com/KhronosGroup/SPIRV-Tools/pull/6267
-        if(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC)
-            if(NOT SLANG_OVERRIDE_MIMALLOC_PATH)
-                # Place mimalloc in slang/external instead of spirv-tools/external for better organization
-                set(MIMALLOC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/mimalloc")
-            else()
-                set(MIMALLOC_PATH "${SLANG_OVERRIDE_MIMALLOC_PATH}/mimalloc")
-            endif()
-
-            # Download mimalloc if it's not available
-            if(NOT EXISTS "${MIMALLOC_PATH}/CMakeLists.txt")
-                message(
-                    STATUS
-                    "mimalloc not found at ${MIMALLOC_PATH} - downloading..."
-                )
-                execute_process(
-                    COMMAND
-                        ${GIT_EXECUTABLE} clone --depth 1 --branch v2.1.7
-                        https://github.com/microsoft/mimalloc.git
-                        "${MIMALLOC_PATH}"
-                    RESULT_VARIABLE git_result
-                    OUTPUT_QUIET
-                    ERROR_QUIET
-                )
-                if(git_result EQUAL 0)
-                    # Point SPIRV-Tools to our mimalloc location
-                    set(mimalloc_SOURCE_DIR "${MIMALLOC_PATH}")
-                    set(SPIRV_TOOLS_USE_MIMALLOC ON)
-                    set(SPIRV_TOOLS_USE_MIMALLOC_IN_STATIC_BUILD ON)
-                    # set(MI_INSTALL_TOPLEVEL OFF)
-                    message(
-                        STATUS
-                        "Successfully downloaded and enabled mimalloc for SPIRV-Tools at ${MIMALLOC_PATH}"
-                    )
-                else()
-                    message(
-                        WARNING
-                        "Failed to download mimalloc. Building SPIRV-Tools without mimalloc support."
-                    )
-                endif()
-            endif()
-
-            # Check if mimalloc is available now
-            if(EXISTS "${MIMALLOC_PATH}/CMakeLists.txt")
-                # Point SPIRV-Tools to our mimalloc location
-                set(mimalloc_SOURCE_DIR "${MIMALLOC_PATH}")
-                set(SPIRV_TOOLS_USE_MIMALLOC ON)
-                # Also enable mimalloc in static builds for better performance
-                set(SPIRV_TOOLS_USE_MIMALLOC_IN_STATIC_BUILD ON)
-                # Disable mimalloc installation to avoid install target conflicts
-                # set(MI_INSTALL_TOPLEVEL OFF)
+        if(SLANG_MIMALLOC_AVAILABLE)
+            set(SPIRV_TOOLS_USE_MIMALLOC
+                ${SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC}
+                CACHE BOOL
+                "Executables and shared libraries use mimalloc instead of the default allocator"
+                FORCE
+            )
+            set(SPIRV_TOOLS_USE_MIMALLOC_IN_STATIC_BUILD
+                ${SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC}
+                CACHE BOOL
+                "Static SPIRV-Tools libraries use mimalloc instead of the default allocator"
+                FORCE
+            )
+            if(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC)
                 message(
                     STATUS
                     "Enabling mimalloc for SPIRV-Tools (including static builds) from ${MIMALLOC_PATH}"
@@ -342,6 +343,21 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
             )
         endif()
     endif()
+endif()
+
+# SPIRV-Tools normally creates mimalloc-static. Create it here when slang-compiler needs it and
+# SPIRV-Tools did not, while keeping the global allocation override in Slang-owned source code.
+if(SLANG_ENABLE_MIMALLOC AND NOT TARGET mimalloc-static)
+    function(_slang_add_mimalloc_target)
+        set(MI_OVERRIDE OFF)
+        set(MI_BUILD_SHARED OFF)
+        set(MI_BUILD_STATIC ON)
+        set(MI_BUILD_OBJECT OFF)
+        set(MI_BUILD_TESTS OFF)
+        set(MI_INSTALL_TOPLEVEL OFF)
+        add_subdirectory("${mimalloc_SOURCE_DIR}" mimalloc EXCLUDE_FROM_ALL)
+    endfunction()
+    _slang_add_mimalloc_target()
 endif()
 
 if(

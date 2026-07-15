@@ -367,6 +367,26 @@ foreach(_slang_fiddle_consumer slang slang-common-objects)
         add_dependencies(${_slang_fiddle_consumer} slang-fiddle-generate)
     endif()
 endforeach()
+if(SLANG_ENABLE_MIMALLOC)
+    if(NOT TARGET mimalloc-static)
+        message(
+            FATAL_ERROR
+            "SLANG_ENABLE_MIMALLOC requires the mimalloc-static target"
+        )
+    endif()
+
+    # Without the embedded core module, the normal source glob already adds this file to slang.
+    # With the embedded core module, the glob belongs to slang-common-objects, where this file
+    # remains empty, so compile the active override directly in slang.
+    if(SLANG_EMBED_CORE_MODULE)
+        target_sources(slang PRIVATE slang-mimalloc.cpp)
+    endif()
+    target_compile_definitions(
+        slang
+        PRIVATE SLANG_MIMALLOC_OVERRIDE_NEW_DELETE=1
+    )
+    target_link_libraries(slang PRIVATE mimalloc-static)
+endif()
 
 set_target_properties(
     slang

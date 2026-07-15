@@ -30,6 +30,12 @@ on:
       only:
         description: "comma-separated workload subset (blank = full suite)"
         default: ""
+      sweep:
+        # Opt-in (~4x runtime): dispatch with sweep=true when fresh scaling
+        # curves are wanted; the published sweep page shows the newest sweep
+        # whenever one last ran.
+        description: "run each workload's sweep_sizes for scaling curves (~4x runtime; tracking still compares the default-size point)"
+        default: "false"
       publish:
         description: "push results + update tracking + deploy pages (set false for one-off measurements: results are uploaded as a run artifact only)"
         default: "true"
@@ -158,6 +164,7 @@ jobs:
         env:
           SAMPLES: ${{ github.event.inputs.samples || '5' }}
           ONLY: ${{ github.event.inputs.only }}
+          SWEEP: ${{ github.event.inputs.sweep || 'false' }}
           REF_INPUT: ${{ github.event.inputs.ref }}
         run: |
           set -euo pipefail
@@ -200,6 +207,10 @@ jobs:
           # the driver is built once per run with the host cl.
           args=(--slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" --samples "$SAMPLES" --warmup 1 --api)
           [ -n "$ONLY" ] && args+=(--only "$ONLY")
+          # Swept multi-size data is collapsed to default_size by
+          # analyze.canonical_runs when the tracking series is rebuilt, so a
+          # swept night still contributes a like-with-like tracking point.
+          [ "$SWEEP" = "true" ] && args+=(--sweep)
           # Daily ToT sweep -> perf-results/daily/<label>/results.json
           python3 bench.py "${args[@]}"
           if [ "$PUBLISH" = "true" ]; then
@@ -216,6 +227,24 @@ jobs:
           name: bench-results-${{ github.sha }}
           path: bench-results/
           if-no-files-found: ignore
+
+      # New releases (majors + patch releases from v2026.13 on) are swept into
+      # the tracked history the night they ship, riding the same results push
+      # below. continue-on-error: a failing new-release sweep must not cost the
+      # night's own point — the script removes partial baselines and the next
+      # nightly retries.
+      - name: Sweep newly published releases
+        if: env.PUBLISH == 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # API rate limit for asset downloads
+          SAMPLES: ${{ github.event.inputs.samples || '5' }}
+        run: |
+          set -euo pipefail
+          cd "$SUITE"
+          python3 new_release_check.py --results "$GITHUB_WORKSPACE/perf-results" \
+            --repo "$GITHUB_WORKSPACE" --samples "$SAMPLES"
 
       - name: Push results
         if: env.PUBLISH == 'true'
@@ -257,6 +286,11 @@ jobs:
           fi
           cd "$SUITE"
           python3 report.py --results "$RESULTS" --index "$RESULTS/index.json"
+          # Sweep landing page + every archived sweep (dailies + releases),
+          # regenerated from repo data on each deploy. Sweeps are opt-in and
+          # few, so rendering all of them is cheap; an empty archive still
+          # produces a valid index page.
+          python3 sweep_report.py --results "$RESULTS" --publish "$RESULTS/analysis/sweep"
 
       - name: Checkout gh-pages branch
         if: env.PUBLISH == 'true'
@@ -301,9 +335,10 @@ jobs:
           git config user.email "slang-perf-bot@users.noreply.github.com"
 
           cp -r "$ANALYSIS/." .
-          mv report_per_workload.html index.html
-          # _combined_index.json is a derived intermediate — no need to serve it
-          rm -f _combined_index.json
+          # report.py writes index.html (the landing page) directly;
+          # report_per_workload.html is kept as a redirect for old bookmarks.
+          # the _*_index.json files are derived intermediates — no need to serve them
+          rm -f _combined_index.json _releases_index.json _daily_index.json
           # Serve files verbatim: without this marker GitHub Pages runs the
           # generated report through legacy Jekyll, whose builds have failed
           # or hung on this content. Must be re-created on every deploy

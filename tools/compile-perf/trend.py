@@ -27,7 +27,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)  # allow running from any directory
 
-from lib import manifest
+from lib import analyze, manifest
 
 
 def timers_for(workload):
@@ -49,7 +49,7 @@ def write_step_summary(md):
     """Append markdown to the GitHub Actions step summary ($GITHUB_STEP_SUMMARY)."""
     path = os.environ.get("GITHUB_STEP_SUMMARY")
     if path:
-        with open(path, "a", encoding="utf-8", newline="\n") as fh:
+        with analyze.open_output(path, "a") as fh:
             fh.write(md + "\n")
 
 
@@ -82,6 +82,9 @@ def main():
     ap.add_argument("--abs", type=float, default=2.0, help="min absolute ms delta to flag")
     ap.add_argument("--min-baseline", type=int, default=3,
                     help="min trailing points required to judge a metric")
+    ap.add_argument("--baseline-kind", choices=["daily", "any"], default="daily",
+                    help="which points form the trailing baseline (default daily: "
+                         "release points carry a build-provenance offset)")
     ap.add_argument("--no-fail", action="store_true", help="report only; always exit 0")
     # Daily labels are keyed by the SWEPT COMMIT's date, so several points can
     # share one date (e.g. master's HEAD was committed yesterday, or a manual
@@ -124,6 +127,14 @@ def main():
     # Restrict the baseline to points on the same runner, strictly before the
     # judged point in series order.
     prior = [p for p in earlier if (p.get("runner") or hist_runner) == cur_runner]
+    # Baseline defaults to DAILY points only: release points are official
+    # prebuilt binaries while dailies are runner-built with matched flags but a
+    # different MSVC toolset — a build-provenance offset (uniform few-%, and
+    # 30%+ on single hot loops) that is not a code regression. Judging tonight
+    # against recent nights keeps the baseline provenance-consistent; use
+    # --baseline-kind any for ad-hoc cross-kind comparisons.
+    if args.baseline_kind == "daily":
+        prior = [p for p in prior if p.get("kind") == "daily"]
     window = prior[-args.window:]
 
     if hist_runner and cur_runner and cur_runner != hist_runner:

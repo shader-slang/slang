@@ -127,11 +127,26 @@ public:
 // inline in the header because they're tiny and need to be reachable
 // from main.cpp without dragging in the rest of the implementation
 // unit.
+
+// The exception `check` throws on a failing Vulkan call. Carries the
+// failing VkResult so callers can react to specific failures — the
+// demos catch VK_ERROR_DEVICE_LOST to suggest batching remedies for
+// OS watchdog resets — without parsing the message text.
+struct VulkanError : std::runtime_error
+{
+    VkResult result;
+    VulkanError(VkResult r, const std::string& message)
+        : std::runtime_error(message), result(r)
+    {
+    }
+};
+
 inline void check(VkResult r, const char* what)
 {
     if (r != VK_SUCCESS)
     {
-        throw std::runtime_error(
+        throw VulkanError(
+            r,
             std::string("Vulkan error in ") + what + ": " + std::to_string(int(r)));
     }
 }
