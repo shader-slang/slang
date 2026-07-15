@@ -279,28 +279,34 @@ def main():
             panels.append(render.line_panel(
                 labels, series,
                 "createGlobalSession RSS delta (api driver)", unit="MiB"))
-        deltas = []
+        # Per-workload panels show the ABSOLUTE process peak, with the
+        # session floor drawn alongside for scale (no subtraction): the
+        # question answered is "how much memory does compiling this workload
+        # take", and the gap to the grey line is the workload's own share.
+        wls = []
         for (wl, cnt), vs in per.items():
             if cnt != "peakRssKb" or wl == "minimal":
                 continue
-            dv = [v - f if v is not None and f is not None else None
-                  for v, f in zip(vs, floor)]
-            if any(v is not None for v in dv):
-                last = next((v for v in reversed(dv) if v is not None), 0.0)
-                deltas.append((abs(last), wl, dv))
-        for _mag, wl, dv in sorted(deltas, reverse=True):
+            if any(v is not None for v in vs):
+                last = next((v for v in reversed(vs) if v is not None), 0.0)
+                wls.append((last, wl, vs))
+        show_floor = any(v is not None for v in floor)
+        for _mag, wl, vs in sorted(wls, reverse=True):
+            series = [(f"{wl} peak RSS", "#e6550d", mib(vs))]
+            if show_floor:
+                series.append(("session floor (minimal)", "#b5bdc4", mib(floor)))
             panels.append(render.line_panel(
-                labels, [(f"{wl} − minimal", "#e6550d", mib(dv))],
-                f"{wl} — peak RSS over the session floor", unit="MiB"))
+                labels, series, f"{wl} — process peak RSS", unit="MiB"))
         body = "".join(f'<span style="display:inline-block;margin:6px">{p}</span>'
                        for p in panels)
         explainer = (
             "<p class='small'><b>Session floor</b> — peak resident memory of "
             "compiling an <i>empty</i> shader: the cost of starting the "
             "compiler (createGlobalSession + core module), paid by every "
-            "compile. <b>Per-workload panels</b> — how much MORE memory that "
-            "workload's compile peaked at, above the floor (the floor itself "
-            "is subtracted so panels show the work, not the startup). "
+            "compile. <b>Per-workload panels</b> — the absolute peak "
+            "resident memory of that workload's whole compile process, with "
+            "the session floor alongside in grey for scale: the gap between "
+            "the lines is the memory the workload's own work added. "
             "<b>createGlobalSession RSS delta</b> — measured inside the api "
             "driver: process memory immediately before vs after that one "
             "call. Panels are line charts, not stacked areas, because these "
