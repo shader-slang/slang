@@ -13,6 +13,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK_SPIRV):-target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -warnings-as-errors all
 //TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry computeMain -stage compute -warnings-as-errors all
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK_BUF):-output-using-type -cpu -output-using-type -xslang -warnings-as-errors -xslang all
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK_BUF):-vk -compute -output-using-type -emit-spirv-directly -xslang -warnings-as-errors -xslang all
 
 //TEST_INPUT:ubuffer(data=[12345678], count=1, stride=4):out,name=output

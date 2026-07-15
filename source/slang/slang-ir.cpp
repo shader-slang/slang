@@ -4349,6 +4349,11 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
          kIROp_EnumCast},
     };
 
+    // bounds checks
+    SLANG_ASSERT((int)fromStyle >= 0);
+    SLANG_ASSERT((int)fromStyle < 5);
+    SLANG_ASSERT((int)toStyle >= 0);
+    SLANG_ASSERT((int)toStyle < 5);
     auto op = opMap[(int)fromStyle][(int)toStyle];
     if (op.op0 == kIROp_Nop)
         return value;

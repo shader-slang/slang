@@ -976,7 +976,7 @@ LoweredValInfo emitCallToDeclRef(
             // the operand and produce the canonical void value (`IRVoidLit`) rather
             // than a `kIROp_CastToVoid` instruction, which no backend can emit and
             // which would only duplicate the one canonical spelling of a void value.
-            SLANG_ASSERT(argCount == 1);
+            SLANG_RELEASE_ASSERT(argCount == 1);
             return LoweredValInfo::simple(builder->getVoidValue());
         default:
             return LoweredValInfo::simple(
