@@ -2351,12 +2351,16 @@ SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
         jit = std::move(*expectJit);
     }
 
-    // The DIBuilder and IRBuilders borrow *llvmModule / *llvmContext by reference and
-    // track metadata against the context; llvmLinker borrows *llvmModule. We are about
-    // to transfer ownership of both the module and context to ORC, after which this
-    // builder no longer controls their lifetime. Destroy those borrowers now, while the
-    // module and context are still alive, so their tracking-metadata destructors do not
-    // run later in ~LLVMBuilder against state ORC may already have freed.
+    // The DIBuilder and IRBuilders borrow *llvmModule / *llvmContext by reference;
+    // llvmLinker borrows *llvmModule. Below we move both the module and context into ORC,
+    // giving up ownership of them, but this LLVMBuilder (and thus these borrowers) lives on
+    // until the caller destroys it after we return. ORC frees the moved module and context
+    // during materialization -- when the module has static initializers (llvm.global_ctors),
+    // initialize() runs them and forces that materialization here. By the time ~LLVMBuilder
+    // then destroys the borrowers, ~DIBuilder tears down its TrackingMDNodeRef vectors,
+    // whose destructors untrack against metadata nodes owned by the (now-freed) context ->
+    // use-after-free. Destroy the borrowers here, before the move, while the module and
+    // context are still alive and owned by this builder.
     llvmDebugBuilder.reset();
     llvmBuilderOpt.reset();
     llvmBuilderNoOpt.reset();
