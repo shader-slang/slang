@@ -11245,39 +11245,39 @@ T fmod(T x, T y)
     // OpenGL document defines "Modulus" as "Returns x - y * floor(x / y)".
     // The use of "Floor()" makes the difference.
     //
-    // In Metal, `fmod` is Modulus function.
+    // In Metal, `fmod` is a Remainder function.
     // Metal document defines it as "Returns x - y * trunc(x/y)".
-    // Note that the function name is same to HLSL but it behaves differently.
+    // This matches HLSL `fmod`, so no sign correction is needed.
     //
     // The tricky ones are when x or y is a negative value.
     //
-    //       | Remainder | Modulus
-    //  x  y | x= i*y +f | x-y*floor(x/y)
-    // ------+-----------+------------------------------
-    //  4  3 | 4= 1*3 +1 | 4-3*floor( 4/3) = 4-3* 1 = 1
-    //  3  3 | 3= 1*3 +0 | 3-3*floor( 3/3) = 3-3* 1 = 0
-    //  2  3 | 2= 0*3 +2 | 2-3*floor( 2/3) = 2-3* 0 = 2
-    //  1  3 | 1= 0*3 +1 | 1-3*floor( 1/3) = 1-3* 0 = 1
-    //  0  3 | 0= 0*3 +0 | 0-3*floor( 0/3) = 0-3* 0 = 0
-    // -1  3 |-1= 0*3 -1 |-1-3*floor(-1/3) =-1-3*-1 = 2
-    // -2  3 |-2= 0*3 -2 |-2-3*floor(-2/3) =-2-3*-1 = 1
-    // -3  3 |-3=-1*3  0 |-3-3*floor(-3/3) =-3-3*-1 = 0
-    // -4  3 |-4=-1*3 -1 |-4-3*floor(-4/3) =-4-3*-2 = 2
+    //       | Remainder        | Modulus
+    //  x  y | x - y*trunc(x/y) | x-y*floor(x/y)
+    // ------+------------------+------------------------------
+    //  4  3 | 4= 1*3 +1        | 4-3*floor( 4/3) = 4-3* 1 = 1
+    //  3  3 | 3= 1*3 +0        | 3-3*floor( 3/3) = 3-3* 1 = 0
+    //  2  3 | 2= 0*3 +2        | 2-3*floor( 2/3) = 2-3* 0 = 2
+    //  1  3 | 1= 0*3 +1        | 1-3*floor( 1/3) = 1-3* 0 = 1
+    //  0  3 | 0= 0*3 +0        | 0-3*floor( 0/3) = 0-3* 0 = 0
+    // -1  3 |-1= 0*3 -1        |-1-3*floor(-1/3) =-1-3*-1 = 2
+    // -2  3 |-2= 0*3 -2        |-2-3*floor(-2/3) =-2-3*-1 = 1
+    // -3  3 |-3=-1*3  0        |-3-3*floor(-3/3) =-3-3*-1 = 0
+    // -4  3 |-4=-1*3 -1        |-4-3*floor(-4/3) =-4-3*-2 = 2
     //
     // When y is a negative value,
     //
-    //       | Remainder | Modulus
-    //  x  y | x= i*y +f | x-y*floor(x/y)
-    // ------+-----------+------------------------------
-    //  4 -3 | 4=-1*-3+1 | 4+3*floor( 4/-3) = 4+3*-2 =-2
-    //  3 -3 | 3=-1*-3+0 | 3+3*floor( 3/-3) = 3+3*-1 = 0
-    //  2 -3 | 2= 0*-3+2 | 2+3*floor( 2/-3) = 2+3*-1 =-1
-    //  1 -3 | 1= 0*-3+1 | 1+3*floor( 1/-3) = 1+3*-1 =-2
-    //  0 -3 | 0= 0*-3+0 | 0+3*floor( 0/-3) = 0+3* 0 = 0
-    // -1 -3 |-1= 0*-3-1 |-1+3*floor(-1/-3) =-1+3* 0 =-1
-    // -2 -3 |-2= 0*-3-2 |-2+3*floor(-2/-3) =-2+3* 0 =-2
-    // -3 -3 |-3= 1*-3 0 |-3+3*floor(-3/-3) =-3+3* 1 = 0
-    // -4 -3 |-4= 1*-3-1 |-4+3*floor(-4/-3) =-4+3* 1 =-1
+    //       | Remainder        | Modulus
+    //  x  y | x - y*trunc(x/y) | x-y*floor(x/y)
+    // ------+------------------+------------------------------
+    //  4 -3 | 4=-1*-3+1        | 4+3*floor( 4/-3) = 4+3*-2 =-2
+    //  3 -3 | 3=-1*-3+0        | 3+3*floor( 3/-3) = 3+3*-1 = 0
+    //  2 -3 | 2= 0*-3+2        | 2+3*floor( 2/-3) = 2+3*-1 =-1
+    //  1 -3 | 1= 0*-3+1        | 1+3*floor( 1/-3) = 1+3*-1 =-2
+    //  0 -3 | 0= 0*-3+0        | 0+3*floor( 0/-3) = 0+3* 0 = 0
+    // -1 -3 |-1= 0*-3-1        |-1+3*floor(-1/-3) =-1+3* 0 =-1
+    // -2 -3 |-2= 0*-3-2        |-2+3*floor(-2/-3) =-2+3* 0 =-2
+    // -3 -3 |-3= 1*-3 0        |-3+3*floor(-3/-3) =-3+3* 1 = 0
+    // -4 -3 |-4= 1*-3-1        |-4+3*floor(-4/-3) =-4+3* 1 =-1
 
     __target_switch
     {
@@ -11287,9 +11287,7 @@ T fmod(T x, T y)
         // GLSL doesn't have a function for remainder.
         __intrinsic_asm "(($0 < 0.0) ? -mod(-$0,abs($1)) : mod($0,abs($1)))";
     case hlsl: __intrinsic_asm "fmod";
-    case metal:
-        // Metal doesn't have a function for remainder.
-        __intrinsic_asm "(($0 < 0.0) ? -fmod(-$0,abs($1)) : fmod($0,abs($1)))";
+    case metal: __intrinsic_asm "fmod";
     case spirv:
         // OpFRem return "The floating-point remainder whose sign
         // matches the sign of Operand 1", where Operand 1 is "x".
