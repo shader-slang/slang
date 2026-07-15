@@ -29,7 +29,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from lib import analyze, manifest
+from lib import analyze, buckets, manifest
 
 # Mutually-exclusive-enough leaves for boundary attribution (compiler leaves
 # as in analyze.LEAF_TIMERS plus the backend emit timer, the legalize pair,
@@ -71,13 +71,11 @@ def daily_points(results_dir, metric):
 def _partition(workload):
     """(bucket_fn, tree) for the workload's family — breakdown's mutually-
     exclusive decomposition, whose buckets tile the headline exactly (named
-    leaves + `(self)` residuals). Imported lazily: breakdown imports this
-    module for the report pages, so a top-level import would be circular."""
-    import breakdown
+    leaves + `(self)` residuals)."""
     spec = manifest.BY_NAME.get(workload)
     if spec is not None and spec.mode == "api":
-        return breakdown.api_buckets, breakdown.API_TREE
-    return breakdown.buckets, breakdown.TREE
+        return buckets.api_buckets, buckets.API_TREE
+    return buckets.buckets, buckets.TREE
 
 
 def _tree_names(tree):
@@ -354,6 +352,31 @@ assert len(_B) == 1 and abs(_B[0][0] - (-10.0)) < 1e-9, \
 assert timer_deltas(_P0[2], _P1[2]) == [("SemanticChecking", -10.0), ("generateIR", 5.0)], \
     "timer_deltas: signed per-leaf suite-net, sorted by |delta|"
 del _P0, _P1, _B
+
+
+# Import-time self-check for the pp-sum tiling contract against the real
+# lib/buckets partition (this used to live in breakdown.py when the partition
+# did — the former import cycle constrained fixture placement).
+# The fixture includes compileInner's DIRECT children (frontEndExecute,
+# generateOutput) so alloc() actually descends: named-leaf buckets, (self)
+# residuals at two levels, and the pp sum are all exercised, not just a
+# single degenerate compileInner (self) bucket.
+_T0 = ("2026-01-01", "aaaaaaaaa",
+       {("w", "compileInner"): 100.0, ("w", "frontEndExecute"): 70.0,
+        ("w", "SemanticChecking"): 40.0, ("w", "generateIR"): 20.0,
+        ("w", "generateOutput"): 25.0})
+_T1 = ("2026-01-02", "bbbbbbbbb",
+       {("w", "compileInner"): 80.0, ("w", "frontEndExecute"): 60.0,
+        ("w", "SemanticChecking"): 30.0, ("w", "generateIR"): 25.0,
+        ("w", "generateOutput"): 15.0})
+_ov, _contrib, _ex, _st = workload_progress([_T0, _T1], "w")
+assert _ov is not None and abs(_ov[6] - (-20.0)) < 1e-9, \
+    "workload_progress fixture: headline 100 -> 80 ms must be -20%"
+assert len(_contrib) >= 4, \
+    "workload_progress fixture must produce a MULTI-bucket partition"
+assert abs(sum(c[3] for c in _contrib) - _ov[6]) < 1e-9, \
+    "workload_progress fixture: contributor pp must sum to the overall %"
+del _T0, _T1, _ov, _contrib, _ex, _st
 
 
 if __name__ == "__main__":
