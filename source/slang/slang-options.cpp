@@ -4477,6 +4477,16 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             // `-profile <profile>+<capability>` form, whose trailing atoms are recorded as
             // capabilities.
             //
+            // Only the `-profile` itself pins a version; an appended `+spirv_1_X` (recorded as a
+            // capability) is a version the user is *requesting*, not a constraint to check against
+            // — so `-profile glsl_450+spirv_1_4` is the user choosing SPIR-V 1.4 and is never a
+            // conflict, while `-profile spirv_1_4+<cap>` pins 1.4 and rejects a `<cap>` needing
+            // more. Deliberate non-goal: with a GLSL-family profile, a version-raising capability
+            // alongside an appended `+spirv_1_X` still silently emits the higher version (e.g.
+            // `-profile glsl_450+spirv_1_4 -capability <needs 1.6>` emits 1.6) — the appended
+            // version is a soft request, not a pin, matching pre-existing behavior and avoiding a
+            // false positive on the common `glsl_NNN+spirv_1_X` idiom.
+            //
             // Two gates keep this from firing on non-conflicts, mirroring `getTargetCaps()`, which
             // only folds the profile when it is target-compatible (`atLeastOneSetImpliedInOther`):
             //  - Skip when profiles already conflict — `ConflictingProfilesSpecifiedForTarget`
@@ -4491,7 +4501,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             switch (profile.getFamily())
             {
             case ProfileFamily::SPIRV:
-                if (isKhronosTarget(rawTarget.format))
+                // Only a SPIR-V *output* target emits a SPIR-V version header. `isKhronosTarget`
+                // also includes the GLSL text target, which does not, so use `isSPIRV` to match
+                // `getTargetCaps()`, which does not fold a SPIR-V profile version into a GLSL
+                // target.
+                if (isSPIRV(rawTarget.format))
                     targetVersionFamily = CapabilityAtom::_spirv_1_0;
                 break;
             case ProfileFamily::METAL:
