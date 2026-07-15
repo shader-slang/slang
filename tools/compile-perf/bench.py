@@ -215,44 +215,64 @@ def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
 
 
 # GNU /usr/bin/time -v gives per-process peak RSS; detect once.
-def _detect_gnu_time():
+def _windows_peak_rss_kb(popen):
+    """PeakWorkingSetSize of a finished subprocess in KB via
+    GetProcessMemoryInfo — the Windows equivalent of POSIX ru_maxrss. Reads
+    through the still-open Popen handle, so it must run before the Popen is
+    garbage-collected. Returns None if the query fails."""
     try:
-        r = subprocess.run(["/usr/bin/time", "-v", "true"],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        return b"Maximum resident set size" in r.stderr
+        import ctypes
+        from ctypes import wintypes
+
+        class PMC(ctypes.Structure):
+            _fields_ = [("cb", wintypes.DWORD),
+                        ("PageFaultCount", wintypes.DWORD),
+                        ("PeakWorkingSetSize", ctypes.c_size_t),
+                        ("WorkingSetSize", ctypes.c_size_t),
+                        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                        ("PagefileUsage", ctypes.c_size_t),
+                        ("PeakPagefileUsage", ctypes.c_size_t)]
+
+        pmc = PMC()
+        pmc.cb = ctypes.sizeof(PMC)
+        psapi = ctypes.WinDLL("psapi")
+        if psapi.GetProcessMemoryInfo(int(popen._handle), ctypes.byref(pmc),
+                                      pmc.cb):
+            return pmc.PeakWorkingSetSize / 1024.0
     except Exception:  # noqa: BLE001
-        return False
-
-
-_GNU_TIME = _detect_gnu_time()
+        pass
+    return None
 
 
 def run_once(cmd):
     """Run one compile; return (rc, wall_ms, combined_text, rss_kb_or_None).
 
-    When GNU time is available the command is wrapped so its peak RSS is written
-    to a side file (keeping the compiler's own stdout/stderr clean for parsing)."""
-    memfile = None
-    runcmd = cmd
-    if _GNU_TIME:
-        memfd, memfile = tempfile.mkstemp(prefix="bench_mem_")
-        os.close(memfd)
-        runcmd = ["/usr/bin/time", "-v", "-o", memfile] + cmd
+    rss is the child's peak resident set (peak working set on Windows) in KB.
+    On POSIX the child is reaped with os.wait4 so ru_maxrss is per-child (a
+    getrusage(RUSAGE_CHILDREN) high-water mark would smear one workload's
+    peak onto every later one); ru_maxrss is KB on Linux and BYTES on macOS.
+    Platform constants differ slightly (working set vs RSS), but the tracked
+    series compares within one runner fingerprint, never across platforms."""
     t0 = time.perf_counter()
-    proc = subprocess.run(runcmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    wall = (time.perf_counter() - t0) * 1000.0
-    text = proc.stdout.decode("utf-8", "replace")
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT)
+    out = proc.stdout.read()
     rss = None
-    if memfile:
+    if os.name == "nt":
+        proc.wait()
+        rss = _windows_peak_rss_kb(proc)
+    else:
         try:
-            with open(memfile, encoding="utf-8", errors="replace") as fh:
-                for line in fh:
-                    if "Maximum resident set size" in line:
-                        rss = float(line.rsplit(":", 1)[1].strip())  # kbytes
-                        break
-        except Exception:  # noqa: BLE001
-            pass
-        os.unlink(memfile)
+            _pid, status, ru = os.wait4(proc.pid, 0)
+            proc.returncode = os.waitstatus_to_exitcode(status)
+            rss = ru.ru_maxrss / (1024.0 if sys.platform == "darwin" else 1.0)
+        except ChildProcessError:
+            proc.wait()  # already reaped elsewhere; lose rss, keep rc
+    wall = (time.perf_counter() - t0) * 1000.0
+    text = out.decode("utf-8", "replace")
     return proc.returncode, wall, text, rss
 
 
