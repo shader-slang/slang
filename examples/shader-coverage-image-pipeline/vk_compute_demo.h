@@ -29,7 +29,7 @@
 //      resources in the slang sources if you want — slang-rhi binds by
 //      name and doesn't need them. (Leaving them in is harmless.)
 //
-// This file (header + cpp) is duplicated verbatim across the two
+// This file (header + cpp) is duplicated verbatim across the
 // shader-coverage example directories. Keeping per-demo copies
 // (rather than a shared helper) reduces coupling and makes each
 // demo a self-contained reference.
