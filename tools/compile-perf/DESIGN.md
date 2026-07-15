@@ -19,6 +19,11 @@ on Windows). See `README.md` Quickstart for copy-paste commands.
   `bench.py --label head`) and diff with `compare.py base head`. A
   one-command driver (`compare_branches.py`) that builds both sides via a
   git worktree is planned for a follow-up PR.
+- **Scaling of one build (compile time vs size N)** — `bench.py … --sweep` then
+  `sweep_report.py --label <name>`: per-workload scaling curves with a
+  floor-subtracted power-law fit (`(t − floor) = a·N^k`) + stacked phase
+  breakdown, to tell a fixed-cost regression from a per-element or
+  super-linear one.
 - **Across releases** — `fetch_releases.py` (caches platform-matched release
   binaries) + `sweep.py` to bench them all, then `analyze.py` (ranked
   step-changes, leaf attribution) and `report.py` (self-contained HTML, incl.
@@ -43,8 +48,9 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   `workflow_dispatch` only right now — the daily `schedule` is commented out;**
   enable it once the suite is validated on the runner and the history is seeded.
   Inputs: `ref` (commit SHA or branch to build; blank = master HEAD, useful for
-  backfilling historical daily points), `samples`, `only`, and `publish`
-  (default `true`). With `publish=false` the run measures only: results are
+  backfilling historical daily points), `samples`, `sweep` (default `false` — opt-in,
+  ~4x runtime: dispatch with `sweep=true` to also collect the multi-size scaling
+  ladders), `only`, and `publish` (default `true`). With `publish=false` the run measures only: results are
   uploaded as a run artifact and the results repo, tracking series, pages, and
   trend check are untouched — the mode for one-off measurements (bisect points,
   suspect commits) that must not pollute the series. Because daily labels are
@@ -58,7 +64,18 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   release `slangc` for the runner's platform, sweeps each into `releases/<tag>/`,
   writes `index.json`, stamps `runner.json`, rebuilds, and pushes. **Run with
   `force=true` to re-measure the whole history onto a new runner.** Inputs:
-  `since`, `until`, `samples`, `force`.
+  `since`, `until`, `samples`, `sweep` (default `false`, opt-in), `force`.
+
+**Sweep publication policy — a landing page plus every archived sweep.**
+Sweeping is opt-in on both workflows (`sweep=true`), so sweeps are few and all
+of them are served: `sweep_report.py --publish` (run by both workflows' report
+steps) renders `analysis/sweep/index.html` — the landing page listing every
+archived sweep, dailies newest-first with the newest as the headline, releases
+in release order — plus each sweep's full page set under
+`analysis/sweep/<label>/`. Everything regenerates from repo data on each
+deploy, so old sweeps persist and an empty archive still yields a valid index.
+`ladder_scaling.py` remains the cross-release floor/slope fit table over the
+same data.
 
 **Per-PR gate and local comparison tools (deferred).** A fast, soft-fail
 per-PR gate — build the PR head and its merge-base on the same runner and diff
@@ -79,7 +96,8 @@ Absolute compile times are runner-specific, so the series is assembled per machi
 `track.py` owns it: `register` (stamp a daily run + rebuild), `rebuild` (recompute
 `tracking/tracking.json`), `stamp-runner` (record the fingerprint the history was
 built on), `runner-id`, `summary`. Points reduce to per-`(workload, timer)` median
-via `analyze.canonical_runs`, so history and daily points compare like-with-like.
+via `analyze.canonical_runs`, so swept multi-size runs collapse to `default_size`
+and history vs daily compare like-with-like.
 
 Points sort by `(date, commit_time, label)`. The full committer timestamp
 matters because daily labels carry only the commit's DATE, and same-date
@@ -127,7 +145,7 @@ conventions in order, so local results are handled transparently by all tools.
 
 `results.json` (all of median/min/mean/stdev per timer) is the only measurement
 artifact stored — no CSV; the analysis/report tools read it directly. Transient
-and regenerable outputs (`gen/`, `analysis/`, `breakdown/`, `*.html`,
+and regenerable outputs (`gen/`, `analysis/`, `sweep/`, `breakdown/`, `*.html`,
 `*.svg`) are excluded via a `.gitignore` committed directly to the
 `slang-compile-perf` repo.
 

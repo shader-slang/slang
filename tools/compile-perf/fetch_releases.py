@@ -26,6 +26,10 @@ import urllib.request
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)  # allow running from any directory
+
+from lib import analyze
+
 DEFAULT_REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))  # slang checkout
 API = "https://api.github.com/repos/shader-slang/slang"
 # Preferred asset suffixes per platform, best first. On Linux the plain build
@@ -202,7 +206,7 @@ def main():
         index.append(rec)
 
     ipath = os.path.join(args.out, "index.json")
-    with open(ipath, "w", encoding="utf-8", newline="\n") as fh:
+    with analyze.open_output(ipath) as fh:
         json.dump(index, fh, indent=2)
     ok = sum(1 for r in index if "slangc" in r)
     print(f"\n{ok}/{len(index)} releases ready. wrote {ipath}")

@@ -322,7 +322,7 @@ def write_html(results_dir, label, metric):
     svg = render_stacked_svg(runs, label, metric)
     outdir = os.path.join(analyze.results_dir_for(results_dir, label), "breakdown")
     os.makedirs(outdir, exist_ok=True)
-    with open(os.path.join(outdir, "breakdown.svg"), "w", encoding="utf-8", newline="\n") as fh:
+    with analyze.open_output(os.path.join(outdir, "breakdown.svg")) as fh:
         fh.write(svg)
     html = (f"<!doctype html><meta charset=utf-8>"
             f"<title>Phase breakdown — {esc(label)}</title>"
@@ -332,7 +332,7 @@ def write_html(results_dir, label, metric):
             f"time not covered by a named child (e.g. the autodiff transform sits "
             f"in <code>linkAndOptimizeIR (self)</code>).</p>{svg}</body>")
     out = os.path.join(outdir, "breakdown.html")
-    with open(out, "w", encoding="utf-8", newline="\n") as fh:
+    with analyze.open_output(out) as fh:
         fh.write(html)
     print(f"wrote {out}  ({len(runs)} workloads)")
     return out
@@ -505,7 +505,7 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
         s.append(f'<rect x="{lx}" y="{yy}" width="12" height="12" fill="{color}"/>')
         s.append(f'<text x="{lx+16}" y="{yy+10}" fill="#222">{esc(name)}</text>')
     s.append("</svg>")
-    with open(out, "w", encoding="utf-8", newline="\n") as fh:
+    with analyze.open_output(out) as fh:
         fh.write("\n".join(s))
     return out
 
@@ -614,12 +614,104 @@ def write_workload_pages(results_dir, index_path, metric, outdir):
                 f"padding-bottom:4px'>Compiled Slang source</h2>"
                 f"<p style='color:#666;font-size:13px'>{esc(size_note)}</p>{code_html}"
                 f"</body>")
-        with open(os.path.join(wdir, f"{wl}.html"), "w", encoding="utf-8", newline="\n") as fh:
+        with analyze.open_output(os.path.join(wdir, f"{wl}.html")) as fh:
             fh.write(html)
         links[wl] = f"workloads/{wl}.html"
     return links
 
 
+def render_stacked_sweep(results_dir, label, metric, out, cols=2, panel=(560, 300),
+                         names=None, title=None):
+    """Stacked-AREA small multiples for ONE build's --sweep run: per workload, the
+    phase sub-counters stacked across sweep sizes N (x-axis linear in N, top edge =
+    compileInner), showing how each phase's share scales as the workload grows.
+    Pass `names=[wl]` (with cols=1) to render a single workload for its own page."""
+    runs = json.load(open(analyze.results_path(results_dir, label)))
+    per = {}
+    for r in runs:
+        if r.get("size", 0) <= 0:
+            continue
+        timers = {k: v[metric] for k, v in r["timers"].items() if v}
+        per.setdefault(r["workload"], {})[r["size"]] = buckets(timers)
+    series = {wl: sorted(bs.items()) for wl, bs in per.items() if len(bs) >= 2}
+    if names is None:
+        names = sorted(series, key=lambda w: -sum(series[w][-1][1].values()))
+    else:
+        names = [w for w in names if w in series]
+    n = len(names)
+    cols = min(cols, n) or 1
+    rows = (n + cols - 1) // cols
+    pw, ph = panel
+    ml, mt, mr, mb = 60, 32, 16, 44
+    cw, chh = ml + pw + mr, mt + ph + mb
+    W = cols * cw + 16
+    legend_cols = min(len(BUCKET_ORDER), 4)
+    legend_rows = (len(BUCKET_ORDER) + legend_cols - 1) // legend_cols
+    H = rows * chh + 56 + legend_rows * 18 + 24
+
+    if title is None:
+        title = f"Phase composition vs size N — stacked sub-counters ({esc(label)}, {esc(metric)} ms)"
+    s = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
+         f'viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet" '
+         f'font-family="sans-serif" font-size="13">',
+         f'<rect width="{W}" height="{H}" fill="white"/>',
+         f'<text x="12" y="30" font-size="20" font-weight="bold">{title}</text>']
+
+    for k, wl in enumerate(names):
+        pts = series[wl]
+        sizes = [sz for sz, _ in pts]
+        nmin, nmax = sizes[0], sizes[-1]
+        cis = [sum(bd.values()) for _, bd in pts]
+        hi = (max(cis) or 1.0) * 1.08
+        r, c = divmod(k, cols)
+        ox, oy = 8 + c * cw, 44 + r * chh
+        ymap = lambda v: oy + mt + ph - (v / hi) * ph
+        xmap = lambda x: ox + ml + ((x - nmin) / (nmax - nmin) * pw if nmax > nmin else pw / 2)
+
+        ratio = cis[-1] / cis[0] if cis[0] else None
+        rtxt = f"  {ratio:.1f}× over N {nmin}→{nmax}" if ratio else ""
+        s.append(f'<text x="{ox+ml}" y="{oy+16}" font-size="15" font-weight="600">'
+                 f'{esc(wl)}<tspan fill="#888" font-weight="400">{esc(rtxt)}</tspan></text>')
+
+        for frac in (0.0, 0.5, 1.0):
+            yv = hi * frac
+            y = ymap(yv)
+            s.append(f'<line x1="{ox+ml:.1f}" y1="{y:.1f}" x2="{ox+ml+pw:.1f}" y2="{y:.1f}" stroke="#eee"/>')
+            lbl = f"{yv:.0f}" if yv >= 10 else f"{yv:.1f}"
+            s.append(f'<text x="{ox+ml-4:.1f}" y="{y+3:.1f}" text-anchor="end" fill="#999">{lbl}</text>')
+        s.append(f'<line x1="{ox+ml:.1f}" y1="{oy+mt:.1f}" x2="{ox+ml:.1f}" y2="{oy+mt+ph:.1f}" stroke="#333"/>')
+        s.append(f'<line x1="{ox+ml:.1f}" y1="{oy+mt+ph:.1f}" x2="{ox+ml+pw:.1f}" y2="{oy+mt+ph:.1f}" stroke="#333"/>')
+        for sz in sizes:
+            x = xmap(sz)
+            s.append(f'<line x1="{x:.1f}" y1="{oy+mt+ph:.1f}" x2="{x:.1f}" y2="{oy+mt+ph+3:.1f}" stroke="#999"/>')
+            s.append(f'<text x="{x:.1f}" y="{oy+mt+ph+16:.1f}" text-anchor="middle" fill="#666">{sz}</text>')
+        s.append(f'<text x="{ox+ml+pw/2:.0f}" y="{oy+mt+ph+34:.0f}" text-anchor="middle" fill="#444">N</text>')
+
+        m = len(pts)
+        lower = [0.0] * m
+        for name, color in BUCKET_ORDER:
+            if all(bd.get(name, 0.0) <= 0 for _, bd in pts):
+                continue
+            upper = [lower[i] + pts[i][1].get(name, 0.0) for i in range(m)]
+            top = [f"{xmap(sizes[i]):.1f},{ymap(upper[i]):.1f}" for i in range(m)]
+            bot = [f"{xmap(sizes[i]):.1f},{ymap(lower[i]):.1f}" for i in reversed(range(m))]
+            s.append(f'<polygon points="{" ".join(top + bot)}" fill="{color}" '
+                     f'fill-opacity="0.9" stroke="#fff" stroke-width="0.4">'
+                     f'<title>{esc(wl)} — {esc(name)}</title></polygon>')
+            lower = upper
+
+    ly = 44 + rows * chh + 6
+    s.append(f'<text x="12" y="{ly}" fill="#666" font-weight="600">phase buckets</text>')
+    for i, (name, color) in enumerate(BUCKET_ORDER):
+        col, row = i % legend_cols, i // legend_cols
+        lx = 12 + col * ((W - 24) // legend_cols)
+        yy = ly + 8 + row * 18
+        s.append(f'<rect x="{lx}" y="{yy}" width="12" height="12" fill="{color}"/>')
+        s.append(f'<text x="{lx+16}" y="{yy+10}" fill="#222">{esc(name)}</text>')
+    s.append("</svg>")
+    with analyze.open_output(out) as fh:
+        fh.write("\n".join(s))
+    return out
 
 
 def main():
