@@ -105,8 +105,6 @@ isolate the shared machinery and scaling behavior directly.
 | --------------- | -------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
 | **minimal**     | a near-empty shader                                      | the **per-compile floor**: core-module load + link | `linkIR`, `readSerializedModuleIR`, `loadBuiltinModule` |
 | **ir_builder**  | one giant straight-line function (`N` trivial int ops)   | **IR construction / dedup / SSA simplify**         | `generateIR`, `simplifyIR`                              |
-| **val_lowering_dag** | a depth-`N` constrained generic type DAG whose type and witness arguments share the preceding node | **AST `Val`-to-IR lowering memoization** | `generateIR` |
-| **visibility_type_dag** | a depth-`N` type-alias DAG whose generic arguments both share the preceding node | **type-visibility traversal memoization** | `SemanticChecking` |
 | **serialize**   | a large module of `N` public functions → `.slang-module` | **IR/AST serialization (write)**                   | `writeSerializedModuleAST/IR`                           |
 | **conformance** | `N` structs conforming to a shared interface             | **conformance checking / witness synthesis**       | `SemanticChecking`                                      |
 | **loop_unroll** | a `[ForceUnroll]` loop of `N` iterations                 | **loop unrolling + simplify**                      | `unrollLoopsInModule`                                   |

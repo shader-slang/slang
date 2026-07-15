@@ -75,25 +75,6 @@ def gen_ir_builder(n):
     return {"ir_builder.slang": "".join(s)}
 
 
-def gen_val_lowering_dag(n):
-    """A constrained generic type chain whose ordinary type arguments and
-    conformance witnesses share the preceding type. This measures whether AST
-    Val-to-IR lowering visits each unique DAG node once.
-
-    Scaling null: n adds one unique type and a fixed number of witnesses; ideal
-    IR generation is O(n).
-    """
-    s = [_HEADER]
-    s.append("interface IModel {}\n")
-    s.append("struct Leaf : IModel {}\n")
-    s.append("struct Pair<First : IModel, Second : IModel> : IModel {}\n\n")
-    s.append("typealias T0 = Leaf;\n")
-    for i in range(1, n + 1):
-        s.append(f"typealias T{i} = Pair<Leaf, T{i - 1}>;\n")
-    s.append(f"\nT{n} value;\n")
-    return {"val_lowering_dag.slang": "".join(s)}
-
-
 def gen_serialize(n):
     """A large module of `n` public functions, compiled to a .slang-module.
     Stresses IR/AST serialization (writeSerializedModule*) — the write side of
@@ -460,41 +441,6 @@ def gen_sema_generics(n):
         s.append(f"    uacc += poly_{i}<uint>(ux, ux + 1u);\n")
     s.append("    outBuf[0] = facc + float(iacc) + float(uacc);\n}\n")
     return {"sema_generics.slang": "".join(s)}
-
-
-def gen_val_substitution_dag(n):
-    """A constrained generic type chain whose conformance witnesses share each
-    inner type with the ordinary generic argument. Inferring the unrelated U in
-    consume<U> substitutes through the fixed deep-tree parameter and measures
-    whether Val substitution visits each unique DAG node once.
-
-    Scaling null: n adds one unique type and witness layer; ideal substitution cost is O(n).
-    """
-    s = [_HEADER]
-    s.append("interface IModel {}\n")
-    s.append("struct Leaf : IModel {}\n")
-    s.append("struct Node<T : IModel> : IModel {}\n\n")
-    s.append("typealias T0 = Leaf;\n")
-    for i in range(1, n + 1):
-        s.append(f"typealias T{i} = Node<T{i - 1}>;\n")
-    s.append(f"\nvoid consume<U>(T{n} model, U value) {{}}\n")
-    s.append(f"void exercise(T{n} model) {{ consume(model, 0); }}\n")
-    return {"val_substitution_dag.slang": "".join(s)}
-
-
-def gen_visibility_type_dag(n):
-    """A type-alias chain in which both generic arguments share the preceding
-    canonical type. Visibility checking should visit each unique type once.
-
-    Scaling null: n adds one unique type; ideal visibility checking is O(n).
-    """
-    s = [_HEADER]
-    s.append("struct Pair<X, Y> {}\n\n")
-    s.append("typealias T0 = int;\n")
-    for i in range(1, n + 1):
-        s.append(f"typealias T{i} = Pair<T{i - 1}, T{i - 1}>;\n")
-    s.append(f"\nT{n} value;\n")
-    return {"visibility_type_dag.slang": "".join(s)}
 
 
 # --------------------------------------------------------------------------- #

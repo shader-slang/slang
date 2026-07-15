@@ -260,26 +260,6 @@ WORKLOADS = [
         sweep_sizes=[125, 250, 500, 1000],
     ),
     WorkloadSpec(
-        name="val_substitution_dag",
-        bucket="sema",
-        gen=workloads.gen_val_substitution_dag,
-        default_size=14,
-        mode="module",
-        # Generic-tree IR lowering has a separate scaling issue, so keep this
-        # workload's signal focused on the Val-substitution path in sema.
-        primary_timers=["SemanticChecking"],
-        sweep_sizes=[6, 8, 10, 12, 14],
-    ),
-    WorkloadSpec(
-        name="visibility_type_dag",
-        bucket="sema",
-        gen=workloads.gen_visibility_type_dag,
-        default_size=16,
-        mode="module",
-        primary_timers=["SemanticChecking"],
-        sweep_sizes=[6, 8, 10, 12, 14, 16],
-    ),
-    WorkloadSpec(
         name="conformance",
         bucket="sema",
         gen=workloads.gen_conformance,
@@ -330,15 +310,6 @@ WORKLOADS = [
         extra_flags=SPIRV,
         primary_timers=["generateIR", "simplifyIR", "compileInner"],
         sweep_sizes=[500, 1000, 2000, 4000],
-    ),
-    WorkloadSpec(
-        name="val_lowering_dag",
-        bucket="ir_infra",
-        gen=workloads.gen_val_lowering_dag,
-        default_size=14,
-        mode="module",
-        primary_timers=["generateIR"],
-        sweep_sizes=[6, 8, 10, 12, 14],
     ),
     WorkloadSpec(
         name="serialize",
