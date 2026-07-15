@@ -480,8 +480,7 @@ static SlangResult _testServerParentMonitorIntegrationTest(UnitTestContext* cont
     slangTestCmdLine.addArg("-use-test-server");
     slangTestCmdLine.addArg("-server-count");
     slangTestCmdLine.addArg("1");
-    slangTestCmdLine.addArg(
-        "slang-unit-test-tool/CommandLineProcessReadCompleteLargeOutput");
+    slangTestCmdLine.addArg("slang-unit-test-tool/CommandLineProcessReadCompleteLargeOutput");
 
     PROCESS_INFORMATION slangTestProcessInfo;
     {
