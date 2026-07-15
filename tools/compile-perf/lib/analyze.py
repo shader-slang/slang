@@ -342,7 +342,7 @@ assert _mr[0]["timers"]["peakRssKb"] == {"median": 5.0}
 assert _mr[0]["timers"]["apiCreateGlobalSessionRssDeltaKb"] == {"median": 7.0}
 assert _mr[0]["timers"]["compileInner"] == {"median": 1.0}, "originals preserved"
 assert _mr[0]["rss_kb"] == {"median": 5.0}, "source fields not consumed"
-_mu = canonical_runs([dict(_rec, workload="parse")])
+_mu = canonical_runs([dict(_rec, workload="conformance")])
 assert "peakRssKb" not in _mu[0]["timers"], \
     "memory promotion must be curated: only track_memory workloads"
 del _rec, _mr, _mu

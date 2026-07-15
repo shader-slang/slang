@@ -45,9 +45,11 @@ class WorkloadSpec:
     # pages. Raw rss_kb is RECORDED for every workload regardless (free, and
     # preserved in results.json for deep dives); tracking is curated because
     # most workloads' peaks are floor-bound and just re-draw the session
-    # floor: the tracked set is minimal (the floor itself), mdl_dxr (the
-    # realistic end-to-end corpus), and api_session_create (the
-    # createGlobalSession delta of shader-slang/slang#9817).
+    # floor. The tracked set: minimal (the floor itself), the realistic
+    # end-to-end workloads (mdl_dxr and the rt renderers), the
+    # createGlobalSession delta carrier (api_session_create,
+    # shader-slang/slang#9817), and the microbenchmarks with meaningful
+    # own memory (parse, sema_generics, autodiff, operator_typecheck).
     track_memory: bool = False
     # emit reflection JSON (bench.py supplies a writable per-run path). Exercises
     # the reflection serializer in addition to the layout engine.
@@ -138,6 +140,7 @@ WORKLOADS = [
     # program pays the whole library's import cost. n = material count.
     WorkloadSpec(
         name="rt_renderer",
+        track_memory=True,
         bucket="rt_renderer",
         gen=workloads.gen_rt_renderer,
         default_size=24,
@@ -150,6 +153,7 @@ WORKLOADS = [
     # link-time specialization against interface-heavy cross-module code.
     WorkloadSpec(
         name="rt_renderer_specialize",
+        track_memory=True,
         bucket="rt_renderer",
         gen=workloads.gen_rt_renderer,
         default_size=24,
@@ -245,6 +249,7 @@ WORKLOADS = [
     # ---- core compiler-stage buckets --------------------------------------
     WorkloadSpec(
         name="parse",
+        track_memory=True,
         bucket="parse",
         gen=workloads.gen_parse,
         default_size=2000,
@@ -264,6 +269,7 @@ WORKLOADS = [
     ),
     WorkloadSpec(
         name="sema_generics",
+        track_memory=True,
         bucket="sema",
         gen=workloads.gen_sema_generics,
         default_size=1000,
@@ -324,6 +330,7 @@ WORKLOADS = [
     # isolate this (uniform types / generic-constraint cost dominate there).
     WorkloadSpec(
         name="operator_typecheck",
+        track_memory=True,
         bucket="typecheck",
         gen=workloads.gen_operator_typecheck,
         default_size=800,
@@ -419,6 +426,7 @@ WORKLOADS = [
     # ---- suspected-regression features -----------------------------------
     WorkloadSpec(
         name="autodiff",
+        track_memory=True,
         bucket="autodiff",
         gen=workloads.gen_autodiff,
         default_size=200,

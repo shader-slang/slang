@@ -283,30 +283,36 @@ def main():
         # session floor drawn alongside for scale (no subtraction): the
         # question answered is "how much memory does compiling this workload
         # take", and the gap to the grey line is the workload's own share.
+        # Each tracked workload's OWN memory: process peak minus the same
+        # point's session floor — the floor panel above carries the absolute
+        # story once, so subtracting it here leaves the pure workload signal
+        # (where changes like v2026.11's front-end memory optimization live).
         wls = []
         for (wl, cnt), vs in per.items():
             if cnt != "peakRssKb" or wl == "minimal":
                 continue
-            if any(v is not None for v in vs):
-                last = next((v for v in reversed(vs) if v is not None), 0.0)
-                wls.append((last, wl, vs))
-        show_floor = any(v is not None for v in floor)
-        for _mag, wl, vs in sorted(wls, reverse=True):
-            series = [(f"{wl} peak RSS", "#e6550d", mib(vs))]
-            if show_floor:
-                series.append(("session floor (minimal)", "#b5bdc4", mib(floor)))
+            own = [v - f if v is not None and f is not None else None
+                   for v, f in zip(vs, floor)]
+            if any(v is not None for v in own):
+                last = next((v for v in reversed(own) if v is not None), 0.0)
+                wls.append((last, wl, own))
+        for _mag, wl, own in sorted(wls, reverse=True):
             panels.append(render.line_panel(
-                labels, series, f"{wl} — process peak RSS", unit="MiB"))
+                labels, [(f"{wl} − minimal", "#e6550d", mib(own))],
+                f"{wl} — own memory (peak − session floor)", unit="MiB"))
         body = "".join(f'<span style="display:inline-block;margin:6px">{p}</span>'
                        for p in panels)
         explainer = (
             "<p class='small'><b>Session floor</b> — peak resident memory of "
             "compiling an <i>empty</i> shader: the cost of starting the "
             "compiler (createGlobalSession + core module), paid by every "
-            "compile. <b>Per-workload panels</b> — the absolute peak "
-            "resident memory of that workload's whole compile process, with "
-            "the session floor alongside in grey for scale: the gap between "
-            "the lines is the memory the workload's own work added. "
+            "compile. <b>Workload panels</b> — each tracked workload's OWN "
+            "memory: its process peak minus the same point's session floor, "
+            "i.e. what the workload's work added beyond compiler startup. "
+            "Raw peak RSS is recorded for every workload in results.json; "
+            "only the curated set (the realistic rt/mdl workloads and the "
+            "microbenchmarks with meaningful own memory) is charted and "
+            "alerted on. "
             "<b>createGlobalSession RSS delta</b> — measured inside the api "
             "driver: process memory immediately before vs after that one "
             "call. Panels are line charts, not stacked areas, because these "
