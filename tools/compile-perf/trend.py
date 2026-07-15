@@ -99,7 +99,7 @@ def main():
     tpath = os.path.join(args.results, "tracking", "tracking.json")
     if not os.path.exists(tpath):
         raise SystemExit(f"no tracking series at {tpath}; run track.py rebuild first")
-    series = json.load(open(tpath))
+    series = analyze.read_json(tpath)
     pts = series.get("points", [])
     if len(pts) < 2:
         print("not enough points to trend (need >= 2)")
