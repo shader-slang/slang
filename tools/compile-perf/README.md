@@ -314,13 +314,19 @@ Every sample also records the child process's **peak RSS** (`rss_kb`:
 `GetProcessMemoryInfo` on Windows), and the api driver reports the RSS
 delta across its **first** `createGlobalSession` (`[MEM]` output lines,
 parsed into the record's `memory` dict) — the cold-session footprint of
-#9817. `analyze.canonical_runs` surfaces both as counter series
-(`peakRssKb`, `apiCreateGlobalSessionRssDeltaKb`) so the tracking series,
-the nightly trend check (1 MiB absolute floor, same ratio gate), and the
-per-workload progress tables consume them like timers;
-`analyze.unit_of`/`fmt_qty` keep kilobytes from rendering as
-milliseconds. The site presents memory on `memory-{tot,releases}.html`
-as line panels — session floor first (the `minimal` workload's absolute
-peak RSS), then api session-create deltas, then per-workload RSS **over
-the floor** — because memory components do not tile a total and a
-stacked area would lie.
+#9817. **Everything is stored; only the meaningful set is shown**: raw
+peak RSS lands in results.json for every workload (deep dives never need
+a re-bench), but `analyze.canonical_runs` promotes memory into the
+tracked counter series (`peakRssKb`,
+`apiCreateGlobalSessionRssDeltaKb`) only for workloads the manifest
+flags with `track_memory` — `minimal` (the session floor), `mdl_dxr`
+(the realistic corpus), and `api_session_create` (the #9817 delta) —
+because most workloads' peaks are floor-bound and would just re-draw
+the floor across dozens of panels and alert series. The tracked series
+feed the nightly trend check (1 MiB absolute floor, same ratio gate)
+and the progress tables like timers; `analyze.unit_of`/`fmt_qty` keep
+kilobytes from rendering as milliseconds. The site presents memory on
+`memory-{tot,releases}.html` as a compact dashboard of line panels —
+session floor, the createGlobalSession delta, then the tracked
+workloads' absolute peaks with the floor alongside for scale — because
+memory components do not tile a total and a stacked area would lie.

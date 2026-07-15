@@ -167,16 +167,21 @@ def canonical_runs(runs):
     out = []
     for r in best.values():
         # Surface the memory measurements as counter series next to the
-        # timers (a shallow copy; the record itself is not mutated): the
-        # tracking series, trend judgment, and per-workload pages all
-        # consume {counter: stats} uniformly, and unit_of() keeps kb from
-        # masquerading as ms in display code. The bucket partition is
-        # unaffected — these names are not in any TREE.
+        # timers (a shallow copy; the record itself is not mutated) — but
+        # only for workloads the manifest flags with track_memory: raw
+        # rss_kb is recorded everywhere, while the TRACKED memory surface is
+        # deliberately small (most peaks are floor-bound and would only
+        # re-draw the session floor across dozens of panels and alert
+        # series). unit_of() keeps kb from masquerading as ms in display
+        # code, and the bucket partition is unaffected — these names are
+        # not in any TREE.
+        spec = manifest.BY_NAME.get(r["workload"])
         extra = {}
-        if r.get("rss_kb"):
-            extra["peakRssKb"] = r["rss_kb"]
-        for name, st in (r.get("memory") or {}).items():
-            extra[name] = st
+        if spec is not None and getattr(spec, "track_memory", False):
+            if r.get("rss_kb"):
+                extra["peakRssKb"] = r["rss_kb"]
+            for name, st in (r.get("memory") or {}).items():
+                extra[name] = st
         if extra:
             for name in extra:
                 assert name.endswith("Kb"), \
@@ -327,14 +332,17 @@ def is_daily(tag):
 assert unit_of("peakRssKb") == "kb" and unit_of("SemanticChecking") == "ms"
 assert fmt_qty("peakRssKb", 215040) == "210.0 MiB"
 assert fmt_qty("simplifyIR", 12.34, signed=True) == "+12.3 ms"
-_mr = canonical_runs([{
-    "workload": "w", "size": 1,
-    "rss_kb": {"median": 5.0},
+_rec = {
+    "size": 1, "rss_kb": {"median": 5.0},
     "memory": {"apiCreateGlobalSessionRssDeltaKb": {"median": 7.0}},
     "timers": {"compileInner": {"median": 1.0}},
-}])
+}
+_mr = canonical_runs([dict(_rec, workload="api_session_create")])
 assert _mr[0]["timers"]["peakRssKb"] == {"median": 5.0}
 assert _mr[0]["timers"]["apiCreateGlobalSessionRssDeltaKb"] == {"median": 7.0}
 assert _mr[0]["timers"]["compileInner"] == {"median": 1.0}, "originals preserved"
 assert _mr[0]["rss_kb"] == {"median": 5.0}, "source fields not consumed"
-del _mr
+_mu = canonical_runs([dict(_rec, workload="parse")])
+assert "peakRssKb" not in _mu[0]["timers"], \
+    "memory promotion must be curated: only track_memory workloads"
+del _rec, _mr, _mu
