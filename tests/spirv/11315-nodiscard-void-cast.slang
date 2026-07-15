@@ -3,23 +3,19 @@
 //
 // A `(void)` cast is the idiomatic way to silence the `[NoDiscard]`
 // discarded-result error: casting the result to `void` counts as *using*
-// it, so `(void)incrementValue(...)` type-checks without the error. That
-// cast used to lower to a `kIROp_CastToVoid` IR instruction which no backend
-// handles, so before the #11315 fix emit aborted with an internal
-// "unimplemented" error. A cast to `void` carries no data, so lowering now
-// yields the canonical void value (`IRVoidLit`) and never materializes the op.
+// it, so `(void)incrementValue(...)` type-checks without the error.
 //
-// Compiling this shader therefore pins both halves: if the `void` cast
-// stopped silencing `[NoDiscard]` the (fatal) discarded-result error would
-// abort compilation, and if the void-cast lowering regressed emit would
-// abort. A successful compile with an entry point proves both.
+// This test verifies the following:
+// - a void cast compiles (was not the case before 11315 was fixed)
+// - void-casting a [NoDiscard] function return value silences the related
+//   warning
+// - a void cast does not remove the side effects of the expression cast to void
 
-//TEST:SIMPLE(filecheck=CHECK_SPIRV):-target spirv-asm -entry main -stage compute -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK_SPIRV):-target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -warnings-as-errors all
+//TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry computeMain -stage compute -warnings-as-errors all
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK_BUF):-vk -compute -output-using-type -emit-spirv-directly -xslang -warnings-as-errors -xslang all
 
-// CHECK_SPIRV: OpEntryPoint
-// CHECK_HLSL: void main
-
+//TEST_INPUT:ubuffer(data=[12345678], count=1, stride=4):out,name=output
 RWStructuredBuffer<uint> output;
 
 enum StatusCode
@@ -38,8 +34,15 @@ enum StatusCode
     return prevVal < val ? StatusCode.Success : StatusCode.Overflow;
 }
 
+// Compilation success checks:
+// CHECK_SPIRV: OpEntryPoint
+// CHECK_HLSL: void computeMain
+
+// Side effect check
+// CHECK_BUF: 12345679
+
 [numthreads(1,1,1)]
-void main(uint3 tid : SV_DispatchThreadID)
+void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     // ignore overflow status code
     (void)incrementValue(output[0]);
