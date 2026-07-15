@@ -533,6 +533,12 @@ def SPV_EXT_fragment_shader_interlock : _spirv_1_0;
 /// [EXT]
 def SPV_EXT_physical_storage_buffer : _spirv_1_3;
 
+/// Represents the SPIR-V extension for physical storage buffer (the KHR-promoted name for
+/// the same feature as SPV_EXT_physical_storage_buffer; folded into core SPIR-V 1.5). Its
+/// floor mirrors the EXT atom's, so requiring it does not raise the effective version.
+/// [EXT]
+def SPV_KHR_physical_storage_buffer : _spirv_1_3;
+
 /// Represents the SPIR-V extension for SPV_EXT_fragment_fully_covered.
 /// [EXT]
 def SPV_EXT_fragment_fully_covered : _spirv_1_0;
@@ -618,10 +624,12 @@ def SPV_KHR_subgroup_rotate : _spirv_1_3;
 def SPV_NV_ray_tracing_motion_blur : _spirv_1_0;
 
 /// Represents the SPIR-V extension for shader invocation reorder (cross-vendor standard).
-/// Requires SPV_KHR_ray_tracing and SPIR-V 1.5 (which includes physical storage buffer).
-/// Note: Spec allows SPIR-V 1.4 + physical_storage_buffer extension, but we require 1.5 for simplicity.
+/// Per the SER spec it requires SPIR-V 1.4, SPV_KHR_ray_tracing, and a physical-storage-buffer
+/// extension. We model the physical-storage-buffer dependency as SPV_KHR_physical_storage_buffer
+/// (the name the emitter declares); the emitter adds that `OpExtension` on the pre-1.5 path
+/// (it is core from 1.5 on), while this dependency records the relationship in the model.
 /// [EXT]
-def SPV_EXT_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
+def SPV_EXT_shader_invocation_reorder : _spirv_1_4 + SPV_KHR_ray_tracing + SPV_KHR_physical_storage_buffer;
 
 /// Represents the SPIR-V extension for shader invocation reorder (NVIDIA-specific).
 /// Inherits from SPV_EXT_shader_invocation_reorder so NV implies EXT.
