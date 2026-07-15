@@ -237,7 +237,7 @@ def hlsl_nvapi : hlsl;
 /// SM 6.9 -- and falls back to the native `case hlsl` arm otherwise. The type emitter and every
 /// method consult this one decision, so a HitObject never mixes the two ABIs, while
 /// "native-DXR HitObject + NVAPI atomics" stays a legal, non-mixing combination on SM 6.9.
-/// [EXT]
+/// [Version]
 def nvapi_hit_objects : hlsl_nvapi;
 
 

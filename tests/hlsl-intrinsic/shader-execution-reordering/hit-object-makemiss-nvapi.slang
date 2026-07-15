@@ -6,6 +6,11 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile sm_6_5 -entry main -stage raygeneration -capability nvapi_hit_objects
 
+// Negative: on a plain native SM 6.9 target (no nvapi_hit_objects) the 2-arg MakeMiss has no arm,
+// so it is a clean capability error (no compatible __target_switch case) rather than a silently
+// mis-emitted native MakeMiss.
+//DIAGNOSTIC_TEST:SIMPLE(diag=NATIVE_ERR,non-exhaustive): -target hlsl -profile sm_6_9 -entry main -stage raygeneration
+
 //TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
 
@@ -19,6 +24,7 @@ void main()
     ray.TMax = 1e4f;
 
     // CHECK: NvMakeMiss
+    // NATIVE_ERR: 41011
     HitObject hm = HitObject::MakeMiss(0, ray);
 
     // CHECK-NOT: dx::HitObject::MakeMiss

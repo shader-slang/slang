@@ -1994,7 +1994,9 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             }
             else
             {
-                // Neither SM 6.9 nor nvapi_hit_objects: diagnose cleanly instead of crashing.
+                // Neither SM 6.9 nor nvapi_hit_objects: emit a hard error (E55215) rather than
+                // crash. The dx::HitObject placeholder below is never consumed — E55215 is a hard
+                // error, so the sink's error flag makes the compiler discard this HLSL text.
                 getSink()->diagnose(
                     Diagnostics::HitObjectRequiresSerCapability{.location = type->sourceLoc});
                 m_writer->emit("dx::HitObject");

@@ -25971,8 +25971,11 @@ struct HitObject
     /// (DispatchRaysIndex in DXR).
 __glsl_extension(GL_EXT_ray_tracing)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, ser_raygen)]
+// Native DXR MaybeReorderThread is SM 6.9-only: gate the native `hlsl` arm on ser_dxr so a plain
+// hlsl_nvapi target (no 6.9, no nvapi_hit_objects opt-in) gets a clean capability error.
+[require(cuda_glsl_spirv, ser_raygen)]
 [require(nvapi_hit_objects, ser_raygen)]
+[require(hlsl, ser_dxr_raygen)]
 void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
@@ -26023,8 +26026,9 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 
 __glsl_extension(GL_EXT_ray_tracing)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, ser_raygen)]
+[require(cuda_glsl_spirv, ser_raygen)]
 [require(nvapi_hit_objects, ser_raygen)]
+[require(hlsl, ser_dxr_raygen)]
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
@@ -26065,8 +26069,9 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
 
 __glsl_extension(GL_EXT_ray_tracing)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, ser_raygen)]
+[require(cuda_glsl_spirv, ser_raygen)]
 [require(nvapi_hit_objects, ser_raygen)]
+[require(hlsl, ser_dxr_raygen)]
 void ReorderThread( HitObject HitOrMiss )
 {
     __target_switch

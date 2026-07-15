@@ -46,11 +46,19 @@ void main()
     if (ht.IsHit())
         r += ht.GetRayFlags();
 
+    // ReorderThread exercises a third re-gated method (with a uniform signature across both ABIs)
+    // on the same object: it must pick the same ABI as MakeNop/TraceRay above, never mixing.
+    ReorderThread(ht);
+    // NATIVE: dx::MaybeReorderThread
+    // NVAPI: NvReorderThread
+
     outputBuffer[0] = r;
 
     // The other ABI's intrinsics must never appear (no mixing).
     // NATIVE-NOT: NvMakeNop
     // NATIVE-NOT: NvTraceRayHitObject
+    // NATIVE-NOT: NvReorderThread
     // NVAPI-NOT: dx::HitObject::MakeNop
     // NVAPI-NOT: dx::HitObject::TraceRay
+    // NVAPI-NOT: dx::MaybeReorderThread
 }
