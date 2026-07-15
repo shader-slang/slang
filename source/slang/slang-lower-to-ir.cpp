@@ -491,11 +491,6 @@ struct SharedIRGenContext
     // The "global" environment for mapping declarations to their IR values.
     IRGenEnv globalEnv;
 
-    // Map an AST-level value to a simple IR value emitted directly into the module scope. Such a
-    // result cannot refer to a declaration binding from a nested lowering environment, so it can
-    // be reused when the same closed value appears in multiple declarations.
-    Dictionary<Val*, LoweredValInfo> mapValToGlobalValue;
-
     // Map an AST-level declaration of an interface
     // requirement to the IR-level "key" that
     // is used to fetch that requirement from a
@@ -3051,33 +3046,12 @@ LoweredValInfo lowerValWithCache(IRGenContext* context, Val* val, F const& lower
     if (auto cachedValue = context->env->mapValToValue.tryGetValue(val))
         return *cachedValue;
 
-    // `ThisType` and its conformance witness are explicit context inputs to `ValLoweringVisitor`.
-    // Even if one such result happens to be emitted at module scope, another interface or nested
-    // generic can bind `ThisType` differently. Keep all values local while either input is bound.
-    const bool canShareAcrossEnvironments = !context->thisType && !context->thisTypeWitness;
-    if (canShareAcrossEnvironments)
-    {
-        if (auto cachedValue = context->shared->mapValToGlobalValue.tryGetValue(val))
-            return *cachedValue;
-    }
-
     auto loweredValue = lower();
 
     // Cache only completed lowering. In particular, do not introduce an in-progress entry that
     // would change how recursive Val graphs are handled.
     context->env->mapValToValue.set(val, loweredValue);
 
-    // Consider the closed aliases `T0 = Leaf` and `T1 = Pair<Leaf, T0>`. Each alias is lowered in
-    // a distinct `IRGenEnv`, but their IR types are emitted directly under the module and are valid
-    // in every environment. In contrast, `Pair<T, T>` inside a generic emits a specialization under
-    // that generic because it refers to the environment's IR parameter. Only share the former
-    // shape across environments; all other results remain in the environment-local cache above.
-    if (canShareAcrossEnvironments && loweredValue.flavor == LoweredValInfo::Flavor::Simple &&
-        loweredValue.val &&
-        loweredValue.val->getParent() == context->irBuilder->getModule()->getModuleInst())
-    {
-        context->shared->mapValToGlobalValue.set(val, loweredValue);
-    }
     return loweredValue;
 }
 
