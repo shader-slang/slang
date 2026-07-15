@@ -294,12 +294,24 @@ def main():
                 f"{wl} — peak RSS over the session floor", unit="MiB"))
         body = "".join(f'<span style="display:inline-block;margin:6px">{p}</span>'
                        for p in panels)
+        explainer = (
+            "<p class='small'><b>Session floor</b> — peak resident memory of "
+            "compiling an <i>empty</i> shader: the cost of starting the "
+            "compiler (createGlobalSession + core module), paid by every "
+            "compile. <b>Per-workload panels</b> — how much MORE memory that "
+            "workload's compile peaked at, above the floor (the floor itself "
+            "is subtracted so panels show the work, not the startup). "
+            "<b>createGlobalSession RSS delta</b> — measured inside the api "
+            "driver: process memory immediately before vs after that one "
+            "call. Panels are line charts, not stacked areas, because these "
+            "are separate memory <i>peaks</i> — maxima do not add up to a "
+            "total the way the time pages' phase buckets sum to "
+            "compileInner.</p>")
         grid_page(os.path.join(outdir, fname),
                   f"Memory — {cad_title}",
-                  "peak RSS per workload (delta over the minimal-workload "
-                  "session floor) and api-driver RSS deltas; components do "
-                  "not tile a total, so panels are line charts, not stacks",
-                  note, body or None)
+                  "peak resident memory per workload and api-driver "
+                  "session-create deltas",
+                  note, body or None, extra_html=explainer)
         return bool(panels)
 
     have_memory = memory_page(dailies, "memory-tot.html",
