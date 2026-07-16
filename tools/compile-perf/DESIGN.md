@@ -52,7 +52,10 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   ~4x runtime: dispatch with `sweep=true` to also collect the multi-size scaling
   ladders), `only`, `publish` (default `true`), and `notify-slack` (default
   `false`; set `true` to send the Slack notification from a manual run too,
-  to test the path end-to-end). With `publish=false` the run measures only: results are
+  to test the path end-to-end). The trend gate is two-tier: changes
+  ≥ 10% over the trailing median fail the job (Slack: regression), changes
+  ≥ 5% are reported as warnings (annotations + step summary + a yellow
+  Slack status) without failing — early signal without alert fatigue. With `publish=false` the run measures only: results are
   uploaded as a run artifact and the results repo, tracking series, pages, and
   trend check are untouched — the mode for one-off measurements (bisect points,
   suspect commits) that must not pollute the series. Because daily labels are

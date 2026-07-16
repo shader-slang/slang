@@ -383,6 +383,7 @@ jobs:
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_COMPILE_PERF }}
           TREND_OUTCOME: ${{ steps.trend.outcome }}
+          TREND_WARNINGS: ${{ steps.trend.outputs.warnings || '0' }}
           JOB_STATUS: ${{ job.status }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -399,10 +400,13 @@ jobs:
           # because this is a publish=false measurement-only run".
           if [ "$TREND_OUTCOME" = "failure" ]; then
             export ICON=":warning:"
-            export STATUS="Regression detected — see CI run for details"
+            export STATUS="Regression detected (>=10% over trailing median) — see CI run for details"
           elif [ "$JOB_STATUS" != "success" ]; then
             export ICON=":x:"
             export STATUS="Nightly job failed — see CI run for details"
+          elif [ "$TREND_OUTCOME" = "success" ] && [ "${TREND_WARNINGS:-0}" != "0" ]; then
+            export ICON=":large_yellow_circle:"
+            export STATUS="$TREND_WARNINGS warning-level change(s) (>=5%, below the 10% error gate) — see CI summary"
           elif [ "$TREND_OUTCOME" = "success" ]; then
             export ICON=":white_check_mark:"
             export STATUS="No regressions detected"
