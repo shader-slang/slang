@@ -1254,6 +1254,14 @@ void initCommandOptions(CommandOptions& options)
          "-save-core-module-bin-source <filename>",
          "Same as -save-core-module but output "
          "the data as a C array.\n"},
+        {OptionKind::SaveAutodiffModule,
+         "-save-autodiff-module",
+         "-save-autodiff-module <filename>",
+         "Save the autodiff builtin module to an archive file."},
+        {OptionKind::SaveAutodiffModuleBinSource,
+         "-save-autodiff-module-bin-source",
+         "-save-autodiff-module-bin-source <filename>",
+         "Save the autodiff builtin module as a C array."},
         {OptionKind::SaveGLSLModuleBinSource,
          "-save-glsl-module-bin-source",
          "-save-glsl-module-bin-source <filename>",
@@ -2888,12 +2896,19 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             SLANG_RETURN_ON_FAIL(
                 addPendingBuiltinModuleSave(slang::BuiltinModuleName::Core, false));
             break;
+        case OptionKind::SaveAutodiffModule:
+            SLANG_RETURN_ON_FAIL(
+                addPendingBuiltinModuleSave(slang::BuiltinModuleName::Autodiff, false));
+            break;
         case OptionKind::SaveCoreModuleBinSource:
+        case OptionKind::SaveAutodiffModuleBinSource:
         case OptionKind::SaveGLSLModuleBinSource:
             {
-                const auto moduleName = optionKind == OptionKind::SaveCoreModuleBinSource
-                                            ? slang::BuiltinModuleName::Core
-                                            : slang::BuiltinModuleName::GLSL;
+                auto moduleName = slang::BuiltinModuleName::GLSL;
+                if (optionKind == OptionKind::SaveCoreModuleBinSource)
+                    moduleName = slang::BuiltinModuleName::Core;
+                else if (optionKind == OptionKind::SaveAutodiffModuleBinSource)
+                    moduleName = slang::BuiltinModuleName::Autodiff;
                 SLANG_RETURN_ON_FAIL(addPendingBuiltinModuleSave(moduleName, true));
                 break;
             }

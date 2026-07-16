@@ -227,6 +227,9 @@ public:
 
     ModuleDecl* baseModuleDecl = nullptr;
     List<RefPtr<Module>> coreModules;
+    // Prevent a differentiability annotation inside a builtin module from recursively requesting
+    // the autodiff supplement while the builtin set is still being generated.
+    bool m_isCompilingBuiltinModule = false;
 
     SourceManager builtinSourceManager;
 
@@ -261,8 +264,8 @@ public:
     String coreModulePath;
 
     ComPtr<ISlangBlob> coreLibraryCode;
-    // ComPtr<ISlangBlob> slangLibraryCode;
     ComPtr<ISlangBlob> hlslLibraryCode;
+    ComPtr<ISlangBlob> autodiffBaseLibraryCode;
     ComPtr<ISlangBlob> glslLibraryCode;
     ComPtr<ISlangBlob> autodiffLibraryCode;
 
@@ -270,6 +273,7 @@ public:
 
     ComPtr<ISlangBlob> getCoreLibraryCode();
     ComPtr<ISlangBlob> getHLSLLibraryCode();
+    ComPtr<ISlangBlob> getAutodiffBaseLibraryCode();
     ComPtr<ISlangBlob> getAutodiffLibraryCode();
     ComPtr<ISlangBlob> getGLSLLibraryCode();
 
@@ -304,6 +308,14 @@ public:
     Linkage* getBuiltinLinkage() const { return m_builtinLinkage; }
 
     Module* getBuiltinModule(slang::BuiltinModuleName builtinModuleName);
+
+    /// Loads the autodiff builtin module if it has not already been loaded.
+    /// Returns success without loading while a builtin module is being source-compiled, because
+    /// starting another builtin compilation there would recurse.
+    SlangResult loadAutodiffModuleIfNeeded();
+
+    /// Returns whether this session is currently source-compiling a builtin module.
+    bool isCompilingBuiltinModule() const { return m_isCompilingBuiltinModule; }
 
     Name* getCompletionRequestTokenName() const { return m_completionTokenName; }
 
