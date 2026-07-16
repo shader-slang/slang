@@ -463,6 +463,14 @@ struct IRGenEnv
     // Map an AST-level declaration to the IR-level value that represents it.
     Dictionary<Decl*, LoweredValInfo> mapDeclToValue;
 
+    // Map an AST-level value to its result in this IR lowering environment.
+    //
+    // Consider `Pair<Leaf, T>` where both generic parameters are constrained by `IModel`.
+    // The type `T` is reachable both as an ordinary generic argument and through its conformance
+    // witness. Both paths must lower to the same IR value in one environment, but a nested generic
+    // environment can bind `T` to a different IR parameter and therefore has its own cache.
+    Dictionary<Val*, LoweredValInfo> mapValToValue;
+
     // Associated vals working set. TODO: Document properly.
     HashSet<Val*> seenVals;
 
@@ -3032,20 +3040,50 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 #undef UNEXPECTED_CASE
 };
 
+template<typename F>
+LoweredValInfo lowerValWithCache(IRGenContext* context, Val* val, F const& lower)
+{
+    if (auto cachedValue = context->env->mapValToValue.tryGetValue(val))
+        return *cachedValue;
+
+    auto loweredValue = lower();
+
+    // Cache only completed lowering. In particular, do not introduce an in-progress entry that
+    // would change how recursive Val graphs are handled.
+    context->env->mapValToValue.set(val, loweredValue);
+
+    return loweredValue;
+}
+
 LoweredValInfo lowerVal(IRGenContext* context, Val* val)
 {
-    ValLoweringVisitor visitor;
-    visitor.context = context;
     auto resolvedVal = val->resolve();
-    return visitor.dispatch(resolvedVal);
+    return lowerValWithCache(
+        context,
+        resolvedVal,
+        [&]()
+        {
+            ValLoweringVisitor visitor;
+            visitor.context = context;
+            return visitor.dispatch(resolvedVal);
+        });
 }
 
 IRType* lowerType(IRGenContext* context, Type* type)
 {
-    ValLoweringVisitor visitor;
-    visitor.context = context;
-    IRType* loweredType = (IRType*)getSimpleVal(context, visitor.dispatchType(type));
+    auto loweredValue = lowerValWithCache(
+        context,
+        type,
+        [&]()
+        {
+            ValLoweringVisitor visitor;
+            visitor.context = context;
+            return visitor.dispatchType(type);
+        });
+    IRType* loweredType = (IRType*)getSimpleVal(context, loweredValue);
 
+    // These operations are contextual side effects rather than part of the Val-to-IR mapping, so
+    // they must still run when the dispatch result came from the cache.
     lowerAssociatedVals(context, type, loweredType);
     lowerRelatedTypes(context, type, loweredType);
 
