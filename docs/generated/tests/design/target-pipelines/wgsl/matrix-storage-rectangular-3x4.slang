@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T21:00:00Z
 //META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#phase-c-wgsl-legalization-lowering-phi-elimination
-//META: doc_section_digest=a07249d171e8760079dd021f485b191eeba9855fbe96652d35a7e74a16b7586a
+//META: doc_section_digest=eda5f65fdaf66849c226ae86c71a3dd2d4db5ad3899105a4ddc6e7ac2d4447df
 //META: purpose=A rectangular RWStructuredBuffer<float3x4> wraps in _MatrixStorage_float3x4_ColMajorstd430 with a 4-element array<vec3<f32>>
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

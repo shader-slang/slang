@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:30:00+00:00
 //META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
 //META: doc_ref=docs/generated/design/pipeline/overview.md#ast-ir-lowering
-//META: doc_section_digest=8186b395b3684ed4e6e22f74790f541ad117cdf9f69fed4adc7bd83bf333f222
+//META: doc_section_digest=9d5c2eb05c23a89909c0247818bda4560451de59e30569a3cce2416cd548bc6d
 //META: purpose=Decls in the AST (here a struct) lower into IR types and re-emerge in the emitted target text after IR passes.
 //META: intent=functional
 //META: pipeline_stage=lower

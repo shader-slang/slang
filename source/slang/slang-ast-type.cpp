@@ -192,10 +192,13 @@ Val* DeclRefType::_substituteImplOverride(
     //
     if (auto satisfyingVal = substDeclRef.declRefBase->resolve())
     {
-        if (satisfyingVal != getDeclRef())
+        if (satisfyingVal != substDeclRef.declRefBase)
         {
             *ioDiff += 1;
-            return DeclRefType::create(astBuilder, substDeclRef);
+            if (auto satisfyingType = as<Type>(satisfyingVal))
+                return satisfyingType;
+            if (auto satisfyingDeclRef = as<DeclRefBase>(satisfyingVal))
+                return DeclRefType::create(astBuilder, DeclRef<Decl>(satisfyingDeclRef));
         }
     }
 
@@ -787,6 +790,14 @@ Val* RematFuncType::_resolveImplOverride()
     }
 }
 
+static Type* _getNoDiffType(ASTBuilder* astBuilder, Type* type)
+{
+    if (doesTypeHaveNoDiffModifier(type))
+        return type;
+
+    return astBuilder->getModifiedType(type, {astBuilder->getNoDiffModifierVal()});
+}
+
 Val* BwdDiffFuncType::_resolveImplOverride()
 {
     // Resolve all operands.
@@ -835,9 +846,7 @@ Val* BwdDiffFuncType::_resolveImplOverride()
         else if (thisParamType)
         {
             // Non-differentiable this type gets no_diff modifier.
-            auto noDiffThisType = astBuilder->getModifiedType(
-                thisParamValueType,
-                {astBuilder->getNoDiffModifierVal()});
+            auto noDiffThisType = _getNoDiffType(astBuilder, thisParamValueType);
             switch (thisParamDirection)
             {
             case ParamPassingMode::In:
@@ -886,9 +895,7 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                     else
                     {
                         // Non-differentiable param gets no_diff modifier.
-                        newParamTypes.add(astBuilder->getModifiedType(
-                            paramInfo.type,
-                            {astBuilder->getNoDiffModifierVal()}));
+                        newParamTypes.add(_getNoDiffType(astBuilder, paramInfo.type));
                     }
                     break;
                 }
@@ -901,9 +908,7 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                     }
                     else
                     {
-                        newParamTypes.add(astBuilder->getModifiedType(
-                            paramInfo.type,
-                            {astBuilder->getNoDiffModifierVal()}));
+                        newParamTypes.add(_getNoDiffType(astBuilder, paramInfo.type));
                     }
                     break;
                 }
@@ -916,10 +921,8 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                     }
                     else
                     {
-                        newParamTypes.add(
-                            astBuilder->getConstRefParamType(astBuilder->getModifiedType(
-                                paramInfo.type,
-                                {astBuilder->getNoDiffModifierVal()})));
+                        newParamTypes.add(astBuilder->getConstRefParamType(
+                            _getNoDiffType(astBuilder, paramInfo.type)));
                     }
                     break;
                 }
@@ -993,9 +996,7 @@ Val* FwdDiffFuncType::_resolveImplOverride()
         else if (thisParamType)
         {
             // Non-differentiable this type
-            auto noDiffThisType = astBuilder->getModifiedType(
-                thisParamValueType,
-                {astBuilder->getNoDiffModifierVal()});
+            auto noDiffThisType = _getNoDiffType(astBuilder, thisParamValueType);
             switch (thisParamDirection)
             {
             case ParamPassingMode::In:
@@ -1026,9 +1027,7 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                     }
                     else
                     {
-                        newParamTypes.add(getCurrentASTBuilder()->getModifiedType(
-                            paramInfo.type,
-                            {getCurrentASTBuilder()->getNoDiffModifierVal()}));
+                        newParamTypes.add(_getNoDiffType(astBuilder, paramInfo.type));
                     }
                     break;
                 }
@@ -1042,9 +1041,7 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                     else
                     {
                         newParamTypes.add(getCurrentASTBuilder()->getOutParamType(
-                            getCurrentASTBuilder()->getModifiedType(
-                                paramInfo.type,
-                                {getCurrentASTBuilder()->getNoDiffModifierVal()})));
+                            _getNoDiffType(astBuilder, paramInfo.type)));
                     }
                     break;
                 }
@@ -1059,9 +1056,7 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                     else
                     {
                         newParamTypes.add(getCurrentASTBuilder()->getBorrowInOutParamType(
-                            getCurrentASTBuilder()->getModifiedType(
-                                paramInfo.type,
-                                {getCurrentASTBuilder()->getNoDiffModifierVal()})));
+                            _getNoDiffType(astBuilder, paramInfo.type)));
                     }
                     break;
                 }
@@ -1081,9 +1076,7 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                     else
                     {
                         newParamTypes.add(getCurrentASTBuilder()->getConstRefParamType(
-                            getCurrentASTBuilder()->getModifiedType(
-                                paramInfo.type,
-                                {getCurrentASTBuilder()->getNoDiffModifierVal()})));
+                            _getNoDiffType(astBuilder, paramInfo.type)));
                     }
                     break;
                 }
@@ -1100,9 +1093,7 @@ Val* FwdDiffFuncType::_resolveImplOverride()
         }
         else if (!funcType->getResultType()->equals(getCurrentASTBuilder()->getVoidType()))
         {
-            newReturnType = getCurrentASTBuilder()->getModifiedType(
-                funcType->getResultType(),
-                {getCurrentASTBuilder()->getNoDiffModifierVal()});
+            newReturnType = _getNoDiffType(astBuilder, funcType->getResultType());
         }
 
         return getCurrentASTBuilder()->getFuncType(

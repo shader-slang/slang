@@ -111,7 +111,7 @@ add_custom_command(
     COMMAND
         slang-capability-generator ${SLANG_CAPABILITY_SOURCE} --target-directory
         ${SLANG_CAPABILITY_OUTPUT_DIR} --doc
-        "${slang_SOURCE_DIR}/docs/user-guide/a3-02-reference-capability-atoms.md"
+        "${slang_SOURCE_DIR}/docs/user-guide/a4-02-reference-capability-atoms.md"
     DEPENDS ${SLANG_CAPABILITY_SOURCE} slang-capability-generator
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
     VERBATIM
@@ -354,6 +354,27 @@ else()
     )
 endif()
 
+if(SLANG_ENABLE_MIMALLOC)
+    if(NOT TARGET mimalloc-static)
+        message(
+            FATAL_ERROR
+            "SLANG_ENABLE_MIMALLOC requires the mimalloc-static target"
+        )
+    endif()
+
+    # Without the embedded core module, the normal source glob already adds this file to slang.
+    # With the embedded core module, the glob belongs to slang-common-objects, where this file
+    # remains empty, so compile the active override directly in slang.
+    if(SLANG_EMBED_CORE_MODULE)
+        target_sources(slang PRIVATE slang-mimalloc.cpp)
+    endif()
+    target_compile_definitions(
+        slang
+        PRIVATE SLANG_MIMALLOC_OVERRIDE_NEW_DELETE=1
+    )
+    target_link_libraries(slang PRIVATE mimalloc-static)
+endif()
+
 set_target_properties(
     slang
     PROPERTIES
@@ -362,6 +383,57 @@ set_target_properties(
         MACHO_COMPATIBILITY_VERSION 0.0.0
         MACHO_CURRENT_VERSION ${SLANG_VERSION_NUMERIC}
 )
+
+# A non-embedded shared library normally creates this cache on the first global-session request.
+# Generate it from the build's core archive after the shared library is linked so the first slangc
+# invocation can load the same archive without compiling the core module again.
+if(NOT SLANG_EMBED_CORE_MODULE AND SLANG_LIB_TYPE STREQUAL "SHARED")
+    # Place the cache beside the shared library: DLLs use the runtime directory on Windows, while
+    # shared libraries use the library directory on other platforms.
+    if(WIN32)
+        get_target_property(
+            core_module_cache_dir
+            slang
+            RUNTIME_OUTPUT_DIRECTORY
+        )
+        set(core_module_cache_install_dir ${runtime_subdir})
+    else()
+        get_target_property(
+            core_module_cache_dir
+            slang
+            LIBRARY_OUTPUT_DIRECTORY
+        )
+        set(core_module_cache_install_dir ${library_subdir})
+    endif()
+    set(core_module_cache "${core_module_cache_dir}/slang-core-module.bin")
+
+    add_custom_target(
+        generate_core_module_cache
+        ALL
+        COMMAND
+            "$<TARGET_FILE:slang-core-module-cache>" "$<TARGET_FILE:slang>"
+            "${core_module_archive_without_timestamp}" "${core_module_cache}"
+        BYPRODUCTS "${core_module_cache}"
+        DEPENDS slang-core-module-cache slang
+        COMMENT "Generating timestamped core module cache"
+        VERBATIM
+    )
+    add_dependencies(generate_core_module_cache generate_core_module)
+    set_target_properties(
+        generate_core_module_cache
+        PROPERTIES FOLDER generated
+    )
+
+    # CMake installation preserves the shared library's timestamp, so this cache stays valid.
+    # Other packaging must also preserve it; otherwise the runtime rejects and regenerates the
+    # cache on first use.
+    install(
+        FILES "${core_module_cache}"
+        DESTINATION ${core_module_cache_install_dir}
+        COMPONENT generators
+        EXCLUDE_FROM_ALL
+    )
+endif()
 
 #
 # Windows proxy DLL for backward compatibility

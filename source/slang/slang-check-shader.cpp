@@ -2073,6 +2073,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         numThreads->extents[i] = glslAttr->extents[i];
                         numThreads->specConstExtents[i] = glslAttr->specConstExtents[i];
                     }
+                    // We attribute the location of the new NumThreadsAttribute
+                    // to the location of the first GLSLLayoutLocalSizeAttribute,
+                    // just to have something there (even if multiple
+                    // attributes get merged to this NumThreadsAttribute).
+                    numThreads->loc = glslAttr->loc;
                 }
                 else
                 {
@@ -3422,7 +3427,39 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     auto args = inArgs;
     auto argCount = inArgCount;
 
-    SharedSemanticsContext sharedSemanticsContext(getLinkage(), nullptr, sink);
+    // Validating a specialization argument means checking that the argument
+    // type conforms to the entry point's generic constraints, and that check
+    // needs to see every `extension` that could supply a conformance witness.
+    //
+    // Scope the checking session to the entry point's own module rather than
+    // leaving it module-less. A module-less (`m_module == nullptr`) context
+    // resolves extensions from the linkage's `loadedModulesList`, which never
+    // contains the primary command-line translation unit -- so a conformance
+    // provided by an `extension` in that primary source (e.g. specializing a
+    // `T : IFoo` entry point to a type whose `T : IFoo` witness comes from an
+    // `extension T : IFoo` in the same file) was invisible and failed with
+    // E38029, even though the identical call resolves fine in the module body.
+    //
+    // With `m_module` set, `getCandidateExtensionsForTypeDecl` instead consults
+    // `importedModulesList`, so we seed it from the entry point's module
+    // dependency closure. `getModuleDependencies()` self-includes the owning
+    // module (see `Module::Module`'s `addModuleDependency(this)`), so the
+    // primary module's own extensions come along -- this is the same
+    // point-of-view an in-body generic call has.
+    //
+    // When the entry point has no owning module (`getModule()` is null) we pass
+    // `nullptr` and fall back to the prior module-less behavior.
+    auto entryPointModule = getModule();
+    SharedSemanticsContext sharedSemanticsContext(getLinkage(), entryPointModule, sink);
+    if (entryPointModule)
+    {
+        for (auto module : getModuleDependencies())
+        {
+            auto moduleDecl = module->getModuleDecl();
+            if (sharedSemanticsContext.importedModulesSet.add(moduleDecl))
+                sharedSemanticsContext.importedModulesList.add(moduleDecl);
+        }
+    }
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
     // The last N arguments will be for the implicit existential arguments

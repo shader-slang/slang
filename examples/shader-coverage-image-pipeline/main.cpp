@@ -636,11 +636,18 @@ int main(int argc, char** argv)
         bool coverageBoolean = false;
         // `--tile-rows=N`: split each config dispatch into horizontal bands
         // of N rows to avoid OS watchdog resets (Windows TDR /
-        // VK_ERROR_DEVICE_LOST) on coverage-instrumented runs. Default is 0
-        // (whole-image dispatch). The bilateral filter's inner loop creates
-        // heavy atomic contention on a few counters; if TDR occurs under
-        // count mode, try --tile-rows=128 or switch to --coverage-mode=boolean.
-        uint32_t tileRows = 0; // 0 = whole-image
+        // VK_ERROR_DEVICE_LOST) on coverage-instrumented runs. The
+        // bilateral filter's inner loop creates heavy atomic contention on
+        // a few counters, and full mode's parameter sweep makes each config
+        // dispatch long enough to trip the watchdog, so full mode defaults
+        // to 128-row tiles — a safe height on any GPU. Smoke mode is quick
+        // and defaults to whole-image dispatch. Pass an explicit value to
+        // tune (smaller if you still observe TDR), or `--tile-rows=0` to
+        // force whole-image dispatch in full mode. --coverage-mode=boolean
+        // also eliminates TDR risk without tiling.
+        constexpr uint32_t kTileRowsUnset = UINT32_MAX;
+        constexpr uint32_t kFullModeTileRows = 128;
+        uint32_t tileRows = kTileRowsUnset; // resolved per mode after parsing
         constexpr std::string_view kTileRowsFlag = "--tile-rows=";
         // `--output-dir=<path>`: explicit output location for the three
         // coverage artifacts (manifest JSON, LCOV, raw counter buffer).
@@ -690,6 +697,12 @@ int main(int argc, char** argv)
                 return 1;
             }
         }
+
+        // Resolve the tile-rows default per mode (see the flag comment
+        // above): full mode tiles by default, smoke mode does not. An
+        // explicit `--tile-rows=` always wins, including `=0`.
+        if (tileRows == kTileRowsUnset)
+            tileRows = (mode == "full") ? kFullModeTileRows : 0;
 
         // Publish the `--demo-dir` override to file-scope storage so
         // `getDemoDirectory()` (called from `compileShader` and from
@@ -821,13 +834,13 @@ int main(int argc, char** argv)
                 (uint32_t)shader.coverageBinding,
                 coverageBuf);
 
-        // Default: whole-image dispatch (tileOriginY = 0, single submission
-        // per config). Pass `--tile-rows=N` to split each config into
-        // horizontal bands of N rows; the shader recovers the real pixel row
-        // as `tid.y + tileOriginY`. Tiling caps the per-submission GPU time,
+        // `--tile-rows=N` splits each config into horizontal bands of N
+        // rows; the shader recovers the real pixel row as
+        // `tid.y + tileOriginY`. Tiling caps the per-submission GPU time,
         // which prevents OS watchdog resets (Windows TDR /
         // VK_ERROR_DEVICE_LOST) under coverage count mode on this demo's hot
-        // bilateral filter. --tile-rows=128 is a safe starting point;
+        // bilateral filter. Full mode defaults to 128-row tiles; smoke mode
+        // and `--tile-rows=0` dispatch the whole image per config.
         // --coverage-mode=boolean also eliminates TDR risk without tiling.
         //
         // Neither shape affects coverage results: tiles partition the image,
@@ -938,6 +951,16 @@ int main(int argc, char** argv)
         ctx.destroyPipeline(pipe);
         std::cout << "done\n";
         return 0;
+    }
+    catch (const vkdemo::VulkanError& e)
+    {
+        std::cerr << "fatal: " << e.what() << "\n";
+        if (e.result == VK_ERROR_DEVICE_LOST)
+            std::cerr << "The GPU was likely reset by the OS watchdog (TDR) during a long "
+                         "coverage-instrumented dispatch. Rerun with smaller tiles "
+                         "(e.g. --tile-rows=64), or use --coverage-mode=boolean, which "
+                         "removes the atomic-counter cost.\n";
+        return 1;
     }
     catch (const std::exception& e)
     {
