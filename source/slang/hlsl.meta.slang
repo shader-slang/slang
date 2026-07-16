@@ -22041,7 +22041,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
 ${
     const char* kCandidateCommitted[] = {"Candidate", "Committed"};
-    const char* kCandidateCommittedMetal[] = {"get_candidate_", "get_committed_"};
+    // Middle piece of the MSL method name. Callers add the "get_" or "is_" prefix.
+    const char* kCandidateCommittedMetal[] = {"candidate_", "committed_"};
 
     // Access Candidate and Committed Matrices.
     for (uint32_t candidateOrCommitted = 0; candidateOrCommitted < 2; candidateOrCommitted++)
@@ -22134,7 +22135,7 @@ $}
         {
         case glsl: __intrinsic_asm "transpose(rayQueryGetIntersection$(method.name)EXT($0, $(ccTF)))";
         case hlsl: __intrinsic_asm ".$(ccName)$(method.name)3x4";
-        case metal: __intrinsic_asm "transpose($0->$(ccNameMetal)$(method.metalName)())";
+        case metal: __intrinsic_asm "transpose($0->get_$(ccNameMetal)$(method.metalName)())";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm
@@ -22158,7 +22159,7 @@ $}
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersection$(method.name)EXT($0, $(ccTF))";
         case hlsl: __intrinsic_asm ".$(ccName)$(method.name)4x3";
-        case metal: __intrinsic_asm "$0->$(ccNameMetal)$(method.metalName)()";
+        case metal: __intrinsic_asm "$0->get_$(ccNameMetal)$(method.metalName)()";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm
@@ -22190,6 +22191,8 @@ ${
         {"float2", "TriangleBarycentrics", "Barycentrics", "triangle_barycentric_coord"},
     };
     for (auto method : rayQueryMethods) {
+        // MSL names boolean queries "is_" and everything else "get_".
+        auto metalPrefix = strcmp(method.type, "bool") == 0 ? "is_" : "get_";
 $}
 
     __glsl_extension(GL_EXT_ray_query)
@@ -22202,7 +22205,7 @@ $}
         {
         case hlsl: __intrinsic_asm ".$(ccName)$(method.hlslName)";
         case glsl: __intrinsic_asm "rayQueryGetIntersection$(method.glslName)EXT($0, $(ccTF))";
-        case metal: __intrinsic_asm "$0->$(ccNameMetal)$(method.metalName)()";
+        case metal: __intrinsic_asm "$0->$(metalPrefix)$(ccNameMetal)$(method.metalName)()";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm
