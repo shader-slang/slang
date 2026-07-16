@@ -420,6 +420,25 @@ local insts = {
 				},
 			},
 			{
+				UntypedResourceHandle = {
+					-- An opaque, untyped handle produced by `ResourceDescriptorHeap[i]`. It is nullary:
+					-- the heap index lives in the value, not the type. `lowerUntypedResourceHandleToUInt`
+					-- rewrites it to its underlying `uint` heap index before emit, so it never reaches
+					-- emit/layout (which treat a survivor as an internal error).
+					struct_name = "UntypedResourceHandleType",
+					hoistable = true,
+				},
+			},
+			{
+				UntypedSamplerHandle = {
+					-- An opaque, untyped handle produced by `SamplerDescriptorHeap[j]`. Nullary, like
+					-- `UntypedResourceHandle`; lowered to `uint` by the same
+					-- `lowerUntypedResourceHandleToUInt` pass and likewise never reaches emit/layout.
+					struct_name = "UntypedSamplerHandleType",
+					hoistable = true,
+				},
+			},
+			{
 				GLSLAtomicUint = {
 					-- An AtomicUint is a placeholder type for a storage buffer, and will be mangled during compiling.
 					struct_name = "GLSLAtomicUintType",
@@ -1885,6 +1904,7 @@ local insts = {
 			-- SPIR-V execution mode.
 			{ glslFragDepthGreater = { struct_name = "GLSLFragDepthGreaterDecoration" } },
 			{ glslFragDepthLess = { struct_name = "GLSLFragDepthLessDecoration" } },
+			{ shader64BitIndexing = { struct_name = "Shader64BitIndexingDecoration" } },
 			{ precise = { struct_name = "PreciseDecoration" } },
 			{ public = { struct_name = "PublicDecoration" } },
 			{ hlslExport = { struct_name = "HLSLExportDecoration" } },
@@ -2086,6 +2106,16 @@ local insts = {
 					-- point.
 					struct_name = "EntryPointParamDecoration",
 					operands = { { "entryPoint", "IRFunc" } },
+				},
+			},
+			{
+				synthesizedParameterGroup = {
+					-- Marks a parameter-group element struct that was synthesized by the
+					-- compiler (e.g. by collecting entry-point `uniform`/resource parameters)
+					-- rather than written by the user. Diagnostics that only make sense for
+					-- source-authored groups (such as "special type leaks from parameter
+					-- group") are suppressed for these.
+					struct_name = "SynthesizedParameterGroupDecoration",
 				},
 			},
 			{
@@ -2719,6 +2749,13 @@ local insts = {
 	-- already concrete types.
 	{ CastDescriptorHandleToResource = { operands = { { "handle" } } } },
 	{ CastResourceToDescriptorHandle = { operands = { { "resource" } } } },
+	-- Wrap/unwrap a `uint` heap index in an untyped descriptor-heap handle. This is an internal
+	-- representation only: the `lowerUntypedResourceHandleToUInt` pass forwards each cast to its
+	-- `uint` operand and removes it before emit, so these ops never reach a target emitter.
+	{ CastUIntToUntypedResourceHandle = { operands = { { "index" } } } },
+	{ CastUntypedResourceHandleToUInt = { operands = { { "handle" } } } },
+	{ CastUIntToUntypedSamplerHandle = { operands = { { "index" } } } },
+	{ CastUntypedSamplerHandleToUInt = { operands = { { "handle" } } } },
 	{ TreatAsDynamicUniform = { operands = { { "value" } } } },
 	{ sizeOf = { operands = { { "type" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },
 	{ alignOf = { operands = { { "baseOp" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },

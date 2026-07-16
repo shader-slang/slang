@@ -38,7 +38,7 @@
 
 // - `alias`: this defines an alias and does not introduce actual atoms.
 
-// How auto-doc works (automatic filling of `a3-02-reference-capability-atoms.md`):
+// How auto-doc works (automatic filling of `a4-02-reference-capability-atoms.md`):
 //
 // 1. `def`/`alias` are considered 'documentable atoms'
 //
@@ -533,6 +533,12 @@ def SPV_EXT_fragment_shader_interlock : _spirv_1_0;
 /// [EXT]
 def SPV_EXT_physical_storage_buffer : _spirv_1_3;
 
+/// Represents the SPIR-V extension for physical storage buffer (the KHR-promoted name for
+/// the same feature as SPV_EXT_physical_storage_buffer; folded into core SPIR-V 1.5). Its
+/// floor mirrors the EXT atom's, so requiring it does not raise the effective version.
+/// [EXT]
+def SPV_KHR_physical_storage_buffer : _spirv_1_3;
+
 /// Represents the SPIR-V extension for SPV_EXT_fragment_fully_covered.
 /// [EXT]
 def SPV_EXT_fragment_fully_covered : _spirv_1_0;
@@ -618,10 +624,12 @@ def SPV_KHR_subgroup_rotate : _spirv_1_3;
 def SPV_NV_ray_tracing_motion_blur : _spirv_1_0;
 
 /// Represents the SPIR-V extension for shader invocation reorder (cross-vendor standard).
-/// Requires SPV_KHR_ray_tracing and SPIR-V 1.5 (which includes physical storage buffer).
-/// Note: Spec allows SPIR-V 1.4 + physical_storage_buffer extension, but we require 1.5 for simplicity.
+/// Per the SER spec it requires SPIR-V 1.4, SPV_KHR_ray_tracing, and a physical-storage-buffer
+/// extension. We model the physical-storage-buffer dependency as SPV_KHR_physical_storage_buffer
+/// (the name the emitter declares); the emitter adds that `OpExtension` on the pre-1.5 path
+/// (it is core from 1.5 on), while this dependency records the relationship in the model.
 /// [EXT]
-def SPV_EXT_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
+def SPV_EXT_shader_invocation_reorder : _spirv_1_4 + SPV_KHR_ray_tracing + SPV_KHR_physical_storage_buffer;
 
 /// Represents the SPIR-V extension for shader invocation reorder (NVIDIA-specific).
 /// Inherits from SPV_EXT_shader_invocation_reorder so NV implies EXT.
@@ -695,6 +703,10 @@ def SPV_KHR_untyped_pointers : _spirv_1_0;
 /// Represents the SPIR-V extension for BFloat16 types.
 /// [EXT]
 def SPV_KHR_bfloat16: _spirv_1_0;
+
+/// Represents the SPIR-V extension for 64-bit integer indexing of resources and arrays.
+/// [EXT]
+def SPV_EXT_shader_64bit_indexing : _spirv_1_0;
 
 // SPIRV Capabilities.
 
@@ -957,6 +969,10 @@ def spvBindlessTextureNV : SPV_NV_bindless_texture;
 /// Represents the SPIR-V capability for descriptor heaps.
 /// [EXT]
 def spvDescriptorHeapEXT : SPV_EXT_descriptor_heap + SPV_KHR_untyped_pointers;
+
+/// Represents the SPIR-V capability for 64-bit integer indexing of resources and arrays.
+/// [EXT]
+def spvShader64BitIndexingEXT : SPV_EXT_shader_64bit_indexing;
 
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core

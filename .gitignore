@@ -85,7 +85,6 @@ prelude/*.h.cpp
 /multiple-definitions.hlsl
 /external/slang-llvm/
 /external/slang-glslang/
-/external/mimalloc/
 /external/slangpy/
 /external/dxvk-remix/
 /external/SaschaWillems-Vulkan/
@@ -152,3 +151,6 @@ __pycache__/
 .slang-replays*
 log*.txt
 replay-capture
+
+# Pre-staged AI-review artifacts (REVIEW.md Step 1)
+/tmp/

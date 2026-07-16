@@ -689,24 +689,15 @@ static bool _containsDiagnostic(
            _contains(result.standardError, expectedText);
 }
 
-enum class CoverageManifestCheck
-{
-    // Require line, function, and branch entry kinds — the full set produced
-    // by -trace-coverage -trace-function-coverage -trace-branch-coverage on
-    // most targets.
-    Full,
-    // Require only the structural fields (version, counter_count, entries,
-    // buffer) and the coverage variable name. Used for the metallib-asm path
-    // where function/branch entries are currently missing from the manifest
-    // even though the IR coverage pass runs with all three flags enabled.
-    // TODO: investigate whether this is a metadata-propagation bug in the
-    // metallib-asm downstream-compilation artifact path (#11610).
-    StructureOnly,
-};
-
-static SlangResult _checkCoverageManifest(
-    const String& path,
-    CoverageManifestCheck check = CoverageManifestCheck::Full)
+// Check that the coverage manifest at `path` carries the structural fields
+// (version, counter_count, entries, buffer), the coverage variable name, and
+// all three entry kinds produced by
+// `-trace-coverage -trace-function-coverage -trace-branch-coverage`. This
+// full check applies to every target, including the metallib-asm downstream
+// path: once the Metal counter width is capped to 32-bit so the downstream
+// metal compile succeeds, its manifest contains the same complete entry set
+// as direct source targets (verified on macOS with Metal Toolchain v17.6).
+static SlangResult _checkCoverageManifest(const String& path)
 {
     if (!File::exists(path))
         return SLANG_FAIL;
@@ -716,15 +707,12 @@ static SlangResult _checkCoverageManifest(
     if (!_contains(manifest, "\"version\"") || !_contains(manifest, "\"counter_count\"") ||
         !_contains(manifest, "\"entries\"") || !_contains(manifest, "\"buffer\""))
         return SLANG_FAIL;
-    if (check == CoverageManifestCheck::Full)
-    {
-        // "kind\": \"line\"" matches the entry-kind field, not the per-entry
-        // source-location "line": <n> field which appears in all entry kinds.
-        if (!_contains(manifest, "\"kind\": \"line\"") ||
-            !_contains(manifest, "\"kind\": \"function\"") ||
-            !_contains(manifest, "\"kind\": \"branch\""))
-            return SLANG_FAIL;
-    }
+    // "kind\": \"line\"" matches the entry-kind field, not the per-entry
+    // source-location "line": <n> field which appears in all entry kinds.
+    if (!_contains(manifest, "\"kind\": \"line\"") ||
+        !_contains(manifest, "\"kind\": \"function\"") ||
+        !_contains(manifest, "\"kind\": \"branch\""))
+        return SLANG_FAIL;
     if (!_contains(manifest, "__slang_coverage"))
         return SLANG_FAIL;
 
@@ -794,9 +782,7 @@ static SlangResult _testCoverageAutoSidecarForMetalLibDisassembly(UnitTestContex
         return SLANG_FAIL;
     if (!File::exists(files.metalDisassemblyOutputPath))
         return SLANG_FAIL;
-    return _checkCoverageManifest(
-        files.metalDisassemblyManifestPath,
-        CoverageManifestCheck::StructureOnly);
+    return _checkCoverageManifest(files.metalDisassemblyManifestPath);
 #else
     SLANG_UNUSED(context);
     return SLANG_OK;
@@ -872,7 +858,7 @@ static SlangResult _testCoverageExplicitSidecarForMetalLibDisassembly(UnitTestCo
         return SLANG_FAIL;
     if (File::exists(files.metalDisassemblyManifestPath))
         return SLANG_FAIL;
-    return _checkCoverageManifest(files.explicitManifestPath, CoverageManifestCheck::StructureOnly);
+    return _checkCoverageManifest(files.explicitManifestPath);
 #else
     SLANG_UNUSED(context);
     return SLANG_OK;
@@ -1607,15 +1593,19 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpMentionsStdin(unitTestContext)));
 }
 
+SLANG_UNIT_TEST(SlangcCoverageManifestOutputMetalLib)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecarForMetalLibDisassembly(unitTestContext)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testCoverageExplicitSidecarForMetalLibDisassembly(unitTestContext)));
+}
+
 SLANG_UNIT_TEST(SlangcCoverageManifestOutput)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecar(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecarForDisassembly(unitTestContext)));
-    SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecarForMetalLibDisassembly(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecar(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarForDisassembly(unitTestContext)));
-    SLANG_CHECK(
-        SLANG_SUCCEEDED(_testCoverageExplicitSidecarForMetalLibDisassembly(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarWithStdoutArtifact(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteArtifact(unitTestContext)));

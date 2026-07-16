@@ -1249,6 +1249,13 @@ class EarlyDepthStencilAttribute : public Attribute
 };
 // `[earlydepthstencil]`
 
+FIDDLE()
+class Shader64BitIndexingAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+// `[Shader64BitIndexing]`
+
 // An HLSL `[numthreads(x,y,z)]` attribute
 FIDDLE()
 class NumThreadsAttribute : public Attribute
@@ -1980,6 +1987,7 @@ FIDDLE()
 class NoDiffThisAttribute : public Attribute
 {
     FIDDLE(...)
+    FIDDLE() bool isSynthesized = false;
 };
 
 /// Indicates that the modified declaration is one of the "magic" declarations

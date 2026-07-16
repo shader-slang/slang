@@ -1875,6 +1875,29 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cluster_acceleration_structure"));
     }
 
+    // Declare the shader-invocation-reorder (SER) extension and capability the module
+    // needs, preferring the NVIDIA-specific variant when the target implies it (NV derives
+    // from EXT in the capability hierarchy) and otherwise using the cross-vendor EXT variant.
+    // Returns true when the NV variant was selected so the caller can emit the matching
+    // HitObject type. The SPIR-V 1.4 physical-storage-buffer dependency is added centrally
+    // by requireSPIRVCapability, so it is not repeated here.
+    bool requireShaderInvocationReorderExtension()
+    {
+        auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
+        bool useNV = targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderNV);
+        if (useNV)
+        {
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
+            requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+        }
+        else
+        {
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
+            requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
+        }
+        return useNV;
+    }
+
     bool hasExtensionDeclaration(const UnownedStringSlice& name)
     {
         return m_extensionInsts.containsKey(name);
@@ -2709,6 +2732,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         SpvLiteralInteger::from32(2));
                 }
             }
+        case kIROp_UntypedResourceHandleType:
+        case kIROp_UntypedSamplerHandleType:
+            // `lowerUntypedResourceHandleToUInt` rewrites every untyped descriptor-heap handle to
+            // `uint` before emit, so one reaching here is an internal error (a leak from that
+            // pass).
+            SLANG_UNEXPECTED(
+                "untyped descriptor-heap handle type should have been lowered to uint");
         case kIROp_SubpassInputType:
             return ensureSubpassInputType(inst, cast<IRSubpassInputType>(inst));
         case kIROp_TextureType:
@@ -2730,33 +2760,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitOpTypeRayQuery(inst);
 
         case kIROp_HitObjectType:
-            {
-                // Check NV first (more specific) since NV derives from EXT in the
-                // capability hierarchy. If no SER capability was explicitly requested,
-                // default to EXT to match capability inference and target-switch fallback.
-                auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
-                if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderNV))
-                {
-                    ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
-                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
-                    return emitOpTypeHitObject(inst);
-                }
-                else if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
-                {
-                    ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
-                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
-                    return emitOpTypeHitObjectEXT(inst);
-                }
-                else
-                {
-                    ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
-                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
-                    return emitOpTypeHitObjectEXT(inst);
-                }
-            }
+            // NV is checked first (it derives from EXT in the capability hierarchy); if no
+            // SER capability was explicitly requested we fall back to EXT, matching
+            // capability inference and the target-switch fallback.
+            return requireShaderInvocationReorderExtension() ? emitOpTypeHitObject(inst)
+                                                             : emitOpTypeHitObjectEXT(inst);
 
         case kIROp_FuncType:
             // > OpTypeFunction
@@ -2835,6 +2843,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 registerInst(inst, inner);
                 return inner;
             }
+        case kIROp_CastUIntToUntypedResourceHandle:
+        case kIROp_CastUntypedResourceHandleToUInt:
+        case kIROp_CastUIntToUntypedSamplerHandle:
+        case kIROp_CastUntypedSamplerHandleToUInt:
+            // The untyped descriptor-heap handle wrap/unwrap casts are an internal representation
+            // that `lowerUntypedResourceHandleToUInt` forwards to their `uint` operand and removes
+            // before emit. Reaching this point means that pass did not run, so this is a bug.
+            SLANG_UNEXPECTED(
+                "untyped descriptor-heap handle cast should have been lowered to uint");
         case kIROp_GlobalParam:
             return emitGlobalParam(as<IRGlobalParam>(inst));
         case kIROp_GlobalVar:
@@ -5082,6 +5099,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 result = inner;
                 break;
             }
+        case kIROp_CastUIntToUntypedResourceHandle:
+        case kIROp_CastUntypedResourceHandleToUInt:
+        case kIROp_CastUIntToUntypedSamplerHandle:
+        case kIROp_CastUntypedSamplerHandleToUInt:
+            // The untyped descriptor-heap handle wrap/unwrap casts are an internal representation
+            // that `lowerUntypedResourceHandleToUInt` forwards to their `uint` operand and removes
+            // before emit. Reaching this point means that pass did not run, so this is a bug.
+            SLANG_UNEXPECTED(
+                "untyped descriptor-heap handle cast should have been lowered to uint");
         case kIROp_CastDescriptorHandleToResource:
             // Convert DescriptorHandle (uint64_t handle) to appropriate resource type
             {
@@ -6362,6 +6388,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             requireSPIRVCapability(SpvCapabilityQuadControlKHR);
             requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeRequireFullQuadsKHR);
             break;
+        case kIROp_Shader64BitIndexingDecoration:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_shader_64bit_indexing"));
+            requireSPIRVCapability(SpvCapabilityShader64BitIndexingEXT);
+            requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeShader64BitIndexingEXT);
+            break;
         case kIROp_SPIRVBufferBlockDecoration:
             {
                 emitOpDecorate(
@@ -6475,30 +6506,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             isRayTracingObject = true;
             break;
         case kIROp_VulkanHitObjectAttributesDecoration:
-            {
-                // needed since GLSL will not set optypes accordingly, but will keep the decoration
-                auto caps = m_targetProgram->getTargetReq()->getTargetCaps();
-                if (caps.implies(CapabilityAtom::spvShaderInvocationReorderNV))
-                {
-                    ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
-                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
-                }
-                else if (caps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
-                {
-                    ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
-                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
-                }
-                else
-                {
-                    ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
-                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
-                }
-                isRayTracingObject = true;
-                break;
-            }
+            // needed since GLSL will not set optypes accordingly, but will keep the decoration
+            requireShaderInvocationReorderExtension();
+            isRayTracingObject = true;
+            break;
         case kIROp_VulkanRayPayloadDecoration:
         case kIROp_VulkanRayPayloadInDecoration:
             // needed since GLSL will not set optypes accordingly, but will keep the decoration
@@ -9286,7 +9297,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             // Float to bool cast.
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
-            auto zero = builder.getIntValue(fromType, 0);
+            auto zero = builder.getFloatValue(fromType, 0.0);
             if (auto vecType = as<IRVectorType>(toTypeV))
             {
                 auto zeroV =
@@ -10179,8 +10190,59 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
 
+    // Return true when floating-point contraction must be disabled for `inst`, i.e.
+    // the effective floating-point mode is `Precise`. The mode comes from the global
+    // `-fp-mode` option, but a function may override it via
+    // `IRFloatingPointModeOverrideDecoration` (e.g. auto-diff forces `Fast` on the
+    // derivative functions it generates), so an inst inside such a function honors the
+    // function's mode rather than the global one.
+    bool isFloatingPointModePrecise(IRInst* inst)
+    {
+        auto mode = m_targetProgram->getOptionSet().getFloatingPointMode();
+        if (auto func = getParentFunc(inst))
+        {
+            if (auto fpModeDecor = func->findDecoration<IRFloatingPointModeOverrideDecoration>())
+                mode = fpModeDecor->getFloatingPointMode();
+        }
+        return mode == FloatingPointMode::Precise;
+    }
+
+    // Under precise floating-point mode, decorate an emitted floating-point arithmetic
+    // instruction with `NoContraction` so the driver may not fuse it (e.g. into an FMA)
+    // or otherwise reassociate the computation -- this is what makes `-fp-mode precise`
+    // meaningful on the direct SPIR-V path (issue #11933). `NoContraction` is only valid
+    // on floating-point arithmetic opcodes, so we gate on the opcode actually emitted:
+    // integer/bitwise/logical ops and floating-point comparisons route through the same
+    // IR arithmetic path but emit other opcodes and are correctly skipped. Callers must
+    // pass only per-element arithmetic results; the `OpCompositeConstruct` that
+    // reassembles a matrix from its rows is not a valid target and is decorated nowhere.
+    void maybeEmitNoContraction(bool isPrecise, SpvInst* result)
+    {
+        if (!isPrecise || !result)
+            return;
+        switch (result->opcode)
+        {
+        case SpvOpFAdd:
+        case SpvOpFSub:
+        case SpvOpFMul:
+        case SpvOpFDiv:
+        case SpvOpFRem:
+        case SpvOpFNegate:
+        case SpvOpVectorTimesScalar:
+            emitOpDecorate(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                getID(result),
+                SpvDecorationNoContraction);
+            break;
+        default:
+            break;
+        }
+    }
+
     SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
     {
+        const bool isPrecise = isFloatingPointModePrecise(inst);
         if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
         {
             auto rowCount = getIntVal(matrixType->getRowCount());
@@ -10206,13 +10268,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         operands.add(originalOperand);
                     }
                 }
-                rows.add(emitVectorOrScalarArithmetic(
+                auto rowResult = emitVectorOrScalarArithmetic(
                     parent,
                     nullptr,
                     rowVectorType,
                     inst->getOp(),
                     inst->getOperandCount(),
-                    operands.getArrayView()));
+                    operands.getArrayView());
+                maybeEmitNoContraction(isPrecise, rowResult);
+                rows.add(rowResult);
             }
             return emitCompositeConstruct(parent, inst, inst->getDataType(), rows);
         }
@@ -10220,13 +10284,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         Array<IRInst*, 4> operands;
         for (UInt i = 0; i < inst->getOperandCount(); i++)
             operands.add(inst->getOperand(i));
-        return emitVectorOrScalarArithmetic(
+        auto result = emitVectorOrScalarArithmetic(
             parent,
             inst,
             inst->getDataType(),
             inst->getOp(),
             inst->getOperandCount(),
             operands.getView());
+        maybeEmitNoContraction(isPrecise, result);
+        return result;
     }
 
     SpvInst* emitDebugLine(SpvInstParent* parent, IRDebugLine* debugLine)
@@ -11540,6 +11606,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (m_capabilities.add(capability))
         {
             emitOpCapability(getSection(SpvLogicalSectionID::Capabilities), nullptr, capability);
+
+            // The shader-invocation-reorder (SER) capabilities are usable from SPIR-V 1.4,
+            // but the extension's 1.4 dependency also requires a physical-storage-buffer
+            // extension to be declared (physical_storage_buffer is folded into core SPIR-V
+            // 1.5). Declare `SPV_KHR_physical_storage_buffer` here so every path that requires
+            // an SER capability — the HitObject type/decoration emit and the `ReorderThread`
+            // and HitObject method `spirv_asm` blocks in hlsl.meta.slang, which all funnel
+            // through this function — gains the dependency uniformly. This is a plain
+            // OpExtension, not a switch to the PhysicalStorageBuffer64 addressing model: SER
+            // needs the extension present, not buffer_reference addressing, so the memory
+            // model stays `Logical GLSL450`. At 1.5+ the guarded call emits nothing extra.
+            if (capability == SpvCapabilityShaderInvocationReorderNV ||
+                capability == SpvCapabilityShaderInvocationReorderEXT)
+            {
+                ensureExtensionDeclarationBeforeSpv15(
+                    UnownedStringSlice("SPV_KHR_physical_storage_buffer"));
+            }
         }
     }
 

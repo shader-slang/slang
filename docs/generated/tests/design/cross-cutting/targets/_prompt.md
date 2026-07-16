@@ -102,7 +102,7 @@ the "feature X is rejected on target Y" claims.
   (`#runtime-representation`) — internal data structure.
 - **`slang-capability-generator` build behaviour** — a build-system
   step.
-- The **`a3-02-reference-capability-atoms.md` doc-comment harvest**
+- The **`a4-02-reference-capability-atoms.md` doc-comment harvest**
   (`#auto-generated-reference`) — documentation tooling, not a
   compile-time observable.
 - The **deprecated `SLANG_GLSL_VULKAN_*` aliases** (`#targets`) — the

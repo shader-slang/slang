@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00Z
 //META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=39802f60e5cbd43729c8f6fcbe4fd592b1c67772402baea64b96c029ed810241
+//META: doc_section_digest=917bf080a9394af34b7de447539625595bb7bb0f0256de58d2502cec931c41aa
 //META: purpose=Negative (doc-gap pair): `AppendStructuredBuffer<T>` on the Metal compute stage is rejected by `checkEntryPointDecorations` with diagnostic E36107, so `lowerAppendConsumeStructuredBuffers` (which the doc says fires for Metal) never produces observable text in compute emit.
 //META: intent=negative
 //META: pipeline_stage=check

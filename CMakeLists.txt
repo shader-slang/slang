@@ -220,17 +220,6 @@ advanced_option(
     ${SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT}
 )
 
-# TODO: Remove this option once SPIRV-Tools fixes the MergeReturnPass UAF:
-# https://github.com/KhronosGroup/SPIRV-Tools/issues/6711
-# Slang tracking issue: https://github.com/shader-slang/slang/issues/11146
-# Keep the source-build default ON to preserve existing SPIR-V output. Builds that need the
-# temporary workaround can set this OFF explicitly until the upstream fix lands.
-advanced_option(
-    SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
-    "Register SPIRV-Tools MergeReturnPass + InlineExhaustivePass in the slang-glslang optimizer pipeline; set OFF to opt into the temporary SPIRV-Tools#6711 workaround"
-    ON
-)
-
 option(
     SLANG_SPIRV_HEADERS_INCLUDE_DIR
     "Provide a specific path for the SPIR-V headers and grammar files"
@@ -351,6 +340,27 @@ enum_option(
     STATIC
     "Build slang-compiler as a static library"
 )
+
+set(SLANG_ENABLE_MIMALLOC_DEFAULT OFF)
+if(
+    WIN32
+    AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC"
+    AND SLANG_LIB_TYPE STREQUAL "SHARED"
+    AND NOT SLANG_ENABLE_ASAN
+)
+    set(SLANG_ENABLE_MIMALLOC_DEFAULT ON)
+endif()
+advanced_option(
+    SLANG_ENABLE_MIMALLOC
+    "Use mimalloc for global C++ allocation in slang-compiler"
+    ${SLANG_ENABLE_MIMALLOC_DEFAULT}
+)
+if(SLANG_ENABLE_MIMALLOC AND SLANG_ENABLE_ASAN)
+    message(
+        WARNING
+        "SLANG_ENABLE_MIMALLOC is enabled with SLANG_ENABLE_ASAN, but this mimalloc configuration does not enable ASan tracking"
+    )
+endif()
 
 option(
     SLANG_ENABLE_RELEASE_DEBUG_INFO
@@ -634,6 +644,13 @@ install(
     DESTINATION .
     COMPONENT metadata
     EXCLUDE_FROM_ALL
+)
+install(
+    DIRECTORY "${slang_SOURCE_DIR}/LICENSES"
+    DESTINATION .
+    COMPONENT metadata
+    EXCLUDE_FROM_ALL
+    PATTERN ".*" EXCLUDE
 )
 install(
     DIRECTORY "${slang_SOURCE_DIR}/docs/"

@@ -189,6 +189,15 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
         if (kv.key == CompilerOptionName::CoverageManifestOutput)
             continue;
 
+        // This is a load-time acceptance-policy knob, not generated shader code: it only decides
+        // whether loadModule runs isBinaryModuleUpToDate. There is no CLI spelling for it, so an
+        // offline `slangc -o *.slang-module` bakes a digest with the flag absent; a loader that
+        // enables it (its sole purpose) would otherwise fold it into the recompute and never match
+        // that baked digest, making the freshness check unable to accept any default-compiled
+        // module (issue #6557). Excluding it keeps the write/read digest symmetric.
+        if (kv.key == CompilerOptionName::UseUpToDateBinaryModule)
+            continue;
+
         builder.append(kv.key);
         builder.append(kv.value.getCount());
         for (auto& v : kv.value)
@@ -458,9 +467,16 @@ void applySettingsToDiagnosticSink(
         targetSink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
     }
 
-    // Handle diagnostic color setting
-    // The sink will handle AUTO by checking writer->isConsole()
-    targetSink->setDiagnosticColorMode(
-        (SlangDiagnosticColor)options.getIntOption(CompilerOptionName::DiagnosticColor));
+    // Handle diagnostic color setting.
+    // A sink may have settings applied from several option sets in sequence (e.g. a linkage option
+    // set followed by a component-type option set). Only apply the color mode when this set
+    // actually carries the option, so a set that does not specify it does not overwrite a mode a
+    // prior set already applied (which would reset it to the AUTO default).
+    // The sink will handle AUTO by checking writer->isConsole().
+    if (options.hasOption(CompilerOptionName::DiagnosticColor))
+    {
+        targetSink->setDiagnosticColorMode(
+            (SlangDiagnosticColor)options.getIntOption(CompilerOptionName::DiagnosticColor));
+    }
 }
 } // namespace Slang

@@ -862,5 +862,13 @@ return {
 	["Type.WorkGraphRecordTypeBase.NodeOutput"] = 886,
 	["Type.WorkGraphRecordTypeBase.NodeOutputArray"] = 887,
 	["Type.WorkGraphRecordTypeBase.EmptyNodeOutput"] = 888,
-	["Type.WorkGraphRecordTypeBase.EmptyNodeOutputArray"] = 889
+	["Type.WorkGraphRecordTypeBase.EmptyNodeOutputArray"] = 889,
+	["Decoration.shader64BitIndexing"] = 890,
+	["Decoration.synthesizedParameterGroup"] = 891,
+	["Type.UntypedResourceHandle"] = 892,
+	["Type.UntypedSamplerHandle"] = 893,
+	["CastUIntToUntypedResourceHandle"] = 894,
+	["CastUntypedResourceHandleToUInt"] = 895,
+	["CastUIntToUntypedSamplerHandle"] = 896,
+	["CastUntypedSamplerHandleToUInt"] = 897
 }
