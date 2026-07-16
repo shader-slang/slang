@@ -2284,11 +2284,18 @@ Result linkAndOptimizeIR(
         // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with
         // direct pointers
         SLANG_PASS(undoParameterCopy);
-        // Transform struct parameters to use ConstRef for better performance
+        // Transform struct parameters to use ConstRef for better performance.
+        // The `isCUDATarget` flag additionally forwards the address of read-only entry-point
+        // uniform aggregates into the borrow-in callee instead of copying the whole aggregate into
+        // a per-thread temporary - the #11774 slowdown. Gated to the CUDA family (incl. PTX/OptiX)
+        // because that depot copy is specific to how CUDA lowers a by-value kernel parameter.
         if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) ||
             isMetalTarget(targetRequest))
         {
-            SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
+            SLANG_PASS(
+                transformParamsToConstRef,
+                codeGenContext->getSink(),
+                isCUDATarget(targetRequest));
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
         [[fallthrough]];

@@ -463,6 +463,14 @@ IRBlock* getBlock(IRInst* inst);
 
 IRVarLayout* findVarLayout(IRInst* value);
 
+/// Return true if `param` is an entry-point (kernel) by-value uniform aggregate parameter: a
+/// non-varying uniform `struct`/`array` in a kernel's argument space. On CUDA its address is
+/// forwarded into a `borrow in` callee (by `transformParamsToConstRef`) instead of copying the
+/// whole aggregate into a per-thread `.local` depot - the #11774 slowdown. This is only a shape
+/// test: forwarding an address is sound solely when the destination slot is a read-only `borrow
+/// in`, which the caller must establish; a `true` result alone does not authorize a forward.
+bool isEntryPointByValueUniformAggregateParam(IRParam* param);
+
 UnownedStringSlice getBuiltinFuncName(IRInst* callee);
 KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee);
 
