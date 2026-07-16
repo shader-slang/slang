@@ -45,6 +45,10 @@ def parse_mem(text):
         if not line.startswith("[MEM]"):
             continue
         toks = line[len("[MEM]"):].strip().split("\t")
+        # Two DIFFERENT suffix contracts meet here, and the case matters:
+        # the VALUE token ends in lowercase "kb" (the api-driver's %.0fkb
+        # print format), while the counter NAME must end in capitalized
+        # "Kb" (analyze.unit_of's display-classification convention).
         if len(toks) == 2 and toks[1].endswith("kb"):
             try:
                 val = float(toks[1][:-2])
@@ -245,7 +249,11 @@ def _windows_peak_rss_kb(popen):
     """PeakWorkingSetSize of a finished subprocess in KB via
     GetProcessMemoryInfo — the Windows equivalent of POSIX ru_maxrss. Reads
     through the still-open Popen handle, so it must run before the Popen is
-    garbage-collected. Returns None if the query fails."""
+    garbage-collected. Depends on the CPython-internal `popen._handle`
+    attribute (no public accessor exists); if a CPython release renames it,
+    the AttributeError lands in the except below and Windows memory
+    collection degrades to None — check here first if rss_kb goes null on
+    the runner after a Python upgrade. Returns None if the query fails."""
     try:
         import ctypes
         from ctypes import wintypes
@@ -270,7 +278,7 @@ def _windows_peak_rss_kb(popen):
         # through a C int, which can truncate 64-bit HANDLE values.
         fn.argtypes = [wintypes.HANDLE, ctypes.POINTER(PMC), wintypes.DWORD]
         fn.restype = wintypes.BOOL
-        if fn(wintypes.HANDLE(int(popen._handle)), ctypes.byref(pmc), pmc.cb):
+        if fn(wintypes.HANDLE(popen._handle), ctypes.byref(pmc), pmc.cb):
             return pmc.PeakWorkingSetSize / 1024.0
     except Exception:  # noqa: BLE001
         pass

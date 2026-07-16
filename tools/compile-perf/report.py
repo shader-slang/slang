@@ -292,10 +292,6 @@ def main():
             panels.append(render.line_panel(
                 labels, series,
                 "createGlobalSession RSS delta (api driver)", unit="MiB"))
-        # Per-workload panels show the ABSOLUTE process peak, with the
-        # session floor drawn alongside for scale (no subtraction): the
-        # question answered is "how much memory does compiling this workload
-        # take", and the gap to the grey line is the workload's own share.
         # Each tracked workload's OWN memory: process peak minus the same
         # point's session floor — the floor panel above carries the absolute
         # story once, so subtracting it here leaves the pure workload signal

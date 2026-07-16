@@ -87,3 +87,19 @@ def line_panel(labels, series, title, unit="", width=620, height=300):
         lx += 14 + 7 * len(name)
     s.append("</svg>")
     return "".join(s)
+
+
+# Import-time self-checks (the lib/ idiom): the three silently-wrong-if-
+# broken behaviors — a lone point must draw a visible marker (the first
+# release with memory data is a single-measurement series), None gaps must
+# split rather than interpolate, and negative values must stay in-domain
+# (an RSS delta can be negative).
+_svg = line_panel(["a", "b", "c"], [("s", "#000", [None, 5.0, None])], "t")
+assert "<circle" in _svg and "<polyline" not in _svg, \
+    "line_panel: a lone point must render a circle marker"
+_svg = line_panel(["a", "b", "c", "d"], [("s", "#000", [1.0, 2.0, None, 3.0])], "t")
+assert _svg.count("<polyline") == 1 and _svg.count("<circle") == 1, \
+    "line_panel: a None gap must split into one polyline + one lone marker"
+_svg = line_panel(["a", "b"], [("s", "#000", [-3.0, 4.0])], "t")
+assert "<polyline" in _svg, "line_panel: negative values must stay drawable"
+del _svg

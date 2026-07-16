@@ -238,5 +238,42 @@ def main():
         sys.exit(1)
 
 
+# Import-time self-check for the zip-symlink extraction and its escape
+# guard (POSIX only, matching the branch in _safe_extract): a symlink member
+# must be recreated as a real symlink — zipfile's default text-file
+# placeholder is exactly the dlopen-breaking bug this fixed — and a link
+# target escaping the destination must be rejected.
+if os.name != "nt":
+    import io
+    import shutil
+    import tempfile
+
+    def _mkzip(linkto):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("lib/real.dylib", b"x")
+            info = zipfile.ZipInfo("lib/link.dylib")
+            info.external_attr = (0o120777 << 16)
+            z.writestr(info, linkto)
+        buf.seek(0)
+        return zipfile.ZipFile(buf)
+
+    _d = tempfile.mkdtemp(prefix="fetch_selfcheck_")
+    try:
+        with _mkzip("real.dylib") as _z:
+            _safe_extract(_z, _z.namelist(), _d)
+        assert os.path.islink(os.path.join(_d, "lib/link.dylib")), \
+            "zip symlink member must extract as a real symlink"
+        try:
+            with _mkzip("../../outside") as _z:
+                _safe_extract(_z, _z.namelist(), _d)
+            raise AssertionError("escaping symlink target must be rejected")
+        except SystemExit:
+            pass
+    finally:
+        shutil.rmtree(_d, ignore_errors=True)
+    del _d, _mkzip
+
+
 if __name__ == "__main__":
     main()
