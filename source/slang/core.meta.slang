@@ -3959,6 +3959,12 @@ __generic<T>
 __intrinsic_op($(kIROp_GetNaturalStride))
 int __naturalStrideOf_impl(T v);
 
+// Return the natural byte stride of `T`: the element-to-element distance used for indexing,
+// i.e. `T`'s natural size rounded up to its natural alignment. This is a *distance*, not an
+// alignment, so it need not be a power of two (e.g. `float3` is 12). Contrast
+// `__naturalAlignmentOf` (the strongest power-of-two address guarantee `T`'s natural layout
+// gives — 4 for `float3`) and `__baseAlignmentOf` (the std430 whole-type base alignment —
+// 16 for `float3`).
 __generic<T>
 [__unsafeForceInlineEarly]
 int __naturalStrideOf()
@@ -3973,14 +3979,31 @@ int __naturalAlignmentOf_impl(T v);
 // Return the largest power-of-two byte alignment that `T`'s natural layout guarantees.
 // This is the strongest alignment a value of `T` can be promised when its address is a
 // multiple of `T`'s natural stride, e.g. 16 for `float4`, 8 for `float2`/`half4`, and 4
-// for `float3` (whose 12-byte stride is not a power of two). It is the value the implicit
-// single-argument `*Aligned` byte-address accessors forward as their alignment promise so
-// that the promise is always a valid (power-of-two) alignment.
+// for `float3` (whose 12-byte stride is not a power of two). Contrast `__baseAlignmentOf`,
+// which is the (generally larger) std430 whole-type base alignment.
 __generic<T>
 [__unsafeForceInlineEarly]
 int __naturalAlignmentOf()
 {
     return __naturalAlignmentOf_impl(__declVal<T>());
+}
+
+__generic<T>
+__intrinsic_op($(kIROp_GetBaseAlignment))
+int __baseAlignmentOf_impl(T v);
+
+// Return the std430 *base alignment* of `T`: the alignment `T` would receive as a member of
+// a std430-laid-out buffer, where a 3-component vector is rounded up to its 4-component base
+// alignment (e.g. 16 for `float3`/`float4`, 8 for `float2`, 4 for `float`, and the maximum of
+// the members' base alignments for a struct). Unlike `__naturalAlignmentOf` (4 for `float3`),
+// this is the alignment at which a whole `float3` can be loaded/stored with a single wide
+// access, so it is the promise the implicit single-argument `*Aligned` byte-address accessors
+// forward.
+__generic<T>
+[__unsafeForceInlineEarly]
+int __baseAlignmentOf()
+{
+    return __baseAlignmentOf_impl(__declVal<T>());
 }
 
 [__unsafeForceInlineEarly]

@@ -302,6 +302,25 @@ struct ByteAddressBufferLegalizationContext
             return;
         }
 
+        // The promise clears the natural-alignment floor, but a promise below the access type's
+        // *base* (std430 whole-type) alignment cannot cover the type in a single wide access and
+        // will be split into narrower loads/stores. That is valid but suboptimal, so we warn
+        // rather than error: e.g. `LoadAligned<float3>(loc, 8)` is legal (8 >= the 4-byte scalar
+        // floor) but below `float3`'s base alignment of 16, so it scalarizes. The base alignment
+        // of a power-of-two-sized type (scalar, `float2`, `float4`) equals its natural alignment,
+        // so this never fires for those and only flags the genuinely-narrow vec3-shaped promises.
+        IRSizeAndAlignment baseSizeAlignment;
+        if (SLANG_SUCCEEDED(getStd430SizeAndAlignment(m_target, accessType, &baseSizeAlignment)) &&
+            baseSizeAlignment.alignment > 0 && alignmentVal < baseSizeAlignment.alignment)
+        {
+            m_sink->diagnose(Diagnostics::ByteAddressBufferAlignmentBelowBase{
+                .alignment = alignmentVal,
+                .baseAlignment = baseSizeAlignment.alignment,
+                .location = baseOffset->sourceLoc,
+            });
+            // Not an error: fall through so the location check still runs.
+        }
+
         // The alignment promise is itself valid; a compile-time-constant location must honor it.
         if (auto baseOffsetLit = as<IRIntLit>(baseOffset))
         {
@@ -314,6 +333,27 @@ struct ByteAddressBufferLegalizationContext
                 });
             }
         }
+    }
+
+    // Return the granularity at which a whole value of `type` can be loaded/stored in a single wide
+    // access: its std430 *stride*. This is deliberately the same quantity the structured-buffer
+    // index division uses (`offset / stride` in `emitSimpleLoad`/`emitSimpleStore`), so the
+    // wide-vs-scalarized decision and the emitted index stay consistent — a value only takes the
+    // whole-value wide path when its offset is an exact multiple of the stride the wide access then
+    // indexes by. For a 3-component vector the std430 stride is 16 (the 12-byte natural span
+    // rounded up to the 16-byte base alignment), so a 16-aligned `float3` wide-loads instead of
+    // scalarizing; for a power-of-two-lane vector the stride equals the natural span (`float2` ->
+    // 8, `float4` -> 16), preserving existing behavior. For an array the stride is the full padded
+    // span
+    // (`float4[2]` -> 32, not the 16-byte element alignment), so a merely-16-aligned array
+    // correctly scalarizes into per-element wide accesses rather than mis-indexing a whole-array
+    // access. Falls back to 0 (the "cannot prove aligned" sentinel) if layout computation fails.
+    IRIntegerValue getWideAccessStride(IRType* type)
+    {
+        IRSizeAndAlignment sizeAlignment;
+        if (SLANG_FAILED(getStd430SizeAndAlignment(m_target, type, &sizeAlignment)))
+            return 0;
+        return sizeAlignment.getStride();
     }
 
     // Returns true if a vectorized `accessSize`-byte access at `baseOffset + immediateOffset` is
@@ -502,15 +542,14 @@ struct ByteAddressBufferLegalizationContext
             if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
                 // Emit an aligned load operation on an array when using a LoadAligned inst.
-                // Else, fallback to scalarizing the loads.
-                IRSizeAndAlignment elementLayout;
-                SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
-                    m_target,
-                    arrayType->getElementType(),
-                    &elementLayout));
-                IRIntegerValue elementStride = elementLayout.getStride();
-                auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                // Else, fallback to scalarizing the loads. As with vectors, the wide-vs-scalarized
+                // decision uses the std430 stride (see `getWideAccessStride`), which the
+                // structured- buffer index division also uses, so a whole-array wide access is only
+                // taken when the offset is an exact multiple of that stride. When it is not, the
+                // load recurses per element, and each element (e.g. a `float4`) can still take its
+                // own wide path.
+                IRIntegerValue accessStride = getWideAccessStride(type);
+                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, accessStride))
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -614,15 +653,16 @@ struct ByteAddressBufferLegalizationContext
             {
                 // Emit an aligned vector load operation when using a LoadAligned inst.
                 // Else, fallback to scalarizing the loads.
-                IRSizeAndAlignment elementLayout;
-                SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
-                    m_target,
-                    vecType->getElementType(),
-                    &elementLayout));
-                IRIntegerValue elementStride = elementLayout.getStride();
-                auto alignmentVal = elementStride * elementCountInst->getValue();
+                //
+                // A single wide load requires the address to be aligned to the vector's *base*
+                // (std430 whole-type) alignment, so we decide against that, not the natural span
+                // (`elementStride * count`). They agree for power-of-two-lane vectors (`float2`
+                // -> 8, `float4` -> 16), but a `float3` has a 12-byte span and a 16-byte base
+                // alignment; using the span would reject a legitimately 16-aligned `float3` and
+                // force scalar loads, so we use the base alignment to let it wide-load.
+                IRIntegerValue accessStride = getWideAccessStride(vecType);
                 if (m_options.scalarizeVectorLoadStore ||
-                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, accessStride))
                 {
                     return emitLegalSequenceLoad(
                         type,
@@ -874,8 +914,14 @@ struct ByteAddressBufferLegalizationContext
                 // the thing we are trying to load, and we need to translate
                 // that into an *index* for use with a structured buffer.
                 //
-                // We convert the offset to an index by dividing by the
-                // stride of `type` as computed with our "natural layout" rules.
+                // We convert the offset to an index by dividing by the stride of `type` as laid
+                // out *in that structured buffer*. The equivalent structured buffer is only used on
+                // the targets that translate byte-address ops (GLSL/SPIR-V), whose runtime array
+                // elements use the std430 array stride — so the divisor is the std430 stride, not
+                // the natural stride. They differ for a 3-component vector: `vec3` has natural
+                // stride 12 but std430 array stride 16 (`OpDecorate ... ArrayStride 16`), so a
+                // base-aligned wide `float3` access (now permitted) must divide by 16 to index the
+                // right element, not 12.
                 //
                 // This logic will be invalid if `offset` isn't a multiple of
                 // the stride of `type`, but that case would have been
@@ -884,7 +930,7 @@ struct ByteAddressBufferLegalizationContext
                 auto offsetType = offset->getDataType();
 
                 IRSizeAndAlignment typeLayout;
-                SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &typeLayout));
+                SLANG_RETURN_NULL_ON_FAIL(getStd430SizeAndAlignment(m_target, type, &typeLayout));
                 auto typeStrideVal = typeLayout.getStride();
 
                 auto typeStrideInst = m_builder.getIntValue(offsetType, typeStrideVal);
@@ -1463,15 +1509,12 @@ struct ByteAddressBufferLegalizationContext
             if (auto elementCountInst = as<IRIntLit>(arrayType->getElementCount()))
             {
                 // Emit an aligned store operation on an array when using a StoreAligned inst.
-                // Else, fallback to scalarizing the stores.
-                IRSizeAndAlignment elementLayout;
-                SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
-                    m_target,
-                    arrayType->getElementType(),
-                    &elementLayout));
-                IRIntegerValue elementStride = elementLayout.getStride();
-                auto alignmentVal = elementStride * elementCountInst->getValue();
-                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                // Else, fallback to scalarizing the stores. As in the array load path, the wide-vs-
+                // scalarized decision uses the std430 stride so it stays consistent with the index
+                // division; a whole-array wide store is only taken when the offset is an exact
+                // multiple of that stride, otherwise the store recurses per element.
+                IRIntegerValue accessStride = getWideAccessStride(type);
+                if (!isWideAccessAligned(baseOffset, immediateOffset, alignment, accessStride))
                 {
                     return emitLegalSequenceStore(
                         buffer,
@@ -1572,16 +1615,13 @@ struct ByteAddressBufferLegalizationContext
             {
                 // Emit an aligned vector store operation when using a StoreAligned inst.
                 // Else, fallback to scalarizing the stores.
-
-                IRSizeAndAlignment elementLayout;
-                SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
-                    m_target,
-                    vecType->getElementType(),
-                    &elementLayout));
-                IRIntegerValue elementStride = elementLayout.getStride();
-                auto alignmentVal = elementStride * elementCountInst->getValue();
+                //
+                // As in the load path, a single wide store requires the address to be aligned to
+                // the vector's *base* (std430 whole-type) alignment (16 for `float3`), not its
+                // 12-byte natural span, so a 16-aligned `float3` stores in one wide access.
+                IRIntegerValue accessStride = getWideAccessStride(vecType);
                 if (m_options.scalarizeVectorLoadStore ||
-                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, alignmentVal))
+                    !isWideAccessAligned(baseOffset, immediateOffset, alignment, accessStride))
                 {
                     return emitLegalSequenceStore(
                         buffer,
@@ -1705,10 +1745,14 @@ struct ByteAddressBufferLegalizationContext
                 // "equivalent" buffer to use, we emit a structured-buffer store,
                 // with an index computed by dividing the offset by the stride.
                 //
+                // As in `emitSimpleLoad`, the divisor is the std430 array stride the equivalent
+                // structured buffer element is declared with (GLSL/SPIR-V array elements), not the
+                // natural stride, so a base-aligned wide `float3` store indexes by 16, not 12.
+                //
                 auto indexType = offset->getDataType();
 
                 IRSizeAndAlignment typeLayout;
-                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &typeLayout));
+                SLANG_RETURN_ON_FAIL(getStd430SizeAndAlignment(m_target, type, &typeLayout));
 
                 auto typeStride = m_builder.getIntValue(indexType, typeLayout.getStride());
 

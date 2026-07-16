@@ -864,5 +864,6 @@ return {
 	["Type.WorkGraphRecordTypeBase.EmptyNodeOutput"] = 888,
 	["Type.WorkGraphRecordTypeBase.EmptyNodeOutputArray"] = 889,
 	["Decoration.shader64BitIndexing"] = 890,
-	["getNaturalAlignment"] = 891
+	["getNaturalAlignment"] = 891,
+	["getBaseAlignment"] = 892
 }

@@ -1823,6 +1823,42 @@ struct PeepholeContext : InstPassBase
                 }
                 break;
             }
+        case kIROp_GetBaseAlignment:
+            {
+                if (targetProgram)
+                {
+                    if (isInGeneric)
+                        break;
+                    auto type = inst->getOperand(0)->getDataType();
+                    IRSizeAndAlignment sizeAlignment;
+                    // The std430 base alignment is the alignment `T` receives as a buffer
+                    // member: a 3-component vector is rounded up to its 4-component base
+                    // alignment (e.g. `float3` -> 16), so a whole value can be accessed with
+                    // a single wide load. This is the promise the single-argument `*Aligned`
+                    // accessors forward. We read `.alignment` (already a power of two under
+                    // std430), not the stride, so a trailing-padded aggregate such as
+                    // `struct { int2; float4; }` reports its base alignment 16, not its
+                    // 32-byte stride.
+                    const auto res = getStd430SizeAndAlignment(
+                        targetProgram->getTargetReq(),
+                        type,
+                        &sizeAlignment);
+                    if (!SLANG_SUCCEEDED(res))
+                        break;
+                    SLANG_ASSERT(sizeAlignment.alignment > 0);
+
+                    IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
+                    builder.setInsertBefore(inst);
+                    auto alignmentVal =
+                        builder.getIntValue(inst->getDataType(), sizeAlignment.alignment);
+                    inst->replaceUsesWith(alignmentVal);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
         case kIROp_IsInt:
         case kIROp_IsFloat:
         case kIROp_IsHalf:
