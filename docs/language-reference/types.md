@@ -7,6 +7,7 @@ Slang types:
 * [Enumerations](types-enum.md)
 * [Extensions](types-extension.md)
 * [Array Types](types-array.md)
+* [Tuple Types](types-tuple.md) (Slang 2026)
 * [Optional Types](types-optional.md)
 * [Pointers](types-pointer.md)
 * [Interfaces](types-interface.md)

@@ -773,6 +773,18 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
 
     options.targetType = (SlangCompileTarget)target;
 
+    // When compiling emitted MSL down to a metallib, tell the metal compiler which language
+    // standard to use. This must match the metallib capability the emitter honored: the emitter
+    // gates version-specific syntax such as `[[required_threads_per_threadgroup]]` on
+    // `metallib_4_0` (see MetalSourceEmitter::emitEntryPointAttributesImpl), so if the target
+    // implies metal4.0 we must compile with `-std=metal4.0` or the metal compiler rejects that
+    // syntax. Leaving the version unset preserves the compiler's historical default standard.
+    if (compilerType == PassThroughMode::MetalC &&
+        getTargetCaps().implies(CapabilityAtom::metallib_4_0))
+    {
+        options.metalLanguageVersion = SemanticVersion(4, 0);
+    }
+
     // Need to configure for the compilation
 
     {

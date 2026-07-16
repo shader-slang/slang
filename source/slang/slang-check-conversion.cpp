@@ -747,7 +747,14 @@ bool SemanticsVisitor::createCtorInvokeExprForAbstractType(
     return true;
 }
 
-// translation from initializer list to constructor invocation if the struct has constructor.
+// Try to coerce an initializer list to `toType` by invoking one of `toType`'s
+// explicit constructors, e.g. turning `float3 v = {a, b}` into `float3(a, b)`.
+// Returns whether such a coercion is possible. The return value must be the same
+// whether or not `outExpr` is requested: overload resolution first calls this with
+// `outExpr == nullptr` to probe whether a candidate is viable (see `canCoerce`),
+// then again with `outExpr` set to actually build the expression. Reporting success
+// only when `outExpr` is non-null would make the viability probe a false negative and
+// reject an otherwise-valid candidate.
 bool SemanticsVisitor::createInvokeExprForExplicitCtor(
     Type* toType,
     InitializerListExpr* fromInitializerListExpr,
@@ -798,11 +805,17 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                 return false;
             }
 
+            // The explicit constructor matched and type-checked, so this is a
+            // valid coercion. Report success even when no output expression was
+            // requested (e.g. the `canCoerce` viability probe passes
+            // `outExpr == nullptr`); otherwise overload resolution would treat
+            // the conversion as impossible and reject an otherwise-viable
+            // candidate. This mirrors `createInvokeExprForSynthesizedCtor` and
+            // `createCtorInvokeExprForAbstractType`, which return `true`
+            // independent of `outExpr`.
             if (outExpr)
-            {
                 *outExpr = ctorInvokeExpr;
-                return true;
-            }
+            return true;
         }
     }
     return false;
@@ -2149,6 +2162,46 @@ bool SemanticsVisitor::_coerce(
                 *outToExpr = rsExpr;
             }
             return true;
+        }
+    }
+
+    // The reverse direction is not an implicit conversion, but explicit cast/constructor syntax
+    // (`EnumTag(x)` or `(EnumTag)x`) should first coerce `x` to the enum's tag type and then wrap
+    // that tag value in the nominal enum type.
+    if (site == CoercionSite::ExplicitCoercion)
+    {
+        if (auto toEnumDeclRef = isDeclRefTypeOf<EnumDecl>(toType))
+        {
+            auto tagType = getTagType(m_astBuilder, toEnumDeclRef);
+            if (!tagType)
+                return false;
+
+            Expr* tagExpr = nullptr;
+            ConversionCost tagCost = kConversionCost_None;
+            if (_coerce(
+                    site,
+                    tagType,
+                    outToExpr ? &tagExpr : nullptr,
+                    fromType,
+                    fromExpr,
+                    sink,
+                    &tagCost,
+                    nullptr))
+            {
+                if (outCost)
+                    *outCost = tagCost + kConversionCost_Explicit;
+                if (outToExpr)
+                {
+                    auto enumExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                    enumExpr->type = toType;
+                    if (fromExpr)
+                        enumExpr->loc = fromExpr->loc;
+                    enumExpr->base = tagExpr;
+                    *outToExpr = enumExpr;
+                }
+                setWitnessOfConversionToBuiltinConversion();
+                return true;
+            }
         }
     }
 

@@ -248,6 +248,25 @@ jobs:
             ccache --show-stats || true
           fi
 
+      - name: Verify Vulkan-Headers was not fetched
+        if: inputs.platform != 'wasm'
+        run: |
+          vulkan_headers_fetch_dir="build/_deps/vulkan_headers-src"
+          if [[ -e "$vulkan_headers_fetch_dir" ]]; then
+            echo "::error title=Unexpected Vulkan-Headers download::Found $vulkan_headers_fetch_dir"
+            cat <<'EOF'
+          Slang owns the Vulkan-Headers checkout in external/vulkan. external/CMakeLists.txt sets
+          FETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS so slang-rhi reuses that checkout instead of
+          downloading a second copy. Finding build/_deps/vulkan_headers-src means that redirect
+          stopped working. The two projects could then compile against different Vulkan header
+          versions.
+
+          Check that FETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS is set before add_subdirectory(slang-rhi)
+          and that slang-rhi still declares the FetchContent dependency as vulkan_headers.
+          EOF
+            exit 1
+          fi
+
       - name: Check documented compiler versions
         run: bash extras/verify-documented-compiler-version.sh
 

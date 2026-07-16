@@ -372,7 +372,6 @@ static_assert(
     "GenericArgumentInferenceFailure must be trivially copyable");
 
 DeclRefIntVal* getDeclRefIntValIgnoringCasts(IntVal* intVal);
-bool arePackCountExpectedCountsEqual(ASTBuilder* astBuilder, IntVal* left, IntVal* right);
 
 struct OverloadCandidate
 {
@@ -2269,7 +2268,7 @@ public:
         RefPtr<WitnessTable> witnessTable);
 
     bool doesTypeSatisfyConstraintRequirements(
-        DeclRef<ContainerDecl> requiredAssociatedTypeDeclRef,
+        DeclRef<ContainerDecl> requirementDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
     bool doesTypeSatisfyAssociatedTypeRequirement(
@@ -2435,8 +2434,18 @@ public:
         RefPtr<WitnessTable> witnessTable,
         MethodWitnessSynthesisFailureDetails* outFailureDetails = nullptr);
 
-    /// Clone generic containers.
-    DeclRef<Decl> liftDeclFromGenericContainers(Decl* decl, SubstitutionSet& outSubst);
+    /// Clone the generic containers that make `decl` well-scoped after relocation.
+    ///
+    /// Generated interface requirements can be moved from a callable's local generic context to a
+    /// sibling requirement on the interface. This clones the enclosing generic signatures, rewrites
+    /// references from the source binders to the cloned binders, and returns a decl-ref that maps
+    /// the source environment to the relocated declaration. `destinationParentDecl` lets callers
+    /// place the cloned generic chain under the semantic owner that should contain the generated
+    /// declaration.
+    DeclRef<Decl> liftDeclFromGenericContainers(
+        Decl* decl,
+        SubstitutionSet& outSubst,
+        ContainerDecl* destinationParentDecl = nullptr);
 
     enum SynthesisPattern
     {
@@ -2806,9 +2815,25 @@ public:
 
     DeclRef<Decl> getRequirementAsLookedUpDecl(ASTBuilder* astBuilder, Decl* decl);
 
+    /// Calculate the builtin differentiable function interface type for a callable-as-type.
+    ///
+    /// The plain overloads derive the type-info witness from `baseFuncAsType`. The
+    /// `WithWitness` overloads are used when conformance checking already selected a specific
+    /// witness, so the computed interface type stays tied to that proof instead of re-synthesizing
+    /// a different one.
     FuncType* getCalculatedDiffFuncType(const char* magicCalcName, Type* baseFuncAsType)
     {
         Val* args[] = {baseFuncAsType, getDiffTypeInfoWitness(baseFuncAsType)};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, typeInfoWitness};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -2823,6 +2848,17 @@ public:
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
 
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* operand1,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, operand1, typeInfoWitness};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
     FuncType* getCalculatedDiffFuncType(
         const char* magicCalcName,
         Type* baseFuncAsType,
@@ -2830,6 +2866,18 @@ public:
         Type* operand2)
     {
         Val* args[] = {baseFuncAsType, operand1, operand2, getDiffTypeInfoWitness(baseFuncAsType)};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
+    FuncType* getCalculatedDiffFuncTypeWithWitness(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* operand1,
+        Type* operand2,
+        Witness* typeInfoWitness)
+    {
+        Val* args[] = {baseFuncAsType, operand1, operand2, typeInfoWitness};
         return as<FuncType>(
             m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
@@ -3024,6 +3072,22 @@ public:
         // joining. The generic solver drains and clears this list whenever it
         // needs to pull newly discovered constraints into the iterative loop.
         ShortList<SolverConstraint, 8> discoveredConstraints;
+
+        // Hidden witness arguments discovered while unifying full generic-app
+        // decl-refs. Consider this example:
+        //
+        //     interface ITensor<T, int D>
+        //     {
+        //         T load<each TIndex>(TIndex indices)
+        //             where TIndex == int
+        //             where countof(TIndex) == D;
+        //     }
+        //
+        // A use site for this requirement already carries proof arguments for `load`'s source
+        // generic constraints. When that lookup resolves to a satisfying method, the solver should
+        // preserve those proof arguments instead of recomputing them from default declaration
+        // context.
+        Dictionary<Decl*, Val*> discoveredWitnessArgs;
 
         // Additional subtype witnesses available to the current constraint solving context.
         Type* subTypeForAdditionalWitnesses = nullptr;
@@ -3701,8 +3765,12 @@ public:
         ASTBuilder* astBuilder,
         DeclRef<InterfaceDecl> interfaceDeclRef);
 
-    bool doesCalleeHaveFwdDiff(DeclRef<CallableDecl> declRef);
-    bool doesCalleeHaveBwdDiff(DeclRef<CallableDecl> declRef);
+    // Differentiability of a function is represented by conformance of the function-as-type to
+    // `IForwardDifferentiable`/`IBackwardDifferentiable`. Query that conformance directly instead
+    // of probing for the `fwd_diff`/`bwd_diff` associated-function entries; those entries are
+    // witnesses produced by the conformance, not the source of truth.
+    SubtypeWitness* isFuncForwardDifferentiable(DeclRef<CallableDecl> declRef);
+    SubtypeWitness* isFuncBackwardDifferentiable(DeclRef<CallableDecl> declRef);
 };
 
 
@@ -4125,13 +4193,13 @@ Witness* findNonEmptyPackWitnessForConstraint(
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError);
 
-// Return the witness that proves `countof(constrainedArg) == expectedCount`,
-// or `nullptr` if the concrete count or an in-scope declared constraint cannot
-// prove that equality.
+// Return the witness that proves `actualCount == expectedCount`, or `nullptr`
+// if the concrete count or an in-scope declared constraint cannot prove that
+// equality.
 Witness* findVariadicPackCountWitnessForConstraint(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
-    Val* constrainedArg,
+    IntVal* actualCount,
     IntVal* expectedCount,
     SemanticsVisitor::OverloadResolveContext* maybeContext,
     bool shouldEmitError);
