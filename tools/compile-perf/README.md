@@ -320,10 +320,12 @@ peak RSS lands in results.json for every workload (deep dives never need
 a re-bench), but `analyze.canonical_runs` promotes memory into the
 tracked counter series (`peakRssKb`,
 `apiCreateGlobalSessionRssDeltaKb`) only for workloads the manifest
-flags with `track_memory` — `minimal` (the session floor), `mdl_dxr`
-(the realistic corpus), and `api_session_create` (the #9817 delta) —
-because most workloads' peaks are floor-bound and would just re-draw
-the floor across dozens of panels and alert series. The tracked series
+flags with `track_memory` — `minimal` (the session floor, the #9817
+headline) and the realistic end-to-end workloads (`mdl_dxr`,
+`rt_renderer`, `rt_renderer_specialize`; the rt api-driver runs also
+carry the createGlobalSession RSS delta) — because most workloads'
+peaks are floor-bound and would just re-draw the floor across dozens
+of panels and alert series. The tracked series
 feed the nightly trend check (1 MiB absolute floor, same ratio gate)
 and the progress tables like timers; `analyze.unit_of`/`fmt_qty` keep
 kilobytes from rendering as milliseconds. The site presents memory on `memory-{tot,releases}.html` as a compact

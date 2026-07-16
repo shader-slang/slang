@@ -346,7 +346,7 @@ _rec = {
     "memory": {"apiCreateGlobalSessionRssDeltaKb": {"median": 7.0}},
     "timers": {"compileInner": {"median": 1.0}},
 }
-_mr = canonical_runs([dict(_rec, workload="api_session_create")])
+_mr = canonical_runs([dict(_rec, workload="rt_renderer")])
 assert _mr[0]["timers"]["peakRssKb"] == {"median": 5.0}
 assert _mr[0]["timers"]["apiCreateGlobalSessionRssDeltaKb"] == {"median": 7.0}
 assert _mr[0]["timers"]["compileInner"] == {"median": 1.0}, "originals preserved"

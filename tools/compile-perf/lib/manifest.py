@@ -45,11 +45,10 @@ class WorkloadSpec:
     # pages. Raw rss_kb is RECORDED for every workload regardless (free, and
     # preserved in results.json for deep dives); tracking is curated because
     # most workloads' peaks are floor-bound and just re-draw the session
-    # floor. The tracked set: minimal (the floor itself), the realistic
-    # end-to-end workloads (mdl_dxr and the rt renderers), the
-    # createGlobalSession delta carrier (api_session_create,
-    # shader-slang/slang#9817), and the microbenchmarks with meaningful
-    # own memory (parse, sema_generics, autodiff, operator_typecheck).
+    # floor. The tracked set is the most user-relevant three: minimal (the
+    # session floor itself — the shader-slang/slang#9817 headline) and the
+    # realistic end-to-end workloads (mdl_dxr and the rt renderers, whose
+    # api-driver runs also carry the createGlobalSession RSS delta).
     track_memory: bool = False
     # emit reflection JSON (bench.py supplies a writable per-run path). Exercises
     # the reflection serializer in addition to the layout engine.
@@ -165,7 +164,6 @@ WORKLOADS = [
     ),
     WorkloadSpec(
         name="api_session_create",
-        track_memory=True,
         bucket="api_overhead",
         gen=workloads.gen_api_none,
         default_size=10,  # createGlobalSession+createSession iterations
@@ -249,7 +247,6 @@ WORKLOADS = [
     # ---- core compiler-stage buckets --------------------------------------
     WorkloadSpec(
         name="parse",
-        track_memory=True,
         bucket="parse",
         gen=workloads.gen_parse,
         default_size=2000,
@@ -269,7 +266,6 @@ WORKLOADS = [
     ),
     WorkloadSpec(
         name="sema_generics",
-        track_memory=True,
         bucket="sema",
         gen=workloads.gen_sema_generics,
         default_size=1000,
@@ -330,7 +326,6 @@ WORKLOADS = [
     # isolate this (uniform types / generic-constraint cost dominate there).
     WorkloadSpec(
         name="operator_typecheck",
-        track_memory=True,
         bucket="typecheck",
         gen=workloads.gen_operator_typecheck,
         default_size=800,
@@ -426,7 +421,6 @@ WORKLOADS = [
     # ---- suspected-regression features -----------------------------------
     WorkloadSpec(
         name="autodiff",
-        track_memory=True,
         bucket="autodiff",
         gen=workloads.gen_autodiff,
         default_size=200,
