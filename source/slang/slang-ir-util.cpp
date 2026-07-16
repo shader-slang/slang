@@ -2469,25 +2469,23 @@ void verifyComputeDerivativeGroupModifiers(
             Diagnostics::OnlyOneOfDerivativeGroupLinearOrQuadCanBeSet{.location = errorLoc});
     }
 
-    IRIntegerValue x = 1;
-    IRIntegerValue y = 1;
-    IRIntegerValue z = 1;
-    if (numThreadsDecor->getX())
-        x = numThreadsDecor->getX()->getValue();
-    if (numThreadsDecor->getY())
-        y = numThreadsDecor->getY()->getValue();
-    if (numThreadsDecor->getZ())
-        z = numThreadsDecor->getZ()->getValue();
+    // A thread-group axis can only be validated when it is a compile-time literal.
+    // Specialization constants (`OpExecutionModeId LocalSizeId`) must be validated at
+    // pipeline creation time.
+    IRIntLit* xLit = numThreadsDecor->getX();
+    IRIntLit* yLit = numThreadsDecor->getY();
+    IRIntLit* zLit = numThreadsDecor->getZ();
 
     if (quadAttr)
     {
-        if (x % 2 != 0 || y % 2 != 0)
+        if ((xLit && xLit->getValue() % 2 != 0) || (yLit && yLit->getValue() % 2 != 0))
             sink->diagnose(
                 Diagnostics::DerivativeGroupQuadMustBeMultiple2ForXyThreads{.location = errorLoc});
     }
     else if (linearAttr)
     {
-        if ((x * y * z) % 4 != 0)
+        if (xLit && yLit && zLit &&
+            (xLit->getValue() * yLit->getValue() * zLit->getValue()) % 4 != 0)
             sink->diagnose(Diagnostics::DerivativeGroupLinearMustBeMultiple4ForTotalThreadCount{
                 .location = errorLoc});
     }
