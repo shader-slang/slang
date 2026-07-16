@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tempfile
 import time
 
-from lib import manifest
+from lib import analyze, manifest
 
 
 def parse_timers(text):
@@ -76,6 +76,20 @@ def stats(values):
 PERF_FLAG = "-report-perf-benchmark"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+# slangc infers the requested artifact from the -o extension for some targets
+# (and per-entry-point output binding for the text targets), so the output name
+# must match the -target rather than always being out.spv.
+_TARGET_EXT = {"spirv": "spv", "dxil": "dxil", "ptx": "ptx", "metal": "metal",
+               "wgsl": "wgsl", "hlsl": "hlsl", "glsl": "glsl", "cuda": "cu"}
+
+
+def _target_ext(extra_flags):
+    for i, flag in enumerate(extra_flags):
+        if flag == "-target" and i + 1 < len(extra_flags):
+            return _TARGET_EXT.get(extra_flags[i + 1], "out")
+    return "spv"
 
 
 def find_libslang(slangc):
@@ -187,7 +201,7 @@ def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
     # per-run output path so the layout/reflection serializer is exercised without
     # polluting the results directory.
     f = spec.main_file or main or list(files)[0]
-    out = os.path.join(gen_dir, "out.spv")
+    out = os.path.join(gen_dir, "out." + _target_ext(spec.extra_flags))
     extra = list(spec.extra_flags)
     # reflection JSON needs a writable path; gen_dir is per-run and writable.
     if getattr(spec, "reflection_json", False):
@@ -231,7 +245,7 @@ def run_once(cmd):
     rss = None
     if memfile:
         try:
-            with open(memfile) as fh:
+            with open(memfile, encoding="utf-8", errors="replace") as fh:
                 for line in fh:
                     if "Maximum resident set size" in line:
                         rss = float(line.rsplit(":", 1)[1].strip())  # kbytes
@@ -246,16 +260,23 @@ def run_once(cmd):
 # hosts that lack it. Release tarballs bundle these, so they usually don't fire.
 _BENIGN = ("E00100", "E52002", "spirv-opt", "spirv-dis", "slang-glslang",
            "failed to load downstream", "pass-through compiler not found")
+# For downstream_required workloads a missing downstream compiler is THE
+# failure being guarded against, not noise: slangc can emit its internal
+# timers before the downstream handoff, so without this the run would record
+# timers and report OK with no DXIL/PTX ever produced. Only genuinely
+# irrelevant tool noise stays benign.
+_BENIGN_DOWNSTREAM_REQUIRED = ("E52002", "spirv-opt", "spirv-dis", "slang-glslang")
 # Matches the modern "error[E30015]:" and legacy "error 30015:" slangc formats,
 # plus the api-driver's bare "error: ..." lines.
 _ERR_RE = re.compile(r"error\[|: error:|\berror \d+:|^error: ")
 
 
-def real_error(text):
+def real_error(text, benign=_BENIGN):
     """A genuine compile error in either the modern or legacy slangc format,
-    ignoring benign missing-downstream-tool diagnostics."""
+    ignoring the given benign diagnostics (by default, missing-downstream-tool
+    noise; downstream_required workloads pass a stricter set)."""
     for line in text.splitlines():
-        if _ERR_RE.search(line) and not any(b in line for b in _BENIGN):
+        if _ERR_RE.search(line) and not any(b in line for b in benign):
             return line.strip()
     return None
 
@@ -267,7 +288,17 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
     os.makedirs(gen_dir, exist_ok=True)
     files = spec.gen(size)
     for fn, src in files.items():
-        with open(os.path.join(gen_dir, fn), "w") as fh:
+        # Fail-loud guard for the byte-determinism invariant (see _HEADER in
+        # workloads.py): a typographic character anywhere in a GENERATED
+        # source would silently make the corpus bytes platform-dependent.
+        # External corpora are exempt — they are third-party input read with
+        # a tolerant decode, not something our generators promise about.
+        # A raise, not an assert: the contract must hold under python -O too.
+        if not spec.external_corpus and not src.isascii():
+            raise ValueError(
+                f"generated source {fn} contains non-ASCII; generators must "
+                f"emit ASCII only so the corpus is byte-identical everywhere")
+        with analyze.open_output(os.path.join(gen_dir, fn)) as fh:
             fh.write(src)
 
     # An api workload without a driver+libslang must fail loudly (not silently
@@ -296,6 +327,9 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
             rc = 1
         if rc != 0:
             setup_ok = False
+
+    benign = (_BENIGN_DOWNSTREAM_REQUIRED
+              if getattr(spec, "downstream_required", False) else _BENIGN)
 
     timed = cmds["timed"]
     for _ in range(warmup):
@@ -328,12 +362,12 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
         walls.append(wall)
         if rss is not None:
             rsses.append(rss)
-        err = real_error(text)
+        err = real_error(text, benign)
         sample_ok.append(err is None)  # ok when no compile error
         for name, ms in parse_timers(text).items():
             per_timer.setdefault(name, []).append(ms)
 
-    err = real_error(last_text)
+    err = real_error(last_text, benign)
     got_timers = bool(per_timer)
     # A run that produced no timers and no recognizable diagnostic would report
     # a bare "no timers" with the actual output lost — surface the first output
@@ -374,6 +408,8 @@ def main():
     ap.add_argument("--warmup", type=int, default=1)
     ap.add_argument("--only", default=None,
                     help="comma-separated workload names to run (default all)")
+    ap.add_argument("--sweep", action="store_true",
+                    help="run each workload's sweep_sizes instead of default_size")
     ap.add_argument("--gen-dir", default=None,
                     help="scratch dir for generated sources + compiled outputs "
                          "(default: a tempdir, auto-removed — keeps the results dir, which "
@@ -400,6 +436,17 @@ def main():
     specs = manifest.WORKLOADS
     if not args.api and not args.only:
         specs = [s for s in specs if s.mode != "api"]
+    # Platform-bound workloads (downstream toolchains like dxc/nvrtc) leave the
+    # default set on other platforms; naming one in --only runs it regardless —
+    # explicit intent fails loudly if the tool is genuinely absent.
+    if not args.only:
+        skipped = [s2.name for s2 in specs
+                   if s2.platforms and sys.platform not in s2.platforms]
+        if skipped:
+            print(f"[skip] platform-bound workloads not on {sys.platform}: "
+                  + ", ".join(skipped))
+        specs = [s2 for s2 in specs
+                 if not s2.platforms or sys.platform in s2.platforms]
     if args.only:
         want = set(args.only.split(","))
         specs = [s for s in specs if s.name in want]
@@ -428,10 +475,26 @@ def main():
 
     records = []
     for spec in specs:
-        sizes = [spec.default_size]
+        sizes = spec.sweep_sizes if (args.sweep and spec.sweep_sizes) else [spec.default_size]
         for size in sizes:
             print(f"[run] {spec.name:18s} n={size:<5d} ", end="", flush=True)
-            rec = run_spec(slangc, spec, size, args.samples, args.warmup, gen_root, api=api)
+            # ANY generator/run failure (missing corpus, a generator bug, a
+            # bad manifest field) must cost ONE workload, not the whole run's
+            # results: everything measured before it would be lost, since
+            # results.json is written at the end. Record the failure and keep
+            # going; bench still exits non-zero at the end via the ok-count.
+            try:
+                rec = run_spec(slangc, spec, size, args.samples, args.warmup, gen_root,
+                               api=api)
+            except Exception as e:  # noqa: BLE001 — isolation is the contract
+                rec = {
+                    "workload": spec.name, "bucket": spec.bucket, "size": size,
+                    "mode": spec.mode, "ok": False, "setup_ok": False,
+                    "got_timers": False, "samples": args.samples,
+                    "warmup": args.warmup, "wall_ms": None, "rss_kb": None,
+                    "timers": {}, "primary_timers": spec.primary_timers,
+                    "cmd": "", "error": str(e), "crash_codes": None,
+                }
             rec["label"] = args.label
             rec["slangc"] = slangc
             records.append(rec)
@@ -447,13 +510,13 @@ def main():
     this_run = records  # workloads run this invocation (for the summary/exit)
     merged = {}
     if os.path.exists(jpath):
-        with open(jpath) as fh:
+        with open(jpath, encoding="utf-8") as fh:
             for r in json.load(fh):
                 merged[(r["workload"], r["size"])] = r
     for r in records:
         merged[(r["workload"], r["size"])] = r
     records = list(merged.values())
-    with open(jpath, "w") as fh:
+    with analyze.open_output(jpath) as fh:
         json.dump(records, fh, indent=2)
 
     # results.json is the single source of truth (all of median/min/mean/stdev per

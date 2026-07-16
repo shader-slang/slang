@@ -747,7 +747,14 @@ bool SemanticsVisitor::createCtorInvokeExprForAbstractType(
     return true;
 }
 
-// translation from initializer list to constructor invocation if the struct has constructor.
+// Try to coerce an initializer list to `toType` by invoking one of `toType`'s
+// explicit constructors, e.g. turning `float3 v = {a, b}` into `float3(a, b)`.
+// Returns whether such a coercion is possible. The return value must be the same
+// whether or not `outExpr` is requested: overload resolution first calls this with
+// `outExpr == nullptr` to probe whether a candidate is viable (see `canCoerce`),
+// then again with `outExpr` set to actually build the expression. Reporting success
+// only when `outExpr` is non-null would make the viability probe a false negative and
+// reject an otherwise-valid candidate.
 bool SemanticsVisitor::createInvokeExprForExplicitCtor(
     Type* toType,
     InitializerListExpr* fromInitializerListExpr,
@@ -798,11 +805,17 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                 return false;
             }
 
+            // The explicit constructor matched and type-checked, so this is a
+            // valid coercion. Report success even when no output expression was
+            // requested (e.g. the `canCoerce` viability probe passes
+            // `outExpr == nullptr`); otherwise overload resolution would treat
+            // the conversion as impossible and reject an otherwise-viable
+            // candidate. This mirrors `createInvokeExprForSynthesizedCtor` and
+            // `createCtorInvokeExprForAbstractType`, which return `true`
+            // independent of `outExpr`.
             if (outExpr)
-            {
                 *outExpr = ctorInvokeExpr;
-                return true;
-            }
+            return true;
         }
     }
     return false;
@@ -2045,6 +2058,91 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    // Optional<T> can be implicitly cast to Optional<U> when T is coercible to U.
+    if (auto fromOptType = as<OptionalType>(fromType))
+    {
+        if (auto toOptType = as<OptionalType>(toType))
+        {
+            Type* fromInner = fromOptType->getValueType();
+            Type* toInner = toOptType->getValueType();
+
+            if (!fromInner->equals(toInner))
+            {
+                // Create a synthetic VarDecl of type fromInner as a placeholder for the
+                // extracted inner value. We build innerVarExpr here (even in cost-probe mode)
+                // because the inner _coerce call needs a properly-typed fromExpr; passing
+                // nullptr would risk a null-deref in the ExplicitRefType path.
+                auto innerVarDecl = getASTBuilder()->create<VarDecl>();
+                innerVarDecl->nameAndLoc.name = getName("__optInner");
+                innerVarDecl->type.type = fromInner;
+
+                auto innerVarExpr = getASTBuilder()->create<VarExpr>();
+                innerVarExpr->type = QualType(fromInner);
+                innerVarExpr->loc = fromExpr ? fromExpr->loc : SourceLoc();
+                innerVarExpr->declRef = makeDeclRef(innerVarDecl);
+
+                // Cost probe: suppress diagnostics on failure.
+                ConversionCost innerCost = kConversionCost_None;
+                bool innerCoercible = _coerce(
+                    site,
+                    toInner,
+                    nullptr,
+                    QualType(fromInner),
+                    innerVarExpr,
+                    nullptr,
+                    &innerCost,
+                    nullptr);
+
+                if (innerCoercible)
+                {
+                    if (outCost)
+                    {
+                        // +1 so that Optional<T>->Optional<U> (with T!=U) costs more than an
+                        // exact Optional<T>->Optional<T> match (cost 0), while still ranking
+                        // below any direct non-Optional conversion.
+                        *outCost = innerCost + 1;
+                    }
+                    if (outToExpr)
+                    {
+                        // Re-run the inner conversion in build mode to construct the
+                        // coerced expression. Note that a probe (outToExpr==nullptr) can
+                        // succeed for an *ambiguous* inner conversion while the build path
+                        // fails: _coerce returns true when probing an ambiguous conversion
+                        // but sets outToExpr to an error expr and returns false when asked
+                        // to reify it (see the AmbiguousConversion path). So do not assert
+                        // success here — on failure the inner call has already emitted the
+                        // specific diagnostic (via sink), so just propagate the failure.
+                        Expr* innerCoercedExpr = nullptr;
+                        bool ok = _coerce(
+                            site,
+                            toInner,
+                            &innerCoercedExpr,
+                            QualType(fromInner),
+                            innerVarExpr,
+                            sink,
+                            nullptr,
+                            nullptr);
+                        if (!ok)
+                        {
+                            *outToExpr = CreateErrorExpr(fromExpr);
+                            return false;
+                        }
+
+                        auto castExpr = getASTBuilder()->create<CastOptionalExpr>();
+                        castExpr->loc = fromExpr->loc;
+                        castExpr->type = QualType(toType);
+                        castExpr->checked = true;
+                        castExpr->valueArg = fromExpr;
+                        castExpr->innerVarDecl = innerVarDecl;
+                        castExpr->innerCoercedExpr = innerCoercedExpr;
+                        *outToExpr = castExpr;
+                    }
+                    return true;
+                }
+            }
+        }
+    }
+
     // A enum type can be converted into its underlying tag type.
     if (auto enumDecl = isEnumType(fromType))
     {
@@ -2064,6 +2162,46 @@ bool SemanticsVisitor::_coerce(
                 *outToExpr = rsExpr;
             }
             return true;
+        }
+    }
+
+    // The reverse direction is not an implicit conversion, but explicit cast/constructor syntax
+    // (`EnumTag(x)` or `(EnumTag)x`) should first coerce `x` to the enum's tag type and then wrap
+    // that tag value in the nominal enum type.
+    if (site == CoercionSite::ExplicitCoercion)
+    {
+        if (auto toEnumDeclRef = isDeclRefTypeOf<EnumDecl>(toType))
+        {
+            auto tagType = getTagType(m_astBuilder, toEnumDeclRef);
+            if (!tagType)
+                return false;
+
+            Expr* tagExpr = nullptr;
+            ConversionCost tagCost = kConversionCost_None;
+            if (_coerce(
+                    site,
+                    tagType,
+                    outToExpr ? &tagExpr : nullptr,
+                    fromType,
+                    fromExpr,
+                    sink,
+                    &tagCost,
+                    nullptr))
+            {
+                if (outCost)
+                    *outCost = tagCost + kConversionCost_Explicit;
+                if (outToExpr)
+                {
+                    auto enumExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                    enumExpr->type = toType;
+                    if (fromExpr)
+                        enumExpr->loc = fromExpr->loc;
+                    enumExpr->base = tagExpr;
+                    *outToExpr = enumExpr;
+                }
+                setWitnessOfConversionToBuiltinConversion();
+                return true;
+            }
         }
     }
 

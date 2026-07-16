@@ -5053,7 +5053,23 @@ static void retargetEntryPointParamDecorations(IRFunc* oldFunc, IRFunc* newFunc)
         decor->setOperand(0, newFunc);
 }
 
-void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointInfo& entryPoint)
+// Convert an entry point's `out`/`inout` parameters (and, for a vertex shader, a struct return)
+// into a single return struct whose fields carry the original stage-output semantics. Metal models
+// stage outputs as return-struct fields (e.g. `[[color(N)]]`, `[[position]]`), so a pointer-typed
+// `out` parameter cannot survive to emit. This runs for the graphics output stages (vertex and
+// fragment); the downstream `wrapReturnValueInStruct`/`fixFieldSemanticsOfFlatStruct` path then
+// maps the field semantics to the Metal attributes (e.g. `SV_Target` -> `[[color(N)]]`).
+//
+// The trigger differs by stage. An `out`/`inout` parameter must be lowered on either stage (that is
+// the #11969 crash: a fragment `out float4 : SV_Target` otherwise reaches emit as a pointer with an
+// unmapped address space). A by-value struct return, however, only needs this explicit lowering for
+// vertex — a fragment that already returns its outputs by value (e.g. `FragOut { float4 :
+// SV_Target; float : SV_Depth; }`) is handled correctly downstream, and re-wrapping it here would
+// strip the field semantics. So the struct-return trigger is gated on the vertex stage.
+void legalizeShaderOutputParamsForMetal(
+    DiagnosticSink* sink,
+    EntryPointInfo& entryPoint,
+    Stage stage)
 {
     const auto oldFunc = entryPoint.entryPointFunc;
 
@@ -5064,7 +5080,9 @@ void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointIn
         [](auto param) { return as<IROutParamTypeBase>(param->getFullType()); });
 
     auto returnType = oldFunc->getResultType();
-    if (!as<IRStructType>(returnType) && !hasOutParameters)
+    const bool hasStructReturn = as<IRStructType>(returnType) != nullptr;
+    const bool triggerOnStructReturn = hasStructReturn && stage == Stage::Vertex;
+    if (!triggerOnStructReturn && !hasOutParameters)
         return;
 
     const bool alwaysUseReturnStruct = true;
@@ -5101,9 +5119,22 @@ void legalizeEntryPointVaryingParamsForMetal(
 {
     for (auto& e : entryPoints)
     {
-        if (e.entryPointDecor->getProfile().getStage() == Stage::Vertex)
+        // Both vertex and fragment stages produce varying outputs that Metal models as
+        // return-struct fields, so an `out`/`inout` output parameter on either stage must be
+        // lowered into the return struct rather than surviving as a pointer-typed parameter (see
+        // issue #11969, where a fragment `out float4 : SV_Target` reached Metal emit as a pointer
+        // and hit an unmapped address space). The function itself decides, per stage, whether a
+        // by-value struct return also triggers the lowering (vertex only) — see
+        // legalizeShaderOutputParamsForMetal.
+        const auto stage = e.entryPointDecor->getProfile().getStage();
+        switch (stage)
         {
-            legalizeVertexShaderOutputParamsForMetal(sink, e);
+        case Stage::Vertex:
+        case Stage::Fragment:
+            legalizeShaderOutputParamsForMetal(sink, e, stage);
+            break;
+        default:
+            break;
         }
     }
     LegalizeMetalEntryPointContext context(module, sink);

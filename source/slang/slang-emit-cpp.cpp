@@ -1940,7 +1940,8 @@ bool CPPSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         // it.
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
-            switch (use->getUser()->getOp())
+            auto user = use->getUser();
+            switch (user->getOp())
             {
             case kIROp_MatrixReshape:
             case kIROp_VectorReshape:
@@ -1951,6 +1952,24 @@ bool CPPSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
                 return false;
             default:
                 break;
+            }
+
+            // A multi-component swizzle read has no native `.xyz` construction
+            // form in C++/CUDA, so the `kIROp_Swizzle` handler in `emitInstExpr`
+            // below builds the result element by element -- for example
+            // `float3{ base.x, base.y, base.z }` -- re-emitting the base operand
+            // once per component. If `base` is a value we would otherwise fold
+            // into its use site (a texture fetch or buffer load), that fold
+            // textually duplicates the fetch N times, producing N times the
+            // memory traffic. SPIR-V lowers the same swizzle to a single
+            // `OpVectorShuffle`, and HLSL emits a native `.xyz`, both evaluating
+            // the base once; keeping the base as its own temp here brings the
+            // C-family targets to that parity. This mirrors the reshape/cast
+            // guard above, whose rationale is likewise "multiple references."
+            if (auto swizzle = as<IRSwizzle>(user))
+            {
+                if (swizzle->getBase() == inst && swizzle->getElementCount() > 1)
+                    return false;
             }
         }
         switch (inst->getOp())
