@@ -172,6 +172,17 @@ function(set_default_compile_options target)
         )
     endif()
 
+    # Use `-Og` for Debug builds on GCC/Clang. `-Og` enables the
+    # optimizations that do not interfere with debugging, producing
+    # noticeably faster Debug binaries while keeping a faithful
+    # step-through/inspection experience.
+    #
+    # Note that MSVC has no `-Og` equivalent, so we'll keep the
+    # default optimization level (`/Od`) for now.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE $<$<CONFIG:Debug>:-Og>)
+    endif()
+
     if(NOT WIN32)
         # these options are for ELF specific and not for Windows
         add_supported_cxx_linker_flags(
