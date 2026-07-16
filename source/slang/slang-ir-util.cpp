@@ -2453,6 +2453,18 @@ IRType* dropNormAttributes(IRType* const t)
     return t;
 }
 
+/// Gets a literal thread count, unwrapping a specialization constant's default when needed.
+static IRIntLit* _getDefaultThreadCount(IRInst* threadCount)
+{
+    if (auto intLit = as<IRIntLit>(threadCount))
+        return intLit;
+
+    auto defaultValueDecor =
+        cast<IRGlobalParam>(threadCount)->findDecoration<IRDefaultValueDecoration>();
+    SLANG_RELEASE_ASSERT(defaultValueDecor);
+    return cast<IRIntLit>(defaultValueDecor->getOperand(0));
+}
+
 void verifyComputeDerivativeGroupModifiers(
     DiagnosticSink* sink,
     SourceLoc errorLoc,
@@ -2469,15 +2481,9 @@ void verifyComputeDerivativeGroupModifiers(
             Diagnostics::OnlyOneOfDerivativeGroupLinearOrQuadCanBeSet{.location = errorLoc});
     }
 
-    IRIntegerValue x = 1;
-    IRIntegerValue y = 1;
-    IRIntegerValue z = 1;
-    if (numThreadsDecor->getX())
-        x = numThreadsDecor->getX()->getValue();
-    if (numThreadsDecor->getY())
-        y = numThreadsDecor->getY()->getValue();
-    if (numThreadsDecor->getZ())
-        z = numThreadsDecor->getZ()->getValue();
+    IRIntegerValue x = _getDefaultThreadCount(numThreadsDecor->getOperand(0))->getValue();
+    IRIntegerValue y = _getDefaultThreadCount(numThreadsDecor->getOperand(1))->getValue();
+    IRIntegerValue z = _getDefaultThreadCount(numThreadsDecor->getOperand(2))->getValue();
 
     if (quadAttr)
     {
