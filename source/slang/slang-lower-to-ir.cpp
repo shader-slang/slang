@@ -977,6 +977,15 @@ LoweredValInfo emitCallToDeclRef(
         case kIROp_GetOffsetPtr:
             SLANG_ASSERT(argCount == 2);
             return LoweredValInfo::simple(builder->emitGetOffsetPtr(args[0], args[1]));
+        case kIROp_CastToVoid:
+            // A `(void)expr` cast (the builtin `__init(T)` on `void`) has no data
+            // content: it evaluates `expr` for its side effects and yields `void`.
+            // Those side effects are already lowered into `args[0]`, so we discard
+            // the operand and produce the canonical void value (`IRVoidLit`) rather
+            // than a `kIROp_CastToVoid` instruction, which no backend can emit and
+            // which would only duplicate the one canonical spelling of a void value.
+            SLANG_RELEASE_ASSERT(argCount == 1);
+            return LoweredValInfo::simple(builder->getVoidValue());
         default:
             return LoweredValInfo::simple(
                 builder->emitIntrinsicInst(type, intrinsicOp, argCount, args));
@@ -9681,21 +9690,30 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
 
     // If the source manager does not have an entry for the corresponding file name, make sure we
     // still emit a source file entry in the spirv module.
-    ComPtr<ISlangBlob> outBlob;
+    ComPtr<ISlangBlob> contentBlob;
     UnownedStringSlice content;
 
     // Only embed source content for Standard and Maximal debug level
     if (context->debugInfoLevel >= DebugInfoLevel::Standard)
     {
+        ComPtr<ISlangBlob> rawBlob;
         if (pathInfo.hasFileFoundPath())
         {
             context->getLinkage()->getFileSystemExt()->loadFile(
                 pathInfo.foundPath.getBuffer(),
-                outBlob.writeRef());
+                rawBlob.writeRef());
         }
-        if (outBlob)
-            content =
-                UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
+        if (rawBlob)
+        {
+            // The raw file bytes may carry a UTF-8 BOM (or another encoding). Decode them the same
+            // way SourceFile::setContents does so that the embedded DebugSource text is BOM-free
+            // and stays aligned with the BOM-free line/column data. `contentBlob` owns the decoded
+            // storage; it must outlive the emitDebugSource call below.
+            contentBlob = SourceFile::decodeContentBlob(rawBlob);
+            content = UnownedStringSlice(
+                (char*)contentBlob->getBufferPointer(),
+                contentBlob->getBufferSize());
+        }
     }
 
     IRBuilder builder(*context->irBuilder);
