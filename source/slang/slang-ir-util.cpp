@@ -2171,6 +2171,43 @@ IRVarLayout* findVarLayout(IRInst* value)
     return nullptr;
 }
 
+bool isEntryPointByValueUniformAggregateParam(IRParam* param)
+{
+    if (!param)
+        return false;
+
+    // Must be an entry-point kernel parameter: an `IRParam` in the entry function's first block
+    // (later-block `IRParam`s are block/phi params, not kernel params).
+    auto block = as<IRBlock>(param->getParent());
+    if (!block)
+        return false;
+    auto parentFunc = as<IRFunc>(block->getParent());
+    if (!parentFunc || block != parentFunc->getFirstBlock() ||
+        !parentFunc->findDecoration<IREntryPointDecoration>())
+        return false;
+
+    // Must be uniform, not a varying (per-thread) input.
+    auto varLayout = findVarLayout(param);
+    if (!varLayout || isVaryingParameter(varLayout))
+        return false;
+
+    // Must be a fixed-size by-value aggregate (`struct`/sized `array`); everything else falls
+    // through `default:`. A tuple is lowered to a struct by `lowerTuples` before this runs, so a
+    // `kIROp_TupleType` cannot occur - assert it rather than misclassify via `default:`.
+    auto type = param->getDataType();
+    if (!type)
+        return false;
+    SLANG_ASSERT(type->getOp() != kIROp_TupleType);
+    switch (type->getOp())
+    {
+    case kIROp_StructType:
+    case kIROp_ArrayType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 UnownedStringSlice getBuiltinFuncName(IRInst* callee)
 {
     auto decor = getResolvedInstForDecorations(callee)->findDecoration<IRKnownBuiltinDecoration>();
