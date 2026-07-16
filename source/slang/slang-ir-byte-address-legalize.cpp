@@ -305,10 +305,12 @@ struct ByteAddressBufferLegalizationContext
         // The promise clears the natural-alignment floor, but a promise below the access type's
         // *base* (std430 whole-type) alignment cannot cover the type in a single wide access and
         // will be split into narrower loads/stores. That is valid but suboptimal, so we warn
-        // rather than error: e.g. `LoadAligned<float3>(loc, 8)` is legal (8 >= the 4-byte scalar
-        // floor) but below `float3`'s base alignment of 16, so it scalarizes. The base alignment
-        // of a power-of-two-sized type (scalar, `float2`, `float4`) equals its natural alignment,
-        // so this never fires for those and only flags the genuinely-narrow vec3-shaped promises.
+        // rather than error: e.g. `LoadAligned<float3>(loc, 8)` and `LoadAligned<float4>(loc, 8)`
+        // are both legal (8 >= the 4-byte scalar floor) but below the 16-byte base alignment, so
+        // they scalarize. This fires whenever the type's base alignment exceeds its
+        // scalar-component floor — i.e. for any vector or aggregate wider than one scalar
+        // (`float2`/`float3`/`float4`, structs, arrays), not just vec3 — and never for a lone
+        // scalar, whose base alignment equals its floor so no below-base band exists.
         IRSizeAndAlignment baseSizeAlignment;
         if (SLANG_SUCCEEDED(getStd430SizeAndAlignment(m_target, accessType, &baseSizeAlignment)) &&
             baseSizeAlignment.alignment > 0 && alignmentVal < baseSizeAlignment.alignment)
