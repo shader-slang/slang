@@ -14,8 +14,19 @@ struct TransformParamsToConstRefContext
     IRBuilder builder;
     bool changed = false;
 
-    TransformParamsToConstRefContext(IRModule* module, DiagnosticSink* sink)
-        : module(module), sink(sink), builder(module)
+    // When set (CUDA only), a call argument that is an entry-point by-value uniform aggregate
+    // parameter is forwarded by address instead of via a temporary copy. See the header comment on
+    // `transformParamsToConstRef`.
+    bool forwardEntryPointUniformAddress = false;
+
+    TransformParamsToConstRefContext(
+        IRModule* module,
+        DiagnosticSink* sink,
+        bool forwardEntryPointUniformAddress = false)
+        : module(module)
+        , sink(sink)
+        , builder(module)
+        , forwardEntryPointUniformAddress(forwardEntryPointUniformAddress)
     {
     }
 
@@ -209,6 +220,15 @@ struct TransformParamsToConstRefContext
         return nullptr;
     }
 
+    // True if `arg` is an entry-point by-value uniform aggregate parameter. This is only the arg
+    // shape; forwarding its address is sound solely because the sole caller reaches here inside the
+    // `updatedParams.contains(param)` path, i.e. after the callee slot is a read-only `borrow in`.
+    bool argIsEntryPointByValueUniformAggregate(IRInst* arg)
+    {
+        auto param = as<IRParam>(arg);
+        return param && isEntryPointByValueUniformAggregateParam(param);
+    }
+
     // Update call sites to pass an address instead of value for each updated-param
     void updateCallSites(IRFunc* func, HashSet<IRParam*>& updatedParams)
     {
@@ -237,6 +257,17 @@ struct TransformParamsToConstRefContext
                     // If existing argument is a load from an immutable buffer address,
                     // we can pass in the address as is, without making a temporary copy.
                     newArgs.add(addr);
+                }
+                else if (
+                    forwardEntryPointUniformAddress && argIsEntryPointByValueUniformAggregate(arg))
+                {
+                    // Forward the argument's address (emitted as `&param` on CUDA) instead of
+                    // copying the whole aggregate into a per-thread temporary - the #11774
+                    // slowdown. Build the pointer from `getDataType()` so it matches the callee's
+                    // `borrow in T*` slot regardless of any rate qualifier on the arg.
+                    auto paramAddr =
+                        builder.emitGetAddress(builder.getPtrType(arg->getDataType()), arg);
+                    newArgs.add(paramAddr);
                 }
                 else
                 {
@@ -422,9 +453,12 @@ struct TransformParamsToConstRefContext
     }
 };
 
-SlangResult transformParamsToConstRef(IRModule* module, DiagnosticSink* sink)
+SlangResult transformParamsToConstRef(
+    IRModule* module,
+    DiagnosticSink* sink,
+    bool forwardEntryPointUniformAddress)
 {
-    TransformParamsToConstRefContext context(module, sink);
+    TransformParamsToConstRefContext context(module, sink, forwardEntryPointUniformAddress);
     return context.processModule();
 }
 
