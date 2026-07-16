@@ -6524,7 +6524,8 @@ Type* TypeLayoutContext::resolveLinkTimeAssociatedType(DeclRefType* declRefType)
     // NOTE: this handles an associated type declared on the interface the wrapper *directly*
     // conforms to. An associated type declared on a *base* of that interface roots the lookup
     // witness at the base, which the wrapper carries no `witnessVal` for, so it is not resolved
-    // here and still hits the layout path that #9580 fixes; that transitive case is a follow-up.
+    // here and still hits the layout path that #9580 fixes; that transitive case is tracked in
+    // shader-slang/slang#12134.
     auto interfaceType = lookup->getWitness()->getSup();
     auto wrapperType = as<DeclRefType>(lookup->getWitness()->getSub());
     if (!wrapperType)
