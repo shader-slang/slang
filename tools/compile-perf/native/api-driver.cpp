@@ -54,10 +54,13 @@
 #include <vector>
 
 #ifdef _WIN32
+// clang-format off
 // windows.h MUST precede psapi.h: psapi.h uses DWORD/HANDLE/BOOL without
-// including their definitions itself.
+// including their definitions itself, and this repo's clang-format include
+// sorting would alphabetize them into that broken order.
 #include <windows.h>
 #include <psapi.h>
+// clang-format on
 #else
 #include <dirent.h>
 #include <dlfcn.h>
