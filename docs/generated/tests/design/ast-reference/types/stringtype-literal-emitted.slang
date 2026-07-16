@@ -15,7 +15,7 @@
 // emitted C++ source for the literal text. CHECK matches the string
 // content in the emitted code.
 
-//TEST:SIMPLE(filecheck=CHECK):-target cpp -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target host-cpp -entry computeMain -stage compute
 
 static const String message = "slang-marker-text";
 

@@ -492,6 +492,88 @@ matcher will consume. A `//TEST` directive with no corresponding
 CHECK pattern is rejected by lint — such a test runs but verifies
 nothing.
 
+### FileCheck / CHECK pattern hygiene (READ — most CHECK failures come from these)
+
+You are writing a pattern that must match the compiler's *actual*
+emitted text, which you cannot see while generating. You will guess
+wrong if you pin exact generated output. **Assert stable structure with
+loose patterns; never pin volatile detail.** The rules below each
+correspond to a real, recurring failure class — follow every one.
+
+1. **Never pin a compiler-generated SSA id or mangled name.** IDs like
+   SPIR-V `%29`, IR `%1234`, or names like `_S3`, `f_0`, `main_1` are
+   assigned by codegen and *vary*. Worse, the slang-test harness
+   disassembles SPIR-V with **friendly names** (so an operand prints as
+   `%f_0`, not `%29`) in some run modes and numeric in others — a test
+   that pins one form fails in the other. For any id/operand use a
+   permissive capture, not a numeric one:
+   - ✅ `%{{[A-Za-z0-9_]+}} = OpConvertFToS %int %{{[A-Za-z0-9_]+}}`
+   - ❌ `%{{[0-9]+}} = OpConvertFToS %int %{{[0-9]+}}`  (fails on `%f_0`)
+   - ❌ `%29 = OpConvertFToS %int %17`  (pins volatile ids)
+   Match the opcode/structure, not the numbering.
+
+2. **Escape FileCheck metacharacters when the emitted text contains them
+   literally.** `[[...]]` is a FileCheck *variable* reference and
+   `{{...}}` is a *regex*. Emitted Metal/HLSL attributes literally
+   contain double brackets (`[[unroll]]`, `[[color(0)]]`, `[[buffer(0)]]`).
+   A CHECK line `// CHECK: [[unroll]]` is parsed as a variable and fails
+   with `undefined variable: unroll`. Escape:
+   - ✅ `// CHECK: {{\[\[}}unroll{{\]\]}}`
+   Likewise escape a literal `{{` as `{{\{\{}}`.
+
+3. **Avoid substring collisions.** FileCheck matches substrings, so a
+   short pattern silently matches inside a longer token:
+   - `CHECK-NOT: OpFunction` fires on `OpFunctionEnd` (present in every
+     module) — use the specific token you mean, e.g. `CHECK-NOT: OpFunctionCall`.
+   - unanchored `StructuredBuffer` matches inside `RWStructuredBuffer` —
+     anchor the read-only spelling: `CHECK-DAG: {{^}}StructuredBuffer`.
+   Prefer the most specific token, anchor with `{{^}}`, or include enough
+   surrounding context to disambiguate.
+
+4. **Plain `CHECK`/`CHECK-DAG` order must equal emission order.** Sequential
+   `CHECK` lines must appear in the order the compiler emits them. Metal
+   and C-family targets emit **callees before the entry point**; IR dumps
+   emit passes top-to-bottom. If you are not certain of the order, use
+   `CHECK-DAG` (order-independent) instead of guessing a sequence.
+
+5. **Match the harness's default `-O0`.** slang-test compiles at `-O0`
+   unless the directive says otherwise. Behavior that only happens with
+   optimization — force-inlining folding a helper away, dead-code
+   elimination, aggressive constant folding — does **not** occur at `-O0`.
+   If the claim is "the helper is inlined / the call disappears", add
+   `-O1` (or higher) to that directive; otherwise assert the un-optimized
+   shape.
+
+6. **Only assert a feature on a target that supports it.** Picking the
+   wrong target makes the feature diagnose instead of emit, so the CHECK
+   never matches. E.g. `String` is unsupported on the `cpp` (kernel)
+   target (emits `E55213`) but works on `host-cpp`. If a target genuinely
+   cannot express the claim, write a negative/diagnostic directive that
+   pins the diagnostic, or record it in `## Untested claims` — **never**
+   weaken the CHECK to force green.
+
+7. **`DIAGNOSTIC_TEST`: annotate the compiler's *actual* message, and use
+   `non-exhaustive` deliberately.** Do not invent diagnostic wording —
+   most diagnostics emit a **short + long message pair** at the same caret
+   span, plus secondary notes (`candidate: ...`, `argument N does not
+   match: ...`, `see declaration of ...`). Rules:
+   - Annotate the *actual* text the compiler emits (a substring is fine),
+     not a plausible-sounding guess. If you cannot be sure of the wording,
+     assert the **error code** (`//CHECK: E39999`) which is stable.
+   - Align the caret (`^`) to the reported column; a multi-caret span
+     (`^^^^`) must cover the reported range.
+   - Add `non-exhaustive` **only when** the compiler emits secondary
+     diagnostics you are intentionally not annotating (candidate notes,
+     etc.). Do **not** add it when every emitted diagnostic is already
+     annotated — the harness rejects an unnecessary `non-exhaustive`. Do
+     **not** omit it when unannotated diagnostics remain — exhaustive mode
+     then fails.
+
+**Bottom line:** keep patterns loose (`{{...}}`, `-DAG`, error codes,
+opcodes) and structural. Every time you are tempted to write an exact id,
+name, ordering, or full message string, ask "will codegen or the harness
+render this differently?" — if yes, loosen it.
+
 If a claim is genuinely unobservable through any `slang-test`
 directive even with full runner access (e.g., the claim is about a
 C++ template pattern with no CLI surface), record it in the

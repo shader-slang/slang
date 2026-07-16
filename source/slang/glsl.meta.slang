@@ -493,12 +493,17 @@ __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public T mod(T x, T y)
 {
-    // SPIR-V doesn't have "modulus".
-    // All of Op?Mod and OpFRem are "remainder".
-
     __target_switch
     {
     case glsl: __intrinsic_asm "mod";
+    case spirv:
+        // `OpFMod` is a floor-modulus (its sign follows Operand 2), which is
+        // exactly what `mod()` computes, so use it directly rather than the
+        // multi-instruction `x - y*floor(x/y)` expansion below.
+        return spirv_asm
+        {
+            result:$$T = OpFMod $x $y
+        };
     default:
         return x - y * floor(x / y);
     }
@@ -513,6 +518,11 @@ public vector<T, N> mod(vector<T, N> x, T y)
     __target_switch
     {
     case glsl: __intrinsic_asm "mod";
+    case spirv:
+        // `OpFMod` requires both operands to have the result type, so broadcast
+        // the scalar divisor and defer to the vector/vector overload rather than
+        // duplicating the opcode here.
+        return mod(x, vector<T, N>(y));
     default:
         return x - y * floor(x / y);
     }
@@ -527,6 +537,11 @@ public vector<T, N> mod(vector<T, N> x, vector<T, N> y)
     __target_switch
     {
     case glsl: __intrinsic_asm "mod";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$vector<T, N> = OpFMod $x $y
+        };
     default:
         return x - y * floor(x / y);
     }

@@ -12,6 +12,7 @@ Loads releases/<tag>/results.json for every release in the index
 Also derives the diagnostics path-cost series (errors - clean).
 """
 import json
+import math
 import os
 import re
 
@@ -28,6 +29,37 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # emission + any bundled downstream tool such as spirv-opt).
 LEAF_TIMERS = ["parseTranslationUnit", "SemanticChecking", "generateIR",
                "specializeModule", "simplifyIR", "linkIR", "unrollLoopsInModule"]
+
+
+def open_output(path, mode="w"):
+    """Open a suite output file for writing under the suite-wide policy:
+    UTF-8, LF-only line endings. Every artifact the suite writes — generated
+    .slang sources, results/tracking/meta json, rendered HTML/SVG — must be
+    byte-identical regardless of the platform that wrote it: Windows' default
+    text mode would otherwise write legacy-codepage bytes and CRLF, making the
+    corpus platform-dependent and churning the results repo. One helper so the
+    policy lives here instead of per-call keyword arguments."""
+    return open(path, mode, encoding="utf-8", newline="\n")
+
+
+def read_json(path):
+    """json.load with explicit UTF-8, the read-side twin of open_output.
+
+    Suite files are WRITTEN as UTF-8 (open_output), but a bare open() READS
+    with the platform default — cp1252 on the Windows runner — so any
+    non-ASCII byte (an em dash in a rendered SVG, a smart quote in a compiler
+    diagnostic captured into results.json) raises UnicodeDecodeError there
+    while passing everywhere else. Every suite read goes through here or
+    read_text so the pair cannot drift."""
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def read_text(path):
+    """Read a suite-owned text file (SVG, HTML fragment) as UTF-8. See
+    read_json for why the encoding must be explicit."""
+    with open(path, encoding="utf-8") as fh:
+        return fh.read()
 
 
 def results_dir_for(results_dir, label):
@@ -166,6 +198,39 @@ def classify(values, step_thr=1.4, drift_thr=1.25):
             "up_frac": up_frac, "n_steps": len(steps)}
 
 
+def linfit(xs, ys):
+    """Ordinary least squares y = a + b*x. Returns (a, b, r2); (0, 0, 0) with
+    fewer than 2 points, where no line is determined (mirrors powfit)."""
+    n = len(xs)
+    if n < 2:
+        return 0.0, 0.0, 0.0
+    sx, sy = sum(xs), sum(ys)
+    sxx = sum(x * x for x in xs)
+    sxy = sum(x * y for x, y in zip(xs, ys))
+    denom = n * sxx - sx * sx
+    if denom == 0:
+        return ys[0], 0.0, 0.0
+    b = (n * sxy - sx * sy) / denom
+    a = (sy - b * sx) / n
+    ybar = sy / n
+    ss_tot = sum((y - ybar) ** 2 for y in ys) or 1.0
+    ss_res = sum((y - (a + b * x)) ** 2 for x, y in zip(xs, ys))
+    return a, b, 1 - ss_res / ss_tot
+
+
+def powfit(xs, ys):
+    """Power-law fit t = a * N^k via OLS on (log N, log t). Returns (a, k, r2),
+    with r2 measured in log space. k is the honest super-linearity exponent —
+    k≈1 linear, k>1 super-linear, k<1 sub-linear — and unlike the linear floor it
+    never goes negative on a convex curve. Needs positive xs/ys; falls back to
+    (0, 0, 0) otherwise."""
+    pts = [(x, y) for x, y in zip(xs, ys) if x > 0 and y > 0]
+    if len(pts) < 2:
+        return 0.0, 0.0, 0.0
+    lx = [math.log(x) for x, _ in pts]
+    ly = [math.log(y) for _, y in pts]
+    loga, k, r2 = linfit(lx, ly)
+    return math.exp(loga), k, r2
 
 
 def flag_steps(values, rel_thr, abs_floor):

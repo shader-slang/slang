@@ -459,6 +459,13 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
         }
         break;
 
+    case kIROp_UntypedResourceHandleType:
+    case kIROp_UntypedSamplerHandleType:
+        // `lowerUntypedResourceHandleToUInt` rewrites every untyped descriptor-heap handle to
+        // `uint` before emit, so one reaching here is an internal error (a leak from that pass).
+        SLANG_UNEXPECTED("untyped descriptor-heap handle type should have been lowered to uint");
+        break;
+
     case kIROp_ArrayType:
         {
             auto arrayType = cast<IRArrayType>(type);
@@ -2570,6 +2577,14 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_CastDescriptorHandleToUInt64:
         emitOperand(inst->getOperand(0), outerPrec);
         break;
+    case kIROp_CastUIntToUntypedResourceHandle:
+    case kIROp_CastUntypedResourceHandleToUInt:
+    case kIROp_CastUIntToUntypedSamplerHandle:
+    case kIROp_CastUntypedSamplerHandleToUInt:
+        // The untyped descriptor-heap handle wrap/unwrap casts are an internal representation that
+        // `lowerUntypedResourceHandleToUInt` forwards to their `uint` operand and removes before
+        // emit. Seeing one here means that pass did not run (or ran too late), so this is a bug.
+        SLANG_UNEXPECTED("untyped descriptor-heap handle cast should have been lowered to uint");
     // Binary ops
     case kIROp_Add:
     case kIROp_Sub:

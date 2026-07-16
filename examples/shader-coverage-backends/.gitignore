@@ -1,0 +1,5 @@
+# Artifacts written by demo runs (see README.md).
+*.counters.bin
+*.coverage-manifest.json
+*.lcov
+coverage-html/

@@ -2128,6 +2128,12 @@ static LegalVal legalizeInst(
         result = legalizeRetVal(context, args[0], (IRReturn*)inst);
         break;
     case kIROp_CastDescriptorHandleToResource:
+    // The untyped-handle casts need no type legalization: both operand and result legalize to
+    // a plain `uint`, so the cast is already a simple value (it forwards its operand at emit).
+    case kIROp_CastUIntToUntypedResourceHandle:
+    case kIROp_CastUntypedResourceHandleToUInt:
+    case kIROp_CastUIntToUntypedSamplerHandle:
+    case kIROp_CastUntypedSamplerHandleToUInt:
         result = LegalVal::simple(inst);
         break;
     case kIROp_DebugVar:
@@ -3874,6 +3880,21 @@ struct IRTypeLegalizationPass
         // register the result of legalization as the proper value
         // for that instruction.
         //
+        // Capture the type before legalization: several legalization paths
+        // (params, local/global vars, funcs) mutate the instruction in place
+        // via `setFullType`/`setDataType` and still return it as a `simple`
+        // value, and such a mutation must count as a change below just as if
+        // the value had been replaced.
+        //
+        auto typeBeforeLegalize = inst->getFullType();
+#if _DEBUG
+        // Snapshot the operands so the debug build can enforce the invariant
+        // the change detection below relies on (see the comment there).
+        List<IRInst*> operandsBeforeLegalize;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+            operandsBeforeLegalize.add(inst->getOperand(i));
+#endif
+
         LegalVal legalVal = legalizeInst(context, inst);
         registerLegalizedValue(context, inst, legalVal);
 
@@ -3891,8 +3912,31 @@ struct IRTypeLegalizationPass
         // * `i` is a user of `inst`, or
         // * `i` is a child of `inst`.
         //
+        // Requeue already-queued users/children only when this step actually
+        // changed `inst`: re-adding them unconditionally re-legalizes almost
+        // everything every round, which is quadratic on long dependence
+        // chains (#12040). The skip is safe because a user processed before
+        // its operand assumed the identity mapping on the map miss, and an
+        // unchanged `simple` result registers exactly that identity. This
+        // relies on an invariant (asserted below in debug builds): a
+        // legalizer signals change only by returning a different `irValue`
+        // or mutating the full type, never by mutating an operand in place;
+        // non-`simple` flavors always count as changed.
+        //
+        bool changed = true;
         if (legalVal.flavor == LegalVal::Flavor::simple)
         {
+            changed = legalVal.irValue != inst || inst->getFullType() != typeBeforeLegalize;
+
+#if _DEBUG
+            if (!changed)
+            {
+                SLANG_ASSERT(inst->getOperandCount() == (UInt)operandsBeforeLegalize.getCount());
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                    SLANG_ASSERT(inst->getOperand(i) == operandsBeforeLegalize[i]);
+            }
+#endif
+
             // The resulting inst may be different from the one we added to the
             // worklist, so ensure that the appropriate flags are set.
             //
@@ -3904,11 +3948,13 @@ struct IRTypeLegalizationPass
         for (auto use = inst->firstUse; use; use = use->nextUse)
         {
             auto user = use->getUser();
-            maybeAddToWorkList(user);
+            if (changed || !hasBeenAddedToWorkListOrProcessed(user))
+                maybeAddToWorkList(user);
         }
         for (auto child : inst->getDecorationsAndChildren())
         {
-            maybeAddToWorkList(child);
+            if (changed || !hasBeenAddedToWorkListOrProcessed(child))
+                maybeAddToWorkList(child);
         }
     }
 

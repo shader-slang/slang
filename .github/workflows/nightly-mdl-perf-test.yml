@@ -16,12 +16,26 @@ on:
         # only; a short SHA fails with "branch or tag not found".
         description: "full commit SHA or branch to build (blank = master HEAD)"
         default: ""
+      suite-ref:
+        # Backfilling an old commit must still run the CURRENT suite: the
+        # checked-out ref's own tools/compile-perf predates newer workloads and
+        # does not accept the arguments this workflow passes (--api,
+        # track.py --commit-time, trend.py --label). Same model as the release
+        # sweep: modern suite measuring an older binary.
+        description: "ref for tools/compile-perf (blank = same as ref; use master when backfilling old commits)"
+        default: ""
       samples:
         description: "timed samples per run"
         default: "5"
       only:
         description: "comma-separated workload subset (blank = full suite)"
         default: ""
+      sweep:
+        # Opt-in (~4x runtime): dispatch with sweep=true when fresh scaling
+        # curves are wanted; the published sweep page shows the newest sweep
+        # whenever one last ran.
+        description: "run each workload's sweep_sizes for scaling curves (~4x runtime; tracking still compares the default-size point)"
+        default: "false"
       publish:
         description: "push results + update tracking + deploy pages (set false for one-off measurements: results are uploaded as a run artifact only)"
         default: "true"
@@ -61,6 +75,20 @@ jobs:
           submodules: "recursive"
           fetch-depth: "0"
 
+      - name: Checkout suite ref (backfill)
+        if: github.event.inputs.suite-ref != ''
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ github.event.inputs.suite-ref }}
+          persist-credentials: false
+          path: "suite-src"
+          # include/ is a suite dependency, not build source: bench.py builds
+          # the api-driver against include/slang.h resolved relative to the
+          # suite root, so dropping it breaks --api backfills at bench time.
+          sparse-checkout: |
+            tools/compile-perf
+            include
+
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
@@ -74,6 +102,22 @@ jobs:
           platform: x86_64
           config: release
           build-llvm: false
+
+      # One resolution for all suite tooling (bench, track, report, trend): with
+      # suite-ref set, all suite tooling runs from the dedicated checkout
+      # while the build tree stays at the swept commit.
+      # Placed AFTER common-setup: that is what puts git-bash on the
+      # Windows runner's PATH, and this step is the job's first bash use.
+      - name: Resolve suite path
+        shell: bash
+        env:
+          SUITE_REF: ${{ github.event.inputs.suite-ref }}
+        run: |
+          if [ -n "$SUITE_REF" ]; then
+            echo "SUITE=$GITHUB_WORKSPACE/suite-src/tools/compile-perf" >> "$GITHUB_ENV"
+          else
+            echo "SUITE=$GITHUB_WORKSPACE/tools/compile-perf" >> "$GITHUB_ENV"
+          fi
 
       - name: Build Slang (tip of tree)
         run: |
@@ -123,12 +167,23 @@ jobs:
         env:
           SAMPLES: ${{ github.event.inputs.samples || '5' }}
           ONLY: ${{ github.event.inputs.only }}
+          SWEEP: ${{ github.event.inputs.sweep || 'false' }}
+          REF_INPUT: ${{ github.event.inputs.ref }}
         run: |
           set -euo pipefail
-          SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
           RESULTS="$GITHUB_WORKSPACE/perf-results"
           SLANGC="$GITHUB_WORKSPACE/build/Release/bin/slangc.exe"
-          LABEL="$(git log -1 --format=%cs HEAD)-$(git rev-parse --short HEAD)"
+          # Label rule: a scheduled / plain-dispatch run is "the nightly of
+          # today", keyed by the RUN date so every calendar day gets exactly
+          # one label even when master's HEAD carries an older commit date
+          # (weekend runs previously minted same-date sibling labels, e.g.
+          # two 2026-07-07 points). An explicit-ref backfill is keyed by the
+          # swept commit's own date so historical points sort by code order.
+          if [ -n "$REF_INPUT" ]; then
+            LABEL="$(git log -1 --format=%cs HEAD)-$(git rev-parse --short HEAD)"
+          else
+            LABEL="$(date -u +%F)-$(git rev-parse --short HEAD)"
+          fi
           COMMIT="$(git rev-parse HEAD)"
           # Full committer timestamp: same-date sibling points (labels carry
           # only the commit's DATE) sort by true code order in the series.
@@ -150,8 +205,15 @@ jobs:
           cp external/MDL-SDK/examples/mdl_sdk/dxr/content/slangified/*.slang "$SUITE/corpus/mdl/"
 
           cd "$SUITE"
-          args=(--slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" --samples "$SAMPLES" --warmup 1)
+          # --api: the api-path workloads (session create, module graph,
+          # reflection, specialize, ...) are part of the tracked nightly set —
+          # the driver is built once per run with the host cl.
+          args=(--slangc "$SLANGC" --label "$LABEL" --out "$RESULTS/daily" --samples "$SAMPLES" --warmup 1 --api)
           [ -n "$ONLY" ] && args+=(--only "$ONLY")
+          # Swept multi-size data is collapsed to default_size by
+          # analyze.canonical_runs when the tracking series is rebuilt, so a
+          # swept night still contributes a like-with-like tracking point.
+          [ "$SWEEP" = "true" ] && args+=(--sweep)
           # Daily ToT sweep -> perf-results/daily/<label>/results.json
           python3 bench.py "${args[@]}"
           if [ "$PUBLISH" = "true" ]; then
@@ -169,23 +231,23 @@ jobs:
           path: bench-results/
           if-no-files-found: ignore
 
-      # Exercise the api-driver + api workloads every night WITHOUT publishing:
-      # they are opt-in for the tracked series until the history is resynced
-      # with them, but unexercised code bit-rots — this builds the driver with
-      # the host cl and runs all six api workloads against the just-built
-      # slang, writing to a scratch dir the job discards. Failures fail the job before results are pushed.
-      - name: API workload smoke (non-publishing)
+      # New releases (majors + patch releases from v2026.13 on) are swept into
+      # the tracked history the night they ship, riding the same results push
+      # below. continue-on-error: a failing new-release sweep must not cost the
+      # night's own point — the script removes partial baselines and the next
+      # nightly retries.
+      - name: Sweep newly published releases
+        if: env.PUBLISH == 'true'
+        continue-on-error: true
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # API rate limit for asset downloads
+          SAMPLES: ${{ github.event.inputs.samples || '5' }}
         run: |
           set -euo pipefail
-          cd "$GITHUB_WORKSPACE/tools/compile-perf"
-          # The list comes from the manifest so a future api workload can never
-          # be silently missing here — the one source of truth names them.
-          API_WORKLOADS="$(python3 -c 'from lib import manifest; print(",".join(w.name for w in manifest.WORKLOADS if w.mode == "api"))')"
-          python3 bench.py --slangc "$GITHUB_WORKSPACE/build/Release/bin/slangc.exe" \
-            --label api-smoke --out "$GITHUB_WORKSPACE/api-smoke-results" \
-            --samples 1 --warmup 0 \
-            --only "$API_WORKLOADS"
+          cd "$SUITE"
+          python3 new_release_check.py --results "$GITHUB_WORKSPACE/perf-results" \
+            --repo "$GITHUB_WORKSPACE" --samples "$SAMPLES"
 
       - name: Push results
         if: env.PUBLISH == 'true'
@@ -220,7 +282,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
           RESULTS="$GITHUB_WORKSPACE/perf-results"
           if [ ! -f "$RESULTS/index.json" ]; then
             echo "No index.json in results repo; skipping report generation"
@@ -228,6 +289,11 @@ jobs:
           fi
           cd "$SUITE"
           python3 report.py --results "$RESULTS" --index "$RESULTS/index.json"
+          # Sweep landing page + every archived sweep (dailies + releases),
+          # regenerated from repo data on each deploy. Sweeps are opt-in and
+          # few, so rendering all of them is cheap; an empty archive still
+          # produces a valid index page.
+          python3 sweep_report.py --results "$RESULTS" --publish "$RESULTS/analysis/sweep"
 
       - name: Checkout gh-pages branch
         if: env.PUBLISH == 'true'
@@ -272,9 +338,10 @@ jobs:
           git config user.email "slang-perf-bot@users.noreply.github.com"
 
           cp -r "$ANALYSIS/." .
-          mv report_per_workload.html index.html
-          # _combined_index.json is a derived intermediate — no need to serve it
-          rm -f _combined_index.json
+          # report.py writes index.html (the landing page) directly;
+          # report_per_workload.html is kept as a redirect for old bookmarks.
+          # the _*_index.json files are derived intermediates — no need to serve them
+          rm -f _combined_index.json _releases_index.json _daily_index.json
           # Serve files verbatim: without this marker GitHub Pages runs the
           # generated report through legacy Jekyll, whose builds have failed
           # or hung on this content. Must be re-created on every deploy
@@ -307,7 +374,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cd "$GITHUB_WORKSPACE/tools/compile-perf"
+          cd "$SUITE"
           python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" --label "${PERF_LABEL:?}"
 
       - name: Notify Slack

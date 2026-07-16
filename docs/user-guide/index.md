@@ -32,6 +32,7 @@ Supported Compilation Targets <09-targets>
 Link-time Specialization and Module Precompilation <10-link-time-specialization>
 Special Topics <a1-special-topics>
 Target-specific Features <a2-target-specific-features>
-Reference <a3-reference>
+Experimental Features <a3-experimental-features>
+Reference <a4-reference>
 ```
 RTD-TOC-END -->
