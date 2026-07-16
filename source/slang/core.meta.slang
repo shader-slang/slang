@@ -2802,6 +2802,28 @@ __generic<T> __extension vector<T, 4>
     [__unsafeForceInlineEarly]
     __intrinsic_op($(kIROp_MakeVector))
     __init(T x, vector<T,3> yzw);
+
+    // we need to disable this initializer explicitly to avoid implicit conversion
+    // of (int2, int) to (int2, int2)
+    [__unsafeForceInlineEarly]
+    [deprecated("Three-component initializer (vector<T, 2>, T) for vector<T, 4> is deprecated. For details, see https://github.com/shader-slang/slang/issues/12093")]
+    [RemovedSince(2026, "Three-component initializer (vector<T, 2>, T) for vector<T, 4> has been removed since Slang 2026.")]
+    __init(vector<T,2> xy, T z)
+    {
+        // legacy semantics with implicit promotion of z to vector<T,2>
+        this = { xy.x, xy.y, z, z };
+    }
+
+    // we need to disable this initializer explicitly to avoid implicit conversion
+    // of (int, int2) to (int2, int2)
+    [__unsafeForceInlineEarly]
+    [deprecated("Three-component initializer (T, vector<T, 2>) for vector<T, 4> is deprecated. For details, see https://github.com/shader-slang/slang/issues/12093")]
+    [RemovedSince(2026, "Three-component initializer (T, vector<T, 2>) for vector<T, 4> has been removed since Slang 2026.")]
+    __init(T x, vector<T,2> yz)
+    {
+        // legacy semantics with implicit promotion of x to vector<T,2>
+        this = { x, x, yz.x, yz.y };
+    }
 }
 
 ${

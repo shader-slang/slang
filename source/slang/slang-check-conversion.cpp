@@ -785,24 +785,54 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
             SemanticsVisitor subVisitor(withSink(&tempSink));
             ctorInvokeExpr = subVisitor.CheckTerm(ctorInvokeExpr);
 
+            // The constructor is type-checked against a temporary sink so that a
+            // genuine overload-match failure can be swallowed and retried through
+            // the legacy initializer-list path. Once we commit to the
+            // constructor, however, any diagnostics it produced are real and must
+            // be surfaced on the caller's sink. This includes warnings such as a
+            // `[deprecated]` constructor (which leave `getErrorCount() == 0` and
+            // were previously lost) as well as errors such as a `[RemovedSince]`
+            // constructor. We only forward when actually building the result
+            // expression (`outExpr != nullptr`); a `canCoerce()` viability probe
+            // passes `outExpr == nullptr` and must stay silent (see `canCoerce`).
+            auto forwardDiagnostics = [&]()
+            {
+                if (!outExpr || tempSink.outputBuffer.getLength() == 0)
+                    return;
+                getSink()->diagnoseRaw(
+                    tempSink.getErrorCount() ? Severity::Error : Severity::Warning,
+                    tempSink.outputBuffer.getUnownedSlice());
+            };
+
+            // A genuine overload-match failure yields an error expression,
+            // whereas a matched constructor that merely emitted diagnostics
+            // (e.g. it is `[deprecated]` or `[RemovedSince]`) still yields a
+            // valid constructor-call expression.
+            const bool ctorMatched = !IsErrorExpr(ctorInvokeExpr);
+
             if (tempSink.getErrorCount())
             {
                 HashSet<Type*> isVisit;
-                if (!isCStyleType(toType, isVisit))
-                {
-                    Slang::ComPtr<ISlangBlob> blob;
-                    tempSink.getBlobIfNeeded(blob.writeRef());
-                    getSink()->diagnoseRaw(
-                        Severity::Error,
-                        static_cast<char const*>(blob->getBufferPointer()));
-                    // For non-c-style types, we will always return true when there
-                    // is a ctor, so that we do not fallback to legacy initializer list logic
-                    // in `_coerceInitializerList()` and produce unrelated errors.
-                    if (outExpr)
-                        *outExpr = CreateErrorExpr(ctorInvokeExpr);
-                    return true;
-                }
-                return false;
+                const bool cStyle = isCStyleType(toType, isVisit);
+
+                // For a C-style type, a genuine match failure should fall back to
+                // the legacy initializer-list logic in `_coerceInitializerList()`.
+                // But when the constructor actually matched and the error is about
+                // that constructor itself (for example it has been removed via
+                // `[RemovedSince]`), falling back would silently discard the
+                // error, so we surface it here instead.
+                if (cStyle && !ctorMatched)
+                    return false;
+
+                forwardDiagnostics();
+
+                // For non-c-style types (and matched-but-errored C-style ctors),
+                // we always return true when there is a ctor, so that we do not
+                // fallback to legacy initializer list logic in
+                // `_coerceInitializerList()` and produce unrelated errors.
+                if (outExpr)
+                    *outExpr = CreateErrorExpr(ctorInvokeExpr);
+                return true;
             }
 
             // The explicit constructor matched and type-checked, so this is a
@@ -813,6 +843,7 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
             // candidate. This mirrors `createInvokeExprForSynthesizedCtor` and
             // `createCtorInvokeExprForAbstractType`, which return `true`
             // independent of `outExpr`.
+            forwardDiagnostics();
             if (outExpr)
                 *outExpr = ctorInvokeExpr;
             return true;
