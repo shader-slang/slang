@@ -169,6 +169,12 @@ def memory_series(results_dir, recs, metric):
                         vals[(run["workload"], cnt)] = st.get(metric)
         for key in set(per) | set(vals):
             per.setdefault(key, [None] * (len(labels) - 1)).append(vals.get(key))
+        # Fail loudly if the alignment ever skews: consumers pair values to
+        # labels positionally (own-memory zips against the floor series, and
+        # line_panel maps value index to x position), so a length mismatch
+        # would render a plausible-but-wrong chart, not an error.
+        assert all(len(v) == len(labels) for v in per.values()), \
+            "memory_series: series/label length skew"
     return labels, per
 
 
