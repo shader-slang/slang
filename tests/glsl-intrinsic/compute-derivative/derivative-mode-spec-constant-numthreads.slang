@@ -9,22 +9,32 @@
 // GLSL `local_size_*_id`) is allowed with compute derivative groups; Vulkan
 // validates the resolved size at pipeline creation time.
 
-// CHECK_SPV_QUAD-DAG: OpExecutionModeId %computeMain LocalSizeId
+// CHECK_SPV_QUAD-DAG: OpExecutionModeId %computeMain LocalSizeId %[[SX:[0-9A-Za-z_]+]] %[[SY:[0-9A-Za-z_]+]] %[[SZ:[0-9A-Za-z_]+]]
+// CHECK_SPV_QUAD-DAG: OpDecorate %[[SX]] SpecId 0
+// CHECK_SPV_QUAD-DAG: OpDecorate %[[SY]] SpecId 1
+// CHECK_SPV_QUAD-DAG: %[[SZ]] = OpConstant %{{u?}}int 1
 // CHECK_SPV_QUAD-DAG: OpExecutionMode %computeMain DerivativeGroupQuads{{NV|KHR}}
 
-// CHECK_SPV_LINEAR-DAG: OpExecutionModeId %computeMain LocalSizeId
+// CHECK_SPV_LINEAR-DAG: OpExecutionModeId %computeMain LocalSizeId %[[SX:[0-9A-Za-z_]+]] %[[SY:[0-9A-Za-z_]+]] %[[SZ:[0-9A-Za-z_]+]]
+// CHECK_SPV_LINEAR-DAG: OpDecorate %[[SX]] SpecId 0
+// CHECK_SPV_LINEAR-DAG: OpDecorate %[[SY]] SpecId 1
+// CHECK_SPV_LINEAR-DAG: %[[SZ]] = OpConstant %{{u?}}int 1
 // CHECK_SPV_LINEAR-DAG: OpExecutionMode %computeMain DerivativeGroupLinear{{NV|KHR}}
 
 // CHECK_GLSL_QUAD-DAG: layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 // CHECK_GLSL_QUAD-DAG: layout(derivative_group_quadsNV) in;
 
-// Verufy that glslang also accepts spec-constant local size combined with a
+// Verify that glslang also accepts spec-constant local size combined with a
 // derivative-group layout qualifier.
+// CHECK_VIA_GLSL_QUAD-DAG: OpExecutionModeId %main LocalSizeId %[[GSX:[0-9A-Za-z_]+]] %[[GSY:[0-9A-Za-z_]+]] %[[GSZ:[0-9A-Za-z_]+]]
 // CHECK_VIA_GLSL_QUAD-DAG: OpExecutionMode %main DerivativeGroupQuads{{NV|KHR}}
-// CHECK_VIA_GLSL_QUAD-DAG: SpecId 0
+// CHECK_VIA_GLSL_QUAD-DAG: OpDecorate %[[GSX]] SpecId 0
+// CHECK_VIA_GLSL_QUAD-DAG: OpDecorate %[[GSY]] SpecId 1
 
+// CHECK_VIA_GLSL_LINEAR-DAG: OpExecutionModeId %main LocalSizeId %[[GSX:[0-9A-Za-z_]+]] %[[GSY:[0-9A-Za-z_]+]] %[[GSZ:[0-9A-Za-z_]+]]
 // CHECK_VIA_GLSL_LINEAR-DAG: OpExecutionMode %main DerivativeGroupLinear{{NV|KHR}}
-// CHECK_VIA_GLSL_LINEAR-DAG: SpecId 0
+// CHECK_VIA_GLSL_LINEAR-DAG: OpDecorate %[[GSX]] SpecId 0
+// CHECK_VIA_GLSL_LINEAR-DAG: OpDecorate %[[GSY]] SpecId 1
 
 // A literal axis that violates the quad constraint is still diagnosed even
 // when another axis is a specialization constant.
