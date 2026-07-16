@@ -6520,6 +6520,11 @@ Type* TypeLayoutContext::resolveLinkTimeAssociatedType(DeclRefType* declRefType)
     // The lookup witness proves `wrapperType : interfaceType` (e.g. `ShaderMode : IShaderMode`);
     // the associated type is projected from `wrapperType`. We only care about the case where
     // `wrapperType` is a link-time wrapper (an `export`/`extern` struct with an `aliasedType`).
+    //
+    // NOTE: this handles an associated type declared on the interface the wrapper *directly*
+    // conforms to. An associated type declared on a *base* of that interface roots the lookup
+    // witness at the base, which the wrapper carries no `witnessVal` for, so it is not resolved
+    // here and still hits the layout path that #9580 fixes; that transitive case is a follow-up.
     auto interfaceType = lookup->getWitness()->getSup();
     auto wrapperType = as<DeclRefType>(lookup->getWitness()->getSub());
     if (!wrapperType)
@@ -6529,9 +6534,12 @@ Type* TypeLayoutContext::resolveLinkTimeAssociatedType(DeclRefType* declRefType)
         return declRefType;
 
     // Find the concrete `aliasedType : interfaceType` witness that checking stored on the wrapper's
-    // inheritance clause, then re-resolve the associated-type requirement against it. The witness
-    // is substituted through `inheritanceDeclRef` so a generic wrapper keeps its specialization
-    // context.
+    // inheritance clause (`witnessVal`, e.g. `SolidMode : IShaderMode`), then re-resolve the
+    // associated-type requirement against it. Resolution reads the concrete type's own witness
+    // table and yields the satisfying type (e.g. `ColorOutput`). The witness is substituted through
+    // `inheritanceDeclRef` so a generic wrapper's arguments are bound into it: for
+    // `ShaderMode<ColorOutput> = SolidMode<T>` the substitution binds `T = ColorOutput`, without
+    // which the unbound `T` would leak into layout.
     for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(astBuilder, wrapperDeclRef))
     {
         auto witnessVal = inheritanceDeclRef.getDecl()->witnessVal;
