@@ -871,6 +871,5 @@ return {
 	["CastUntypedResourceHandleToUInt"] = 895,
 	["CastUIntToUntypedSamplerHandle"] = 896,
 	["CastUntypedSamplerHandleToUInt"] = 897,
-	["getNaturalAlignment"] = 898,
-	["getBaseAlignment"] = 899
+	["getBaseAlignment"] = 898
 }

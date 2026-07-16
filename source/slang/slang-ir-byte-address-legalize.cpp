@@ -307,10 +307,11 @@ struct ByteAddressBufferLegalizationContext
         // will be split into narrower loads/stores. That is valid but suboptimal, so we warn
         // rather than error: e.g. `LoadAligned<float3>(loc, 8)` and `LoadAligned<float4>(loc, 8)`
         // are both legal (8 >= the 4-byte scalar floor) but below the 16-byte base alignment, so
-        // they scalarize. This fires whenever the type's base alignment exceeds its
-        // scalar-component floor — i.e. for any vector or aggregate wider than one scalar
-        // (`float2`/`float3`/`float4`, structs, arrays), not just vec3 — and never for a lone
-        // scalar, whose base alignment equals its floor so no below-base band exists.
+        // they scalarize. This fires whenever the type's std430 base alignment exceeds its
+        // scalar-component floor — vectors, and aggregates whose members push the base alignment
+        // above that floor (e.g. anything containing a `float2`/`float3`/`float4`). It never fires
+        // when the base alignment already equals the floor (a lone scalar, or a struct/array of
+        // only `float`s, base alignment 4), since then there is no below-base band.
         IRSizeAndAlignment baseSizeAlignment;
         if (SLANG_SUCCEEDED(getStd430SizeAndAlignment(m_target, accessType, &baseSizeAlignment)) &&
             baseSizeAlignment.alignment > 0 && alignmentVal < baseSizeAlignment.alignment)

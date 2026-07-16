@@ -23,7 +23,6 @@ static bool isMetaOp(IRInst* inst)
     case kIROp_IsCoopFloat:
     case kIROp_IsVector:
     case kIROp_GetNaturalStride:
-    case kIROp_GetNaturalAlignment:
     case kIROp_GetBaseAlignment:
     case kIROp_TypeEquals:
         return true;
