@@ -7,14 +7,22 @@
 // alignment lowers to a single wide load (`.xyz` of a 16-byte access) instead of three scalar
 // element loads. A promise below the base alignment (but at/above the 4-byte scalar floor) is
 // still valid, but scalarizes and is reported as a suboptimal-access warning (E41304).
-//
-// Tested on SPIR-V, where byte-address accesses lower to structured access and the alignment
-// promise drives codegen. (On HLSL the access stays a native `ByteAddressBuffer.Load3`, so the
-// wide-vs-scalarized distinction is not observable.)
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly -entry computeMain -stage compute
+// Value test: on Vulkan the byte-address buffer lowers to a structured buffer and both the wide
+// (promise 16) and scalarized (promise 8) accesses must round-trip the same values. CPU exercises
+// the direct byte-address path for the same values.
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST(vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 
-RWByteAddressBuffer buffer;
+// Codegen test: on SPIR-V the promise-16 access is a single wide `float3` load and the promise-8
+// access scalarizes with the below-base warning.
+//TEST:SIMPLE(filecheck=CHECKIR):-target spirv -emit-spirv-directly -entry computeMain -stage compute
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):name=scratch
+RWByteAddressBuffer scratch;
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<float> outputBuffer;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -22,16 +30,28 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     // Promise 16 == `float3`'s base alignment, so this is a single wide load of a `float3`
     // (three floats loaded together), not three separate scalar loads. No warning.
-    float3 wide = buffer.LoadAligned<float3>(tid.x * 16, 16);
+    scratch.StoreAligned<float3>(0, float3(2.0f, 3.0f, 4.0f));
+    float3 wide = scratch.LoadAligned<float3>(0, 16);
 
     // Promise 8 clears the 4-byte scalar floor but is below the 16-byte base alignment, so the
     // access is valid yet scalarized into three 32-bit element loads, with a below-base warning.
-    // CHECK-DAG: warning[E41304]
-    float3 narrow = buffer.LoadAligned<float3>(tid.x * 16, 8);
+    // CHECKIR-DAG: warning[E41304]
+    float3 narrow = scratch.LoadAligned<float3>(0, 8);
 
-    buffer.StoreAligned<float3>(0, wide + narrow);
+    // CHECK: 2.0
+    outputBuffer[0] = wide.x;
+    // CHECK: 3.0
+    outputBuffer[1] = wide.y;
+    // CHECK: 4.0
+    outputBuffer[2] = wide.z;
+    // Scalarized read of the same bytes must agree with the wide read.
+    // CHECK: 2.0
+    outputBuffer[3] = narrow.x;
+    // CHECK: 3.0
+    outputBuffer[4] = narrow.y;
+    // CHECK: 4.0
+    outputBuffer[5] = narrow.z;
 }
 
-// The promise-16 load is a single 3-component vector load; the promise-8 load scalarizes into
-// three. Match the wide vector load explicitly.
-// CHECK: OpLoad %v3float
+// The promise-16 load is a single 3-component vector load.
+// CHECKIR: OpLoad %v3float
