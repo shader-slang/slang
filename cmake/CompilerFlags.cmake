@@ -185,6 +185,13 @@ function(set_default_compile_options target)
     # reports `CMAKE_CXX_COMPILER_ID` as `Clang` but expects MSVC-style flags,
     # so it must keep the default `/Od` optimization level rather than receive
     # the GNU-style `-Og`. Plain MSVC (`cl`) has no `-Og` equivalent either.
+    #
+    # `-Og` is applied with a raw `target_compile_options` rather than through
+    # `add_supported_cxx_flags`: that helper feature-tests via
+    # `check_cxx_compiler_flag`, which operates on a literal flag string and
+    # cannot see through the `$<$<CONFIG:Debug>:...>` generator expression
+    # needed to condition `-Og` on the Debug config. Hardcoding is safe since
+    # `-Og` has been supported by GCC since 4.8 and by Clang for years.
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT MSVC)
         target_compile_options(${target} PRIVATE $<$<CONFIG:Debug>:-Og>)
     endif()
