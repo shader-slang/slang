@@ -26,6 +26,11 @@ sibling examples `shader-coverage-image-pipeline` and
 ## Running
 
 ```bash
+# Build (from the repository root):
+cmake --build --preset release --target shader-coverage-backends
+# The binary lands in
+# build/examples/shader-coverage-backends/Release/shader-coverage-backends
+
 shader-coverage-backends --backend=cpu
 shader-coverage-backends --backend=cuda       # NVIDIA GPU + CUDA toolkit
 shader-coverage-backends --backend=vulkan
