@@ -180,6 +180,18 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
         return SLANG_FAIL;
     }
 
+    const bool hasExplicitSeparateDebugInfoOutputPath = _hasExplicitSeparateDebugInfoOutputPath();
+    if (hasExplicitSeparateDebugInfoOutputPath && !optionSet.shouldEmitSeparateDebugInfo())
+    {
+        getSink()->diagnose(Diagnostics::SeparateDebugInfoOutputWithoutSeparateDebugInfo{});
+        return SLANG_FAIL;
+    }
+    if (hasExplicitSeparateDebugInfoOutputPath && m_containerFormat != ContainerFormat::None)
+    {
+        getSink()->diagnose(Diagnostics::SeparateDebugInfoOutputWithContainer{});
+        return SLANG_FAIL;
+    }
+
     // We only do parsing and semantic checking if we *aren't* doing
     // a pass-through compilation.
     //
@@ -405,7 +417,7 @@ String EndToEndCompileRequest::_getEntryPointPath(TargetRequest* targetReq, Inde
 
 SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact* artifact)
 {
-    if (path.getLength() > 0)
+    if (path.getLength() > 0 && path != "-")
     {
         SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::writeToFile(artifact, getSink(), path));
     }
@@ -426,6 +438,16 @@ String EndToEndCompileRequest::_getExplicitCoverageManifestPath()
 bool EndToEndCompileRequest::_hasExplicitCoverageManifestPath()
 {
     return _getExplicitCoverageManifestPath().getLength() != 0;
+}
+
+String EndToEndCompileRequest::_getExplicitSeparateDebugInfoOutputPath()
+{
+    return getOptionSet().getStringOption(CompilerOptionName::SeparateDebugInfoOutput);
+}
+
+bool EndToEndCompileRequest::_hasExplicitSeparateDebugInfoOutputPath()
+{
+    return _getExplicitSeparateDebugInfoOutputPath().getLength() != 0;
 }
 
 // If the artifact carries coverage tracing metadata, write its JSON
@@ -508,6 +530,11 @@ static bool _areOutputPathsEquivalent(const String& left, const String& right)
 #endif
 }
 
+static bool _isStdoutArtifactPath(const String& path)
+{
+    return path.getLength() == 0 || path == "-";
+}
+
 SlangResult EndToEndCompileRequest::_maybeWriteCoverageManifest(
     const String& path,
     IArtifact* artifact)
@@ -524,7 +551,7 @@ SlangResult EndToEndCompileRequest::_maybeWriteCoverageManifest(
     }
     else
     {
-        if (path.getLength() == 0)
+        if (_isStdoutArtifactPath(path))
             return SLANG_OK;
         sidecarPath = path + ".coverage-manifest.json";
     }
@@ -595,7 +622,7 @@ static String _getDebugSpvPath(const String& basePath)
     return basePath + dbgExt;
 }
 
-String EndToEndCompileRequest::_getDebugArtifactPath(
+String EndToEndCompileRequest::_getSeparateDebugInfoOutputPath(
     TargetProgram* targetProgram,
     const String& path,
     IArtifact* artifact)
@@ -603,39 +630,144 @@ String EndToEndCompileRequest::_getDebugArtifactPath(
     if (!targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
         return String();
 
-    const auto dbgArtifact = getSeparateDbgArtifact(artifact);
-    if (!dbgArtifact)
+    const auto separateDebugInfoArtifact = getSeparateDbgArtifact(artifact);
+    if (!separateDebugInfoArtifact)
         return String();
+
+    const String explicitPath = _getExplicitSeparateDebugInfoOutputPath();
+    if (explicitPath.getLength() != 0)
+        return explicitPath;
+
+    // Preserve the legacy behavior as a fallback: without an explicit debug path, derive the
+    // sidecar location from the main `-o` output file.
+    SLANG_RELEASE_ASSERT(!_isStdoutArtifactPath(path));
 
     // The artifact's name may have been set to the debug build id hash, use
     // it as the filename if it exists.
-    String dbgPath = dbgArtifact->getName();
-    if (dbgPath.getLength() == 0)
-        dbgPath = _getDebugSpvPath(path);
+    String separateDebugInfoOutputPath = separateDebugInfoArtifact->getName();
+    if (separateDebugInfoOutputPath.getLength() == 0)
+    {
+        separateDebugInfoOutputPath = _getDebugSpvPath(path);
+    }
     else
-        dbgPath.append(".dbg.spv");
-    return dbgPath;
+    {
+        separateDebugInfoOutputPath.append(".dbg.spv");
+    }
+    return separateDebugInfoOutputPath;
 }
 
-SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
+SlangResult EndToEndCompileRequest::_validateSeparateDebugInfoOutputPaths()
+{
+    const String explicitPath = _getExplicitSeparateDebugInfoOutputPath();
+    const bool hasExplicitPath = explicitPath.getLength() != 0;
+
+    auto linkage = getLinkage();
+    auto program = getSpecializedGlobalAndEntryPointsComponentType();
+
+    List<String> otherOutputPaths;
+    Index debugArtifactCount = 0;
+    bool missingDerivedPath = false;
+
+    for (auto targetReq : linkage->targets)
+    {
+        auto targetProgram = program->getTargetProgram(targetReq);
+        const bool generateWholeProgram =
+            targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram);
+        const Index artifactCount = generateWholeProgram ? 1 : program->getEntryPointCount();
+
+        for (Index artifactIndex = 0; artifactIndex < artifactCount; ++artifactIndex)
+        {
+            bool needToRecordArtifact = false;
+            String artifactPath;
+            IArtifact* artifact = nullptr;
+
+            if (generateWholeProgram)
+            {
+                artifact = targetProgram->getExistingWholeProgramResult();
+                artifactPath = _getWholeProgramPath(targetReq);
+                needToRecordArtifact = artifact != nullptr;
+            }
+            else
+            {
+                artifact = targetProgram->getExistingEntryPointResult(artifactIndex);
+                artifactPath = _getEntryPointPath(targetReq, artifactIndex);
+                needToRecordArtifact = artifact != nullptr;
+            }
+
+            if (!needToRecordArtifact || !getSeparateDbgArtifact(artifact))
+                continue;
+
+            debugArtifactCount++;
+            if (!hasExplicitPath)
+            {
+                if (_isStdoutArtifactPath(artifactPath))
+                    missingDerivedPath = true;
+                continue;
+            }
+
+            // Normalize both spellings of stdout so an explicit `-` sidecar cannot collide with an
+            // implicit stdout main artifact.
+            otherOutputPaths.add(_isStdoutArtifactPath(artifactPath) ? String("-") : artifactPath);
+
+            if (_findCoverageTracingMetadata(artifact))
+            {
+                String coveragePath = _getExplicitCoverageManifestPath();
+                if (coveragePath.getLength() == 0 && !_isStdoutArtifactPath(artifactPath))
+                    coveragePath = artifactPath + ".coverage-manifest.json";
+                if (coveragePath.getLength() != 0)
+                    otherOutputPaths.add(coveragePath);
+            }
+        }
+    }
+
+    if (missingDerivedPath)
+    {
+        getSink()->diagnose(Diagnostics::SeparateDebugInfoRequiresOutputPath{});
+        return SLANG_FAIL;
+    }
+
+    if (!hasExplicitPath)
+        return SLANG_OK;
+
+    if (debugArtifactCount == 0)
+    {
+        getSink()->diagnose(
+            Diagnostics::SeparateDebugInfoOutputWithoutDebugData{.path = explicitPath});
+        return SLANG_FAIL;
+    }
+    SLANG_RELEASE_ASSERT(debugArtifactCount == 1);
+
+    for (const auto& otherPath : otherOutputPaths)
+    {
+        if (_areOutputPathsEquivalent(explicitPath, otherPath))
+        {
+            getSink()->diagnose(
+                Diagnostics::SeparateDebugInfoOutputCollidesWithArtifact{.path = explicitPath});
+            return SLANG_FAIL;
+        }
+    }
+
+    return SLANG_OK;
+}
+
+SlangResult EndToEndCompileRequest::_maybeWriteSeparateDebugInfoOutput(
     TargetProgram* targetProgram,
     const String& path,
     IArtifact* artifact)
 {
-    if (targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
-    {
-        const auto dbgArtifact = getSeparateDbgArtifact(artifact);
-        // Check if a debug artifact was actually created (only for SPIR-V targets)
-        if (dbgArtifact)
-        {
-            String dbgPath = _getDebugArtifactPath(targetProgram, path, artifact);
-            return _maybeWriteArtifact(dbgPath, dbgArtifact);
-        }
-        // If no debug artifact exists (e.g., for non-SPIR-V targets), just silently succeed
-        // The warning about unsupported targets is already issued during option parsing
-    }
+    if (!targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
+        return SLANG_OK;
 
-    return SLANG_OK;
+    const auto separateDebugInfoArtifact = getSeparateDbgArtifact(artifact);
+    // A separate debug-info artifact is currently produced only for SPIR-V targets. The warning
+    // about unsupported targets is already issued during option parsing.
+    if (!separateDebugInfoArtifact)
+        return SLANG_OK;
+
+    String separateDebugInfoOutputPath =
+        _getSeparateDebugInfoOutputPath(targetProgram, path, artifact);
+    SLANG_RELEASE_ASSERT(separateDebugInfoOutputPath.getLength() != 0);
+    return _maybeWriteArtifact(separateDebugInfoOutputPath, separateDebugInfoArtifact);
 }
 
 SlangResult EndToEndCompileRequest::_validateCoverageManifestOutputPaths()
@@ -656,48 +788,47 @@ SlangResult EndToEndCompileRequest::_validateCoverageManifestOutputPaths()
     List<String> emittedArtifactPaths;
     Index coverageArtifactCount = 0;
 
-    // Records paths slangc will emit for this target/artifact pair and counts
-    // coverage-bearing artifacts. The count rejects 0 or 2+ coverage artifacts;
-    // the path list rejects explicit-sidecar collisions.
-    auto recordArtifact =
-        [&](TargetProgram* targetProgram, const String& artifactPath, IArtifact* artifact)
-    {
-        if (!artifact)
-            return;
-        // Stdout artifacts have no file path to collide with.
-        if (artifactPath.getLength() != 0)
-            emittedArtifactPaths.add(artifactPath);
-
-        String dbgPath = _getDebugArtifactPath(targetProgram, artifactPath, artifact);
-        // Targets that did not emit separate debug info have no debug path to collide with.
-        if (dbgPath.getLength() != 0)
-            emittedArtifactPaths.add(dbgPath);
-
-        if (_findCoverageTracingMetadata(artifact))
-            coverageArtifactCount++;
-    };
-
     for (auto targetReq : linkage->targets)
     {
         auto targetProgram = program->getTargetProgram(targetReq);
+        const bool generateWholeProgram =
+            targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram);
+        const Index artifactCount = generateWholeProgram ? 1 : program->getEntryPointCount();
 
-        if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
+        for (Index artifactIndex = 0; artifactIndex < artifactCount; ++artifactIndex)
         {
-            recordArtifact(
-                targetProgram,
-                _getWholeProgramPath(targetReq),
-                targetProgram->getExistingWholeProgramResult());
-        }
-        else
-        {
-            Index entryPointCount = program->getEntryPointCount();
-            for (Index ee = 0; ee < entryPointCount; ++ee)
+            bool needToRecordArtifact = false;
+            String artifactPath;
+            IArtifact* artifact = nullptr;
+
+            if (generateWholeProgram)
             {
-                recordArtifact(
-                    targetProgram,
-                    _getEntryPointPath(targetReq, ee),
-                    targetProgram->getExistingEntryPointResult(ee));
+                artifact = targetProgram->getExistingWholeProgramResult();
+                artifactPath = _getWholeProgramPath(targetReq);
+                needToRecordArtifact = artifact != nullptr;
             }
+            else
+            {
+                artifact = targetProgram->getExistingEntryPointResult(artifactIndex);
+                artifactPath = _getEntryPointPath(targetReq, artifactIndex);
+                needToRecordArtifact = artifact != nullptr;
+            }
+
+            if (!needToRecordArtifact)
+                continue;
+
+            // Stdout artifacts have no file path to collide with.
+            if (!_isStdoutArtifactPath(artifactPath))
+                emittedArtifactPaths.add(artifactPath);
+
+            String separateDebugInfoOutputPath =
+                _getSeparateDebugInfoOutputPath(targetProgram, artifactPath, artifact);
+            // Targets that did not emit separate debug info have no debug path to collide with.
+            if (separateDebugInfoOutputPath.getLength() != 0)
+                emittedArtifactPaths.add(separateDebugInfoOutputPath);
+
+            if (_findCoverageTracingMetadata(artifact))
+                coverageArtifactCount++;
         }
     }
 
@@ -1004,6 +1135,9 @@ void EndToEndCompileRequest::generateOutput()
 
     if (m_isCommandLineCompile && m_containerFormat == ContainerFormat::None)
     {
+        if (SLANG_FAILED(_validateSeparateDebugInfoOutputPaths()))
+            return;
+
         if (SLANG_FAILED(_validateCoverageManifestOutputPaths()))
             return;
 
@@ -1025,7 +1159,7 @@ void EndToEndCompileRequest::generateOutput()
 
                     // If we are compiling separate debug info, check for the additional
                     // SPIRV artifact and write that if needed.
-                    _maybeWriteDebugArtifact(targetProgram, path, artifact);
+                    _maybeWriteSeparateDebugInfoOutput(targetProgram, path, artifact);
 
                     _maybeWriteCoverageManifest(path, artifact);
                 }
@@ -1043,7 +1177,7 @@ void EndToEndCompileRequest::generateOutput()
 
                         // If we are compiling separate debug info, check for the additional
                         // SPIRV artifact and write that if needed.
-                        _maybeWriteDebugArtifact(targetProgram, path, artifact);
+                        _maybeWriteSeparateDebugInfoOutput(targetProgram, path, artifact);
 
                         _maybeWriteCoverageManifest(path, artifact);
                     }

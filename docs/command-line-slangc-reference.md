@@ -659,7 +659,15 @@ When generating SPIRV with spvDescriptorHeapEXT, emit each resource descriptor-h
 
 <a id="separate-debug-info"></a>
 ### -separate-debug-info
-Emit debug data to a separate file, and strip it from the main output file. 
+Emit debug data to a separate file, and strip it from the main output file. For backward compatibility, when `-separate-debug-info-output &lt;path&gt;` is omitted, the debug file path falls back to the path derived from the main `-o &lt;path&gt;` output. Specify `-separate-debug-info-output &lt;path&gt;` to override that fallback or when the main artifact is written to stdout.
+
+
+<a id="separate-debug-info-output"></a>
+### -separate-debug-info-output
+
+**-separate-debug-info-output &lt;path&gt;**
+
+Write separate debug information to an explicit sidecar path, overriding the fallback path derived from `-o &lt;path&gt;`. Requires `-separate-debug-info`. Use `-` as the path to write the separate debug information to stdout when the main artifact is written to a file. The main artifact and separate debug information cannot both be written to stdout. When this option is omitted, the legacy `-o`-based path derivation remains in effect.
 
 
 <a id="emit-cpu-via-cpp"></a>

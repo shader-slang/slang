@@ -385,18 +385,22 @@ private:
     String _getEntryPointPath(TargetRequest* targetReq, Index entryPointIndex);
     String _getExplicitCoverageManifestPath();
     bool _hasExplicitCoverageManifestPath();
+    String _getExplicitSeparateDebugInfoOutputPath();
+    bool _hasExplicitSeparateDebugInfoOutputPath();
 
     /// Maybe write the artifact to the path (if set), or stdout (if there is no container or path)
     SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
-    /// Returns the path slangc would use for a separate-debug-info artifact for this
-    /// target/artifact pair, or empty if none will be emitted. Used by both the debug artifact
-    /// writer and coverage-manifest preflight collision checks. Empty means either separate debug
-    /// info is disabled or the target did not produce a debug artifact.
-    String _getDebugArtifactPath(
+    /// Returns the explicit separate-debug path when one was requested; otherwise derives the
+    /// sidecar path from the main artifact path. Returns empty when separate debug info is disabled
+    /// or the target did not produce a separate debug-info artifact.
+    String _getSeparateDebugInfoOutputPath(
         TargetProgram* targetProgram,
         const String& path,
         IArtifact* artifact);
-    SlangResult _maybeWriteDebugArtifact(
+    /// Preflight-validates separate-debug output before any artifact write, including stdout and
+    /// path-collision cases.
+    SlangResult _validateSeparateDebugInfoOutputPaths();
+    SlangResult _maybeWriteSeparateDebugInfoOutput(
         TargetProgram* targetProgram,
         const String& path,
         IArtifact* artifact);
