@@ -1068,6 +1068,22 @@ Same as [-save-core-module](#save-core-module) but output the data as a C array.
 
 
 
+<a id="save-autodiff-module"></a>
+### -save-autodiff-module
+
+**-save-autodiff-module &lt;filename&gt;**
+
+Save the autodiff builtin module to an archive file. 
+
+
+<a id="save-autodiff-module-bin-source"></a>
+### -save-autodiff-module-bin-source
+
+**-save-autodiff-module-bin-source &lt;filename&gt;**
+
+Save the autodiff builtin module as a C array. 
+
+
 <a id="save-glsl-module-bin-source"></a>
 ### -save-glsl-module-bin-source
 

@@ -166,6 +166,31 @@ Module* Session::getBuiltinModule(slang::BuiltinModuleName name)
     return nullptr;
 }
 
+SlangResult Session::loadAutodiffModuleIfNeeded()
+{
+    if (getBuiltinModule(slang::BuiltinModuleName::Autodiff))
+        return SLANG_OK;
+
+    // Loading the supplement while source-compiling either builtin module would recursively start
+    // another builtin compilation. The current compilation already sees and checks its own
+    // declarations; the caller therefore has no late-loaded module to merge in this case.
+    if (m_isCompilingBuiltinModule)
+        return SLANG_OK;
+
+    // Normal builds keep the serialized supplement in the library without deserializing it. A
+    // bootstrap/source-only build has no serialized blob, so compile the same source segment when
+    // it is first requested.
+    if (auto moduleBlob = slang_getEmbeddedAutodiffModule())
+    {
+        return loadBuiltinModule(
+            slang::BuiltinModuleName::Autodiff,
+            moduleBlob->getBufferPointer(),
+            moduleBlob->getBufferSize());
+    }
+
+    return compileBuiltinModule(slang::BuiltinModuleName::Autodiff, 0);
+}
+
 void Session::_initCodeGenTransitionMap()
 {
     // TODO(JS): Might want to do something about these in the future...
@@ -347,6 +372,9 @@ const char* getBuiltinModuleNameStr(slang::BuiltinModuleName name)
     case slang::BuiltinModuleName::GLSL:
         result = "glsl";
         break;
+    case slang::BuiltinModuleName::Autodiff:
+        result = "autodiff";
+        break;
     default:
         SLANG_UNEXPECTED("Unknown builtin module");
     }
@@ -373,6 +401,9 @@ Session::BuiltinModuleInfo Session::getBuiltinModuleInfo(slang::BuiltinModuleNam
         result.name = "glsl";
         result.languageScope = glslLanguageScope;
         break;
+    case slang::BuiltinModuleName::Autodiff:
+        result.languageScope = coreLanguageScope;
+        break;
     default:
         SLANG_UNEXPECTED("Unknown builtin module");
     }
@@ -391,10 +422,15 @@ void Session::getBuiltinModuleSource(StringBuilder& sb, slang::BuiltinModuleName
     case slang::BuiltinModuleName::Core:
         sb << (const char*)getCoreLibraryCode()->getBufferPointer()
            << (const char*)getHLSLLibraryCode()->getBufferPointer()
-           << (const char*)getAutodiffLibraryCode()->getBufferPointer();
+           << (const char*)getAutodiffBaseLibraryCode()->getBufferPointer();
         break;
     case slang::BuiltinModuleName::GLSL:
         sb << (const char*)getGLSLLibraryCode()->getBufferPointer();
+        break;
+    case slang::BuiltinModuleName::Autodiff:
+        // The supplement is a module that depends on the base core. Every builtin declaration
+        // referenced by this source must therefore remain in one of the eager core segments above.
+        sb << (const char*)getAutodiffLibraryCode()->getBufferPointer();
         break;
     }
 }
@@ -405,9 +441,14 @@ SlangResult Session::compileBuiltinModule(
 {
     SLANG_AST_BUILDER_RAII(m_builtinLinkage->getASTBuilder());
 
+    const bool wasCompilingBuiltinModule = m_isCompilingBuiltinModule;
+    m_isCompilingBuiltinModule = true;
+    SLANG_DEFER(m_isCompilingBuiltinModule = wasCompilingBuiltinModule);
+
 #ifdef _DEBUG
     time_t beginTime = 0;
-    if (moduleName == slang::BuiltinModuleName::Core)
+    if (moduleName == slang::BuiltinModuleName::Core ||
+        moduleName == slang::BuiltinModuleName::Autodiff)
     {
         // Print a message in debug builds to notice the user that compiling the core module
         // can take a while.
@@ -435,7 +476,8 @@ SlangResult Session::compileBuiltinModule(
         moduleSrcBlob,
         compiledModule);
 
-    if (moduleName == slang::BuiltinModuleName::Core)
+    if (moduleName == slang::BuiltinModuleName::Core ||
+        moduleName == slang::BuiltinModuleName::Autodiff)
     {
         // We need to retain this AST so that we can use it in other code
         // (Note that the `Scope` type does not retain the AST it points to)
@@ -505,7 +547,8 @@ SlangResult Session::loadBuiltinModule(
         builtinModuleInfo.name,
         module));
 
-    if (moduleName == slang::BuiltinModuleName::Core)
+    if (moduleName == slang::BuiltinModuleName::Core ||
+        moduleName == slang::BuiltinModuleName::Autodiff)
     {
         // We need to retain this AST so that we can use it in other code
         // (Note that the `Scope` type does not retain the AST it points to)

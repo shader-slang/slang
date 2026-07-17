@@ -5962,6 +5962,14 @@ static Expr* _checkHigherOrderInvokeExpr(
     HigherOrderInvokeExpr* expr,
     HigherOrderInvokeExprCheckingActions* actions)
 {
+    // DifferentiateExpr and PrimalSubstituteExpr need derivative implementations. The remaining
+    // HigherOrderInvokeExpr subtype, DispatchKernelExpr, only describes a kernel launch.
+    if ((as<DifferentiateExpr>(expr) || as<PrimalSubstituteExpr>(expr)) &&
+        SLANG_FAILED(semantics->ensureAutodiffModuleLoaded(expr->loc)))
+    {
+        return semantics->CreateErrorExpr(expr);
+    }
+
     // Check/Resolve inner function declaration.
     SemanticsVisitor subVisitor(semantics->getShared());
     subVisitor = subVisitor.withSink(semantics->getSink()).allowStaticReferenceToNonStaticMember();

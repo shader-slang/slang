@@ -59,6 +59,29 @@ protected:
 
 } // namespace
 
+SlangResult SemanticsContext::ensureAutodiffModuleLoaded(SourceLoc location)
+{
+    auto session = getSession();
+    const SlangResult loadResult = session->loadAutodiffModuleIfNeeded();
+    if (SLANG_FAILED(loadResult))
+    {
+        m_sink->diagnose(Diagnostics::UnableToLoadAutodiffModule{.location = location});
+        return loadResult;
+    }
+
+    auto module = session->getBuiltinModule(slang::BuiltinModuleName::Autodiff);
+    if (module)
+    {
+        m_shared->addLoadedAutodiffModule(module->getModuleDecl());
+        return SLANG_OK;
+    }
+
+    // Source-compiling a builtin module deliberately suppresses recursive supplement loads.
+    // Its declarations are checked in the current module, so there is no late module to merge.
+    SLANG_ASSERT(session->isCompilingBuiltinModule());
+    return SLANG_OK;
+}
+
 
 void Session::_setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
 {

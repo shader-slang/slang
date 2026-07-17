@@ -4397,6 +4397,13 @@ err(
     span { loc = "location", message = "the code produced by 'bwd_diff' is not itself differentiable, so a function that calls 'bwd_diff' cannot be differentiated; for higher-order derivatives, nest 'fwd_diff' calls or apply a single 'bwd_diff' to a function that uses 'fwd_diff'." }
 )
 
+err(
+    "unable-to-load-autodiff-module",
+    38038,
+    "unable to load autodiff builtin module",
+    span { loc = "location", message = "unable to load the autodiff builtin module" }
+)
+
 --
 -- 380xx: entry point parameters
 --
