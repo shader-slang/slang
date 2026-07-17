@@ -21,7 +21,25 @@ MINGW* | MSYS* | CYGWIN*)
   ;;
 esac
 
-backends=("$@")
+usage() {
+  echo "usage: $0 [cpu|cuda|vulkan|metal ...]   (default: all four)"
+}
+
+backends=()
+for arg in "$@"; do
+  case "$arg" in
+  cpu | cuda | vulkan | metal) backends+=("$arg") ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "error: unknown backend '$arg'" >&2
+    usage >&2
+    exit 2
+    ;;
+  esac
+done
 [[ ${#backends[@]} -eq 0 ]] && backends=(cpu cuda vulkan metal)
 
 # Find an existing binary in any CMake configuration, or build the

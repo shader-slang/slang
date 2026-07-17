@@ -15,9 +15,23 @@ param([string[]]$Backends = @())
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
+$known = @("cpu", "cuda", "vulkan", "metal")
+foreach ($b in $Backends)
+{
+    if ($b -in "-h", "--help", "-Help")
+    {
+        Write-Host "usage: ./run-backends.ps1 [cpu|cuda|vulkan|metal ...]   (default: all four)"
+        exit 0
+    }
+    if ($b -notin $known)
+    {
+        Write-Error "unknown backend '$b'; expected: $($known -join ', ')"
+        exit 2
+    }
+}
 if ($Backends.Count -eq 0)
 {
-    $Backends = @("cpu", "cuda", "vulkan", "metal")
+    $Backends = $known
 }
 
 # Find an existing binary in any CMake configuration, or build the
