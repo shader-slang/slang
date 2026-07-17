@@ -10061,21 +10061,25 @@ bool isMovableInst(IRInst* inst)
             default:
                 break;
             }
-            // A load from `UniformConstant` memory is movable. `UniformConstant` is read-only
-            // opaque-resource storage (textures, samplers, descriptor-heap elements) that is never
-            // written from within the shader, so two loads of the same address always yield the
-            // same result -- redundancy removal may safely CSE them, and (when hoisting is enabled)
-            // may hoist a load whose address operands dominate the target block. This lets a
-            // descriptor loaded once and used many times (e.g. a hoisted `DescriptorHandle<T>`
-            // sampled in a loop, #12051) collapse to a single load, matching HLSL. It is keyed on
-            // the storage class, not on the descriptor-handle shape, and only SPIR-V legalization
-            // produces `UniformConstant` pointers, so it is a no-op on other targets.
-            if (auto ptrType = as<IRPtrTypeBase>(addrType))
-            {
-                if (ptrType->hasAddressSpace() &&
-                    ptrType->getAddressSpace() == AddressSpace::UniformConstant)
-                    return true;
-            }
+            // A load of a resource *element* from `UniformConstant` memory is movable.
+            // `UniformConstant` is read-only opaque-resource storage that is never written from
+            // within the shader, so two loads of the same address always yield the same result and
+            // redundancy removal may safely CSE (and, when hoisting is enabled, hoist) them. This
+            // lets a descriptor read once from a heap/array and used many times (e.g. a hoisted
+            // `DescriptorHandle<T>` or a `Texture2D t[N]` element sampled in a loop) collapse to a
+            // single load, matching HLSL. Only SPIR-V legalization produces `UniformConstant`
+            // pointers, so this is a no-op on other targets.
+            //
+            // The address must be an element access (`kIROp_GetElementPtr`): the scope is
+            // descriptor-heap / resource-array element reuse. A combined sampler/texture that is
+            // its own scalar global is loaded directly from that global (no element access) and is
+            // deliberately left non-movable -- its per-use loads must stay distinct for the
+            // combined-sampler emit path.
+            if (auto ptrType = as<IRPtrTypeBase>(addrType);
+                ptrType && ptrType->hasAddressSpace() &&
+                ptrType->getAddressSpace() == AddressSpace::UniformConstant &&
+                load->getPtr()->getOp() == kIROp_GetElementPtr)
+                return true;
         }
         return false;
     default:
