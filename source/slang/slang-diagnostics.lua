@@ -5236,13 +5236,6 @@ err(
     span { loc = "location", message = "the byte address buffer location `~offset:Int` is not a multiple of the specified alignment `~alignment:Int`" }
 )
 
-warning(
-    "byte-address-buffer-alignment-below-base",
-    41304,
-    "byte address buffer alignment is below the base alignment of the access type",
-    span { loc = "location", message = "the alignment `~alignment:Int` of a byte address buffer access is below `~baseAlignment:Int`, the base alignment of the access type; the access is valid but will be split into narrower loads/stores and may perform suboptimally" }
-)
-
 err(
     "static-assertion-failure",
     41400,

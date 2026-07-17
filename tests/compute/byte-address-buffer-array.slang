@@ -18,19 +18,9 @@ struct Block {
 [numthreads(1,1,1)]
 void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
-    // The access below is valid, so no hard error is emitted. (The `LoadAligned<Block>(4, 4)`
-    // call promises only 4-byte alignment, which is below `Block`'s 16-byte base alignment, so it
-    // additionally emits the E41304 below-base warning — asserted in
-    // byte-address-buffer-alignment-11545.slang, not here.)
-    // CHECK-NOT: error
+    // CHECK-NOT: warning
 
-    // The single-argument `LoadAligned<Block>(0)` forwards `Block`'s base alignment (16 — the
-    // element alignment of `float4[2]`), which is below the array's 16-byte-strided-per-element
-    // *stride span* of 32, so the whole array is not loaded as one wide access; instead each
-    // `float4` row loads wide at its 16-byte stride (two `Load<float4>`).
-    // CHECK2: float4 {{.*}} = (buffer_0).Load<float4 >(0U);
-    // CHECK2: float4 {{.*}} = (buffer_0).Load<float4 >(16U);
-    // CHECK2: float4 {{.*}}[int(2)] = { {{.*}}, {{.*}} };
+    // CHECK2: float4 {{.*}}[int(2)] = (buffer_0).Load<float4 [int(2)] >(0U);
     // CHECK2: buffer_0.Store(0U,{{.*}});
     // CHECK2: float {{.*}} = (buffer_0).Load<float >(4U);
     // CHECK2: float {{.*}} = (buffer_0).Load<float >(8U);
@@ -42,8 +32,6 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // CHECK2: float {{.*}} = (buffer_0).Load<float >(28U);
     // CHECK2: float {{.*}} = (buffer_0).Load<float >(32U);
     // CHECK2: float4 {{.*}} = float4({{.*}}, {{.*}}, {{.*}}, {{.*}});
-    // The 16-byte-aligned `Store<Block>(16, ..., 16)` promises only 16, below the array's 32-byte
-    // stride, so the two reassembled rows are stored per-row rather than as one wide array store.
     // CHECK2: buffer_0.Store(16U,{{.*}});
     // CHECK2: buffer_0.Store(32U,{{.*}});
 

@@ -5,8 +5,7 @@
 // The `alignment` argument of `(RW)ByteAddressBuffer.LoadAligned`/`Store` is a compile-time
 // contract: it must be a power of two, and at least the alignment of
 // `T`'s scalar components, and a compile-time-constant `location` must be a multiple of it.
-// Each violation is reported as a distinct diagnostic. A promise that is valid but below `T`'s
-// base (std430 whole-type) alignment is additionally reported as a suboptimal-access warning.
+// Each violation is reported as a distinct diagnostic.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute
@@ -37,11 +36,5 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // CHECK-DAG: error[E41300]
     buffer.Store<float>(0, e, 2);
 
-    // A valid promise below the type's base alignment (a `float4` is 16-byte base-aligned; 8
-    // clears the 4-byte scalar floor but cannot cover the whole vector) is allowed but warns:
-    // the access is split into narrower loads.
-    // CHECK-DAG: warning[E41304]
-    float4 f = buffer.LoadAligned<float4>(0, 8);
-
-    buffer.Store<float4>(0, b + c + d + f);
+    buffer.Store<float4>(0, b + c + d);
 }

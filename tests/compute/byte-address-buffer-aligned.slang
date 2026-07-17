@@ -18,10 +18,7 @@
 [numthreads(1,1,1)]
 void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
-    // The explicit alignment-4 accesses below are valid, so no hard error is emitted. (Promise 4
-    // is below `float4`'s 16-byte base alignment, so those calls also emit the E41304 below-base
-    // warning — asserted in byte-address-buffer-alignment-11545.slang, not here.)
-    // CHECK-NOT: error
+    // CHECK-NOT: warning
 
     // CHECK1: vec4 {{.*}} = buffer0_{{.*}}.{{.*}} = buffer0_{{.*}}.{{.*}};
     // CHECK1: vec4 {{.*}} = buffer0_{{.*}}.{{.*}} = vec4(buffer0_{{.*}}.{{.*}}, buffer0_{{.*}}.{{.*}}, buffer0_{{.*}}.{{.*}}, buffer0_{{.*}}.{{.*}});
@@ -117,9 +114,9 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // CHECK3-DAG: OpStore %[[V34]] %[[V30]]
     // Per issue #11545 the alignment must be a power of two and a constant location must be a
     // multiple of it, so the wide-vs-scalarized choice is requested through an explicit alignment
-    // rather than a (now self-contradictory) misaligned single-argument call. A `float4` accessed
-    // at its 16-byte base alignment loads/stores wide; an explicit alignment of 4 (below the base
-    // alignment) forces the per-component path and emits the E41304 below-base warning.
+    // rather than a (now self-contradictory) misaligned single-argument call. A `float4` whose
+    // natural alignment (16) is satisfied loads/stores wide; an explicit alignment of 4 forces the
+    // per-component path.
     buffer0.StoreAligned(32, buffer0.LoadAligned<float4>(32));      // wide load + wide store
     buffer0.StoreAligned(32, buffer0.LoadAligned<float4>(8, 4));    // scalarized load + wide store
     buffer0.Store<float4>(8, buffer0.LoadAligned<float4>(32), 4);   // wide load + scalarized store
