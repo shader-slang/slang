@@ -65,6 +65,7 @@ python3 tools/shader-coverage/slang-coverage-to-lcov.py \
     --manifest cpu.coverage-manifest.json --counters cpu.counters.bin \
     --output cpu.lcov
 genhtml cpu.lcov --output-directory coverage-html
+open coverage-html/index.html    # macOS; Linux: xdg-open, Windows: start
 ```
 
 `genhtml` has no common Windows distribution; where it is unavailable,
