@@ -454,9 +454,14 @@ void EndToEndCompileRequest::_collectExistingOutputArtifacts(
     }
 }
 
+static bool _isStdoutArtifactPath(const String& path)
+{
+    return path.getLength() == 0 || path == "-";
+}
+
 SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact* artifact)
 {
-    if (path.getLength() > 0 && path != "-")
+    if (!_isStdoutArtifactPath(path))
     {
         SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::writeToFile(artifact, getSink(), path));
     }
@@ -567,11 +572,6 @@ static bool _areOutputPathsEquivalent(const String& left, const String& right)
     // the platform where case aliases are expected and handled explicitly.
     return normalizedLeft == normalizedRight;
 #endif
-}
-
-static bool _isStdoutArtifactPath(const String& path)
-{
-    return path.getLength() == 0 || path == "-";
 }
 
 SlangResult EndToEndCompileRequest::_maybeWriteCoverageManifest(
@@ -701,6 +701,10 @@ SlangResult EndToEndCompileRequest::_validateSeparateDebugInfoOutputPaths()
     const String explicitPath = _getExplicitSeparateDebugInfoOutputPath();
     const bool hasExplicitPath = explicitPath.getLength() != 0;
 
+    // This preflight has two modes. Fallback mode only rejects a debug-bearing stdout artifact,
+    // because it has no main output path from which to derive a sidecar path. Explicit mode counts
+    // debug artifacts and collects every other destination for the missing-data and collision
+    // checks after the loop.
     List<String> otherOutputPaths;
     Index debugArtifactCount = 0;
     bool missingDerivedPath = false;
@@ -755,10 +759,10 @@ SlangResult EndToEndCompileRequest::_validateSeparateDebugInfoOutputPaths()
             Diagnostics::SeparateDebugInfoOutputWithoutDebugData{.path = explicitPath});
         return SLANG_FAIL;
     }
-    // Command-line output mapping permits one output per target, and multi-entry-point SPIR-V
-    // compiles share that target's separate-debug artifact. Duplicate outputs for the same target
-    // are rejected earlier by the option parser, while non-SPIR-V targets produce no debug
-    // artifact.
+    // This preflight runs only for command-line output, whose option parser rejects duplicate
+    // target formats. At most one SPIR-V target (the only format that produces separate debug
+    // information) can therefore reach this point. Direct-SPIR-V output is whole-program, so its
+    // entry points share that target's one separate-debug artifact; other target formats add none.
     SLANG_RELEASE_ASSERT(debugArtifactCount == 1);
 
     for (const auto& otherPath : otherOutputPaths)
