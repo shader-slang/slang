@@ -39,6 +39,24 @@ float4 main(VertexOutput input) : SV_Target
 // DebugCompilationUnit as its parent scope (not the imported module's compilation unit).
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugGlobalVariable {{%[0-9]+}} {{%[0-9]+}} [[SOURCE_MAIN]] %uint_0 %uint_0 [[CU_MAIN]]
 
+// Capture the imported module's DebugSource and its own DebugCompilationUnit.
+// CHECK-DAG: [[IMPORT_FILE:%[0-9]+]] = OpString "{{.*}}shader-utils-module.slang"
+// CHECK-DAG: [[SOURCE_IMPORT:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugSource [[IMPORT_FILE]] %{{[0-9]+}}
+// CHECK-DAG: [[CU_IMPORT:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugCompilationUnit %uint_{{[0-9]+}} %uint_{{[0-9]+}} [[SOURCE_IMPORT]] %uint_{{[0-9]+}}
+
+// Regression guard for shader-slang/slang#11983: each imported function's DebugFunction must be
+// scoped to the imported module's own DebugCompilationUnit ([[CU_IMPORT]]) — the trailing scope
+// operand of DebugFunction — not the entry point's, so a debugger resolves it to the right file.
+// CHECK-DAG: [[FN_CALC:%[0-9]+]] = OpString "calculateDistanceFromCenterModule"
+// CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugFunction [[FN_CALC]] %{{[0-9]+}} [[SOURCE_IMPORT]] %uint_{{[0-9]+}} %uint_{{[0-9]+}} [[CU_IMPORT]]
+// CHECK-DAG: [[FN_RADIAL:%[0-9]+]] = OpString "createRadialFadeModule"
+// CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugFunction [[FN_RADIAL]] %{{[0-9]+}} [[SOURCE_IMPORT]] %uint_{{[0-9]+}} %uint_{{[0-9]+}} [[CU_IMPORT]]
+
+// The entry-point function is scoped to the main file's compilation unit, confirming scope is per
+// owning module rather than one shared compilation unit for every function.
+// CHECK-DAG: [[FN_MAIN:%[0-9]+]] = OpString "main"
+// CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugFunction [[FN_MAIN]] %{{[0-9]+}} [[SOURCE_MAIN]] %uint_{{[0-9]+}} %uint_{{[0-9]+}} [[CU_MAIN]]
+
 // Regression guard for shader-slang/slang#11982: an imported module used to produce a
 // duplicate, orphaned DebugSource record (the two IR-lowering producers spelled its path
 // differently, defeating hoistable dedup). There are exactly two physical source files here

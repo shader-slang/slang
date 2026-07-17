@@ -874,7 +874,8 @@ void fixUpDebugFuncType(IRFunc* func)
             oldDebugFunc->getLine(),
             oldDebugFunc->getCol(),
             oldDebugFunc->getFile(),
-            funcType);
+            funcType,
+            oldDebugFunc->getScope());
         debugFuncDecor->removeAndDeallocate();
         builder.addDecoration(func, kIROp_DebugFuncDecoration, newDebugFunc);
     }
@@ -3556,8 +3557,16 @@ IRInst* IRBuilder::emitDebugFunction(
     IRInst* line,
     IRInst* col,
     IRInst* file,
-    IRInst* debugType)
+    IRInst* debugType,
+    IRInst* scope)
 {
+    // The scope (owning DebugCompilationUnit) is an optional trailing operand: it is absent when
+    // no compilation unit exists (Minimal debug level), so we never store a null operand.
+    if (scope)
+    {
+        IRInst* args[] = {name, line, col, file, debugType, scope};
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 6, args);
+    }
     IRInst* args[] = {name, line, col, file, debugType};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 5, args);
 }

@@ -2724,6 +2724,13 @@ struct IRDebugFunction : IRInst
     IRInst* getCol() { return getOperand(2); }
     IRInst* getFile() { return getOperand(3); }
     IRInst* getDebugType() { return getOperand(4); }
+
+    // The DebugCompilationUnit of the module this function is defined in, or null when no
+    // compilation unit exists (Minimal debug level emits no compilation units, and functions
+    // deserialized from older IR blobs predate this operand). The scope is bound at IR-gen from
+    // the owning module so that an imported function stays parented to its own module's
+    // compilation unit after linking, rather than the entry point's.
+    IRInst* getScope() { return getOperandCount() > 5 ? getOperand(5) : nullptr; }
 };
 
 FIDDLE()
@@ -3586,7 +3593,8 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* line,
         IRInst* col,
         IRInst* file,
-        IRInst* debugType);
+        IRInst* debugType,
+        IRInst* scope = nullptr);
 
     /// Emit an LiveRangeStart instruction indicating the referenced item is live following this
     /// instruction
