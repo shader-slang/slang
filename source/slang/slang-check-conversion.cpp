@@ -808,12 +808,10 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
             // whereas a matched constructor that merely emitted diagnostics
             // (e.g. it is `[deprecated]` or `[RemovedSince]`) still yields a
             // valid constructor-call expression.
-            const bool ctorMatched = !IsErrorExpr(ctorInvokeExpr);
-
             if (tempSink.getErrorCount())
             {
                 HashSet<Type*> isVisit;
-                const bool cStyle = isCStyleType(toType, isVisit);
+                const bool ctorMatched = !IsErrorExpr(ctorInvokeExpr);
 
                 // For a C-style type, a genuine match failure should fall back to
                 // the legacy initializer-list logic in `_coerceInitializerList()`.
@@ -821,7 +819,7 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                 // that constructor itself (for example it has been removed via
                 // `[RemovedSince]`), falling back would silently discard the
                 // error, so we surface it here instead.
-                if (cStyle && !ctorMatched)
+                if (isCStyleType(toType, isVisit) && !ctorMatched)
                     return false;
 
                 forwardDiagnostics();
