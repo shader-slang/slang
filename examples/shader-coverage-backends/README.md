@@ -25,6 +25,17 @@ sibling examples `shader-coverage-image-pipeline` and
 
 ## Running
 
+The wrapper scripts build the example if needed and run one or more
+backends with a per-backend summary:
+
+```bash
+./run-backends.sh                # every backend (Linux / macOS / Git Bash)
+./run-backends.sh cpu metal      # a subset
+./run-backends.ps1               # Windows (PowerShell)
+```
+
+Or manually:
+
 ```bash
 # Build (from the repository root):
 cmake --build --preset release --target shader-coverage-backends
