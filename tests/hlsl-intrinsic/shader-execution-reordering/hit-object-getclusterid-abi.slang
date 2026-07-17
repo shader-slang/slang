@@ -1,12 +1,12 @@
-// Coverage for the new cuda_glsl_nvapi_hit_objects require alias (#11903 / #11997): GetClusterID is
+// Coverage for the new cuda_glsl_nvapiHitObjects require alias (#11903 / #11997): GetClusterID is
 // an NVAPI/SPIRV/CUDA extension with no native DXR 1.3 arm, so on HLSL it is reachable only through
-// the explicit nvapi_hit_objects opt-in (its require is `cuda_glsl_nvapi_hit_objects`, i.e.
-// cuda | glsl | nvapi_hit_objects). Confirm the HLSL path emits the NVAPI `.GetClusterID` accessor on
+// the explicit nvapiHitObjects opt-in (its require is `cuda_glsl_nvapiHitObjects`, i.e.
+// cuda | glsl | nvapiHitObjects). Confirm the HLSL path emits the NVAPI `.GetClusterID` accessor on
 // an NvHitObject, and never a native dx::HitObject.
 
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile sm_6_5 -entry main -stage raygeneration -capability nvapi_hit_objects
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile sm_6_5 -entry main -stage raygeneration -capability nvapiHitObjects
 
-// Negative: on a plain native SM 6.9 target (no nvapi_hit_objects) GetClusterID has no arm — it is
+// Negative: on a plain native SM 6.9 target (no nvapiHitObjects) GetClusterID has no arm — it is
 // an NVAPI/SPIRV/CUDA-only extension — so it is a clean capability error, not native DXR codegen.
 //DIAGNOSTIC_TEST:SIMPLE(diag=NATIVE_ERR,non-exhaustive): -target hlsl -profile sm_6_9 -entry main -stage raygeneration
 

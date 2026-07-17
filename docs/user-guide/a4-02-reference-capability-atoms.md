@@ -239,17 +239,6 @@ Versions
 `metallib_latest`
 > Represents the latest MetalLib version.
 
-`nvapi_hit_objects`
-> Explicit opt-in to the NVAPI HitObject ABI for HLSL shader-execution-reordering. This is the
-> vendor-specific selector for HitObject, kept deliberately distinct from the coarse hlsl_nvapi
-> atom (which gates atomics and other NVAPI intrinsics). It must be requested explicitly; the
-> platform-standard native DXR 1.3 path (SM 6.9) is the default. Because its atom set is a strict
-> superset of hlsl (nvapi_hit_objects derives from hlsl_nvapi, which derives from hlsl), a HitObject
-> __target_switch selects the NVAPI arm whenever nvapi_hit_objects is present -- even alongside
-> SM 6.9 -- and falls back to the native `case hlsl` arm otherwise. The type emitter and every
-> method consult this one decision, so a HitObject never mixes the two ABIs, while
-> "native-DXR HitObject + NVAPI atomics" stays a legal, non-mixing combination on SM 6.9.
-
 `sm_4_0`
 > HLSL shader model 4.0 and related capabilities of other targets.
 > Includes related GLSL/SPIRV extensions.
@@ -741,6 +730,17 @@ Extensions
 `SPV_NV_tensor_addressing`
 > Represents the SPIR-V extension for SPV_NV_tensor_addressing.
 
+`nvapiHitObjects`
+> Explicit opt-in to the NVAPI HitObject ABI for HLSL shader-execution-reordering. This is the
+> vendor-specific selector for HitObject, kept deliberately distinct from the coarse hlsl_nvapi
+> atom (which gates atomics and other NVAPI intrinsics). It must be requested explicitly; the
+> platform-standard native DXR 1.3 path (SM 6.9) is the default. Because its atom set is a strict
+> superset of hlsl (nvapiHitObjects derives from hlsl_nvapi, which derives from hlsl), a HitObject
+> __target_switch selects the NVAPI arm whenever nvapiHitObjects is present -- even alongside
+> SM 6.9 -- and falls back to the native `case hlsl` arm otherwise. The type emitter and every
+> method consult this one decision, so a HitObject never mixes the two ABIs, while
+> "native-DXR HitObject + NVAPI atomics" stays a legal, non-mixing combination on SM 6.9.
+
 `ser_hlsl_native`
 > DXR 1.3 native SER support (SM 6.9, no NVAPI required)
 
@@ -1210,9 +1210,9 @@ Compound Capabilities
 `cuda_glsl_nvapi`
 > CUDA, GLSL, and NVAPI code-gen targets
 
-`cuda_glsl_nvapi_hit_objects`
+`cuda_glsl_nvapiHitObjects`
 > CUDA, GLSL, and explicit-NVAPI-HitObject code-gen targets. Like cuda_glsl_nvapi but the HLSL
-> disjunct requires the explicit nvapi_hit_objects opt-in, so NVAPI-only HitObject operations
+> disjunct requires the explicit nvapiHitObjects opt-in, so NVAPI-only HitObject operations
 > (e.g. cluster queries) are available on HLSL only when NVAPI was requested.
 
 `cuda_glsl_spirv`

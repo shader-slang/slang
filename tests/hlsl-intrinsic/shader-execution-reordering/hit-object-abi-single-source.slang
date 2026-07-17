@@ -2,7 +2,7 @@
 // ABI (native DXR 1.3 vs NVAPI), consulted identically by the type emitter and every method, so the
 // emitted HLSL never mixes the two on one object.
 //
-// Native DXR (SM 6.9) is the default. NVAPI is used ONLY when the explicit `nvapi_hit_objects`
+// Native DXR (SM 6.9) is the default. NVAPI is used ONLY when the explicit `nvapiHitObjects`
 // capability is requested; merely having `hlsl_nvapi` (e.g. for atomics) does NOT switch HitObject
 // to NVAPI. So none of these three configurations may produce a mixed dx::HitObject / Nv* result.
 
@@ -14,7 +14,7 @@
 //TEST:SIMPLE(filecheck=NATIVE): -target hlsl -profile sm_6_9 -entry main -stage raygeneration -capability hlsl_nvapi
 
 // [3] Explicit NVAPI opt-in: all NVAPI, even alongside SM 6.9.
-//TEST:SIMPLE(filecheck=NVAPI): -target hlsl -profile sm_6_9 -entry main -stage raygeneration -capability nvapi_hit_objects
+//TEST:SIMPLE(filecheck=NVAPI): -target hlsl -profile sm_6_9 -entry main -stage raygeneration -capability nvapiHitObjects
 
 //TEST_INPUT: set scene = AccelerationStructure
 uniform RaytracingAccelerationStructure scene;

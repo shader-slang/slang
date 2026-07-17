@@ -1968,10 +1968,10 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             // non-interchangeable ABIs. We test capability implication with the same single-set
             // primitive `specializeTargetSwitch` uses to pick a HitObject op's `__target_switch`
             // case, so the emitted type agrees with how the operations lower. NVAPI is used only
-            // when the explicit `nvapi_hit_objects` capability was requested (its atom set is a
+            // when the explicit `nvapiHitObjects` capability was requested (its atom set is a
             // strict superset of the native `case hlsl` arm, so it out-specializes it); otherwise
             // the platform-standard native DXR path (SM 6.9) is the default. Keying on
-            // `nvapi_hit_objects` rather than the coarse `hlsl_nvapi` is what lets a shader use the
+            // `nvapiHitObjects` rather than the coarse `hlsl_nvapi` is what lets a shader use the
             // native HitObject while still enabling `hlsl_nvapi` for atomics.
             auto targetCaps = getTargetReq()->getTargetCaps();
             auto impliesCap = [&](CapabilityName atom)
@@ -1979,9 +1979,9 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 return targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(atom)) ==
                        CapabilitySet::ImpliesReturnFlags::Implied;
             };
-            if (impliesCap(CapabilityName::nvapi_hit_objects))
+            if (impliesCap(CapabilityName::nvapiHitObjects))
             {
-                // Explicit NVAPI opt-in: use NvHitObject (matches `case nvapi_hit_objects:` op
+                // Explicit NVAPI opt-in: use NvHitObject (matches `case nvapiHitObjects:` op
                 // calls).
                 m_writer->emit("NvHitObject");
                 // Ensure NVAPI header is included when using NvHitObject type.
@@ -1994,7 +1994,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             }
             else
             {
-                // Neither SM 6.9 nor nvapi_hit_objects: emit a hard error (E55215) rather than
+                // Neither SM 6.9 nor nvapiHitObjects: emit a hard error (E55215) rather than
                 // crash. The dx::HitObject placeholder below is never consumed — E55215 is a hard
                 // error, so the sink's error flag makes the compiler discard this HLSL text.
                 getSink()->diagnose(

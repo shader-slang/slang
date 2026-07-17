@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage raygeneration -entry main -capability nvapi_hit_objects
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage raygeneration -entry main -capability nvapiHitObjects
 
 RaytracingAccelerationStructure as;
 

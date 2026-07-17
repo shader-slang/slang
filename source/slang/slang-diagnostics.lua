@@ -5576,7 +5576,7 @@ err(
     "hit-object-requires-ser-capability",
     55215,
     "HitObject requires a shader-execution-reordering capability",
-    span { loc = "location", message = "cannot emit HitObject for the current target: shader-execution-reordering on HLSL requires either SM 6.9 (native DXR) or the explicit 'nvapi_hit_objects' capability." }
+    span { loc = "location", message = "cannot emit HitObject for the current target: shader-execution-reordering on HLSL requires either SM 6.9 (native DXR) or the explicit 'nvapiHitObjects' capability." }
 )
 
 err(
