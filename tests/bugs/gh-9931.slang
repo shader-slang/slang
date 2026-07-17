@@ -50,7 +50,10 @@ void computeMainNV()
 {
     DescriptorHandle<Texture2D<float4>> h =
         inputBuffer.Load<DescriptorHandle<Texture2D<float4>>>(4);
-    outputByteBuffer.Store<DescriptorHandle<Texture2D<float4>>>(4, h, 8);
+    // Offset 4 is below the 8-byte alignment of a `DescriptorHandle`, so there is no honest
+    // explicit-alignment promise for it (an 8 promise trips E41303); the plain `Store` scalarizes,
+    // which is exactly the unaligned path this test exercises.
+    outputByteBuffer.Store<DescriptorHandle<Texture2D<float4>>>(4, h);
 
     uint64_t handleBits = (uint64_t)h;
 
