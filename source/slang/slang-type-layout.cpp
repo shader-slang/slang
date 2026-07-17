@@ -6513,13 +6513,20 @@ DeclRef<GenericDecl> getOuterGeneric(DeclRef<Decl> declRef)
 // witness, which walks `SolidMode`'s own witness table and yields `ColorOutput`.
 Type* TypeLayoutContext::resolveLinkTimeAssociatedType(DeclRefType* declRefType)
 {
+    // We only handle a type reached through a witness lookup (a `LookupDeclRef`) — for
+    // `ShaderMode::FragOut` this is "look up the `FragOut` requirement of `IShaderMode` from
+    // `ShaderMode`, through the `ShaderMode : IShaderMode` witness." A plain `struct`/`enum`
+    // reference is not a `LookupDeclRef`, so it is returned unchanged.
     auto lookup = as<LookupDeclRef>(declRefType->getDeclRef().declRefBase);
     if (!lookup)
         return declRefType;
 
-    // The lookup witness proves `wrapperType : interfaceType` (e.g. `ShaderMode : IShaderMode`);
-    // the associated type is projected from `wrapperType`. We only care about the case where
-    // `wrapperType` is a link-time wrapper (an `export`/`extern` struct with an `aliasedType`).
+    // The lookup witness proves `wrapperType : interfaceType` (e.g. `ShaderMode : IShaderMode`):
+    // `getSub()` is the type the member is projected from (`ShaderMode`), `getSup()` is the
+    // interface that declares it (`IShaderMode`). We only proceed when `wrapperType` is a link-time
+    // wrapper, i.e. a nominal type (`AggTypeDecl`) declared with the `struct X : I = Y;` alias
+    // syntax (`aliasedType` is set); in this scenario the source is always such a nominal type, so
+    // the `!wrapperType` cast check is just a defensive guard, not part of that test.
     //
     // NOTE: this handles an associated type declared on the interface the wrapper *directly*
     // conforms to. An associated type declared on a *base* of that interface roots the lookup
