@@ -14684,15 +14684,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             if (locationDecor && debugType)
             {
-                // Scope the function to the compilation unit of its own source file (for an
+                // Parent the function to the compilation unit of its own source file (for an
                 // #include'd file, this is the compilation unit of the file that included it, per
-                // the second pass in generateIRForTranslationUnit). The scope stays null only when
-                // no compilation unit exists (Minimal debug level), in which case the emitter falls
+                // the second pass in generateIRForTranslationUnit). It stays null only when no
+                // compilation unit exists (Minimal debug level), in which case the emitter falls
                 // back to the module-global scope.
-                IRInst* scope = nullptr;
+                IRInst* parentScope = nullptr;
                 context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
                     locationDecor->getSource(),
-                    scope);
+                    parentScope);
 
                 auto debugFuncCallee = getBuilder()->emitDebugFunction(
                     nameOperand,
@@ -14700,7 +14700,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     locationDecor->getCol(),
                     locationDecor->getSource(),
                     debugType,
-                    scope);
+                    parentScope);
 
                 // Add a decoration to link the function to its debug function
                 getBuilder()->addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);

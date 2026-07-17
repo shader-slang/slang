@@ -766,7 +766,7 @@ struct InliningPassBase
                     debugFunc->getCol(),
                     debugFunc->getFile(),
                     newType,
-                    debugFunc->getScope());
+                    debugFunc->getParentScope());
                 debugInlineInfo.calleeDebugFunc = newDebugFunc;
             }
         }

@@ -2725,12 +2725,14 @@ struct IRDebugFunction : IRInst
     IRInst* getFile() { return getOperand(3); }
     IRInst* getDebugType() { return getOperand(4); }
 
-    // The DebugCompilationUnit of the module this function is defined in, or null when no
-    // compilation unit exists (Minimal debug level emits no compilation units, and functions
-    // deserialized from older IR blobs predate this operand). The scope is bound at IR-gen from
-    // the owning module so that an imported function stays parented to its own module's
-    // compilation unit after linking, rather than the entry point's.
-    IRInst* getScope() { return getOperandCount() > 5 ? getOperand(5) : nullptr; }
+    // The function's lexical parent scope, or null when none was recorded (Minimal debug level
+    // emits no compilation units, and functions deserialized from older IR blobs predate this
+    // operand). Today the only parent scope produced is the DebugCompilationUnit of the source
+    // file the function is defined in, bound at IR-gen so an imported/included function stays
+    // parented to its own module's compilation unit after linking rather than the entry point's.
+    // It is typed as a general parent scope (not specifically a compilation unit) so that lexical
+    // scopes can fill it in the future without changing this operand's meaning.
+    IRInst* getParentScope() { return getOperandCount() > 5 ? getOperand(5) : nullptr; }
 };
 
 FIDDLE()
@@ -3594,7 +3596,7 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* col,
         IRInst* file,
         IRInst* debugType,
-        IRInst* scope = nullptr);
+        IRInst* parentScope = nullptr);
 
     /// Emit an LiveRangeStart instruction indicating the referenced item is live following this
     /// instruction
