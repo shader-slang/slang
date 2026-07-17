@@ -14,7 +14,7 @@
 // so the checker — which has already assigned a type to the string-
 // literal Expr — fails to match any overload and reports an error.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 void take(int v) {}
 void take(float v) {}

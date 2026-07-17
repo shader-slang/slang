@@ -64,3 +64,6 @@
 	path = external/fast_float
 	url = https://github.com/fastfloat/fast_float
 	branch = v8.2.7
+[submodule "external/mimalloc"]
+	path = external/mimalloc
+	url = https://github.com/microsoft/mimalloc.git

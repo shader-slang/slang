@@ -16,8 +16,17 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 int f(int x) { return 1; }
+/*CHECK:
+    ^ candidate: func f(int) -> int
+*/
 int f(int x, int y) { return 2; }
+/*CHECK:
+    ^ candidate: func f(int, int) -> int
+*/
 int f(int x, int y, int z) { return 3; }
+/*CHECK:
+    ^ candidate: func f(int, int, int) -> int
+*/
 
 void main() { int y = f(); }
 //CHECK:               ^ no overload for 'f' applicable to arguments of type ()

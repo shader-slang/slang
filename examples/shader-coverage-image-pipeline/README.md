@@ -32,9 +32,11 @@ The coverage delta between the two runs is the demo's headline.
 # measurement):
 ./shader-coverage-image-pipeline --mode=full --no-coverage
 
-# Tile each config into 128-row horizontal bands to avoid GPU watchdog
-# resets (Windows TDR) under count mode on the hot bilateral filter:
-./shader-coverage-image-pipeline --mode=full --tile-rows=128
+# Tune the tile height (full mode already tiles into 128-row bands by
+# default to avoid GPU watchdog resets under count mode on the hot
+# bilateral filter), or force whole-image dispatch:
+./shader-coverage-image-pipeline --mode=full --tile-rows=64
+./shader-coverage-image-pipeline --mode=full --tile-rows=0
 
 # Write the coverage artifacts somewhere other than the demo's source
 # directory (the default). `--output-dir` creates the directory if
@@ -85,8 +87,9 @@ preserves). Pick `count` when you need exact execution counts; pick
 
 `--tile-rows=N` splits each config dispatch into horizontal bands of N
 rows. The shader recovers the real pixel row as `tid.y + tileOriginY`.
-Default (no flag) is whole-image: each config is a single submission
-with `tileOriginY = 0`.
+Full mode defaults to 128-row bands; smoke mode (quick enough not to
+need tiling) and `--tile-rows=0` dispatch the whole image per config,
+a single submission with `tileOriginY = 0`.
 
 The bilateral filter's inner loop creates heavy atomic contention on a
 handful of counter slots — millions of threads all increment the same
@@ -99,7 +102,8 @@ Tiling caps per-submission GPU time without affecting coverage results:
 bands partition the image, every pixel is processed exactly once, and
 counters accumulate across all bands and configs.
 
-`--tile-rows=128` is a safe starting point. Alternatives:
+The default `--tile-rows=128` is a safe height on any GPU; reduce it if
+you still observe TDR. Alternatives:
 
 - `--coverage-mode=boolean`: removes all atomic contention (non-atomic
   stores of `1`), so whole-image dispatch is safe without tiling.

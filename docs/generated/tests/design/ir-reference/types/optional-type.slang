@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T13:50:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/ir-reference/types.md#vectors-matrices-and-composite
-//META: doc_section_digest=a2958c27179f43de9a6c91173654a84b9300b21241a75525e0ed05ed4d9bc705
+//META: doc_section_digest=a86cbda4849cf43ca676c38db72fbd5fa8f4cb2bf87a66f6e3971d66c5026c9f
 //META: purpose=The Optional(valueType) IR type is produced for an Optional<T> return value.
 //META: intent=functional
 //META: pipeline_stage=lower

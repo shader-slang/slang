@@ -2031,6 +2031,39 @@ static SlangResult _createArtifactFromHexDump(
     return SLANG_OK;
 }
 
+static SlangResult _executeBinaryFile(const UnownedStringSlice& fileName, ExecuteResult& outExeRes)
+{
+    CommandLine cmdLine;
+
+#if SLANG_LINUX_FAMILY
+    // Consider a //TEST:EXECUTABLE: case in sanitizer CI. slangc first invokes an
+    // uninstrumented host compiler to produce the binary, and slang-test then runs it.
+    // Applying LD_PRELOAD to slang-test would also inject the sanitizer into the compiler
+    // and linker. Keep the requested value inert until this exact execution boundary instead.
+    StringBuilder preloadValue;
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+            UnownedStringSlice("SLANG_TEST_EXECUTABLE_LD_PRELOAD"),
+            preloadValue)) &&
+        preloadValue.getLength())
+    {
+        cmdLine.setExecutableLocation(ExecutableLocation("env"));
+
+        StringBuilder preloadAssignment;
+        preloadAssignment << "LD_PRELOAD=" << preloadValue;
+        cmdLine.addArg(preloadAssignment.produceString());
+        cmdLine.addArg(fileName);
+
+        return ProcessUtil::execute(cmdLine, outExeRes);
+    }
+#endif
+
+    ExecutableLocation exe;
+    exe.setPath(fileName);
+    cmdLine.setExecutableLocation(exe);
+
+    return ProcessUtil::execute(cmdLine, outExeRes);
+}
+
 static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResult& outExeRes)
 {
     ComPtr<IArtifact> artifact;
@@ -2046,15 +2079,7 @@ static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResu
     SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, fileRep.writeRef()));
 
     const auto fileName = fileRep->getPath();
-
-    // Execute it
-    ExecutableLocation exe;
-    exe.setPath(fileName);
-
-    CommandLine cmdLine;
-    cmdLine.setExecutableLocation(exe);
-
-    return ProcessUtil::execute(cmdLine, outExeRes);
+    return _executeBinaryFile(UnownedStringSlice(fileName), outExeRes);
 }
 
 static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
@@ -2277,15 +2302,8 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     else
     {
         // Execute the binary and see what we get
-        CommandLine cmdLine;
-
-        ExecutableLocation exe;
-        exe.setPath(moduleExePath);
-
-        cmdLine.setExecutableLocation(exe);
-
         ExecuteResult exeRes;
-        if (SLANG_FAILED(ProcessUtil::execute(cmdLine, exeRes)))
+        if (SLANG_FAILED(_executeBinaryFile(moduleExePath.getUnownedSlice(), exeRes)))
         {
             return TestResult::Fail;
         }

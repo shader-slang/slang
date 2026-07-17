@@ -2,8 +2,8 @@
 //META: model=claude-opus-4-7
 //META: generated_at=2026-05-20T17:00:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
-//META: doc_ref=docs/generated/design/ast-reference/statements.md#declstmt-and-expressionstmt
-//META: doc_section_digest=5421163f30d37859ccbac142213ea7e98961f1ad0e8a11d41b9da2055e015242
+//META: doc_ref=docs/generated/design/ast-reference/statements.md#declstmt-expressionstmt-and-emptystmt
+//META: doc_section_digest=8cbc53779444646ce64a0d14a5a1f170a96bcb2eec03025e1840f339a2581e40
 //META: purpose=An ExpressionStmt holds an arbitrary `Expr` used for its side effects; the value of the expression is computed and discarded, and any side effects (function call, assignment) are observed.
 //META: intent=functional
 //META: pipeline_stage=check

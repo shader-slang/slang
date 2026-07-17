@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#wgsl
-//META: doc_section_digest=c4d36907ae85aa70fabbf2ec79508a8a9a447cb63c069d92f6f276441747833c
+//META: doc_section_digest=f8fe9fc0e2a1f3a991c9b77cee331190ace8eeb799406afb3b0967d0ea5e6824
 //META: purpose=The WGSL backend emits WGSL source with @binding(N) @group(N) for resources and @compute / @workgroup_size for the compute entry point.
 //META: intent=functional
 //META: pipeline_stage=emit
