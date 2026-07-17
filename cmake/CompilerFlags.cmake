@@ -177,9 +177,15 @@ function(set_default_compile_options target)
     # noticeably faster Debug binaries while keeping a faithful
     # step-through/inspection experience.
     #
-    # Note that MSVC has no `-Og` equivalent, so we'll keep the
-    # default optimization level (`/Od`) for now.
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    # This is appended after `CMAKE_CXX_FLAGS_DEBUG` (which is `-O0 -g` for
+    # GCC/Clang), so `-Og` overrides CMake's default `-O0` by last-`-O`-wins
+    # semantics.
+    #
+    # The `NOT MSVC` guard excludes the MSVC-compatible frontend: `clang-cl`
+    # reports `CMAKE_CXX_COMPILER_ID` as `Clang` but expects MSVC-style flags,
+    # so it must keep the default `/Od` optimization level rather than receive
+    # the GNU-style `-Og`. Plain MSVC (`cl`) has no `-Og` equivalent either.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT MSVC)
         target_compile_options(${target} PRIVATE $<$<CONFIG:Debug>:-Og>)
     endif()
 
