@@ -692,6 +692,9 @@ String EndToEndCompileRequest::_getSeparateDebugInfoOutputPath(
     else
     {
         separateDebugInfoOutputPath.append(".dbg.spv");
+        String parentPath = Path::getParentDirectory(path);
+        if (parentPath.getLength() != 0)
+            separateDebugInfoOutputPath = Path::combine(parentPath, separateDebugInfoOutputPath);
     }
     return separateDebugInfoOutputPath;
 }
