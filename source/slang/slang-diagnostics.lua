@@ -880,10 +880,10 @@ err(
 )
 
 err(
-    "operator-name-used-as-variable-name",
+    "operator-name-on-non-function",
     20020,
-    "operator name used as variable name",
-    span { loc = "location", message = "an operator name cannot be used as the name of a variable; an 'operator' declaration must be a function" }
+    "operator name used to declare a non-function",
+    span { loc = "location", message = "an operator name can only be used to declare an operator function, not a variable, parameter, typedef, or property" }
 )
 
 err(
