@@ -381,8 +381,18 @@ public:
     CompilerOptionSet& getOptionSet() { return m_linkage->m_optionSet; }
 
 private:
+    struct ExistingOutputArtifact
+    {
+        TargetProgram* targetProgram = nullptr;
+        String path;
+        IArtifact* artifact = nullptr;
+    };
+
     String _getWholeProgramPath(TargetRequest* targetReq);
     String _getEntryPointPath(TargetRequest* targetReq, Index entryPointIndex);
+    /// Collects the already-generated whole-program or per-entry-point artifacts that command-line
+    /// output validation and emission will consume.
+    void _collectExistingOutputArtifacts(List<ExistingOutputArtifact>& outArtifacts);
     String _getExplicitCoverageManifestPath();
     bool _hasExplicitCoverageManifestPath();
     String _getExplicitSeparateDebugInfoOutputPath();

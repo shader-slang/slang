@@ -608,6 +608,7 @@ struct TempCoverageCliFiles
     String disassemblyManifestPath;
     String metalDisassemblyOutputPath;
     String metalDisassemblyManifestPath;
+    String hlslOutputPath;
     String wgslOutputPath;
     String explicitManifestPath;
     String explicitDebugPath;
@@ -623,6 +624,7 @@ struct TempCoverageCliFiles
         File::remove(disassemblyManifestPath);
         File::remove(metalDisassemblyOutputPath);
         File::remove(metalDisassemblyManifestPath);
+        File::remove(hlslOutputPath);
         File::remove(wgslOutputPath);
         File::remove(explicitManifestPath);
         File::remove(explicitDebugPath);
@@ -642,6 +644,7 @@ static SlangResult _createTempCoverageCliFiles(
     out.disassemblyManifestPath = out.disassemblyOutputPath + ".coverage-manifest.json";
     out.metalDisassemblyOutputPath = out.basePath + ".metallib-asm";
     out.metalDisassemblyManifestPath = out.metalDisassemblyOutputPath + ".coverage-manifest.json";
+    out.hlslOutputPath = out.basePath + ".hlsl";
     out.wgslOutputPath = out.basePath + ".wgsl";
     out.explicitManifestPath = out.basePath + ".coverage-manifest.json";
     out.explicitDebugPath = out.basePath + ".explicit.dbg.spv";
@@ -1367,6 +1370,73 @@ static SlangResult _testSeparateDebugInfoOutputRejectsArtifactCollision(UnitTest
     return !File::exists(files.outputPath) ? SLANG_OK : SLANG_FAIL;
 }
 
+// Verifies that a debug sidecar cannot overwrite an output from a target without debug data.
+static SlangResult _testSeparateDebugInfoOutputRejectsOtherTargetCollision(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    args.add(files.sourcePath);
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("-target");
+    args.add("hlsl");
+    args.add("-o");
+    args.add(files.hlslOutputPath);
+    args.add("-target");
+    args.add("spirv");
+    args.add("-o");
+    args.add(files.outputPath);
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-separate-debug-info-output");
+    args.add(files.hlslOutputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00111", "must differ from every other output path"))
+        return SLANG_FAIL;
+    if (File::exists(files.hlslOutputPath) || File::exists(files.outputPath))
+        return SLANG_FAIL;
+    return SLANG_OK;
+}
+
+// Verifies that debug and coverage sidecars cannot claim the same destination.
+static SlangResult _testSeparateDebugInfoOutputRejectsCoverageManifestCollision(
+    UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-separate-debug-info-output");
+    args.add(files.explicitManifestPath);
+    args.add("-coverage-manifest-output");
+    args.add(files.explicitManifestPath);
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00111", "must differ from every other output path"))
+        return SLANG_FAIL;
+    if (File::exists(files.outputPath) || File::exists(files.explicitManifestPath))
+        return SLANG_FAIL;
+    return SLANG_OK;
+}
+
 static SlangResult _testSeparateDebugInfoOutputRejectsContainer(UnitTestContext* context)
 {
     TempCoverageCliFiles files;
@@ -1939,6 +2009,10 @@ SLANG_UNIT_TEST(SlangcSeparateDebugInfoOutput)
         SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRequiresSeparateDebugInfo(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRejectsArtifactCollision(unitTestContext)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRejectsOtherTargetCollision(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoOutputRejectsCoverageManifestCollision(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRejectsContainer(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRejectsMissingDebugData(unitTestContext)));

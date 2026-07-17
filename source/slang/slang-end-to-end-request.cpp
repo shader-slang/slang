@@ -415,6 +415,45 @@ String EndToEndCompileRequest::_getEntryPointPath(TargetRequest* targetReq, Inde
     return String();
 }
 
+void EndToEndCompileRequest::_collectExistingOutputArtifacts(
+    List<ExistingOutputArtifact>& outArtifacts)
+{
+    outArtifacts.clear();
+
+    auto linkage = getLinkage();
+    auto program = getSpecializedGlobalAndEntryPointsComponentType();
+    for (auto targetReq : linkage->targets)
+    {
+        auto targetProgram = program->getTargetProgram(targetReq);
+        if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
+        {
+            if (auto artifact = targetProgram->getExistingWholeProgramResult())
+            {
+                ExistingOutputArtifact outputArtifact;
+                outputArtifact.targetProgram = targetProgram;
+                outputArtifact.path = _getWholeProgramPath(targetReq);
+                outputArtifact.artifact = artifact;
+                outArtifacts.add(outputArtifact);
+            }
+        }
+        else
+        {
+            for (Index entryPointIndex = 0; entryPointIndex < program->getEntryPointCount();
+                 ++entryPointIndex)
+            {
+                if (auto artifact = targetProgram->getExistingEntryPointResult(entryPointIndex))
+                {
+                    ExistingOutputArtifact outputArtifact;
+                    outputArtifact.targetProgram = targetProgram;
+                    outputArtifact.path = _getEntryPointPath(targetReq, entryPointIndex);
+                    outputArtifact.artifact = artifact;
+                    outArtifacts.add(outputArtifact);
+                }
+            }
+        }
+    }
+}
+
 SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact* artifact)
 {
     if (path.getLength() > 0 && path != "-")
@@ -639,7 +678,8 @@ String EndToEndCompileRequest::_getSeparateDebugInfoOutputPath(
         return explicitPath;
 
     // Preserve the legacy behavior as a fallback: without an explicit debug path, derive the
-    // sidecar location from the main `-o` output file.
+    // sidecar location from the main `-o` output file. The separate-debug preflight runs before
+    // this helper's coverage-preflight caller and rejects stdout paths that cannot be derived.
     SLANG_RELEASE_ASSERT(!_isStdoutArtifactPath(path));
 
     // The artifact's name may have been set to the debug build id hash, use
@@ -661,63 +701,43 @@ SlangResult EndToEndCompileRequest::_validateSeparateDebugInfoOutputPaths()
     const String explicitPath = _getExplicitSeparateDebugInfoOutputPath();
     const bool hasExplicitPath = explicitPath.getLength() != 0;
 
-    auto linkage = getLinkage();
-    auto program = getSpecializedGlobalAndEntryPointsComponentType();
-
     List<String> otherOutputPaths;
     Index debugArtifactCount = 0;
     bool missingDerivedPath = false;
 
-    for (auto targetReq : linkage->targets)
+    List<ExistingOutputArtifact> outputArtifacts;
+    _collectExistingOutputArtifacts(outputArtifacts);
+    for (const auto& outputArtifact : outputArtifacts)
     {
-        auto targetProgram = program->getTargetProgram(targetReq);
-        const bool generateWholeProgram =
-            targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram);
-        const Index artifactCount = generateWholeProgram ? 1 : program->getEntryPointCount();
-
-        for (Index artifactIndex = 0; artifactIndex < artifactCount; ++artifactIndex)
+        // With an explicit path, compare it against every other output, including outputs from
+        // targets that do not themselves produce separate debug information.
+        if (hasExplicitPath)
         {
-            bool needToRecordArtifact = false;
-            String artifactPath;
-            IArtifact* artifact = nullptr;
-
-            if (generateWholeProgram)
-            {
-                artifact = targetProgram->getExistingWholeProgramResult();
-                artifactPath = _getWholeProgramPath(targetReq);
-                needToRecordArtifact = artifact != nullptr;
-            }
-            else
-            {
-                artifact = targetProgram->getExistingEntryPointResult(artifactIndex);
-                artifactPath = _getEntryPointPath(targetReq, artifactIndex);
-                needToRecordArtifact = artifact != nullptr;
-            }
-
-            if (!needToRecordArtifact || !getSeparateDbgArtifact(artifact))
-                continue;
-
-            debugArtifactCount++;
-            if (!hasExplicitPath)
-            {
-                if (_isStdoutArtifactPath(artifactPath))
-                    missingDerivedPath = true;
-                continue;
-            }
-
             // Normalize both spellings of stdout so an explicit `-` sidecar cannot collide with an
             // implicit stdout main artifact.
-            otherOutputPaths.add(_isStdoutArtifactPath(artifactPath) ? String("-") : artifactPath);
+            otherOutputPaths.add(
+                _isStdoutArtifactPath(outputArtifact.path) ? String("-") : outputArtifact.path);
 
-            if (_findCoverageTracingMetadata(artifact))
+            if (_findCoverageTracingMetadata(outputArtifact.artifact))
             {
                 String coveragePath = _getExplicitCoverageManifestPath();
-                if (coveragePath.getLength() == 0 && !_isStdoutArtifactPath(artifactPath))
-                    coveragePath = artifactPath + ".coverage-manifest.json";
+                if (coveragePath.getLength() == 0 && !_isStdoutArtifactPath(outputArtifact.path))
+                {
+                    coveragePath = outputArtifact.path + ".coverage-manifest.json";
+                }
                 if (coveragePath.getLength() != 0)
                     otherOutputPaths.add(coveragePath);
             }
         }
+
+        if (!getSeparateDbgArtifact(outputArtifact.artifact))
+            continue;
+
+        debugArtifactCount++;
+        // In fallback mode, the only invalid shape is a debug-bearing stdout artifact because it
+        // has no file path from which to derive the sidecar destination.
+        if (!hasExplicitPath && _isStdoutArtifactPath(outputArtifact.path))
+            missingDerivedPath = true;
     }
 
     if (missingDerivedPath)
@@ -735,6 +755,10 @@ SlangResult EndToEndCompileRequest::_validateSeparateDebugInfoOutputPaths()
             Diagnostics::SeparateDebugInfoOutputWithoutDebugData{.path = explicitPath});
         return SLANG_FAIL;
     }
+    // Command-line output mapping permits one output per target, and multi-entry-point SPIR-V
+    // compiles share that target's separate-debug artifact. Duplicate outputs for the same target
+    // are rejected earlier by the option parser, while non-SPIR-V targets produce no debug
+    // artifact.
     SLANG_RELEASE_ASSERT(debugArtifactCount == 1);
 
     for (const auto& otherPath : otherOutputPaths)
@@ -782,54 +806,27 @@ SlangResult EndToEndCompileRequest::_validateCoverageManifestOutputPaths()
     if (!m_isCommandLineCompile || m_containerFormat != ContainerFormat::None)
         return SLANG_OK;
 
-    auto linkage = getLinkage();
-    auto program = getSpecializedGlobalAndEntryPointsComponentType();
-
     List<String> emittedArtifactPaths;
     Index coverageArtifactCount = 0;
 
-    for (auto targetReq : linkage->targets)
+    List<ExistingOutputArtifact> outputArtifacts;
+    _collectExistingOutputArtifacts(outputArtifacts);
+    for (const auto& outputArtifact : outputArtifacts)
     {
-        auto targetProgram = program->getTargetProgram(targetReq);
-        const bool generateWholeProgram =
-            targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram);
-        const Index artifactCount = generateWholeProgram ? 1 : program->getEntryPointCount();
+        // Stdout artifacts have no file path to collide with.
+        if (!_isStdoutArtifactPath(outputArtifact.path))
+            emittedArtifactPaths.add(outputArtifact.path);
 
-        for (Index artifactIndex = 0; artifactIndex < artifactCount; ++artifactIndex)
-        {
-            bool needToRecordArtifact = false;
-            String artifactPath;
-            IArtifact* artifact = nullptr;
+        String separateDebugInfoOutputPath = _getSeparateDebugInfoOutputPath(
+            outputArtifact.targetProgram,
+            outputArtifact.path,
+            outputArtifact.artifact);
+        // Targets that did not emit separate debug info have no debug path to collide with.
+        if (separateDebugInfoOutputPath.getLength() != 0)
+            emittedArtifactPaths.add(separateDebugInfoOutputPath);
 
-            if (generateWholeProgram)
-            {
-                artifact = targetProgram->getExistingWholeProgramResult();
-                artifactPath = _getWholeProgramPath(targetReq);
-                needToRecordArtifact = artifact != nullptr;
-            }
-            else
-            {
-                artifact = targetProgram->getExistingEntryPointResult(artifactIndex);
-                artifactPath = _getEntryPointPath(targetReq, artifactIndex);
-                needToRecordArtifact = artifact != nullptr;
-            }
-
-            if (!needToRecordArtifact)
-                continue;
-
-            // Stdout artifacts have no file path to collide with.
-            if (!_isStdoutArtifactPath(artifactPath))
-                emittedArtifactPaths.add(artifactPath);
-
-            String separateDebugInfoOutputPath =
-                _getSeparateDebugInfoOutputPath(targetProgram, artifactPath, artifact);
-            // Targets that did not emit separate debug info have no debug path to collide with.
-            if (separateDebugInfoOutputPath.getLength() != 0)
-                emittedArtifactPaths.add(separateDebugInfoOutputPath);
-
-            if (_findCoverageTracingMetadata(artifact))
-                coverageArtifactCount++;
-        }
+        if (_findCoverageTracingMetadata(outputArtifact.artifact))
+            coverageArtifactCount++;
     }
 
     // Exactly one coverage-instrumented artifact is allowed to claim an
