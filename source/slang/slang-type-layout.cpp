@@ -3232,9 +3232,9 @@ static bool isOpenGLTarget(TargetRequest*)
     return false;
 }
 
-bool isD3DTarget(TargetRequest* targetReq)
+bool isD3DTarget(CodeGenTarget target)
 {
-    switch (targetReq->getTarget())
+    switch (target)
     {
     case CodeGenTarget::HLSL:
     case CodeGenTarget::DXBytecode:
@@ -3246,6 +3246,11 @@ bool isD3DTarget(TargetRequest* targetReq)
     default:
         return false;
     }
+}
+
+bool isD3DTarget(TargetRequest* targetReq)
+{
+    return isD3DTarget(targetReq->getTarget());
 }
 
 bool isMetalTarget(CodeGenTarget target)

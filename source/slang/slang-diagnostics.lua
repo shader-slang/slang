@@ -322,7 +322,7 @@ err("conflicting-profiles-specified-for-target", 41, "conflicting profiles have 
 err(
     "conflicting-explicit-capability-and-profile",
     46,
-    "the capability '~capability' requires a higher target version than the explicitly requested profile '~profile'; specify a higher '-profile' or remove the '-capability'"
+    "a requested '-capability' requires a higher target version than the explicitly requested profile '~profile'; specify a higher '-profile' or remove the conflicting '-capability'"
 )
 
 err(

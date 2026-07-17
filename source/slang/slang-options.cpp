@@ -4496,15 +4496,19 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             //    e.g. `-profile glsl_450` (GLSL family) implies a SPIR-V floor, so on a SPIR-V
             //    target `-profile glsl_450+spirv_1_4` (a valid request to emit SPIR-V 1.4) must not
             //    be flagged, and `-profile spirv_1_4` on a Metal target must not be flagged either.
+            // Map the profile's family to the version-atom family for a matching code-gen target.
+            // A profile only pins a concrete output version for its own family's target: SPIR-V on
+            // a SPIR-V output (`isSPIRV`, not `isKhronosTarget` — the GLSL text target emits no
+            // SPIR-V version header), Metal on a Metal target, and an HLSL shader-model (`sm_*`,
+            // a DX-family profile) on a D3D target. GLSL profiles are excluded: `_GLSL_*` is the
+            // GLSL `#version` axis, not a SPIR-V/Metal-style output version. CUDA is excluded too —
+            // there is no CUDA profile family, so a CUDA SM version cannot be pinned via
+            // `-profile`.
             Profile profile = rawTarget.optionSet.getProfile();
             CapabilityAtom targetVersionFamily = CapabilityAtom::Invalid;
             switch (profile.getFamily())
             {
             case ProfileFamily::SPIRV:
-                // Only a SPIR-V *output* target emits a SPIR-V version header. `isKhronosTarget`
-                // also includes the GLSL text target, which does not, so use `isSPIRV` to match
-                // `getTargetCaps()`, which does not fold a SPIR-V profile version into a GLSL
-                // target.
                 if (isSPIRV(rawTarget.format))
                     targetVersionFamily = CapabilityAtom::_spirv_1_0;
                 break;
@@ -4512,12 +4516,19 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 if (isMetalTarget(rawTarget.format))
                     targetVersionFamily = CapabilityAtom::metallib_2_3;
                 break;
+            case ProfileFamily::DX:
+                if (isD3DTarget(rawTarget.format))
+                    targetVersionFamily = CapabilityAtom::_sm_4_0;
+                break;
             default:
                 break;
             }
             if (!rawTarget.conflictingProfilesSet && targetVersionFamily != CapabilityAtom::Invalid)
             {
-                CapabilitySet profileCaps = profile.getCapabilityName();
+                // Collect the explicit `-capability` atoms, then ask once whether — folded in the
+                // way `getTargetCaps()` folds them — they raise the emitted target version above
+                // what the profile pins.
+                List<CapabilityName> requestedCapabilities;
                 for (auto atomVal : rawTarget.optionSet.getArray(CompilerOptionName::Capability))
                 {
                     CapabilityName capabilityName = CapabilityName::Invalid;
@@ -4530,18 +4541,17 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                         capabilityName = findCapabilityName(atomVal.stringValue.getUnownedSlice());
                         break;
                     }
-                    if (capabilityName == CapabilityName::Invalid)
-                        continue;
+                    if (capabilityName != CapabilityName::Invalid)
+                        requestedCapabilities.add(capabilityName);
+                }
 
-                    if (doesCapabilityRaiseTargetVersionAboveProfile(
-                            profileCaps,
-                            CapabilitySet(capabilityName),
-                            targetVersionFamily))
-                    {
-                        m_sink->diagnose(Diagnostics::ConflictingExplicitCapabilityAndProfile{
-                            .capability = capabilityNameToString(capabilityName),
-                            .profile = profile.getName()});
-                    }
+                if (doRequestedCapabilitiesRaiseTargetVersionAboveProfile(
+                        profile.getCapabilityName(),
+                        requestedCapabilities,
+                        targetVersionFamily))
+                {
+                    m_sink->diagnose(Diagnostics::ConflictingExplicitCapabilityAndProfile{
+                        .profile = profile.getName()});
                 }
             }
         }

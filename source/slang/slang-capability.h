@@ -505,27 +505,33 @@ UnownedStringSlice capabilityNameToString(CapabilityName name);
 bool isDirectChildOfAbstractAtom(CapabilityAtom name);
 bool isStageAtom(CapabilityName name, CapabilityName& outCanonicalStage);
 
-/// Return true if `name` represents an atom for a target version, e.g. spirv_1_5.
+/// Return true if `name` is a concrete target-version atom of any handled target family — SPIR-V
+/// (`_spirv_1_x`), Metal (`metallib_x_y`), or HLSL shader model (`_sm_x_y`), e.g. `_spirv_1_5`.
 bool isTargetVersionAtom(CapabilityAtom name);
+/// Return true if `name` is specifically a SPIR-V version atom (`_spirv_1_0.._spirv_latest`). Use
+/// this, not `isTargetVersionAtom`, when a SPIR-V-only code path must ignore other families'
+/// version atoms (e.g. pulling the target version from a profile in the SPIR-V branch of
+/// `getTargetCaps`).
+bool isSpirvVersionAtom(CapabilityAtom name);
 bool isSpirvExtensionAtom(CapabilityAtom name);
 
-/// Determine whether folding `capabilityCaps` into `profileCaps` raises the concrete target version
-/// the compiler would emit above the version `profileCaps` pins, within `targetVersionFamily` (a
-/// version atom naming the family of interest, e.g. `_spirv_1_0`). Returns false when `profileCaps`
-/// pins no concrete version of that family.
+/// Determine whether folding the explicit `-capability` atoms in `requestedCapabilities` into
+/// `profileCaps` raises the concrete target version the compiler would emit above the version
+/// `profileCaps` pins, within `targetVersionFamily` (a version atom naming the family of interest,
+/// e.g. `_spirv_1_0`). Returns false when `profileCaps` pins no concrete version of that family.
 ///
-/// The version-raise decision is made by the same `join` `TargetRequest::getTargetCaps()` uses to
-/// fold a `-capability` in, with the emitted version read back as emission reads it (the highest
-/// version atom of the family). The base set folded into differs from `getTargetCaps()` (this uses
-/// `profileCaps`, not its target-atom-seeded set), but the parts that decide a raise are the same,
-/// so the answer matches — the diagnostic fires exactly when that fold would raise the emitted
-/// version. It hard-codes no capability's requirement, so its behavior tracks the capability model:
-/// if a capability's requirement at the selected version changes, the check follows without edits
-/// here. Today, for example, folding `SPV_KHR_cooperative_matrix` (which requires SPIR-V 1.6) into
-/// a `spirv_1_4` profile raises the version and conflicts.
-bool doesCapabilityRaiseTargetVersionAboveProfile(
+/// The version-raise decision replays the exact per-atom fold `TargetRequest::getTargetCaps()`
+/// performs (`if (!targetCap.isIncompatibleWith(toAdd)) targetCap.join(toAdd)`), then reads the
+/// emitted version as emission does (the highest version atom of the family). Each capability is
+/// folded individually — a target-incompatible one is skipped without poisoning the rest, matching
+/// `getTargetCaps()` — so the check reflects exactly what the compiler would emit for that
+/// combination. It hard-codes no capability's requirement, so its behavior tracks the capability
+/// model: if a capability's requirement at the selected version changes, the check follows without
+/// edits here. Today, for example, folding `SPV_KHR_cooperative_matrix` (which requires SPIR-V 1.6)
+/// into a `spirv_1_4` profile raises the version and conflicts.
+bool doRequestedCapabilitiesRaiseTargetVersionAboveProfile(
     const CapabilitySet& profileCaps,
-    const CapabilitySet& capabilityCaps,
+    const List<CapabilityName>& requestedCapabilities,
     CapabilityAtom targetVersionFamily);
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);

@@ -144,10 +144,10 @@ bool isStageAtom(CapabilityName name, CapabilityName& outCanonicalStage)
     }
 }
 
-// The concrete target-version atoms form two contiguous, ascending enum ranges (one per target
-// family), so both membership and version ordering can be decided by enum comparison. These two
-// predicates are the single source of truth for those ranges.
-static bool isSpirvVersionAtom(CapabilityAtom name)
+// The concrete target-version atoms of each target family form a contiguous, ascending enum range,
+// so both membership and version ordering within a family can be decided by enum comparison. These
+// per-family predicates are the single source of truth for those ranges.
+bool isSpirvVersionAtom(CapabilityAtom name)
 {
     return name >= CapabilityAtom::_spirv_1_0 && name <= getLatestSpirvAtom();
 }
@@ -157,17 +157,27 @@ static bool isMetalVersionAtom(CapabilityAtom name)
     return name >= CapabilityAtom::metallib_2_3 && name <= getLatestMetalAtom();
 }
 
-bool isTargetVersionAtom(CapabilityAtom name)
+// The HLSL shader-model version atoms `_sm_4_0.._sm_6_10`. The upper bound is the last atom in the
+// `_sm_*` chain in `slang-capabilities.capdef`; keep it in sync when a newer shader model is added
+// there (there is no `_sm_latest` alias analogous to `_spirv_latest`/`metallib_latest`).
+static bool isHlslVersionAtom(CapabilityAtom name)
 {
-    return isSpirvVersionAtom(name) || isMetalVersionAtom(name);
+    return name >= CapabilityAtom::_sm_4_0 && name <= CapabilityAtom::_sm_6_10;
 }
 
-// Two target-version atoms belong to the same family when both are SPIR-V versions or both are
-// Metal versions. Only within a family does enum ordering correspond to version ordering.
+bool isTargetVersionAtom(CapabilityAtom name)
+{
+    return isSpirvVersionAtom(name) || isMetalVersionAtom(name) || isHlslVersionAtom(name);
+}
+
+// Two target-version atoms belong to the same family when both are SPIR-V versions, both Metal, or
+// both HLSL shader-model versions. Only within a family does enum ordering correspond to version
+// ordering (the families occupy disjoint enum ranges).
 static bool isSameTargetVersionFamily(CapabilityAtom a, CapabilityAtom b)
 {
     return (isSpirvVersionAtom(a) && isSpirvVersionAtom(b)) ||
-           (isMetalVersionAtom(a) && isMetalVersionAtom(b));
+           (isMetalVersionAtom(a) && isMetalVersionAtom(b)) ||
+           (isHlslVersionAtom(a) && isHlslVersionAtom(b));
 }
 
 bool isSpirvExtensionAtom(CapabilityAtom name)
@@ -176,10 +186,10 @@ bool isSpirvExtensionAtom(CapabilityAtom name)
 }
 
 // Return the highest concrete target-version atom in `capabilities` that belongs to the same family
-// (SPIR-V or Metal) as `family`, or `CapabilityAtom::Invalid` if there is none. `family` must
-// itself be a target-version atom naming the family of interest (e.g. `_spirv_1_0` for SPIR-V).
+// (SPIR-V, Metal, or HLSL shader model) as `family`, or `CapabilityAtom::Invalid` if there is none.
+// `family` must itself be a target-version atom naming the family of interest (e.g. `_spirv_1_0`).
 // Restricting to one family keeps the `>` comparison meaningful: version order matches enum order
-// only within a family, since the SPIR-V and Metal version atoms occupy disjoint enum ranges.
+// only within a family, since each family's version atoms occupy a disjoint enum range.
 static CapabilityAtom getHighestTargetVersionAtomInFamily(
     const CapabilitySet& capabilities,
     CapabilityAtom family)
@@ -190,8 +200,10 @@ static CapabilityAtom getHighestTargetVersionAtomInFamily(
     {
         for (auto atomVal : atomSet)
         {
+            // `isSameTargetVersionFamily` is true only for two version atoms of the same family, so
+            // it already implies `isTargetVersionAtom(atom)`.
             CapabilityAtom atom = asAtom(atomVal);
-            if (!isTargetVersionAtom(atom) || !isSameTargetVersionFamily(atom, family))
+            if (!isSameTargetVersionFamily(atom, family))
                 continue;
             if (highest == CapabilityAtom::Invalid || atom > highest)
                 highest = atom;
@@ -200,35 +212,40 @@ static CapabilityAtom getHighestTargetVersionAtomInFamily(
     return highest;
 }
 
-bool doesCapabilityRaiseTargetVersionAboveProfile(
+bool doRequestedCapabilitiesRaiseTargetVersionAboveProfile(
     const CapabilitySet& profileCaps,
-    const CapabilitySet& capabilityCaps,
+    const List<CapabilityName>& requestedCapabilities,
     CapabilityAtom targetVersionFamily)
 {
     // The profile pins a concrete output version within `targetVersionFamily` — the highest version
-    // atom of that family it selects. We reject `capabilityCaps` only when folding it in would
-    // raise the emitted version above that pin. Rather than re-deriving realizability by hand, we
-    // perform the same join `TargetRequest::getTargetCaps()` performs to fold a `-capability` into
-    // the target caps, and read the resulting version the way emission does (the highest version
-    // atom of the family). The base set differs from `getTargetCaps()` — we fold into `profileCaps`
-    // rather than its target-atom-seeded set — but the parts that decide a version *raise* (the
-    // version atoms present and the max-atom read-back) are the same, so the answer matches.
-    // Deferring to that join hard-codes no capability's requirement: if a capability's requirement
-    // at the selected version changes, this check follows with no edit here.
+    // atom of that family it selects. We reject the requested `-capability` atoms only when folding
+    // them in would raise the emitted version above that pin. Rather than re-deriving realizability
+    // by hand, we replay the exact fold `TargetRequest::getTargetCaps()` performs and read the
+    // resulting version the way emission does (the highest version atom of the family). Deferring
+    // to that fold hard-codes no capability's requirement: if a capability's requirement at the
+    // selected version changes, this check follows with no edit here.
     CapabilityAtom selectedVersion =
         getHighestTargetVersionAtomInFamily(profileCaps, targetVersionFamily);
     if (selectedVersion == CapabilityAtom::Invalid)
         return false; // the profile does not pin a concrete version of this family — nothing to
                       // conflict.
 
-    // A capability whose targets are entirely disjoint from the profile is dropped by `join`
-    // (equivalently the `!isIncompatibleWith` guard in `getTargetCaps()`), so it cannot raise this
-    // target's version. For a capability that is target-compatible but has realizations for other
-    // targets too (e.g. the GLSL side of a `GL_*`-aliased SPIR-V capability), the join is
-    // target-scoped: only the matching-target realization is folded in, so the off-target
-    // realization cannot mask this family's version requirement.
+    // Fold each requested capability into the caps one at a time, exactly as `getTargetCaps()`
+    // does: `if (!targetCap.isIncompatibleWith(toAdd)) targetCap.join(toAdd)`. This per-atom guard
+    // is why we must NOT pre-join the requested atoms into a single set and fold that: joining a
+    // target-incompatible atom (e.g. an `hlsl`-only capability on a SPIR-V target) with a
+    // target-compatible one first would make the combined set invalid and mask the compatible
+    // atom's version raise. Folding one at a time drops only the incompatible atom (as
+    // `getTargetCaps()` would) and keeps the compatible atom's contribution. It is also what makes
+    // a `GL_*`-aliased SPIR-V capability still conflict: the fold is target-scoped, so only its
+    // SPIR-V realization is joined and its GLSL side cannot mask the version requirement.
     CapabilitySet combined = profileCaps;
-    combined.join(capabilityCaps);
+    for (auto capabilityName : requestedCapabilities)
+    {
+        CapabilitySet capabilitySet(capabilityName);
+        if (!combined.isIncompatibleWith(capabilitySet))
+            combined.join(capabilitySet);
+    }
 
     CapabilityAtom emittedVersion =
         getHighestTargetVersionAtomInFamily(combined, targetVersionFamily);
