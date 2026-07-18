@@ -459,24 +459,6 @@ static bool _isStdoutArtifactPath(const String& path)
     return path.getLength() == 0 || path == "-";
 }
 
-struct OutputDestination
-{
-    String path;
-    bool isStdout = false;
-};
-
-// Artifact and reflection writers interpret `-` as stdout. Other output writers, such as coverage
-// manifests and dependency files, treat `-` as a literal file path.
-static OutputDestination _getArtifactOutputDestination(const String& path)
-{
-    return {_isStdoutArtifactPath(path) ? String("-") : path, _isStdoutArtifactPath(path)};
-}
-
-static OutputDestination _getFileOutputDestination(const String& path)
-{
-    return {path, false};
-}
-
 SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact* artifact)
 {
     if (!_isStdoutArtifactPath(path))
@@ -592,29 +574,6 @@ static bool _areOutputPathsEquivalent(const String& left, const String& right)
 #endif
 }
 
-static bool _areOutputDestinationsEquivalent(
-    const OutputDestination& left,
-    const OutputDestination& right)
-{
-    if (left.isStdout || right.isStdout)
-        return left.isStdout && right.isStdout;
-    return _areOutputPathsEquivalent(left.path, right.path);
-}
-
-String EndToEndCompileRequest::_getCoverageManifestOutputPath(
-    const String& path,
-    IArtifact* artifact)
-{
-    if (!_findCoverageTracingMetadata(artifact))
-        return String();
-
-    const String explicitSidecarPath = _getExplicitCoverageManifestPath();
-    if (explicitSidecarPath.getLength() != 0)
-        return explicitSidecarPath;
-
-    return _isStdoutArtifactPath(path) ? String() : path + ".coverage-manifest.json";
-}
-
 SlangResult EndToEndCompileRequest::_maybeWriteCoverageManifest(
     const String& path,
     IArtifact* artifact)
@@ -623,9 +582,18 @@ SlangResult EndToEndCompileRequest::_maybeWriteCoverageManifest(
     if (!coverage)
         return SLANG_OK;
 
-    const String sidecarPath = _getCoverageManifestOutputPath(path, artifact);
-    if (sidecarPath.getLength() == 0)
-        return SLANG_OK;
+    const String explicitSidecarPath = _getExplicitCoverageManifestPath();
+    String sidecarPath;
+    if (explicitSidecarPath.getLength() != 0)
+    {
+        sidecarPath = explicitSidecarPath;
+    }
+    else
+    {
+        if (_isStdoutArtifactPath(path))
+            return SLANG_OK;
+        sidecarPath = path + ".coverage-manifest.json";
+    }
 
     ComPtr<ISlangBlob> jsonBlob;
     SLANG_RETURN_ON_FAIL(slang_writeCoverageManifestJson(coverage, jsonBlob.writeRef()));
@@ -737,7 +705,7 @@ SlangResult EndToEndCompileRequest::_validateSeparateDebugInfoOutputPaths()
     // because it has no main output path from which to derive a sidecar path. Explicit mode counts
     // debug artifacts and collects every other destination for the missing-data and collision
     // checks after the loop.
-    List<OutputDestination> otherOutputDestinations;
+    List<String> otherOutputPaths;
     Index debugArtifactCount = 0;
     bool missingDerivedPath = false;
 
@@ -751,15 +719,18 @@ SlangResult EndToEndCompileRequest::_validateSeparateDebugInfoOutputPaths()
         {
             // Normalize both spellings of stdout so an explicit `-` sidecar cannot collide with an
             // implicit stdout main artifact.
-            otherOutputDestinations.add(_getArtifactOutputDestination(outputArtifact.path));
+            otherOutputPaths.add(
+                _isStdoutArtifactPath(outputArtifact.path) ? String("-") : outputArtifact.path);
 
-            String coveragePath =
-                _getCoverageManifestOutputPath(outputArtifact.path, outputArtifact.artifact);
-            if (coveragePath.getLength() != 0)
+            if (_findCoverageTracingMetadata(outputArtifact.artifact))
             {
-                // Coverage manifests always use file paths; unlike artifact and reflection output,
-                // `-` has no stdout meaning for `-coverage-manifest-output`.
-                otherOutputDestinations.add(_getFileOutputDestination(coveragePath));
+                String coveragePath = _getExplicitCoverageManifestPath();
+                if (coveragePath.getLength() == 0 && !_isStdoutArtifactPath(outputArtifact.path))
+                {
+                    coveragePath = outputArtifact.path + ".coverage-manifest.json";
+                }
+                if (coveragePath.getLength() != 0)
+                    otherOutputPaths.add(coveragePath);
             }
         }
 
@@ -785,9 +756,9 @@ SlangResult EndToEndCompileRequest::_validateSeparateDebugInfoOutputPaths()
     const String reflectionPath =
         getOptionSet().getStringOption(CompilerOptionName::EmitReflectionJSON);
     if (reflectionPath.getLength() != 0)
-        otherOutputDestinations.add(_getArtifactOutputDestination(reflectionPath));
+        otherOutputPaths.add(reflectionPath);
     if (m_dependencyOutputPath.getLength() != 0)
-        otherOutputDestinations.add(_getFileOutputDestination(m_dependencyOutputPath));
+        otherOutputPaths.add(m_dependencyOutputPath);
 
     if (debugArtifactCount == 0)
     {
@@ -802,14 +773,13 @@ SlangResult EndToEndCompileRequest::_validateSeparateDebugInfoOutputPaths()
         return SLANG_FAIL;
     }
 
-    const OutputDestination explicitDestination = _getArtifactOutputDestination(explicitPath);
-    for (const auto& otherDestination : otherOutputDestinations)
+    for (const auto& otherPath : otherOutputPaths)
     {
-        if (_areOutputDestinationsEquivalent(explicitDestination, otherDestination))
+        if (_areOutputPathsEquivalent(explicitPath, otherPath))
         {
             getSink()->diagnose(Diagnostics::SeparateDebugInfoOutputCollidesWithArtifact{
                 .path = explicitPath,
-                .otherPath = otherDestination.path});
+                .otherPath = otherPath});
             return SLANG_FAIL;
         }
     }
@@ -851,27 +821,55 @@ SlangResult EndToEndCompileRequest::_validateCoverageManifestOutputPaths()
     if (!m_isCommandLineCompile || m_containerFormat != ContainerFormat::None)
         return SLANG_OK;
 
-    List<OutputDestination> emittedDestinations;
+    auto linkage = getLinkage();
+    auto program = getSpecializedGlobalAndEntryPointsComponentType();
+
+    List<String> emittedArtifactPaths;
     Index coverageArtifactCount = 0;
 
-    List<ExistingOutputArtifact> outputArtifacts;
-    _collectExistingOutputArtifacts(outputArtifacts);
-    for (const auto& outputArtifact : outputArtifacts)
+    // Records paths slangc will emit for this target/artifact pair and counts
+    // coverage-bearing artifacts. The count rejects 0 or 2+ coverage artifacts;
+    // the path list rejects explicit-sidecar collisions.
+    auto recordArtifact =
+        [&](TargetProgram* targetProgram, const String& artifactPath, IArtifact* artifact)
     {
-        emittedDestinations.add(_getArtifactOutputDestination(outputArtifact.path));
+        if (!artifact)
+            return;
+        // Stdout artifacts have no file path to collide with.
+        if (artifactPath.getLength() != 0)
+            emittedArtifactPaths.add(artifactPath);
 
-        String separateDebugInfoOutputPath = _getSeparateDebugInfoOutputPath(
-            outputArtifact.targetProgram,
-            outputArtifact.path,
-            outputArtifact.artifact);
+        String dbgPath = _getSeparateDebugInfoOutputPath(targetProgram, artifactPath, artifact);
         // Targets that did not emit separate debug info have no debug path to collide with.
-        if (separateDebugInfoOutputPath.getLength() != 0)
-        {
-            emittedDestinations.add(_getArtifactOutputDestination(separateDebugInfoOutputPath));
-        }
+        if (dbgPath.getLength() != 0)
+            emittedArtifactPaths.add(dbgPath);
 
-        if (_findCoverageTracingMetadata(outputArtifact.artifact))
+        if (_findCoverageTracingMetadata(artifact))
             coverageArtifactCount++;
+    };
+
+    for (auto targetReq : linkage->targets)
+    {
+        auto targetProgram = program->getTargetProgram(targetReq);
+
+        if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::GenerateWholeProgram))
+        {
+            recordArtifact(
+                targetProgram,
+                _getWholeProgramPath(targetReq),
+                targetProgram->getExistingWholeProgramResult());
+        }
+        else
+        {
+            Index entryPointCount = program->getEntryPointCount();
+            for (Index ee = 0; ee < entryPointCount; ++ee)
+            {
+                recordArtifact(
+                    targetProgram,
+                    _getEntryPointPath(targetReq, ee),
+                    targetProgram->getExistingEntryPointResult(ee));
+            }
+        }
     }
 
     // Exactly one coverage-instrumented artifact is allowed to claim an
@@ -890,10 +888,9 @@ SlangResult EndToEndCompileRequest::_validateCoverageManifestOutputPaths()
         return SLANG_FAIL;
     }
 
-    const OutputDestination explicitDestination = _getFileOutputDestination(explicitSidecarPath);
-    for (const auto& emittedDestination : emittedDestinations)
+    for (const auto& artifactPath : emittedArtifactPaths)
     {
-        if (_areOutputDestinationsEquivalent(explicitDestination, emittedDestination))
+        if (_areOutputPathsEquivalent(explicitSidecarPath, artifactPath))
         {
             getSink()->diagnose(Diagnostics::CoverageManifestOutputCollidesWithArtifact{
                 .path = explicitSidecarPath});

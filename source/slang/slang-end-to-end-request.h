@@ -395,10 +395,6 @@ private:
     void _collectExistingOutputArtifacts(List<ExistingOutputArtifact>& outArtifacts);
     String _getExplicitCoverageManifestPath();
     bool _hasExplicitCoverageManifestPath();
-    /// Returns the explicit coverage-manifest path, or the derived sidecar path for a file-backed
-    /// coverage artifact. Returns empty when the artifact has no coverage data or writes to stdout
-    /// without an explicit manifest path.
-    String _getCoverageManifestOutputPath(const String& path, IArtifact* artifact);
     String _getExplicitSeparateDebugInfoOutputPath();
     bool _hasExplicitSeparateDebugInfoOutputPath();
 
