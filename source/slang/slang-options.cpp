@@ -3127,7 +3127,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 // -fvk-{b|s|t|u}-shift <binding-shift> <set>
                 const auto slice = arg.value.getUnownedSlice().subString(5, 1);
-                HLSLToVulkanLayoutOptions::Kind kind;
+                HLSLToVulkanLayoutOptions::Kind kind = HLSLToVulkanLayoutOptions::Kind::Invalid;
                 SLANG_RETURN_ON_FAIL(_getValue(arg, slice, kind));
 
                 Int shift;
@@ -3542,14 +3542,14 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         case OptionKind::LineDirectiveMode:
             {
-                SlangLineDirectiveMode value;
+                SlangLineDirectiveMode value = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 m_compileRequest->setLineDirectiveMode(value);
                 break;
             }
         case OptionKind::FloatingPointMode:
             {
-                FloatingPointMode value;
+                FloatingPointMode value = FloatingPointMode::Default;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 setFloatingPointMode(getCurrentTarget(), value);
                 break;
@@ -3594,7 +3594,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::FileSystem:
             {
                 typedef TypeTextUtil::FileSystemType FileSystemType;
-                FileSystemType value;
+                FileSystemType value = FileSystemType::Default;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
 
                 switch (value)
