@@ -1,4 +1,4 @@
-#include "../slang-test/test-output-path-util.h"
+#include "slang-test/test-output-path-util.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
