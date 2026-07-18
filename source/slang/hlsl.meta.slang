@@ -2296,14 +2296,8 @@ __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int
 _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format> __extractImage(
     _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> combinedSampler);
 
-// Gather four texels from a combined sampled image at `location`, offset by `offset`, selecting
-// channel `component`. Lowered to `kIROp_ImageGatherOffset`; the SPIR-V backend inspects the offset
-// operand and emits `OpImageGather ... ConstOffset` (no capability) when the offset is a compile-time
-// constant, or `OpImageGather ... Offset` + `OpCapability ImageGatherExtended` when it is a runtime
-// value. Kept as a backend IR op — rather than a `spirv_asm` block with a hard-coded operand — so the
-// constant-vs-runtime decision can be made where the offset's constness is known, which a `spirv_asm`
-// block cannot do (Slang does not iterate instructions inside such a block, and cannot overload on
-// `constexpr`).
+// Gather with a texel offset. The SPIR-V backend selects `ConstOffset` (no capability) or `Offset`
+// (`ImageGatherExtended`) based on whether the offset is a compile-time constant.
 __intrinsic_op($(kIROp_ImageGatherOffset))
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 vector<T.Element,4> __spirvImageGatherOffset(

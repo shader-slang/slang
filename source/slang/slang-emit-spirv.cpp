@@ -5801,44 +5801,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                         : builder.getIntValue(builder.getIntType(), 0));
     }
 
-    // Return true when `offset` is a compile-time-constant texel offset that SPIR-V will emit as an
-    // `OpConstantComposite` (or a scalar constant), so it is a valid operand for the `ConstOffset`
-    // image operand. A gather offset is a small flat integer vector, so the only shapes that
-    // qualify are a constant leaf, or a `MakeVector` / `MakeVectorFromScalar` whose every element
-    // is itself a constant leaf; such an inst is @ConstExpr and hoisted to the ConstantsAndTypes
-    // section, where `emitCompositeConstruct` renders it as `OpConstantComposite`. Anything else
-    // (a runtime value, or a composite built from non-constants) must use the `Offset` image
-    // operand instead, which requires the `ImageGatherExtended` capability. A misclassification is
-    // only ever safe in the `Offset` direction: an unproven-constant offset falls back to
-    // `Offset` + capability (valid SPIR-V), never to a `ConstOffset` on a non-constant id.
+    // True if `offset` is a compile-time constant (a constant leaf, or a vector built entirely from
+    // constants), so it can use the `ConstOffset` image operand instead of `Offset`.
     static bool isConstantGatherOffset(IRInst* offset)
     {
-        if (as<IRConstant>(offset))
-            return true;
-
-        // For the vector builders, every operand is an element value (there is no leading type
-        // operand in the constructed IR), so an all-`IRConstant` operand list means an all-constant
-        // vector. Iterating operands directly is therefore correct for these two ops only.
-        if (offset->getOp() == kIROp_MakeVector || offset->getOp() == kIROp_MakeVectorFromScalar)
+        switch (offset->getOp())
         {
+        case kIROp_MakeVector:
+        case kIROp_MakeVectorFromScalar:
             for (UInt i = 0; i < offset->getOperandCount(); ++i)
-            {
                 if (!as<IRConstant>(offset->getOperand(i)))
                     return false;
-            }
             return true;
+        default:
+            return as<IRConstant>(offset) != nullptr;
         }
-
-        return false;
     }
 
-    // Emit `OpImageGather` for a `kIROp_ImageGatherOffset` (operands: sampledImage, location,
-    // component, offset). A compile-time-constant offset is emitted with the `ConstOffset` image
-    // operand, which requires no capability; a runtime offset is emitted with the `Offset` image
-    // operand, which requires `ImageGatherExtended`. Selecting the operand by the offset's
-    // constness here — rather than in a `spirv_asm` block — is what lets the constant case avoid
-    // over-declaring the capability while the runtime case (a variable offset reaching this op via
-    // `textureGatherOffset`, which uniquely permits a runtime offset) stays valid.
     SpvInst* emitImageGatherOffset(SpvInstParent* parent, IRInst* inst)
     {
         auto sampledImage = inst->getOperand(0);
