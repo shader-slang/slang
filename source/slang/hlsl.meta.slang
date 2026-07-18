@@ -2296,6 +2296,16 @@ __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int
 _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format> __extractImage(
     _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> combinedSampler);
 
+// Gather with a texel offset. The SPIR-V backend selects `ConstOffset` (no capability) or `Offset`
+// (`ImageGatherExtended`) based on whether the offset is a compile-time constant.
+__intrinsic_op($(kIROp_ImageGatherOffset))
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+vector<T.Element,4> __spirvImageGatherOffset(
+    _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,1,format> sampledImage,
+    vector<float, Shape.dimensions+isArray> location,
+    int component,
+    vector<int, Shape.planeDimensions> offset);
+
 // Non-combined texture types specific functions
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
@@ -4007,11 +4017,7 @@ vector<T.Element,4> __texture_gather_offset(
         __intrinsic_asm "$0.gather($1, $2, $3, metal::component($4))";
     case spirv:
         let sampledImage = __makeCombinedTextureSampler(texture, s);
-        return spirv_asm {
-            OpCapability ImageGatherExtended;
-            // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-            result:$$vector<T.Element,4> = OpImageGather $sampledImage $location $component Offset $offset;
-        };
+        return __spirvImageGatherOffset(sampledImage, location, component, offset);
     case wgsl:
         __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
         static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
@@ -4061,10 +4067,7 @@ vector<T.Element,4> __texture_gather_offset(
     case glsl:
         __intrinsic_asm "textureGatherOffset($0, $1, $2, $3)";
     case spirv:
-        return spirv_asm {
-            OpCapability ImageGatherExtended;
-            result:$$vector<T.Element,4> = OpImageGather $sampler $location $component Offset $offset;
-        };
+        return __spirvImageGatherOffset(sampler, location, component, offset);
     }
 }
 
