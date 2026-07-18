@@ -66,7 +66,16 @@ jobs:
           fetch-depth: "1"
 
       - name: Clean inherited checkout state
-        shell: ${{ inputs.os == 'windows' && 'pwsh' || 'bash' }}
+        if: inputs.os != 'windows'
+        run: |
+          # Remove stale files and stale submodule worktrees inherited by self-hosted runners.
+          git submodule deinit --all --force
+          git clean -ffdx
+          git reset --hard HEAD
+
+      - name: Clean inherited checkout state (Windows)
+        if: inputs.os == 'windows'
+        shell: pwsh
         run: |
           # Remove stale files and stale submodule worktrees inherited by self-hosted runners.
           git submodule deinit --all --force
@@ -74,8 +83,14 @@ jobs:
           git reset --hard HEAD
 
       - name: Checkout OptiX headers
-        if: (inputs.full-gpu-tests || inputs.gpu-api-only) && inputs.os != 'macos'
-        shell: ${{ inputs.os == 'windows' && 'pwsh' || 'bash' }}
+        if: (inputs.full-gpu-tests || inputs.gpu-api-only) && inputs.os == 'linux'
+        run: |
+          git submodule sync -- external/optix-dev
+          git submodule update --init --depth=1 external/optix-dev
+
+      - name: Checkout OptiX headers (Windows)
+        if: (inputs.full-gpu-tests || inputs.gpu-api-only) && inputs.os == 'windows'
+        shell: pwsh
         run: |
           git submodule sync -- external/optix-dev
           git submodule update --init --depth=1 external/optix-dev
