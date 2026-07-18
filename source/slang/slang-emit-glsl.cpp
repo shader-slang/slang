@@ -2603,24 +2603,28 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             IRInst* left = inst->getOperand(0);
             IRInst* right = inst->getOperand(1);
 
-            // Handle as a function call
-            auto prec = getInfo(EmitOp::Postfix);
+            // GLSL has no built-in floating-point remainder. Its `mod()` is a
+            // floor-modulus (`x - y*floor(x/y)`, whose sign follows the divisor),
+            // whereas `FRem` is a truncated remainder (whose sign follows the
+            // dividend). They disagree for operands of opposite sign, e.g.
+            // `-7.0 % 3.0` is `-1.0` but `mod(-7.0, 3.0)` is `2.0`. Recover the
+            // remainder as `sign(x) * mod(abs(x), abs(y))`: `mod` on the
+            // magnitudes gives the correct magnitude, and multiplying by
+            // `sign(x)` restores the dividend's sign. Unlike the ternary form the
+            // core module uses for the scalar `fmod` intrinsic, this is
+            // branchless and component-wise, so it is also valid for vector
+            // operands (`float3 % float3`), where a `?:` on a boolean vector
+            // would not be. The operands are emitted at general precedence
+            // because each use is wrapped in a `sign(...)`/`abs(...)` call.
+            auto argPrec = getInfo(EmitOp::General);
 
-            EmitOpInfo outerPrec = inOuterPrec;
-            bool needClose = maybeEmitParens(outerPrec, prec);
-
-            // TODO: the GLSL `mod` function amounts to a floating-point
-            // modulus rather than a floating-point remainder. We need
-            // to fix this to emit the right SPIR-V opcode, but there is
-            // no built-in GLSL function that maps to the opcode we want.
-            //
-            m_writer->emit("mod(");
-            emitOperand(left, getInfo(EmitOp::General));
-            m_writer->emit(",");
-            emitOperand(right, getInfo(EmitOp::General));
-            m_writer->emit(")");
-
-            maybeCloseParens(needClose);
+            m_writer->emit("(sign(");
+            emitOperand(left, argPrec);
+            m_writer->emit(") * mod(abs(");
+            emitOperand(left, argPrec);
+            m_writer->emit("), abs(");
+            emitOperand(right, argPrec);
+            m_writer->emit(")))");
 
             return true;
         }

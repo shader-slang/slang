@@ -26,6 +26,11 @@ sibling examples `shader-coverage-image-pipeline` and
 ## Running
 
 ```bash
+# Build (from the repository root):
+cmake --build --preset release --target shader-coverage-backends
+# The binary lands in
+# build/examples/shader-coverage-backends/Release/shader-coverage-backends
+
 shader-coverage-backends --backend=cpu
 shader-coverage-backends --backend=cuda       # NVIDIA GPU + CUDA toolkit
 shader-coverage-backends --backend=vulkan
@@ -60,6 +65,7 @@ python3 tools/shader-coverage/slang-coverage-to-lcov.py \
     --manifest cpu.coverage-manifest.json --counters cpu.counters.bin \
     --output cpu.lcov
 genhtml cpu.lcov --output-directory coverage-html
+open coverage-html/index.html    # macOS; Linux: xdg-open, Windows: start
 ```
 
 `genhtml` has no common Windows distribution; where it is unavailable,

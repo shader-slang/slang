@@ -315,6 +315,14 @@ public:
     /// Set the content as a string
     void setContents(const String& content);
 
+    /// Return the contents of `rawBlob` decoded to UTF-8 with any leading Unicode
+    /// Byte-Order-Marker removed. This is the canonical "raw file bytes -> source text" transform:
+    /// a UTF-8 file with no BOM is returned unchanged (same blob), while a BOM-prefixed or
+    /// non-UTF-8 file is decoded into a fresh blob. Both `setContents` and any other consumer that
+    /// needs BOM-free source text from an on-disk blob should route through here so the decode
+    /// lives in exactly one place.
+    static ComPtr<ISlangBlob> decodeContentBlob(ISlangBlob* rawBlob);
+
     /// Calculate a display path -> can canonicalize if necessary
     String calcVerbosePath() const;
 

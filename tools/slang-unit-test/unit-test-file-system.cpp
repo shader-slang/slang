@@ -806,6 +806,43 @@ SLANG_UNIT_TEST(fileSystem)
     }
 }
 
+// Loads a ZIP and then modifies it so miniz must take ownership of the Slang-owned input buffer.
+static SlangResult _testZipReadWriteTransition()
+{
+    ComPtr<ISlangMutableFileSystem> sourceFileSystem;
+    SLANG_RETURN_ON_FAIL(_createFileSystem(FileSystemType::Zip, sourceFileSystem));
+    SLANG_RETURN_ON_FAIL(sourceFileSystem->saveFile("before.txt", "before", 6));
+
+    IArchiveFileSystem* sourceArchive = as<IArchiveFileSystem>(sourceFileSystem);
+    if (!sourceArchive)
+        return SLANG_FAIL;
+
+    ComPtr<ISlangBlob> archiveBlob;
+    SLANG_RETURN_ON_FAIL(sourceArchive->storeArchive(false, archiveBlob.writeRef()));
+
+    ComPtr<ISlangFileSystemExt> loadedFileSystem;
+    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(
+        archiveBlob->getBufferPointer(),
+        archiveBlob->getBufferSize(),
+        loadedFileSystem));
+
+    ISlangMutableFileSystem* mutableFileSystem = as<ISlangMutableFileSystem>(loadedFileSystem);
+    IArchiveFileSystem* loadedArchive = as<IArchiveFileSystem>(loadedFileSystem);
+    if (!mutableFileSystem || !loadedArchive)
+        return SLANG_FAIL;
+
+    SLANG_RETURN_ON_FAIL(mutableFileSystem->saveFile("after.txt", "after", 5));
+
+    ComPtr<ISlangBlob> updatedArchiveBlob;
+    SLANG_RETURN_ON_FAIL(loadedArchive->storeArchive(false, updatedArchiveBlob.writeRef()));
+    return _checkFile(mutableFileSystem, "after.txt", "after");
+}
+
+SLANG_UNIT_TEST(zipReadWriteTransitionPreservesAllocatorOwnership)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_testZipReadWriteTransition()));
+}
+
 SLANG_UNIT_TEST(zipRejectsOversizedUncompressedEntry)
 {
 #if SLANG_CAN_PATCH_ARCHIVE_BOMB_SIZE
