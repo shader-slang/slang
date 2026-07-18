@@ -115,5 +115,4 @@ SLANG_UNIT_TEST(slangTestOutputPathNormalization)
 
         checkArgs(args, values, SLANG_COUNT_OF(values));
     }
-
 }
