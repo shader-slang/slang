@@ -2,6 +2,7 @@
 #define SLANG_CORE_BLOB_H
 
 #include "../core/slang-com-object.h"
+#include "slang-allocator.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang-list.h"
@@ -138,7 +139,7 @@ public:
         deallocate();
         if (size > 0)
         {
-            m_data = ::malloc(size);
+            m_data = StandardAllocator::allocate(size);
         }
         m_sizeInBytes = size;
         m_capacityInBytes = size;
@@ -157,7 +158,7 @@ public:
         if (!data)
         {
             // allocate() updates m_sizeInBytes/m_capacityInBytes even when
-            // ::malloc returns nullptr; reset to a fully deallocated state
+            // allocation can return nullptr; reset to a fully deallocated state
             // so callers don't see inconsistent sizes alongside a null buffer.
             deallocate();
             return nullptr;
@@ -172,7 +173,7 @@ public:
     {
         if (m_data)
         {
-            ::free(m_data);
+            StandardAllocator::deallocate(m_data);
             m_data = nullptr;
         }
         m_sizeInBytes = 0;
@@ -184,7 +185,7 @@ public:
     {
         if (capacity != m_capacityInBytes)
         {
-            m_data = ::realloc(m_data, capacity);
+            m_data = StandardAllocator::reallocate(m_data, capacity);
             m_sizeInBytes = capacity;
             m_capacityInBytes = capacity;
         }
@@ -199,8 +200,10 @@ public:
         m_capacityInBytes = 0;
         return data;
     }
+
     /// Attach some data.
-    /// NOTE! data must be a pointer that was returned from malloc, otherwise will incorrectly free.
+    /// NOTE! data must be a pointer allocated by StandardAllocator, otherwise it will be
+    /// incorrectly freed.
     void attach(void* data, size_t size)
     {
         deallocate();

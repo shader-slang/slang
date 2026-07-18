@@ -1073,20 +1073,37 @@ Expr* SemanticsVisitor::createLookupResultExpr(
     }
 }
 
-DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
+static DeclVisibility _getTypeVisibility(
+    Type* type,
+    Dictionary<Type*, DeclVisibility>& typeVisibilityCache)
 {
+    if (auto cachedVisibility = typeVisibilityCache.tryGetValue(type))
+        return *cachedVisibility;
+
+    DeclVisibility visibility = DeclVisibility::Public;
     if (auto declRefType = as<DeclRefType>(type))
     {
-        auto v = getDeclVisibility(declRefType->getDeclRef().getDecl());
+        visibility = getDeclVisibility(declRefType->getDeclRef().getDecl());
         auto args = findInnerMostGenericArgs(SubstitutionSet(declRefType->getDeclRef()));
         for (auto arg : args)
         {
             if (auto typeArg = as<DeclRefType>(arg))
-                v = Math::Min(v, getTypeVisibility(typeArg));
+                visibility =
+                    Math::Min(visibility, _getTypeVisibility(typeArg, typeVisibilityCache));
         }
-        return v;
     }
-    return DeclVisibility::Public;
+
+    // Cache only completed results. Consider `Pair<T, T>`: both arguments point to the same
+    // canonical type DAG, so the second edge should reuse the visibility collected through the
+    // first instead of traversing the entire DAG again.
+    typeVisibilityCache.add(type, visibility);
+    return visibility;
+}
+
+DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
+{
+    Dictionary<Type*, DeclVisibility> typeVisibilityCache;
+    return _getTypeVisibility(type, typeVisibilityCache);
 }
 
 bool SemanticsVisitor::isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope)
