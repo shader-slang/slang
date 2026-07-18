@@ -226,7 +226,7 @@ err(
 err(
     "separate-debug-info-output-collides-with-artifact",
     111,
-    "`-separate-debug-info-output` path '~path' must differ from every other output path emitted by this compile"
+    "`-separate-debug-info-output` path '~path' must differ from output path '~otherPath' emitted by this compile"
 )
 
 err(
@@ -239,6 +239,12 @@ err(
     "separate-debug-info-output-without-debug-data",
     113,
     "`-separate-debug-info-output` path '~path' was requested, but the selected target did not produce separate debug information"
+)
+
+err(
+    "separate-debug-info-output-multiple-artifacts",
+    114,
+    "`-separate-debug-info-output` path '~path' cannot receive multiple separate debug-information artifacts"
 )
 
 err(

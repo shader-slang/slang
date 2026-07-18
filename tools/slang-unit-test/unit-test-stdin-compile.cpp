@@ -612,6 +612,8 @@ struct TempCoverageCliFiles
     String wgslOutputPath;
     String explicitManifestPath;
     String explicitDebugPath;
+    String reflectionPath;
+    String dependencyPath;
     String containerOutputPath;
 
     ~TempCoverageCliFiles()
@@ -628,6 +630,8 @@ struct TempCoverageCliFiles
         File::remove(wgslOutputPath);
         File::remove(explicitManifestPath);
         File::remove(explicitDebugPath);
+        File::remove(reflectionPath);
+        File::remove(dependencyPath);
         File::remove(containerOutputPath);
     }
 };
@@ -648,6 +652,8 @@ static SlangResult _createTempCoverageCliFiles(
     out.wgslOutputPath = out.basePath + ".wgsl";
     out.explicitManifestPath = out.basePath + ".coverage-manifest.json";
     out.explicitDebugPath = out.basePath + ".explicit.dbg.spv";
+    out.reflectionPath = out.basePath + ".reflection.json";
+    out.dependencyPath = out.basePath + ".d";
     out.containerOutputPath = out.basePath + ".slang-module";
     return File::writeAllText(out.sourcePath, source);
 }
@@ -1365,7 +1371,7 @@ static SlangResult _testSeparateDebugInfoOutputRejectsArtifactCollision(UnitTest
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
     if (result.resultCode == 0)
         return SLANG_FAIL;
-    if (!_containsDiagnostic(result, "E00111", "must differ from every other output path"))
+    if (!_containsDiagnostic(result, "E00111", "must differ from output path"))
         return SLANG_FAIL;
     return !File::exists(files.outputPath) ? SLANG_OK : SLANG_FAIL;
 }
@@ -1400,7 +1406,7 @@ static SlangResult _testSeparateDebugInfoOutputRejectsOtherTargetCollision(UnitT
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
     if (result.resultCode == 0)
         return SLANG_FAIL;
-    if (!_containsDiagnostic(result, "E00111", "must differ from every other output path"))
+    if (!_containsDiagnostic(result, "E00111", "must differ from output path"))
         return SLANG_FAIL;
     if (File::exists(files.hlslOutputPath) || File::exists(files.outputPath))
         return SLANG_FAIL;
@@ -1430,9 +1436,79 @@ static SlangResult _testSeparateDebugInfoOutputRejectsCoverageManifestCollision(
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
     if (result.resultCode == 0)
         return SLANG_FAIL;
-    if (!_containsDiagnostic(result, "E00111", "must differ from every other output path"))
+    if (!_containsDiagnostic(result, "E00111", "must differ from output path"))
         return SLANG_FAIL;
     if (File::exists(files.outputPath) || File::exists(files.explicitManifestPath))
+        return SLANG_FAIL;
+    return SLANG_OK;
+}
+
+// Verifies that outputs written outside the artifact loop are part of the same output namespace.
+static SlangResult _testSeparateDebugInfoOutputRejectsAuxiliaryOutputCollision(
+    UnitTestContext* context,
+    bool useReflectionOutput)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    const String collisionPath = useReflectionOutput ? files.reflectionPath : files.dependencyPath;
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-separate-debug-info-output");
+    args.add(collisionPath);
+    args.add(useReflectionOutput ? "-reflection-json" : "-depfile");
+    args.add(collisionPath);
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00111", "must differ from output path"))
+        return SLANG_FAIL;
+    if (File::exists(files.outputPath) || File::exists(files.explicitDebugPath) ||
+        File::exists(collisionPath))
+        return SLANG_FAIL;
+    return SLANG_OK;
+}
+
+// Verifies that one explicit path cannot claim multiple per-entry-point debug artifacts.
+static SlangResult _testSeparateDebugInfoOutputRejectsMultipleArtifacts(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files, kCoverageCliTwoEntryShader));
+
+    List<String> args;
+    args.add(files.sourcePath);
+    args.add("-target");
+    args.add("spirv");
+    args.add("-target");
+    args.add("glsl");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("-entry");
+    args.add("main2");
+    args.add("-stage");
+    args.add("compute");
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-separate-debug-info-output");
+    args.add(files.explicitDebugPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00114", "cannot receive multiple"))
+        return SLANG_FAIL;
+    if (result.standardOutput.getLength() != 0 || File::exists(files.explicitDebugPath))
         return SLANG_FAIL;
     return SLANG_OK;
 }
@@ -1538,7 +1614,7 @@ static SlangResult _testSeparateDebugInfoOutputRejectsStdoutCollision(
     SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
     if (result.resultCode == 0)
         return SLANG_FAIL;
-    if (!_containsDiagnostic(result, "E00111", "must differ from every other output path"))
+    if (!_containsDiagnostic(result, "E00111", "must differ from output path"))
         return SLANG_FAIL;
     return result.standardOutput.getLength() == 0 ? SLANG_OK : SLANG_FAIL;
 }
@@ -2013,6 +2089,12 @@ SLANG_UNIT_TEST(SlangcSeparateDebugInfoOutput)
         SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRejectsOtherTargetCollision(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(
         _testSeparateDebugInfoOutputRejectsCoverageManifestCollision(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoOutputRejectsAuxiliaryOutputCollision(unitTestContext, true)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoOutputRejectsAuxiliaryOutputCollision(unitTestContext, false)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRejectsMultipleArtifacts(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRejectsContainer(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRejectsMissingDebugData(unitTestContext)));

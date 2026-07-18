@@ -459,6 +459,24 @@ static bool _isStdoutArtifactPath(const String& path)
     return path.getLength() == 0 || path == "-";
 }
 
+struct OutputDestination
+{
+    String path;
+    bool isStdout = false;
+};
+
+// Artifact and reflection writers interpret `-` as stdout. Other output writers, such as coverage
+// manifests and dependency files, treat `-` as a literal file path.
+static OutputDestination _getArtifactOutputDestination(const String& path)
+{
+    return {_isStdoutArtifactPath(path) ? String("-") : path, _isStdoutArtifactPath(path)};
+}
+
+static OutputDestination _getFileOutputDestination(const String& path)
+{
+    return {path, false};
+}
+
 SlangResult EndToEndCompileRequest::_writeArtifact(const String& path, IArtifact* artifact)
 {
     if (!_isStdoutArtifactPath(path))
@@ -574,6 +592,29 @@ static bool _areOutputPathsEquivalent(const String& left, const String& right)
 #endif
 }
 
+static bool _areOutputDestinationsEquivalent(
+    const OutputDestination& left,
+    const OutputDestination& right)
+{
+    if (left.isStdout || right.isStdout)
+        return left.isStdout && right.isStdout;
+    return _areOutputPathsEquivalent(left.path, right.path);
+}
+
+String EndToEndCompileRequest::_getCoverageManifestOutputPath(
+    const String& path,
+    IArtifact* artifact)
+{
+    if (!_findCoverageTracingMetadata(artifact))
+        return String();
+
+    const String explicitSidecarPath = _getExplicitCoverageManifestPath();
+    if (explicitSidecarPath.getLength() != 0)
+        return explicitSidecarPath;
+
+    return _isStdoutArtifactPath(path) ? String() : path + ".coverage-manifest.json";
+}
+
 SlangResult EndToEndCompileRequest::_maybeWriteCoverageManifest(
     const String& path,
     IArtifact* artifact)
@@ -582,18 +623,9 @@ SlangResult EndToEndCompileRequest::_maybeWriteCoverageManifest(
     if (!coverage)
         return SLANG_OK;
 
-    const String explicitSidecarPath = _getExplicitCoverageManifestPath();
-    String sidecarPath;
-    if (explicitSidecarPath.getLength() != 0)
-    {
-        sidecarPath = explicitSidecarPath;
-    }
-    else
-    {
-        if (_isStdoutArtifactPath(path))
-            return SLANG_OK;
-        sidecarPath = path + ".coverage-manifest.json";
-    }
+    const String sidecarPath = _getCoverageManifestOutputPath(path, artifact);
+    if (sidecarPath.getLength() == 0)
+        return SLANG_OK;
 
     ComPtr<ISlangBlob> jsonBlob;
     SLANG_RETURN_ON_FAIL(slang_writeCoverageManifestJson(coverage, jsonBlob.writeRef()));
@@ -705,7 +737,7 @@ SlangResult EndToEndCompileRequest::_validateSeparateDebugInfoOutputPaths()
     // because it has no main output path from which to derive a sidecar path. Explicit mode counts
     // debug artifacts and collects every other destination for the missing-data and collision
     // checks after the loop.
-    List<String> otherOutputPaths;
+    List<OutputDestination> otherOutputDestinations;
     Index debugArtifactCount = 0;
     bool missingDerivedPath = false;
 
@@ -719,18 +751,15 @@ SlangResult EndToEndCompileRequest::_validateSeparateDebugInfoOutputPaths()
         {
             // Normalize both spellings of stdout so an explicit `-` sidecar cannot collide with an
             // implicit stdout main artifact.
-            otherOutputPaths.add(
-                _isStdoutArtifactPath(outputArtifact.path) ? String("-") : outputArtifact.path);
+            otherOutputDestinations.add(_getArtifactOutputDestination(outputArtifact.path));
 
-            if (_findCoverageTracingMetadata(outputArtifact.artifact))
+            String coveragePath =
+                _getCoverageManifestOutputPath(outputArtifact.path, outputArtifact.artifact);
+            if (coveragePath.getLength() != 0)
             {
-                String coveragePath = _getExplicitCoverageManifestPath();
-                if (coveragePath.getLength() == 0 && !_isStdoutArtifactPath(outputArtifact.path))
-                {
-                    coveragePath = outputArtifact.path + ".coverage-manifest.json";
-                }
-                if (coveragePath.getLength() != 0)
-                    otherOutputPaths.add(coveragePath);
+                // Coverage manifests always use file paths; unlike artifact and reflection output,
+                // `-` has no stdout meaning for `-coverage-manifest-output`.
+                otherOutputDestinations.add(_getFileOutputDestination(coveragePath));
             }
         }
 
@@ -753,24 +782,34 @@ SlangResult EndToEndCompileRequest::_validateSeparateDebugInfoOutputPaths()
     if (!hasExplicitPath)
         return SLANG_OK;
 
+    const String reflectionPath =
+        getOptionSet().getStringOption(CompilerOptionName::EmitReflectionJSON);
+    if (reflectionPath.getLength() != 0)
+        otherOutputDestinations.add(_getArtifactOutputDestination(reflectionPath));
+    if (m_dependencyOutputPath.getLength() != 0)
+        otherOutputDestinations.add(_getFileOutputDestination(m_dependencyOutputPath));
+
     if (debugArtifactCount == 0)
     {
         getSink()->diagnose(
             Diagnostics::SeparateDebugInfoOutputWithoutDebugData{.path = explicitPath});
         return SLANG_FAIL;
     }
-    // This preflight runs only for command-line output, whose option parser rejects duplicate
-    // target formats. At most one SPIR-V target (the only format that produces separate debug
-    // information) can therefore reach this point. Direct-SPIR-V output is whole-program, so its
-    // entry points share that target's one separate-debug artifact; other target formats add none.
-    SLANG_RELEASE_ASSERT(debugArtifactCount == 1);
-
-    for (const auto& otherPath : otherOutputPaths)
+    if (debugArtifactCount > 1)
     {
-        if (_areOutputPathsEquivalent(explicitPath, otherPath))
+        getSink()->diagnose(
+            Diagnostics::SeparateDebugInfoOutputMultipleArtifacts{.path = explicitPath});
+        return SLANG_FAIL;
+    }
+
+    const OutputDestination explicitDestination = _getArtifactOutputDestination(explicitPath);
+    for (const auto& otherDestination : otherOutputDestinations)
+    {
+        if (_areOutputDestinationsEquivalent(explicitDestination, otherDestination))
         {
-            getSink()->diagnose(
-                Diagnostics::SeparateDebugInfoOutputCollidesWithArtifact{.path = explicitPath});
+            getSink()->diagnose(Diagnostics::SeparateDebugInfoOutputCollidesWithArtifact{
+                .path = explicitPath,
+                .otherPath = otherDestination.path});
             return SLANG_FAIL;
         }
     }
@@ -794,6 +833,8 @@ SlangResult EndToEndCompileRequest::_maybeWriteSeparateDebugInfoOutput(
 
     String separateDebugInfoOutputPath =
         _getSeparateDebugInfoOutputPath(targetProgram, path, artifact);
+    // The separate-debug preflight runs before emission and rejects every shape for which this
+    // artifact has no destination, including an underivable stdout fallback.
     SLANG_RELEASE_ASSERT(separateDebugInfoOutputPath.getLength() != 0);
     return _maybeWriteArtifact(separateDebugInfoOutputPath, separateDebugInfoArtifact);
 }
@@ -810,16 +851,14 @@ SlangResult EndToEndCompileRequest::_validateCoverageManifestOutputPaths()
     if (!m_isCommandLineCompile || m_containerFormat != ContainerFormat::None)
         return SLANG_OK;
 
-    List<String> emittedArtifactPaths;
+    List<OutputDestination> emittedDestinations;
     Index coverageArtifactCount = 0;
 
     List<ExistingOutputArtifact> outputArtifacts;
     _collectExistingOutputArtifacts(outputArtifacts);
     for (const auto& outputArtifact : outputArtifacts)
     {
-        // Stdout artifacts have no file path to collide with.
-        if (!_isStdoutArtifactPath(outputArtifact.path))
-            emittedArtifactPaths.add(outputArtifact.path);
+        emittedDestinations.add(_getArtifactOutputDestination(outputArtifact.path));
 
         String separateDebugInfoOutputPath = _getSeparateDebugInfoOutputPath(
             outputArtifact.targetProgram,
@@ -827,7 +866,9 @@ SlangResult EndToEndCompileRequest::_validateCoverageManifestOutputPaths()
             outputArtifact.artifact);
         // Targets that did not emit separate debug info have no debug path to collide with.
         if (separateDebugInfoOutputPath.getLength() != 0)
-            emittedArtifactPaths.add(separateDebugInfoOutputPath);
+        {
+            emittedDestinations.add(_getArtifactOutputDestination(separateDebugInfoOutputPath));
+        }
 
         if (_findCoverageTracingMetadata(outputArtifact.artifact))
             coverageArtifactCount++;
@@ -849,9 +890,10 @@ SlangResult EndToEndCompileRequest::_validateCoverageManifestOutputPaths()
         return SLANG_FAIL;
     }
 
-    for (const auto& artifactPath : emittedArtifactPaths)
+    const OutputDestination explicitDestination = _getFileOutputDestination(explicitSidecarPath);
+    for (const auto& emittedDestination : emittedDestinations)
     {
-        if (_areOutputPathsEquivalent(explicitSidecarPath, artifactPath))
+        if (_areOutputDestinationsEquivalent(explicitDestination, emittedDestination))
         {
             getSink()->diagnose(Diagnostics::CoverageManifestOutputCollidesWithArtifact{
                 .path = explicitSidecarPath});

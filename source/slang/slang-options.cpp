@@ -535,6 +535,7 @@ void initCommandOptions(CommandOptions& options)
          "-o",
          "-o <path>",
          "Specify a path where generated output should be written.\n"
+         "Use `-` to write generated output to stdout. "
          "If no -target or -stage is specified, one may be inferred "
          "from file extension (see <file-extension>). "
          "If multiple -target options and a single -entry are present, each -o "
