@@ -34,14 +34,12 @@ RWStructuredBuffer<uint> UnusedRWStructuredBuffer;
 SamplerState UsedSampler;
 SamplerState UnusedSampler;
 
-// Loose uniforms aggregate into an implicit constant buffer that
-// shares register space with other CBs in this shader. The reflection
-// API for Uniform queries does not take parent CB identity, so a
-// query for UnusedUniform's byte offset matches any uniform range in
-// the same space (including UsedCB's). The expected file reflects
-// this over reporting; UnusedUniform shows used=1 even though it is
-// never read. Tracked for follow up; safe over reporting only, never
-// missing a real usage.
+// Loose uniforms aggregate into the implicit $Globals constant buffer.
+// Their usage is reported on that container (the $Globals entry in the
+// bindings below) as byte ranges, not as a used flag per uniform, so a
+// consumer intersects each uniform's [offset, size) against the ranges.
+// UsedUniform (offset 0) is read and UnusedUniform (offset 4) is not,
+// so the $Globals record is [{offset 0, size 4}].
 uniform uint UsedUniform;
 uniform uint UnusedUniform;
 

@@ -3,6 +3,7 @@
 
 #include "compiler-core/slang-artifact-container-util.h"
 #include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-associated-impl.h"
 #include "compiler-core/slang-artifact-impl.h"
 #include "core/slang-char-util.h"
 #include "core/slang-memory-file-system.h"
@@ -108,6 +109,8 @@ ISlangUnknown* ComponentType::getInterface(Guid const& guid)
         return static_cast<slang::IModulePrecompileService_Experimental*>(this);
     if (guid == IComponentType2::getTypeGuid())
         return static_cast<slang::IComponentType2*>(this);
+    if (guid == slang::IParameterUsage::getTypeGuid())
+        return static_cast<slang::IParameterUsage*>(this);
     return nullptr;
 }
 
@@ -351,6 +354,137 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointMetadata(
 
     *outMetadata = static_cast<slang::IMetadata*>(metadata);
     (*outMetadata)->addRef();
+    return SLANG_OK;
+}
+
+static void _useWholeParameter(List<slang::UsedByteRange>& outRanges)
+{
+    outRanges.clear();
+    slang::UsedByteRange whole;
+    whole.offset = 0;
+    whole.size = SLANG_UNBOUNDED_SIZE;
+    outRanges.add(whole);
+}
+
+// A parameter with no usage record, or one with no metadata, reports a
+// single whole parameter range (all used) so callers never special case
+// missing data. A parameter with a record reports its real ranges, and an
+// empty list means nothing is used.
+static void _collectUsedByteRanges(
+    ComponentType* self,
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    slang::VariableLayoutReflection* parameter,
+    List<slang::UsedByteRange>& outRanges)
+{
+    outRanges.clear();
+
+    auto typeLayout = parameter ? parameter->getTypeLayout() : nullptr;
+    if (!typeLayout)
+    {
+        _useWholeParameter(outRanges);
+        return;
+    }
+
+    auto kind = typeLayout->getKind();
+    if (kind != slang::TypeReflection::Kind::ConstantBuffer &&
+        kind != slang::TypeReflection::Kind::ParameterBlock &&
+        kind != slang::TypeReflection::Kind::Struct)
+    {
+        _useWholeParameter(outRanges);
+        return;
+    }
+
+    bool hasConstantBuffer = false;
+    bool hasDescriptorTableSlot = false;
+    for (unsigned int i = 0, n = parameter->getCategoryCount(); i < n; ++i)
+    {
+        switch (parameter->getCategoryByIndex(i))
+        {
+        case slang::ParameterCategory::ConstantBuffer:
+            hasConstantBuffer = true;
+            break;
+        case slang::ParameterCategory::DescriptorTableSlot:
+            hasDescriptorTableSlot = true;
+            break;
+        default:
+            break;
+        }
+    }
+
+    UniformParentBinding parent = selectUniformParentBinding(
+        hasConstantBuffer,
+        parameter->getBindingSpace(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER),
+        parameter->getOffset(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER),
+        hasDescriptorTableSlot,
+        parameter->getBindingSpace(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT),
+        parameter->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT));
+    SlangUInt spaceIndex = parent.found
+                               ? parent.space
+                               : parameter->getBindingSpace(
+                                     SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER);
+    SlangUInt parentBindingIndex = parent.bindingIndex;
+
+    ComPtr<slang::IMetadata> metadata;
+    if (SLANG_FAILED(self->getEntryPointMetadata(
+            entryPointIndex,
+            targetIndex,
+            metadata.writeRef(),
+            nullptr)))
+    {
+        _useWholeParameter(outRanges);
+        return;
+    }
+    IArtifactPostEmitMetadata* postEmit = static_cast<IArtifactPostEmitMetadata*>(
+        metadata->castAs(IArtifactPostEmitMetadata::getTypeGuid()));
+    if (!postEmit)
+    {
+        _useWholeParameter(outRanges);
+        return;
+    }
+
+    for (const auto& entry : postEmit->getUniformParamUsage())
+    {
+        if (entry.parentBindingSpace != spaceIndex ||
+            entry.parentBindingIndex != parentBindingIndex)
+            continue;
+        outRanges.clear();
+        for (const auto& r : entry.usedRanges)
+        {
+            slang::UsedByteRange u;
+            u.offset = r.registerIndex;
+            u.size = r.registerCount;
+            outRanges.add(u);
+        }
+        return;
+    }
+    _useWholeParameter(outRanges);
+}
+
+SLANG_NO_THROW SlangInt SLANG_MCALL ComponentType::getUsedByteRangeCount(
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    slang::VariableLayoutReflection* parameter)
+{
+    List<slang::UsedByteRange> ranges;
+    _collectUsedByteRanges(this, entryPointIndex, targetIndex, parameter, ranges);
+    return ranges.getCount();
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getUsedByteRange(
+    SlangInt entryPointIndex,
+    SlangInt targetIndex,
+    slang::VariableLayoutReflection* parameter,
+    SlangInt index,
+    slang::UsedByteRange* outRange)
+{
+    if (!outRange || index < 0)
+        return SLANG_E_INVALID_ARG;
+    List<slang::UsedByteRange> ranges;
+    _collectUsedByteRanges(this, entryPointIndex, targetIndex, parameter, ranges);
+    if (index >= ranges.getCount())
+        return SLANG_E_INVALID_ARG;
+    *outRange = ranges[index];
     return SLANG_OK;
 }
 

@@ -4,9 +4,9 @@
 // "for each global shader parameter that holds byte addressable uniform
 // storage, which byte ranges does any reachable code actually read?"
 //
-// The output feeds into spIsParameterLocationUsed for the Uniform
-// parameter category, which engines use to skip uploads or binds for
-// storage that the shader never touches.
+// The output feeds the byte range reflection API (IParameterUsage) and
+// the JSON reflection dump, which engines use to skip uploads or binds
+// for storage that the shader never touches.
 //
 // Scope. We only walk parameters whose layout is wrapped in a parameter
 // group (constant buffers, parameter blocks, and the implicit parameter
@@ -14,8 +14,8 @@
 // addressable globals like RT payloads or byte address buffer contents
 // are out of scope because they do not have a useful per leaf access
 // model in this representation. Unbounded byte regions are not tracked
-// here either; instead we emit an isUntracked marker so the caller
-// returns SLANG_E_NOT_AVAILABLE rather than a misleading false answer.
+// here either. We emit no record for such a param, and a consumer
+// treats a param with no record as fully used.
 //
 // Strategy. For each in scope param we walk forward through use chains
 // from the global param. We peel FieldAddress and FieldExtract,
@@ -38,8 +38,8 @@
 // widens to the whole matrix; column major storage makes per element
 // byte ranges discontiguous and that case is not yet handled. The
 // function name carries Approximate to flag this. Engines should treat
-// used true as authoritative and SLANG_E_NOT_AVAILABLE as may be used
-// and bind it.
+// the recorded ranges as authoritative, so bytes outside them are
+// genuinely unread, and a param with no record as fully used.
 //
 // Alternatives considered. (1) Reusing UsedRanges from
 // slang-parameter-binding.cpp. That type is parameter binding specific
@@ -48,14 +48,16 @@
 // is a better fit. (2) Tracking unbounded byte regions explicitly with
 // a new range kind. The metadata coordinate space (spaceIndex,
 // byteOffset) has no per param identity, so an unbounded entry would
-// taint sibling CBs in the same space. The isUntracked marker is the
-// same idea pushed down to a single per param decision.
+// taint sibling CBs in the same space. Emitting no record instead keeps
+// the representation to plain byte ranges and pushes the fully used
+// decision down to a single per param choice.
 // (3) Coalescing on every insert during the walk. Per call merging is
 // O(N) per insert and burns time during the walk; deferring to a single
 // sort and sweep at the end is O(N log N) total per param.
 #include "slang-ir-byte-granularity-usage.h"
 
 #include "../compiler-core/slang-artifact-associated.h"
+#include "slang-ir-insts.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -360,19 +362,17 @@ collectApproximateByteGranularityUsageInformationForParameterGroups(const IRModu
             baseOffset += offsetAttr->getOffset();
 
         ByteGranularityParameterUsageInfo info;
-        info.param = param;
-        info.parentSpace = 0;
+        UInt registerSpaceOffset = 0;
         if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
-            info.parentSpace = spaceAttr->getOffset();
+            registerSpaceOffset = spaceAttr->getOffset();
         // Capture the parent CB or parameter block binding. For most
         // targets a parameter group has a ConstantBuffer offset (D3D b
         // register) or a DescriptorTableSlot offset (Vulkan/SPIR-V
         // descriptor binding). Some target configurations (cooperative
         // type metadata shaders, certain Metal/WGSL paths) yield a group
         // with neither attr. In that case we have no parent identity to
-        // scope per byte ranges against, so emit an untracked entry.
-        // Queries then return SLANG_E_NOT_AVAILABLE, which is safe over
-        // reporting rather than a silent collision with binding zero.
+        // scope per byte ranges against, so we emit no record for it and
+        // let it be treated as fully used.
         auto cbAttr = varLayout->findOffsetAttr(LayoutResourceKind::ConstantBuffer);
         auto dtAttr = varLayout->findOffsetAttr(LayoutResourceKind::DescriptorTableSlot);
         // parentBindingSpace must match what the reflection emitter sees
@@ -380,37 +380,25 @@ collectApproximateByteGranularityUsageInformationForParameterGroups(const IRModu
         // RegisterSpace offset. A descriptor set can live in either source
         // depending on binding style (vk::binding(N, set) puts it in the
         // descriptor attr's space; -fvk-bind-globals puts it in
-        // RegisterSpace), so both are summed. parentSpace stays the
-        // RegisterSpace offset alone, matching the space a Uniform query
-        // carries.
+        // RegisterSpace), so both are summed.
         UniformParentBinding parent = selectUniformParentBinding(
             cbAttr != nullptr,
-            info.parentSpace + (cbAttr ? cbAttr->getSpace() : 0),
+            registerSpaceOffset + (cbAttr ? cbAttr->getSpace() : 0),
             cbAttr ? cbAttr->getOffset() : 0,
             dtAttr != nullptr,
-            info.parentSpace + (dtAttr ? dtAttr->getSpace() : 0),
+            registerSpaceOffset + (dtAttr ? dtAttr->getSpace() : 0),
             dtAttr ? dtAttr->getOffset() : 0);
         if (!parent.found)
-        {
-            info.parentBindingSpace = info.parentSpace;
-            info.parentBindingIndex = 0;
-            info.isUntracked = true;
-            result.add(_Move(info));
             continue;
-        }
         info.parentBindingSpace = parent.space;
         info.parentBindingIndex = parent.bindingIndex;
-        info.isUntracked = false;
 
         UInt elementByteSize = 0;
         if (!_tryGetUniformByteSize(typeLayout, elementByteSize))
         {
-            // Unbounded uniform element type. Emit an untracked marker so
-            // queries against this region return SLANG_E_NOT_AVAILABLE
-            // rather than a misleading false answer. Engines reading the
-            // reflection should treat this as may be used and bind.
-            info.isUntracked = true;
-            result.add(_Move(info));
+            // Unbounded uniform element type. We have no finite extent to
+            // scope per byte ranges against, so we emit no record for it
+            // and let it be treated as fully used.
             continue;
         }
         // Parameter group whose element type has zero uniform byte size

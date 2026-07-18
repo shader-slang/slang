@@ -4557,19 +4557,8 @@ struct IMetadata : public ISlangCastable
     SLANG_COM_INTERFACE(0x8044a8a3, 0xddc0, 0x4b7f, {0xaf, 0x8e, 0x2, 0x6e, 0x90, 0x5d, 0x73, 0x32})
 
     /*
-    Whether the compiled shader uses the parameter location.
-    On SLANG_OK, outUsed is the answer. SLANG_E_NOT_AVAILABLE means we can't
-    tell (untracked category, unbounded byte storage, etc.). Treat that as
-    used and bind it.
-
-    For SLANG_PARAMETER_CATEGORY_UNIFORM, registerIndex is the byte offset
-    of the queried field within its space. The answer is true when any
-    tracked read overlaps that byte. When several constant buffers share
-    the same space, this query cannot distinguish between them and may
-    return true for an unused field if a sibling buffer's range covers the
-    same offset. The over reporting is safe (you may bind more than
-    strictly required), never an under report (a real usage is never
-    reported as unused).
+    Returns whether a resource parameter at the specified binding location is actually being used
+    in the compiled shader.
     */
     virtual SlangResult isParameterLocationUsed(
         SlangParameterCategory category, // is this a `t` register? `s` register?
@@ -5450,6 +5439,52 @@ struct IComponentType2 : public ISlangUnknown
         slang::IBlob** outDiagnostics = 0) = 0;
 };
     #define SLANG_UUID_IComponentType2 IComponentType2::getTypeGuid()
+
+/** A contiguous byte range within a parameter's uniform storage that the shader
+reads. `offset` and `size` use the same units as
+`VariableLayoutReflection::getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM)`. A `size`
+of `SLANG_UNBOUNDED_SIZE` runs to the end of the parameter.
+*/
+struct UsedByteRange
+{
+    SlangUInt offset;
+    SlangUInt size;
+};
+
+/** Reports which bytes of a parameter's uniform storage the shader reads, so a
+host can skip uploading bytes that are never used. Query it with
+`queryInterface(SLANG_UUID_IParameterUsage, ...)` on an `IComponentType` (the
+program `getLayout` is called on), the same way `IComponentType2` extends it.
+
+An untracked parameter reports one range covering the whole parameter (all
+used). A fully unused one reports a count of zero.
+*/
+struct IParameterUsage : public ISlangUnknown
+{
+    SLANG_COM_INTERFACE(
+        0xae41cb10,
+        0x5bca,
+        0x4721,
+        {0xbb, 0x3c, 0xdb, 0xf7, 0x08, 0x7a, 0x1a, 0xdc})
+
+    /** Number of used byte ranges of `parameter` for the given entry point and
+    target. See the interface comment for the untracked and unused conventions.
+    */
+    virtual SLANG_NO_THROW SlangInt SLANG_MCALL getUsedByteRangeCount(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        VariableLayoutReflection* parameter) = 0;
+
+    /** Write the used byte range of `parameter` at `index` to `outRange`.
+    */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getUsedByteRange(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        VariableLayoutReflection* parameter,
+        SlangInt index,
+        UsedByteRange* outRange) = 0;
+};
+    #define SLANG_UUID_IParameterUsage IParameterUsage::getTypeGuid()
 
 /** A module is the granularity of shader code compilation and loading.
 

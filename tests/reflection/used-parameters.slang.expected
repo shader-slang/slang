@@ -380,11 +380,18 @@ standard output = {
                 },
                 {
                     "name": "UsedUniform",
-                    "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0, "used": 1}
+                    "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                 },
                 {
                     "name": "UnusedUniform",
-                    "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0, "used": 1}
+                    "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
+                },
+                {
+                    "name": "$Globals",
+                    "binding": {"kind": "constantBuffer", "index": 0, "used": 1},
+                    "usedByteRanges": [
+                        {"offset": 0, "size": 4}
+                    ]
                 }
             ]
         }

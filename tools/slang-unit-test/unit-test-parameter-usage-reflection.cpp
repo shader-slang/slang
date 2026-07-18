@@ -8,10 +8,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 using namespace Slang;
 
-// Test that the isParameterLocationUsed API works.
+// Tests the isParameterLocationUsed and IParameterUsage reflection APIs.
 
 SLANG_UNIT_TEST(isParameterLocationUsedReflection)
 {
@@ -203,12 +204,13 @@ SLANG_UNIT_TEST(isParameterLocationUsedParameterBlockConstantBuffer)
     }
 }
 
-// Exercises the Uniform category of the API, which the other tests do not
-// touch. The key case is a query against a space the pass produced no
-// entry for: that must report SLANG_E_NOT_AVAILABLE rather than fabricate
-// an authoritative "not used". The invariant is that a "no" is always
-// accurate, so with no information about a space we may not answer false.
-SLANG_UNIT_TEST(isParameterLocationUsedUniformUnknownSpace)
+// Exercises the uniform byte range API IParameterUsage, which the
+// isParameterLocationUsed tests do not touch. The constant buffer reads
+// usedColor (bytes [0, 16)) and usedScalar (bytes [32, 36)) and leaves
+// unusedColor [16, 32) and unusedScalar [36, 40) untouched, so the
+// reported ranges must be exactly those two reads and must exclude the
+// unread bytes. The order is deterministic, ascending by offset.
+SLANG_UNIT_TEST(parameterUsageUniformByteRanges)
 {
     const char* userSourceBody = R"(
         cbuffer Params
@@ -243,8 +245,8 @@ SLANG_UNIT_TEST(isParameterLocationUsedUniformUnknownSpace)
 
     ComPtr<slang::IBlob> diagnosticBlob;
     auto module = session->loadModuleFromSourceString(
-        "uniformUnknownSpace",
-        "uniformUnknownSpace.slang",
+        "uniformByteRanges",
+        "uniformByteRanges.slang",
         userSourceBody,
         diagnosticBlob.writeRef());
     SLANG_CHECK(module != nullptr);
@@ -270,55 +272,53 @@ SLANG_UNIT_TEST(isParameterLocationUsedUniformUnknownSpace)
     compositeProgram->link(linkedProgram.writeRef(), nullptr);
     SLANG_CHECK(linkedProgram != nullptr);
 
-    ComPtr<slang::IMetadata> metadata;
-    linkedProgram->getTargetMetadata(0, metadata.writeRef(), nullptr);
-    SLANG_CHECK(metadata != nullptr);
-
-    // The constant buffer lands in space 0. usedColor occupies bytes
-    // [0, 16) and usedScalar byte [32, 36); unusedColor [16, 32) and
-    // unusedScalar [36, 40) are present in the buffer but never read.
-    bool isUsed = false;
+    ComPtr<slang::IParameterUsage> parameterUsage;
     SLANG_CHECK(
-        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_UNIFORM, 0, 0, isUsed) ==
-        SLANG_OK);
-    SLANG_CHECK(isUsed);
+        linkedProgram->queryInterface(
+            slang::IParameterUsage::getTypeGuid(),
+            (void**)parameterUsage.writeRef()) == SLANG_OK);
+    SLANG_CHECK(parameterUsage != nullptr);
 
-    SLANG_CHECK(
-        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_UNIFORM, 0, 32, isUsed) ==
-        SLANG_OK);
-    SLANG_CHECK(isUsed);
+    auto programLayout = linkedProgram->getLayout(0);
+    SLANG_CHECK(programLayout != nullptr);
 
-    // Tracked but unread bytes in a space we did record are an accurate false.
-    SLANG_CHECK(
-        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_UNIFORM, 0, 16, isUsed) ==
-        SLANG_OK);
-    SLANG_CHECK(!isUsed);
+    slang::VariableLayoutReflection* paramsVar = nullptr;
+    for (unsigned int i = 0, n = programLayout->getParameterCount(); i < n; ++i)
+    {
+        auto p = programLayout->getParameterByIndex(i);
+        if (strcmp(p->getName(), "Params") == 0)
+        {
+            paramsVar = p;
+            break;
+        }
+    }
+    SLANG_CHECK(paramsVar != nullptr);
 
-    SLANG_CHECK(
-        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_UNIFORM, 0, 36, isUsed) ==
-        SLANG_OK);
-    SLANG_CHECK(!isUsed);
+    SLANG_CHECK(parameterUsage->getUsedByteRangeCount(0, 0, paramsVar) == 2);
 
-    // The regression guard: a space the pass never produced an entry for
-    // must be reported as not available, never a fabricated false. Seed
-    // isUsed = true to confirm the failing path does not leave it cleared.
-    isUsed = true;
+    slang::UsedByteRange range0 = {};
+    SLANG_CHECK(parameterUsage->getUsedByteRange(0, 0, paramsVar, 0, &range0) == SLANG_OK);
+    SLANG_CHECK(range0.offset == 0);
+    SLANG_CHECK(range0.size == 16);
+
+    slang::UsedByteRange range1 = {};
+    SLANG_CHECK(parameterUsage->getUsedByteRange(0, 0, paramsVar, 1, &range1) == SLANG_OK);
+    SLANG_CHECK(range1.offset == 32);
+    SLANG_CHECK(range1.size == 4);
+
+    // An out of range index is rejected rather than returning a stale range.
+    slang::UsedByteRange ignored = {};
     SLANG_CHECK(
-        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_UNIFORM, 999, 0, isUsed) ==
-        SLANG_E_NOT_AVAILABLE);
+        parameterUsage->getUsedByteRange(0, 0, paramsVar, 2, &ignored) == SLANG_E_INVALID_ARG);
 }
 
-// Covers the other path to SLANG_E_NOT_AVAILABLE: a space the pass *did*
-// record an entry for, but that entry is untracked. This is distinct from
-// the unknown-space case above, which returns not available because no
-// entry matched the space at all. Here the matcher must short-circuit on
-// the untracked marker before it ever consults byte ranges, so the byte
-// offset in the query is irrelevant. A push-constant constant buffer is
-// the cleanest trigger: it carries neither a ConstantBuffer nor a
-// DescriptorTableSlot binding, so the pass has no parent identity to scope
-// byte ranges against and emits an untracked entry rather than risk a
-// misleading "not used".
-SLANG_UNIT_TEST(isParameterLocationUsedUniformUntracked)
+// A push constant carries neither a ConstantBuffer nor a
+// DescriptorTableSlot binding, so the IR pass has no parent binding
+// identity to scope byte ranges against and emits no record. With no
+// record IParameterUsage reports the whole parameter as used: a single
+// range at offset 0 whose size is SLANG_UNBOUNDED_SIZE, so a host binds
+// the whole block rather than stripping bytes it cannot prove are unread.
+SLANG_UNIT_TEST(parameterUsageUniformWholeParameterFallback)
 {
     const char* userSourceBody = R"(
         struct PushData
@@ -352,8 +352,8 @@ SLANG_UNIT_TEST(isParameterLocationUsedUniformUntracked)
 
     ComPtr<slang::IBlob> diagnosticBlob;
     auto module = session->loadModuleFromSourceString(
-        "uniformUntracked",
-        "uniformUntracked.slang",
+        "uniformWholeParameterFallback",
+        "uniformWholeParameterFallback.slang",
         userSourceBody,
         diagnosticBlob.writeRef());
     SLANG_CHECK(module != nullptr);
@@ -379,18 +379,233 @@ SLANG_UNIT_TEST(isParameterLocationUsedUniformUntracked)
     compositeProgram->link(linkedProgram.writeRef(), nullptr);
     SLANG_CHECK(linkedProgram != nullptr);
 
-    ComPtr<slang::IMetadata> metadata;
-    linkedProgram->getTargetMetadata(0, metadata.writeRef(), nullptr);
-    SLANG_CHECK(metadata != nullptr);
-
-    // The push constant produces an untracked entry in space 0. A uniform
-    // query there must report not available via the untracked short-circuit,
-    // not a fabricated true or false. Seed isUsed = true to confirm the
-    // failing path leaves it untouched, and query a byte the shader actually
-    // reads (offset 0) to prove the untracked check fires regardless of the
-    // recorded ranges.
-    bool isUsed = true;
+    ComPtr<slang::IParameterUsage> parameterUsage;
     SLANG_CHECK(
-        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_UNIFORM, 0, 0, isUsed) ==
-        SLANG_E_NOT_AVAILABLE);
+        linkedProgram->queryInterface(
+            slang::IParameterUsage::getTypeGuid(),
+            (void**)parameterUsage.writeRef()) == SLANG_OK);
+    SLANG_CHECK(parameterUsage != nullptr);
+
+    auto programLayout = linkedProgram->getLayout(0);
+    SLANG_CHECK(programLayout != nullptr);
+
+    slang::VariableLayoutReflection* pcVar = nullptr;
+    for (unsigned int i = 0, n = programLayout->getParameterCount(); i < n; ++i)
+    {
+        auto p = programLayout->getParameterByIndex(i);
+        if (strcmp(p->getName(), "pc") == 0)
+        {
+            pcVar = p;
+            break;
+        }
+    }
+    SLANG_CHECK(pcVar != nullptr);
+
+    SLANG_CHECK(parameterUsage->getUsedByteRangeCount(0, 0, pcVar) == 1);
+
+    slang::UsedByteRange whole = {};
+    SLANG_CHECK(parameterUsage->getUsedByteRange(0, 0, pcVar, 0, &whole) == SLANG_OK);
+    SLANG_CHECK(whole.offset == 0);
+    SLANG_CHECK(whole.size == SLANG_UNBOUNDED_SIZE);
+}
+
+// IParameterUsage is a distinct COM interface reached through
+// queryInterface, not an extension of the IComponentType vtable, so
+// existing callers keep their ABI. This probe checks the interface is
+// reachable, that it shares one COM identity with the component type (a
+// round trip through ISlangUnknown returns the same pointer), and that a
+// base IComponentType method still works through the queried interface.
+SLANG_UNIT_TEST(parameterUsageInterfaceIdentity)
+{
+    const char* userSourceBody = R"(
+        cbuffer Params { float4 color; }
+        RWStructuredBuffer<float4> outBuf;
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void main(uint tid : SV_DispatchThreadID)
+        {
+            outBuf[tid] = color;
+        }
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "parameterUsageIdentity",
+        "parameterUsageIdentity.slang",
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    module->findAndCheckEntryPoint(
+        "main",
+        SLANG_STAGE_COMPUTE,
+        entryPoint.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(entryPoint != nullptr);
+
+    ComPtr<slang::IComponentType> compositeProgram;
+    slang::IComponentType* components[] = {module, entryPoint.get()};
+    session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(compositeProgram != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    compositeProgram->link(linkedProgram.writeRef(), nullptr);
+    SLANG_CHECK(linkedProgram != nullptr);
+
+    ComPtr<slang::IParameterUsage> parameterUsage;
+    SLANG_CHECK(
+        linkedProgram->queryInterface(
+            slang::IParameterUsage::getTypeGuid(),
+            (void**)parameterUsage.writeRef()) == SLANG_OK);
+    SLANG_CHECK(parameterUsage != nullptr);
+
+    ComPtr<ISlangUnknown> unknownFromProgram;
+    SLANG_CHECK(
+        linkedProgram->queryInterface(
+            ISlangUnknown::getTypeGuid(),
+            (void**)unknownFromProgram.writeRef()) == SLANG_OK);
+    ComPtr<ISlangUnknown> unknownFromUsage;
+    SLANG_CHECK(
+        parameterUsage->queryInterface(
+            ISlangUnknown::getTypeGuid(),
+            (void**)unknownFromUsage.writeRef()) == SLANG_OK);
+    SLANG_CHECK(unknownFromProgram.get() == unknownFromUsage.get());
+
+    ComPtr<slang::IComponentType> programAgain;
+    SLANG_CHECK(
+        parameterUsage->queryInterface(
+            slang::IComponentType::getTypeGuid(),
+            (void**)programAgain.writeRef()) == SLANG_OK);
+    SLANG_CHECK(programAgain != nullptr);
+    SLANG_CHECK(programAgain->getLayout(0) != nullptr);
+}
+
+// Loose global uniforms report usage on the implicit $Globals constant
+// buffer via getGlobalParamsVarLayout, not on their flattened leaves (a
+// leaf query gives the whole parameter fallback). $Globals shares space
+// with sibling CBs, so records must stay distinct: the shader reads
+// usedScalar ([0, 4) of $Globals) and UsedCB.Extra.x ([8, 12) of UsedCB),
+// and the $Globals query must return only [0, 4).
+SLANG_UNIT_TEST(parameterUsageLooseGlobalUniforms)
+{
+    const char* userSourceBody = R"(
+        struct S { uint2 Size; uint2 Extra; };
+        ConstantBuffer<S> UsedCB;
+        ConstantBuffer<S> UnusedCB;
+        uniform float usedScalar;
+        uniform float unusedScalar;
+        RWStructuredBuffer<float> outBuf;
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void main(uint tid : SV_DispatchThreadID)
+        {
+            outBuf[tid] = usedScalar + float(UsedCB.Extra.x);
+        }
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "looseGlobalUniforms",
+        "looseGlobalUniforms.slang",
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    module->findAndCheckEntryPoint(
+        "main",
+        SLANG_STAGE_COMPUTE,
+        entryPoint.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(entryPoint != nullptr);
+
+    ComPtr<slang::IComponentType> compositeProgram;
+    slang::IComponentType* components[] = {module, entryPoint.get()};
+    session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(compositeProgram != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    compositeProgram->link(linkedProgram.writeRef(), nullptr);
+    SLANG_CHECK(linkedProgram != nullptr);
+
+    ComPtr<slang::IParameterUsage> parameterUsage;
+    SLANG_CHECK(
+        linkedProgram->queryInterface(
+            slang::IParameterUsage::getTypeGuid(),
+            (void**)parameterUsage.writeRef()) == SLANG_OK);
+
+    auto programLayout = linkedProgram->getLayout(0);
+    SLANG_CHECK(programLayout != nullptr);
+
+    slang::VariableLayoutReflection* usedCBVar = nullptr;
+    slang::VariableLayoutReflection* usedScalarVar = nullptr;
+    for (unsigned int i = 0, n = programLayout->getParameterCount(); i < n; ++i)
+    {
+        auto p = programLayout->getParameterByIndex(i);
+        if (strcmp(p->getName(), "UsedCB") == 0)
+            usedCBVar = p;
+        else if (strcmp(p->getName(), "usedScalar") == 0)
+            usedScalarVar = p;
+    }
+    SLANG_CHECK(usedCBVar != nullptr);
+    SLANG_CHECK(usedScalarVar != nullptr);
+
+    SLANG_CHECK(parameterUsage->getUsedByteRangeCount(0, 0, usedCBVar) == 1);
+    slang::UsedByteRange cbRange = {};
+    SLANG_CHECK(parameterUsage->getUsedByteRange(0, 0, usedCBVar, 0, &cbRange) == SLANG_OK);
+    SLANG_CHECK(cbRange.offset == 8);
+    SLANG_CHECK(cbRange.size == 4);
+
+    SLANG_CHECK(parameterUsage->getUsedByteRangeCount(0, 0, usedScalarVar) == 1);
+    slang::UsedByteRange leafRange = {};
+    SLANG_CHECK(parameterUsage->getUsedByteRange(0, 0, usedScalarVar, 0, &leafRange) == SLANG_OK);
+    SLANG_CHECK(leafRange.offset == 0);
+    SLANG_CHECK(leafRange.size == SLANG_UNBOUNDED_SIZE);
+
+    auto globalVar = programLayout->getGlobalParamsVarLayout();
+    SLANG_CHECK(globalVar != nullptr);
+    SLANG_CHECK(
+        globalVar->getTypeLayout()->getKind() == slang::TypeReflection::Kind::ConstantBuffer);
+    SLANG_CHECK(parameterUsage->getUsedByteRangeCount(0, 0, globalVar) == 1);
+    slang::UsedByteRange globalRange = {};
+    SLANG_CHECK(parameterUsage->getUsedByteRange(0, 0, globalVar, 0, &globalRange) == SLANG_OK);
+    SLANG_CHECK(globalRange.offset == 0);
+    SLANG_CHECK(globalRange.size == 4);
 }

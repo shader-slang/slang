@@ -83,8 +83,7 @@ standard output = {
             "bindings": [
                 {
                     "name": "pc",
-                    "binding": {"kind": "pushConstantBuffer", "index": 0},
-                    "usedByteRangesUnavailable": true
+                    "binding": {"kind": "pushConstantBuffer", "index": 0}
                 },
                 {
                     "name": "outBuf",

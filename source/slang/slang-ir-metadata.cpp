@@ -323,15 +323,11 @@ void collectMetadata(
     for (auto& info : collectApproximateByteGranularityUsageInformationForParameterGroups(irModule))
     {
         UniformParamUsage entry;
-        entry.parentSpace = info.parentSpace;
         entry.parentBindingSpace = info.parentBindingSpace;
         entry.parentBindingIndex = info.parentBindingIndex;
-        entry.isUntracked = info.isUntracked;
         for (auto& r : info.ranges)
         {
             ShaderBindingRange sbr;
-            sbr.category = slang::Uniform;
-            sbr.spaceIndex = info.parentSpace;
             sbr.registerIndex = r.offset;
             sbr.registerCount = r.size;
             entry.usedRanges.add(sbr);

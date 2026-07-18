@@ -98,7 +98,8 @@ private:
 class ComponentType : public RefObject,
                       public slang::IComponentType,
                       public slang::IComponentType2,
-                      public slang::IModulePrecompileService_Experimental
+                      public slang::IModulePrecompileService_Experimental,
+                      public slang::IParameterUsage
 {
 public:
     //
@@ -189,6 +190,21 @@ public:
         int targetIndex,
         ISlangSharedLibrary** outSharedLibrary,
         slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
+
+    //
+    // slang::IParameterUsage interface
+    //
+
+    SLANG_NO_THROW SlangInt SLANG_MCALL getUsedByteRangeCount(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::VariableLayoutReflection* parameter) SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL getUsedByteRange(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::VariableLayoutReflection* parameter,
+        SlangInt index,
+        slang::UsedByteRange* outRange) SLANG_OVERRIDE;
 
     //
     // slang::IModulePrecompileService interface

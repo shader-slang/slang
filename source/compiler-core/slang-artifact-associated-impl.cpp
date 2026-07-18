@@ -347,46 +347,6 @@ SlangResult ArtifactPostEmitMetadata::isParameterLocationUsed(
     SlangUInt registerIndex,
     bool& outUsed)
 {
-    // Uniform queries are answered from the per param structure which
-    // scopes byte ranges by their parent CB or parameter block. Without
-    // the parent identity in the API signature we still over report
-    // when multiple CBs share a register space (a query matches if any
-    // CB in the space has the byte used). This is safe over reporting
-    // for the API contract: a "yes" might be conservative but a "no"
-    // is always accurate. An untracked entry in the queried space
-    // yields SLANG_E_NOT_AVAILABLE.
-    if (category == SLANG_PARAMETER_CATEGORY_UNIFORM)
-    {
-        // Track whether the queried space was seen at all. A space with no
-        // matching entry is one the pass produced no information for
-        // (uniform tracking never ran for this artifact, or it ran but
-        // never reached this space), so a fall through to outUsed = false
-        // would fabricate an authoritative "not used" from nothing. Only a
-        // space we actually recorded an entry for can yield a trustworthy
-        // false; otherwise we must report not available.
-        bool anyEntryForSpace = false;
-        for (const auto& entry : m_uniformParamUsage)
-        {
-            if (entry.parentSpace != spaceIndex)
-                continue;
-            anyEntryForSpace = true;
-            if (entry.isUntracked)
-                return SLANG_E_NOT_AVAILABLE;
-            for (const auto& r : entry.usedRanges)
-            {
-                if (r.containsBinding(slang::Uniform, spaceIndex, registerIndex))
-                {
-                    outUsed = true;
-                    return SLANG_OK;
-                }
-            }
-        }
-        if (!anyEntryForSpace)
-            return SLANG_E_NOT_AVAILABLE;
-        outUsed = false;
-        return SLANG_OK;
-    }
-
     for (const auto& range : getUsedBindingRanges())
     {
         if (range.containsBinding((slang::ParameterCategory)category, spaceIndex, registerIndex))
