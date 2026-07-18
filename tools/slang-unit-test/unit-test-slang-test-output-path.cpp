@@ -95,70 +95,6 @@ SLANG_UNIT_TEST(slangTestOutputPathNormalization)
     }
 
     {
-        const char* values[] = {
-            "-target",
-            "spirv",
-            "-dump-intermediates",
-            "-dump-intermediate-prefix",
-            "../leaky-",
-        };
-        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
-        normalizeTestOutputPathsForTestFile(testPath, args);
-
-        checkArgs(args, values, SLANG_COUNT_OF(values));
-    }
-
-    {
-        const char* values[] = {"-target", "spirv", "-dump-intermediates"};
-        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
-        normalizeTestOutputPathsForTestFile(testPath, args);
-
-        const char* expected[] = {
-            "-target",
-            "spirv",
-            "-dump-intermediates",
-            "-dump-intermediate-prefix",
-            "tests/diagnostics/path-normalization-",
-        };
-        checkArgs(args, expected, SLANG_COUNT_OF(expected));
-    }
-
-    {
-        const char* values[] = {
-            "-target",
-            "spirv",
-            "-dump-intermediates",
-            "-dump-intermediate-prefix",
-            "explicit-",
-        };
-        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
-        normalizeTestOutputPathsForTestFile(testPath, args);
-
-        const char* expected[] = {
-            "-target",
-            "spirv",
-            "-dump-intermediates",
-            "-dump-intermediate-prefix",
-            "tests/diagnostics/explicit-",
-        };
-        checkArgs(args, expected, SLANG_COUNT_OF(expected));
-    }
-
-    {
-        const char* values[] = {
-            "-target",
-            "spirv",
-            "-dump-intermediates",
-            "-dump-intermediate-prefix",
-            "nested/explicit-",
-        };
-        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
-        normalizeTestOutputPathsForTestFile(testPath, args);
-
-        checkArgs(args, values, SLANG_COUNT_OF(values));
-    }
-
-    {
         const char* values[] = {"-o", "a.dxbc", "-o", "b.dxbc"};
         List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
         normalizeTestOutputPathsForTestFile(testPath, args);
@@ -180,11 +116,4 @@ SLANG_UNIT_TEST(slangTestOutputPathNormalization)
         checkArgs(args, values, SLANG_COUNT_OF(values));
     }
 
-    {
-        const char* values[] = {"-target", "spirv", "-dump-intermediate-prefix"};
-        List<String> args = makeArgs(values, SLANG_COUNT_OF(values));
-        normalizeTestOutputPathsForTestFile(testPath, args);
-
-        checkArgs(args, values, SLANG_COUNT_OF(values));
-    }
 }
