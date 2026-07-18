@@ -71,6 +71,20 @@ jobs:
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
 
+      # slang-test's CUDA pass-through compiles through NVRTC, so the
+      # offline (non-NVRTC) branch of the prelude is never compiled by the
+      # test suite. Compile it here: the guarded regressions are type
+      # errors, so compiling is the whole test. -std pins the language
+      # mode against toolkit-default drift. -arch pins compute_80: the
+      # fixture enables the half/bf16/fp8 prelude sections, whose
+      # intrinsics need __CUDA_ARCH__ >= 530 (fp16) / 800 (bf16); nvcc's
+      # default sm_52 has neither. Compile-only, so any arch works.
+      - name: Compile offline (non-NVRTC) CUDA prelude test
+        if: inputs.os == 'windows' && inputs.full-gpu-tests
+        run: >-
+          nvcc -std=c++17 -arch=compute_80 -c tests/cuda/cuda-prelude-vec1-make.cu
+          -I prelude -o "${{ runner.temp }}/cuda-prelude-vec1-make.obj"
+
       - name: Test Slang
         run: |
           # Fail fast on mutually exclusive inputs — both would accumulate

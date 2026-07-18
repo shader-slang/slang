@@ -4279,6 +4279,17 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
         SLANG_UNREACHABLE("cast from void type");
     }
 
+    if (toStyle == TypeCastStyle::Void)
+    {
+        // A cast to `void` discards `value` and yields the canonical void value
+        // (`IRVoidLit`). There is no data-carrying "cast to void" instruction:
+        // `void` has a single canonical spelling, and materializing a dedicated
+        // cast op would only create a second representation that no backend emits.
+        // Any side effects needed to produce `value` are already present as the
+        // instructions that computed it.
+        return getVoidValue();
+    }
+
     if (toStyle == TypeCastStyle::Unknown || fromStyle == TypeCastStyle::Unknown)
     {
         if (fallbackToBuiltinCast)
@@ -4306,45 +4317,43 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
         }
     };
 
-    static const OpSeq opMap[5][6] = {
-        /*      To:      Int, Float, Bool, Ptr, Enum, Void */
+    // Casts to `void` are handled above, so this table only covers the
+    // data-carrying target styles (Int, Float, Bool, Ptr, Enum).
+    static const OpSeq opMap[5][5] = {
+        /*      To:      Int, Float, Bool, Ptr, Enum */
         /* From Int   */ {
             kIROp_IntCast,
             kIROp_CastIntToFloat,
             kIROp_IntCast,
             kIROp_CastIntToPtr,
-            kIROp_CastIntToEnum,
-            kIROp_CastToVoid},
+            kIROp_CastIntToEnum},
         /* From Float */
         {kIROp_CastFloatToInt,
          kIROp_FloatCast,
          {kIROp_Neq},
          {kIROp_CastFloatToInt, kIROp_CastIntToPtr},
-         {kIROp_CastFloatToInt, kIROp_CastIntToEnum},
-         kIROp_CastToVoid},
+         {kIROp_CastFloatToInt, kIROp_CastIntToEnum}},
         /* From Bool  */
-        {kIROp_IntCast,
-         kIROp_CastIntToFloat,
-         kIROp_Nop,
-         kIROp_CastIntToPtr,
-         kIROp_CastIntToEnum,
-         kIROp_CastToVoid},
+        {kIROp_IntCast, kIROp_CastIntToFloat, kIROp_Nop, kIROp_CastIntToPtr, kIROp_CastIntToEnum},
         /* From Ptr   */
         {kIROp_CastPtrToInt,
          {kIROp_CastPtrToInt, kIROp_CastIntToFloat},
          kIROp_CastPtrToBool,
          kIROp_BitCast,
-         {kIROp_CastPtrToInt, kIROp_CastIntToEnum},
-         kIROp_CastToVoid},
+         {kIROp_CastPtrToInt, kIROp_CastIntToEnum}},
         /* From Enum   */
         {kIROp_CastEnumToInt,
          {kIROp_CastEnumToInt, kIROp_CastIntToFloat},
          {kIROp_CastEnumToInt, kIROp_IntCast},
          {kIROp_CastEnumToInt, kIROp_CastIntToPtr},
-         kIROp_EnumCast,
-         kIROp_CastToVoid},
+         kIROp_EnumCast},
     };
 
+    // bounds checks
+    SLANG_ASSERT((int)fromStyle >= 0);
+    SLANG_ASSERT((int)fromStyle < 5);
+    SLANG_ASSERT((int)toStyle >= 0);
+    SLANG_ASSERT((int)toStyle < 5);
     auto op = opMap[(int)fromStyle][(int)toStyle];
     if (op.op0 == kIROp_Nop)
         return value;

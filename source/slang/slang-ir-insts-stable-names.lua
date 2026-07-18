@@ -871,5 +871,6 @@ return {
 	["CastUntypedResourceHandleToUInt"] = 895,
 	["CastUIntToUntypedSamplerHandle"] = 896,
 	["CastUntypedSamplerHandleToUInt"] = 897,
-	["getNaturalAlignment"] = 898
+	["imageGatherOffset"] = 898,
+	["getNaturalAlignment"] = 899
 }

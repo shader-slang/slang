@@ -212,6 +212,42 @@ warning(
 )
 
 err(
+    "separate-debug-info-requires-output-path",
+    109,
+    "`-separate-debug-info` requires an output file path; use `-o <path>` or `-separate-debug-info-output <path>`"
+)
+
+err(
+    "separate-debug-info-output-without-separate-debug-info",
+    110,
+    "`-separate-debug-info-output` requires `-separate-debug-info`"
+)
+
+err(
+    "separate-debug-info-output-collides-with-artifact",
+    111,
+    "`-separate-debug-info-output` path '~path' must differ from output path '~otherPath' emitted by this compile"
+)
+
+err(
+    "separate-debug-info-output-with-container",
+    112,
+    "`-separate-debug-info-output` is not supported when writing a container output"
+)
+
+err(
+    "separate-debug-info-output-without-debug-data",
+    113,
+    "`-separate-debug-info-output` path '~path' was requested, but the selected target did not produce separate debug information"
+)
+
+err(
+    "separate-debug-info-output-multiple-artifacts",
+    114,
+    "`-separate-debug-info-output` path '~path' cannot receive multiple separate debug-information artifacts"
+)
+
+err(
     "unknown-source-language",
     19,
     "unknown source language '~language'",
