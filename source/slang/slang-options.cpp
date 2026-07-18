@@ -535,6 +535,7 @@ void initCommandOptions(CommandOptions& options)
          "-o",
          "-o <path>",
          "Specify a path where generated output should be written.\n"
+         "Use `-` to write generated output to stdout. "
          "If no -target or -stage is specified, one may be inferred "
          "from file extension (see <file-extension>). "
          "If multiple -target options and a single -entry are present, each -o "
@@ -949,7 +950,17 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::EmitSeparateDebug,
          "-separate-debug-info",
          nullptr,
-         "Emit debug data to a separate file, and strip it from the main output file."},
+         "Emit debug data to a separate file, and strip it from the main output file. By default, "
+         "the debug file path is derived from the main `-o <path>` output as a fallback. Use "
+         "`-separate-debug-info-output <path>` to override it or when the main artifact is written "
+         "to stdout."},
+        {OptionKind::SeparateDebugInfoOutput,
+         "-separate-debug-info-output",
+         "-separate-debug-info-output <path>",
+         "Write separate debug information to an explicit sidecar path, overriding the fallback "
+         "path derived from `-o <path>`. Requires `-separate-debug-info` and allows the main "
+         "artifact to be written to stdout. Use `-` to write the separate debug information to "
+         "stdout when the main artifact is written to a file."},
         {OptionKind::EmitCPUViaCPP,
          "-emit-cpu-via-cpp",
          nullptr,
@@ -4008,6 +4019,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // This will emit a separate debug file, containing all debug info in
                 // a .dbg.spv file. The main output SPIRV will have all debug info stripped.
                 linkage->m_optionSet.set(OptionKind::EmitSeparateDebug, true);
+                break;
+            }
+        case OptionKind::SeparateDebugInfoOutput:
+            {
+                CommandLineArg outputPath;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(outputPath));
+                linkage->m_optionSet.set(OptionKind::SeparateDebugInfoOutput, outputPath.value);
                 break;
             }
         case OptionKind::EmitCPUViaCPP:
