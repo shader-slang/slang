@@ -118,7 +118,7 @@ protected:
     }
     // Move ctor
     explicit ListBlob(List<uint8_t>&& data)
-        : m_data(data)
+        : m_data(_Move(data))
     {
     }
 
