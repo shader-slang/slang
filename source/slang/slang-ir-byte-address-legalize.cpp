@@ -770,6 +770,22 @@ struct ByteAddressBufferLegalizationContext
                 {
                     return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
                 }
+                // Chunking emits typed sub-vector loads (e.g. a `float2` `Load<T>`). Targets
+                // flagged `useBitCastFromUInt` (fxc / DX <= 5.0) have no templated `Load<T>` for
+                // byte-address buffers, so scalarize instead: each element then routes through the
+                // uint-load + bitcast path below, which is the only fxc-compatible form.
+                if (m_options.useBitCastFromUInt)
+                {
+                    return emitLegalSequenceLoad(
+                        type,
+                        buffer,
+                        baseOffset,
+                        immediateOffset,
+                        kIROp_MakeVector,
+                        vecType->getElementType(),
+                        elementCountInst->getValue(),
+                        alignment);
+                }
                 // The whole vector is not aligned for a single wide load, but a narrower
                 // power-of-two-width access may still be: emit the widest chunks the alignment
                 // permits and fall back to per-component loads for the remainder (issue
@@ -1744,6 +1760,20 @@ struct ByteAddressBufferLegalizationContext
                         baseOffset,
                         immediateOffset,
                         value);
+                }
+                // Mirror the load path: `useBitCastFromUInt` targets (fxc / DX <= 5.0) cannot
+                // express a typed sub-vector `Store<T>`, so scalarize rather than chunk; each
+                // element then routes through the uint-bitcast store path below.
+                if (m_options.useBitCastFromUInt)
+                {
+                    return emitLegalSequenceStore(
+                        buffer,
+                        baseOffset,
+                        immediateOffset,
+                        value,
+                        vecType->getElementType(),
+                        elementCountInst->getValue(),
+                        alignment);
                 }
                 // The whole vector is not aligned for a single wide store, but a narrower
                 // power-of-two-width access may still be: store the widest chunks the alignment
