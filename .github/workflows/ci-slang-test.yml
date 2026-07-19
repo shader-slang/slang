@@ -60,22 +60,21 @@ jobs:
         shell: bash
 
     steps:
+      # Ensure Git Bash tools are in PATH for Windows.
+      # Needed by pre-setup Bash steps before common-test-setup adds them.
+      - name: Add Git Bash to PATH (Windows)
+        if: inputs.os == 'windows'
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           submodules: "false"
           fetch-depth: "1"
 
       - name: Clean inherited checkout state
-        if: inputs.os != 'windows'
-        run: |
-          # Remove stale files and stale submodule worktrees inherited by self-hosted runners.
-          git submodule deinit --all --force
-          git clean -ffdx
-          git reset --hard HEAD
-
-      - name: Clean inherited checkout state (Windows)
-        if: inputs.os == 'windows'
-        shell: pwsh
         run: |
           # Remove stale files and stale submodule worktrees inherited by self-hosted runners.
           git submodule deinit --all --force
@@ -83,14 +82,7 @@ jobs:
           git reset --hard HEAD
 
       - name: Checkout OptiX headers
-        if: (inputs.full-gpu-tests || inputs.gpu-api-only) && inputs.os == 'linux'
-        run: |
-          git submodule sync -- external/optix-dev
-          git submodule update --init --depth=1 external/optix-dev
-
-      - name: Checkout OptiX headers (Windows)
-        if: (inputs.full-gpu-tests || inputs.gpu-api-only) && inputs.os == 'windows'
-        shell: pwsh
+        if: (inputs.full-gpu-tests || inputs.gpu-api-only) && inputs.os != 'macos'
         run: |
           git submodule sync -- external/optix-dev
           git submodule update --init --depth=1 external/optix-dev
