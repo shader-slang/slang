@@ -37,8 +37,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     float4 c = buffer.LoadAligned<float4>(0);
     float4 d = buffer.LoadAligned<float4>(16);
 
-    // Store at alignment 8 is split into two `float2` stores (not four scalar stores, which
-    // `CHECK: Store` alone would not have distinguished).
+    // Store at alignment 8 is split into two `float2` stores (not four scalar stores); matching the
+    // `float2(` payload distinguishes the two cases where a bare store-count would not.
     // CHECK-COUNT-2: Store{{.*}}float2(
     buffer.Store<float4>(0, a + b + c + d, 8);
 }
