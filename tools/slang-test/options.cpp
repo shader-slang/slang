@@ -3,6 +3,7 @@
 
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-string-util.h"
+#include "slang-test-optimization-options.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,6 +87,11 @@ static bool _isSubCommand(const char* arg)
         "  -skip-api-detection            Skip API availability detection\n"
         "  -only-api-detection            Only run API detection and print results, then exit\n"
         "  -server-count <n>              Set number of test servers (default: 1)\n"
+        "  -default-optimization-level <level>  Override the default slangc optimization level\n"
+        "                                 injected for tests that do not pin their own -O\n"
+        "                                 (accepts 0/none, 1/default, 2/high, 3/maximal, or the\n"
+        "                                 -O<level> form). Tests that specify their own level\n"
+        "                                 still win; Metal render tests keep -O1.\n"
         "  -show-adapter-info             Show detailed adapter information\n"
         "  -generate-hlsl-baselines       Generate HLSL test baselines\n"
         "  -skip-reference-image-generation Skip generating reference images for render tests\n"
@@ -372,6 +378,35 @@ static bool _isSubCommand(const char* arg)
             {
                 optionsOut->serverCount = 1;
             }
+        }
+        else if (strcmp(arg, "-default-optimization-level") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+            // Accept either a bare level (e.g. "3" or "maximal") or the "-O<level>" form,
+            // normalize to a single "-O<level>" argument, and validate it against slangc's
+            // optimization-level names so a typo fails fast instead of silently disabling the
+            // override.
+            const char* rawLevel = *argCursor++;
+            String level = rawLevel;
+            if (!level.startsWith("-O"))
+            {
+                level = String("-O") + level;
+            }
+            if (!SlangTest::isSlangOptimizationArg(level))
+            {
+                stdError.print(
+                    "error: invalid optimization level '%s' for '%s'; expected 0/none, "
+                    "1/default, 2/high, or 3/maximal (optionally with a leading -O)\n",
+                    rawLevel,
+                    arg);
+                return SLANG_FAIL;
+            }
+            optionsOut->defaultOptimizationLevel = level;
         }
         else if (strcmp(arg, "-appveyor") == 0)
         {

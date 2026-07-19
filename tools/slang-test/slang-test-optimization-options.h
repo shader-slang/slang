@@ -59,15 +59,23 @@ inline bool hasSlangOptimizationArg(const List<String>& args)
 /// Most compiler-based tests do not need optimized output, and keeping them at `-O0` avoids
 /// optimizer time and SPIR-V optimizer output churn.
 ///
+/// A non-empty `defaultLevelOverride` (a full `-O<level>` argument such as `-O3`) replaces the
+/// built-in `kTestOptimizationOption`; this is how the nightly SpvOpt job forces the optimizer
+/// suite-wide. When it is empty the built-in default is used.
+///
 /// The default is inserted at the front of the argument list rather than appended, so it can
 /// never change the meaning of the test-provided arguments. For example, a diagnostic test may
 /// intentionally end with a dangling `-target` to provoke a missing-argument diagnostic; an
 /// appended `-O0` would be consumed as that option's argument and change the diagnostic.
-inline void addDefaultSlangOptimization(CommandLine& ioCmdLine)
+inline void addDefaultSlangOptimization(
+    CommandLine& ioCmdLine,
+    const String& defaultLevelOverride = String())
 {
     if (!hasSlangOptimizationArg(ioCmdLine.m_args))
     {
-        ioCmdLine.m_args.insert(0, kTestOptimizationOption);
+        const String level = defaultLevelOverride.getLength() ? defaultLevelOverride
+                                                              : String(kTestOptimizationOption);
+        ioCmdLine.m_args.insert(0, level);
     }
 }
 
@@ -120,20 +128,32 @@ inline bool hasRenderTestRenderApiArg(const List<String>& args, RenderApiType ap
 /// Metal render tests receive `-O1` instead of `-O0`; see
 /// `kMetalRenderTestOptimizationOption` for why.
 ///
+/// A non-empty `defaultLevelOverride` (a full `-O<level>` argument) replaces the built-in `-O0`
+/// on the non-Metal path. Metal keeps its `-O1` exception even under an override, because that
+/// exception exists to avoid a toolchain flakiness that a higher level would not cure.
+///
 /// Like `addDefaultSlangOptimization`, the default is inserted at the front of the argument
 /// list rather than appended, so a directive that accidentally leaves an option without its
 /// required parameter cannot consume the inserted default and change the command's meaning.
-inline void addDefaultRenderTestSlangOptimization(CommandLine& ioCmdLine)
+inline void addDefaultRenderTestSlangOptimization(
+    CommandLine& ioCmdLine,
+    const String& defaultLevelOverride = String())
 {
     if (hasRenderTestSlangOptimizationArg(ioCmdLine.m_args))
         return;
 
     const bool isMetal = hasRenderTestRenderApiArg(ioCmdLine.m_args, RenderApiType::Metal);
 
+    String level;
+    if (isMetal)
+        level = kMetalRenderTestOptimizationOption;
+    else if (defaultLevelOverride.getLength())
+        level = defaultLevelOverride;
+    else
+        level = kTestOptimizationOption;
+
     ioCmdLine.m_args.insert(0, "-Xslang");
-    ioCmdLine.m_args.insert(
-        1,
-        isMetal ? kMetalRenderTestOptimizationOption : kTestOptimizationOption);
+    ioCmdLine.m_args.insert(1, level);
 }
 
 } // namespace SlangTest

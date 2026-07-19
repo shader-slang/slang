@@ -1,0 +1,9 @@
+# Expected failures for the nightly SpvOpt slang-test run (see issue #11988).
+#
+# This list absorbs test failures that appear only when the suite runs with
+# spirv-opt forced on (slang-test's -default-optimization-level set to a level
+# >= 1), so that a SPIR-V submodule bump producing optimized-output churn is
+# contained to the nightly job instead of blocking every PR.
+#
+# Add one test path per line; '#' begins a comment. Empty for now — populate as
+# the first nightly runs reveal which tests need suppressing.

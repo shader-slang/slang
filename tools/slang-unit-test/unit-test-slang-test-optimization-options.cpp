@@ -287,3 +287,76 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         SLANG_CHECK(cmdLine.m_args[3] == "-xslang");
     }
 }
+
+SLANG_UNIT_TEST(slangTestDefaultOptimizationOverride)
+{
+    // A compiler test with no pinned level takes the override instead of the built-in -O0.
+    {
+        CommandLine cmdLine;
+
+        SlangTest::addDefaultSlangOptimization(cmdLine, String("-O3"));
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 1);
+        SLANG_CHECK(cmdLine.m_args[0] == "-O3");
+    }
+
+    // A compiler test that pins its own level still wins over the override.
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-O1");
+
+        SlangTest::addDefaultSlangOptimization(cmdLine, String("-O3"));
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 1);
+        SLANG_CHECK(cmdLine.m_args[0] == "-O1");
+    }
+
+    // An empty override is treated as unset, so the built-in default is still used.
+    {
+        CommandLine cmdLine;
+
+        SlangTest::addDefaultSlangOptimization(cmdLine, String());
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 1);
+        SLANG_CHECK(cmdLine.m_args[0] == SlangTest::kTestOptimizationOption);
+    }
+
+    // A non-Metal render test takes the override for its forwarded level.
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-vk");
+
+        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine, String("-O3"));
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 3);
+        SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[1] == "-O3");
+        SLANG_CHECK(cmdLine.m_args[2] == "-vk");
+    }
+
+    // Metal render tests keep their -O1 exception even when an override is set.
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-mtl");
+
+        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine, String("-O3"));
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 3);
+        SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[1] == SlangTest::kMetalRenderTestOptimizationOption);
+        SLANG_CHECK(cmdLine.m_args[2] == "-mtl");
+    }
+
+    // A render test that already forwards a level keeps it, override notwithstanding.
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-Xslang");
+        cmdLine.addArg("-O0");
+
+        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine, String("-O3"));
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 2);
+        SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[1] == "-O0");
+    }
+}
