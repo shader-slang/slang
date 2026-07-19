@@ -3,9 +3,8 @@
 // Feature test for https://github.com/shader-slang/slang/issues/11545 — slice 2 (#11591).
 //
 // The access-width lowering decision is driven by the promised `alignment` alone, so a constant
-// `location` and a runtime `location` carrying the same `alignment` lower identically. Before this
-// change the constant-folded case used the actual offset and could emit a wider load than a
-// runtime location with the same promise would have.
+// `location` and a runtime `location` carrying the same `alignment` must lower identically: a
+// constant-folded location must not be widened past the promise on the strength of its own offset.
 //
 // Tested on SPIR-V, where byte-address accesses lower to structured access and the alignment
 // promise drives codegen. (On HLSL the access stays a native `ByteAddressBuffer.Load`, so the
