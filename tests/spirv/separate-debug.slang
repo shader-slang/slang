@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -g2 -emit-spirv-directly -separate-debug-info -separate-debug-info-output build/separate-debug.actual
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -g2 -emit-spirv-directly -separate-debug-info -separate-debug-info-output separate-debug.dbg.spv
 
 struct TestType
 {
