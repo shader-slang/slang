@@ -144,9 +144,6 @@ bool isStageAtom(CapabilityName name, CapabilityName& outCanonicalStage)
     }
 }
 
-// The concrete target-version atoms of each target family form a contiguous, ascending enum range,
-// so both membership and version ordering within a family can be decided by enum comparison. These
-// per-family predicates are the single source of truth for those ranges.
 bool isSpirvVersionAtom(CapabilityAtom name)
 {
     return name >= CapabilityAtom::_spirv_1_0 && name <= getLatestSpirvAtom();
@@ -157,39 +154,41 @@ static bool isMetalVersionAtom(CapabilityAtom name)
     return name >= CapabilityAtom::metallib_2_3 && name <= getLatestMetalAtom();
 }
 
-// The HLSL shader-model version atoms `_sm_4_0.._sm_6_10`. The upper bound is the last atom in the
-// `_sm_*` chain in `slang-capabilities.capdef`; keep it in sync when a newer shader model is added
-// there (there is no `_sm_latest` alias analogous to `_spirv_latest`/`metallib_latest`).
 static bool isHlslVersionAtom(CapabilityAtom name)
 {
-    return name >= CapabilityAtom::_sm_4_0 && name <= CapabilityAtom::_sm_6_10;
+    return name >= CapabilityAtom::_sm_4_0 && name <= getLatestHlslAtom();
+}
+
+static bool isGlslVersionAtom(CapabilityAtom name)
+{
+    return name >= CapabilityAtom::_GLSL_130 && name <= getLatestGlslAtom();
 }
 
 bool isTargetVersionAtom(CapabilityAtom name)
 {
-    return isSpirvVersionAtom(name) || isMetalVersionAtom(name) || isHlslVersionAtom(name);
+    return isSpirvVersionAtom(name) || isMetalVersionAtom(name) || isHlslVersionAtom(name) ||
+           isGlslVersionAtom(name);
 }
 
-// Two target-version atoms belong to the same family when both are SPIR-V versions, both Metal, or
-// both HLSL shader-model versions. Only within a family does enum ordering correspond to version
-// ordering (the families occupy disjoint enum ranges).
 static bool isSameTargetVersionFamily(CapabilityAtom a, CapabilityAtom b)
 {
     return (isSpirvVersionAtom(a) && isSpirvVersionAtom(b)) ||
            (isMetalVersionAtom(a) && isMetalVersionAtom(b)) ||
-           (isHlslVersionAtom(a) && isHlslVersionAtom(b));
+           (isHlslVersionAtom(a) && isHlslVersionAtom(b)) ||
+           (isGlslVersionAtom(a) && isGlslVersionAtom(b));
 }
 
 bool isSpirvExtensionAtom(CapabilityAtom name)
 {
-    return _getInfo(name).name.startsWith("SPV_");
+    UnownedStringSlice atomName = _getInfo(name).name;
+    if (atomName.startsWith("SPV_"))
+        return true;
+    return atomName.startsWith("spv") && atomName.getLength() > 3 && atomName[3] >= 'A' &&
+           atomName[3] <= 'Z';
 }
 
-// Return the highest concrete target-version atom in `capabilities` that belongs to the same family
-// (SPIR-V, Metal, or HLSL shader model) as `family`, or `CapabilityAtom::Invalid` if there is none.
-// `family` must itself be a target-version atom naming the family of interest (e.g. `_spirv_1_0`).
-// Restricting to one family keeps the `>` comparison meaningful: version order matches enum order
-// only within a family, since each family's version atoms occupy a disjoint enum range.
+// Highest version atom in `capabilities` belonging to `family`'s target-version family, or
+// `Invalid` if none.
 static CapabilityAtom getHighestTargetVersionAtomInFamily(
     const CapabilitySet& capabilities,
     CapabilityAtom family)
@@ -200,8 +199,6 @@ static CapabilityAtom getHighestTargetVersionAtomInFamily(
     {
         for (auto atomVal : atomSet)
         {
-            // `isSameTargetVersionFamily` is true only for two version atoms of the same family, so
-            // it already implies `isTargetVersionAtom(atom)`.
             CapabilityAtom atom = asAtom(atomVal);
             if (!isSameTargetVersionFamily(atom, family))
                 continue;
@@ -217,28 +214,14 @@ bool doRequestedCapabilitiesRaiseTargetVersionAboveProfile(
     const List<CapabilityName>& requestedCapabilities,
     CapabilityAtom targetVersionFamily)
 {
-    // The profile pins a concrete output version within `targetVersionFamily` — the highest version
-    // atom of that family it selects. We reject the requested `-capability` atoms only when folding
-    // them in would raise the emitted version above that pin. Rather than re-deriving realizability
-    // by hand, we replay the exact fold `TargetRequest::getTargetCaps()` performs and read the
-    // resulting version the way emission does (the highest version atom of the family). Deferring
-    // to that fold hard-codes no capability's requirement: if a capability's requirement at the
-    // selected version changes, this check follows with no edit here.
     CapabilityAtom selectedVersion =
         getHighestTargetVersionAtomInFamily(profileCaps, targetVersionFamily);
     if (selectedVersion == CapabilityAtom::Invalid)
-        return false; // the profile does not pin a concrete version of this family — nothing to
-                      // conflict.
+        return false;
 
-    // Fold each requested capability into the caps one at a time, exactly as `getTargetCaps()`
-    // does: `if (!targetCap.isIncompatibleWith(toAdd)) targetCap.join(toAdd)`. This per-atom guard
-    // is why we must NOT pre-join the requested atoms into a single set and fold that: joining a
-    // target-incompatible atom (e.g. an `hlsl`-only capability on a SPIR-V target) with a
-    // target-compatible one first would make the combined set invalid and mask the compatible
-    // atom's version raise. Folding one at a time drops only the incompatible atom (as
-    // `getTargetCaps()` would) and keeps the compatible atom's contribution. It is also what makes
-    // a `GL_*`-aliased SPIR-V capability still conflict: the fold is target-scoped, so only its
-    // SPIR-V realization is joined and its GLSL side cannot mask the version requirement.
+    // Fold each capability one at a time with the same guard `getTargetCaps()` uses, rather than
+    // pre-joining them: a single incompatible atom would otherwise invalidate the whole set and
+    // mask a compatible atom's version raise.
     CapabilitySet combined = profileCaps;
     for (auto capabilityName : requestedCapabilities)
     {
@@ -295,6 +278,29 @@ CapabilityAtom getLatestMetalAtom()
             latestMetalCapSetElements[latestMetalCapSetElements.getCount() - 2]); //-1 gets shader
                                                                                   // stage
     }
+    return result;
+}
+
+// Latest version atom of a target family, read from its `_*_latest` capdef alias rather than a
+// hard-coded top. The atom set is sorted, so the last element is the shader-stage atom and the
+// element before it is the highest version atom — the same read `getLatestSpirvAtom`/
+// `getLatestMetalAtom` perform for their families.
+static CapabilityAtom getLatestVersionAtomOfFamily(CapabilityName latestAlias)
+{
+    CapabilitySet latestCapSet = CapabilitySet(latestAlias);
+    auto elements = latestCapSet.getAtomSets()->getElements<CapabilityAtom>();
+    return asAtom(elements[elements.getCount() - 2]); // -1 is the shader stage
+}
+
+CapabilityAtom getLatestHlslAtom()
+{
+    static CapabilityAtom result = getLatestVersionAtomOfFamily(CapabilityName::_sm_latest);
+    return result;
+}
+
+CapabilityAtom getLatestGlslAtom()
+{
+    static CapabilityAtom result = getLatestVersionAtomOfFamily(CapabilityName::_GLSL_latest);
     return result;
 }
 

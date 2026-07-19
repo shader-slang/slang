@@ -3,8 +3,8 @@
 // Test for issue #12099: an explicit `-capability` that cannot be realized at the concrete
 // target version an explicit `-profile` selected must be rejected at the command line, rather
 // than silently raising the emitted target version. Covers every target-version family a profile
-// can pin: SPIR-V (Cases 1-4), and HLSL shader model (Case 5). (Metal is handled by the same code
-// path but has no local toolchain to exercise end-to-end here.)
+// can pin: SPIR-V (Cases 1-4), HLSL shader model (Case 5), and GLSL (Case 7). (Metal is handled by
+// the same code path but has no local toolchain to exercise end-to-end here.)
 //
 // `SPV_KHR_cooperative_matrix` requires SPIR-V 1.6 (capdef:
 // `SPV_KHR_cooperative_matrix : _spirv_1_6 + ...`), so it genuinely conflicts with
@@ -54,6 +54,13 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK6):-target spirv-asm -emit-spirv-directly -profile spirv_1_4 -capability SPV_KHR_cooperative_matrix -capability hlsl -entry main -stage compute
 //CHECK6: requires a higher target version than the explicitly requested profile 'spirv_1_4'
 
+// Case 7: the same conflict on the GLSL version family. `GL_NV_compute_shader_derivatives`'s GLSL
+// realization requires `_GLSL_450`, so it conflicts with the GLSL-family profile `glsl_440` on a
+// GLSL target.
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK7):-target glsl -profile glsl_440 -capability GL_NV_compute_shader_derivatives -entry main -stage compute
+//CHECK7: requires a higher target version than the explicitly requested profile 'glsl_440'
+
+
 // Control 1: the same capability at a profile that provides a high enough version is NOT a conflict.
 // `SPV_KHR_cooperative_matrix` requires SPIR-V 1.6, and `-profile spirv_1_6` selects exactly 1.6, so
 // this must compile with no conflict diagnostic and emit a 1.6 module.
@@ -95,6 +102,11 @@
 // `-profile sm_6_6` pins exactly that.
 //TEST:SIMPLE(filecheck=OK6):-target hlsl -profile sm_6_6 -capability atomic64 -entry main -stage compute
 //OK6-NOT: requires a higher target version
+
+// Control 7: the GLSL counterpart of Case 7 — `GL_NV_compute_shader_derivatives` needs `_GLSL_450`,
+// and `-profile glsl_450` pins exactly that, so it must not be flagged.
+//TEST:SIMPLE(filecheck=OK7):-target glsl -profile glsl_450 -capability GL_NV_compute_shader_derivatives -entry main -stage compute
+//OK7-NOT: requires a higher target version
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

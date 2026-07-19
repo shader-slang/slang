@@ -4468,47 +4468,17 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                         TypeTextUtil::getCompileTargetName(SlangCompileTarget(rawTarget.format))});
             }
 
-            // A `-profile` that explicitly names a concrete output version of the target's own
-            // family (e.g. `spirv_1_4` for a SPIR-V target) pins that version, so a `-capability`
-            // that can only be realized at a higher version is a genuine command-line conflict.
-            // Left undiagnosed, `TargetRequest::getTargetCaps()` silently folds the capability in
-            // and raises the emitted version (a version raise is a "compatible" join). The check
-            // below rejects that instead; it is order-independent and also covers the appended
-            // `-profile <profile>+<capability>` form, whose trailing atoms are recorded as
-            // capabilities.
-            //
-            // Only the `-profile` itself pins a version; an appended `+spirv_1_X` (recorded as a
-            // capability) is a version the user is *requesting*, not a constraint to check against
-            // — so `-profile glsl_450+spirv_1_4` is the user choosing SPIR-V 1.4 and is never a
-            // conflict, while `-profile spirv_1_4+<cap>` pins 1.4 and rejects a `<cap>` needing
-            // more. Deliberate non-goal: with a GLSL-family profile, a version-raising capability
-            // alongside an appended `+spirv_1_X` still silently emits the higher version (e.g.
-            // `-profile glsl_450+spirv_1_4 -capability <needs 1.6>` emits 1.6) — the appended
-            // version is a soft request, not a pin, matching pre-existing behavior and avoiding a
-            // false positive on the common `glsl_NNN+spirv_1_X` idiom.
-            //
-            // Two gates keep this from firing on non-conflicts, mirroring `getTargetCaps()`, which
-            // only folds the profile when it is target-compatible (`atLeastOneSetImpliedInOther`):
-            //  - Skip when profiles already conflict — `ConflictingProfilesSpecifiedForTarget`
-            //    (above) owns that error and the pinned version is meaningless.
-            //  - Require the profile's family to match the target's version family. Otherwise a
-            //    cross-family profile still contributes version atoms that would misread as a pin:
-            //    e.g. `-profile glsl_450` (GLSL family) implies a SPIR-V floor, so on a SPIR-V
-            //    target `-profile glsl_450+spirv_1_4` (a valid request to emit SPIR-V 1.4) must not
-            //    be flagged, and `-profile spirv_1_4` on a Metal target must not be flagged either.
-            // Map the profile's family to the version-atom family for a matching code-gen target.
-            // A profile only pins a concrete output version for its own family's target: SPIR-V on
-            // a SPIR-V output (`isSPIRV`, not `isKhronosTarget` — the GLSL text target emits no
-            // SPIR-V version header), Metal on a Metal target, and an HLSL shader-model (`sm_*`,
-            // a DX-family profile) on a D3D target. GLSL profiles are excluded: `_GLSL_*` is the
-            // GLSL `#version` axis, not a SPIR-V/Metal-style output version. CUDA is excluded too —
-            // there is no CUDA profile family, so a CUDA SM version cannot be pinned via
-            // `-profile`.
+            // Reject a `-capability` that raises the emitted version above what an explicit
+            // `-profile` pins. Only run when the profile's family matches the target's version
+            // family: a cross-family profile (e.g. `glsl_450` on a SPIR-V target) contributes
+            // version atoms that would misread as a pin, wrongly flagging `-profile
+            // glsl_450+spirv_1_4`.
             Profile profile = rawTarget.optionSet.getProfile();
             CapabilityAtom targetVersionFamily = CapabilityAtom::Invalid;
             switch (profile.getFamily())
             {
             case ProfileFamily::SPIRV:
+                // `isSPIRV`, not `isKhronosTarget`: the GLSL text target emits no SPIR-V version.
                 if (isSPIRV(rawTarget.format))
                     targetVersionFamily = CapabilityAtom::_spirv_1_0;
                 break;
@@ -4519,6 +4489,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             case ProfileFamily::DX:
                 if (isD3DTarget(rawTarget.format))
                     targetVersionFamily = CapabilityAtom::_sm_4_0;
+                break;
+            case ProfileFamily::GLSL:
+                if (rawTarget.format == CodeGenTarget::GLSL)
+                    targetVersionFamily = CapabilityAtom::_GLSL_130;
                 break;
             default:
                 break;
