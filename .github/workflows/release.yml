@@ -214,7 +214,7 @@ jobs:
           fi
 
           # Extract version from filename
-          version=$(basename "$libslang_library" | sed -E 's/.*\.0\.([0-9]+(\.[0-9]+)*)\.dylib$/\1/')
+          version=$(basename "$libslang_library" | sed -E 's/^libslang-compiler\.0\.([0-9]+(\.[0-9]+)*)\.dylib$/\1/')
 
           # Validate version was extracted
           if [[ -z "$version" ]]; then

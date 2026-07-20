@@ -352,7 +352,7 @@ if(
 endif()
 advanced_option(
     SLANG_ENABLE_MIMALLOC
-    "Use mimalloc for global C++ allocation in slang-compiler"
+    "Use mimalloc for Slang-owned allocations"
     ${SLANG_ENABLE_MIMALLOC_DEFAULT}
 )
 if(SLANG_ENABLE_MIMALLOC AND SLANG_ENABLE_ASAN)

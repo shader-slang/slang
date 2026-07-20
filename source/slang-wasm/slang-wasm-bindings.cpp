@@ -74,7 +74,8 @@ EMSCRIPTEN_BINDINGS(slang)
             "getUserAttributeByIndex",
             &slang::wgsl::VariableReflection::getUserAttributeByIndex,
             allow_raw_pointers())
-        .function("hasDefaultValue", &slang::wgsl::VariableReflection::hasDefaultValue);
+        .function("hasDefaultValue", &slang::wgsl::VariableReflection::hasDefaultValue)
+        .function("getDefaultValueBlob", &slang::wgsl::VariableReflection::getDefaultValueBlob);
 
 
     class_<slang::wgsl::VariableLayoutReflection>("VariableLayoutReflection")
@@ -242,6 +243,14 @@ EMSCRIPTEN_BINDINGS(slang)
         .function(
             "findFunctionByName",
             &slang::wgsl::ProgramLayout::findFunctionByName,
+            allow_raw_pointers())
+        .function(
+            "findTypeByName",
+            &slang::wgsl::ProgramLayout::findTypeByName,
+            allow_raw_pointers())
+        .function(
+            "findVarByNameInType",
+            &slang::wgsl::ProgramLayout::findVarByNameInType,
             allow_raw_pointers());
 
     enum_<slang::BindingType>("BindingType")

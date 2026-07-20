@@ -1236,6 +1236,14 @@ typedef uint32_t SlangSizeT;
         // combine on the command line. CLI spellings: -Wall, -Wextra, -Wpedantic.
         WarningLevel = 155,
 
+        SeparateDebugInfoOutput =
+            156, // stringValue0: explicit path for the slangc separate-debug-info sidecar.
+                 //   When unset, slangc derives the sidecar path from the main artifact path.
+                 //   This option is output policy only and is excluded from compiler cache keys.
+                 //   It requires EmitSeparateDebug and permits the main artifact to be written to
+                 //   stdout. A value of "-" writes the separate debug information to stdout when
+                 //   the main artifact is written to a file. Query/set with the string option APIs.
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
@@ -3164,26 +3172,52 @@ struct VariableReflection
         return findAttributeByName(globalSession, name);
     }
 
-    bool hasDefaultValue()
+    /// Deprecated: call getDefaultValueBlob and check for a null blob instead.
+    SLANG_DEPRECATED bool hasDefaultValue()
     {
         return spReflectionVariable_HasDefaultValue((SlangReflectionVariable*)this);
     }
 
+    /// Deprecated: use getDefaultValueBlob instead.
     /// Gets an integer default value. For specialized generic static constants,
     /// the semantic value is resolved under the current specialization first;
     /// literal initializers are used as a fallback when no integer value resolves.
-    SlangResult getDefaultValueInt(int64_t* value)
+    SLANG_DEPRECATED SlangResult getDefaultValueInt(int64_t* value)
     {
         return spReflectionVariable_GetDefaultValueInt((SlangReflectionVariable*)this, value);
     }
 
+    /// Deprecated: use getDefaultValueBlob instead.
     /// Gets a floating-point default value from a literal initializer. Unlike
     /// getDefaultValueInt, this API does not currently resolve specialized
     /// generic semantic values before checking the initializer.
-    SlangResult getDefaultValueFloat(float* value)
+    SLANG_DEPRECATED SlangResult getDefaultValueFloat(float* value)
     {
         return spReflectionVariable_GetDefaultValueFloat((SlangReflectionVariable*)this, value);
     }
+
+    /** Retrieves a variable's default initializer as a packed byte blob.
+     *
+     * If the variable has no explicit initializer, returns `SLANG_OK` and sets `*outBlob` to
+     * `nullptr`. Otherwise `*outBlob` receives an `ISlangBlob*` with an added reference holding the
+     * initializer's bytes; the caller owns that reference. Returns `SLANG_E_INVALID_ARG` for null
+     * arguments and `SLANG_E_NOT_AVAILABLE` when the initializer cannot be represented as a
+     * default-value blob.
+     *
+     * Scalars, vectors, matrices, fixed-size arrays, structs/aggregates, and enums are supported.
+     * Values are packed in natural scalar/field order with no aggregate padding: matrices
+     * row-by-row, base-class fields before derived fields, and a field with no explicit initializer
+     * as its zero/default representation. Encoding is target-independent: `bool` occupies 4 bytes
+     * to match Slang's GPU scalar layout, `intptr_t`/`uintptr_t` always occupy 8 bytes
+     * signed/unsigned (consumers on narrower-pointer targets must narrow explicitly), and enums use
+     * their underlying tag type.
+     *
+     * Scalars are stored in host byte order (little-endian on all supported platforms), and the
+     * buffer is aligned to at least `alignof(max_align_t)`, which covers every scalar type encoded
+     * by this API. After checking the blob size, callers may cast `getBufferPointer()` directly to
+     * the payload element type.
+     */
+    SLANG_API SlangResult getDefaultValueBlob(ISlangBlob** outBlob);
 
     GenericReflection* getGenericContainer()
     {

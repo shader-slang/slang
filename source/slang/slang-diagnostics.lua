@@ -212,6 +212,42 @@ warning(
 )
 
 err(
+    "separate-debug-info-requires-output-path",
+    109,
+    "`-separate-debug-info` requires an output file path; use `-o <path>` or `-separate-debug-info-output <path>`"
+)
+
+err(
+    "separate-debug-info-output-without-separate-debug-info",
+    110,
+    "`-separate-debug-info-output` requires `-separate-debug-info`"
+)
+
+err(
+    "separate-debug-info-output-collides-with-artifact",
+    111,
+    "`-separate-debug-info-output` path '~path' must differ from output path '~otherPath' emitted by this compile"
+)
+
+err(
+    "separate-debug-info-output-with-container",
+    112,
+    "`-separate-debug-info-output` is not supported when writing a container output"
+)
+
+err(
+    "separate-debug-info-output-without-debug-data",
+    113,
+    "`-separate-debug-info-output` path '~path' was requested, but the selected target did not produce separate debug information"
+)
+
+err(
+    "separate-debug-info-output-multiple-artifacts",
+    114,
+    "`-separate-debug-info-output` path '~path' cannot receive multiple separate debug-information artifacts"
+)
+
+err(
     "unknown-source-language",
     19,
     "unknown source language '~language'",
@@ -5219,7 +5255,21 @@ err(
     "byte-address-buffer-unaligned",
     41300,
     "invalid byte address buffer alignment",
-    span { loc = "location", message = "invalid alignment `~alignment:Int` specified for the byte address buffer resource with the element size of `~elementSize:Int`" }
+    span { loc = "location", message = "the alignment `~alignment:Int` of a byte address buffer access must be at least `~requiredAlignment:Int`, the natural alignment of the access type's scalar components" }
+)
+
+err(
+    "byte-address-buffer-alignment-not-power-of-two",
+    41301,
+    "byte address buffer alignment must be a power of two",
+    span { loc = "location", message = "the alignment `~alignment:Int` of a byte address buffer access must be a power of two" }
+)
+
+err(
+    "byte-address-buffer-location-not-aligned",
+    41303,
+    "byte address buffer location is not a multiple of the specified alignment",
+    span { loc = "location", message = "the byte address buffer location `~offset:Int` is not a multiple of the specified alignment `~alignment:Int`" }
 )
 
 err(

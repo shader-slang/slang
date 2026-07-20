@@ -446,12 +446,29 @@ TypeLayoutReflection* ProgramLayout::getGlobalParamsTypeLayout()
     return (slang::wgsl::TypeLayoutReflection*)(interface()->getGlobalParamsTypeLayout());
 }
 
-FunctionReflection* ProgramLayout::findFunctionByName(std::string name)
+FunctionReflection* ProgramLayout::findFunctionByName(const std::string& name)
 {
     return (slang::wgsl::FunctionReflection*)(interface()->findFunctionByName(name.c_str()));
 }
 
-EntryPointReflection* ProgramLayout::findEntryPointByName(std::string name)
+TypeReflection* ProgramLayout::findTypeByName(const std::string& name)
+{
+    return (slang::wgsl::TypeReflection*)(interface()->findTypeByName(name.c_str()));
+}
+
+VariableReflection* ProgramLayout::findVarByNameInType(
+    slang::wgsl::TypeReflection* type,
+    const std::string& name)
+{
+    if (!type)
+        return nullptr;
+
+    return (slang::wgsl::VariableReflection*)interface()->findVarByNameInType(
+        type->interface(),
+        name.c_str());
+}
+
+EntryPointReflection* ProgramLayout::findEntryPointByName(const std::string& name)
 {
     return (slang::wgsl::EntryPointReflection*)(interface()->findEntryPointByName(name.c_str()));
 }
@@ -587,7 +604,32 @@ slang::wgsl::UserAttribute* VariableReflection::getUserAttributeByIndex(uint32_t
 
 bool VariableReflection::hasDefaultValue()
 {
-    return interface()->hasDefaultValue();
+    Slang::ComPtr<ISlangBlob> defaultValueBlob;
+    return SLANG_SUCCEEDED(interface()->getDefaultValueBlob(defaultValueBlob.writeRef())) &&
+           defaultValueBlob != nullptr;
+}
+
+emscripten::val VariableReflection::getDefaultValueBlob()
+{
+    Slang::ComPtr<ISlangBlob> defaultValueBlob;
+    SlangResult result = interface()->getDefaultValueBlob(defaultValueBlob.writeRef());
+    if (SLANG_FAILED(result))
+    {
+        g_error.type = std::string("USER");
+        g_error.result = result;
+        return emscripten::val::null();
+    }
+
+    if (!defaultValueBlob)
+        return emscripten::val::null();
+
+    uint8_t* ptr = (uint8_t*)defaultValueBlob->getBufferPointer();
+    auto view =
+        emscripten::val(emscripten::typed_memory_view(defaultValueBlob->getBufferSize(), ptr));
+    auto resultArray =
+        emscripten::val::global("Uint8Array").new_(defaultValueBlob->getBufferSize());
+    resultArray.call<void>("set", view);
+    return resultArray;
 }
 
 slang::wgsl::TypeReflection* VariableReflection::getType()

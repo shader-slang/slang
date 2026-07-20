@@ -33,6 +33,7 @@
 #include "slangc-tool.h"
 #include "slangi-tool.h"
 #include "test-context.h"
+#include "test-output-path-util.h"
 #include "test-reporter.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -740,6 +741,7 @@ static SlangResult _gatherTestsForFile(
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
+            normalizeTestOutputPathsForTestFile(filePath, testDetails.options.args);
 
             outTestList->tests.add(testDetails);
         }
@@ -770,6 +772,7 @@ static SlangResult _gatherTestsForFile(
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
+            normalizeTestOutputPathsForTestFile(filePath, testDetails.options.args);
 
             // Mark that it is a diagnostic test
             testDetails.options.type = TestOptions::Type::Diagnostic;

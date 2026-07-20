@@ -12,3 +12,14 @@ slang_add_target(
     PRECOMPILE_HEADERS
         ${CMAKE_CURRENT_SOURCE_DIR}/slang-basic.h
 )
+
+if(SLANG_ENABLE_MIMALLOC)
+    if(NOT TARGET mimalloc-static)
+        message(
+            FATAL_ERROR
+            "SLANG_ENABLE_MIMALLOC requires the mimalloc-static target"
+        )
+    endif()
+    target_compile_definitions(core PUBLIC SLANG_ENABLE_MIMALLOC=1)
+    target_link_libraries(core PUBLIC mimalloc-static)
+endif()
