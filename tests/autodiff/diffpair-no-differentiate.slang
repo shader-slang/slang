@@ -5,6 +5,11 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 
+// Direct DifferentialPair use marks the module as needing autodiff lowering, so it
+// takes the finalize path: finalizeAutoDiffPass runs to lower the pair type.
+//TEST:SIMPLE(filecheck=PASS): -target hlsl -entry computeMain -stage compute -dump-ir-after finalizeAutoDiffPass
+// PASS: ### AFTER finalizeAutoDiffPass:
+
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<float> outputBuffer;
 

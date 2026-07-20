@@ -4,6 +4,14 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 
+// A derivative-free module takes the skip path in linkAndOptimizeIR: the cheap
+// stripAutoDiffDecorations runs (so eliminateDeadCode can drop the core-module
+// autodiff builtins), but the whole-module finalizeAutoDiffPass is skipped.
+//TEST:SIMPLE(filecheck=PASS): -target hlsl -entry computeMain -stage compute -dump-ir-after stripAutoDiffDecorations -dump-ir-after finalizeAutoDiffPass
+// PASS-NOT: ### AFTER finalizeAutoDiffPass:
+// PASS: ### AFTER stripAutoDiffDecorations:
+// PASS-NOT: ### AFTER finalizeAutoDiffPass:
+
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<float> outputBuffer;
 
