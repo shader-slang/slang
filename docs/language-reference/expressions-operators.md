@@ -69,12 +69,12 @@ Description:
 
 ### Logical Operators (scalar)
 
-| Operator  | Operator function               | Description                                  |
+| Operator  | Operator function                   | Description                                  |
 |-----------|-------------------------------------|----------------------------------------------|
-| `!`       | `__prefix T operator ! (T val)` | logical NOT                                  |
+| `!`       | `__prefix T operator ! (T val)`     | logical NOT                                  |
 | `&&`      | `T operator && (T lhs, T rhs)`      | logical AND                                  |
 | `\|\|`    | `T operator \|\| (T lhs, T rhs)`    | logical OR                                   |
-| `~`       | `__prefix T operator ~ (T val)` | bitwise NOT                                  |
+| `~`       | `__prefix T operator ~ (T val)`     | bitwise NOT                                  |
 | `&`       | `T operator & (T lhs, T rhs)`       | bitwise AND                                  |
 | `^`       | `T operator ^ (T lhs, T rhs)`       | bitwise XOR                                  |
 | `\|`      | `T operator \| (T lhs, T rhs)`      | bitwise OR                                   |
