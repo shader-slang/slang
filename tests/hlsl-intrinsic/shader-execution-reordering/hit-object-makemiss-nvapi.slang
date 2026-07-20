@@ -8,7 +8,8 @@
 
 // Negative: on a plain native SM 6.9 target (no nvapiHitObjects) the 2-arg MakeMiss has no arm,
 // so it is a clean capability error (no compatible __target_switch case) rather than a silently
-// mis-emitted native MakeMiss.
+// mis-emitted native MakeMiss. The code is 41011 (a method with no compatible arm for the target),
+// not the type-emitter's 55215 (which fires when the HitObject type itself cannot be emitted).
 //DIAGNOSTIC_TEST:SIMPLE(diag=NATIVE_ERR,non-exhaustive): -target hlsl -profile sm_6_9 -entry main -stage raygeneration
 
 //TEST_INPUT:set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)

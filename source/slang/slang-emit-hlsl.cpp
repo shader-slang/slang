@@ -1994,9 +1994,12 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             }
             else
             {
-                // Neither SM 6.9 nor nvapiHitObjects: emit a hard error (E55215) rather than
-                // crash. The dx::HitObject placeholder below is never consumed — E55215 is a hard
-                // error, so the sink's error flag makes the compiler discard this HLSL text.
+                // Neither SM 6.9 nor nvapiHitObjects: emit a hard error (E55215) rather than crash.
+                // The dx::HitObject placeholder just keeps emission well-formed; no valid artifact
+                // is ever produced from it. On the direct -target hlsl path the error flag makes
+                // generateOutput() discard this text; on the -target dxil path the placeholder is
+                // handed to DXC, but DXC likewise rejects dx::HitObject on a sub-6.9 target, so the
+                // compile still fails (with a redundant downstream diagnostic).
                 getSink()->diagnose(
                     Diagnostics::HitObjectRequiresSerCapability{.location = type->sourceLoc});
                 m_writer->emit("dx::HitObject");

@@ -24234,13 +24234,15 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(cuda, raytracing_lss_ho)]
+    [require(nvapiHitObjects, raytracing_lss_ho)]
     [require(spirv, spvShaderInvocationReorderNV)]
     float4 GetSpherePositionAndRadius()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetSphereObjectPositionAndRadius";
+        // NVAPI-only: no native dx::HitObject equivalent, so the HLSL arm is the NVAPI opt-in.
+        case nvapiHitObjects: __intrinsic_asm ".GetSphereObjectPositionAndRadius";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
@@ -24262,13 +24264,15 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(cuda, raytracing_lss_ho)]
+    [require(nvapiHitObjects, raytracing_lss_ho)]
     [require(spirv, spvShaderInvocationReorderNV)]
     float2x4 GetLssPositionsAndRadii()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetLssObjectPositionsAndRadii";
+        // NVAPI-only: no native dx::HitObject equivalent, so the HLSL arm is the NVAPI opt-in.
+        case nvapiHitObjects: __intrinsic_asm ".GetLssObjectPositionsAndRadii";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
@@ -24296,13 +24300,15 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(cuda, raytracing_lss_ho)]
+    [require(nvapiHitObjects, raytracing_lss_ho)]
     [require(spirv, spvShaderInvocationReorderNV)]
     bool IsSphereHit()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".IsSphereHit";
+        // NVAPI-only: no native dx::HitObject equivalent, so the HLSL arm is the NVAPI opt-in.
+        case nvapiHitObjects: __intrinsic_asm ".IsSphereHit";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectIsSphereHit";
@@ -24321,13 +24327,15 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(cuda, raytracing_lss_ho)]
+    [require(nvapiHitObjects, raytracing_lss_ho)]
     [require(spirv, spvShaderInvocationReorderNV)]
     bool IsLssHit()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".IsLssHit";
+        // NVAPI-only: no native dx::HitObject equivalent, so the HLSL arm is the NVAPI opt-in.
+        case nvapiHitObjects: __intrinsic_asm ".IsLssHit";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectIsLSSHit";
