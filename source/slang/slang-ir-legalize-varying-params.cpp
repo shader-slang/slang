@@ -554,7 +554,7 @@ protected:
         m_param = param;
 
         // We expect and require all entry-point parameters to have layout
-        // information assocaited with them at this point.
+        // information associated with them at this point.
         //
         auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
         SLANG_ASSERT(paramLayoutDecoration);
@@ -609,10 +609,10 @@ protected:
 
     void processMutableParam(IRParam* param, IROutParamTypeBase* paramPtrType)
     {
-        // The deafult handling of any mutable (`out` or `inout`) parameter
+        // The default handling of any mutable (`out` or `inout`) parameter
         // will be to introduce a local variable of the corresponding
         // type and to use that in place of the actual parameter during
-        // exeuction of the function.
+        // execution of the function.
 
         // The replacement variable will have the type of the original
         // parameter (the `T` in `Out<T>` or `InOut<T>`).
@@ -644,7 +644,7 @@ protected:
         }
 
         // Because the `out` or `inout` parameter is represented
-        // as a pointer, and our local variabel is also a pointer
+        // as a pointer, and our local variable is also a pointer
         // we can directly replace all uses of the original parameter
         // with uses of the variable.
         //
@@ -836,7 +836,7 @@ protected:
 
     LegalizedVaryingVal _createLegalVaryingVal(VaryingParamInfo const& info)
     {
-        // By default, when we seek to creating a legalized value
+        // By default, when we seek to create a legalized value
         // for a varying parameter, we will look at its type to
         // decide what to do.
         //
