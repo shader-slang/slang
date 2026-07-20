@@ -276,6 +276,11 @@ trigger a diagnostic warning.
 > - [Operator](expressions-operators.md) call where the argument type does not match the parameter type
 > - [Generic argument application](generics.md) where the argument type does not match the generic parameter type
 
+> ⚠️ **Warning:** In Slang 2025 and earlier, `vector<T, 4>` allowed initialization from
+> `(vector<T, 2>, T)` and `(T, vector<T, 2>)` arguments due to the `T` &rarr; `vector<T, 2>` implicit
+> conversion. This has been removed in Slang 2026.
+> See GitHub issue [#12093](https://github.com/shader-slang/slang/issues/12093) for details.
+
 #### Examples
 
 **Scalar to vector, scalar to matrix**
@@ -460,4 +465,3 @@ void main(uint3 tid : SV_DispatchThreadID)
     output[0] = bit_cast<uint>(f); // 0x7F800000U
 }
 ```
-
