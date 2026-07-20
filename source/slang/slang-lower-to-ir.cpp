@@ -14684,12 +14684,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             if (locationDecor && debugType)
             {
-                // Parent the function to the compilation unit of its own source file. It stays null
-                // when the file has no compilation unit — an #include'd/__include'd file or a
-                // #line-remapped source, or any file at Minimal debug level — in which case the
-                // emitter falls back to the module-global scope (unchanged from before this
-                // change). Resolving the owning compilation unit for included/remapped sources is
-                // deferred to a follow-up (see the issue linked in the PR).
+                // Parent the function to the compilation unit of its own source file. Only
+                // non-included files have a compilation unit, so this is null for a function whose
+                // source is an #include'd/__include'd file or a #line-remapped source, and for
+                // every function at Minimal debug level (where no compilation unit is built at
+                // all).
                 IRInst* parentScope = nullptr;
                 context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
                     locationDecor->getSource(),
