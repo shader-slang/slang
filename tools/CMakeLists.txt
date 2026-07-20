@@ -315,7 +315,8 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         OBJECT
         EXCLUDE_FROM_ALL
         INCLUDE_DIRECTORIES_PUBLIC .
-        INCLUDE_FROM_PRIVATE slang core
+        LINK_WITH_PRIVATE core
+        INCLUDE_FROM_PRIVATE slang
         INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/include
         FOLDER test
     )
@@ -449,7 +450,9 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     # publishing an internal validator as part of the stable public ABI.
     target_sources(
         slang-unit-test
-        PRIVATE ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
+        PRIVATE
+            ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
+            ${slang_SOURCE_DIR}/tools/slang-test/test-output-path-util.cpp
     )
     # The unit tests include internal slang headers (e.g. slang-repro.h) that
     # transitively pull in FIDDLE / capability generated headers. The `slang`

@@ -1,4 +1,4 @@
-#if defined(SLANG_MIMALLOC_OVERRIDE_NEW_DELETE)
+#if defined(SLANG_ENABLE_MIMALLOC)
 
 // Override global C++ allocation in slang-compiler with mimalloc.
 
