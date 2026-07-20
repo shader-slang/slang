@@ -402,7 +402,13 @@ public:
     void emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling);
 
     /// Emit high-level language statements from a structured region.
-    void emitRegion(Region* inRegion);
+    ///
+    /// If `breakRegionToOmit` is non-null, that specific `break` region is skipped rather
+    /// than emitted. This is used to drop the redundant switch-terminating break for targets
+    /// that want break-free case bodies (see shouldEmitSwitchCaseTerminatingBreak). Because
+    /// `break` regions are leaves (no `nextRegion`), only the single trailing break of the
+    /// chain can match, so nested/early breaks are unaffected.
+    void emitRegion(Region* inRegion, Region* breakRegionToOmit = nullptr);
 
     /// Emit high-level language statements from a structured region tree.
     void emitRegionTree(RegionTree* regionTree);
@@ -660,6 +666,19 @@ protected:
     /// Targets like HLSL (FXC) and WGSL don't support fall-through.
     /// This is used by the restructure pass to decide whether to preserve fall-through.
     virtual bool supportsSwitchFallThrough() { return true; }
+
+    /// Should the `break` that terminates a switch `case` — the one that merely exits the
+    /// switch rather than breaking early — be emitted explicitly?
+    ///
+    /// Slang places such a break at the tail of every case. For most targets it must stay:
+    /// either fall-through is legal (so the break is semantically required), or the downstream
+    /// compiler requires it (FXC for HLSL SM 5.x errors on a case that lacks a terminating
+    /// break). WGSL is the exception — its cases never fall through, so the trailing break is
+    /// redundant, and older `naga` validators reject `break` outside a loop. WGSL therefore
+    /// overrides this to omit only that terminating break; genuine early breaks inside a case
+    /// are still emitted. Note this is distinct from supportsSwitchFallThrough(): HLSL/FXC also
+    /// lacks fall-through yet still needs the break, so this cannot be derived from that.
+    virtual bool shouldEmitSwitchCaseTerminatingBreak() { return true; }
 
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) { SLANG_UNUSED(decoration); }
     virtual void emitLivenessImpl(IRInst* inst);
