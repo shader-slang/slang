@@ -19607,11 +19607,12 @@ int __callablePayloadLocation(__ref Payload payload);
 /// @remarks Used to implement dynamic shader calls during ray tracing
 /// @category raytracing
 __generic<Payload>
-[require(glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
+[require(cuda_glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
 void CallShader(uint shaderIndex, inout Payload payload)
 {
     __target_switch
     {
+    case cuda: __intrinsic_asm "optixDirectCall<void>($0, $1)";
     case hlsl: __intrinsic_asm "CallShader";
     case glsl:
         {
