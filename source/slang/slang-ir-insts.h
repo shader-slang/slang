@@ -2726,12 +2726,13 @@ struct IRDebugFunction : IRInst
     IRInst* getDebugType() { return getOperand(4); }
 
     // The function's lexical parent scope, or null when none was recorded (Minimal debug level
-    // emits no compilation units, and functions deserialized from older IR blobs predate this
-    // operand). Today the only parent scope produced is the DebugCompilationUnit of the source
-    // file the function is defined in, bound at IR-gen so an imported/included function stays
-    // parented to its own module's compilation unit after linking rather than the entry point's.
-    // It is typed as a general parent scope (not specifically a compilation unit) so that lexical
-    // scopes can fill it in the future without changing this operand's meaning.
+    // emits no compilation units; a function whose source has no compilation unit of its own — an
+    // #include'd/#line-remapped source — has none pending shader-slang/slang#12150; and functions
+    // deserialized from older IR blobs predate this operand). Today the only parent scope produced
+    // is the DebugCompilationUnit of the source file the function is defined in, bound at IR-gen so
+    // an imported function stays parented to its own module's compilation unit after linking rather
+    // than the entry point's. It is typed as a general parent scope (not specifically a compilation
+    // unit) so that lexical scopes can fill it in the future without changing this operand's meaning.
     IRInst* getParentScope() { return getOperandCount() > 5 ? getOperand(5) : nullptr; }
 };
 
