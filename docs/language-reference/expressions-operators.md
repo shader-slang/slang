@@ -227,11 +227,14 @@ condition is `true`, `trueVal` is returned. Otherwise, `falseVal` is returned.
 
 The default ternary conditional operator is provided for all copyable types.
 
-> ⚠️ **Warning:** Unlike C, C++, GLSL, and most other C-family languages, Slang currently follows the precedent
-> of HLSL where `?:` does not short-circuit. That is, both `trueVal` and `falseVal` are evaluated before
-> either is selected. This is subject to change in future Slang language versions. It is recommended to write
-> code that does not depend on whether `?:` short-circuits or not. When short-circuiting is required,
-> use an `if`/`else` construct instead.
+The ternary conditional operator is short-circuiting for a scalar condition.
+
+> ⚠️ **Warning:** The ternary conditional operator is also defined for vector condition operands for legacy
+> reasons. In this deprecated form, the condition vector length must match the `trueVal` and `falseVal` vector
+> lengths, and for each element, the corresponding element of the condition selects the corresponding
+> element of either `trueVal` or `falseVal`. However, this form is non-short-circuiting. Use
+> [select()](../../../core-module-reference/global-decls/select.html) instead to make the non-short-circuiting
+> behavior explicit.
 
 ### Call Expression
 
