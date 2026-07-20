@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-via-glsl -dump-intermediates
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-via-glsl
 
 // CHECK: OpDecorate %vout_vertexID{{.*}} PerVertexKHR
 

@@ -5423,6 +5423,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_ImageSubscript:
             result = emitImageSubscript(parent, as<IRImageSubscript>(inst));
             break;
+        case kIROp_ImageGatherOffset:
+            result = emitImageGatherOffset(parent, inst);
+            break;
         case kIROp_AtomicInc:
             {
                 if (m_memoryModel == SpvMemoryModelVulkan)
@@ -5796,6 +5799,57 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             subscript->getCoord(),
             subscript->hasSampleCoord() ? subscript->getSampleCoord()
                                         : builder.getIntValue(builder.getIntType(), 0));
+    }
+
+    // True if `offset` is a compile-time constant (a constant leaf, or a vector built entirely from
+    // constants), so it can use the `ConstOffset` image operand instead of `Offset`.
+    static bool isConstantGatherOffset(IRInst* offset)
+    {
+        switch (offset->getOp())
+        {
+        case kIROp_MakeVector:
+        case kIROp_MakeVectorFromScalar:
+            for (UInt i = 0; i < offset->getOperandCount(); ++i)
+                if (!as<IRConstant>(offset->getOperand(i)))
+                    return false;
+            return true;
+        default:
+            return as<IRConstant>(offset) != nullptr;
+        }
+    }
+
+    SpvInst* emitImageGatherOffset(SpvInstParent* parent, IRInst* inst)
+    {
+        auto sampledImage = inst->getOperand(0);
+        auto location = inst->getOperand(1);
+        auto component = inst->getOperand(2);
+        auto offset = inst->getOperand(3);
+
+        SpvWord offsetMask;
+        if (isConstantGatherOffset(offset))
+        {
+            offsetMask = SpvImageOperandsConstOffsetMask;
+        }
+        else
+        {
+            offsetMask = SpvImageOperandsOffsetMask;
+            requireSPIRVCapability(SpvCapabilityImageGatherExtended);
+        }
+
+        return emitInstCustomOperandFunc(
+            parent,
+            inst,
+            SpvOpImageGather,
+            [&]()
+            {
+                emitOperand(inst->getDataType());
+                emitOperand(kResultID);
+                emitOperand(sampledImage);
+                emitOperand(location);
+                emitOperand(component);
+                emitOperand(offsetMask);
+                emitOperand(offset);
+            });
     }
 
     SpvInst* emitGetStringHash(IRInst* inst)

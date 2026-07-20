@@ -60,7 +60,32 @@ jobs:
         shell: bash
 
     steps:
+      # Ensure Git Bash tools are in PATH for Windows.
+      # Needed by pre-setup Bash steps before common-test-setup adds them.
+      - name: Add Git Bash to PATH (Windows)
+        if: inputs.os == 'windows'
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          submodules: "false"
+          fetch-depth: "1"
+
+      - name: Clean inherited checkout state
+        run: |
+          # Remove stale files and stale submodule worktrees inherited by self-hosted runners.
+          git submodule deinit --all --force
+          git clean -ffdx
+          git reset --hard HEAD
+
+      - name: Checkout OptiX headers
+        if: (inputs.full-gpu-tests || inputs.gpu-api-only) && inputs.os != 'macos'
+        run: |
+          git submodule sync -- external/optix-dev
+          git submodule update --init --depth=1 external/optix-dev
 
       - name: Common Test Setup
         uses: ./.github/actions/common-test-setup
@@ -70,6 +95,20 @@ jobs:
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
           artifact-suffix: ${{ inputs.artifact-suffix }}
+
+      # slang-test's CUDA pass-through compiles through NVRTC, so the
+      # offline (non-NVRTC) branch of the prelude is never compiled by the
+      # test suite. Compile it here: the guarded regressions are type
+      # errors, so compiling is the whole test. -std pins the language
+      # mode against toolkit-default drift. -arch pins compute_80: the
+      # fixture enables the half/bf16/fp8 prelude sections, whose
+      # intrinsics need __CUDA_ARCH__ >= 530 (fp16) / 800 (bf16); nvcc's
+      # default sm_52 has neither. Compile-only, so any arch works.
+      - name: Compile offline (non-NVRTC) CUDA prelude test
+        if: inputs.os == 'windows' && inputs.full-gpu-tests
+        run: >-
+          nvcc -std=c++17 -arch=compute_80 -c tests/cuda/cuda-prelude-vec1-make.cu
+          -I prelude -o "${{ runner.temp }}/cuda-prelude-vec1-make.obj"
 
       - name: Test Slang
         run: |
@@ -165,6 +204,17 @@ jobs:
           printf '\n'
 
           "$bin_dir/slang-test" "${slang_test_args[@]}"
+
+      - name: Check slang-test worktree cleanliness
+        if: always()
+        run: |
+          status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**')"
+          if [[ -n "$status" ]]; then
+            echo "::error::slang-test left generated or modified files in the worktree"
+            printf '%s\n' "$status"
+            exit 1
+          fi
+
       - name: Run Slang examples
         # Run examples on release for pull requests, and not on merge_group, to reduce CI load.
         if: inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
@@ -200,3 +250,14 @@ jobs:
           printf '\n'
 
           "$bin_dir/slang-test" "${via_glsl_args[@]}"
+
+      - name: Check via-glsl slang-test worktree cleanliness
+        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
+        if: always() && inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        run: |
+          status="$(git status --short --untracked-files=all -- . ':(exclude)github_artifact/**')"
+          if [[ -n "$status" ]]; then
+            echo "::error::slang-test left generated or modified files in the worktree"
+            printf '%s\n' "$status"
+            exit 1
+          fi

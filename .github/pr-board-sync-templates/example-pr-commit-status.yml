@@ -1,0 +1,30 @@
+name: PR Commit Status Sync
+
+# Relays external commit statuses (e.g. "SlangPy Tests", "license/cla",
+# "CodeRabbit") to the board. Copy to `.github/workflows/pr-commit-status.yml`.
+#
+# Some PR checks are not GitHub Actions check runs but external commit statuses;
+# the reusable workflow folds those into its check rollup (a failing status -> the
+# PR is Snagged), but only the `status` event carries them -- check_suite and
+# workflow_run cover only Actions suites. Unlike check_suite for Actions CI, the
+# `status` event IS delivered here, because these statuses are posted by external
+# apps/PATs, not the recursion-suppressed GITHUB_TOKEN.
+#
+# Generic -- copy verbatim, no per-repo customization needed. Note: `status` is
+# repo-wide (it fires for any commit, including non-PR pushes); for a non-PR
+# commit the reusable workflow resolves zero open PRs and no-ops.
+
+on:
+  status: {}
+
+permissions: {}
+
+jobs:
+  board-sync:
+    # Skip the initial "pending" each external check posts; only a settled status
+    # (success -> recovery, failure/error -> Snagged) changes the outcome, and the
+    # recompute is idempotent regardless.
+    if: ${{ github.event.state != 'pending' }}
+    uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
+    secrets:
+      SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}

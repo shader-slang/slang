@@ -1284,6 +1284,15 @@ local insts = {
 	},
 	-- Store into an Image.
 	{ imageStore = { operands = { { "image" }, { "coord" }, { "value" } } } },
+	-- Gather four texels from a sampled image at a coordinate, offset by a texel offset.
+	-- The offset may be a compile-time constant or a runtime value; the SPIR-V backend
+	-- inspects the offset operand and selects the `ConstOffset` image operand (no capability)
+	-- for a constant offset, or `Offset` + `ImageGatherExtended` for a runtime offset.
+	{
+		imageGatherOffset = {
+			operands = { { "sampledImage" }, { "location" }, { "component" }, { "offset" } },
+		},
+	},
 	-- Form a pointer to a texel of an image for atomic operations.
 	{ ImageTexelPointer = { operands = { { "image" }, { "coord" }, { "sample" } } } },
 	-- Load from a SubpassInput.
@@ -1344,6 +1353,7 @@ local insts = {
 	-- Resource qualifiers for dynamically varying index
 	{ nonUniformResourceIndex = { operands = { { "index" } } } },
 	{ getNaturalStride = { operands = { { "type" } } } },
+	{ getNaturalAlignment = { operands = { { "type" } } } },
 	{ meshOutputRef = { operands = { { "base" }, { "index" } } } },
 	{ nodeOutputRecordGetElementPtr = { operands = { { "base" }, { "index" } } } },
 	{ meshOutputSet = { operands = { { "base" }, { "index" }, { "elementValue" } } } },

@@ -1,5 +1,6 @@
 #include "slang-ir-peephole.h"
 
+#include "../core/slang-math.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-layout.h"
@@ -1801,6 +1802,46 @@ struct PeepholeContext : InstPassBase
                     auto stride =
                         builder.getIntValue(inst->getDataType(), sizeAlignment.getStride());
                     inst->replaceUsesWith(stride);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
+        case kIROp_GetNaturalAlignment:
+            {
+                if (targetProgram)
+                {
+                    if (isInGeneric)
+                        break;
+                    auto type = inst->getOperand(0)->getDataType();
+                    IRSizeAndAlignment sizeAlignment;
+                    const auto res = getNaturalSizeAndAlignment(
+                        targetProgram->getTargetReq(),
+                        type,
+                        &sizeAlignment);
+                    if (!SLANG_SUCCEEDED(res))
+                        break;
+
+                    // The natural alignment we promise for the implicit single-argument
+                    // `*Aligned` accessors is the largest power of two that divides the
+                    // type's natural stride. For a power-of-two-sized aggregate (scalars,
+                    // `vec2`, `vec4`, `half4`, ...) this is the full stride, so a single
+                    // wide access is still possible; for a 3-component vector (stride
+                    // `3 * scalarSize`, never a power of two) it collapses to the scalar
+                    // alignment, which is the strongest *valid* (power-of-two) promise.
+                    // The types these accessors accept are concrete and non-empty, so the stride
+                    // is always positive; alignment 0 is the legalizer's "no promise" sentinel and
+                    // must never be produced here.
+                    IRIntegerValue stride = sizeAlignment.getStride();
+                    SLANG_ASSERT(stride > 0);
+                    IRIntegerValue alignment = Math::getLowestBit(stride);
+
+                    IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
+                    builder.setInsertBefore(inst);
+                    auto alignmentVal = builder.getIntValue(inst->getDataType(), alignment);
+                    inst->replaceUsesWith(alignmentVal);
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }

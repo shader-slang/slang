@@ -4,6 +4,8 @@
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <string.h>
+
 using namespace Slang;
 
 // Test that reflection API can correctly report info about enum declarations.
@@ -51,18 +53,26 @@ SLANG_UNIT_TEST(enumReflection)
     SLANG_CHECK_ABORT(enumType != nullptr);
     SLANG_CHECK(enumType->getKind() == slang::TypeReflection::Kind::Enum);
     SLANG_CHECK(enumType->getFieldCount() == 3);
-    int64_t value = -1;
+    auto getDefaultValueInt = [](slang::VariableReflection* var) -> int32_t
+    {
+        ComPtr<slang::IBlob> blob;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(var->getDefaultValueBlob(blob.writeRef())));
+        SLANG_CHECK_ABORT(blob != nullptr);
+        SLANG_CHECK_ABORT(blob->getBufferSize() == sizeof(int32_t));
+
+        return *(const int32_t*)blob->getBufferPointer();
+    };
 
     auto case0 = enumType->getFieldByIndex(0);
-    case0->getDefaultValueInt(&value);
+    auto value = getDefaultValueInt(case0);
     SLANG_CHECK(strcmp(case0->getName(), "A") == 0 && value == 0);
 
     auto case1 = enumType->getFieldByIndex(1);
-    case1->getDefaultValueInt(&value);
+    value = getDefaultValueInt(case1);
     SLANG_CHECK(strcmp(case1->getName(), "B") == 0 && value == 123 * 4);
 
     auto case2 = enumType->getFieldByIndex(2);
-    case2->getDefaultValueInt(&value);
+    value = getDefaultValueInt(case2);
     SLANG_CHECK(strcmp(case2->getName(), "C") == 0 && value == 123 * 4 + 5);
 
     auto unscopedEnumType = reflection->findTypeByName("Flags");
