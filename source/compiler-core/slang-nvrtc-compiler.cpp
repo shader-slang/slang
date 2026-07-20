@@ -1340,6 +1340,9 @@ SlangResult NVRTCDownstreamCompiler::compile(
     //
     if (options.pipelineType == PipelineType::RayTracing)
     {
+        // Generate relocatable PTX so NVRTC retains OptiX direct-callable device functions.
+        cmdLine.addArg("--relocatable-device-code=true");
+
         if (SLANG_FAILED(_maybeAddOptixSupport(options, cmdLine, diagnostics)))
         {
             diagnostics->setResult(SLANG_FAIL);
