@@ -10,6 +10,7 @@
 #include "slang-ir-util.h"
 #include "slang-parameter-binding.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-type-layout.h"
 
 #include <set>
 
@@ -2153,6 +2154,32 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         }
 
         return nullptr;
+    }
+
+    // OptiX direct-callable programs use the CUDA function-call ABI for their
+    // payload parameters. These parameters are marked varying so that they are
+    // not collected into the shader record, but they do not otherwise require
+    // special legalization. Leave them in place so that the existing CUDA
+    // parameter-emission logic can handle them.
+
+    void processInOutParam(IRParam* param, IRBorrowInOutParamType* inOutType) SLANG_OVERRIDE
+    {
+        if( getLayoutResourceKind(m_paramLayout->getTypeLayout()) == LayoutResourceKind::CallablePayload )
+        {
+            return;
+        }
+
+        EntryPointVaryingParamLegalizeContext::processInOutParam(param, inOutType);
+    }
+
+    void processOutParam(IRParam* param, IROutParamType* outType) SLANG_OVERRIDE
+    {
+        if( getLayoutResourceKind(m_paramLayout->getTypeLayout()) == LayoutResourceKind::CallablePayload )
+        {
+            return;
+        }
+
+        EntryPointVaryingParamLegalizeContext::processOutParam(param, outType);
     }
 
     void beginModuleImpl() SLANG_OVERRIDE
