@@ -434,9 +434,21 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 {
     if (!inst)
         return;
-    if (inst->findDecoration<IREntryPointDecoration>())
+
+    if (auto entryPointDecor = inst->findDecoration<IREntryPointDecoration>())
     {
-        m_writer->emit("extern \"C\" __global__ ");
+        m_writer->emit("extern \"C\" ");
+
+        // OptiX callables are emitted as __device__, while all others are __global__.
+        if (entryPointDecor->getProfile().getStage() == Stage::Callable)
+        {
+            m_writer->emit("__device__ ");
+        }
+        else
+        {
+            m_writer->emit("__global__ ");
+        }
+
         return;
     }
 
@@ -457,8 +469,8 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
 {
     // We have an entry-point function in the IR module, which we
-    // will want to emit as a `__global__` function in the generated
-    // CUDA C++.
+    // need to generate the name of the corresponding CUDA C++
+    // function.
     //
     // The most common case will be a compute kernel, in which case
     // we will emit the function more or less as-is, including
