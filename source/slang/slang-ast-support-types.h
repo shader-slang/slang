@@ -1958,4 +1958,18 @@ FIDDLE() namespace Slang
         UnownedStringSlice opText,
         OperatorArity arity);
 
+    // Whether the builtin fast path applies operator `kind` to a builtin element of base type
+    // `elementBaseType`: bitwise/shift and bitwise-not require an integer element; equality
+    // (`==`/`!=`) accepts integer, floating-point, or bool; logical-not (`!`) requires bool;
+    // arithmetic, ordering, and unary negate require integer or float (so `bool` is excluded). This
+    // is the single source of truth for the per-operator element-type rule, shared by the fast path
+    // (`convertToBuiltinArithmeticOp`) and the declaration-time check that rejects overloading a
+    // builtin operator on builtin operands (`checkOverloadedBuiltinOperatorDecl`), so the two
+    // cannot drift. `kind` must be a fast-path operator kind (i.e. what
+    // `getBuiltinOperationKindFromString` returns for the rewritten operators); non-fast-path kinds
+    // are out of contract.
+    bool isBuiltinOperationKindEligibleForBaseType(
+        BuiltinOperationKind kind,
+        BaseType elementBaseType);
+
 } // namespace Slang

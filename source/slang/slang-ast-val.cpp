@@ -6,6 +6,7 @@
 #include "slang-ast-dispatch.h"
 #include "slang-ast-natural-layout.h"
 #include "slang-ast-substitution.h"
+#include "slang-base-type-info.h"
 #include "slang-check-impl.h"
 #include "slang-diagnostics.h"
 #include "slang-mangle.h"
@@ -2342,6 +2343,48 @@ BuiltinOperationKind getBuiltinOperationKindFromString(
     if (opText == toSlice("||"))
         return BuiltinOperationKind::Or;
     return BuiltinOperationKind::Unknown;
+}
+
+bool isBuiltinOperationKindEligibleForBaseType(BuiltinOperationKind kind, BaseType elementBaseType)
+{
+    auto flags = BaseTypeInfo::getInfo(elementBaseType).flags;
+    const bool isInt = (flags & BaseTypeInfo::Flag::Integer) != 0;
+    const bool isFloat = (flags & BaseTypeInfo::Flag::FloatingPoint) != 0;
+    const bool isBool = (elementBaseType == BaseType::Bool);
+    switch (kind)
+    {
+    case BuiltinOperationKind::BitAnd:
+    case BuiltinOperationKind::BitOr:
+    case BuiltinOperationKind::BitXor:
+    case BuiltinOperationKind::Lsh:
+    case BuiltinOperationKind::Rsh:
+    case BuiltinOperationKind::BitNot:
+        return isInt;
+    case BuiltinOperationKind::Eql:
+    case BuiltinOperationKind::Neq:
+        return isInt || isFloat || isBool;
+    case BuiltinOperationKind::Not:
+        // Logical-not `!` applies to `bool` only.
+        return isBool;
+    case BuiltinOperationKind::Add:
+    case BuiltinOperationKind::Sub:
+    case BuiltinOperationKind::Mul:
+    case BuiltinOperationKind::Div:
+    case BuiltinOperationKind::Mod:
+    case BuiltinOperationKind::Neg:
+    case BuiltinOperationKind::Less:
+    case BuiltinOperationKind::Greater:
+    case BuiltinOperationKind::Leq:
+    case BuiltinOperationKind::Geq:
+        // Arithmetic (`+ - * / %`, unary `-`) and ordering (`< > <= >=`): integer or float
+        // (`bool` excluded).
+        return isInt || isFloat;
+    default:
+        // Out of contract: `kind` should be a fast-path operator kind. The short-circuiting/ternary
+        // kinds (`And`/`Or`/`Conditional`) and `Unknown` are not rewritten by the fast path, so
+        // callers gate them out before reaching here.
+        SLANG_UNEXPECTED("isBuiltinOperationKindEligibleForBaseType: non-fast-path operator kind");
+    }
 }
 
 void BuiltinOperationIntVal::_toTextOverride(StringBuilder& out)
