@@ -100,7 +100,10 @@ void computeMain()
     // BUF-NEXT: 80125682
 
     // Note: Below tests are mainly to verify that we don't emit invalid spirv code
-    u16vec2 k = {(uint16_t)inputBuffer.a, (uint16_t)inputBuffer.b};
+    u16vec2 k = {
+        (uint16_t)inputBuffer.a,
+        (uint16_t)inputBuffer.b
+    };
     outputBuffer.k = pack32(k);
     // BUF-NEXT: 1349A802
 
@@ -108,11 +111,21 @@ void computeMain()
     outputBuffer.l = pack32(l);
     // BUF-NEXT: 1349A802
 
-    u8vec4 m = {(uint8_t)inputBuffer.c, (uint8_t)inputBuffer.d, (uint8_t)inputBuffer.e, (uint8_t)inputBuffer.f};
+    u8vec4 m = {
+        (uint8_t)inputBuffer.c,
+        (uint8_t)inputBuffer.d,
+        (uint8_t)inputBuffer.e,
+        (uint8_t)inputBuffer.f
+    };
     outputBuffer.m = pack32(m);
     // BUF-NEXT: 72B291C2
 
-    u8vec4 n = {(uint8_t)inputBuffer.c, (uint8_t)inputBuffer.d, (uint8_t)inputBuffer.e, (uint8_t)inputBuffer.f};
+    u8vec4 n = {
+        (uint8_t)inputBuffer.c,
+        (uint8_t)inputBuffer.d,
+        (uint8_t)inputBuffer.e,
+        (uint8_t)inputBuffer.f
+    };
     outputBuffer.n = pack32(n);
     // BUF-NEXT: 72B291C2
 }
