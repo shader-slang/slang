@@ -2803,7 +2803,7 @@ __generic<T> __extension vector<T, 4>
     __intrinsic_op($(kIROp_MakeVector))
     __init(T x, vector<T,3> yzw);
 
-    // we need to disable this initializer explicitly to avoid implicit conversion
+    // we need to declare this initializer explicitly to avoid implicit conversion
     // of (int2, int) to (int2, int2)
     [__unsafeForceInlineEarly]
     [deprecated("Three-component initializer (vector<T, 2>, T) for vector<T, 4> is deprecated. For details, see https://github.com/shader-slang/slang/issues/12093")]
@@ -2814,7 +2814,7 @@ __generic<T> __extension vector<T, 4>
         this = { xy.x, xy.y, z, z };
     }
 
-    // we need to disable this initializer explicitly to avoid implicit conversion
+    // we need to declare this initializer explicitly to avoid implicit conversion
     // of (int, int2) to (int2, int2)
     [__unsafeForceInlineEarly]
     [deprecated("Three-component initializer (T, vector<T, 2>) for vector<T, 4> is deprecated. For details, see https://github.com/shader-slang/slang/issues/12093")]
