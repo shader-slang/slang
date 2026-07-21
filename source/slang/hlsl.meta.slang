@@ -11534,7 +11534,7 @@ T fwidth(T p)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(glsl_hlsl_spirv_wgsl, fragmentprocessing)]
+[require(glsl_hlsl_metal_spirv_wgsl, fragmentprocessing)]
 vector<T, N> fwidth(vector<T, N> x)
 {
     __requireComputeDerivative();
@@ -11543,6 +11543,8 @@ vector<T, N> fwidth(vector<T, N> x)
     case hlsl:
         __intrinsic_asm "fwidth($0)";
     case glsl:
+        __intrinsic_asm "fwidth($0)";
+    case metal:
         __intrinsic_asm "fwidth($0)";
     case spirv:
         return spirv_asm
@@ -11556,7 +11558,7 @@ vector<T, N> fwidth(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_metal_spirv_wgsl, fragmentprocessing)]
 matrix<T, N, M> fwidth(matrix<T, N, M> x)
 {
     __target_switch
