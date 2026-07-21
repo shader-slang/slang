@@ -282,6 +282,20 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             out << ">";
             return SLANG_OK;
         }
+    case kIROp_ArrayType:
+        {
+            // Arrays are usually emitted through `_emitType`, but a fixed-size array
+            // can also appear where only a type *name* is valid — e.g. as the element
+            // type of a `ConstantBuffer`/`ParameterBlock` below, which renders as
+            // `FixedArray<T, N>*`.
+            auto arrayType = static_cast<IRArrayType*>(type);
+            out << "FixedArray<";
+            SLANG_RETURN_ON_FAIL(calcTypeName(arrayType->getElementType(), target, out));
+            out << ", ";
+            out << getIntVal(arrayType->getElementCount());
+            out << ">";
+            return SLANG_OK;
+        }
     case kIROp_ConstantBufferType:
     case kIROp_ParameterBlockType:
         {
@@ -1589,8 +1603,17 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             auto getElementInst = static_cast<IRGetElement*>(inst);
 
             IRInst* baseInst = getElementInst->getBase();
-            IRType* baseType = (IRType*)unwrapAttributedType(
-                as<IRPtrTypeBase>(baseInst->getDataType())->getValueType());
+            // The base is usually a pointer, but can also be a pointer-like type —
+            // e.g. a `ParameterBlock<T[N]>`-typed parameter, which emits as `T*` and
+            // is addressed through the generic dereference path below.
+            IRType* basePointeeType = nullptr;
+            if (auto basePtrType = as<IRPtrTypeBase>(baseInst->getDataType()))
+                basePointeeType = basePtrType->getValueType();
+            else if (auto basePtrLikeType = as<IRPointerLikeType>(baseInst->getDataType()))
+                basePointeeType = basePtrLikeType->getElementType();
+            if (!basePointeeType)
+                return false;
+            IRType* baseType = (IRType*)unwrapAttributedType(basePointeeType);
             if (auto vectorBaseType = as<IRVectorType>(baseType))
             {
                 if (auto intLitIndex = as<IRIntLit>(getElementInst->getIndex()))
