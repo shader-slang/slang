@@ -9,6 +9,9 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute  -shaderobj -output-using-type -xslang -Wno-30056
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -compute  -shaderobj -output-using-type -xslang -Wno-30056
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type -xslang -Wno-30056
+//
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-wgpu -compute  -shaderobj -output-using-type -xslang -Wno-30056
+// See https://github.com/shader-slang/slang/issues/12173
 
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=output
