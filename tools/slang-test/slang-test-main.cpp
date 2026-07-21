@@ -1571,12 +1571,12 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
         // Call the render-test tool asking it only to startup a specified render api
         // (taking into account adapter options)
 
-        // The per-API "Check <api>: ..." discovery lines are informational; suppress them below
-        // Info verbosity (e.g. `-v failure`) while still computing the availability flags. CI runs
-        // at default (Info) and greps this output, so gating on Info keeps CI detection working.
-        // Note this also gates the device-startup branch's captured stderr/stdout dump: a device
-        // that fails to start is capability detection, not a test failure, so under `-v failure` it
-        // is intentionally silent along with the "Not Supported" line.
+        // Only the positive "Check <api>: Supported" lines are noise to hide below Info verbosity
+        // (e.g. `-v failure`); the "Not Supported" lines and the accompanying startup-failure
+        // stderr/stdout dump are always shown, since a missing backend explains why tests are
+        // skipped and is exactly what someone running `-v failure` needs to see. CI runs at default
+        // (Info) and greps this output, so gating only the positive line keeps CI detection
+        // working.
         const bool showDiscovery = context->options.verbosity >= VerbosityLevel::Info;
 
         RenderApiFlags availableRenderApiFlags = 0;
@@ -1602,7 +1602,7 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                             "Check %s: Supported\n",
                             RenderApiUtil::getApiName(apiType).begin());
                 }
-                else if (showDiscovery)
+                else
                 {
                     StdWriters::getOut().print(
                         "Check %s: Not Supported\n",
@@ -1646,7 +1646,7 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                             "Check %s: Supported\n",
                             RenderApiUtil::getApiName(apiType).begin());
                 }
-                else if (showDiscovery)
+                else
                 {
                     StdWriters::getOut().print(
                         "Check %s: Not Supported\n",
