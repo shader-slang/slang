@@ -462,6 +462,23 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
     }
     else
     {
+        // OptiX requires `--relocatable-device-code=true`; see section 6.1,
+        // "Program Input," in the OptiX Programming Guide.
+        //
+        // Device functions are local to the CUDA module by default, but
+        // enabling relocatable device code causes them to have public
+        // visibility. To keep behavior consistent across both modes, we
+        // add static to device functions that aren't explicitly exported to
+        // maintain the default behavior and avoid multiple definition errors.
+        auto func = as<IRFunc>(inst);
+        const bool isLocalFuncDefinition =
+            func && isDefinition(func) &&
+            !func->findDecoration<IRCudaDeviceExportDecoration>();
+        if (isRaytracingStage(m_entryPointStage) && isLocalFuncDefinition)
+        {
+            m_writer->emit("static ");
+        }
+
         m_writer->emit("__device__ ");
     }
 }
