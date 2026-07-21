@@ -23197,8 +23197,9 @@ struct HitObject
     [ForceInline]
     [require(cuda, ser_raygen_closesthit_miss)]
     [require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
-    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
-    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    // Single hlsl arm covers both native DXR and explicit NVAPI; __hlslMakeHit picks the ABI (and
+    // enforces SM 6.9 for the native path through its own ser_dxr require).
+    [require(hlsl, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -23212,23 +23213,9 @@ struct HitObject
     {
         __target_switch
         {
-        case nvapiHitObjects:
-            HitObject hitObj_nvapi;
-            __hlslMakeHit_NVAPI(
-                AccelerationStructure,
-                InstanceIndex,
-                GeometryIndex,
-                PrimitiveIndex,
-                HitKind,
-                RayContributionToHitGroupIndex,
-                MultiplierForGeometryContributionToHitGroupIndex,
-                Ray,
-                attributes,
-                hitObj_nvapi);
-            return hitObj_nvapi;
         case hlsl:
-            HitObject hitObj_dxr;
-            __hlslMakeHit_DXR(
+            HitObject hitObj;
+            __hlslMakeHit(
                 AccelerationStructure,
                 InstanceIndex,
                 GeometryIndex,
@@ -23238,8 +23225,8 @@ struct HitObject
                 MultiplierForGeometryContributionToHitGroupIndex,
                 Ray,
                 attributes,
-                hitObj_dxr);
-            return hitObj_dxr;
+                hitObj);
+            return hitObj;
         case glsl:
             {
                 // Save the attributes
@@ -23798,9 +23785,12 @@ struct HitObject
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     // This 2-argument Invoke lowers only to native dx::HitObject::Invoke; the nvapiHitObjects
     // requirement exists solely so the __target_switch below can carry a reachable
-    // `case nvapiHitObjects:` that diagnoses (E41400) under explicit NVAPI, instead of falling
-    // through to `case hlsl:` and emitting a native Invoke applied to an NvHitObject.
-    [require(nvapiHitObjects, ser_dxr_raygen_closesthit_miss)]
+    // `case nvapiHitObjects:` that diagnoses under explicit NVAPI, instead of falling through to
+    // `case hlsl:` and emitting a native Invoke applied to an NvHitObject. It uses the plain
+    // ser_raygen_closesthit_miss (not the ser_dxr_ SM 6.9 variant the native arm needs) so the
+    // diagnostic is reachable on a pre-6.9 NVAPI target rather than being masked by a "requires
+    // SM 6.9" capability error.
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         HitObject HitOrMiss,
         inout payload_t Payload)
@@ -24928,9 +24918,12 @@ struct HitObject
         }
     }
 
-    [__requiresNVAPI]
+    // Combined native/NVAPI MakeHit dispatcher (mirrors __hlslMakeHitWithRecordIndex): one switch
+    // carrying both arms. A single generic helper with only the NVAPI arm would fail E41011 when
+    // force-instantiated on the (unreached) native path; keeping a native `case hlsl:` here avoids it.
     [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
-    static void __hlslMakeHit_NVAPI<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    static void __hlslMakeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
         uint GeometryIndex,
         uint PrimitiveIndex,
@@ -24944,23 +24937,6 @@ struct HitObject
         __target_switch
         {
         case nvapiHitObjects: __intrinsic_asm "NvMakeHit";
-        }
-    }
-
-    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
-    static void __hlslMakeHit_DXR<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
-        uint InstanceIndex,
-        uint GeometryIndex,
-        uint PrimitiveIndex,
-        uint HitKind,
-        uint RayContributionToHitGroupIndex,
-        uint MultiplierForGeometryContributionToHitGroupIndex,
-        RayDesc Ray,
-        attr_t attributes,
-        out HitObject hitObj)
-    {
-        __target_switch
-        {
         case hlsl: __intrinsic_asm "($9 = dx::HitObject::MakeHit($0, $1, $2, $3, $4, $5, $6, $7, $8))";
         }
     }

@@ -23,6 +23,7 @@ uniform RaytracingAccelerationStructure scene;
 RWStructuredBuffer<uint> outputBuffer;
 
 struct MyPayload { float4 color; };
+struct MyAttribs { float2 bary; };
 
 [shader("raygeneration")]
 void main()
@@ -52,13 +53,27 @@ void main()
     // NATIVE: dx::MaybeReorderThread
     // NVAPI: NvReorderThread
 
+    // MakeHit is the most heavily re-gated method; it must pick the same ABI as the rest.
+    MyAttribs attribs = { float2(0.5, 0.5) };
+    HitObject hh = HitObject::MakeHit(scene, 0, 0, 0, 0, 0, 0, ray, attribs);
+    // NATIVE: dx::HitObject::MakeHit
+    // NVAPI: NvMakeHit
+    r += hh.IsHit() ? 1u : 0u;
+
     outputBuffer[0] = r;
 
-    // The other ABI's intrinsics must never appear (no mixing).
+    // The emitted HitObject TYPE must also match the ABI, never mixed.
+    // NATIVE-DAG: dx::HitObject
+    // NVAPI-DAG: NvHitObject
+
+    // The other ABI's intrinsics / type must never appear (no mixing).
     // NATIVE-NOT: NvMakeNop
     // NATIVE-NOT: NvTraceRayHitObject
     // NATIVE-NOT: NvReorderThread
+    // NATIVE-NOT: NvMakeHit
+    // NATIVE-NOT: NvHitObject
     // NVAPI-NOT: dx::HitObject::MakeNop
     // NVAPI-NOT: dx::HitObject::TraceRay
     // NVAPI-NOT: dx::MaybeReorderThread
+    // NVAPI-NOT: dx::HitObject::MakeHit
 }
