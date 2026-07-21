@@ -219,7 +219,7 @@ Versions
 > Represent HLSL compatibility support.
 
 `hlsl_nvapi`
-> Represents HLSL NVAPI support.
+> Deprecated: use `nvapi`. Kept as an alias for source compatibility with `-capability hlsl_nvapi`.
 
 `metallib_2_3`
 > Represents MetalLib 2.3.
@@ -238,6 +238,9 @@ Versions
 
 `metallib_latest`
 > Represents the latest MetalLib version.
+
+`nvapi`
+> NVAPI support (HLSL). Canonical name for the NVAPI capability family (nvapi*).
 
 `sm_4_0`
 > HLSL shader model 4.0 and related capabilities of other targets.
@@ -1025,7 +1028,7 @@ Compound Capabilities
 > (hlsl only) Capabilities required to use hlsl atomic operations
 
 `atomic_hlsl_nvapi`
-> (hlsl only) Capabilities required to use hlsl NVAPI atomics
+> Deprecated: use `nvapiAtomic`.
 
 `atomic_hlsl_sm_6_6`
 > (hlsl only) Capabilities required to use hlsl sm_6_6 atomics
@@ -1320,8 +1323,11 @@ Compound Capabilities
 `nonuniformqualifier`
 > Capabilities required to use NonUniform qualifier
 
-`nvapi`
-> NVAPI capability for HLSL
+`nvapiAtomic`
+> (hlsl only) Capabilities required to use hlsl NVAPI atomics
+
+`nvapiSer`
+> Capabilities needed for shader-execution-reordering (NVAPI path for HLSL)
 
 `pack_vector`
 > Capabilities required to use pack/unpack intrinsics on packed vector data
@@ -1482,7 +1488,7 @@ Compound Capabilities
 > NVIDIA-specific SER for raygen, closesthit, miss stages (GLSL/SPIRV NV paths)
 
 `ser_nvapi`
-> Capabilities needed for shader-execution-reordering (NVAPI path for HLSL)
+> Deprecated: use `nvapiSer`.
 
 `ser_raygen`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stage of raygen.

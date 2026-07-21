@@ -224,9 +224,13 @@ def _sm_6_8 : _sm_6_7;
 def _sm_6_9 : _sm_6_8;
 def _sm_6_10 : _sm_6_9;
 
-/// Represents HLSL NVAPI support.
+/// NVAPI support (HLSL). Canonical name for the NVAPI capability family (nvapi*).
 /// [Version]
-def hlsl_nvapi : hlsl;
+def nvapi : hlsl;
+
+/// Deprecated: use `nvapi`. Kept as an alias for source compatibility with `-capability hlsl_nvapi`.
+/// [Version]
+alias hlsl_nvapi = nvapi;
 
 /// Explicit opt-in to the NVAPI HitObject ABI for HLSL shader-execution-reordering. This is the
 /// vendor-specific selector for HitObject, kept deliberately distinct from the coarse hlsl_nvapi
@@ -238,7 +242,7 @@ def hlsl_nvapi : hlsl;
 /// method consult this one decision, so a HitObject never mixes the two ABIs, while
 /// "native-DXR HitObject + NVAPI atomics" stays a legal, non-mixing combination on SM 6.9.
 /// [EXT]
-def nvapiHitObjects : hlsl_nvapi;
+def nvapiHitObjects : nvapi;
 
 
 /// Represent HLSL compatibility support.
@@ -405,7 +409,7 @@ alias cuda_glsl_hlsl = cuda | glsl | hlsl;
 
 /// CUDA, GLSL, and NVAPI code-gen targets
 /// [Compound]
-alias cuda_glsl_nvapi = cuda | glsl | hlsl_nvapi;
+alias cuda_glsl_nvapi = cuda | glsl | nvapi;
 
 /// CUDA and GLSL code-gen targets.
 /// [Compound]
@@ -1354,16 +1358,16 @@ alias GL_NV_cooperative_vector = _GL_NV_cooperative_vector | spvCooperativeVecto
 
 // Define feature names not reliant on shader stages
 
-/// NVAPI capability for HLSL
-/// [Compound]
-alias nvapi = hlsl_nvapi;
 
 /// Capabilities needed for minimal raytracing support
 /// [Compound]
 alias raytracing = GL_EXT_ray_tracing | _sm_6_3 | cuda;
 /// Capabilities needed for shader-execution-reordering (NVAPI path for HLSL)
 /// [Compound]
-alias ser_nvapi = raytracing + hlsl_nvapi;
+alias nvapiSer = raytracing + nvapi;
+/// Deprecated: use `nvapiSer`.
+/// [Compound]
+alias ser_nvapi = nvapiSer;
 
 /// DXR 1.3 native SER support (SM 6.9, no NVAPI required)
 /// [EXT]
@@ -2307,7 +2311,10 @@ alias appendstructuredbuffer = sm_5_0_version;
 alias atomic_hlsl = _sm_4_0;
 /// (hlsl only) Capabilities required to use hlsl NVAPI atomics
 /// [Compound]
-alias atomic_hlsl_nvapi = _sm_4_0 + hlsl_nvapi;
+alias nvapiAtomic = _sm_4_0 + nvapi;
+/// Deprecated: use `nvapiAtomic`.
+/// [Compound]
+alias atomic_hlsl_nvapi = nvapiAtomic;
 /// (hlsl only) Capabilities required to use hlsl sm_6_6 atomics
 /// [Compound]
 alias atomic_hlsl_sm_6_6 = _sm_6_6;

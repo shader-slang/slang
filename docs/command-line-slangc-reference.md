@@ -1356,7 +1356,7 @@ A capability describes an optional feature that a target may or may not support.
 * `metallib_3_0` 
 * `metallib_3_1` 
 * `metallib_4_0` 
-* `hlsl_nvapi` 
+* `nvapi` 
 * `nvapiHitObjects` 
 * `hlsl_2018` 
 * `optix_coopvec` 
@@ -1475,6 +1475,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvShader64BitIndexingEXT` 
 * `ser_hlsl_native` 
 * `metallib_latest` 
+* `hlsl_nvapi` 
 * `dxil_lib` 
 * `any_target` 
 * `any_textual_target` 
@@ -1603,8 +1604,8 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_NV_shader_texture_footprint` : enables the GL_NV_shader_texture_footprint extension 
 * `GL_NV_cluster_acceleration_structure` : enables the GL_NV_cluster_acceleration_structure extension 
 * `GL_NV_cooperative_vector` : enables the GL_NV_cooperative_vector extension 
-* `nvapi` 
 * `raytracing` 
+* `nvapiSer` 
 * `ser_nvapi` 
 * `ser_dxr` 
 * `ser` 
@@ -1759,6 +1760,7 @@ A capability describes an optional feature that a target may or may not support.
 * `METAL_4_0` 
 * `appendstructuredbuffer` 
 * `atomic_hlsl` 
+* `nvapiAtomic` 
 * `atomic_hlsl_nvapi` 
 * `atomic_hlsl_sm_6_6` 
 * `byteaddressbuffer` 
