@@ -406,10 +406,21 @@ Slang supports the following expression forms with nearly identical syntax to HL
 * Operators: `-a`, `b + c`, `d++`, `e %= f`
 
 > #### Note ####
-> Like HLSL but unlike most other C-family languages, the `&&` and `||` operators do *not* currently perform "short-circuiting".
-> They evaluate all of their operands unconditionally.
-> However, the `?:` operator does perform short-circuiting if the condition is a scalar. Use of `?:` where the condition is a vector is deprecated in Slang. The vector version of `?:` operator does *not* perform short-circuiting, and the user is advised to call `select` instead.
-> The default behavior of these operators is likely to change in a future Slang release.
+>
+> Like most C-family languages, the `&&` and `||` operators perform "short-circuiting" evaluation when their
+> operands are scalars, and the `?:` operator does so when its condition is a scalar. For `&&` and `||`, the
+> right-hand operand is evaluated only when it can affect the result, and for `?:`, only one of the two
+> expressions on either side of `:` is evaluated. That is, in `a && b`, `b` is not evaluated when `a` is
+> `false`, and in `a || b`, `b` is not evaluated when `a` is `true`. In `a ? b : c`, `b` is evaluated when
+> `a` is `true`, and otherwise, `c` is evaluated.
+>
+> However, when the operands are vectors, `&&` and `||` *do not* short-circuit. Instead, they evaluate both
+> operands unconditionally and combine them element-wise. The vector version of `?:` operator *does not*
+> perform short-circuiting, either. Use of `?:` where the condition is a vector is deprecated in Slang, and
+> the user is advised to call `select` instead.
+>
+> Short-circuiting for `&&` and `||` can be disabled globally with the `-disable-short-circuit` compiler
+> option.
 
 Additional expression forms specific to shading languages follow.
 
