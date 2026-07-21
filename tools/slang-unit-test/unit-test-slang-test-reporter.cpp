@@ -4,12 +4,9 @@
 
 using namespace Slang;
 
-// Regression guard for shader-slang/slang#12177: a per-worker reporter in a parallel run must pick
-// up verbosity/dump-on-failure/hide-ignored/output-mode from the parsed Options, not silently keep
-// the constructor defaults. The bug was that runTestsInParallel's worker reporters only called
-// init() and never received these settings, so passing tests printed under `-v failure`. Pinning
-// the propagation here means dropping any of the assignments in init() fails a test instead of
-// re-introducing the bug.
+// A sub-reporter (the per-worker reporter used by parallel runs) must receive the same
+// Options-derived display configuration as the main reporter, so that verbosity, dump-on-failure,
+// hide-ignored, output mode, and the expected-failure list all take effect on every worker.
 SLANG_UNIT_TEST(slangTestReporterInitFromOptions)
 {
     Options options;
@@ -19,7 +16,7 @@ SLANG_UNIT_TEST(slangTestReporterInitFromOptions)
     options.hideIgnored = true;
     options.expectedFailureList.add(String("tests/some/expected-failure.slang"));
 
-    // isSubReporter=true exercises the worker/parallel path, which is where the settings were lost.
+    // isSubReporter=true selects the worker/parallel configuration path.
     TestReporter reporter;
     SLANG_CHECK(SLANG_SUCCEEDED(reporter.init(options, /*isSubReporter*/ true)));
 
