@@ -453,6 +453,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         PRIVATE
             ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-output-path-util.cpp
+            ${slang_SOURCE_DIR}/tools/slang-test/test-reporter.cpp
     )
     # The unit tests include internal slang headers (e.g. slang-repro.h) that
     # transitively pull in FIDDLE / capability generated headers. The `slang`

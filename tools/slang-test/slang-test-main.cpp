@@ -1574,6 +1574,9 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
         // The per-API "Check <api>: ..." discovery lines are informational; suppress them below
         // Info verbosity (e.g. `-v failure`) while still computing the availability flags. CI runs
         // at default (Info) and greps this output, so gating on Info keeps CI detection working.
+        // Note this also gates the device-startup branch's captured stderr/stdout dump: a device
+        // that fails to start is capability detection, not a test failure, so under `-v failure` it
+        // is intentionally silent along with the "Not Supported" line.
         const bool showDiscovery = context->options.verbosity >= VerbosityLevel::Info;
 
         RenderApiFlags availableRenderApiFlags = 0;
@@ -5879,6 +5882,10 @@ SlangResult innerMain(int argc, char** argv)
                 SLANG_ASSERT(passThroughCategories[i] == nullptr);
                 passThroughCategories[i] = categorySet.add(buf.getBuffer() + 1, fullTestCategory);
 
+                // Each token keeps its leading space (the `+ 1` above strips it only for the
+                // category name), so the joined line reads "Supported backends: a b". CI greps the
+                // literal "Supported backends: " (with the trailing space), so this is
+                // load-bearing.
                 supportedBackends << buf;
             }
         }
@@ -5934,8 +5941,8 @@ SlangResult innerMain(int argc, char** argv)
 
     Options& options = context.options;
 
-    // Print the supported-backends line computed above, now that verbosity is known. CI parses this
-    // at default (Info) verbosity, so suppress it only below Info (e.g. `-v failure`).
+    // CI greps this at default (Info) verbosity, so suppress it only below Info (e.g. `-v
+    // failure`).
     if (options.verbosity >= VerbosityLevel::Info)
     {
         StdWriters::getOut().print("Supported backends:%s\n", supportedBackends.getBuffer());
