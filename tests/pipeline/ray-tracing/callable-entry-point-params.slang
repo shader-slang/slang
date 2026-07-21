@@ -16,11 +16,15 @@ struct Payload
     int value;
 };
 
+// Declare the inout parameter case as a callable shader in the source.
+[shader("callable")]
 void callableInOut(inout Payload payload)
 {
     payload.value += 1;
 }
 
+// Declare the out parameter case as a callable shader in the source.
+[shader("callable")]
 void callableOut(out Payload payload)
 {
     payload.value = 2;
