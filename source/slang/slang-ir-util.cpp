@@ -2173,8 +2173,7 @@ IRVarLayout* findVarLayout(IRInst* value)
 
 bool isEntryPointByValueUniformAggregateParam(IRParam* param)
 {
-    if (!param)
-        return false;
+    SLANG_ASSERT(param);
 
     // Must be an entry-point kernel parameter: an `IRParam` in the entry function's first block
     // (later-block `IRParam`s are block/phi params, not kernel params).
@@ -2186,14 +2185,20 @@ bool isEntryPointByValueUniformAggregateParam(IRParam* param)
         !parentFunc->findDecoration<IREntryPointDecoration>())
         return false;
 
-    // Must be uniform, not a varying (per-thread) input.
+    // Must be uniform, not a varying (per-thread) input. A missing var layout is treated the same
+    // as varying: the fallback direction is conservative - the forward is skipped, which is a
+    // missed optimization, never an unsound one. (An entry-point param normally has a layout by
+    // this late pass; the null case is defensive.)
     auto varLayout = findVarLayout(param);
     if (!varLayout || isVaryingParameter(varLayout))
         return false;
 
-    // Must be a fixed-size by-value aggregate (`struct`/sized `array`); everything else falls
-    // through `default:`. A tuple is lowered to a struct by `lowerTuples` before this runs, so a
-    // `kIROp_TupleType` cannot occur - assert it rather than misclassify via `default:`.
+    // Must be a fixed-size by-value aggregate (`struct`/sized `array`); everything else - including
+    // a pointer-typed param already indirected by another pass - falls through `default:` to false,
+    // which is what makes the "ByValue" in the name hold. A tuple is lowered to a struct by
+    // `lowerTuples` before this pass's only consumer runs, so `kIROp_TupleType` cannot occur here;
+    // the assert is a debug-only tripwire for a pipeline reordering, and in release a tuple would
+    // still fall through `default:` to the conservative `false` (no forward).
     auto type = param->getDataType();
     if (!type)
         return false;

@@ -1,7 +1,10 @@
 // GPU-gated companion to the source-emit forward-uniform tests: compiles the emitted CUDA under
 // NVRTC and runs it, checking the numeric result, so a malformed address-forward the FileCheck
 // tests cannot catch fails here. Forwards a by-value uniform aggregate into a [noinline] helper
-// (`(&(data))`) rather than reading it inline. Fix for #11774.
+// (`&data`) AND reads it inline (`data.values[0]`) in the same kernel, so the load-redirect path
+// and its statement ordering are validated by execution: a missed load (reading the pointer as a
+// value) or a mis-placed rebuilt call (use-before-def) produces a wrong result or fails to compile,
+// not just a FileCheck mismatch. Fix for #11774.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type -shaderobj
 
@@ -27,10 +30,12 @@ float gather(Data d, uint i)
 [numthreads(4, 1, 1)]
 void computeMain(uint tid: SV_DispatchThreadID, uniform Data data, uniform RWStructuredBuffer<float> output)
 {
-    // indices = [3,2,1,0] so output[i] = values[indices[i]] = [40,30,20,10].
+    // `gather` forwards `data` by address; `data.values[0]` (= 10.0) is an inline read that goes
+    // through the redirect load. indices = [3,2,1,0], so
+    // output[i] = values[indices[i]] + values[0] = [40,30,20,10] + 10 = [50,40,30,20].
+    // CHECK: 50.0
     // CHECK: 40.0
     // CHECK: 30.0
     // CHECK: 20.0
-    // CHECK: 10.0
-    output[tid] = gather(data, tid);
+    output[tid] = gather(data, tid) + data.values[0];
 }

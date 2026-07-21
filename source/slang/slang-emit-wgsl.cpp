@@ -602,6 +602,12 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
 
+    case kIROp_PhysicalParamStorageType:
+        // `PhysicalParamStorage<T>` is a CUDA-family-only representation for forwarding a by-value
+        // kernel parameter's address; it is never produced for WGSL and must not reach emit.
+        SLANG_UNEXPECTED("PhysicalParamStorage type emitted for WGSL target");
+        break;
+
     case kIROp_ArrayType:
         {
             m_writer->emit("array<");

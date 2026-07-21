@@ -383,6 +383,37 @@ local insts = {
 						},
 					},
 					{
+						PhysicalParamStorage = {
+							-- Semantically a `T*` in the IR (an `IRLoad` is required to read the `T`),
+							-- whose referent is the target's physical by-value parameter storage. Used only
+							-- by the CUDA-family address-forwarding in `transformParamsToConstRef`: an
+							-- entry-point by-value uniform aggregate param is retyped to
+							-- `PhysicalParamStorage<T>` so its address can be forwarded into a `borrow in`
+							-- callee without a per-thread copy, instead of taking `GetAddress` of an SSA
+							-- value. The C++/CUDA backend emits such a param as the plain value `T p` (the
+							-- kernel ABI is unchanged) and emits a reference of `p` as `&p`. It is never
+							-- valid for the SPIR-V/WGSL/Metal backends.
+							--
+							-- The three trailing operands exist only for structural compatibility with
+							-- the `IRPtrTypeBase` accessors (so `getValueType()` etc. work); the builder
+							-- always fixes them to Read / Generic / default-layout and they are not meant
+							-- to vary.
+							--
+							-- Adding this type bumps `k_maxSupportedModuleVersion` in `slang-ir.h`, per the
+							-- "new instruction added" rule there (the version tracks IR semantics, not the
+							-- serialization format). In practice this op is only produced inside
+							-- `linkAndOptimizeIR` target codegen, after front-end IR serialization, so a
+							-- serialized module never actually carries it.
+							struct_name = "PhysicalParamStorageType",
+							operands = {
+								{ "valueType", "IRType" },
+								{ "accessQualifierOperand", "IRIntLit", optional = true },
+								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
+							},
+						},
+					},
+					{
 						OutParamTypeBase = {
 							{ OutParam = { struct_name = "OutParamType", operands = { { "valueType", "IRType" } } } },
 							{

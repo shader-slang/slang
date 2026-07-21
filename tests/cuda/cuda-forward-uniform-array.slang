@@ -26,4 +26,4 @@ void computeMain(
 
 // No whole-array copy spilled before the forward; anchored on the type so reformatted spills trip it.
 // CHECK-NOT: FixedArray<float, 256>{{.*}}= [[TENSORS]]
-// CHECK: gather{{[A-Za-z0-9_]*}}((&([[TENSORS]]))
+// CHECK: gather{{[A-Za-z0-9_]*}}(&[[TENSORS]]

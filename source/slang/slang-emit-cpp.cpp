@@ -1179,6 +1179,16 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             _emitType(ptrType->getValueType(), &refDeclarator);
         }
         break;
+    case kIROp_PhysicalParamStorageType:
+        {
+            // `PhysicalParamStorage<T>` is pointer-like in the IR, but its whole purpose is to be
+            // emitted as the target's by-value parameter storage: emit the plain value type `T`
+            // (no `*`), leaving the kernel signature `T p` unchanged. A reference of the parameter
+            // is emitted as `&p` (see the `kIROp_Param` case in `emitOperandImpl`).
+            auto ptrType = cast<IRPtrTypeBase>(type);
+            _emitType(ptrType->getValueType(), declarator);
+        }
+        break;
     case kIROp_ArrayType:
         {
             auto arrayType = static_cast<IRArrayType*>(type);
@@ -2082,6 +2092,17 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec
     case kIROp_Var:
     case kIROp_GlobalVar:
         emitVarExpr(inst, outerPrec);
+        break;
+    case kIROp_Param:
+        // A parameter retyped to `PhysicalParamStorage<T>` is a pointer to the target's by-value
+        // parameter storage, emitted by-value as `T p`. A reference to it therefore emits `&p`,
+        // the same way a local `Var`'s address is taken. Any other parameter emits its bare name.
+        if (as<IRPhysicalParamStorageType>(inst->getDataType()))
+        {
+            emitVarExpr(inst, outerPrec);
+            break;
+        }
+        m_writer->emit(getName(inst));
         break;
     default:
         m_writer->emit(getName(inst));
