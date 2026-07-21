@@ -1662,44 +1662,42 @@ void printVarLayout(
 }
 ```
 
-### Uniform Parameters
+### Byte-Granularity Usage Information
 
-Uniform parameters occupy byte ranges within a constant buffer or parameter block rather than discrete register locations, so `isParameterLocationUsed()` does not report their usage.
-Uniform byte usage is reported through the `IParameterUsage` interface instead.
+The `isParameterLocationUsed()` API is able to determine if an entire texture, buffer, or parameter block might be accessed by a compiled kernel, but does not provide information on which bytes within a buffer or block might be accessed (and thus which are provably *not* accessed).
+Uniform byte usage is reported through the `IParameterByteRangeUsageInfo` interface instead.
 
-`IParameterUsage` reports which bytes of a uniform parameter a compiled program reads, so a host can skip uploading bytes the shader never touches.
+The `IParameterByteRangeUsageInfo` API allows an application to query whether a given range of bytes inside a given parameter binding location might be accessed by the compiled kernel at runtime.
+It does not guarantee that the kernel will access those bytes at runtime, but is a conservative estimate of what the kernel might access.
+An application developer can use this information to avoid filling in bytes in buffers that a kernel will provably never access, in cases where the CPU overhead of filling in the data is high, and the application codebase is not architected so that whole-buffer-granularity usage information is not enough to hit performance targets.
 Query it with `queryInterface()` from the `IComponentType` that reflection was obtained from.
 
 ```c++
-Slang::ComPtr<slang::IParameterUsage> parameterUsage;
+Slang::ComPtr<slang::IParameterByteRangeUsageInfo> parameterUsage;
 if (SLANG_FAILED(program->queryInterface(
-    SLANG_UUID_IParameterUsage, (void**)parameterUsage.writeRef())))
+    SLANG_UUID_IParameterByteRangeUsageInfo, (void**)parameterUsage.writeRef())))
 {
     // This program does not report uniform byte usage.
     return;
 }
 ```
 
-`getUsedByteRangeCount()` returns how many byte ranges a parameter reads for a given entry point and target.
+`getUsedByteRangeCount()` returns how many byte ranges are read within a binding for a given entry point and target.
 `getUsedByteRange()` reads one of those ranges by index.
-A parameter is identified by its `VariableLayoutReflection`.
+A binding is identified by its space and register, the absolute location of the constant buffer or parameter block that holds the uniforms.
+This matches the target coordinate model of `isParameterLocationUsed`.
 
 ```c++
 SlangInt rangeCount = parameterUsage->getUsedByteRangeCount(
-    entryPointIndex, targetIndex, parameter);
+    entryPointIndex, targetIndex, spaceIndex, registerIndex);
 for (SlangInt i = 0; i < rangeCount; ++i)
 {
-    slang::UsedByteRange range;
+    slang::ByteRange range;
     parameterUsage->getUsedByteRange(
-        entryPointIndex, targetIndex, parameter, i, &range);
+        entryPointIndex, targetIndex, spaceIndex, registerIndex, i, &range);
     // range gives a byte offset and a byte size within the parameter.
 }
 ```
-
-Two conventions cover parameters with no explicit ranges.
-A count of zero means the shader reads none of the parameter, so a host can skip uploading it entirely.
-A single range with `offset` zero and `size` equal to `SLANG_UNBOUNDED_SIZE` covers the whole parameter and means all of it is used.
-Slang reports the whole parameter range when it cannot scope usage to individual bytes, for example when the uniform storage has an unbounded extent.
 
 The same information is available through the JSON reflection output (`-reflection-json`).
 Within each entry point's `bindings` array, a uniform parameter carries a `usedByteRanges` array of `{"offset": <byte>, "size": <byte>}` objects describing the bytes it reads.
@@ -1710,14 +1708,8 @@ Within each entry point's `bindings` array, a uniform parameter carries a `usedB
 ]
 ```
 
-An empty array means the shader reads none of the parameter.
-When the key is absent, treat the whole parameter as used.
-
-Loose uniform parameters at global scope are gathered into an implicit constant buffer named `$Globals`, and their used byte ranges are reported on that container rather than on each parameter.
-The JSON output lists a `$Globals` entry in the entry point `bindings` array carrying its own `usedByteRanges`, and the C++ API reaches the same container through `getGlobalParamsVarLayout()`.
-
-Querying one loose parameter by its own `VariableLayoutReflection` currently returns the whole parameter fallback instead of that parameter's slice.
-A consumer that needs per parameter usage should read the parameter's own byte offset and size from its layout and intersect that span against the `$Globals` ranges.
+When the `usedByteRanges` key is absent on a variable layout, an application should assume that any and all bytes of that variable might be accessed.
+A variable where it is known that none of its bytes will be accessed will have an empty array for its `usedByteRanges`.
 
 ### Target-Specific Limitations
 

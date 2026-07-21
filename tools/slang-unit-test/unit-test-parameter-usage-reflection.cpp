@@ -12,7 +12,7 @@
 
 using namespace Slang;
 
-// Tests the isParameterLocationUsed and IParameterUsage reflection APIs.
+// Tests the isParameterLocationUsed and IParameterByteRangeUsageInfo reflection APIs.
 
 SLANG_UNIT_TEST(isParameterLocationUsedReflection)
 {
@@ -204,7 +204,47 @@ SLANG_UNIT_TEST(isParameterLocationUsedParameterBlockConstantBuffer)
     }
 }
 
-// Exercises the uniform byte range API IParameterUsage, which the
+// Resolve a variable layout to its parent binding location, the correlation
+// a host performs with the main reflection API.
+static void getParentBindingLocation(
+    slang::VariableLayoutReflection* var,
+    SlangUInt& outSpaceIndex,
+    SlangUInt& outRegisterIndex)
+{
+    bool hasConstantBuffer = false;
+    bool hasDescriptorTableSlot = false;
+    for (unsigned int i = 0, n = var->getCategoryCount(); i < n; ++i)
+    {
+        switch (var->getCategoryByIndex(i))
+        {
+        case slang::ParameterCategory::ConstantBuffer:
+            hasConstantBuffer = true;
+            break;
+        case slang::ParameterCategory::DescriptorTableSlot:
+            hasDescriptorTableSlot = true;
+            break;
+        default:
+            break;
+        }
+    }
+    if (hasConstantBuffer)
+    {
+        outSpaceIndex = var->getBindingSpace(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER);
+        outRegisterIndex = var->getOffset(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER);
+    }
+    else if (hasDescriptorTableSlot)
+    {
+        outSpaceIndex = var->getBindingSpace(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+        outRegisterIndex = var->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+    }
+    else
+    {
+        outSpaceIndex = var->getBindingSpace(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER);
+        outRegisterIndex = 0;
+    }
+}
+
+// Exercises the uniform byte range API IParameterByteRangeUsageInfo, which the
 // isParameterLocationUsed tests do not touch. The constant buffer reads
 // usedColor (bytes [0, 16)) and usedScalar (bytes [32, 36)) and leaves
 // unusedColor [16, 32) and unusedScalar [36, 40) untouched, so the
@@ -272,10 +312,10 @@ SLANG_UNIT_TEST(parameterUsageUniformByteRanges)
     compositeProgram->link(linkedProgram.writeRef(), nullptr);
     SLANG_CHECK(linkedProgram != nullptr);
 
-    ComPtr<slang::IParameterUsage> parameterUsage;
+    ComPtr<slang::IParameterByteRangeUsageInfo> parameterUsage;
     SLANG_CHECK(
         linkedProgram->queryInterface(
-            slang::IParameterUsage::getTypeGuid(),
+            slang::IParameterByteRangeUsageInfo::getTypeGuid(),
             (void**)parameterUsage.writeRef()) == SLANG_OK);
     SLANG_CHECK(parameterUsage != nullptr);
 
@@ -294,28 +334,37 @@ SLANG_UNIT_TEST(parameterUsageUniformByteRanges)
     }
     SLANG_CHECK(paramsVar != nullptr);
 
-    SLANG_CHECK(parameterUsage->getUsedByteRangeCount(0, 0, paramsVar) == 2);
+    SlangUInt paramsSpace = 0;
+    SlangUInt paramsRegister = 0;
+    getParentBindingLocation(paramsVar, paramsSpace, paramsRegister);
 
-    slang::UsedByteRange range0 = {};
-    SLANG_CHECK(parameterUsage->getUsedByteRange(0, 0, paramsVar, 0, &range0) == SLANG_OK);
+    SLANG_CHECK(parameterUsage->getUsedByteRangeCount(0, 0, paramsSpace, paramsRegister) == 2);
+
+    slang::ByteRange range0 = {};
+    SLANG_CHECK(
+        parameterUsage->getUsedByteRange(0, 0, paramsSpace, paramsRegister, 0, &range0) ==
+        SLANG_OK);
     SLANG_CHECK(range0.offset == 0);
     SLANG_CHECK(range0.size == 16);
 
-    slang::UsedByteRange range1 = {};
-    SLANG_CHECK(parameterUsage->getUsedByteRange(0, 0, paramsVar, 1, &range1) == SLANG_OK);
+    slang::ByteRange range1 = {};
+    SLANG_CHECK(
+        parameterUsage->getUsedByteRange(0, 0, paramsSpace, paramsRegister, 1, &range1) ==
+        SLANG_OK);
     SLANG_CHECK(range1.offset == 32);
     SLANG_CHECK(range1.size == 4);
 
     // An out of range index is rejected rather than returning a stale range.
-    slang::UsedByteRange ignored = {};
+    slang::ByteRange ignored = {};
     SLANG_CHECK(
-        parameterUsage->getUsedByteRange(0, 0, paramsVar, 2, &ignored) == SLANG_E_INVALID_ARG);
+        parameterUsage->getUsedByteRange(0, 0, paramsSpace, paramsRegister, 2, &ignored) ==
+        SLANG_E_INVALID_ARG);
 }
 
 // A push constant carries neither a ConstantBuffer nor a
 // DescriptorTableSlot binding, so the IR pass has no parent binding
 // identity to scope byte ranges against and emits no record. With no
-// record IParameterUsage reports the whole parameter as used: a single
+// record IParameterByteRangeUsageInfo reports the whole parameter as used: a single
 // range at offset 0 whose size is SLANG_UNBOUNDED_SIZE, so a host binds
 // the whole block rather than stripping bytes it cannot prove are unread.
 SLANG_UNIT_TEST(parameterUsageUniformWholeParameterFallback)
@@ -379,10 +428,10 @@ SLANG_UNIT_TEST(parameterUsageUniformWholeParameterFallback)
     compositeProgram->link(linkedProgram.writeRef(), nullptr);
     SLANG_CHECK(linkedProgram != nullptr);
 
-    ComPtr<slang::IParameterUsage> parameterUsage;
+    ComPtr<slang::IParameterByteRangeUsageInfo> parameterUsage;
     SLANG_CHECK(
         linkedProgram->queryInterface(
-            slang::IParameterUsage::getTypeGuid(),
+            slang::IParameterByteRangeUsageInfo::getTypeGuid(),
             (void**)parameterUsage.writeRef()) == SLANG_OK);
     SLANG_CHECK(parameterUsage != nullptr);
 
@@ -401,15 +450,19 @@ SLANG_UNIT_TEST(parameterUsageUniformWholeParameterFallback)
     }
     SLANG_CHECK(pcVar != nullptr);
 
-    SLANG_CHECK(parameterUsage->getUsedByteRangeCount(0, 0, pcVar) == 1);
+    SlangUInt pcSpace = 0;
+    SlangUInt pcRegister = 0;
+    getParentBindingLocation(pcVar, pcSpace, pcRegister);
 
-    slang::UsedByteRange whole = {};
-    SLANG_CHECK(parameterUsage->getUsedByteRange(0, 0, pcVar, 0, &whole) == SLANG_OK);
+    SLANG_CHECK(parameterUsage->getUsedByteRangeCount(0, 0, pcSpace, pcRegister) == 1);
+
+    slang::ByteRange whole = {};
+    SLANG_CHECK(parameterUsage->getUsedByteRange(0, 0, pcSpace, pcRegister, 0, &whole) == SLANG_OK);
     SLANG_CHECK(whole.offset == 0);
     SLANG_CHECK(whole.size == SLANG_UNBOUNDED_SIZE);
 }
 
-// IParameterUsage is a distinct COM interface reached through
+// IParameterByteRangeUsageInfo is a distinct COM interface reached through
 // queryInterface, not an extension of the IComponentType vtable, so
 // existing callers keep their ABI. This probe checks the interface is
 // reachable, that it shares one COM identity with the component type (a
@@ -471,10 +524,10 @@ SLANG_UNIT_TEST(parameterUsageInterfaceIdentity)
     compositeProgram->link(linkedProgram.writeRef(), nullptr);
     SLANG_CHECK(linkedProgram != nullptr);
 
-    ComPtr<slang::IParameterUsage> parameterUsage;
+    ComPtr<slang::IParameterByteRangeUsageInfo> parameterUsage;
     SLANG_CHECK(
         linkedProgram->queryInterface(
-            slang::IParameterUsage::getTypeGuid(),
+            slang::IParameterByteRangeUsageInfo::getTypeGuid(),
             (void**)parameterUsage.writeRef()) == SLANG_OK);
     SLANG_CHECK(parameterUsage != nullptr);
 
@@ -500,9 +553,8 @@ SLANG_UNIT_TEST(parameterUsageInterfaceIdentity)
 }
 
 // Loose global uniforms report usage on the implicit $Globals constant
-// buffer via getGlobalParamsVarLayout, not on their flattened leaves (a
-// leaf query gives the whole parameter fallback). $Globals shares space
-// with sibling CBs, so records must stay distinct: the shader reads
+// buffer reached via getGlobalParamsVarLayout. $Globals shares a space with
+// sibling constant buffers, so records must stay distinct: the shader reads
 // usedScalar ([0, 4) of $Globals) and UsedCB.Extra.x ([8, 12) of UsedCB),
 // and the $Globals query must return only [0, 4).
 SLANG_UNIT_TEST(parameterUsageLooseGlobalUniforms)
@@ -565,47 +617,47 @@ SLANG_UNIT_TEST(parameterUsageLooseGlobalUniforms)
     compositeProgram->link(linkedProgram.writeRef(), nullptr);
     SLANG_CHECK(linkedProgram != nullptr);
 
-    ComPtr<slang::IParameterUsage> parameterUsage;
+    ComPtr<slang::IParameterByteRangeUsageInfo> parameterUsage;
     SLANG_CHECK(
         linkedProgram->queryInterface(
-            slang::IParameterUsage::getTypeGuid(),
+            slang::IParameterByteRangeUsageInfo::getTypeGuid(),
             (void**)parameterUsage.writeRef()) == SLANG_OK);
 
     auto programLayout = linkedProgram->getLayout(0);
     SLANG_CHECK(programLayout != nullptr);
 
     slang::VariableLayoutReflection* usedCBVar = nullptr;
-    slang::VariableLayoutReflection* usedScalarVar = nullptr;
     for (unsigned int i = 0, n = programLayout->getParameterCount(); i < n; ++i)
     {
         auto p = programLayout->getParameterByIndex(i);
         if (strcmp(p->getName(), "UsedCB") == 0)
             usedCBVar = p;
-        else if (strcmp(p->getName(), "usedScalar") == 0)
-            usedScalarVar = p;
     }
     SLANG_CHECK(usedCBVar != nullptr);
-    SLANG_CHECK(usedScalarVar != nullptr);
 
-    SLANG_CHECK(parameterUsage->getUsedByteRangeCount(0, 0, usedCBVar) == 1);
-    slang::UsedByteRange cbRange = {};
-    SLANG_CHECK(parameterUsage->getUsedByteRange(0, 0, usedCBVar, 0, &cbRange) == SLANG_OK);
+    SlangUInt usedCBSpace = 0;
+    SlangUInt usedCBRegister = 0;
+    getParentBindingLocation(usedCBVar, usedCBSpace, usedCBRegister);
+    SLANG_CHECK(parameterUsage->getUsedByteRangeCount(0, 0, usedCBSpace, usedCBRegister) == 1);
+    slang::ByteRange cbRange = {};
+    SLANG_CHECK(
+        parameterUsage->getUsedByteRange(0, 0, usedCBSpace, usedCBRegister, 0, &cbRange) ==
+        SLANG_OK);
     SLANG_CHECK(cbRange.offset == 8);
     SLANG_CHECK(cbRange.size == 4);
-
-    SLANG_CHECK(parameterUsage->getUsedByteRangeCount(0, 0, usedScalarVar) == 1);
-    slang::UsedByteRange leafRange = {};
-    SLANG_CHECK(parameterUsage->getUsedByteRange(0, 0, usedScalarVar, 0, &leafRange) == SLANG_OK);
-    SLANG_CHECK(leafRange.offset == 0);
-    SLANG_CHECK(leafRange.size == SLANG_UNBOUNDED_SIZE);
 
     auto globalVar = programLayout->getGlobalParamsVarLayout();
     SLANG_CHECK(globalVar != nullptr);
     SLANG_CHECK(
         globalVar->getTypeLayout()->getKind() == slang::TypeReflection::Kind::ConstantBuffer);
-    SLANG_CHECK(parameterUsage->getUsedByteRangeCount(0, 0, globalVar) == 1);
-    slang::UsedByteRange globalRange = {};
-    SLANG_CHECK(parameterUsage->getUsedByteRange(0, 0, globalVar, 0, &globalRange) == SLANG_OK);
+    SlangUInt globalSpace = 0;
+    SlangUInt globalRegister = 0;
+    getParentBindingLocation(globalVar, globalSpace, globalRegister);
+    SLANG_CHECK(parameterUsage->getUsedByteRangeCount(0, 0, globalSpace, globalRegister) == 1);
+    slang::ByteRange globalRange = {};
+    SLANG_CHECK(
+        parameterUsage->getUsedByteRange(0, 0, globalSpace, globalRegister, 0, &globalRange) ==
+        SLANG_OK);
     SLANG_CHECK(globalRange.offset == 0);
     SLANG_CHECK(globalRange.size == 4);
 }

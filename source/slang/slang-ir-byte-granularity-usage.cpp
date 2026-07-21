@@ -4,7 +4,7 @@
 // "for each global shader parameter that holds byte addressable uniform
 // storage, which byte ranges does any reachable code actually read?"
 //
-// The output feeds the byte range reflection API (IParameterUsage) and
+// The output feeds the byte range reflection API (IParameterByteRangeUsageInfo) and
 // the JSON reflection dump, which engines use to skip uploads or binds
 // for storage that the shader never touches.
 //
