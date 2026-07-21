@@ -4354,45 +4354,18 @@ void legalizeEntryPointParameterForGLSL(
             if (dec->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
                 continue;
             auto globalVar = dec->getOperand(0);
-            auto globalVarType = cast<IRPtrTypeBase>(globalVar->getDataType())->getValueType();
-            if (as<IRStructType>(globalVarType))
+            // Route by the scalarized shape, not by the global var's syntactic type:
+            // a struct scalarizes to a `tuple` whether standalone (`in triangle S s;`)
+            // or array-nested (`in triangle S arr[3];`), and both must be rewritten
+            // field-by-field via `tryReplaceUsesOfStageInput`.
+            if (globalValue.flavor == ScalarizedVal::Flavor::tuple)
             {
                 tryReplaceUsesOfStageInput(context, globalValue, globalVar);
             }
             else
             {
-
-                auto key = dec->getOperand(1);
                 IRInst* realGlobalVar = nullptr;
-
-                // When we relate a "global variable" to a "global parameter" using
-                // kIROp_GlobalVariableShadowingGlobalParameterDecoration, the globalValue flavor
-                // is dependent on the global parameter's type. Struct types for example will relate
-                // to the tuple flavor, while vector types will be related to the address flavor.
-                if (globalValue.flavor == ScalarizedVal::Flavor::tuple)
-                {
-                    if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
-                    {
-                        for (auto elem : tupleVal->elements)
-                        {
-                            if (elem.key == key)
-                            {
-                                realGlobalVar = elem.val.irValue;
-                                if (!realGlobalVar &&
-                                    ScalarizedVal::Flavor::typeAdapter == elem.val.flavor)
-                                {
-                                    if (auto typeAdapterVal =
-                                            as<ScalarizedTypeAdapterValImpl>(elem.val.impl))
-                                    {
-                                        realGlobalVar = typeAdapterVal->val.irValue;
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-                else if (globalValue.flavor == ScalarizedVal::Flavor::address)
+                if (globalValue.flavor == ScalarizedVal::Flavor::address)
                 {
                     realGlobalVar = globalValue.irValue;
                 }
@@ -4418,9 +4391,6 @@ void legalizeEntryPointParameterForGLSL(
                             }
                         }
                     });
-                // we will be replacing uses of `globalVarToReplace`. We need
-                // globalVarToReplaceNextUse to catch the next use before it is removed from the
-                // list of uses.
                 globalVar->replaceUsesWith(realGlobalVar);
                 globalVar->removeAndDeallocate();
             }
