@@ -1324,6 +1324,11 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(" constant*");
             return;
         }
+    case kIROp_PhysicalParamStorageType:
+        // `PhysicalParamStorage<T>` is a CUDA-family-only representation for forwarding a by-value
+        // kernel parameter's address; it is never produced for Metal and must not reach emit.
+        SLANG_UNEXPECTED("PhysicalParamStorage type emitted for Metal target");
+        break;
     case kIROp_PtrType:
     case kIROp_BorrowInOutParamType:
     case kIROp_OutParamType:

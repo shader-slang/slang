@@ -8,7 +8,8 @@ struct Big
     float v[64];
 }
 
-// `count`/`vec` are helper arguments so the CHECK-NOTs below are non-vacuous.
+// `count`/`vec` are passed by value into helpers so the positive call-site checks below actually
+// discriminate: a wrongly-broadened forward would turn them into `&count`/`&vec` there.
 [noinline]
 float readsum(Big b, uint count, uint i)
 {
@@ -35,8 +36,8 @@ void computeMain(
 }
 
 // CHECK: __global__ void computeMain(Big_0 {{[A-Za-z0-9_]+}}, uint {{[A-Za-z0-9_]+}}, float4 {{.*}}RWStructuredBuffer<float>{{.*}})
-// CHECK: readsum_0((&(big_0)), count_1
+// Only the aggregate is address-forwarded; the scalar and vector are passed by value. These
+// positive call-site checks are the discriminating guard: had the forward wrongly broadened to
+// scalars/vectors, the emitted argument would be `&count_1` / `&vec_0` and these matches would fail.
+// CHECK: readsum_0(&big_0, count_1
 // CHECK: readvec_0(vec_0
-// CHECK-NOT: (&(count_0))
-// CHECK-NOT: (&(count_1))
-// CHECK-NOT: (&(vec_0))

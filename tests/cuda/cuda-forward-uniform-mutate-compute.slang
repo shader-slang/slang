@@ -1,8 +1,12 @@
 // GPU-gated companion that NVRTC-compiles and runs the *mutation* path: a [noinline] helper that
-// "mutates" its by-value aggregate. The callee copies the pointee (`*b`) into a local and writes
-// that, so the forwarded address is only read; a forward that let a write reach the parameter's
-// storage (or otherwise miscompiled) fails here, not just in a source-emit FileCheck. Companions:
-// cuda-forward-uniform-mutated-copy.slang (emit shape), -forward-compute.slang (read-only). #11774.
+// "mutates" its by-value aggregate. This verifies the mutation path executes correctly through the
+// forward - the callee copies the pointee (`*b`) into a local, writes and reads that local, and the
+// numeric result is right - so a forward that miscompiled the copy-before-write would fail here, not
+// just in a source-emit FileCheck. (It does not attempt to detect a leaked cross-thread write: each
+// thread writes and reads its own lane, so the output would be [101..104] even if the writes aliased
+// shared storage; the no-write-reaches-storage property is guaranteed by the IR typing documented in
+// the transform, not by this data pattern.) Companions: cuda-forward-uniform-mutated-copy.slang (emit
+// shape), -forward-compute.slang (read-only). #11774.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -output-using-type -shaderobj
 

@@ -31,4 +31,4 @@ void computeMain(
 // CHECK: mutate_and_read_0(Big_0 * b_0
 // CHECK: Big_0 {{.*}} = *b_0;
 // CHECK: __global__ void computeMain(Big_0 big_0, StructuredBuffer<uint>
-// CHECK: mutate_and_read_0((&(big_0))
+// CHECK: mutate_and_read_0(&big_0

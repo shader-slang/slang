@@ -8,7 +8,7 @@
 
 // No whole-struct copy spilled before the forward; anchored on the type so reformatted spills trip it.
 // CHECK-NOT: Big_0 {{.*}}= [[BIG]]
-// CHECK: readsum_0((&([[BIG]]))
+// CHECK: readsum_0(&[[BIG]]
 
 struct Big
 {

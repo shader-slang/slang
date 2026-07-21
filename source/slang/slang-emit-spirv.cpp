@@ -2400,6 +2400,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 return emitOpTypeFloat(inst, SpvLiteralInteger::from32(int32_t(i.width)));
             }
+        case kIROp_PhysicalParamStorageType:
+            // `PhysicalParamStorage<T>` is a CUDA-family-only representation for forwarding a
+            // by-value kernel parameter's address; it is never produced for SPIR-V and must not
+            // reach emit.
+            SLANG_UNEXPECTED("PhysicalParamStorage type emitted for SPIR-V target");
+            break;
         case kIROp_PtrType:
         case kIROp_RefParamType:
         case kIROp_BorrowInParamType:
