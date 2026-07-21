@@ -411,14 +411,18 @@ void calcRequiredLoweringPassSet(
     // never call fwd_diff/bwd_diff (e.g. direct DifferentialPair use, or a no_diff type),
     // so mark autodiff here too; otherwise those passes would be skipped and autodiff IR
     // would survive into emission.
+    //
+    // These stay as base-class checks (not switch cases) because each spans several
+    // concrete opcodes; `as<Base>` keeps matching if a new leaf op is added under the
+    // base later. Single-opcode autodiff insts live in the switch below.
     if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst) ||
         as<IRDifferentialPairTypeBase>(inst) || as<IRMakeDifferentialPairBase>(inst) ||
         as<IRDifferentialPairGetDifferentialBase>(inst) ||
-        as<IRDifferentialPairGetPrimalBase>(inst) || as<IRDetachDerivative>(inst) ||
-        as<IRAnnotation>(inst))
+        as<IRDifferentialPairGetPrimalBase>(inst))
     {
         result.autodiff = true;
     }
+    // no_diff is an attribute payload, not a distinct opcode, so it needs findAttr.
     if (auto attrType = as<IRAttributedType>(inst))
     {
         if (attrType->findAttr<IRNoDiffAttr>())
@@ -497,6 +501,8 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetRegisterSpace:
         result.bindingQuery = true;
         break;
+    case kIROp_Annotation:
+    case kIROp_DetachDerivative:
     case kIROp_BackwardDifferentiate:
     case kIROp_ForwardDifferentiate:
     case kIROp_DiffTypeInfo:
