@@ -5,6 +5,16 @@
 # PCH header for tools that use slang core types
 set(SLANG_TOOLS_PCH ${slang_SOURCE_DIR}/source/core/slang-basic.h)
 
+# CMake adds /EHsc to CMAKE_CXX_FLAGS for MSVC, but render-test needs /EHa so that it can catch
+# structured exceptions raised by graphics drivers. Select the exception mode per target to avoid
+# passing both options to cl, which diagnoses the intentional override with warning D9025.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    string(REPLACE "/EHsc" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    add_compile_options(
+        "$<$<NOT:$<BOOL:$<TARGET_PROPERTY:SLANG_MSVC_ENABLE_ASYNC_EXCEPTIONS>>>:/EHsc>"
+    )
+endif()
+
 add_custom_target(
     all-generators
     COMMENT "meta target which depends on all generators"
@@ -409,6 +419,10 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         OUTPUT_NAME render-test-tool
         REQUIRED_BY slang-test
         FOLDER test/tools
+    )
+    set_target_properties(
+        render-test
+        PROPERTIES SLANG_MSVC_ENABLE_ASYNC_EXCEPTIONS TRUE
     )
 
     if(SLANG_HAS_WEBGPU_SUPPORT AND CMAKE_SYSTEM_NAME MATCHES "Linux|Darwin")
