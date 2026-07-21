@@ -2,6 +2,8 @@
 //TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -std 2026
 //TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -DVER_2026
 //TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -DVER_2026_2
+//TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -DVER_2027
+//TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -DVER_2027_2
 //TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -DVER_LATEST1
 //TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -DVER_LATEST2
 //TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv
@@ -15,6 +17,14 @@
 
 #ifdef VER_2026_2
 #language 2026
+#endif
+
+#ifdef VER_2027
+#language slang 2027
+#endif
+
+#ifdef VER_2027_2
+#language 2027
 #endif
 
 #ifdef VER_LATEST1
