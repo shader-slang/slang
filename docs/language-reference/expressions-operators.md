@@ -114,9 +114,9 @@ Description:
 
 The `&&` and `||` operators short-circuit when their operands are scalars: the right-hand operand is evaluated
 only when it can affect the result. That is, in `lhs && rhs`, `rhs` is evaluated only when `lhs` is `true`. In
-`lhs || rhs`, `rhs` is evaluated only when `lhs` is `false`. When the operands are vectors, `&&` and `||` do
-not short-circuit and evaluate both operands element-wise. Short-circuiting can be disabled globally with the
-`-disable-short-circuit` compiler option.
+`lhs || rhs`, `rhs` is evaluated only when `lhs` is `false`. When the operands are vectors or matrices, `&&`
+and `||` do not short-circuit and evaluate both operands element-wise. Short-circuiting can be disabled
+globally with the `-disable-short-circuit` compiler option.
 
 
 ### Comparison Operators (scalar)

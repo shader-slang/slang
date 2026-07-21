@@ -414,10 +414,10 @@ Slang supports the following expression forms with nearly identical syntax to HL
 > `false`, and in `a || b`, `b` is not evaluated when `a` is `true`. In `a ? b : c`, `b` is evaluated when
 > `a` is `true`, and otherwise, `c` is evaluated.
 >
-> However, when the operands are vectors, `&&` and `||` *do not* short-circuit. Instead, they evaluate both
-> operands unconditionally and combine them element-wise. The vector version of `?:` operator *does not*
-> perform short-circuiting, either. Use of `?:` where the condition is a vector is deprecated in Slang, and
-> the user is advised to call `select` instead.
+> However, when the operands are vectors or matrices, `&&` and `||` *do not* short-circuit. Instead, they
+> evaluate both operands unconditionally and combine them element-wise. The vector or matrix variant of the
+> `?:` operator *does not* perform short-circuiting, either. Use of `?:` where the condition is a vector or matrix
+> is deprecated in Slang, and the user is advised to call `select` instead.
 >
 > Short-circuiting for `&&` and `||` can be disabled globally with the `-disable-short-circuit` compiler
 > option.
