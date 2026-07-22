@@ -475,8 +475,7 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
         // maintain the default behavior and avoid multiple definition errors.
         auto func = as<IRFunc>(inst);
         const bool isLocalFuncDefinition =
-            func && isDefinition(func) &&
-            !func->findDecoration<IRCudaDeviceExportDecoration>();
+            func && isDefinition(func) && !func->findDecoration<IRCudaDeviceExportDecoration>();
         if (isRaytracingStage(m_entryPointStage) && isLocalFuncDefinition)
         {
             m_writer->emit("static ");

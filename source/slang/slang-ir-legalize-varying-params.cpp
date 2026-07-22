@@ -411,9 +411,7 @@ protected:
     Stage m_stage = Stage::Unknown;
 
 
-    virtual void processEntryPoint(
-        IRFunc* entryPointFunc,
-        IREntryPointDecoration* entryPointDecor)
+    virtual void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
     {
         m_entryPointFunc = entryPointFunc;
 
@@ -2158,18 +2156,15 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         return nullptr;
     }
 
-    void processEntryPoint(
-        IRFunc* entryPointFunc,
-        IREntryPointDecoration* entryPointDecor) SLANG_OVERRIDE
+    void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
+        SLANG_OVERRIDE
     {
         // OptiX direct-callable programs use the CUDA function-call ABI, so their signatures
         // should not undergo varying-parameter legalization.
         if (entryPointDecor->getProfile().getStage() == Stage::Callable)
             return;
 
-        EntryPointVaryingParamLegalizeContext::processEntryPoint(
-            entryPointFunc,
-            entryPointDecor);
+        EntryPointVaryingParamLegalizeContext::processEntryPoint(entryPointFunc, entryPointDecor);
     }
 
     void beginModuleImpl() SLANG_OVERRIDE
