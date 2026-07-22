@@ -1571,6 +1571,14 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
         // Call the render-test tool asking it only to startup a specified render api
         // (taking into account adapter options)
 
+        // Only the positive "Check <api>: Supported" lines are noise to hide below Info verbosity
+        // (e.g. `-v failure`); the "Not Supported" lines and the accompanying startup-failure
+        // stderr/stdout dump are always shown, since a missing backend explains why tests are
+        // skipped and is exactly what someone running `-v failure` needs to see. CI runs at default
+        // (Info) and greps this output, so gating only the positive line keeps CI detection
+        // working.
+        const bool showDiscovery = context->options.verbosity >= VerbosityLevel::Info;
+
         RenderApiFlags availableRenderApiFlags = 0;
         for (int i = 0; i < int(RenderApiType::CountOf); ++i)
         {
@@ -1589,9 +1597,10 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                         SLANG_PASS_THROUGH_GENERIC_C_CPP)))
                 {
                     availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
-                    StdWriters::getOut().print(
-                        "Check %s: Supported\n",
-                        RenderApiUtil::getApiName(apiType).begin());
+                    if (showDiscovery)
+                        StdWriters::getOut().print(
+                            "Check %s: Supported\n",
+                            RenderApiUtil::getApiName(apiType).begin());
                 }
                 else
                 {
@@ -1632,9 +1641,10 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                         ToolReturnCode::Success)
                 {
                     availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
-                    StdWriters::getOut().print(
-                        "Check %s: Supported\n",
-                        RenderApiUtil::getApiName(apiType).begin());
+                    if (showDiscovery)
+                        StdWriters::getOut().print(
+                            "Check %s: Supported\n",
+                            RenderApiUtil::getApiName(apiType).begin());
                 }
                 else
                 {
@@ -5393,7 +5403,7 @@ void runTestsInParallel(TestContext* context, int count, const F& f)
     auto threadFunc = [&](int threadId)
     {
         TestReporter reporter;
-        reporter.init(context->options.outputMode, context->options.expectedFailureList, true);
+        reporter.init(context->options, true);
         TestReporter::SuiteScope suiteScope(&reporter, "tests");
         context->setThreadIndex(threadId);
         context->setTestReporter(&reporter);
@@ -5843,12 +5853,13 @@ SlangResult innerMain(int argc, char** argv)
     // All following values are initialized to '0', so null.
     TestCategory* passThroughCategories[SLANG_PASS_THROUGH_COUNT_OF] = {nullptr};
 
-    // Work out what backends/pass-thrus are available
+    // Work out what backends/pass-thrus are available. This has to run before Options::parse below
+    // because `-category`/`-exclude <backend-name>` resolves against the categories registered
+    // here. The "Supported backends:" line, however, is informational and gated on verbosity, which
+    // is only known after the parse, so we accumulate it here and print it once options are parsed.
+    StringBuilder supportedBackends;
     {
         SlangSession* session = context.getSession();
-
-        auto out = StdWriters::getOut();
-        out.print("Supported backends:");
 
         for (int i = 0; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
         {
@@ -5871,11 +5882,13 @@ SlangResult innerMain(int argc, char** argv)
                 SLANG_ASSERT(passThroughCategories[i] == nullptr);
                 passThroughCategories[i] = categorySet.add(buf.getBuffer() + 1, fullTestCategory);
 
-                out.write(buf.getBuffer(), buf.getLength());
+                // Each token keeps its leading space (the `+ 1` above strips it only for the
+                // category name), so the joined line reads "Supported backends: a b". CI greps the
+                // literal "Supported backends: " (with the trailing space), so this is
+                // load-bearing.
+                supportedBackends << buf;
             }
         }
-
-        out.print("\n");
     }
 
     {
@@ -5928,6 +5941,13 @@ SlangResult innerMain(int argc, char** argv)
 
     Options& options = context.options;
 
+    // CI greps this at default (Info) verbosity, so suppress it only below Info (e.g. `-v
+    // failure`).
+    if (options.verbosity >= VerbosityLevel::Info)
+    {
+        StdWriters::getOut().print("Supported backends:%s\n", supportedBackends.getBuffer());
+    }
+
     context.setMaxTestRunnerThreadCount(options.serverCount);
 
     // Set up the prelude/s
@@ -5955,9 +5975,8 @@ SlangResult innerMain(int argc, char** argv)
     {
         // Create a TestReporter since _getAvailableRenderApiFlags may use it in verbose mode
         TestReporter reporter;
-        SLANG_RETURN_ON_FAIL(reporter.init(options.outputMode, options.expectedFailureList));
+        SLANG_RETURN_ON_FAIL(reporter.init(options));
         context.setTestReporter(&reporter);
-        reporter.m_verbosity = options.verbosity;
 
         _getAvailableRenderApiFlags(&context);
 
@@ -6041,13 +6060,9 @@ SlangResult innerMain(int argc, char** argv)
     {
         // Setup the reporter
         TestReporter reporter;
-        SLANG_RETURN_ON_FAIL(reporter.init(options.outputMode, options.expectedFailureList));
+        SLANG_RETURN_ON_FAIL(reporter.init(options));
 
         context.setTestReporter(&reporter);
-
-        reporter.m_dumpOutputOnFailure = options.dumpOutputOnFailure;
-        reporter.m_verbosity = options.verbosity;
-        reporter.m_hideIgnored = options.hideIgnored;
 
         {
             TestReporter::SuiteScope suiteScope(&reporter, "tests");
