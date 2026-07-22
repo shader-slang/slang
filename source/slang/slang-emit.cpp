@@ -2274,7 +2274,7 @@ Result linkAndOptimizeIR(
         if (targetProgram->getOptionSet().getBoolOption(
                 CompilerOptionName::EnableExperimentalPasses))
             SLANG_PASS(introduceExplicitGlobalContext, target);
-        SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
+        SLANG_PASS(transformParamsToConstRef, targetRequest, codeGenContext->getSink());
         break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
@@ -2292,10 +2292,7 @@ Result linkAndOptimizeIR(
         if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) ||
             isMetalTarget(targetRequest))
         {
-            SLANG_PASS(
-                transformParamsToConstRef,
-                codeGenContext->getSink(),
-                isCUDATarget(targetRequest));
+            SLANG_PASS(transformParamsToConstRef, targetRequest, codeGenContext->getSink());
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
         [[fallthrough]];

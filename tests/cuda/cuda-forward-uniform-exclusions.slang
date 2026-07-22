@@ -35,9 +35,10 @@ void computeMain(
         output[tid.x] = readsum(big, count, tid.x) + readvec(vec, tid.x % 4);
 }
 
-// CHECK: __global__ void computeMain(Big_0 {{[A-Za-z0-9_]+}}, uint {{[A-Za-z0-9_]+}}, float4 {{.*}}RWStructuredBuffer<float>{{.*}})
-// Only the aggregate is address-forwarded; the scalar and vector are passed by value. These
-// positive call-site checks are the discriminating guard: had the forward wrongly broadened to
-// scalars/vectors, the emitted argument would be `&count_1` / `&vec_0` and these matches would fail.
-// CHECK: readsum_0(&big_0, count_1
-// CHECK: readvec_0(vec_0
+// Capture the aggregate and vector parameter names so the call-site checks below reference the
+// exact same variables. Only the aggregate is address-forwarded (`&[[BIG_VAR]]`); the vector is
+// passed by value (`[[VEC_VAR]]`, no `&`). These positive checks are the discriminating guard: had
+// the forward wrongly broadened to vectors, `readvec_0` would emit `&[[VEC_VAR]]` and fail to match.
+// CHECK: __global__ void computeMain(Big_0 [[BIG_VAR:[A-Za-z0-9_]+]], uint {{[A-Za-z0-9_]+}}, float4 [[VEC_VAR:[A-Za-z0-9_]+]]{{.*}}RWStructuredBuffer<float>{{.*}})
+// CHECK: readsum_0(&[[BIG_VAR]], count_1
+// CHECK: readvec_0([[VEC_VAR]],
