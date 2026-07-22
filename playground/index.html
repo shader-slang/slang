@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>Slang Playground</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1" />
+  <meta name="description"
+    content="Interactive playground for experimenting with Slang shading language. Write, compile, and visualize shader code in real-time." />
+  <meta name="keywords" content="Slang, shader, WebGPU, graphics programming, code playground, real-time rendering" />
+  <link rel="icon" type="image/png" href="/images/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/images/favicon.svg" />
+  <link rel="shortcut icon" href="/images/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png" />
+  <link href="src/assets/styles.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/jsontree/jsontree.js.css">
+  <script type="module" src="/jsontree/jsontree.min.js"></script>
+  <script type="module" src="src/main.ts"></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-TMTZVLLMBP"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-TMTZVLLMBP');
+  </script>
+</head>
+
+<body>
+  <div id="app">
+    <div id="loading-screen">
+        <img height="80px" src="./src/assets/slang-logo.svg" alt="Slang Logo" />
+        <div id="loading-status-line">
+            <div class="spinner"></div>
+            <p class="loading-status" id="loadingStatusLabel">Loading Playground...</p>
+        </div>
+        <div id="progress-bar-container">
+            <div class="progress-bar"></div>
+        </div>
+    </div>
+  </div>
+</body>
+
+</html>
