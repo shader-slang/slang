@@ -1288,32 +1288,41 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;
 
-    GLSLResourceReturnFunctionInliningPass(IRModule* module)
-        : Super(module)
+    // When true, only the `groupshared`-by-reference parameter case triggers inlining; the
+    // GLSL-specific resource-return / illegal-parameter-type cases are skipped. WGSL uses this
+    // mode: it can represent resources fine, but baseline WGSL cannot take a `ptr<workgroup, ...>`
+    // as a function parameter, so a `groupshared`-by-reference parameter must still be inlined
+    // away.
+    bool m_groupSharedByRefOnly = false;
+
+    GLSLResourceReturnFunctionInliningPass(IRModule* module, bool groupSharedByRefOnly)
+        : Super(module), m_groupSharedByRefOnly(groupSharedByRefOnly)
     {
     }
 
     bool shouldInline(CallSiteInfo const& info)
     {
-        if (isResourceType(info.callee->getResultType()))
+        if (!m_groupSharedByRefOnly && isResourceType(info.callee->getResultType()))
         {
             return true;
         }
         for (auto param : info.callee->getParams())
         {
-            if (isIllegalGLSLParameterType(param->getDataType()))
+            if (!m_groupSharedByRefOnly && isIllegalGLSLParameterType(param->getDataType()))
                 return true;
             // A `groupshared` value passed by reference becomes a pointer parameter into
-            // the `Workgroup` storage class, which the Khronos backends cannot represent
-            // as a function parameter (GLSL has no pointers, and a SPIR-V `Workgroup`
-            // pointer cannot legally cross a function boundary without the
-            // `VariablePointers` capability). The `groupshared`-ness lives on the
-            // parameter's rate (`IRGroupSharedRate`), not on its value type, so the
-            // value-type checks above never catch it. Inline the callee so the parameter
-            // disappears and the accesses fall directly on the `Workgroup` global,
+            // the `Workgroup` storage class, which neither the Khronos backends nor WGSL can
+            // represent as a function parameter (GLSL has no pointers, a SPIR-V `Workgroup`
+            // pointer cannot legally cross a function boundary without the `VariablePointers`
+            // capability, and baseline WGSL lacks `ptr<workgroup>` parameters). The
+            // `groupshared`-ness lives on the parameter's rate (`IRGroupSharedRate`), not on its
+            // value type, so the value-type checks above never catch it. Inline the callee so the
+            // parameter disappears and the accesses fall directly on the `Workgroup` global,
             // mirroring how resource parameters are handled here.
             if (as<IRGroupSharedRate>(param->getRate()))
                 return true;
+            if (m_groupSharedByRefOnly)
+                continue;
             auto outType = as<IROutParamTypeBase>(param->getDataType());
             if (!outType)
                 continue;
@@ -1325,9 +1334,12 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
     }
 };
 
-void performGLSLResourceReturnFunctionInlining(IRModule* module, TargetProgram* targetProgram)
+void performGLSLResourceReturnFunctionInlining(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    bool groupSharedByRefOnly)
 {
-    GLSLResourceReturnFunctionInliningPass pass(module);
+    GLSLResourceReturnFunctionInliningPass pass(module, groupSharedByRefOnly);
     bool changed = true;
 
     while (changed)
