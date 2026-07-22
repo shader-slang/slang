@@ -21281,13 +21281,24 @@ DeclVisibility getDeclVisibility(Decl* decl)
         else if (as<PrivateModifier>(modifier))
             return DeclVisibility::Private;
     }
+    // In Slang 2026+, an unmodified member of an aggregate inherits the aggregate's effective
+    // visibility, mirroring the interface-member rule below. Keyed off effective visibility so it
+    // composes transitively through nested aggregates.
+    auto parentModule = getModuleDecl(decl);
+    if (parentModule && parentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+    {
+        if (auto parentAggTypeDecl = getParentAggTypeDecl(decl))
+        {
+            return getDeclVisibility(parentAggTypeDecl);
+        }
+    }
     // Interface members will always have the same visibility as the interface itself.
     if (auto interfaceDecl = findParentInterfaceDecl(decl))
     {
         return getDeclVisibility(interfaceDecl);
     }
     auto defaultVis = DeclVisibility::Default;
-    if (auto parentModule = getModuleDecl(decl))
+    if (parentModule)
     {
         defaultVis = parentModule->languageVersion == SLANG_LANGUAGE_VERSION_LEGACY
                          ? DeclVisibility::Public
