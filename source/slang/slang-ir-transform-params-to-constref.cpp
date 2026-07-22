@@ -19,12 +19,12 @@ struct TransformParamsToConstRefContext
     // When set (CUDA only), a call argument that is an entry-point by-value uniform aggregate
     // parameter is forwarded by address instead of via a temporary copy. See the header comment on
     // `transformParamsToConstRef`.
-    bool forwardEntryPointUniformAddress = false;
+    bool forwardEntryPointUniformAddress;
 
     TransformParamsToConstRefContext(
         IRModule* module,
         DiagnosticSink* sink,
-        bool forwardEntryPointUniformAddress = false)
+        bool forwardEntryPointUniformAddress)
         : module(module)
         , sink(sink)
         , builder(module)
@@ -262,12 +262,6 @@ struct TransformParamsToConstRefContext
             // actually transform - not an indirect call, and not a
             // signature-preserving/untransformable callee; by this late pass such shapes are
             // specialized away, but gate on them rather than assume it.
-            //
-            // This `return false` (fall back to the temp-copy path) has no FileCheck regression:
-            // an indirect call or a function-value use is specialized/inlined away before this CUDA
-            // pass runs, so a CUDA compute kernel cannot spell an aggregate that reaches a
-            // non-transformable callee at source level. The guard is defense-in-depth against a
-            // future pipeline change that let such a shape survive.
             auto callee = as<IRFunc>(call->getCallee());
             if (!callee || !shouldProcessFunction(callee) || hasSignaturePreservingUse(callee))
                 return false;
@@ -601,7 +595,10 @@ SlangResult transformParamsToConstRef(
 struct EntryPointInParamToBorrowContext : public TransformParamsToConstRefContext
 {
     EntryPointInParamToBorrowContext(IRModule* module, DiagnosticSink* sink)
-        : TransformParamsToConstRefContext(module, sink)
+        : TransformParamsToConstRefContext(
+              module,
+              sink,
+              /* forwardEntryPointUniformAddress */ false)
     {
     }
     virtual bool shouldProcessFunction(IRFunc* func) override
