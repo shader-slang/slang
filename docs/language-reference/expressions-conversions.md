@@ -64,7 +64,7 @@ the behavior is [undefined](basics-behavior.md).
 > from literal 0 to a user-defined [structure](types-struct.md) type. This is equivalent to initializing the
 > structure with a default initializer.
 >
-> The special semantics are removed from Slang 2027. In Slang 2027, a cast from literal 0 is a regular
+> The special semantics are removed in Slang 2027. In Slang 2027, a cast from literal 0 is a regular
 > conversion, and it invokes the single-argument initializer of the target type.
 >
 > ```hlsl
