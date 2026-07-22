@@ -10,20 +10,28 @@
 // the same as conversion from value zero. That is, the same as
 // invocation of __init(0).
 
+// 2025 - no warning about (S)0
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_2025_2026): -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_2025_2026):-cpu -shaderobj -output-using-type
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK2026): -shaderobj -output-using-type -xslang -Wno-30087
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK2026):-cpu -shaderobj -output-using-type -xslang -Wno-30087
+// 2026 - warn about (S)0  (semantics change in 2027)
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_2025_2026): -shaderobj -output-using-type -xslang -Wno-30087 -xslang -DSLANG2026=1
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_2025_2026):-cpu -shaderobj -output-using-type -xslang -Wno-30087 -xslang -DSLANG2026=1
 
+// 2027 - verify that the semantics changed
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK2027): -shaderobj -output-using-type -xslang -DSLANG2027=1
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK2027):-cpu -shaderobj -output-using-type -xslang -DSLANG2027=1
 
-//TEST:SIMPLE(filecheck=WARNCHECK2026): -no-codegen -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=WARNCHECK2025): -no-codegen -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=WARNCHECK2026): -no-codegen -stage compute -entry computeMain -DSLANG2026=1
 //TEST:SIMPLE(filecheck=WARNCHECK2027): -no-codegen -stage compute -entry computeMain -DSLANG2027=1
 
-#ifdef SLANG2027
+#if defined(SLANG2027)
 #language 2027
-#else
+#elif defined(SLANG2026)
 #language 2026
+#else
+#language 2025
 #endif
 
 struct S
@@ -62,19 +70,19 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     gOutputBuffer[6U * tid.x + 5U] = s.c.y;
 }
 
-//CHECK2026: int32_t
-//CHECK2026-NEXT: 1
-//CHECK2026-NEXT: 2
-//CHECK2026-NEXT: 0
-//CHECK2026-NEXT: 0
-//CHECK2026-NEXT: 0
-//CHECK2026-NEXT: 0
-//CHECK2026-NEXT: 1
-//CHECK2026-NEXT: 1
-//CHECK2026-NEXT: 0
-//CHECK2026-NEXT: 0
-//CHECK2026-NEXT: 0
-//CHECK2026-NEXT: 0
+//CHECK_2025_2026: int32_t
+//CHECK_2025_2026-NEXT: 1
+//CHECK_2025_2026-NEXT: 2
+//CHECK_2025_2026-NEXT: 0
+//CHECK_2025_2026-NEXT: 0
+//CHECK_2025_2026-NEXT: 0
+//CHECK_2025_2026-NEXT: 0
+//CHECK_2025_2026-NEXT: 1
+//CHECK_2025_2026-NEXT: 1
+//CHECK_2025_2026-NEXT: 0
+//CHECK_2025_2026-NEXT: 0
+//CHECK_2025_2026-NEXT: 0
+//CHECK_2025_2026-NEXT: 0
 
 //CHECK2027: int32_t
 //CHECK2027-NEXT: 0
@@ -89,6 +97,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK2027-NEXT: 0
 //CHECK2027-NEXT: 0
 //CHECK2027-NEXT: 0
+
+//WARNCHECK2025: result code = 0
+//WARNCHECK2025-NOT: warning[E30087]
+//WARNCHECK2025: standard output = {
 
 //WARNCHECK2026: result code = 0
 //WARNCHECK2026: warning[E30087]

@@ -7463,15 +7463,15 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                         initListExpr->useCStyleInitialization = false;
                         auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
 
-                        // For regular structs (i.e., anything the user
-                        // defines), warn that cast from literal 0 changes
-                        // semantics.
+                        // In Slang 2026 mode, warn that a cast from literal 0
+                        // changes semantics for regular structs (i.e., anything
+                        // that the user defines).
                         //
-                        // We don't warn about cast from zero to core module
-                        // types (e.g., float, vector, etc). The default
+                        // We don't warn about casts from literal 0 to core
+                        // module types (e.g., float, vector, etc). The default
                         // initializers of these types have the zeroing
                         // semantics.
-                        if (!isFromCoreModule(structDeclRef.getDecl()))
+                        if (isSlang2026OrLater(this) && !isFromCoreModule(structDeclRef.getDecl()))
                             getSink()->diagnose(
                                 Diagnostics::DeprecatedStructCastFromZero{.expr = expr});
 

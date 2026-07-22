@@ -48,6 +48,8 @@ Slang language version 2026 brings these changes on top of Slang 2025:
   in GLSL source code for compatibility reasons.
 - Interface-typed variables can no longer be default-initialized. See GitHub issue
   [#9191](https://github.com/shader-slang/slang/issues/9191) for details.
+- Casting a literal `0` to a user-defined struct type (e.g., `(MyStruct)0`) triggers a warning about future
+  compatibility (see _Slang 2027_).
 
 ## Slang 2027
 
@@ -55,5 +57,5 @@ Slang language version 2027 brings these changes on top of Slang 2026:
 
 - Casting a literal `0` to a user-defined struct type (e.g., `(MyStruct)0`) has lost its special meaning, and
   it is now a regular conversion. To maintain the previous semantics, a constructor call with no arguments can
-  be used, instead (e.g., `MyStruct()`). See GitHub issue
+  be used instead (e.g., `MyStruct()`). See GitHub issue
   [#12045](https://github.com/shader-slang/slang/issues/12045) for details.
