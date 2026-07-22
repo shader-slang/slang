@@ -24201,7 +24201,8 @@ struct HitObject
     __glsl_extension(GL_NV_cluster_acceleration_structure)
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(cuda_glsl_nvapiHitObjects, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl, ser_raygen_closesthit_miss)]
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     [require(spirv, spvShaderInvocationReorderNV)]
     int GetClusterID()
     {

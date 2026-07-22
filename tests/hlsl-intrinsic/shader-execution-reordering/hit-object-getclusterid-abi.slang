@@ -1,8 +1,6 @@
-// Coverage for the new cuda_glsl_nvapiHitObjects require alias (#11903 / #11997): GetClusterID is
-// an NVAPI/SPIRV/CUDA extension with no native DXR 1.3 arm, so on HLSL it is reachable only through
-// the explicit nvapiHitObjects opt-in (its require is `cuda_glsl_nvapiHitObjects`, i.e.
-// cuda | glsl | nvapiHitObjects). Confirm the HLSL path emits the NVAPI `.GetClusterID` accessor on
-// an NvHitObject, and never a native dx::HitObject.
+// GetClusterID is an NVAPI/SPIRV/CUDA extension with no native DXR 1.3 arm, so on HLSL it is
+// reachable only through the explicit nvapiHitObjects opt-in. Confirm the HLSL path emits the NVAPI
+// `.GetClusterID` accessor on an NvHitObject, and never a native dx::HitObject.
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile sm_6_5 -entry main -stage raygeneration -capability nvapiHitObjects
 

@@ -1180,6 +1180,9 @@ Compound Capabilities
 `cpp_llvm`
 > CPP and LLVM code-gen targets
 
+`cuda_glsl`
+> CUDA and GLSL code-gen targets.
+
 `cuda_glsl_hlsl`
 > CUDA, GLSL, and HLSL code-gen targets
 
@@ -1209,11 +1212,6 @@ Compound Capabilities
 
 `cuda_glsl_nvapi`
 > CUDA, GLSL, and NVAPI code-gen targets
-
-`cuda_glsl_nvapiHitObjects`
-> CUDA, GLSL, and explicit-NVAPI-HitObject code-gen targets. Like cuda_glsl_nvapi but the HLSL
-> disjunct requires the explicit nvapiHitObjects opt-in, so NVAPI-only HitObject operations
-> (e.g. cluster queries) are available on HLSL only when NVAPI was requested.
 
 `cuda_glsl_spirv`
 > CUDA, GLSL, and SPIRV code-gen targets

@@ -407,11 +407,9 @@ alias cuda_glsl_hlsl = cuda | glsl | hlsl;
 /// [Compound]
 alias cuda_glsl_nvapi = cuda | glsl | hlsl_nvapi;
 
-/// CUDA, GLSL, and explicit-NVAPI-HitObject code-gen targets. Like cuda_glsl_nvapi but the HLSL
-/// disjunct requires the explicit nvapiHitObjects opt-in, so NVAPI-only HitObject operations
-/// (e.g. cluster queries) are available on HLSL only when NVAPI was requested.
+/// CUDA and GLSL code-gen targets.
 /// [Compound]
-alias cuda_glsl_nvapiHitObjects = cuda | glsl | nvapiHitObjects;
+alias cuda_glsl = cuda | glsl;
 
 /// CUDA, HLSL, Metal, and SPIRV code-gen targets
 /// [Compound]

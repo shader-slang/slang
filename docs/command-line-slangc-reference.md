@@ -1511,7 +1511,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cpp_hlsl` 
 * `cuda_glsl_hlsl` 
 * `cuda_glsl_nvapi` 
-* `cuda_glsl_nvapiHitObjects` 
+* `cuda_glsl` 
 * `cuda_hlsl_metal_spirv` 
 * `cuda_glsl_hlsl_spirv` 
 * `cuda_glsl_hlsl_spirv_llvm` 
