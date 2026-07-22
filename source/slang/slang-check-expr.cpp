@@ -7471,7 +7471,7 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                         // types (e.g., float, vector, etc). The default
                         // initializers of these types have the zeroing
                         // semantics.
-                        if (!isFromCoreModule(declRefType->getDeclRef().getDecl()))
+                        if (!isFromCoreModule(structDeclRef.getDecl()))
                             getSink()->diagnose(
                                 Diagnostics::DeprecatedStructCastFromZero{.expr = expr});
 
