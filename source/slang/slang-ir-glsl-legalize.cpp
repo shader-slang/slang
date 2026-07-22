@@ -4354,10 +4354,15 @@ void legalizeEntryPointParameterForGLSL(
             if (dec->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
                 continue;
             auto globalVar = dec->getOperand(0);
-            // Route by the scalarized shape, not by the global var's syntactic type:
-            // a struct scalarizes to a `tuple` whether standalone (`in triangle S s;`)
-            // or array-nested (`in triangle S arr[3];`), and both must be rewritten
-            // field-by-field via `tryReplaceUsesOfStageInput`.
+            // Route by the scalarized shape, not by the proxy var's syntactic type.
+            // A struct scalarizes to a `tuple` whether standalone (`in triangle S s;`)
+            // or array-nested (`in triangle S arr[3];`); the array-nested proxy var has
+            // array type even though its scalarized value is a tuple, so a syntactic
+            // type test does not identify the tuple case. `tryReplaceUsesOfStageInput`
+            // rewrites a tuple structurally (by array element, then by field), so it
+            // handles both, and it leaves the dead proxy var and its stores for later
+            // DCE — unlike the `address` branch below, which splices and deallocates the
+            // proxy explicitly.
             if (globalValue.flavor == ScalarizedVal::Flavor::tuple)
             {
                 tryReplaceUsesOfStageInput(context, globalValue, globalVar);
@@ -4370,6 +4375,10 @@ void legalizeEntryPointParameterForGLSL(
                     realGlobalVar = globalValue.irValue;
                 }
                 else
+                    // Other flavors (e.g. a top-level `typeAdapter` for a
+                    // type-adapted system value) had their uses rewritten by the
+                    // `tryReplaceUsesOfStageInput(context, globalValue, pp)` call above,
+                    // so there is nothing to splice here.
                     continue;
                 SLANG_ASSERT(realGlobalVar);
 
