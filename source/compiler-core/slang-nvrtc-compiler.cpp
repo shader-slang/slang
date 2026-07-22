@@ -1340,7 +1340,8 @@ SlangResult NVRTCDownstreamCompiler::compile(
     //
     if (options.pipelineType == PipelineType::RayTracing)
     {
-        // Generate relocatable PTX so NVRTC retains OptiX direct-callable device functions.
+        // OptiX requires this flag (OptiX Programming Guide, section 6.1). It prevents the compiler
+        // from removing callables as dead code.
         cmdLine.addArg("--relocatable-device-code=true");
 
         if (SLANG_FAILED(_maybeAddOptixSupport(options, cmdLine, diagnostics)))
