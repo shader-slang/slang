@@ -2065,7 +2065,8 @@ public float texture(samplerCubeShadow sampler, vec4 p, float bias)
     }
 }
 
-[require(glsl_hlsl_spirv, texture_shadowlod)]
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl_hlsl_spirv, texture_shadowgrad)]
 [ForceInline]
 public float texture(samplerCubeArrayShadow sampler, vec4 location, float compareValue, float bias)
 {
@@ -2075,15 +2076,19 @@ public float texture(samplerCubeArrayShadow sampler, vec4 location, float compar
     __requireComputeDerivative();
     __target_switch
     {
-    case glsl: __intrinsic_asm "texture";
+    case glsl:
+        // texture(samplerCubeArrayShadow, P, compare, bias) is added by GL_EXT_texture_shadow_lod.
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "texture";
     case spirv:
         return spirv_asm
         {
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
         };
     default:
-        // TODO: Need to apply bias
-        return sampler.SampleCmp(location, compareValue);
+        // The require is glsl_hlsl_spirv and glsl/spirv are handled above, so HLSL is the
+        // only target reaching here; apply the bias via SampleCmpBias.
+        return sampler.SampleCmpBias(location, compareValue, bias);
     }
 }
 

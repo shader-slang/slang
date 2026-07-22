@@ -1016,7 +1016,7 @@ float __glsl_shadow_lod_texture_level_offset<TSampler, TCoord, TOffset>(TSampler
 // So the grad wrappers never require the extension, and only the *_ext bias wrappers do.
 
 // Core (no extension): texture(sampler, P, bias) for the GLSL-1.50 baseline shadow types.
-[require(glsl, texture_shadowlod)]
+[require(glsl, texture_shadowgrad)]
 float __glsl150_texture_bias<TSampler, TCoord>(TSampler s, TCoord value, float bias)
 {
     __target_switch
@@ -1027,7 +1027,7 @@ float __glsl150_texture_bias<TSampler, TCoord>(TSampler s, TCoord value, float b
 
 // Extension: texture(sampler2DArrayShadow, vec4 P, float bias). Added by GL_EXT_texture_shadow_lod.
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
+[require(glsl, texture_shadowgrad)]
 float __glsl_shadow_lod_texture_bias<TSampler, TCoord>(TSampler s, TCoord value, float bias)
 {
     __target_switch
@@ -1042,7 +1042,7 @@ float __glsl_shadow_lod_texture_bias<TSampler, TCoord>(TSampler s, TCoord value,
 // value is a separate argument here (the coordinate is already a full vec4), unlike the other
 // forms where it is packed into the coordinate vector.
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
+[require(glsl, texture_shadowgrad)]
 float __glsl_shadow_lod_texture_bias_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float compare, float bias)
 {
     __target_switch
@@ -1055,7 +1055,7 @@ float __glsl_shadow_lod_texture_bias_cube_array_shadow<TSampler, TCoord>(TSample
 
 // Core (no extension): textureOffset(sampler, P, offset, bias) for the GLSL-1.50 baseline types.
 // Note the GLSL argument order is (sampler, P, offset, bias) — offset precedes bias.
-[require(glsl, texture_shadowlod)]
+[require(glsl, texture_shadowgrad)]
 float __glsl150_texture_bias_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset, float bias)
 {
     __target_switch
@@ -1066,7 +1066,7 @@ float __glsl150_texture_bias_offset<TSampler, TCoord, TOffset>(TSampler s, TCoor
 
 // Extension: textureOffset(sampler2DArrayShadow, vec4 P, ivec2 offset, float bias).
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
+[require(glsl, texture_shadowgrad)]
 float __glsl_shadow_lod_texture_bias_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset, float bias)
 {
     __target_switch
@@ -1079,7 +1079,7 @@ float __glsl_shadow_lod_texture_bias_offset<TSampler, TCoord, TOffset>(TSampler 
 
 // Core (no extension): textureGrad(sampler, P, dPdx, dPdy). All shadow-sampler gradient forms
 // we emit are core GLSL, so there is no extension-requiring gradient wrapper.
-[require(glsl, texture_shadowlod)]
+[require(glsl, texture_shadowgrad)]
 float __glsl150_texture_grad<TSampler, TCoord, TGrad>(TSampler s, TCoord value, TGrad gradX, TGrad gradY)
 {
     __target_switch
@@ -1089,7 +1089,7 @@ float __glsl150_texture_grad<TSampler, TCoord, TGrad>(TSampler s, TCoord value, 
 }
 
 // Core (no extension): textureGradOffset(sampler, P, dPdx, dPdy, offset).
-[require(glsl, texture_shadowlod)]
+[require(glsl, texture_shadowgrad)]
 float __glsl150_texture_grad_offset<TSampler, TCoord, TGrad, TOffset>(TSampler s, TCoord value, TGrad gradX, TGrad gradY, constexpr TOffset offset)
 {
     __target_switch
@@ -1224,7 +1224,7 @@ float __glsl_shadow_lod_texture_level_offset<TTexture, TCoord, TOffset>(TTexture
 // core (__glsl150_*) vs GL_EXT_texture_shadow_lod (__glsl_shadow_lod_*) capability split.
 
 // Core (no extension): texture(sampler, P, bias).
-[require(glsl, texture_shadowlod)]
+[require(glsl, texture_shadowgrad)]
 float __glsl150_texture_bias<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float bias)
 {
     __target_switch
@@ -1235,7 +1235,7 @@ float __glsl150_texture_bias<TTexture, TCoord>(TTexture t, SamplerComparisonStat
 
 // Extension: texture(sampler2DArrayShadow, vec4 P, float bias).
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
+[require(glsl, texture_shadowgrad)]
 float __glsl_shadow_lod_texture_bias<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float bias)
 {
     __target_switch
@@ -1248,7 +1248,7 @@ float __glsl_shadow_lod_texture_bias<TTexture, TCoord>(TTexture t, SamplerCompar
 
 // Extension: texture(samplerCubeArrayShadow, vec4 P, float compare, float bias) — compare separate.
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
+[require(glsl, texture_shadowgrad)]
 float __glsl_shadow_lod_texture_bias_cube_array_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float compare, float bias)
 {
     __target_switch
@@ -1260,7 +1260,7 @@ float __glsl_shadow_lod_texture_bias_cube_array_shadow<TTexture, TCoord>(TTextur
 }
 
 // Core (no extension): textureOffset(sampler, P, offset, bias).
-[require(glsl, texture_shadowlod)]
+[require(glsl, texture_shadowgrad)]
 float __glsl150_texture_bias_offset<TTexture, TCoord, TOffset>(TTexture t, SamplerComparisonState s, TCoord value, constexpr TOffset offset, float bias)
 {
     __target_switch
@@ -1271,7 +1271,7 @@ float __glsl150_texture_bias_offset<TTexture, TCoord, TOffset>(TTexture t, Sampl
 
 // Extension: textureOffset(sampler2DArrayShadow, vec4 P, ivec2 offset, float bias).
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
+[require(glsl, texture_shadowgrad)]
 float __glsl_shadow_lod_texture_bias_offset<TTexture, TCoord, TOffset>(TTexture t, SamplerComparisonState s, TCoord value, constexpr TOffset offset, float bias)
 {
     __target_switch
@@ -1283,7 +1283,7 @@ float __glsl_shadow_lod_texture_bias_offset<TTexture, TCoord, TOffset>(TTexture 
 }
 
 // Core (no extension): textureGrad(sampler, P, dPdx, dPdy).
-[require(glsl, texture_shadowlod)]
+[require(glsl, texture_shadowgrad)]
 float __glsl150_texture_grad<TTexture, TCoord, TGrad>(TTexture t, SamplerComparisonState s, TCoord value, TGrad gradX, TGrad gradY)
 {
     __target_switch
@@ -1293,7 +1293,7 @@ float __glsl150_texture_grad<TTexture, TCoord, TGrad>(TTexture t, SamplerCompari
 }
 
 // Core (no extension): textureGradOffset(sampler, P, dPdx, dPdy, offset).
-[require(glsl, texture_shadowlod)]
+[require(glsl, texture_shadowgrad)]
 float __glsl150_texture_grad_offset<TTexture, TCoord, TGrad, TOffset>(TTexture t, SamplerComparisonState s, TCoord value, TGrad gradX, TGrad gradY, constexpr TOffset offset)
 {
     __target_switch
@@ -2132,6 +2132,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             // baseline shapes to the no-extension wrapper and only the two array-of-2D/cube shapes
             // to the extension wrappers, so we never emit GL_EXT_texture_shadow_lod for the baseline
             // forms. sampler1DShadow's coordinate is padded to vec3.
+            //
+            // Combined shadow samplers only ever have __Shape1D/__Shape2D/__ShapeCube, and __ShapeCube
+            // reports dimensions == 3 (there is no 3D shadow sampler), so the dimensions == 3 branch
+            // below is the cube / cube-array case.
             if (Shape.dimensions == 1)
             {
                 if (isArray == 0)
@@ -3632,6 +3636,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             // Same core-vs-extension split as the combined-sampler SampleCmpBias: texture(P, bias)
             // is core for 1D/1DArray/2D/Cube shadow samplers; GL_EXT_texture_shadow_lod adds only
             // the 2DArray and CubeArray variants. sampler1DShadow's coordinate is padded to vec3.
+            // Shadow samplers are only 1D/2D/Cube (no 3D shadow), and __ShapeCube reports
+            // dimensions == 3, so the dimensions == 3 branch below is the cube / cube-array case.
             if (Shape.dimensions == 1)
             {
                 if (isArray == 0)
