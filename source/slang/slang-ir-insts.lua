@@ -398,12 +398,6 @@ local insts = {
 							-- the `IRPtrTypeBase` accessors (so `getValueType()` etc. work); the builder
 							-- always fixes them to Read / Generic / default-layout and they are not meant
 							-- to vary.
-							--
-							-- Adding this type bumps `k_maxSupportedModuleVersion` in `slang-ir.h`, per the
-							-- "new instruction added" rule there (the version tracks IR semantics, not the
-							-- serialization format). In practice this op is only produced inside
-							-- `linkAndOptimizeIR` target codegen, after front-end IR serialization, so a
-							-- serialized module never actually carries it.
 							struct_name = "PhysicalParamStorageType",
 							operands = {
 								{ "valueType", "IRType" },

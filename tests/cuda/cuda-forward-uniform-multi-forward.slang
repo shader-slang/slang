@@ -38,7 +38,7 @@ void computeMain(
 }
 
 // Kernel ABI unchanged: the aggregate is still a plain by-value kernel argument.
-// CHECK: __global__ void computeMain(Big_0 [[BIG:big_0]], StructuredBuffer<uint>
+// CHECK: __global__ void computeMain(Big_0 [[BIG:big_[0-9]*]], StructuredBuffer<uint>
 
 // The inline read goes through one load of the parameter, not the pointer.
 // CHECK: Big_0 {{[A-Za-z0-9_]+}} = [[BIG]];

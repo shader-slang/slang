@@ -3388,10 +3388,6 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRRefParamType* getRefParamType(IRType* valueType, AddressSpace addrSpace);
     IRBorrowInParamType* getBorrowInParamType(IRType* valueType, AddressSpace addrSpace);
-    // Only `valueType` is meaningful on the resulting `IRPhysicalParamStorageType`. Its inherited
-    // `IRPtrTypeBase` access-qualifier / address-space / layout operands are fixed placeholders
-    // (Read / Generic / default-layout) for structural compatibility only - do not read
-    // `getAddressSpace()` etc. off it expecting a real value.
     IRPhysicalParamStorageType* getPhysicalParamStorageType(IRType* valueType);
     IRPtrType* getPtrType(
         IROp op,

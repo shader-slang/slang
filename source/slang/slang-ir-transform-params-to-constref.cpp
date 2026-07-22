@@ -7,6 +7,8 @@
 namespace Slang
 {
 
+bool isCUDATarget(TargetRequest* targetReq);
+
 struct TransformParamsToConstRefContext
 {
     IRModule* module;
@@ -260,6 +262,12 @@ struct TransformParamsToConstRefContext
             // actually transform - not an indirect call, and not a
             // signature-preserving/untransformable callee; by this late pass such shapes are
             // specialized away, but gate on them rather than assume it.
+            //
+            // This `return false` (fall back to the temp-copy path) has no FileCheck regression:
+            // an indirect call or a function-value use is specialized/inlined away before this CUDA
+            // pass runs, so a CUDA compute kernel cannot spell an aggregate that reaches a
+            // non-transformable callee at source level. The guard is defense-in-depth against a
+            // future pipeline change that let such a shape survive.
             auto callee = as<IRFunc>(call->getCallee());
             if (!callee || !shouldProcessFunction(callee) || hasSignaturePreservingUse(callee))
                 return false;
@@ -579,9 +587,13 @@ struct TransformParamsToConstRefContext
 
 SlangResult transformParamsToConstRef(
     IRModule* module,
-    DiagnosticSink* sink,
-    bool forwardEntryPointUniformAddress)
+    TargetRequest* targetReq,
+    DiagnosticSink* sink)
 {
+    // The entry-point uniform address-forward (the #11774 fix) is specific to how CUDA lowers a
+    // by-value kernel parameter, so it is enabled only for the CUDA family. Other targets keep the
+    // temp-copy path, leaving their codegen unchanged.
+    const bool forwardEntryPointUniformAddress = isCUDATarget(targetReq);
     TransformParamsToConstRefContext context(module, sink, forwardEntryPointUniformAddress);
     return context.processModule();
 }

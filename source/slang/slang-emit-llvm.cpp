@@ -299,6 +299,13 @@ public:
                 llvmType = builder->getVectorType(elemCount, elemType);
             }
             break;
+        case kIROp_PhysicalParamStorageType:
+            // `PhysicalParamStorage<T>` is a CUDA-family-only representation for forwarding a
+            // by-value kernel parameter's address; the transform produces it only for CUDA, never
+            // for the LLVM (CPU) target, so it must not reach emit here.
+            SLANG_UNEXPECTED("PhysicalParamStorage type emitted for LLVM target");
+            break;
+
         // TODO: atomics
         default:
             // Matrices and CoopVectors & CoopMatrices are already lowered into
