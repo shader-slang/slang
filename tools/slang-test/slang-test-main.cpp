@@ -2154,7 +2154,7 @@ TestResult runDocTest(TestContext* context, TestInput& input)
     }
 
     _initSlangCompiler(context, cmdLine);
-    SlangTest::addDefaultSlangOptimization(cmdLine);
+    SlangTest::addDefaultSlangOptimization(cmdLine, context->options.defaultOptimizationLevel);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -2282,7 +2282,7 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
             cmdLine.addArg(arg);
         }
     }
-    SlangTest::addDefaultSlangOptimization(cmdLine);
+    SlangTest::addDefaultSlangOptimization(cmdLine, context->options.defaultOptimizationLevel);
     ExecuteResult exeRes;
 
     // TODO(Yong) HACK:
@@ -2696,7 +2696,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         return TestResult::Ignored;
     }
     // Keep compiler-based tests on the default optimization level unless a test opts out.
-    SlangTest::addDefaultSlangOptimization(cmdLine);
+    SlangTest::addDefaultSlangOptimization(cmdLine, context->options.defaultOptimizationLevel);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -2759,7 +2759,7 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
     {
         cmdLine.addArg(arg);
     }
-    SlangTest::addDefaultSlangOptimization(cmdLine);
+    SlangTest::addDefaultSlangOptimization(cmdLine, context->options.defaultOptimizationLevel);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -2918,7 +2918,7 @@ TestResult runCompile(TestContext* context, TestInput& input)
             cmdLine.addArg(arg);
         }
     }
-    SlangTest::addDefaultSlangOptimization(cmdLine);
+    SlangTest::addDefaultSlangOptimization(cmdLine, context->options.defaultOptimizationLevel);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -2957,7 +2957,9 @@ TestResult runCompileTarget(TestContext* context, TestInput& input)
     }
 
     cmdLine.addArg("-compile-only");
-    SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+    SlangTest::addDefaultRenderTestSlangOptimization(
+        cmdLine,
+        context->options.defaultOptimizationLevel);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3033,7 +3035,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
     {
         cmdLine.addArg(arg);
     }
-    SlangTest::addDefaultSlangOptimization(cmdLine);
+    SlangTest::addDefaultSlangOptimization(cmdLine, context->options.defaultOptimizationLevel);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3129,7 +3131,7 @@ static TestResult runCPPCompilerCompile(TestContext* context, TestInput& input)
     {
         cmdLine.addArg(arg);
     }
-    SlangTest::addDefaultSlangOptimization(cmdLine);
+    SlangTest::addDefaultSlangOptimization(cmdLine, context->options.defaultOptimizationLevel);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3489,7 +3491,9 @@ static TestResult generateExpectedOutput(
     {
         expectedCmdLine.addArg(arg);
     }
-    SlangTest::addDefaultSlangOptimization(expectedCmdLine);
+    SlangTest::addDefaultSlangOptimization(
+        expectedCmdLine,
+        context->options.defaultOptimizationLevel);
 
     ExecuteResult expectedExeRes;
     TEST_RETURN_ON_DONE(
@@ -3536,7 +3540,9 @@ TestResult generateActualOutput(
     {
         actualCmdLine.addArg(arg);
     }
-    SlangTest::addDefaultSlangOptimization(actualCmdLine);
+    SlangTest::addDefaultSlangOptimization(
+        actualCmdLine,
+        context->options.defaultOptimizationLevel);
 
     ExecuteResult actualExeRes;
     TEST_RETURN_ON_DONE(
@@ -3654,7 +3660,7 @@ TestResult generateHLSLBaseline(
     cmdLine.addArg(targetFormat);
     cmdLine.addArg("-pass-through");
     cmdLine.addArg(passThroughName);
-    SlangTest::addDefaultSlangOptimization(cmdLine);
+    SlangTest::addDefaultSlangOptimization(cmdLine, context->options.defaultOptimizationLevel);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3714,7 +3720,7 @@ static TestResult _runHLSLComparisonTest(
 
     cmdLine.addArg("-target");
     cmdLine.addArg(targetFormat);
-    SlangTest::addDefaultSlangOptimization(cmdLine);
+    SlangTest::addDefaultSlangOptimization(cmdLine, context->options.defaultOptimizationLevel);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3802,7 +3808,7 @@ TestResult doGLSLComparisonTestRun(
     {
         cmdLine.addArg(arg);
     }
-    SlangTest::addDefaultSlangOptimization(cmdLine);
+    SlangTest::addDefaultSlangOptimization(cmdLine, context->options.defaultOptimizationLevel);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3956,7 +3962,9 @@ TestResult runPerformanceProfile(TestContext* context, TestInput& input)
     {
         cmdLine.addArg(arg);
     }
-    SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+    SlangTest::addDefaultRenderTestSlangOptimization(
+        cmdLine,
+        context->options.defaultOptimizationLevel);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -4127,7 +4135,9 @@ TestResult runComputeComparisonImpl(
     cmdLine.addArg("-o");
     auto actualOutputFile = outputStem + ".actual.txt";
     cmdLine.addArg(actualOutputFile);
-    SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+    SlangTest::addDefaultRenderTestSlangOptimization(
+        cmdLine,
+        context->options.defaultOptimizationLevel);
 
     if (context->isExecuting())
     {
@@ -4232,7 +4242,9 @@ TestResult doRenderComparisonTestRun(
     cmdLine.addArg(langOption);
     cmdLine.addArg("-o");
     cmdLine.addArg(outputStem + outputKind + ".png");
-    SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+    SlangTest::addDefaultRenderTestSlangOptimization(
+        cmdLine,
+        context->options.defaultOptimizationLevel);
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
