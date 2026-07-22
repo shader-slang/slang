@@ -373,6 +373,11 @@ struct CompilerOptionSet
         return getBoolOption(CompilerOptionName::EmitSeparateDebug);
     }
 
+    bool shouldIncludeSourceInDebugInfo()
+    {
+        return getBoolOption(CompilerOptionName::DebugInfoIncludeSource);
+    }
+
     bool shouldEmitRichDiagnostics()
     {
         return getBoolOption(CompilerOptionName::EnableRichDiagnostics);
