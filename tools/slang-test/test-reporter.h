@@ -13,6 +13,7 @@
 
 // Forward declaration
 enum class VerbosityLevel;
+struct Options;
 
 enum class TestOutputMode
 {
@@ -113,10 +114,11 @@ public:
 
     void outputSummary();
 
-    SlangResult init(
-        TestOutputMode outputMode,
-        const Slang::HashSet<Slang::String>& expectedFailureList,
-        bool isSubReporter = false);
+    /// Configure the reporter from the parsed command-line options. Both the single-run and the
+    /// per-worker parallel reporters go through this one path so that all reporter configuration
+    /// derived from `Options` (output mode, verbosity, dump-on-failure, hide-ignored, and the
+    /// expected-failure list) can never drift between them.
+    SlangResult init(const Options& options, bool isSubReporter = false);
 
     /// Ctor
     TestReporter();
