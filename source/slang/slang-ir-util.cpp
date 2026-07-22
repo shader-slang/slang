@@ -3433,4 +3433,20 @@ IRType* getWorkGraphRecordElementType(IRType* type)
     return nullptr;
 }
 
+bool isBindlessTextureNVEncodableResourceType(IRType* type)
+{
+    auto unwrapped = unwrapAttributedType(type);
+    return as<IRTextureType>(unwrapped) || as<IRSamplerStateTypeBase>(unwrapped);
+}
+
+bool isDescriptorHandleRepresentedAsUInt64(IRInst* descriptorHandleType, bool hasBindlessTextureNV)
+{
+    if (!hasBindlessTextureNV)
+        return false;
+    auto handleType = as<IRDescriptorHandleType>(descriptorHandleType);
+    if (!handleType)
+        return false;
+    return isBindlessTextureNVEncodableResourceType(handleType->getResourceType());
+}
+
 } // namespace Slang

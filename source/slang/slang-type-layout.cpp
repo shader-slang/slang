@@ -103,6 +103,17 @@ void _typeLayout_keepFunctions()
     SLANG_UNUSED(b);
 }
 
+// True if a `DescriptorHandle<elementType>` is represented as `uint64` rather than `uint2` under
+// `spvBindlessTextureNV`. This is the AST-side mirror of the IR classifier
+// `isBindlessTextureNVEncodableResourceType`: only the texture/sampler-family kinds the extension
+// can convert use the wide form, so layout and reflection agree with emission. `Buffer<T>` /
+// `RWBuffer<T>` are `TextureType` (buffer shape) and so are included; constant/structured buffers
+// and acceleration structures are not and stay `uint2`.
+static bool _isBindlessTextureNVUInt64ElementType(Type* elementType)
+{
+    return as<TextureType>(elementType) || as<SamplerStateType>(elementType);
+}
+
 // Given a Type returns the equivalent ShaderParameterKind
 static ShaderParameterKind _getShaderParameterKindForResourceType(Type* type)
 {
@@ -474,13 +485,13 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         Type* elementType,
         const TypeLayoutContext& context) override
     {
-        SLANG_UNUSED(elementType);
-
-        // Check if SPIRV with spvBindlessTextureNV extension is enabled
+        // Under spvBindlessTextureNV only the texture/sampler kinds the extension converts are
+        // represented as uint64; buffers and acceleration structures stay on the default (uint2)
+        // layout, matching the SPIR-V type emission.
         if (context.targetReq &&
-            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV) &&
+            _isBindlessTextureNVUInt64ElementType(elementType))
         {
-            // For spvBindlessTextureNV, DescriptorHandle<T> is represented as uint64_t
             auto uint64Info = GetScalarLayout(BaseType::UInt64, context);
             return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint64Info.size, uint64Info.alignment));
         }
@@ -5684,9 +5695,12 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     {
         maybePromoteDescriptorHandleCapability(context.targetReq);
 
-        // For spvBindlessTextureNV, DescriptorHandle<T> has the layout of uint64_t
+        // Under spvBindlessTextureNV only the texture/sampler kinds the extension converts have the
+        // layout of uint64; buffers and acceleration structures stay uint2 (below), matching the
+        // SPIR-V type emission.
         if (context.targetReq &&
-            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV) &&
+            _isBindlessTextureNVUInt64ElementType(resPtrType->getElementType()))
         {
             auto uint64Type = context.astBuilder->getUInt64Type();
             return _createTypeLayout(context, uint64Type);
