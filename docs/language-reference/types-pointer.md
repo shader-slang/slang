@@ -68,8 +68,9 @@ See [pointer traits](#traits).
 The pointer declaration `*` applied to a base type creates a pointer type. The base type may be
 any [addressable](types-traits.md) type including pointer and [array](types-array.md) types.
 
-To obtain the address of an object, the *address-of* operator `&` is used. The address may be assigned to a
-pointer variable with a matching type. Alternatively, `__getAddress(obj)` may be used.
+Pointer values are obtained from pointer-typed shader parameters (such as constant buffer fields) or by
+performing pointer arithmetic on an existing pointer. There is no address-of operator that takes the address
+of an arbitrary object.
 
 To access the *pointed-to* object, the pointer dereference operator `*` is used. If the pointed-to type is a
 [structure](types-struct.md) or a [class](types-class.md) type, the member access operators `.` or `->` may be
@@ -97,23 +98,23 @@ For a comprehensive description, see [pointer expressions (TODO)](expressions.md
 > 📝 **Remark 1:** Currently, there are no `const` pointers in Slang. Pointers to read-only data and immutable
 > data may be declared with [generic pointer types](#generic-pointer).
 
-> 📝 **Remark 2:** Consider the following pointer arithmetic:
+> 📝 **Remark 2:** Consider the following pointer arithmetic, where `g_data` is a pointer obtained from a
+> shader parameter (e.g., a constant buffer field) referencing an array of at least 10 elements:
 >
 > ```hlsl
-> var arr : uint[10] = { };
 > var ptr : uint *;
 >
-> ptr = &arr[9]; // OK: ptr points to the last element
->                // of the array
+> ptr = g_data + 9; // OK: ptr points to the last element
+>                   // of the referenced array
 >
-> ptr++;         // Still OK: ptr points to one past the
->                // last element
+> ptr++;            // Still OK: ptr points to one past the
+>                   // last element
 >
-> ptr++;         // Pointer is now invalid
+> ptr++;            // Pointer is now invalid
 >
-> ptr--;         // No validity guarantees with invalid
->                // pointers in pointer expressions;
->                // dereferencing would be undefined behavior
+> ptr--;            // No validity guarantees with invalid
+>                   // pointers in pointer expressions;
+>                   // dereferencing would be undefined behavior
 > ```
 
 
@@ -168,6 +169,6 @@ void main(uint3 id : SV_DispatchThreadID)
     // the input data buffer is big enough.
     outputBuffer[id.x] +=
         sumOfValues(
-            g_inputData, &g_inputData[min(g_inputDataLen, 10)]);
+            g_inputData, g_inputData + min(g_inputDataLen, 10));
 }
 ```

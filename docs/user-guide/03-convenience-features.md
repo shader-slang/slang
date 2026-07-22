@@ -555,7 +555,7 @@ struct MyType
 int test(MyType* pObj)
 {
     MyType* pNext = pObj + 1;
-    MyType* pNext2 = &pNext[1];
+    MyType* pNext2 = pNext + 1;
     return pNext.a + pNext->a + (*pNext2).a + pNext2[0].a;
 }
 
@@ -567,13 +567,6 @@ cbuffer Constants
 int validTest()
 {
     return test(ptr);
-}
-
-int invalidTest()
-{
-    // cannot produce a pointer from a local variable
-    MyType obj;
-    return test(&obj); // !! ERROR !!
 }
 ```
 
@@ -589,7 +582,9 @@ declaring pointers to read-only and immutable values, and pointers to address sp
 
 - Slang supports pointers that are defined as shader parameters (e.g. as a constant buffer field).
 
-- Slang can produce pointers using the & operator from data in global memory.
+- Pointer values are obtained from pointer-typed shader parameters or by performing pointer arithmetic on
+  an existing pointer. Slang does not provide an address-of operator that takes the address of an arbitrary
+  object.
 
 - Slang doesn't support forming pointers to opaque handle types, e.g. `Texture2D`. For handle pointers, use `DescriptorHandle<T>` instead.
 
