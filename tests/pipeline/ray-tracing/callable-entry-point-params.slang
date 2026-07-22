@@ -6,10 +6,14 @@
 //TEST:SIMPLE(filecheck=CUDA_INOUT): -target cuda -entry callableInOut -stage callable
 
 // DXC requires callable payload parameters to be `inout`, while SPIR-V and CUDA also support
-// `out`. Keep the latter cases here to cover both mutable-parameter legalization paths.
+// `out`. Keep the latter cases here to cover both mutable parameter forms.
 //TEST:SIMPLE(filecheck=SPIRV_OUT): -target spirv-assembly -entry callableOut -stage callable -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=SPIRV_OUT): -target spirv -entry callableOut -stage callable
 //TEST:SIMPLE(filecheck=CUDA_OUT): -target cuda -entry callableOut -stage callable
+
+// Compile Callable and compute entry points together. The Callable payload must retain its pointer
+// parameter, while the compute SV_DispatchThreadID parameter must still lower to CUDA built-ins.
+//TEST:SIMPLE(filecheck=CUDA_MIXED): -target cuda
 
 struct Payload
 {
@@ -30,6 +34,11 @@ void callableOut(out Payload payload)
     payload.value = 2;
 }
 
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+{}
+
 // SPIRV_INOUT: OpEntryPoint Callable{{NV|KHR}}
 // SPIRV_INOUT-DAG: OpTypePointer IncomingCallableData{{NV|KHR}}
 // SPIRV_INOUT-DAG: OpVariable %{{.*}} IncomingCallableData{{NV|KHR}}
@@ -45,3 +54,7 @@ void callableOut(out Payload payload)
 
 // CUDA_OUT-LABEL: extern "C" __device__ void __direct_callable__callableOut(
 // CUDA_OUT-SAME: Payload_0 * payload_0)
+
+// CUDA_MIXED-LABEL: extern "C" __device__ void __direct_callable__callableInOut(
+// CUDA_MIXED-SAME: Payload_0 * payload_0)
+// CUDA_MIXED-LABEL: extern "C" __global__ void computeMain()
