@@ -17,6 +17,9 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK2027): -shaderobj -output-using-type -xslang -DSLANG2027=1
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK2027):-cpu -shaderobj -output-using-type -xslang -DSLANG2027=1
 
+//TEST:SIMPLE(filecheck=WARNCHECK2026): -no-codegen -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=WARNCHECK2027): -no-codegen -stage compute -entry computeMain -DSLANG2027=1
+
 #ifdef SLANG2027
 #language 2027
 #else
@@ -34,7 +37,7 @@ S test(int val)
 {
     if (val == 0)
     {
-        S s = (S)0;
+        S s = (S)0; // triggers warning E30087 on Slang 2026
         return s;
     }
     else
@@ -86,3 +89,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK2027-NEXT: 0
 //CHECK2027-NEXT: 0
 //CHECK2027-NEXT: 0
+
+//WARNCHECK2026: result code = 0
+//WARNCHECK2026: warning[E30087]
+//WARNCHECK2026: standard output = {
+
+//WARNCHECK2027: result code = 0
+//WARNCHECK2027-NOT: warning[E30087]
+//WARNCHECK2027: standard output = {
