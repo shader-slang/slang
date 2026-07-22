@@ -1,8 +1,8 @@
 // https://github.com/shader-slang/slang/issues/2189
 // See also ./c-style-cast-coerce.slang which represents the essence of this bug
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj -xslang -std -xslang 2026 -xslang -wno-30087
-//TEST(compute):COMPARE_COMPUTE: -shaderobj -vulkan -xslang -std -xslang 2026 -xslang -wno-30087
+//TEST(compute):COMPARE_COMPUTE: -shaderobj -xslang -std -xslang 2026 -xslang -Wno-30087
+//TEST(compute):COMPARE_COMPUTE: -shaderobj -vulkan -xslang -std -xslang 2026 -xslang -Wno-30087
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
