@@ -488,6 +488,8 @@ bool isInternalCapabilityName(CapabilityName name);
 
 CapabilityAtom getLatestSpirvAtom();
 CapabilityAtom getLatestMetalAtom();
+CapabilityAtom getLatestHlslAtom();
+CapabilityAtom getLatestGlslAtom();
 
 /// For debug purposes ensure a casted CapabilityAtom is valid
 template<typename T>
@@ -505,9 +507,17 @@ UnownedStringSlice capabilityNameToString(CapabilityName name);
 bool isDirectChildOfAbstractAtom(CapabilityAtom name);
 bool isStageAtom(CapabilityName name, CapabilityName& outCanonicalStage);
 
-/// Return true if `name` represents an atom for a target version, e.g. spirv_1_5.
 bool isTargetVersionAtom(CapabilityAtom name);
+bool isSpirvVersionAtom(CapabilityAtom name);
 bool isSpirvExtensionAtom(CapabilityAtom name);
+
+/// True if any `-capability` in `requestedCapabilities` would raise the emitted target version of
+/// `targetVersionFamily` above what `profileCaps` pins; false when `profileCaps` pins no version of
+/// that family. Mirrors the capability fold in `TargetRequest::getTargetCaps()`.
+bool doRequestedCapabilitiesRaiseTargetVersionAboveProfile(
+    const CapabilitySet& profileCaps,
+    const List<CapabilityName>& requestedCapabilities,
+    CapabilityAtom targetVersionFamily);
 
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);

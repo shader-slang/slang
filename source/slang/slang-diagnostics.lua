@@ -320,6 +320,12 @@ warning("same-profile-specified-more-than-once", 40, "the '~profile' was specifi
 err("conflicting-profiles-specified-for-target", 41, "conflicting profiles have been specified for target '~target'")
 
 err(
+    "conflicting-explicit-capability-and-profile",
+    46,
+    "a requested '-capability' requires a higher target version than the explicitly requested profile '~profile'; specify a higher '-profile' or remove the conflicting '-capability'"
+)
+
+err(
     "profile-specification-ignored-because-no-targets",
     42,
     "a '-profile' option was specified, but no target was specified with '-target'"

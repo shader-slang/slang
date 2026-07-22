@@ -144,18 +144,95 @@ bool isStageAtom(CapabilityName name, CapabilityName& outCanonicalStage)
     }
 }
 
+bool isSpirvVersionAtom(CapabilityAtom name)
+{
+    return name >= CapabilityAtom::_spirv_1_0 && name <= getLatestSpirvAtom();
+}
+
+static bool isMetalVersionAtom(CapabilityAtom name)
+{
+    return name >= CapabilityAtom::metallib_2_3 && name <= getLatestMetalAtom();
+}
+
+static bool isHlslVersionAtom(CapabilityAtom name)
+{
+    return name >= CapabilityAtom::_sm_4_0 && name <= getLatestHlslAtom();
+}
+
+static bool isGlslVersionAtom(CapabilityAtom name)
+{
+    return name >= CapabilityAtom::_GLSL_130 && name <= getLatestGlslAtom();
+}
+
 bool isTargetVersionAtom(CapabilityAtom name)
 {
-    if (name >= CapabilityAtom::_spirv_1_0 && name <= getLatestSpirvAtom())
-        return true;
-    if (name >= CapabilityAtom::metallib_2_3 && name <= getLatestMetalAtom())
-        return true;
-    return false;
+    return isSpirvVersionAtom(name) || isMetalVersionAtom(name) || isHlslVersionAtom(name) ||
+           isGlslVersionAtom(name);
+}
+
+static bool isSameTargetVersionFamily(CapabilityAtom a, CapabilityAtom b)
+{
+    return (isSpirvVersionAtom(a) && isSpirvVersionAtom(b)) ||
+           (isMetalVersionAtom(a) && isMetalVersionAtom(b)) ||
+           (isHlslVersionAtom(a) && isHlslVersionAtom(b)) ||
+           (isGlslVersionAtom(a) && isGlslVersionAtom(b));
 }
 
 bool isSpirvExtensionAtom(CapabilityAtom name)
 {
-    return _getInfo(name).name.startsWith("SPV_");
+    UnownedStringSlice atomName = _getInfo(name).name;
+    if (atomName.startsWith("SPV_"))
+        return true;
+    return atomName.startsWith("spv") && atomName.getLength() > 3 && atomName[3] >= 'A' &&
+           atomName[3] <= 'Z';
+}
+
+// Highest version atom in `capabilities` belonging to `family`'s target-version family, or
+// `Invalid` if none.
+static CapabilityAtom getHighestTargetVersionAtomInFamily(
+    const CapabilitySet& capabilities,
+    CapabilityAtom family)
+{
+    SLANG_ASSERT(isTargetVersionAtom(family));
+    CapabilityAtom highest = CapabilityAtom::Invalid;
+    for (auto& atomSet : capabilities.getAtomSets())
+    {
+        for (auto atomVal : atomSet)
+        {
+            CapabilityAtom atom = asAtom(atomVal);
+            if (!isSameTargetVersionFamily(atom, family))
+                continue;
+            if (highest == CapabilityAtom::Invalid || atom > highest)
+                highest = atom;
+        }
+    }
+    return highest;
+}
+
+bool doRequestedCapabilitiesRaiseTargetVersionAboveProfile(
+    const CapabilitySet& profileCaps,
+    const List<CapabilityName>& requestedCapabilities,
+    CapabilityAtom targetVersionFamily)
+{
+    CapabilityAtom selectedVersion =
+        getHighestTargetVersionAtomInFamily(profileCaps, targetVersionFamily);
+    if (selectedVersion == CapabilityAtom::Invalid)
+        return false;
+
+    // Fold each capability one at a time with the same guard `getTargetCaps()` uses, rather than
+    // pre-joining them: a single incompatible atom would otherwise invalidate the whole set and
+    // mask a compatible atom's version raise.
+    CapabilitySet combined = profileCaps;
+    for (auto capabilityName : requestedCapabilities)
+    {
+        CapabilitySet capabilitySet(capabilityName);
+        if (!combined.isIncompatibleWith(capabilitySet))
+            combined.join(capabilitySet);
+    }
+
+    CapabilityAtom emittedVersion =
+        getHighestTargetVersionAtomInFamily(combined, targetVersionFamily);
+    return emittedVersion != CapabilityAtom::Invalid && emittedVersion > selectedVersion;
 }
 
 bool lookupCapabilityName(const UnownedStringSlice& str, CapabilityName& value);
@@ -201,6 +278,29 @@ CapabilityAtom getLatestMetalAtom()
             latestMetalCapSetElements[latestMetalCapSetElements.getCount() - 2]); //-1 gets shader
                                                                                   // stage
     }
+    return result;
+}
+
+// Latest version atom of a target family, read from its `_*_latest` capdef alias rather than a
+// hard-coded top. The atom set is sorted, so the last element is the shader-stage atom and the
+// element before it is the highest version atom — the same read `getLatestSpirvAtom`/
+// `getLatestMetalAtom` perform for their families.
+static CapabilityAtom getLatestVersionAtomOfFamily(CapabilityName latestAlias)
+{
+    CapabilitySet latestCapSet = CapabilitySet(latestAlias);
+    auto elements = latestCapSet.getAtomSets()->getElements<CapabilityAtom>();
+    return asAtom(elements[elements.getCount() - 2]); // -1 is the shader stage
+}
+
+CapabilityAtom getLatestHlslAtom()
+{
+    static CapabilityAtom result = getLatestVersionAtomOfFamily(CapabilityName::_sm_latest);
+    return result;
+}
+
+CapabilityAtom getLatestGlslAtom()
+{
+    static CapabilityAtom result = getLatestVersionAtomOfFamily(CapabilityName::_GLSL_latest);
     return result;
 }
 

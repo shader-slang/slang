@@ -4467,6 +4467,67 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     .target =
                         TypeTextUtil::getCompileTargetName(SlangCompileTarget(rawTarget.format))});
             }
+
+            // Reject a `-capability` that raises the emitted version above what an explicit
+            // `-profile` pins. Only run when the profile's family matches the target's version
+            // family: a cross-family profile (e.g. `glsl_450` on a SPIR-V target) contributes
+            // version atoms that would misread as a pin, wrongly flagging `-profile
+            // glsl_450+spirv_1_4`.
+            Profile profile = rawTarget.optionSet.getProfile();
+            CapabilityAtom targetVersionFamily = CapabilityAtom::Invalid;
+            switch (profile.getFamily())
+            {
+            case ProfileFamily::SPIRV:
+                // `isSPIRV`, not `isKhronosTarget`: the GLSL text target emits no SPIR-V version.
+                if (isSPIRV(rawTarget.format))
+                    targetVersionFamily = CapabilityAtom::_spirv_1_0;
+                break;
+            case ProfileFamily::METAL:
+                if (isMetalTarget(rawTarget.format))
+                    targetVersionFamily = CapabilityAtom::metallib_2_3;
+                break;
+            case ProfileFamily::DX:
+                if (isD3DTarget(rawTarget.format))
+                    targetVersionFamily = CapabilityAtom::_sm_4_0;
+                break;
+            case ProfileFamily::GLSL:
+                if (rawTarget.format == CodeGenTarget::GLSL)
+                    targetVersionFamily = CapabilityAtom::_GLSL_130;
+                break;
+            default:
+                break;
+            }
+            if (!rawTarget.conflictingProfilesSet && targetVersionFamily != CapabilityAtom::Invalid)
+            {
+                // Collect the explicit `-capability` atoms, then ask once whether — folded in the
+                // way `getTargetCaps()` folds them — they raise the emitted target version above
+                // what the profile pins.
+                List<CapabilityName> requestedCapabilities;
+                for (auto atomVal : rawTarget.optionSet.getArray(CompilerOptionName::Capability))
+                {
+                    CapabilityName capabilityName = CapabilityName::Invalid;
+                    switch (atomVal.kind)
+                    {
+                    case CompilerOptionValueKind::Int:
+                        capabilityName = CapabilityName(atomVal.intValue);
+                        break;
+                    case CompilerOptionValueKind::String:
+                        capabilityName = findCapabilityName(atomVal.stringValue.getUnownedSlice());
+                        break;
+                    }
+                    if (capabilityName != CapabilityName::Invalid)
+                        requestedCapabilities.add(capabilityName);
+                }
+
+                if (doRequestedCapabilitiesRaiseTargetVersionAboveProfile(
+                        profile.getCapabilityName(),
+                        requestedCapabilities,
+                        targetVersionFamily))
+                {
+                    m_sink->diagnose(Diagnostics::ConflictingExplicitCapabilityAndProfile{
+                        .profile = profile.getName()});
+                }
+            }
         }
 
         // `-spirv-unified-descriptor-heap-stride` and an explicit non-zero
