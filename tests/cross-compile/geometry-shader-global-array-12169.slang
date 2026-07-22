@@ -24,11 +24,16 @@ in triangle CoarseVertex coarseVertices[3];
 // SPIRV-DAG: %coarseVertices_position = OpVariable %{{.*}} Input
 // SPIRV-DAG: %outputStream_position = OpVariable %{{.*}} Output
 // The indexed read must access-chain into the input array, load that element,
-// and store it to the output — the capture chain binds the loaded value to the
-// stored value so a broken data flow fails the test.
-// SPIRV: %[[PTR:[0-9]+]] = OpAccessChain %{{.*}} %coarseVertices_position %{{[0-9]+}}
+// and feed it to the output. The capture chain follows the value end to end:
+// input element -> v.position -> reload of v -> extract -> output store, so a
+// broken data flow fails the test.
+// SPIRV: %[[DST:[0-9]+]] = OpAccessChain %_ptr_Function_v4float %v %int_0
+// SPIRV: %[[PTR:[0-9]+]] = OpAccessChain %_ptr_Input_v4float %coarseVertices_position %{{[0-9]+}}
 // SPIRV: %[[VAL:[0-9]+]] = OpLoad %v4float %[[PTR]]
-// SPIRV: OpStore %outputStream_position %[[VAL]]
+// SPIRV: OpStore %[[DST]] %[[VAL]]
+// SPIRV: %[[RV:[0-9]+]] = OpLoad %RasterVertex %v
+// SPIRV: %[[OUT:[0-9]+]] = OpCompositeExtract %v4float %[[RV]] 0
+// SPIRV: OpStore %outputStream_position %[[OUT]]
 
 // GLSL: in vec4 {{.*}}coarseVertices_position{{[0-9_]*}}[3];
 // GLSL: layout(triangles) in;
