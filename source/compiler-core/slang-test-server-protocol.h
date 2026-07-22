@@ -7,6 +7,21 @@
 #include "slang-json-value.h"
 #include "slang.h"
 
+// WARNING: Protocol/layout compatibility
+// These structs define the serialized test-server protocol used between test-server and
+// external clients/pre-built binaries (for example, VK-GL-CTS).
+//
+// These headers and the JSON native RTTI generated from them are also compiled into some external
+// clients. For those clients, the C++ field list/layout and RTTI field order jointly define the
+// array-style JSON schema they send and receive. Do not add, remove, rename, reorder, or change
+// existing fields without first updating and releasing all pre-built clients that include this
+// header.
+//
+// Marking a field Optional in RTTI is not enough when an older binary was built with the previous
+// struct layout.
+//
+// The VK-GL-CTS nightly CI workflow will fail if this protocol compatibility is broken.
+
 namespace TestServerProtocol
 {
 
