@@ -3,6 +3,7 @@
 
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-string-util.h"
+#include "slang-test-optimization-options.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,6 +87,8 @@ static bool _isSubCommand(const char* arg)
         "  -skip-api-detection            Skip API availability detection\n"
         "  -only-api-detection            Only run API detection and print results, then exit\n"
         "  -server-count <n>              Set number of test servers (default: 1)\n"
+        "  -OX                            Set the default slangc optimization level for tests,\n"
+        "                                 where X is between 0 and 3\n"
         "  -show-adapter-info             Show detailed adapter information\n"
         "  -generate-hlsl-baselines       Generate HLSL test baselines\n"
         "  -skip-reference-image-generation Skip generating reference images for render tests\n"
@@ -372,6 +375,10 @@ static bool _isSubCommand(const char* arg)
             {
                 optionsOut->serverCount = 1;
             }
+        }
+        else if (SlangTest::isSlangTestOptimizationArg(UnownedStringSlice(arg)))
+        {
+            optionsOut->defaultOptimizationLevel = arg;
         }
         else if (strcmp(arg, "-appveyor") == 0)
         {
