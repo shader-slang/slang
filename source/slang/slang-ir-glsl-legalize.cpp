@@ -4355,14 +4355,14 @@ void legalizeEntryPointParameterForGLSL(
                 continue;
             auto globalVar = dec->getOperand(0);
             // Route by the scalarized shape, not by the proxy var's syntactic type.
-            // A struct scalarizes to a `tuple` whether standalone (`in triangle S s;`)
-            // or array-nested (`in triangle S arr[3];`); the array-nested proxy var has
-            // array type even though its scalarized value is a tuple, so a syntactic
-            // type test does not identify the tuple case. `tryReplaceUsesOfStageInput`
-            // rewrites a tuple structurally (by array element, then by field), so it
-            // handles both, and it leaves the dead proxy var and its stores for later
-            // DCE — unlike the `address` branch below, which splices and deallocates the
-            // proxy explicitly.
+            // A struct scalarizes to a `tuple` whether standalone or array-nested
+            // (`in triangle S arr[3];`); the array-nested proxy var has array type even
+            // though its scalarized value is a tuple, so a syntactic type test does not
+            // identify the tuple case. `tryReplaceUsesOfStageInput` rewrites the reads of
+            // a tuple structurally (by array element, then by field); it leaves the proxy
+            // var and the stores that initialize it in place (they persist to the emitted
+            // output). The `address` branch below instead splices in the real input and
+            // deallocates the proxy here.
             if (globalValue.flavor == ScalarizedVal::Flavor::tuple)
             {
                 tryReplaceUsesOfStageInput(context, globalValue, globalVar);
