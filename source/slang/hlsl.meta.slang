@@ -998,6 +998,106 @@ float __glsl_shadow_lod_texture_level_offset<TSampler, TCoord, TOffset>(TSampler
     }
 }
 
+// GLSL shadow sampling with bias / gradients (combined-sampler path).
+//
+// These wrappers exist so the SampleCmpBias/SampleCmpGrad methods can emit GLSL's
+// texture()/textureOffset()/textureGrad()/textureGradOffset() with GLSL's argument
+// ordering, rather than raw HLSL-style intrinsic calls. They mirror the __glsl150_*
+// (no extension) vs __glsl_shadow_lod_* (GL_EXT_texture_shadow_lod) split already used
+// by the SampleCmpLevel path.
+//
+// Capability boundary, per the GL_EXT_texture_shadow_lod spec:
+//  - texture()/textureOffset() WITH bias are core GLSL 1.50 for sampler1DShadow,
+//    sampler1DArrayShadow, sampler2DShadow and samplerCubeShadow; the extension only
+//    adds the sampler2DArrayShadow and samplerCubeArrayShadow bias variants (and the
+//    sampler2DArrayShadow textureOffset+bias variant).
+//  - textureGrad()/textureGradOffset() on shadow samplers are entirely core GLSL; the
+//    extension adds no gradient variants at all.
+// So the grad wrappers never require the extension, and only the *_ext bias wrappers do.
+
+// Core (no extension): texture(sampler, P, bias) for the GLSL-1.50 baseline shadow types.
+[require(glsl, texture_shadowlod)]
+float __glsl150_texture_bias<TSampler, TCoord>(TSampler s, TCoord value, float bias)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture($0, $1, $2)";
+    }
+}
+
+// Extension: texture(sampler2DArrayShadow, vec4 P, float bias). Added by GL_EXT_texture_shadow_lod.
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowlod)]
+float __glsl_shadow_lod_texture_bias<TSampler, TCoord>(TSampler s, TCoord value, float bias)
+{
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "texture($0, $1, $2)";
+    }
+}
+
+// Extension: texture(samplerCubeArrayShadow, vec4 P, float compare, float bias). The comparison
+// value is a separate argument here (the coordinate is already a full vec4), unlike the other
+// forms where it is packed into the coordinate vector.
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowlod)]
+float __glsl_shadow_lod_texture_bias_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float compare, float bias)
+{
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "texture($0, $1, $2, $3)";
+    }
+}
+
+// Core (no extension): textureOffset(sampler, P, offset, bias) for the GLSL-1.50 baseline types.
+// Note the GLSL argument order is (sampler, P, offset, bias) — offset precedes bias.
+[require(glsl, texture_shadowlod)]
+float __glsl150_texture_bias_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset, float bias)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureOffset($0, $1, $2, $3)";
+    }
+}
+
+// Extension: textureOffset(sampler2DArrayShadow, vec4 P, ivec2 offset, float bias).
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowlod)]
+float __glsl_shadow_lod_texture_bias_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset, float bias)
+{
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureOffset($0, $1, $2, $3)";
+    }
+}
+
+// Core (no extension): textureGrad(sampler, P, dPdx, dPdy). All shadow-sampler gradient forms
+// we emit are core GLSL, so there is no extension-requiring gradient wrapper.
+[require(glsl, texture_shadowlod)]
+float __glsl150_texture_grad<TSampler, TCoord, TGrad>(TSampler s, TCoord value, TGrad gradX, TGrad gradY)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureGrad($0, $1, $2, $3)";
+    }
+}
+
+// Core (no extension): textureGradOffset(sampler, P, dPdx, dPdy, offset).
+[require(glsl, texture_shadowlod)]
+float __glsl150_texture_grad_offset<TSampler, TCoord, TGrad, TOffset>(TSampler s, TCoord value, TGrad gradX, TGrad gradY, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureGradOffset($0, $1, $2, $3, $4)";
+    }
+}
+
 [require(glsl, texture_sm_4_1)]
 float __glsl_texture<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value)
 {
@@ -1115,6 +1215,90 @@ float __glsl_shadow_lod_texture_level_offset<TTexture, TCoord, TOffset>(TTexture
     case glsl:
         __requireCapability(GL_EXT_texture_shadow_lod);
         __intrinsic_asm "textureLodOffset($p, $2, $3, $4)";
+    }
+}
+
+// GLSL shadow sampling with bias / gradients for the separate Texture* + SamplerComparisonState
+// path. These are the counterparts of the combined-sampler wrappers above; they emit the same
+// GLSL built-ins through the combined-sampler intrinsic form ($p), and follow the same
+// core (__glsl150_*) vs GL_EXT_texture_shadow_lod (__glsl_shadow_lod_*) capability split.
+
+// Core (no extension): texture(sampler, P, bias).
+[require(glsl, texture_shadowlod)]
+float __glsl150_texture_bias<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float bias)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture($p, $2, $3)";
+    }
+}
+
+// Extension: texture(sampler2DArrayShadow, vec4 P, float bias).
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowlod)]
+float __glsl_shadow_lod_texture_bias<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float bias)
+{
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "texture($p, $2, $3)";
+    }
+}
+
+// Extension: texture(samplerCubeArrayShadow, vec4 P, float compare, float bias) — compare separate.
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowlod)]
+float __glsl_shadow_lod_texture_bias_cube_array_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float compare, float bias)
+{
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "texture($p, $2, $3, $4)";
+    }
+}
+
+// Core (no extension): textureOffset(sampler, P, offset, bias).
+[require(glsl, texture_shadowlod)]
+float __glsl150_texture_bias_offset<TTexture, TCoord, TOffset>(TTexture t, SamplerComparisonState s, TCoord value, constexpr TOffset offset, float bias)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureOffset($p, $2, $3, $4)";
+    }
+}
+
+// Extension: textureOffset(sampler2DArrayShadow, vec4 P, ivec2 offset, float bias).
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowlod)]
+float __glsl_shadow_lod_texture_bias_offset<TTexture, TCoord, TOffset>(TTexture t, SamplerComparisonState s, TCoord value, constexpr TOffset offset, float bias)
+{
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureOffset($p, $2, $3, $4)";
+    }
+}
+
+// Core (no extension): textureGrad(sampler, P, dPdx, dPdy).
+[require(glsl, texture_shadowlod)]
+float __glsl150_texture_grad<TTexture, TCoord, TGrad>(TTexture t, SamplerComparisonState s, TCoord value, TGrad gradX, TGrad gradY)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureGrad($p, $2, $3, $4)";
+    }
+}
+
+// Core (no extension): textureGradOffset(sampler, P, dPdx, dPdy, offset).
+[require(glsl, texture_shadowlod)]
+float __glsl150_texture_grad_offset<TTexture, TCoord, TGrad, TOffset>(TTexture t, SamplerComparisonState s, TCoord value, TGrad gradX, TGrad gradY, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureGradOffset($p, $2, $3, $4, $5)";
     }
 }
 
@@ -1846,12 +2030,21 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         __target_switch
         {
+        case glsl:
+            // GLSL's textureGrad() on shadow samplers is entirely core (GLSL 1.50); the
+            // GL_EXT_texture_shadow_lod extension adds no gradient variants, so no branch here
+            // requires it. The only shape-specific handling is the sampler1DShadow coordinate,
+            // which GLSL expects as vec3 P = (s, unused, compareValue).
+            if (Shape.dimensions == 1 && isArray == 0)
+                return __glsl150_texture_grad(this, __makeVector(__makeVector(location, 0.0), compareValue), gradX, gradY);
+            else
+                return __glsl150_texture_grad(this, __makeVector(location, compareValue), gradX, gradY);
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -1867,13 +2060,21 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
+        case glsl:
+            // textureGradOffset() on shadow samplers is core GLSL for the offset-capable shapes
+            // (1D, 1DArray, 2D, 2DArray); cube shapes are excluded by the static_assert above.
+            // sampler1DShadow needs its coordinate padded to vec3.
+            if (Shape.dimensions == 1 && isArray == 0)
+                return __glsl150_texture_grad_offset(this, __makeVector(__makeVector(location, 0.0), compareValue), gradX, gradY, offset);
+            else
+                return __glsl150_texture_grad_offset(this, __makeVector(location, compareValue), gradX, gradY, offset);
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -1918,12 +2119,41 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
     {
         __requireComputeDerivative();
         __target_switch
         {
+        case glsl:
+            // GLSL's texture(sampler, P, bias) is core (GLSL 1.50) for sampler1DShadow,
+            // sampler1DArrayShadow, sampler2DShadow and samplerCubeShadow; GL_EXT_texture_shadow_lod
+            // only adds the sampler2DArrayShadow and samplerCubeArrayShadow bias variants. Route
+            // baseline shapes to the no-extension wrapper and only the two array-of-2D/cube shapes
+            // to the extension wrappers, so we never emit GL_EXT_texture_shadow_lod for the baseline
+            // forms. sampler1DShadow's coordinate is padded to vec3.
+            if (Shape.dimensions == 1)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias(this, __makeVector(__makeVector(location, 0.0), compareValue), bias);
+                else
+                    return __glsl150_texture_bias(this, __makeVector(location, compareValue), bias);
+            }
+            else if (Shape.dimensions == 2)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias(this, __makeVector(location, compareValue), bias);
+                else
+                    return __glsl_shadow_lod_texture_bias(this, __makeVector(location, compareValue), bias);
+            }
+            else
+            {
+                static_assert(Shape.dimensions == 3, "_Texture::SampleCmpBias(location, compareValue, bias): Unimplemented shape dimension");
+                if (isArray == 0)
+                    return __glsl150_texture_bias(this, __makeVector(location, compareValue), bias);
+                else
+                    return __glsl_shadow_lod_texture_bias_cube_array_shadow(this, location, compareValue, bias);
+            }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -1939,13 +2169,33 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
         {
+        case glsl:
+            // textureOffset(sampler, P, offset, bias) — note GLSL orders offset before bias.
+            // Core for sampler1DShadow, sampler1DArrayShadow and sampler2DShadow; the extension
+            // adds only the sampler2DArrayShadow variant. Cube shapes are excluded above.
+            // sampler1DShadow's coordinate is padded to vec3.
+            if (Shape.dimensions == 1)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias_offset(this, __makeVector(__makeVector(location, 0.0), compareValue), offset, bias);
+                else
+                    return __glsl150_texture_bias_offset(this, __makeVector(location, compareValue), offset, bias);
+            }
+            else
+            {
+                static_assert(Shape.dimensions == 2, "_Texture::SampleCmpBias with offset: only 1D/2D shadow shapes are supported in GLSL");
+                if (isArray == 0)
+                    return __glsl150_texture_bias_offset(this, __makeVector(location, compareValue), offset, bias);
+                else
+                    return __glsl_shadow_lod_texture_bias_offset(this, __makeVector(location, compareValue), offset, bias);
+            }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -3282,12 +3532,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         __target_switch
         {
+        case glsl:
+            // GLSL textureGrad() on shadow samplers is core; sampler1DShadow needs a padded vec3 P.
+            if (Shape.dimensions == 1 && isArray == 0)
+                return __glsl150_texture_grad(this, s, __makeVector(__makeVector(location, 0.0), compareValue), gradX, gradY);
+            else
+                return __glsl150_texture_grad(this, s, __makeVector(location, compareValue), gradX, gradY);
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -3305,13 +3561,19 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
+        case glsl:
+            // textureGradOffset() on shadow samplers is core GLSL; cube shapes excluded above.
+            if (Shape.dimensions == 1 && isArray == 0)
+                return __glsl150_texture_grad_offset(this, s, __makeVector(__makeVector(location, 0.0), compareValue), gradX, gradY, offset);
+            else
+                return __glsl150_texture_grad_offset(this, s, __makeVector(location, compareValue), gradX, gradY, offset);
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -3360,12 +3622,38 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
     {
         __requireComputeDerivative();
         __target_switch
         {
+        case glsl:
+            // Same core-vs-extension split as the combined-sampler SampleCmpBias: texture(P, bias)
+            // is core for 1D/1DArray/2D/Cube shadow samplers; GL_EXT_texture_shadow_lod adds only
+            // the 2DArray and CubeArray variants. sampler1DShadow's coordinate is padded to vec3.
+            if (Shape.dimensions == 1)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias(this, s, __makeVector(__makeVector(location, 0.0), compareValue), bias);
+                else
+                    return __glsl150_texture_bias(this, s, __makeVector(location, compareValue), bias);
+            }
+            else if (Shape.dimensions == 2)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias(this, s, __makeVector(location, compareValue), bias);
+                else
+                    return __glsl_shadow_lod_texture_bias(this, s, __makeVector(location, compareValue), bias);
+            }
+            else
+            {
+                static_assert(Shape.dimensions == 3, "_Texture::SampleCmpBias(s, location, compareValue, bias): Unimplemented shape dimension");
+                if (isArray == 0)
+                    return __glsl150_texture_bias(this, s, __makeVector(location, compareValue), bias);
+                else
+                    return __glsl_shadow_lod_texture_bias_cube_array_shadow(this, s, location, compareValue, bias);
+            }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -3383,13 +3671,30 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
         {
+        case glsl:
+            // textureOffset(P, offset, bias) — core for 1D/1DArray/2D; extension adds only 2DArray.
+            if (Shape.dimensions == 1)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias_offset(this, s, __makeVector(__makeVector(location, 0.0), compareValue), offset, bias);
+                else
+                    return __glsl150_texture_bias_offset(this, s, __makeVector(location, compareValue), offset, bias);
+            }
+            else
+            {
+                static_assert(Shape.dimensions == 2, "_Texture::SampleCmpBias with offset: only 1D/2D shadow shapes are supported in GLSL");
+                if (isArray == 0)
+                    return __glsl150_texture_bias_offset(this, s, __makeVector(location, compareValue), offset, bias);
+                else
+                    return __glsl_shadow_lod_texture_bias_offset(this, s, __makeVector(location, compareValue), offset, bias);
+            }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
