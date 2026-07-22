@@ -11,6 +11,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIAG2): -target spirv -DVER_ILLEGAL2
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIAG3): -target spirv -DLANG_ILLEGAL
 
+// Note: tests/compute/cast-zero-to-struct.slang has testing for Slang 2026 vs 2027 behavior
+
 #ifdef VER_2026
 #language slang 2026
 #endif

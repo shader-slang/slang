@@ -11,8 +11,8 @@
 // invocation of __init(0).
 
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK2026): -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK2026):-cpu -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK2026): -shaderobj -output-using-type -xslang -Wno-30087
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK2026):-cpu -shaderobj -output-using-type -xslang -Wno-30087
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK2027): -shaderobj -output-using-type -xslang -DSLANG2027=1
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK2027):-cpu -shaderobj -output-using-type -xslang -DSLANG2027=1
