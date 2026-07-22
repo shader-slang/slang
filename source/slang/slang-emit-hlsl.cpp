@@ -1963,22 +1963,28 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_HitObjectType:
         {
-            // Emit appropriate HitObject type based on capability
-            // User must explicitly specify which SER path to use
+            // Emit the HitObject type for the SER ABI the target implies. NVAPI SER
+            // (`NvHitObject`) and DXR-1.3 native SER (`dx::HitObject`) are distinct,
+            // non-interchangeable ABIs. We test capability implication with the same single-set
+            // primitive `specializeTargetSwitch` uses to pick a HitObject op's `__target_switch`
+            // case, so the emitted type agrees with how the operations lower. The user selects a
+            // SER path via capabilities (e.g. `ser_nvapi` vs a native SM 6.9 DXR profile).
             auto targetCaps = getTargetReq()->getTargetCaps();
-            auto nvapiCapabilitySet = CapabilitySet(CapabilityName::hlsl_nvapi);
-            auto sm69CapabilitySet = CapabilitySet(CapabilityName::_sm_6_9);
-
-            if (targetCaps.implies(nvapiCapabilitySet))
+            auto impliesCap = [&](CapabilityName atom)
             {
-                // NVAPI extension: use NvHitObject (matches `case hlsl_nvapi:` calls)
+                return targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(atom)) ==
+                       CapabilitySet::ImpliesReturnFlags::Implied;
+            };
+            if (impliesCap(CapabilityName::hlsl_nvapi))
+            {
+                // NVAPI extension: use NvHitObject (matches `case hlsl_nvapi:` op calls).
                 m_writer->emit("NvHitObject");
-                // Ensure NVAPI header is included when using NvHitObject type
+                // Ensure NVAPI header is included when using NvHitObject type.
                 m_extensionTracker->m_requiresNVAPI = true;
             }
-            else if (targetCaps.implies(sm69CapabilitySet))
+            else if (impliesCap(CapabilityName::_sm_6_9))
             {
-                // DXR 1.3 native: use dx::HitObject namespace
+                // DXR 1.3 native: use the dx::HitObject namespace type.
                 m_writer->emit("dx::HitObject");
             }
             else

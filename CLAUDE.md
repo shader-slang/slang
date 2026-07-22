@@ -393,7 +393,7 @@ working on repro handling. Inputs are validated before use.
 
 ### Capability Atoms Documentation
 
-**`docs/user-guide/a3-02-reference-capability-atoms.md` is auto-generated — never edit it directly.**
+**`docs/user-guide/a4-02-reference-capability-atoms.md` is auto-generated — never edit it directly.**
 
 It is produced by `slang-capability-generator` from `source/slang/slang-capabilities.capdef`. To add or update a capability atom's description:
 
@@ -409,7 +409,7 @@ It is produced by `slang-capability-generator` from `source/slang/slang-capabili
    ./build/generators/Debug/bin/slang-capability-generator \
        source/slang/slang-capabilities.capdef \
        --target-directory build/capgen-out \
-       --doc docs/user-guide/a3-02-reference-capability-atoms.md
+       --doc docs/user-guide/a4-02-reference-capability-atoms.md
    ```
 3. Commit the updated `slang-capabilities.capdef` and the regenerated `.md` together.
 

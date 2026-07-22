@@ -23,6 +23,7 @@ static bool isMetaOp(IRInst* inst)
     case kIROp_IsCoopFloat:
     case kIROp_IsVector:
     case kIROp_GetNaturalStride:
+    case kIROp_GetNaturalAlignment:
     case kIROp_TypeEquals:
         return true;
     default:
@@ -1207,6 +1208,22 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
     checkConstructor(func, reachability, sink);
 }
 
+// Returns true if this global's value is supplied by host code rather than by an in-module
+// initializer -- the documented `__global public __extern_cpp int myGlobal;` pattern for CPU
+// targets (docs/cpu-target.md), where the host locates the unmangled symbol by name and sets it
+// directly. Such a global has no initializer by design and so, like the externally-supplied globals
+// exempted in checkUninitializedGlobals, must not warn E41017. The predicate keys off
+// `__extern_cpp` (unmangled name) together with external linkage (`export`/`public`).
+static bool isHostProvidedGlobal(IRGlobalVar* variable)
+{
+    if (!variable->findDecoration<IRExternCppDecoration>())
+        return false;
+
+    return variable->findDecoration<IRExportDecoration>() ||
+           variable->findDecoration<IRHLSLExportDecoration>() ||
+           variable->findDecoration<IRPublicDecoration>();
+}
+
 static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sink)
 {
     IRType* type = variable->getFullType();
@@ -1222,6 +1239,9 @@ static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sin
         return;
 
     if (variable->findDecoration<IRVulkanHitAttributesDecoration>())
+        return;
+
+    if (isHostProvidedGlobal(variable))
         return;
 
     // Check for initialization blocks

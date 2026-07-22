@@ -459,6 +459,13 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
         }
         break;
 
+    case kIROp_UntypedResourceHandleType:
+    case kIROp_UntypedSamplerHandleType:
+        // `lowerUntypedResourceHandleToUInt` rewrites every untyped descriptor-heap handle to
+        // `uint` before emit, so one reaching here is an internal error (a leak from that pass).
+        SLANG_UNEXPECTED("untyped descriptor-heap handle type should have been lowered to uint");
+        break;
+
     case kIROp_ArrayType:
         {
             auto arrayType = cast<IRArrayType>(type);
@@ -2570,6 +2577,14 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_CastDescriptorHandleToUInt64:
         emitOperand(inst->getOperand(0), outerPrec);
         break;
+    case kIROp_CastUIntToUntypedResourceHandle:
+    case kIROp_CastUntypedResourceHandleToUInt:
+    case kIROp_CastUIntToUntypedSamplerHandle:
+    case kIROp_CastUntypedSamplerHandleToUInt:
+        // The untyped descriptor-heap handle wrap/unwrap casts are an internal representation that
+        // `lowerUntypedResourceHandleToUInt` forwards to their `uint` operand and removes before
+        // emit. Seeing one here means that pass did not run (or ran too late), so this is a bug.
+        SLANG_UNEXPECTED("untyped descriptor-heap handle cast should have been lowered to uint");
     // Binary ops
     case kIROp_Add:
     case kIROp_Sub:
@@ -3568,7 +3583,29 @@ void CLikeSourceEmitter::emitSwitchCaseSelectorsImpl(
     }
 }
 
-void CLikeSourceEmitter::emitRegion(Region* inRegion)
+// Walk the top-level region chain of a switch `case` body to its final region, and return
+// that region if it is a `break` that exits `switchRegion` itself. This is the redundant
+// break a non-fall-through target places at the tail of every case — because such a case
+// never falls through, reaching the end of the body already exits the switch. Any other
+// terminal (a `return`/`discard` folded into a `SimpleRegion`, a `continue`, or a `break`
+// targeting an enclosing loop) returns null, as does a nested/early break, since only the
+// top-level `nextRegion` chain is followed here.
+static Region* findSwitchCaseTerminatingBreak(Region* caseBody, SwitchRegion* switchRegion)
+{
+    // `break`/`continue` are leaf regions; every other flavor derives from `SeqRegion` and
+    // links to what follows it through `nextRegion`, so follow that chain to its end.
+    Region* region = caseBody;
+    while (region && region->getFlavor() != Region::Flavor::Break &&
+           region->getFlavor() != Region::Flavor::Continue)
+    {
+        region = static_cast<SeqRegion*>(region)->nextRegion.Ptr();
+    }
+    if (!region || region->getFlavor() != Region::Flavor::Break)
+        return nullptr;
+    return (static_cast<BreakRegion*>(region)->outerRegion == switchRegion) ? region : nullptr;
+}
+
+void CLikeSourceEmitter::emitRegion(Region* inRegion, Region* breakRegionToOmit)
 {
     // We will use a loop so that we can process sequential (simple)
     // regions iteratively rather than recursively.
@@ -3636,7 +3673,10 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
         // don't need to consider multi-level break/continue (which we
         // don't for now).
         case Region::Flavor::Break:
-            m_writer->emit("break;\n");
+            // Skip the specific switch-terminating break a break-free target asked us to
+            // omit; emit every other break normally.
+            if (region != breakRegionToOmit)
+                m_writer->emit("break;\n");
             break;
         case Region::Flavor::Continue:
             m_writer->emit("continue;\n");
@@ -3723,6 +3763,14 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                 m_writer->emit(")\n{\n");
 
                 auto defaultCase = switchRegion->defaultCase;
+
+                // When a target's switch cases never fall through, the `break` Slang places
+                // at the tail of each case only exists to exit the switch — which already
+                // happens on reaching the case's end. Most such targets still need it emitted
+                // (FXC for HLSL SM 5.x rejects a case without a terminating break), but WGSL
+                // prefers break-free output and older `naga` validators reject `break` outside
+                // a loop, so WGSL opts out via shouldEmitSwitchCaseTerminatingBreak().
+                bool emitTerminatingBreak = shouldEmitSwitchCaseTerminatingBreak();
                 for (auto currentCase : switchRegion->cases)
                 {
                     bool isDefault = (currentCase.Ptr() == defaultCase);
@@ -3730,7 +3778,11 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                     m_writer->indent();
                     m_writer->emit("{\n");
                     m_writer->indent();
-                    emitRegion(currentCase->body);
+                    Region* breakToOmit =
+                        emitTerminatingBreak
+                            ? nullptr
+                            : findSwitchCaseTerminatingBreak(currentCase->body, switchRegion);
+                    emitRegion(currentCase->body, breakToOmit);
                     m_writer->dedent();
                     m_writer->emit("}\n");
                     m_writer->dedent();

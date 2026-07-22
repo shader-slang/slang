@@ -64,7 +64,7 @@ Description:
   See [IArithmetic.div](../../../core-module-reference/interfaces/iarithmetic-01/div.html) for details.
 - The **remainder** operator returns the remainder of `lhs` by `rhs` division such that
   `rem = lhs - n * rhs` where `n` is an integer and `abs(rem)` < `abs(rhs)`. The sign of remainder matches the
-  sign of `lhs`.
+  sign of `lhs`. That is, `lhs % rhs == lhs - trunc(lhs / rhs) * rhs`.
   See [IArithmetic.mod](../../../core-module-reference/interfaces/iarithmetic-01/mod.html) for details.
 
 ### Logical Operators (scalar)

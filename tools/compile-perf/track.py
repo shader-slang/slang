@@ -70,7 +70,7 @@ def _point_metrics(results_json_path):
     history and daily points compare like-with-like. The median (not min) is the
     saved/compared value: it reflects the typical run rather than the single
     luckiest one, and is steadier when a build's run-to-run spread shifts."""
-    runs = analyze.canonical_runs(json.load(open(results_json_path)))
+    runs = analyze.canonical_runs(analyze.read_json(results_json_path))
     out = {}
     for r in runs:
         for timer, st in r["timers"].items():
@@ -83,7 +83,7 @@ def _release_points(results_dir, index_path):
     if not os.path.exists(index_path):
         return []
     pts = []
-    for rec in json.load(open(index_path)):
+    for rec in analyze.read_json(index_path):
         rj = analyze.results_path(results_dir, rec.get("tag", ""))
         if "slangc" not in rec or not os.path.exists(rj):
             continue
@@ -105,7 +105,7 @@ def _daily_points(results_dir):
         meta = {}
         mp = os.path.join(ddir, label, "meta.json")
         if os.path.exists(mp):
-            meta = json.load(open(mp))
+            meta = analyze.read_json(mp)
         date = meta.get("date") or label[:10]  # label prefix is YYYY-MM-DD
         pts.append({"label": label, "date": date, "kind": "daily",
                     "commit": meta.get("commit", ""),
@@ -132,7 +132,7 @@ def assemble(results_dir, index_path):
     runner = ""
     rp = os.path.join(results_dir, "runner.json")
     if os.path.exists(rp):
-        runner = json.load(open(rp)).get("fingerprint", "")
+        runner = analyze.read_json(rp).get("fingerprint", "")
     return {"runner": runner, "last_release": rel[-1]["label"] if rel else None,
             "points": rel + tail}
 
@@ -142,7 +142,7 @@ def rebuild(results_dir, index_path):
     outdir = os.path.join(results_dir, "tracking")
     os.makedirs(outdir, exist_ok=True)
     out = os.path.join(outdir, "tracking.json")
-    with open(out, "w", encoding="utf-8") as fh:
+    with analyze.open_output(out) as fh:
         json.dump(series, fh, indent=2)
     n_rel = sum(1 for p in series["points"] if p["kind"] == "release")
     n_day = sum(1 for p in series["points"] if p["kind"] == "daily")
@@ -165,7 +165,7 @@ def register(results_dir, index_path, label, commit, date, corpus_sha="", commit
     # sibling points by code chronology in the tracking series and reports.
     if commit_time:
         meta["commit_time"] = commit_time
-    with open(os.path.join(ddir, "meta.json"), "w", encoding="utf-8") as fh:
+    with analyze.open_output(os.path.join(ddir, "meta.json")) as fh:
         json.dump(meta, fh, indent=2)
     print(f"registered daily {label} (commit {commit[:9] or '?'}, runner {meta['runner']})")
     rebuild(results_dir, index_path)
@@ -182,13 +182,13 @@ def merge_index(results_dir, new_index_path):
     dest = os.path.join(results_dir, "index.json")
     existing = {}
     if os.path.exists(dest):
-        for r in json.load(open(dest)):
+        for r in analyze.read_json(dest):
             existing[r["tag"]] = r
     n_before = len(existing)
-    for r in json.load(open(new_index_path)):
+    for r in analyze.read_json(new_index_path):
         existing[r["tag"]] = r
     merged = sorted(existing.values(), key=lambda r: r.get("date", ""))
-    with open(dest, "w", encoding="utf-8") as fh:
+    with analyze.open_output(dest) as fh:
         json.dump(merged, fh, indent=2)
     n_added = len(existing) - n_before
     print(f"merged index: {len(merged)} releases total "
@@ -197,7 +197,7 @@ def merge_index(results_dir, new_index_path):
 
 def stamp_runner(results_dir, label):
     rp = os.path.join(results_dir, "runner.json")
-    with open(rp, "w", encoding="utf-8") as fh:
+    with analyze.open_output(rp) as fh:
         json.dump({"fingerprint": runner_id(), "label": label}, fh, indent=2)
     print(f"stamped {rp}: {runner_id()} (built by {label})")
 

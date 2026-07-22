@@ -33,6 +33,7 @@
 #include "slangc-tool.h"
 #include "slangi-tool.h"
 #include "test-context.h"
+#include "test-output-path-util.h"
 #include "test-reporter.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -740,6 +741,7 @@ static SlangResult _gatherTestsForFile(
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
+            normalizeTestOutputPathsForTestFile(filePath, testDetails.options.args);
 
             outTestList->tests.add(testDetails);
         }
@@ -770,6 +772,7 @@ static SlangResult _gatherTestsForFile(
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
+            normalizeTestOutputPathsForTestFile(filePath, testDetails.options.args);
 
             // Mark that it is a diagnostic test
             testDetails.options.type = TestOptions::Type::Diagnostic;
@@ -1568,6 +1571,14 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
         // Call the render-test tool asking it only to startup a specified render api
         // (taking into account adapter options)
 
+        // Only the positive "Check <api>: Supported" lines are noise to hide below Info verbosity
+        // (e.g. `-v failure`); the "Not Supported" lines and the accompanying startup-failure
+        // stderr/stdout dump are always shown, since a missing backend explains why tests are
+        // skipped and is exactly what someone running `-v failure` needs to see. CI runs at default
+        // (Info) and greps this output, so gating only the positive line keeps CI detection
+        // working.
+        const bool showDiscovery = context->options.verbosity >= VerbosityLevel::Info;
+
         RenderApiFlags availableRenderApiFlags = 0;
         for (int i = 0; i < int(RenderApiType::CountOf); ++i)
         {
@@ -1586,9 +1597,10 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                         SLANG_PASS_THROUGH_GENERIC_C_CPP)))
                 {
                     availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
-                    StdWriters::getOut().print(
-                        "Check %s: Supported\n",
-                        RenderApiUtil::getApiName(apiType).begin());
+                    if (showDiscovery)
+                        StdWriters::getOut().print(
+                            "Check %s: Supported\n",
+                            RenderApiUtil::getApiName(apiType).begin());
                 }
                 else
                 {
@@ -1629,9 +1641,10 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                         ToolReturnCode::Success)
                 {
                     availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
-                    StdWriters::getOut().print(
-                        "Check %s: Supported\n",
-                        RenderApiUtil::getApiName(apiType).begin());
+                    if (showDiscovery)
+                        StdWriters::getOut().print(
+                            "Check %s: Supported\n",
+                            RenderApiUtil::getApiName(apiType).begin());
                 }
                 else
                 {
@@ -2031,6 +2044,39 @@ static SlangResult _createArtifactFromHexDump(
     return SLANG_OK;
 }
 
+static SlangResult _executeBinaryFile(const UnownedStringSlice& fileName, ExecuteResult& outExeRes)
+{
+    CommandLine cmdLine;
+
+#if SLANG_LINUX_FAMILY
+    // Consider a //TEST:EXECUTABLE: case in sanitizer CI. slangc first invokes an
+    // uninstrumented host compiler to produce the binary, and slang-test then runs it.
+    // Applying LD_PRELOAD to slang-test would also inject the sanitizer into the compiler
+    // and linker. Keep the requested value inert until this exact execution boundary instead.
+    StringBuilder preloadValue;
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+            UnownedStringSlice("SLANG_TEST_EXECUTABLE_LD_PRELOAD"),
+            preloadValue)) &&
+        preloadValue.getLength())
+    {
+        cmdLine.setExecutableLocation(ExecutableLocation("env"));
+
+        StringBuilder preloadAssignment;
+        preloadAssignment << "LD_PRELOAD=" << preloadValue;
+        cmdLine.addArg(preloadAssignment.produceString());
+        cmdLine.addArg(fileName);
+
+        return ProcessUtil::execute(cmdLine, outExeRes);
+    }
+#endif
+
+    ExecutableLocation exe;
+    exe.setPath(fileName);
+    cmdLine.setExecutableLocation(exe);
+
+    return ProcessUtil::execute(cmdLine, outExeRes);
+}
+
 static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResult& outExeRes)
 {
     ComPtr<IArtifact> artifact;
@@ -2046,15 +2092,7 @@ static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResu
     SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, fileRep.writeRef()));
 
     const auto fileName = fileRep->getPath();
-
-    // Execute it
-    ExecutableLocation exe;
-    exe.setPath(fileName);
-
-    CommandLine cmdLine;
-    cmdLine.setExecutableLocation(exe);
-
-    return ProcessUtil::execute(cmdLine, outExeRes);
+    return _executeBinaryFile(UnownedStringSlice(fileName), outExeRes);
 }
 
 static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStringSlice& b)
@@ -2277,15 +2315,8 @@ TestResult runExecutableTest(TestContext* context, TestInput& input)
     else
     {
         // Execute the binary and see what we get
-        CommandLine cmdLine;
-
-        ExecutableLocation exe;
-        exe.setPath(moduleExePath);
-
-        cmdLine.setExecutableLocation(exe);
-
         ExecuteResult exeRes;
-        if (SLANG_FAILED(ProcessUtil::execute(cmdLine, exeRes)))
+        if (SLANG_FAILED(_executeBinaryFile(moduleExePath.getUnownedSlice(), exeRes)))
         {
             return TestResult::Fail;
         }
@@ -5372,7 +5403,7 @@ void runTestsInParallel(TestContext* context, int count, const F& f)
     auto threadFunc = [&](int threadId)
     {
         TestReporter reporter;
-        reporter.init(context->options.outputMode, context->options.expectedFailureList, true);
+        reporter.init(context->options, true);
         TestReporter::SuiteScope suiteScope(&reporter, "tests");
         context->setThreadIndex(threadId);
         context->setTestReporter(&reporter);
@@ -5822,12 +5853,13 @@ SlangResult innerMain(int argc, char** argv)
     // All following values are initialized to '0', so null.
     TestCategory* passThroughCategories[SLANG_PASS_THROUGH_COUNT_OF] = {nullptr};
 
-    // Work out what backends/pass-thrus are available
+    // Work out what backends/pass-thrus are available. This has to run before Options::parse below
+    // because `-category`/`-exclude <backend-name>` resolves against the categories registered
+    // here. The "Supported backends:" line, however, is informational and gated on verbosity, which
+    // is only known after the parse, so we accumulate it here and print it once options are parsed.
+    StringBuilder supportedBackends;
     {
         SlangSession* session = context.getSession();
-
-        auto out = StdWriters::getOut();
-        out.print("Supported backends:");
 
         for (int i = 0; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
         {
@@ -5850,11 +5882,13 @@ SlangResult innerMain(int argc, char** argv)
                 SLANG_ASSERT(passThroughCategories[i] == nullptr);
                 passThroughCategories[i] = categorySet.add(buf.getBuffer() + 1, fullTestCategory);
 
-                out.write(buf.getBuffer(), buf.getLength());
+                // Each token keeps its leading space (the `+ 1` above strips it only for the
+                // category name), so the joined line reads "Supported backends: a b". CI greps the
+                // literal "Supported backends: " (with the trailing space), so this is
+                // load-bearing.
+                supportedBackends << buf;
             }
         }
-
-        out.print("\n");
     }
 
     {
@@ -5907,6 +5941,13 @@ SlangResult innerMain(int argc, char** argv)
 
     Options& options = context.options;
 
+    // CI greps this at default (Info) verbosity, so suppress it only below Info (e.g. `-v
+    // failure`).
+    if (options.verbosity >= VerbosityLevel::Info)
+    {
+        StdWriters::getOut().print("Supported backends:%s\n", supportedBackends.getBuffer());
+    }
+
     context.setMaxTestRunnerThreadCount(options.serverCount);
 
     // Set up the prelude/s
@@ -5934,9 +5975,8 @@ SlangResult innerMain(int argc, char** argv)
     {
         // Create a TestReporter since _getAvailableRenderApiFlags may use it in verbose mode
         TestReporter reporter;
-        SLANG_RETURN_ON_FAIL(reporter.init(options.outputMode, options.expectedFailureList));
+        SLANG_RETURN_ON_FAIL(reporter.init(options));
         context.setTestReporter(&reporter);
-        reporter.m_verbosity = options.verbosity;
 
         _getAvailableRenderApiFlags(&context);
 
@@ -6020,13 +6060,9 @@ SlangResult innerMain(int argc, char** argv)
     {
         // Setup the reporter
         TestReporter reporter;
-        SLANG_RETURN_ON_FAIL(reporter.init(options.outputMode, options.expectedFailureList));
+        SLANG_RETURN_ON_FAIL(reporter.init(options));
 
         context.setTestReporter(&reporter);
-
-        reporter.m_dumpOutputOnFailure = options.dumpOutputOnFailure;
-        reporter.m_verbosity = options.verbosity;
-        reporter.m_hideIgnored = options.hideIgnored;
 
         {
             TestReporter::SuiteScope suiteScope(&reporter, "tests");

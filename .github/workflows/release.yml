@@ -214,7 +214,7 @@ jobs:
           fi
 
           # Extract version from filename
-          version=$(basename "$libslang_library" | sed -E 's/.*\.0\.([0-9]+(\.[0-9]+)*)\.dylib$/\1/')
+          version=$(basename "$libslang_library" | sed -E 's/^libslang-compiler\.0\.([0-9]+(\.[0-9]+)*)\.dylib$/\1/')
 
           # Validate version was extracted
           if [[ -z "$version" ]]; then
@@ -287,6 +287,7 @@ jobs:
             cp build.em/Release/bin/slang-wasm.wasm "${base}/slang-wasm.wasm"
             cp build.em/Release/bin/slang-wasm.js "${base}/slang-wasm.js"
             cp build.em/Release/bin/interface.d.ts "${base}/interface.d.ts"
+            cp -R LICENSES "${base}/LICENSES"
             (cd "${base}" && zip -r "../${base}.zip" .)
             echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"
 
@@ -299,6 +300,7 @@ jobs:
             cp build.em/external/miniz/Release/libminiz.a "${base_libs}/lib/" 2>/dev/null || true
             cp build.em/external/cmark/src/Release/libcmark-gfm.a "${base_libs}/lib/"
             cp build.em/Release/include/*.h "${base_libs}/include/"
+            cp -R LICENSES "${base_libs}/LICENSES"
             (cd "${base_libs}" && zip -r "../${base_libs}.zip" .)
             echo "SLANG_WASM_LIBS_ARCHIVE=${base_libs}.zip" >> "$GITHUB_OUTPUT"
 

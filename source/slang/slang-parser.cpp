@@ -1492,6 +1492,20 @@ static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = null
     }
 }
 
+// Parse a static member name after `::`. When `__subscript` is itself followed by `::`, as in
+// `Type::__subscript::get`, translate the declaration keyword to the `SubscriptDecl`'s internal
+// `operator[]` name. The trailing scope token is required: without it, preserve the literal
+// identifier so expressions such as `Type::__subscript()` keep their ordinary meaning.
+static NameLoc ParseStaticMemberName(Parser* parser)
+{
+    if (parser->LookAheadToken("__subscript") && parser->LookAheadToken(TokenType::Scope, 1))
+    {
+        auto subscriptToken = parser->ReadToken("__subscript");
+        return NameLoc(getSubscriptOperatorName(parser->astBuilder), subscriptToken.loc);
+    }
+    return expectIdentifier(parser);
+}
+
 // A "declarator" as used in C-style languages
 struct Declarator : RefObject
 {
@@ -1511,8 +1525,8 @@ struct NameDeclarator : Declarator
     NameLoc nameAndLoc;
 
     // True if the name came from `operator <op>` syntax. Such a name is only
-    // valid for a function declaration; using it for a variable is diagnosed in
-    // `CompleteVarDecl`.
+    // valid for a function declaration; `UnwrapDeclarator` diagnoses it for any
+    // other declaration kind unless the caller opts in via `allowOperatorName`.
     bool isOperatorName = false;
 };
 
@@ -1544,10 +1558,6 @@ struct DeclaratorInfo
     NameLoc nameAndLoc;
     Modifiers semantics;
     Expr* initializer = nullptr;
-
-    // True if `nameAndLoc` came from `operator <op>` syntax (see
-    // `NameDeclarator::isOperatorName`).
-    bool isOperatorName = false;
 };
 
 // Add a member declaration to its container, and ensure that its
@@ -2457,20 +2467,6 @@ static void CompleteVarDecl(Parser* parser, VarDeclBase* decl, DeclaratorInfo co
 {
     parser->FillPosition(decl);
 
-    // An `operator <op>` name only makes sense for a function declaration. If we
-    // reach here the declarator was completed as a variable (e.g.
-    // `int operator+ = 10;`), which is not valid; without this the malformed
-    // declaration is accepted silently and only surfaces as a confusing error at
-    // a later use site. `CompleteVarDecl` is shared with traditional parameter
-    // parsing, so exclude `ParamDecl` (whose "operator name used as a variable
-    // name" message would be inaccurate); a parameter named with an operator is a
-    // separate, rarer case left to its own handling.
-    if (declaratorInfo.isOperatorName && !as<ParamDecl>(decl))
-    {
-        parser->sink->diagnose(
-            Diagnostics::OperatorNameUsedAsVariableName{.location = declaratorInfo.nameAndLoc.loc});
-    }
-
     if (!declaratorInfo.nameAndLoc.name)
     {
         // HACK(tfoley): we always give a name, even if the declarator didn't include one... :(
@@ -2552,8 +2548,8 @@ static RefPtr<Declarator> parseDirectAbstractDeclarator(
         {
             // A valid `operator <op>` name is only legal when this declarator
             // turns out to be a function. Remember whether `ParseDeclName`
-            // actually parsed a valid operator name so a later variable
-            // completion can reject it (see `CompleteVarDecl`). A malformed
+            // actually parsed a valid operator name so `UnwrapDeclarator` can
+            // reject it for any non-function declaration. A malformed
             // `operator <garbage>` already reports `InvalidOperator`, so it is
             // not flagged again.
             auto nameDeclarator = new NameDeclarator();
@@ -2736,11 +2732,21 @@ static InitDeclarator parseInitDeclarator(Parser* parser, DeclaratorParseOptions
     return result;
 }
 
+// Fold a parsed declarator's pointer/array suffixes onto the base type in `ioInfo->typeSpec` and
+// copy out its name. This is the single point every C-style declarator (variable, parameter,
+// typedef, property, and function) passes through on its way to a declaration, so it is where the
+// `operator <op>` name rule is enforced: an operator name is only legal for a function, so unless
+// `allowOperatorName` is set (only the traditional-function branch opts in), an operator-named
+// declarator is diagnosed here. Enforcing at this one chokepoint means the variable, parameter,
+// typedef, and property cases are all rejected by construction, with no per-kind check to keep in
+// sync.
 static void UnwrapDeclarator(
-    ASTBuilder* astBuilder,
+    Parser* parser,
     RefPtr<Declarator> declarator,
-    DeclaratorInfo* ioInfo)
+    DeclaratorInfo* ioInfo,
+    bool allowOperatorName = false)
 {
+    auto astBuilder = parser->astBuilder;
     while (declarator)
     {
         switch (declarator->flavor)
@@ -2749,7 +2755,11 @@ static void UnwrapDeclarator(
             {
                 auto nameDeclarator = (NameDeclarator*)declarator.Ptr();
                 ioInfo->nameAndLoc = nameDeclarator->nameAndLoc;
-                ioInfo->isOperatorName = nameDeclarator->isOperatorName;
+                if (nameDeclarator->isOperatorName && !allowOperatorName)
+                {
+                    parser->sink->diagnose(Diagnostics::OperatorNameOnNonFunction{
+                        .location = nameDeclarator->nameAndLoc.loc});
+                }
                 return;
             }
             break;
@@ -2790,11 +2800,12 @@ static void UnwrapDeclarator(
 }
 
 static void UnwrapDeclarator(
-    ASTBuilder* astBuilder,
+    Parser* parser,
     InitDeclarator const& initDeclarator,
-    DeclaratorInfo* ioInfo)
+    DeclaratorInfo* ioInfo,
+    bool allowOperatorName = false)
 {
-    UnwrapDeclarator(astBuilder, initDeclarator.declarator, ioInfo);
+    UnwrapDeclarator(parser, initDeclarator.declarator, ioInfo, allowOperatorName);
     ioInfo->semantics = initDeclarator.semantics;
     ioInfo->initializer = initDeclarator.initializer;
 }
@@ -3672,7 +3683,9 @@ static DeclBase* ParseDeclaratorDecl(
         // constructs when parsing the declarator.
         && !initDeclarator.initializer && !initDeclarator.semantics.first)
     {
-        UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
+        // This declarator is followed by a parameter list (or generic `<`), so it declares a
+        // function -- the one context where an `operator <op>` name is legal.
+        UnwrapDeclarator(parser, initDeclarator, &declaratorInfo, /*allowOperatorName*/ true);
 
         // diagnose new type declaration, which is not allowed in function
         // return type expression
@@ -3693,7 +3706,7 @@ static DeclBase* ParseDeclaratorDecl(
     if (AdvanceIf(parser, TokenType::Semicolon))
     {
         // easy case: we only had a single declaration!
-        UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
+        UnwrapDeclarator(parser, initDeclarator, &declaratorInfo);
         VarDeclBase* firstDecl = CreateVarDeclForContext(parser->astBuilder, containerDecl);
         CompleteVarDecl(parser, firstDecl, declaratorInfo);
 
@@ -3715,7 +3728,7 @@ static DeclBase* ParseDeclaratorDecl(
     for (;;)
     {
         declaratorInfo.typeSpec = sharedTypeSpec;
-        UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
+        UnwrapDeclarator(parser, initDeclarator, &declaratorInfo);
 
         VarDeclBase* varDecl = CreateVarDeclForContext(parser->astBuilder, containerDecl);
         CompleteVarDecl(parser, varDecl, declaratorInfo);
@@ -4781,8 +4794,7 @@ static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
             parser->FillPosition(decl);
             parser->PushScope(decl);
 
-            // TODO: the use of this name here is a bit magical...
-            decl->nameAndLoc.name = getName(parser, "operator[]");
+            decl->nameAndLoc.name = getSubscriptOperatorName(parser->astBuilder);
 
             parseParameterList(parser, decl);
 
@@ -4874,7 +4886,7 @@ static NodeBase* parsePropertyDecl(Parser* parser, void* /*userData*/)
         declaratorInfo.typeSpec = parser->ParseType();
 
         auto declarator = parseDeclarator(parser, kDeclaratorParseOptions_None);
-        UnwrapDeclarator(parser->astBuilder, declarator, &declaratorInfo);
+        UnwrapDeclarator(parser, declarator, &declaratorInfo);
 
         // TODO: We might want to handle the case where the
         // resulting declarator is not valid to use for
@@ -5021,7 +5033,7 @@ static void _parseTraditionalParamDeclCommonBase(
     declaratorInfo.typeSpec = parser->ParseType();
 
     InitDeclarator initDeclarator = parseInitDeclarator(parser, options);
-    UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
+    UnwrapDeclarator(parser, initDeclarator, &declaratorInfo);
 
     // Assume it is a variable-like declarator
     CompleteVarDecl(parser, decl, declaratorInfo);
@@ -5135,7 +5147,7 @@ NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
     DeclaratorInfo declaratorInfo;
     declaratorInfo.typeSpec = type.exp;
     auto declarator = parseDeclarator(parser, kDeclaratorParseOptions_None);
-    UnwrapDeclarator(parser->astBuilder, declarator, &declaratorInfo);
+    UnwrapDeclarator(parser, declarator, &declaratorInfo);
 
     typeDefDecl->loc = declaratorInfo.nameAndLoc.loc;
     typeDefDecl->nameAndLoc = declaratorInfo.nameAndLoc;
@@ -9167,7 +9179,7 @@ static Expr* parsePostfixExpr(Parser* parser)
                 staticMemberExpr->baseExpression = expr;
                 parser->ReadToken(TokenType::Scope);
                 parser->FillPosition(staticMemberExpr);
-                staticMemberExpr->name = expectIdentifier(parser).name;
+                staticMemberExpr->name = ParseStaticMemberName(parser).name;
 
                 if (peekTokenType(parser) == TokenType::OpLess)
                     expr = maybeParseGenericApp(parser, staticMemberExpr);

@@ -183,10 +183,21 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
 {
     for (auto& kv : options)
     {
-        // This is an output-policy knob (manifest sidecar path), not generated shader code.
-        // Locked by _testCoverageManifestOutputDoesNotAffectCompilerOptionHash; re-including it
-        // would invalidate persistent module caches on every sidecar-path change.
-        if (kv.key == CompilerOptionName::CoverageManifestOutput)
+        // These are output-policy sidecar paths, not generated shader code. Locked by
+        // _testCoverageManifestOutputDoesNotAffectCompilerOptionHash and
+        // _testSeparateDebugInfoOutputDoesNotAffectCompilerOptionHash; re-including them would
+        // invalidate persistent module caches on every sidecar-path change.
+        if (kv.key == CompilerOptionName::CoverageManifestOutput ||
+            kv.key == CompilerOptionName::SeparateDebugInfoOutput)
+            continue;
+
+        // This is a load-time acceptance-policy knob, not generated shader code: it only decides
+        // whether loadModule runs isBinaryModuleUpToDate. There is no CLI spelling for it, so an
+        // offline `slangc -o *.slang-module` bakes a digest with the flag absent; a loader that
+        // enables it (its sole purpose) would otherwise fold it into the recompute and never match
+        // that baked digest, making the freshness check unable to accept any default-compiled
+        // module (issue #6557). Excluding it keeps the write/read digest symmetric.
+        if (kv.key == CompilerOptionName::UseUpToDateBinaryModule)
             continue;
 
         builder.append(kv.key);

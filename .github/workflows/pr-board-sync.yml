@@ -8,7 +8,10 @@ name: PR Board Sync (reusable)
 #     on the event-driven happy path,
 #   - backfills the assignee + reviewers (an Internal PR's author; otherwise a
 #     linked-issue owner, else the top committer-signal owner, else the
-#     maintainer) and requests reviewers, and
+#     maintainer) and requests reviewers,
+#   - when a PR has an owner, assigns any still-unassigned linked (closing)
+#     issues to that same owner (the PR's primary assignee, not the co-assigned
+#     community author), and
 #   - unrequests auto-assigned reviewers that cannot approve (e.g. bmillsNV).
 #
 # Status state machine (two variants that differ ONLY on a CI failure):
@@ -25,27 +28,26 @@ name: PR Board Sync (reusable)
 #   - Approved   - not a draft, already has an approving review, and is still
 #                  waiting on something automated: CI is pending, or it is sitting
 #                  in the merge queue.
-#   - Done       - the PR is closed (merged or otherwise); terminal.
+#   - Done       - the PR is closed (merged or otherwise); terminal. Once the
+#                  board Status is Done, this workflow never changes it again,
+#                  so a late event (CI completion, review relay, etc.) cannot
+#                  overwrite Done set earlier by merge automation.
 # Bot vs. human: on a CI failure a Bot PR goes to Revising (the bot fixes it
 # itself); a human PR (Internal/Community) goes to Snagged. The merge-queue drop
 # is Snagged for both, since a human assignee always resolves that.
 #
-# This is the event-driven half of the slang-pr-maintenance state machine. It
-# replicates the sweep's full assignee/reviewer selection -- committer-signal
-# ranking + selection, faithful ports of scripts/pr_signal.py and pr_common.py
-# inlined into the Reconcile step (so this reusable workflow needs no checkout
-# when called from another repo). That inlined block is the single source of
-# truth; .github/scripts/{pr-signal,pr-assign}.test.js extract it from this YAML
-# (via extract-workflow-js.js) and unit-test it. A periodic sweep (run on a
-# cadence; see pr-sweep-nightly.yml / mode: sweep) remains the idempotent safety
-# net for what events cannot deliver -- missed webhooks or failed runs, a
-# manually linked issue or post-hoc issue assignment, board drift, repos not yet
-# onboarded -- and reconciles the whole board.
+# This is the event-driven half of the PR maintenance state machine; sweep mode
+# (pr-sweep-nightly.yml) runs the same per-PR engine over every open PR. Full
+# architecture, state machine, assignment rules, and caller map:
+#   .github/workflows/pr-board-sync.md
+#
+# The inlined committer-signal + assignee block is unit-tested by
+# .github/scripts/{pr-signal,pr-assign}.test.js (via extract-workflow-js.js).
 #
 # Cross-repo reuse: any shader-slang repo adds a thin caller workflow that
 # declares the PR event triggers and calls this one, mapping the single required
-# secret explicitly (no `secrets: inherit`, and no `permissions:` block needed —
-# this workflow uses the PAT for everything, not the GITHUB_TOKEN):
+# secret explicitly (no `secrets: inherit`; callers should set `permissions: {}`
+# because this workflow uses the PAT for everything, not the GITHUB_TOKEN):
 #
 #   jobs:
 #     board-sync:
@@ -71,13 +73,26 @@ name: PR Board Sync (reusable)
 #
 # Triggers and fork secrets (PUBLIC repo): callers drive this via privileged
 # events that DO receive the secret for fork PRs -- `pull_request_target` (PR
-# lifecycle/commits), `check_suite` (CI), `workflow_run` (the fork-review relay),
-# and `schedule` (the sweep). `pull_request_review` only receives the secret for
-# ORIGIN PRs; a fork review runs the fork head with no secret, so the caller
-# routes fork reviews through an unprivileged bridge whose completion fires a
-# privileged `workflow_run` here (see the dispatch's `workflow_run` branch). When
-# no token is delivered, every privileged step is gated off (HAS_TOKEN) and the
-# run skips cleanly; the sweep is the backstop.
+# lifecycle/commits), `workflow_run` (CI completion + the fork-review relay),
+# `status` (external commit statuses), and `schedule` (the sweep).
+# `pull_request_review` only receives the secret for ORIGIN PRs; a fork review
+# runs the fork head with no secret, so the caller routes fork reviews through an
+# unprivileged bridge whose completion fires a privileged `workflow_run` here
+# (see the dispatch's `workflow_run` branch). When no token is delivered, every
+# privileged step is gated off (HAS_TOKEN) and the run skips cleanly; the sweep
+# is the backstop.
+#
+# Why CI/check results come via `workflow_run` and `status`, NOT `check_suite`:
+# GitHub deliberately does not deliver `check_suite`/`check_run` events for suites
+# created by GitHub Actions (recursion prevention), so a `check_suite` trigger
+# never fires for this repo's Actions-based CI. `workflow_run` IS delivered for
+# Actions runs, so it carries "an Actions workflow finished" -- a CI failure (or
+# recovery) that lands after a PR's last push reaches the board in real time
+# instead of waiting for the nightly sweep. External, non-Actions checks instead
+# post a commit `status` (e.g. "SlangPy Tests", "license/cla", "CodeRabbit"),
+# which `computeTarget` folds into the CI rollup; the `status` event is the only
+# signal that carries those. A caller may still subscribe to `check_suite` for
+# any non-Actions, GitHub-App-created suites; the dispatch handles it.
 
 on:
   workflow_call:
@@ -160,12 +175,15 @@ jobs:
     runs-on: ubuntu-latest
     # Serialize events for the same PR so two near-simultaneous events (e.g.
     # opened + a fast synchronize) cannot double-write; cancel-in-progress: false
-    # lets the in-flight run finish and queues the next. A check_suite keys on its
-    # head SHA rather than a PR number, so it can still overlap a PR-keyed event --
-    # benign, since the assignment pick is deterministic and the Status writes are
-    # idempotent recomputes.
+    # lets the in-flight run finish and queues the next. The commit-scoped events
+    # (check_suite / workflow_run / status) key on their head SHA rather than a PR
+    # number, so they serialize against each other for the same commit -- which
+    # matters now that pr-ci-complete fans out to several gating workflows whose
+    # completions for one commit would otherwise run concurrently. They can still
+    # overlap a PR-number-keyed event, but that is benign: the assignment pick is
+    # deterministic and the Status writes are idempotent recomputes.
     concurrency:
-      group: pr-board-sync-${{ github.event.pull_request.number || github.event.check_suite.head_sha || github.run_id }}
+      group: pr-board-sync-${{ github.event.pull_request.number || github.event.check_suite.head_sha || github.event.workflow_run.head_sha || github.event.sha || github.run_id }}
       cancel-in-progress: false
     # HAS_TOKEN is false when SLANG_PR_BOT_TOKEN is not delivered to the run. On a
     # PUBLIC repo, GitHub withholds secrets from fork-PR head-context events
@@ -216,8 +234,7 @@ jobs:
               // Internal iff the author has write (push) access to this repo, i.e.
               // they can approve workflow runs and approve/merge PRs. Everyone else
               // -- org members without write here, and fork contributors -- is
-              // Community. Mirrors pr_sweep.py classify_source (collaborators with
-              // permissions.push == true). On any read error, fail safe to Community.
+              // Community. On any read error, fail safe to Community.
               let canWrite = false;
               try {
                 const resp = await github.rest.repos.getCollaboratorPermissionLevel({
@@ -289,12 +306,9 @@ jobs:
             // Committer-signal ranking + assignee/reviewer selection, inlined so
             // this reusable workflow needs NO checkout when called cross-repo
             // (a checkout in a reusable workflow lands the CALLER's repo, not this
-            // one). This block is a faithful copy of scripts/pr_signal.py and
-            // select_assignee_and_reviewers in pr_common.py. It is the single
-            // source of truth: the unit tests (.github/scripts/pr-signal.test.js,
-            // pr-assign.test.js) extract THIS block from the YAML at run time via
-            // extract-workflow-js.js, so a change here is what gets tested. Keep
-            // it behaviorally identical to the cadence sweep's Python.
+            // one). This block is the single source of truth; the unit tests
+            // (.github/scripts/pr-signal.test.js, pr-assign.test.js) extract THIS
+            // block from the YAML at run time via extract-workflow-js.js.
             // ----- extract-js:assignment:begin -----
             const DEFAULT_SIGNAL_FINALISTS = 6; // top candidates re-scored by true per-file LOC
             const DEFAULT_SIGNAL_CLEAR_MARGIN = 1.5; // skip the tiebreak when #1 leads #2 by this factor
@@ -349,8 +363,8 @@ jobs:
               return lastApprover;
             }
 
-            // Translate an fnmatch-style glob to an anchored RegExp (matches Python's
-            // fnmatch: `*` and `**` match any chars incl. '/'; `?` matches one char).
+            // Translate an fnmatch-style glob to an anchored RegExp (`*` and `**`
+            // match any chars incl. '/'; `?` matches one char).
             function _globToRegExp(glob) {
               let re = "";
               for (let i = 0; i < glob.length; i++) {
@@ -694,9 +708,8 @@ jobs:
             }
             // ----- extract-js:assignment:end -----
 
-            // Committer-signal weighting. MUST match pr_common.py's DEFAULT_*
-            // (file multipliers, top-files, commit sample, horizon) so the sweep
-            // and this workflow produce the same ranking.
+            // Committer-signal weighting defaults (file multipliers, top-files,
+            // commit sample, horizon). Event and sweep mode share these constants.
             const FILE_MULTIPLIERS = [
               ["source/slang/**", 3.0],
               ["source/**", 2.0],
@@ -712,8 +725,7 @@ jobs:
             const SIGNAL_CLEAR_MARGIN = 1.5;
             // Run-scoped signal caches (raw, PR-independent source data) so a sweep
             // fetches each file's history / commit stats once across all PRs, not
-            // once per PR. `since` is computed once for stable cache keys. Mirrors
-            // pr_sweep.py's SignalCache + signal_since.
+            // once per PR. `since` is computed once for stable cache keys.
             const SIGNAL_CACHE = makeCache();
             const SIGNAL_SINCE = horizonSince(SIGNAL_HORIZON_DAYS);
 
@@ -729,7 +741,7 @@ jobs:
               },
             };
 
-            // --- ProjectsV2 helpers (mirror Applier in pr_sweep.py) ----------
+            // --- ProjectsV2 helpers ------------------------------------------
             const fieldCache = {};
             async function field(name) {
               if (fieldCache[name]) return fieldCache[name];
@@ -797,6 +809,13 @@ jobs:
               return data?.node?.fieldValueByName?.name || null;
             }
 
+            // Done is terminal on the board: once set (by this workflow's closed
+            // handler or other merge automation), never move the card back into
+            // the live state machine on a late-arriving event.
+            async function isBoardStatusDone(itemId) {
+              return (await itemSingleSelect(itemId, STATUS.field)) === STATUS.done;
+            }
+
             // --- CI rollup (mirror summarize_ci / ci_state_from_rollup) -------
             function summarizeCi(runs) {
               if (!runs.length) return "none";
@@ -824,7 +843,7 @@ jobs:
                       author { login __typename }
                       assignees(first: 10) { nodes { login } }
                       reviewRequests(first: 20) { nodes { requestedReviewer { __typename ... on User { login } } } }
-                      closingIssuesReferences(first: 10) { nodes { assignees(first: 20) { nodes { login } } } }
+                      closingIssuesReferences(first: 10) { nodes { number assignees(first: 20) { nodes { login } } } }
                       files(first: 100) { nodes { path additions deletions } }
                       mergeQueueEntry { id }
                       latestOpinionatedReviews(first: 100) { nodes { state commit { oid } } }
@@ -878,11 +897,16 @@ jobs:
                 .map(n => n.requestedReviewer)
                 .filter(r => r && r.__typename === "User" && r.login)
                 .map(r => r.login);
+              const linkedIssues = [];
               const issueAssignees = [];
               for (const iss of (pr.closingIssuesReferences?.nodes || [])) {
-                for (const a of (iss.assignees?.nodes || [])) {
-                  if (a.login && !issueAssignees.includes(a.login))
-                    issueAssignees.push(a.login);
+                const issAssignees = (iss.assignees?.nodes || [])
+                  .map(a => a.login).filter(Boolean);
+                if (iss.number) {
+                  linkedIssues.push({ number: iss.number, assignees: issAssignees });
+                }
+                for (const login of issAssignees) {
+                  if (!issueAssignees.includes(login)) issueAssignees.push(login);
                 }
               }
               // PR's own changed-file LOC (path -> max(add, del)) for the
@@ -897,14 +921,12 @@ jobs:
                 ci: summarizeCi(runs), approved, changeRequested,
                 inMergeQueue: pr.mergeQueueEntry != null,
                 authorLogin, assignees, requestedReviewers, issueAssignees,
-                changedFiles,
+                linkedIssues, changedFiles,
               };
             }
 
             // The Status an OPEN PR should currently carry, from observed state.
-            // This is the single source of truth for the event machine and MUST
-            // stay identical to target_status() in scripts/pr_sweep.py so the
-            // cadence sweep never fights this workflow. Priority (first match wins):
+            // Shared by event mode and sweep mode. Priority (first match wins):
             //   1. A current changes-request -> Revising (must revise; ranked above
             //      the draft rule so even a Bot draft with a changes-request is
             //      Revising). "Current" = the review was made on the head commit;
@@ -935,8 +957,7 @@ jobs:
             }
 
             // Member logins of an org team given as "org/slug" (empty for a bare
-            // slug or on any read error -- callers then fall through, exactly like
-            // pr_common.list_team_members). Cached per run.
+            // slug or on any read error -- callers then fall through). Cached per run.
             const teamCache = {};
             async function listTeamMembers(teamSpec) {
               if (!teamSpec || !teamSpec.includes("/")) return new Set();
@@ -956,10 +977,10 @@ jobs:
               return members;
             }
 
-            // Logins with write+ access to this repo (the extra-reviewer pool),
-            // mirroring pr_common.collect_repo_collaborators. Empty on access error
-            // (listing collaborators needs repo admin/push), so the extra reviewer
-            // is simply skipped -- never a hard failure. Cached per run.
+            // Logins with write+ access to this repo (the extra-reviewer pool).
+            // Empty on access error (listing collaborators needs repo admin/push),
+            // so the extra reviewer is simply skipped -- never a hard failure.
+            // Cached per run.
             let _collabCache;
             async function repoCollaborators() {
               if (_collabCache) return _collabCache;
@@ -994,15 +1015,52 @@ jobs:
               return _maintainer;
             }
 
-            // Backfill a PR's assignee + reviewers, replicating pr_sweep.py's
-            // select_assignee_and_reviewers in full (issue-owner -> committer-signal
+            // The PR's primary owner assignee when it is already assigned. For a
+            // Community PR the owner is the assignee who is not the author (the
+            // co-assigned contributor); for Internal/Bot PRs it is the sole owner.
+            function primaryOwnerAssignee(info, source) {
+              if (!info.assignees.length) return null;
+              if (source === SOURCE_COMMUNITY && info.authorLogin) {
+                const owner = info.assignees.find(
+                  a => a.toLowerCase() !== info.authorLogin.toLowerCase());
+                if (owner) return owner;
+              }
+              return info.assignees[0];
+            }
+
+            // Assign each still-unassigned linked (closing) issue to the PR's owner.
+            // Idempotent: issues that already have an assignee are left alone.
+            async function syncLinkedIssueAssignees(ownerLogin, linkedIssues) {
+              if (!ownerLogin || !linkedIssues?.length) return;
+              for (const iss of linkedIssues) {
+                if (iss.assignees?.length) continue;
+                try {
+                  await github.rest.issues.addAssignees({
+                    owner: context.repo.owner, repo: context.repo.repo,
+                    issue_number: iss.number, assignees: [ownerLogin],
+                  });
+                  console.log(`assigned issue #${iss.number} -> ${ownerLogin}`);
+                } catch (error) {
+                  core.warning(
+                    `could not assign issue #${iss.number} (${error.status})`);
+                }
+              }
+            }
+
+            // Backfill a PR's assignee + reviewers (issue-owner -> committer-signal
             // owner -> maintainer; reviewers = assignee + top dev-not-owner unless a
             // real reviewer is already requested). Internal PRs go to the author with
-            // no requested reviewer. Idempotent: only ever touches an UNASSIGNED PR,
-            // so re-running on any event is a no-op once an owner is set.
+            // no requested reviewer. PR assignment is idempotent: only ever touches an
+            // UNASSIGNED PR. Linked-issue assignment is also idempotent: only unassigned
+            // issues are updated, including when the PR was assigned earlier or the
+            // issue was linked later.
             async function reconcileAssignment(info, source, number) {
               if (!source) return;                     // Source unknown -> leave to sweep
-              if (info.assignees.length) return;        // already assigned
+              if (info.assignees.length) {
+                await syncLinkedIssueAssignees(
+                  primaryOwnerAssignee(info, source), info.linkedIssues);
+                return;                                  // PR already assigned
+              }
               if (info.inMergeQueue) return;            // far enough along
               if (info.isDraft && !info.isBot) return;  // human draft: author's "not ready"
 
@@ -1055,6 +1113,28 @@ jobs:
               });
               console.log(`assigned ${assignee} (source ${source})`);
 
+              // For a Community PR, also co-assign the original author. ProjectsV2
+              // has no people-typed custom field, so the built-in Assignees column
+              // is the only place an external contributor renders as a real,
+              // linked identity on the board -- co-assigning them is how we surface
+              // "who wrote it" alongside the owner. This is best-effort and runs
+              // after the owner assignment so an unassignable author cannot block
+              // ownership or reviewer setup. Bot/Internal PRs are unaffected -- a
+              // bot author is noise, and an Internal author is already the assignee.
+              if (source === SOURCE_COMMUNITY && info.authorLogin &&
+                  info.authorLogin.toLowerCase() !== assignee.toLowerCase()) {
+                try {
+                  await github.rest.issues.addAssignees({
+                    owner: context.repo.owner, repo: context.repo.repo,
+                    issue_number: number, assignees: [info.authorLogin],
+                  });
+                  console.log(`co-assigned community author ${info.authorLogin}`);
+                } catch (error) {
+                  core.warning(
+                    `could not co-assign community author ${info.authorLogin} (${error.status})`);
+                }
+              }
+
               // Unrequest auto-assigned non-approvers (e.g. bmillsNV), coupled to
               // assignment exactly as the sweep does.
               const toRemove =
@@ -1083,14 +1163,15 @@ jobs:
                     `could not request reviewers ${toRequest.join(", ")} (${error.status})`);
                 }
               }
+
+              await syncLinkedIssueAssignees(assignee, info.linkedIssues);
             }
 
-            // Classify a PR's Source from observed state, mirroring the
-            // "Classify PR Source" step and pr_common.classify_source: Bot for a
-            // bot author, else Internal iff the author has repo write access, else
-            // Community. Used when the board has no Source yet and no freshly-
-            // classified value is available (i.e. the sweep, or a non-onboarding
-            // event). Fails safe to Community on a read error.
+            // Classify a PR's Source from observed state: Bot for a bot author,
+            // else Internal iff the author has repo write access, else Community.
+            // Used when the board has no Source yet and no freshly-classified value
+            // is available (sweep mode or a non-onboarding event). Fails safe to
+            // Community on a read error.
             async function classifySource(info) {
               if (info.isBot) return process.env.SOURCE_BOT;
               let canWrite = false;
@@ -1140,12 +1221,14 @@ jobs:
               if (!info) return;
               itemId = itemId || await ensureItem(nodeId || info.nodeId);
               if (!itemId) return;
-              // Resolve Source like pr_sweep.py: the board value when set
-              // (authoritative; honors a manual override), else the freshly-
-              // classified value (opened/reopened), else classify now (the sweep, or
-              // an event without the classify step). Backfill the board when it had
-              // none, so a PR first seen by the sweep gets its Source. is_bot is then
-              // "Source == Bot".
+              if (await isBoardStatusDone(itemId)) {
+                console.log(`#${number} already Done; skipping reconcile`);
+                return;
+              }
+              // Resolve Source: the board value when set (authoritative; honors a
+              // manual override), else the freshly-classified value (opened/reopened),
+              // else classify now (sweep mode or an event without the classify step).
+              // Backfill the board when it had none. is_bot is then "Source == Bot".
               let resolvedSource = await itemSingleSelect(itemId, SOURCE_FIELD);
               if (!resolvedSource) {
                 resolvedSource = process.env.SOURCE_VALUE || await classifySource(info);
@@ -1213,7 +1296,7 @@ jobs:
               if (action === "opened" || action === "reopened") {
                 // Set the classified Source only when the board has none yet, so
                 // an existing value (incl. a manual override, e.g. on reopen) is
-                // authoritative - matching pr_sweep.py, which only backfills Source.
+                // authoritative -- only backfill when the board has none yet.
                 const source = process.env.SOURCE_VALUE;
                 if (source && !(await itemSingleSelect(itemId, SOURCE_FIELD))) {
                   await setSingleSelect(itemId, SOURCE_FIELD, source);
@@ -1223,7 +1306,11 @@ jobs:
               if (action === "closed") {
                 // Closed (merged or otherwise) -> Done; terminal, and the only
                 // state not derived from computeTarget (a closed PR is not open).
-                await setSingleSelect(itemId, STATUS.field, STATUS.done);
+                // Skip when already Done so merge automation's earlier write is
+                // not duplicated on the timeline.
+                if (!(await isBoardStatusDone(itemId))) {
+                  await setSingleSelect(itemId, STATUS.field, STATUS.done);
+                }
               } else if (action === "dequeued") {
                 // Fell out of the merge queue -> Snagged (a human re-queues/merges).
                 // The cadence sweep agrees: a dequeue does not change the head
@@ -1231,7 +1318,9 @@ jobs:
                 // dropped PR reads approved + green + un-queued, which computeTarget
                 // also maps to Snagged. (A new commit is the one thing that makes
                 // head CI pending, but that dequeues via `synchronize` -> In Review.)
-                await setSingleSelect(itemId, STATUS.field, STATUS.snagged);
+                if (!(await isBoardStatusDone(itemId))) {
+                  await setSingleSelect(itemId, STATUS.field, STATUS.snagged);
+                }
               } else {
                 // opened / reopened / edited / synchronize / enqueued /
                 // ready_for_review / converted_to_draft: recompute the whole target
@@ -1250,13 +1339,30 @@ jobs:
               const suite = context.payload.check_suite || {};
               await reconcileByCommit(suite.head_sha, suite.pull_requests);
             } else if (ev === "workflow_run") {
-              // Stage 2 of the fork-review relay (see header): a fork PR's review
-              // can't get secrets, so an unprivileged caller bridge fires on the
-              // review and completes; this privileged run resolves the PR from the
-              // upstream run's head SHA and reconciles. Metadata only -- NEVER add a
-              // checkout here (the upstream ran fork-controlled context).
+              // Two privileged uses, both resolved the same way (by the upstream
+              // run's head SHA, since its pull_requests array is empty for fork
+              // PRs):
+              //   1. Gating-check completion: GitHub does not deliver check_suite
+              //      for Actions-created suites (recursion prevention), so a caller
+              //      relays a gating Actions workflow's completion (CI and the
+              //      lighter PR checks) here to recompute the target -- a failed
+              //      check goes to Snagged, a green run recovers it.
+              //   2. Stage 2 of the fork-review relay (see header): a fork PR's
+              //      review can't get secrets, so an unprivileged caller bridge
+              //      fires on the review and completes; this privileged run picks
+              //      that up.
+              // Metadata only -- NEVER add a checkout here (the upstream may have
+              // run in a fork-controlled context).
               const wr = context.payload.workflow_run || {};
               await reconcileByCommit(wr.head_sha, wr.pull_requests);
+            } else if (ev === "status") {
+              // A commit status posted by an external, non-Actions integration --
+              // e.g. "SlangPy Tests", "license/cla", or "CodeRabbit". computeTarget
+              // folds StatusContext results into the CI rollup (a failure -> the PR
+              // is Snagged), but these are NOT Actions check suites, so neither
+              // check_suite nor workflow_run ever carries them; the status event is
+              // the only signal. It is commit-scoped, so resolve the PR(s) by SHA.
+              await reconcileByCommit(context.payload.sha, null);
             }
 
       # --- Unrequest auto-assigned non-approver reviewers --------------------
@@ -1264,10 +1370,9 @@ jobs:
       # non-approver (e.g. bmillsNV) that repo automation requests on a new PR. It
       # deliberately does NOT run on review_requested, so a maintainer manually
       # requesting that reviewer is never undone. reconcileAssignment also unrequests
-      # these (coupled to assignment, like the sweep), but only when it assigns an
-      # owner; this onboarding step still covers the PRs assignment skips (Source
-      # not yet known, a human draft, merge-queued, or no maintainer resolved). The
-      # cadence sweep (scripts/pr_sweep.py) remains the backstop for both.
+      # these when it freshly assigns an owner; this onboarding step covers PRs
+      # assignment skips (Source not yet known, a human draft, merge-queued, or no
+      # maintainer resolved). Already-assigned PRs are not re-scanned on sweep.
       - name: Unrequest ignored reviewers
         if: >-
           env.HAS_TOKEN == 'true' &&

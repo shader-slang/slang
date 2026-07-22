@@ -51,12 +51,44 @@ static SlangResult _compileProgramImpl(
     out.reset();
 
     List<const char*> args;
+
+    // The "slang" bucket holds options meant for the Slang compiler itself, so forward them
+    // verbatim; slangc's parseCommandLineArguments consumes them directly.
     for (const auto& arg : options.downstreamArgs.getArgsByName("slang"))
     {
         args.add(arg.value.getBuffer());
         // The -load-repro feature is not maintained, and not supported by the new compile API.
         // TODO: Remove this when the feature has been deprecated.
         SLANG_ASSERT(arg.value != "-load-repro");
+    }
+
+    // Forward every other downstream bucket (e.g. "dxc", "glslang") on to Slang. render-test
+    // itself only ever reads the "slang" bucket, so a `-Xdxc ...` option — now accepted since
+    // options.cpp registers all downstream names — would otherwise land in an unread bucket and be
+    // silently dropped, passing the test without applying the option. Re-emitting the args lets
+    // slangc's own parseCommandLineArguments re-bucket them into its DownstreamArgs and route them
+    // to the right downstream compiler, exactly as `slangc -Xdxc ...` does.
+    //
+    // Each stored value is re-emitted as its own `-X<name> <value>` single-option pair rather than
+    // one `-X<name>... <values> -X.` block. slangc's stripDownstreamArgs takes the token after
+    // `-X<name>` verbatim, so this keeps every value opaque; the block form would instead
+    // reinterpret a value that itself looks like the grammar (a literal `-X.` would close the
+    // block early, a `-Xfoo...` value would open a nested scope).
+    //
+    // synthesizedNames owns the built `-X<name>` strings so their buffers stay alive for the
+    // parseCommandLineArguments call, which holds them as raw `const char*`.
+    List<String> synthesizedNames;
+    for (const auto& entry : options.downstreamArgs.m_entries)
+    {
+        if (entry.name == "slang")
+            continue;
+
+        for (const auto& arg : entry.args)
+        {
+            synthesizedNames.add("-X" + entry.name);
+            args.add(synthesizedNames.getLast().getBuffer());
+            args.add(arg.value.getBuffer());
+        }
     }
 
     slang::TargetDesc sessionTargetDesc = {};
