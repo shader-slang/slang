@@ -439,7 +439,9 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
     {
         m_writer->emit("extern \"C\" ");
 
-        // OptiX callables are emitted as __device__, while all others are __global__.
+        // Emit OptiX callables as __device__, which follows OptiX best
+        // practices and keeps pointer parameters for generated functions in the
+        // generic address space, allowing callees to write to them.
         if (entryPointDecor->getProfile().getStage() == Stage::Callable)
         {
             m_writer->emit("__device__ ");
@@ -462,8 +464,9 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
     }
     else
     {
-        // OptiX requires `--relocatable-device-code=true`; see section 6.1,
-        // "Program Input," in the OptiX Programming Guide.
+        // OptiX requires `--relocatable-device-code=true` (see OptiX
+        // Programming Guide, section 6.1). Given that requirement, we assume
+        // that all ray tracing stages will be compiled with that flag.
         //
         // Device functions are local to the CUDA module by default, but
         // enabling relocatable device code causes them to have public
