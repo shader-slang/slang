@@ -60,20 +60,24 @@ conversion.
 If the integer-to-float or float-to-integer conversion is not representable by the target type after rounding,
 the behavior is [undefined](basics-behavior.md).
 
-> 📝 **Remark:** As a compatibility feature for legacy code, Slang supports a cast from literal 0 to a
-> user-defined [structure](types-struct.md) type. This is equivalent to initializing the structure with an
-> empty initializer list.
+> 📝 **Remark:** As a compatibility feature for legacy code, Slang &le;2026 has special semantics for a cast
+> from literal 0 to a user-defined [structure](types-struct.md) type. This is equivalent to initializing the
+> structure with a default initializer.
+>
+> The special semantics are removed from Slang 2027. In Slang 2027, a cast from literal 0 is a regular
+> conversion, and it invokes the single-argument initializer of the target type.
 >
 > ```hlsl
-> MyStruct s = (MyStruct) 0;
+> MyStruct s = (MyStruct)0;
 >
-> // is same as
+> // In Slang 2026 and previous versions, the above is the same as
+> MyStruct s = MyStruct();
 >
-> MyStruct s = {};
+> // From Slang 2027 onward, the cast from literal 0 is equivalent to
+> MyStruct s = MyStruct(0);
 > ```
 >
-> This is a deprecated feature and subject to removal in a future Slang language version.
-> See also [GitHub issue 12045](https://github.com/shader-slang/slang/issues/12045).
+> See also GitHub issue [#12045](https://github.com/shader-slang/slang/issues/12045).
 
 #### Examples
 
