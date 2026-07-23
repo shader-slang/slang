@@ -39,6 +39,9 @@ on:
       publish:
         description: "push results + update tracking + deploy pages (set false for one-off measurements: results are uploaded as a run artifact only)"
         default: "true"
+      notify-slack:
+        description: "send the Slack notification for this manual run too (scheduled runs always notify) — lets the notification path be tested end-to-end without waiting for the cron"
+        default: "false"
 
 concurrency:
   group: nightly-mdl-perf-test
@@ -366,9 +369,78 @@ jobs:
       # keyed by the swept commit's date, so several points can share a date
       # and the series' last point may be a sibling, not this run's.
       - name: Check trend (fail on regression)
+        id: trend
         if: env.PUBLISH == 'true'
         shell: bash
         run: |
           set -euo pipefail
           cd "$SUITE"
           python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" --label "${PERF_LABEL:?}"
+
+      - name: Notify Slack
+        if: always() && (github.event_name == 'schedule' || github.event.inputs['notify-slack'] == 'true')
+        shell: bash
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_COMPILE_PERF }}
+          TREND_OUTCOME: ${{ steps.trend.outcome }}
+          TREND_WARNINGS: ${{ steps.trend.outputs.warnings || '0' }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK" ]; then
+            echo "SLACK_WEBHOOK_COMPILE_PERF not set; skipping Slack notification"
+            exit 0
+          fi
+          export DATE=$(date -u +%Y-%m-%d)
+          # A regression must be classified BEFORE the generic-failure case: the
+          # trend step exits non-zero on a regression, which also drives
+          # job.status to failure, so testing JOB_STATUS first would shadow the
+          # regression message. JOB_STATUS then distinguishes "trend skipped
+          # because an earlier step failed" (job failed) from "trend skipped
+          # because this is a publish=false measurement-only run".
+          if [ "$TREND_OUTCOME" = "failure" ]; then
+            export ICON=":warning:"
+            export STATUS="Regression detected (>=10% over trailing median) — see CI run for details"
+          elif [ "$JOB_STATUS" != "success" ]; then
+            export ICON=":x:"
+            export STATUS="Nightly job failed — see CI run for details"
+          elif [ "$TREND_OUTCOME" = "success" ] && [ "${TREND_WARNINGS:-0}" != "0" ]; then
+            export ICON=":large_yellow_circle:"
+            export STATUS="$TREND_WARNINGS warning-level change(s) (>=5%, below the 10% error gate) — see CI summary"
+          elif [ "$TREND_OUTCOME" = "success" ]; then
+            export ICON=":white_check_mark:"
+            export STATUS="No regressions detected"
+          else
+            # Reached when the trend step did not run while the job stayed
+            # green: its gate (if: env.PUBLISH == 'true') makes
+            # steps.trend.outcome report "skipped", which matches neither
+            # branch above. Phrased generically so the message stays true if
+            # that gate changes.
+            export ICON=":information_source:"
+            export STATUS="Trend check did not run — see CI run for details"
+          fi
+          python3 -c "
+          import json, os, urllib.request
+          payload = {
+              'text': (
+                  f'{os.environ[\"ICON\"]} *Compile-perf nightly — {os.environ[\"DATE\"]}*\n'
+                  f'{os.environ[\"STATUS\"]}\n'
+                  f'• Run: {os.environ[\"RUN_URL\"]}\n'
+                  f'• Report: https://shader-slang.org/slang-compile-perf/ '
+                  f'(may take a few minutes to update after the run)'
+              )
+          }
+          req = urllib.request.Request(
+              os.environ['SLACK_WEBHOOK'],
+              data=json.dumps(payload).encode(),
+              headers={'Content-Type': 'application/json'})
+          # Non-blocking by contract: a Slack outage must not red an
+          # otherwise-green run (a red step here would be indistinguishable
+          # from a real regression at a glance). The ::warning:: annotation
+          # keeps a broken webhook visible on the run summary.
+          try:
+              urllib.request.urlopen(req, timeout=10)
+              print('Slack notification sent')
+          except Exception as e:
+              print(f'::warning title=Slack notification failed::{e}')
+          "

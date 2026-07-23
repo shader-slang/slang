@@ -16,7 +16,7 @@ this machine — re-run compile-perf-release-sweep (force=true); trend.py warns 
 compares only against same-runner points.
 
     python3 trend.py --results <perf-results>        # after track.py rebuild
-    python3 trend.py --results <dir> --window 7 --rel 1.25 --abs 2.0
+    python3 trend.py --results <dir> --window 7 --rel 1.10 --abs 2.0
 """
 import argparse
 import json
@@ -67,9 +67,11 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--results", default=os.path.join(HERE, "results"))
     # Threshold rationale:
-    # --rel 1.25: flag a 25% rise vs trailing median. The per-PR gate uses 15%;
-    #   25% here catches gradual drift that accumulates across many PRs without
-    #   any single one tripping the per-PR gate.
+    # --rel 1.10: flag a 10% rise vs trailing median. The runner is a dedicated
+    #   quiesced machine with 5-sample medians, giving a noise floor of ~1-3%,
+    #   so 10% catches real medium regressions while avoiding noise false positives.
+    #   The --abs guard (2 ms) prevents alerting on tiny absolute deltas even when
+    #   the relative ratio exceeds 10%.
     # --abs 2.0: ignore sub-2 ms absolute deltas regardless of ratio — a 50%
     #   rise in a 3 ms timer is within measurement noise, not a real regression.
     # --window 7: trailing-7-point median spans ~one week of nightly runs,
@@ -78,7 +80,10 @@ def main():
     # --min-baseline 3: require at least 3 prior same-runner points before judging,
     #   so the first few nights after a new runner don't produce false positives.
     ap.add_argument("--window", type=int, default=7, help="trailing points for the median")
-    ap.add_argument("--rel", type=float, default=1.25, help="relative regression threshold")
+    ap.add_argument("--rel", type=float, default=1.10,
+                    help="relative threshold for an ERROR (fails the nightly)")
+    ap.add_argument("--warn-rel", type=float, default=1.05,
+                    help="relative threshold for a WARNING (reported, does not fail)")
     ap.add_argument("--abs", type=float, default=2.0, help="min absolute ms delta to flag")
     ap.add_argument("--min-baseline", type=int, default=3,
                     help="min trailing points required to judge a metric")
@@ -154,6 +159,7 @@ def main():
 
     base_labels = f"{window[0]['label']}..{window[-1]['label']}"
     regressions = []
+    warnings = []
     for key, cur in sorted(current.get("metrics", {}).items()):
         wl, _, timer = key.partition("|")
         if timer not in timers_for(wl):
@@ -166,14 +172,28 @@ def main():
             continue
         ratio = cur / med
         delta = cur - med
-        if ratio >= args.rel and delta >= args.abs:
-            regressions.append((wl, timer, med, cur, ratio, delta))
+        if delta >= args.abs:
+            if ratio >= args.rel:
+                regressions.append((wl, timer, med, cur, ratio, delta))
+            elif ratio >= args.warn_rel:
+                warnings.append((wl, timer, med, cur, ratio, delta))
 
     regressions.sort(key=lambda r: -r[4])
+    warnings.sort(key=lambda r: -r[4])
 
     print(f"baseline: trailing {len(window)} point(s) [{base_labels}], "
-          f"median per metric; flag at ratio >= {args.rel} and >= {args.abs} ms\n")
-    if not regressions:
+          f"median per metric; ERROR at ratio >= {args.rel}, WARNING at "
+          f">= {args.warn_rel}, both gated on >= {args.abs} ms\n")
+
+    # Expose the counts to the workflow (the Slack step distinguishes a
+    # warnings-only night from a clean one; the exit code alone cannot,
+    # since warnings deliberately do not fail the job).
+    out = os.environ.get("GITHUB_OUTPUT")
+    if out:
+        with open(out, "a", encoding="utf-8") as fh:
+            fh.write(f"errors={len(regressions)}\nwarnings={len(warnings)}\n")
+
+    if not regressions and not warnings:
         print(f"OK — no compile-perf regression in {current['label']} vs trailing median.")
         write_step_summary(f"### Compile-perf trend — {current['label']}\n\n"
                 f"OK — no regression vs trailing {len(window)}-point median "
@@ -181,21 +201,29 @@ def main():
         return
 
     print(f"{'workload':20s}{'timer':26s}{'median':>10}{'current':>10}{'ratio':>8}{'Δms':>9}")
-    rows = ["### ⚠️ Compile-perf regressions — " + current["label"],
+    rows = [f"### {'🔴' if regressions else '⚠️'} Compile-perf trend — " + current["label"],
             f"\nvs trailing {len(window)}-point median (`{base_labels}`), "
-            f"runner `{cur_runner}`.\n",
-            "| workload | timer | median (ms) | current (ms) | ratio | Δ ms |",
-            "|---|---|--:|--:|--:|--:|"]
-    for wl, timer, med, cur, ratio, delta in regressions:
-        print(f"{wl:20s}{timer:26s}{med:10.1f}{cur:10.1f}{ratio:7.2f}x{delta:+9.1f}")
-        emit_gha_command(f"::error title=Perf regression {wl}/{timer}::"
-           f"{ratio:.2f}x ({med:.1f} -> {cur:.1f} ms, +{delta:.1f}) vs trailing median")
-        rows.append(f"| {wl} | {timer} | {med:.1f} | {cur:.1f} | "
-                    f"{ratio:.2f}× | +{delta:.1f} |")
+            f"runner `{cur_runner}`. ERROR ≥ {args.rel}×, WARNING ≥ {args.warn_rel}×.\n"]
+
+    def table(items, kind, gha):
+        rows.append(f"\n**{kind}** ({len(items)}):\n")
+        rows.append("| workload | timer | median (ms) | current (ms) | ratio | Δ ms |")
+        rows.append("|---|---|--:|--:|--:|--:|")
+        for wl, timer, med, cur, ratio, delta in items:
+            print(f"{wl:20s}{timer:26s}{med:10.1f}{cur:10.1f}{ratio:7.2f}x{delta:+9.1f}")
+            emit_gha_command(f"::{gha} title=Perf {kind.lower()} {wl}/{timer}::"
+               f"{ratio:.2f}x ({med:.1f} -> {cur:.1f} ms, +{delta:.1f}) vs trailing median")
+            rows.append(f"| {wl} | {timer} | {med:.1f} | {cur:.1f} | "
+                        f"{ratio:.2f}× | +{delta:.1f} |")
+
+    if regressions:
+        table(regressions, "Regressions", "error")
+    if warnings:
+        table(warnings, "Warnings", "warning")
     write_step_summary("\n".join(rows))
 
-    print(f"\n{len(regressions)} regression(s) flagged.")
-    if not args.no_fail:
+    print(f"\n{len(regressions)} regression(s), {len(warnings)} warning(s) flagged.")
+    if regressions and not args.no_fail:
         raise SystemExit(1)
 
 

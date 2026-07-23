@@ -50,7 +50,12 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   Inputs: `ref` (commit SHA or branch to build; blank = master HEAD, useful for
   backfilling historical daily points), `samples`, `sweep` (default `false` — opt-in,
   ~4x runtime: dispatch with `sweep=true` to also collect the multi-size scaling
-  ladders), `only`, and `publish` (default `true`). With `publish=false` the run measures only: results are
+  ladders), `only`, `publish` (default `true`), and `notify-slack` (default
+  `false`; set `true` to send the Slack notification from a manual run too,
+  to test the path end-to-end). The trend gate is two-tier: changes
+  ≥ 10% over the trailing median fail the job (Slack: regression), changes
+  ≥ 5% are reported as warnings (annotations + step summary + a yellow
+  Slack status) without failing — early signal without alert fatigue. With `publish=false` the run measures only: results are
   uploaded as a run artifact and the results repo, tracking series, pages, and
   trend check are untouched — the mode for one-off measurements (bisect points,
   suspect commits) that must not pollute the series. Because daily labels are
@@ -134,11 +139,15 @@ nightly passes `--label` with the label it just registered, so the judged point
 is pinned to this run's registration — daily labels are keyed by the swept
 commit's date, so several points can share a date and "the latest point" can be
 a same-date sibling. Without `--label` (ad-hoc CLI use) the last point is
-judged. A metric past both a relative (`--rel`, default 1.25×) and absolute
+judged. A metric past both a relative (`--rel`, default 1.10×) and absolute
 (`--abs`, default 2 ms) threshold is flagged — printed, emitted as a GitHub
 `::error::` annotation + step-summary row, and the job exits non-zero (after
 the push, so the data is still stored). If the judged point's runner differs
 from the history's, it warns and compares only same-runner points.
+On scheduled runs (and manual runs with `notify-slack=true`) the workflow also
+posts a Slack status notification — clean / regression detected / job failed /
+trend check skipped (`SLACK_WEBHOOK_COMPILE_PERF` secret; the step is skipped
+when unset, and a delivery failure only warns — it never fails the run).
 
 ### Runner-change procedure
 
