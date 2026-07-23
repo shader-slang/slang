@@ -191,6 +191,14 @@ void maybeAppendExtraNames(std::vector<Name>& ioNames);
 
 Public C APIs will prefix all symbol names while following the casing convention (e.g. `SlangModule`, `slangLoadModule`, etc.).
 
+### Internal `spirv_asm` result registers
+
+Result registers named inside a `spirv_asm` block in the core module (the `*.meta.slang` files) must be given a `__` prefix, e.g. `%__result` rather than `%result`.
+The SPIR-V emitter emits an `OpName` for every named `spirv_asm` register, so an un-prefixed internal name such as `%result` surfaces in the generated module's debug names where it can be mistaken for a user symbol.
+The `__` prefix marks these names as compiler-internal, matching the convention above for other not-for-normal-use core-module identifiers.
+This is enforced at parse time: the parser asserts that every named `spirv_asm` register in core-module code begins with `__`.
+User-authored `spirv_asm` blocks are unaffected — they may name registers however they like.
+
 ### Enums
 
 C-style `enum` should use the following convention:
