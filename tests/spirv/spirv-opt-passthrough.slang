@@ -45,8 +45,9 @@
 // code (a successful compile would print `result code = 0`) and the surfaced diagnostic, so the
 // test fails if the error is emitted but the compile wrongly reports success. `result code = -1`
 // and the `Unknown flag` wording are external contracts (slang-test's harness and SPIRV-Tools'
-// message); if either drifts, this is wording drift, not a Slang regression -- the `{{[Ee]rror}}`
-// line guards the actual intent (an invalid flag surfaces an error and fails the compile).
+// message); if either drifts, this is wording drift, not a Slang regression -- the `result code =
+// -1` and `{{[Ee]rror}}` lines together guard the intent (an invalid flag surfaces an error and
+// fails the compile).
 // INVALID: result code = -1
 // INVALID: {{[Ee]rror}}
 // INVALID: Unknown flag
