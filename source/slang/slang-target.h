@@ -21,6 +21,8 @@
 namespace Slang
 {
 
+class DiagnosticSink;
+
 enum class CodeGenTarget : SlangCompileTargetIntegral
 {
     Unknown = SLANG_TARGET_UNKNOWN,
@@ -159,9 +161,19 @@ public:
 
     void setTargetCaps(CapabilitySet capSet);
 
+    /// Validate that any explicitly requested capabilities are compatible with the code-gen target.
+    /// May emit an error diagnostic for each incompatible capability, unless capability
+    /// checking is suppressed by compiler options (e.g. -ignore-capabilities).
+    void checkCapabilities(DiagnosticSink* sink);
+
     HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions();
 
 private:
+    /// Returns true if this target emits GLSL or uses the GLSL-SPIRV pipeline.
+    /// Used to determine whether SPIRV capability atoms should be auto-converted
+    /// rather than treated as incompatible. Keep in sync with getTargetCaps().
+    bool isGLSLBasedTarget();
+
     Linkage* linkage = nullptr;
     CompilerOptionSet optionSet;
     CapabilitySet cookedCapabilities;
