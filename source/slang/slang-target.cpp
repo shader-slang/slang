@@ -4,6 +4,7 @@
 #include "../core/slang-type-text-util.h"
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "slang-compiler.h"
+#include "slang-target-program.h"
 #include "slang-type-layout.h"
 
 namespace Slang
@@ -240,28 +241,49 @@ CapabilitySet TargetRequest::getTargetCaps()
 }
 
 
-TypeLayout* TargetRequest::getTypeLayout(Type* type, slang::LayoutRules rules)
+TypeLayout* TargetRequest::getTypeLayout(
+    Type* type,
+    slang::LayoutRules rules,
+    ProgramLayout* programLayout)
 {
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
-    // TODO: We are not passing in a `ProgramLayout` here, although one
-    // is nominally required to establish the global ordering of
-    // generic type parameters, which might be referenced from field types.
+    // When a `ProgramLayout` is supplied, the layout context can resolve
+    // `extern` declarations against their link-time definitions (via
+    // `buildExternTypeMap`) and establish the global ordering of generic type
+    // parameters that might be referenced from field types. The reflection
+    // entry point `spReflection_GetTypeLayout` always has the `ProgramLayout`
+    // in hand, so it threads it through here; that way a query such as
+    // `getTypeLayout` for a struct with an `extern` member resolves the member
+    // to its concrete linked type rather than laying out the bare, unresolved
+    // `extern` declaration (which would report zero fields and size 0).
     //
-    // The solution here is to make sure that the reflection data for
-    // uses of global generic/existential types does *not* include any
-    // kind of index in that global ordering, and just refers to the
-    // parameter instead (leaving the user to figure out how that
-    // maps to the ordering via some API on the program layout).
+    // `programLayout` may still be null for the genuinely program-less entry
+    // point (`Linkage::getTypeLayout`); in that case the layout context leaves
+    // `extern`/global-generic references unresolved, which is correct for a
+    // type that does not reference them.
+    auto layoutContext = getInitialLayoutContextForTarget(this, programLayout, rules);
+
+    // Choose where to cache. When a `ProgramLayout` is supplied, the resulting
+    // `TypeLayout` is computed against that specific program (resolved `extern`
+    // members, global-generic indices), so it must be cached with the program's
+    // lifetime — on the owning `TargetProgram`, not on this session-long
+    // `TargetRequest`. Caching a program-scoped result under a raw
+    // `ProgramLayout*` key here would let a freed program's address be reused
+    // by a later program and alias a stale entry.
     //
-    auto layoutContext = getInitialLayoutContextForTarget(this, nullptr, rules);
+    // The program-less path has no such hazard: `Type*` lives in the
+    // linkage-owned `ASTBuilder` arena that outlives every program, so its
+    // entries stay on this `TargetRequest`.
+    auto& typeLayoutCache =
+        programLayout ? programLayout->getTargetProgram()->getTypeLayouts() : getTypeLayouts();
 
     RefPtr<TypeLayout> result;
     auto key = TypeLayoutKey{type, rules};
-    if (getTypeLayouts().tryGetValue(key, result))
+    if (typeLayoutCache.tryGetValue(key, result))
         return result.Ptr();
     result = createTypeLayout(layoutContext, type);
-    getTypeLayouts()[key] = result;
+    typeLayoutCache[key] = result;
     return result.Ptr();
 }
 
