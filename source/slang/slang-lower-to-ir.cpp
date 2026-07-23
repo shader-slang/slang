@@ -15188,23 +15188,34 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
     return info;
 }
 
-// Stamp the entry-point function's required language-version capability atoms onto
-// `entryPointInst` as IRRequireCapabilityAtomDecoration. The atoms come from the function's
-// inferred capability requirements, which fold in any `[require(...)]` attributes, and are
-// filtered to the target language-version atoms (SPIR-V `_spirv_1_x`, Metal `metallib_2_x`)
-// via isTargetVersionAtom. Both the codegen front-end lowering and the layout/reflection IR
-// module call this, so the codegen module carries the same per-entry-point version
-// requirement the reflection module records. The SPIR-V backend reads these decorations to
-// raise the emitted binary version (see determineSpirvVersion in slang-ir-spirv-legalize.cpp;
-// #11631). The Metal atoms are carried for parity with the reflection module and currently
-// have no codegen consumer.
+// Stamp the entry point's user-specified target language-version atoms (those accepted by
+// `isTargetVersionAtom` — e.g. `_spirv_1_x`, `metallib_2_x`) onto `entryPointInst` as
+// IRRequireCapabilityAtomDecoration, so the SPIR-V backend can raise the emitted binary version to
+// match a source-level `[require(spirv_1_x)]` the same way `-capability`/`-profile` does (see
+// determineSpirvVersion in slang-ir-spirv-legalize.cpp).
+//
+// The atoms come from the *explicitly declared* capability set
+// (`ExplicitlyDeclaredCapabilityModifier` — the user's `[require]`, expanded and parent-merged by
+// the semantic checker), not the body-inferred set. Reading the declared set is what keeps codegen
+// stable for shaders that never wrote `[require]`: capability inference can conclude that a
+// ray-tracing shader needs `_spirv_1_4`, but promoting an *inferred* requirement into the emitted
+// version would change output for code the user never annotated. An entry point with no `[require]`
+// has no modifier and contributes nothing.
+//
+// Both the codegen lowering and the layout/reflection IR module call this, so the codegen module
+// carries the same per-entry-point requirement the reflection module records.
 static void addEntryPointRequireCapabilityDecorations(
     IRBuilder* builder,
     IRInst* entryPointInst,
     FuncDecl* entryPointFuncDecl)
 {
-    CapabilitySet capabilitySet{entryPointFuncDecl->inferredCapabilityRequirements};
-    for (auto atomSet : capabilitySet.getAtomSets())
+    auto declaredCapModifier =
+        entryPointFuncDecl->findModifier<ExplicitlyDeclaredCapabilityModifier>();
+    if (!declaredCapModifier || !declaredCapModifier->declaredCapabilityRequirements)
+        return;
+
+    CapabilitySet declaredCaps{declaredCapModifier->declaredCapabilityRequirements};
+    for (auto atomSet : declaredCaps.getAtomSets())
     {
         for (auto atomVal : atomSet)
         {
@@ -15308,10 +15319,8 @@ static void lowerFrontEndEntryPointToIR(
             builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(instToDecorate);
     }
 
-    // Carry the entry point's user-specified `[require(...)]` capability atoms into the codegen
-    // module so the SPIR-V backend can honor them (raise the emitted binary version, select the
-    // bindless descriptor path) alongside the global compiler options (#11631). Previously these
-    // were recorded only on the layout/reflection IR module, so codegen never saw them.
+    // Carry the entry point's user-specified `[require(...)]` target-version atoms onto the codegen
+    // entry function so the SPIR-V backend's version scan can raise the emitted binary version.
     addEntryPointRequireCapabilityDecorations(builder, instToDecorate, entryPointFuncDecl);
 }
 

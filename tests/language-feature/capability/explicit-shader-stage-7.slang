@@ -1,17 +1,14 @@
 //TEST:SIMPLE(filecheck=CHECK_PASS): -target spirv -entry main -allow-glsl -profile sm_5_0
 //TEST:SIMPLE(filecheck=CHECK_WARN): -target spirv -entry main -allow-glsl -profile sm_5_0 -DWARN
 
-// Our code will stillwarn about spirv version being below 'spirv 1.3'. This is Because we are still using `Profile` internally.
-// 'Profile' is an issue which needs to be refactored out since it only stores the info in a single integer through 'profileRaw'
-//CHECK_PASS: warning[E50011]
-//
-// Our code does not warn about capabilities here since we specify profile 'sm_5_0' and a 'ser_motion_raygen' shader.
-// 'ser_motion_raygen' implicitly uses "raygen + raytracing_motion + ser" capabilities.
+// A 'ser_motion_raygen' shader implicitly requires "raygen + raytracing_motion + ser", which pulls
+// in SPIR-V 1.4. The via-GLSL legalization path records that as an internal `_spirv_1_4`
+// IRRequireCapabilityAtomDecoration and the backend version scan honors it, so the emitted header is
+// 1.4 — at or above the 1.3 minimum — and no E50011 "below spirv 1.3" warning is emitted here.
 //CHECK_PASS: main
 
-// On the contrary, our code will warn without 'ser_motion_raygen'.
+// Without 'ser_motion_raygen' the plain 'raygen' stage triggers the profile-upgrade warning.
 //CHECK_WARN: warning[E41012]
-//CHECK_WARN: warning[E50011]
 
 
 struct RayPayload

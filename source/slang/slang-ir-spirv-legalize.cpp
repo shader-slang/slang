@@ -35,14 +35,10 @@ namespace Slang
 // Legalization of IR for direct SPIRV emit.
 //
 
-// Raise the shared SPIR-V backend's minimum required binary version when `atom` is one of
-// the internal `_spirv_1_x` language-version atoms (e.g. `_spirv_1_5` -> binary version
-// 0x10500). Both the target-capability scan and the per-entry-point `[require]` decoration
-// scan in determineSpirvVersion() funnel through this so the two stay in lockstep: the
-// IRRequireCapabilityAtomDecoration is produced with the *internal* `_spirv_1_x` atom by both
-// the per-entry-point lowering (slang-lower-to-ir.cpp) and the via-GLSL legalization path
-// (slang-ir-glsl-legalize.cpp), so the decoration scan must match that internal namespace
-// rather than the public `spirv_1_x` aliases (see #11631).
+// Raise the shared SPIR-V backend's minimum required binary version when `atom` is one of the
+// internal `_spirv_1_x` language-version atoms (e.g. `_spirv_1_5` -> binary version 0x10500).
+// The match is on the internal atoms because `IRRequireCapabilityAtomDecoration` and the target
+// capability set both carry the internal `_spirv_1_x`, never the public `spirv_1_x` alias.
 static void raiseSpirvVersionForAtom(SPIRVEmitSharedContext* sharedContext, CapabilityName atom)
 {
     switch (atom)
