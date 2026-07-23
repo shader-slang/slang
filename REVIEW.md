@@ -120,6 +120,8 @@ nothing and exit with an error naming the failed reviewer. Do not post a partial
 
 Once ALL dispatched reviewers have returned findings, build the editorial table below, **fill every column for every Keep row**, and post only Keep rows.
 
+If `tmp/prior-review-threads.json` exists, read it first — it lists prior Claude findings on this PR and any maintainer replies. Apply Rule 7 below before keeping anything.
+
 | Source agent | file:line | Severity | Confidence | Evidence / verification quote | User-visible impact | Keep / Drop |
 
 Rules (applied in order, before any posting):
@@ -138,6 +140,27 @@ Rules (applied in order, before any posting):
 5. **Dedup + bundling:** Merge duplicates across teammates. Group closely related consistency nits (missing `static`/`override`/`public`, docstring polish) into one comment; do not post low-impact maintainability items as separate inline threads.
 
 6. **CI-enforced drops:** Drop formatting/style issues (`./extras/formatting.sh`) and anything already caught by existing CI.
+
+7. **Don't re-post a finding the maintainer already dismissed.** The cleanup step writes prior findings to `tmp/prior-review-threads.json` (no file → skip this rule). Each entry has this shape:
+
+   ```json
+   {
+     "path": "tests/.../foo.slang",
+     "line": 99,
+     "outdated": false,
+     "finding": "<the bot's earlier comment text>",
+     "humanReplies": [
+       { "user": "<maintainer>", "body": "<maintainer's reply>" }
+     ]
+   }
+   ```
+
+   `outdated` is `true` when newer commits changed those lines since the reply (GitHub re-anchored the thread). DROP a candidate finding when **ALL** of these hold:
+   - a prior entry made the same point on the same code (same `path`, within ±8 lines), **and**
+   - its `humanReplies` is non-empty and a maintainer dismissed or explained it ("won't fix", "by design", "no such target", "the diagnostic test is exhaustive", …), **and**
+   - that entry has **`"outdated": false`**. If `"outdated": true`, the verdict is stale (the code changed since the reply) — re-review the finding normally instead.
+
+   Always KEEP a 🔴 Bug whose evidence shows a concrete wrong result the reply did not address. If `humanReplies` is empty, nobody responded — you may post the finding once. When you drop a finding here, mark the row **Drop** with `Suppressed: prior verdict by @<user>` and list it in the folded **Suppressed** section of the review body (see Review Body Format).
 
 A finding that fails any rule above is marked Drop in the table. Do not post Drop rows. Do not post findings that were not in the table.
 
@@ -235,9 +258,18 @@ The review body is the SUMMARY. The detailed analysis goes in inline comments. U
 | 🔵 Question | `file:line` | <one-line description — detail is in the inline comment> |
 
 </details>
+
+<details>
+<summary>Suppressed (K) — findings a maintainer already addressed on this PR; not re-posted</summary>
+
+| Location | Finding | Maintainer verdict |
+|----------|---------|--------------------|
+| `file:line` | <one-line description of the dropped finding> | @user: <short paraphrase of their reply> |
+
+</details>
 ```
 
-Omit the Findings section if there are 0 findings. Changes Overview is ALWAYS included.
+Omit the Findings section if there are 0 findings. Omit the Suppressed section if nothing was suppressed under Rule 7. Changes Overview is ALWAYS included.
 
 ### Severity badges:
 
