@@ -111,30 +111,41 @@ under their respective upstream terms (they are not checked into this tree).
 
 ## Which dependency feeds which output
 
-Grouped by the artifact each dependency ends up in:
+Each dependency, grouped by the artifact it ends up in:
 
-- **The `slang` compiler and `slang-rt` runtime** — `unordered_dense`, `miniz`,
-  and `lz4` (via `source/core`); `fast_float` and `spirv-headers` (via
-  `source/compiler-core`); `cmark` (via `source/slang`, for Markdown handling);
-  and `mimalloc` when enabled (the allocator is linked into Slang and shared
-  with SPIRV-Tools).
-- **The `slang-glslang` shared library** (Slang's GLSL / SPIR-V tooling path) —
-  `glslang` and `spirv-tools` (`SPIRV`, `SPIRV-Tools-opt`, `SPIRV-Tools-link`).
-- **Downstream compilers the Slang compiler drives** — DXC (the fetched binary,
-  for DXIL), `slang-llvm` (the fetched binary, for CPU/host), and `slang-tint`
-  (the fetched binary, loaded at runtime by `source/compiler-core` via
-  `slang-tint-headers/` to translate to WGSL). `optix-dev` headers are included
-  by the CUDA prelude (`prelude/slang-cuda-prelude.h`) for OptiX code generation.
-- **Tools, examples, and tests only** (not linked into the compiler) —
-  `slang-rhi`, `imgui`, `stb`, `glm`, `tinyobjloader`, and `renderdoc_app.h`.
-  The vendored `metal-cpp` submodule is consumed by `tools/` and the examples
-  (`slang-rhi` independently fetches its own Metal C++ archive). The `vulkan`
-  (Vulkan-Headers) checkout is reused by `slang-rhi` through FetchContent. And
-  `webgpu_dawn` (the fetched WebGPU runtime) is staged next to the test binaries.
-- **Build-time tooling** (produces no shipped output) — `lua` drives the
-  `slang-fiddle` code generator; `WindowsToolchain` supplies CMake toolchain
-  files; `glslang-generated/` and `spirv-tools-generated/` are compiled into the
-  glslang / SPIRV-Tools build.
+```mermaid
+flowchart LR
+    unordered_dense & miniz & lz4 --> corelib["source/core (shared utilities)"]
+    corelib --> slang["slang compiler"]
+    corelib --> slangrt["slang-rt runtime"]
+    fast_float & spirv_headers["spirv-headers"] & cmark --> slang
+    mimalloc -.->|when enabled, shared with SPIRV-Tools| slang
+
+    glslang & spirv_tools["spirv-tools"] --> glslang_lib["slang-glslang shared library"]
+
+    dxc["DXC (fetched)"] -->|DXIL| downstream["downstream compilers Slang drives"]
+    slang_llvm["slang-llvm (fetched)"] -->|CPU / host| downstream
+    slang_tint["slang-tint (fetched, runtime-loaded)"] -->|WGSL| downstream
+    optix_dev["optix-dev"] -->|OptiX, via CUDA prelude| downstream
+
+    slang_rhi["slang-rhi"] & imgui & stb & glm & tinyobjloader & renderdoc["renderdoc_app.h"] --> tools["tools, examples, tests"]
+    metal_cpp["metal-cpp"] -->|tools + examples| tools
+    vulkan["vulkan (Vulkan-Headers)"] -->|via slang-rhi FetchContent| tools
+    webgpu_dawn["webgpu_dawn (fetched)"] -->|staged by tests| tools
+
+    lua -->|slang-fiddle generator| build_tooling["build-time tooling"]
+    WindowsToolchain --> build_tooling
+    generated["glslang-generated/, spirv-tools-generated/"] --> build_tooling
+```
+
+A few edges carry caveats the diagram abbreviates: the `slang-glslang` shared
+library is loaded at runtime by `source/compiler-core` (by name, via
+`loadSharedLibrary`), not linked into the compiler; `mimalloc` is one checkout
+shared between Slang and SPIRV-Tools; `slang-tint` is likewise loaded at runtime
+by `source/compiler-core` (via `slang-tint-headers/`); `slang-rhi` fetches its
+own Metal C++ archive separately from the vendored `metal-cpp`; and the
+`*-generated/` directories are committed inputs compiled into the glslang /
+SPIRV-Tools build rather than build products.
 
 ## Build-wide option families
 
