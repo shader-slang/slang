@@ -5,6 +5,7 @@
 #include "../compiler-core/slang-artifact-impl.h"
 #include "../compiler-core/slang-artifact-util.h"
 #include "../compiler-core/slang-name.h"
+#include "../compiler-core/slang-slice-allocator.h"
 #include "../core/slang-castable.h"
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-type-text-util.h"
@@ -3381,6 +3382,12 @@ static SlangResult createArtifactFromIR(
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
         downstreamOptions.targetType = SLANG_SPIRV;
         downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
+
+        // Forward `-Xspirv-opt` arguments so they reach the SPIRV-Tools optimizer as additional
+        // passes on top of the `-OX` preset. The allocator must outlive the compile() call below.
+        SliceAllocator allocator;
+        downstreamOptions.compilerSpecificArguments = allocator.allocate(
+            codeGenContext->getTargetProgram()->getOptionSet().getDownstreamArgs("spirv-opt"));
         switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
         {
         case OptimizationLevel::None:
