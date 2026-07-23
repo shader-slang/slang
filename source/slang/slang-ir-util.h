@@ -206,6 +206,12 @@ IRType* getMatrixElementType(IRType* type);
 bool isResourceType(IRType* type);
 bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);
 
+// True if `type` (after peeling any array wrappers) is an opaque handle that cannot be copied by a
+// value load/store — currently a `RayQuery` or a `HitObject`. Such a handle IS its storage: a
+// whole-handle load/store is a no-op on it (see shader-slang/slang#12197), so it must be produced
+// in place rather than copied.
+bool isNonCopyableOpaqueType(IRType* type);
+
 // True if type is a pointer to a resource
 bool isPointerToResourceType(IRType* type);
 
