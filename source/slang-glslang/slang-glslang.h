@@ -43,6 +43,12 @@ struct glsl_SPIRVVersion
 // Pre-declare
 struct glslang_CompileRequest_1_1;
 
+// The glslang_CompileRequest_1_N structs form a versioned chain across the slang-glslang shared
+// library boundary. Each version must be a layout-compatible prefix of the next: new fields are
+// appended only, never reordered or resized. The `set()` converters and the prefix `memcpy`
+// up/downgrades in slang-glslang-compiler.cpp rely on this. When adding a `_1_(N+1)`, append its
+// new fields and zero them in its `set()`.
+
 // 1.0 version
 struct glslang_CompileRequest_1_0
 {

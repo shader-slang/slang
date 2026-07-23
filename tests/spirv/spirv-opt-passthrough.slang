@@ -21,14 +21,18 @@
 // passthrough flag applies -- the option is additive to `-OX`, it does not turn the optimizer on.
 //TEST:SIMPLE(filecheck=O0): -target spirv-asm -entry computeMain -stage compute -O0 -Xspirv-opt --strip-debug
 
+// An invalid pass flag is rejected by SPIRV-Tools rather than silently ignored: the optimize step
+// fails and its diagnostic is surfaced (the compiler does not run a partially-registered pipeline).
+//TEST:SIMPLE(filecheck=INVALID): -target spirv-asm -entry computeMain -stage compute -O1 -Xspirv-opt --this-pass-does-not-exist
+
 // At `-O1` the preset keeps the debug names and inlines the call.
 // BASE: {{^}}OpName %
 // BASE-NOT: {{^}}%{{[0-9]+}} = OpFunctionCall
 
 // With `--strip-debug` on top of `-O1`: the preset still inlines the call, and the extra pass
-// removes the debug names. OpEntryPoint appears near the top of every module, so anchoring on it
-// first makes the following exclusions scan the entire remainder of the module (the OpName section
-// and all function bodies come after it).
+// removes the debug names. The SPIR-V logical layout guarantees OpEntryPoint precedes the debug
+// (OpName) and function-body sections, so anchoring on it first makes the following exclusions scan
+// the entire remainder of the module -- this is a layout guarantee, not incidental emitter order.
 // STRIP: {{^}}OpEntryPoint
 // STRIP-NOT: {{^}}OpName %
 // STRIP-NOT: {{^}}%{{[0-9]+}} = OpFunctionCall
@@ -36,6 +40,13 @@
 // At `-O0` nothing runs: the call is not inlined and the debug names are not stripped.
 // O0: {{^}}OpName %
 // O0: {{^}}%{{[0-9]+}} = OpFunctionCall
+
+// The invalid flag is reported by spirv-opt and the compile fails: assert both the failing result
+// code (a successful compile would print `result code = 0`) and the surfaced diagnostic, so the
+// test fails if the error is emitted but the compile wrongly reports success.
+// INVALID: result code = -1
+// INVALID: {{[Ee]rror}}
+// INVALID: Unknown flag
 
 RWStructuredBuffer<float> outputBuffer;
 

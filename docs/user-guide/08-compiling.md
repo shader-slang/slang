@@ -301,6 +301,7 @@ When used, `option` is not interpreted by GCC, but is passed to the linker once 
 * `gcc` - GCC C/C++ compiler
 * `genericcpp` - A generic C++ compiler (can be any one of Visual Studio, Clang, or GCC depending on the system and availability)
 * `nvrtc` - NVRTC CUDA compiler
+* `spirv-opt` - spirv-tools SPIRV optimizer
 
 The Slang command line allows you to specify an argument to these downstream compilers, by using their name after the `-X`. So for example, to send an option `-Gfa` through to DXC you can use:
 
@@ -349,6 +350,14 @@ And the linker would see (as passed through by GCC):
 ```
 
 Setting options for tools that aren't used in a Slang compilation has no effect. This allows for setting `-X` options specific for all downstream tools on a command line, and they are only used as part of a compilation that needs them.
+
+Arguments passed via `-Xspirv-opt` are forwarded to the SPIRV-Tools optimizer as additional passes, registered on top of the passes selected by the `-O<level>` preset (they add to that level, they do not replace it). For example, to strip debug information in addition to the `-O1` passes:
+
+```
+-target spirv -O1 -Xspirv-opt --strip-debug
+```
+
+The accepted flags are the pass-selection flags of the `spirv-opt` command-line tool (for example `--strip-debug`, `--eliminate-dead-code-aggressive`, `-O`, `-Os`) — those recognized by SPIRV-Tools' `RegisterPassesFromFlags`. Driver-level `spirv-opt` options that do not select a pass (such as `--target-env` or `--validate-after-all`) are not supported. An unrecognized flag is reported by SPIRV-Tools and the compilation fails. Because the optimizer only runs when the optimization level is above `-O0`, these flags have no effect under an explicit `-O0`. They currently apply to the default direct SPIR-V path; they are not forwarded on the `-emit-spirv-via-glsl` path.
 
 NOTE! Not all tools that Slang uses downstream make command line argument parsing available. `FXC` and `GLSLANG` currently do not have any command line argument passing as part of their integration, although this could change in the future.
 

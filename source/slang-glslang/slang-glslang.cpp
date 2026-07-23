@@ -261,7 +261,9 @@ extern "C"
     return succ;
 }
 
-// Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
+// Apply the SPIRV-Tools optimizer to generated SPIR-V: the passes of the requested optimization
+// level preset, plus any passthrough passes from `request.spirvOptimizationFlags` (`-Xspirv-opt`)
+// registered on top. Returns SLANG_FAIL if a passthrough flag is invalid.
 // TODO: add flag for optimizing SPIR-V size as well
 static int glslang_optimizeSPIRV(
     spv_target_env targetEnv,
@@ -511,10 +513,10 @@ static int glslang_optimizeSPIRV(
         }
     }
 
-    // Register any additional passes selected via `-Xspirv-opt` on top of the preset above.
-    // SPIRV-Tools owns the flag->pass mapping. It stops at the first invalid flag (reporting it
-    // through the message consumer) and leaves the earlier flags registered, so a false return
-    // means the requested pipeline is only partially built -- fail rather than run it.
+    // These `-Xspirv-opt` passes are additive: they run on top of the preset registered above.
+    // RegisterPassesFromFlags stops at the first invalid flag (reporting it through the message
+    // consumer) and leaves the earlier flags registered, so a false return means the pipeline is
+    // only partially built -- fail rather than run a partial pipeline.
     if (request.spirvOptimizationFlags && request.spirvOptimizationFlagCount)
     {
         std::vector<std::string> flags(
@@ -1032,8 +1034,12 @@ extern "C"
 #endif
         int glslang_compile_1_2(glslang_CompileRequest_1_2* inRequest)
 {
-    // Normalize the caller's request to this build's _1_2 layout using its declared sizeInBytes,
-    // so a caller built against a shorter/older _1_2 isn't over-read, before converting to _1_3.
+    // Exported entry point: a client that loaded this symbol by name (see
+    // GlslangDownstreamCompiler::init) still calls it after the internal request was bumped to
+    // _1_3. Unlike the _1_1/_1_0 shims below -- which receive an in-process request this same build
+    // just constructed at the exact current size -- `inRequest` here crosses the library boundary
+    // and may come from a client built against a shorter/older _1_2, so normalize by its declared
+    // sizeInBytes to avoid over-reading before converting to _1_3.
     glslang_CompileRequest_1_2 normalized;
     const size_t copySize =
         (inRequest->sizeInBytes > sizeof(normalized)) ? sizeof(normalized) : inRequest->sizeInBytes;
