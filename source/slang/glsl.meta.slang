@@ -2133,6 +2133,17 @@ public float texture(sampler2DArrayShadow sampler, vec4 p)
         return sampler.SampleCmpLevelZero(p.xyz, p.w);
 }
 
+// A GL_EXT_texture_shadow_lod form; the extension is requested branch-locally inside SampleCmpBias's wrapper.
+[ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowgrad)]
+public float texture(sampler2DArrayShadow sampler, vec4 p, float bias)
+{
+    if (__targetHasImplicitDerivatives())
+        return sampler.SampleCmpBias(p.xyz, p.w, bias);
+    else
+        return sampler.SampleCmpLevelZero(p.xyz, p.w);
+}
+
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(samplerCubeArrayShadow sampler, vec4 p, float compare)
@@ -2804,6 +2815,17 @@ public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2
         return sampler.SampleCmpLevelZero(p.xyz, p.w, offset);
 }
 
+// A GL_EXT_texture_shadow_lod form; the extension is requested branch-locally inside SampleCmpBias's wrapper.
+[ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowgrad)]
+public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2 offset, float bias)
+{
+    if (__targetHasImplicitDerivatives())
+        return sampler.SampleCmpBias(p.xyz, p.w, bias, offset);
+    else
+        return sampler.SampleCmpLevelZero(p.xyz, p.w, offset);
+}
+
 // -------------------
 // texelFetch
 // -------------------
@@ -3327,6 +3349,14 @@ public float textureLodOffset(sampler1DArrayShadow sampler, vec3 p, float lod, c
         // TODO: Need to apply lod
         return sampler.SampleCmpLevelZero(p.xy, p.z, offset);
     }
+}
+
+// A GL_EXT_texture_shadow_lod form; the extension is requested branch-locally inside SampleCmpLevel's wrapper.
+[ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod_ext)]
+public float textureLodOffset(sampler2DArrayShadow sampler, vec4 p, float lod, constexpr ivec2 offset)
+{
+    return sampler.SampleCmpLevel(p.xyz, p.w, lod, offset);
 }
 
 // -------------------
