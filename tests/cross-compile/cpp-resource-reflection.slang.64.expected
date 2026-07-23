@@ -12,6 +12,8 @@ standard output = {
                 "elementType": {
                     "kind": "struct",
                     "name": "Thing",
+                    "uniformSize": 12,
+                    "uniformStride": 12,
                     "fields": [
                         {
                             "name": "a",
@@ -46,6 +48,8 @@ standard output = {
                     "type": {
                         "kind": "struct",
                         "name": "Thing",
+                        "uniformSize": 12,
+                        "uniformStride": 12,
                         "fields": [
                             {
                                 "name": "a",
@@ -133,6 +137,8 @@ standard output = {
                     "type": {
                         "kind": "struct",
                         "name": "Thing",
+                        "uniformSize": 12,
+                        "uniformStride": 12,
                         "fields": [
                             {
                                 "name": "a",
@@ -167,6 +173,8 @@ standard output = {
                     "type": {
                         "kind": "struct",
                         "name": "Thing",
+                        "uniformSize": 12,
+                        "uniformStride": 12,
                         "fields": [
                             {
                                 "name": "a",

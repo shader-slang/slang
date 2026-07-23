@@ -11,6 +11,8 @@ standard output = {
                 "kind": "constantBuffer",
                 "elementType": {
                     "kind": "struct",
+                    "uniformSize": 172,
+                    "uniformStride": 176,
                     "fields": [
                         {
                             "name": "aa",
@@ -59,6 +61,8 @@ standard output = {
                 "elementVarLayout": {
                     "type": {
                         "kind": "struct",
+                        "uniformSize": 172,
+                        "uniformStride": 176,
                         "fields": [
                             {
                                 "name": "aa",
@@ -112,12 +116,16 @@ standard output = {
                 "kind": "constantBuffer",
                 "elementType": {
                     "kind": "struct",
+                    "uniformSize": 172,
+                    "uniformStride": 176,
                     "fields": [
                         {
                             "name": "b",
                             "type": {
                                 "kind": "struct",
                                 "name": "SB",
+                                "uniformSize": 172,
+                                "uniformStride": 176,
                                 "fields": [
                                     {
                                         "name": "ba",
@@ -170,12 +178,16 @@ standard output = {
                 "elementVarLayout": {
                     "type": {
                         "kind": "struct",
+                        "uniformSize": 172,
+                        "uniformStride": 176,
                         "fields": [
                             {
                                 "name": "b",
                                 "type": {
                                     "kind": "struct",
                                     "name": "SB",
+                                    "uniformSize": 172,
+                                    "uniformStride": 176,
                                     "fields": [
                                         {
                                             "name": "ba",

@@ -34,6 +34,8 @@ standard output = {
                 "kind": "constantBuffer",
                 "elementType": {
                     "kind": "struct",
+                    "uniformSize": 40,
+                    "uniformStride": 48,
                     "fields": [
                         {
                             "name": "vertexCA",
@@ -87,6 +89,8 @@ standard output = {
                 "elementVarLayout": {
                     "type": {
                         "kind": "struct",
+                        "uniformSize": 40,
+                        "uniformStride": 48,
                         "fields": [
                             {
                                 "name": "vertexCA",
@@ -168,6 +172,8 @@ standard output = {
                 "kind": "constantBuffer",
                 "elementType": {
                     "kind": "struct",
+                    "uniformSize": 40,
+                    "uniformStride": 48,
                     "fields": [
                         {
                             "name": "fragmentCA",
@@ -221,6 +227,8 @@ standard output = {
                 "elementVarLayout": {
                     "type": {
                         "kind": "struct",
+                        "uniformSize": 40,
+                        "uniformStride": 48,
                         "fields": [
                             {
                                 "name": "fragmentCA",
@@ -302,6 +310,8 @@ standard output = {
                 "kind": "constantBuffer",
                 "elementType": {
                     "kind": "struct",
+                    "uniformSize": 40,
+                    "uniformStride": 48,
                     "fields": [
                         {
                             "name": "sharedCA",
@@ -355,6 +365,8 @@ standard output = {
                 "elementVarLayout": {
                     "type": {
                         "kind": "struct",
+                        "uniformSize": 40,
+                        "uniformStride": 48,
                         "fields": [
                             {
                                 "name": "sharedCA",

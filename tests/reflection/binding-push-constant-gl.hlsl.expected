@@ -11,6 +11,8 @@ standard output = {
                 "kind": "constantBuffer",
                 "elementType": {
                     "kind": "struct",
+                    "uniformSize": 192,
+                    "uniformStride": 192,
                     "fields": [
                         {
                             "name": "x",
@@ -49,6 +51,8 @@ standard output = {
                 "elementVarLayout": {
                     "type": {
                         "kind": "struct",
+                        "uniformSize": 192,
+                        "uniformStride": 192,
                         "fields": [
                             {
                                 "name": "x",
@@ -93,6 +97,8 @@ standard output = {
                 "elementType": {
                     "kind": "struct",
                     "name": "MyPushConstantStruct",
+                    "uniformSize": 8,
+                    "uniformStride": 8,
                     "fields": [
                         {
                             "name": "pushX",
@@ -119,6 +125,8 @@ standard output = {
                     "type": {
                         "kind": "struct",
                         "name": "MyPushConstantStruct",
+                        "uniformSize": 8,
+                        "uniformStride": 8,
                         "fields": [
                             {
                                 "name": "pushX",

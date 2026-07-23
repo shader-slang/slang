@@ -17,6 +17,8 @@ standard output = {
                 "elementType": {
                     "kind": "struct",
                     "name": "Data",
+                    "uniformSize": 16,
+                    "uniformStride": 16,
                     "fields": [
                         {
                             "name": "tex",

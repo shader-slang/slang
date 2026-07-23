@@ -913,6 +913,23 @@ static void emitReflectionTypeLayoutInfoJSON(
                 writer.maybeComma();
                 emitReflectionNameInfoJSON(writer, name);
             }
+
+            // Emit both keys iff the struct has a nonzero uniform footprint; unlike Array,
+            // size is emitted too since trailing padding makes it underivable from stride.
+            if (structTypeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) != 0)
+            {
+                writer.maybeComma();
+                writer << "\"uniformSize\": ";
+                emitReflectionSize(
+                    writer,
+                    structTypeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM));
+                writer.maybeComma();
+                writer << "\"uniformStride\": ";
+                emitReflectionSize(
+                    writer,
+                    structTypeLayout->getStride(SLANG_PARAMETER_CATEGORY_UNIFORM));
+            }
+
             writer.maybeComma();
             writer << "\"fields\": [\n";
             writer.indent();

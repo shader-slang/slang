@@ -12,6 +12,8 @@ standard output = {
                 "elementType": {
                     "kind": "struct",
                     "name": "S",
+                    "uniformSize": 60,
+                    "uniformStride": 64,
                     "fields": [
                         {
                             "name": "z",
@@ -26,6 +28,8 @@ standard output = {
                             "type": {
                                 "kind": "struct",
                                 "name": "A",
+                                "uniformSize": 8,
+                                "uniformStride": 16,
                                 "fields": [
                                     {
                                         "name": "x",
@@ -89,6 +93,8 @@ standard output = {
                     "type": {
                         "kind": "struct",
                         "name": "S",
+                        "uniformSize": 60,
+                        "uniformStride": 64,
                         "fields": [
                             {
                                 "name": "z",
@@ -103,6 +109,8 @@ standard output = {
                                 "type": {
                                     "kind": "struct",
                                     "name": "A",
+                                    "uniformSize": 8,
+                                    "uniformStride": 16,
                                     "fields": [
                                         {
                                             "name": "x",
@@ -173,6 +181,8 @@ standard output = {
                 "resultType": {
                     "kind": "struct",
                     "name": "S",
+                    "uniformSize": 36,
+                    "uniformStride": 36,
                     "fields": [
                         {
                             "name": "z",
@@ -187,6 +197,8 @@ standard output = {
                             "type": {
                                 "kind": "struct",
                                 "name": "A",
+                                "uniformSize": 8,
+                                "uniformStride": 8,
                                 "fields": [
                                     {
                                         "name": "x",

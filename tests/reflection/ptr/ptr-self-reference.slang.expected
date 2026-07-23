@@ -14,6 +14,8 @@ standard output = {
                 "resultType": {
                     "kind": "struct",
                     "name": "SomeStruct",
+                    "uniformSize": 16,
+                    "uniformStride": 16,
                     "fields": [
                         {
                             "name": "payload",

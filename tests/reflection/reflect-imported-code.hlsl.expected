@@ -34,6 +34,8 @@ standard output = {
                 "kind": "constantBuffer",
                 "elementType": {
                     "kind": "struct",
+                    "uniformSize": 4,
+                    "uniformStride": 16,
                     "fields": [
                         {
                             "name": "c",
@@ -51,6 +53,8 @@ standard output = {
                 "elementVarLayout": {
                     "type": {
                         "kind": "struct",
+                        "uniformSize": 4,
+                        "uniformStride": 16,
                         "fields": [
                             {
                                 "name": "c",
@@ -96,6 +100,8 @@ standard output = {
                 "kind": "constantBuffer",
                 "elementType": {
                     "kind": "struct",
+                    "uniformSize": 4,
+                    "uniformStride": 16,
                     "fields": [
                         {
                             "name": "c_i",
@@ -113,6 +119,8 @@ standard output = {
                 "elementVarLayout": {
                     "type": {
                         "kind": "struct",
+                        "uniformSize": 4,
+                        "uniformStride": 16,
                         "fields": [
                             {
                                 "name": "c_i",

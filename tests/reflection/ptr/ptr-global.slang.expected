@@ -14,6 +14,8 @@ standard output = {
                 "resultType": {
                     "kind": "struct",
                     "name": "SomeStruct",
+                    "uniformSize": 24,
+                    "uniformStride": 24,
                     "fields": [
                         {
                             "name": "regularGlobal",
