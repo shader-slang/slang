@@ -112,6 +112,12 @@ Description:
 - The **bitwise right shift** operator shifts all bits in `lhs` right by `amount`.
   See [ILogical.shr](../../../core-module-reference/interfaces/ilogical-01/shr.html) for details.
 
+The `&&` and `||` operators short-circuit when their operands are scalars: the right-hand operand is evaluated
+only when it can affect the result. That is, in `lhs && rhs`, `rhs` is evaluated only when `lhs` is `true`. In
+`lhs || rhs`, `rhs` is evaluated only when `lhs` is `false`. When the operands are vectors or matrices, `&&`
+and `||` do not short-circuit and evaluate both operands element-wise. Short-circuiting can be disabled
+globally with the `-disable-short-circuit` compiler option.
+
 
 ### Comparison Operators (scalar)
 
@@ -348,6 +354,9 @@ vector or matrix element with the scalar operator.
 The matrix/matrix and matrix/vector multiplication are special, and they follow the matrix multiplication
 rules. See [Vector and Matrix Types](types-vector-and-matrix.md) for details.
 
+> 📝 **Remark:** The short-circuiting behavior of operators `&&`, `||`, and `?:` differs between scalar and
+> vector/matrix operands. See sections _Logical Operators (scalar)_ and _Ternary Conditional Operator_ for
+> details.
 
 ## Non-Overloadable Operators
 
