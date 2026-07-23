@@ -141,14 +141,19 @@ SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_3& reque
 {
     // The `-Xspirv-opt` pass flags only exist in the _1_3 request. If the loaded library predates
     // _1_3 we must downgrade to an older struct, which cannot carry them -- so honoring the user's
-    // explicit request is impossible. Rather than silently drop the flags and emit unmodified
-    // SPIR-V, fail with a diagnostic (the flags are only populated when the user passed them).
-    if (request.spirvOptimizationFlagCount != 0 && !m_compile_1_3 && request.diagnosticFunc)
+    // explicit request is impossible. Fail unconditionally rather than silently drop the flags and
+    // emit unmodified SPIR-V. The failure does not depend on a diagnostic sink; the message is
+    // emitted only if one is present (compile(), the only caller that populates flags, always sets
+    // one).
+    if (request.spirvOptimizationFlagCount != 0 && !m_compile_1_3)
     {
-        const char msg[] =
-            "error: -Xspirv-opt requires a newer slang-glslang library; the loaded version does "
-            "not support forwarding optimizer pass flags.\n";
-        request.diagnosticFunc(msg, sizeof(msg) - 1, request.diagnosticUserData);
+        if (request.diagnosticFunc)
+        {
+            const char msg[] =
+                "error: -Xspirv-opt requires a newer slang-glslang library; the loaded version "
+                "does not support forwarding optimizer pass flags.\n";
+            request.diagnosticFunc(msg, sizeof(msg) - 1, request.diagnosticUserData);
+        }
         return SLANG_FAIL;
     }
 
@@ -161,6 +166,8 @@ SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_3& reque
     {
         // Older libraries don't understand the _1_3 fields; downgrade by copying the shared prefix.
         // (Any `-Xspirv-opt` flags were already rejected above, so nothing user-requested is lost.)
+        // Unlike the cross-boundary up-convert in glslang_compile_1_2 (which clamps by the caller's
+        // sizeInBytes), no clamp is needed here: `request` is a same-build _1_3, always >= _1_2.
         glslang_CompileRequest_1_2 request_1_2;
         memcpy(&request_1_2, &request, sizeof(request_1_2));
         request_1_2.sizeInBytes = sizeof(request_1_2);
@@ -495,6 +502,7 @@ SlangResult GlslangDownstreamCompiler::convert(
 
 SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersionString)
 {
+    // Prefer the newest available entry point, matching init()'s selection.
     uint64_t timestamp;
     if (m_compile_1_3)
     {
