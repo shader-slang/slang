@@ -13,9 +13,12 @@
 // since hlsl.meta.slang has an independent wrapper set for each. Companion of
 // texture-shadow-lod-no-ext.slang, which covers the LOD forms.
 
-// A positive anchor first, so the test cannot pass vacuously on empty/error output; the CHECK-NOT
-// then guards the whole emitted body against the extension pragma.
-// CHECK: texture
+// Anchor on `#version`, which GLSL always emits first — before any `#extension` line. This makes
+// the test non-vacuous (it only passes on real, non-empty GLSL output) while keeping the CHECK-NOT
+// region covering the preamble, where `#extension GL_EXT_texture_shadow_lod` would appear if a
+// baseline form ever leaked it. (Anchoring on a body `texture(` call would leave the preamble
+// unscanned — and `texture` even matches inside the `GL_EXT_texture_shadow_lod` token itself.)
+// CHECK: #version
 // CHECK-NOT: GL_EXT_texture_shadow_lod
 
 // Combined shadow samplers.

@@ -1987,8 +1987,7 @@ public float texture(sampler1DShadow sampler, vec3 p, float bias)
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
         };
     default:
-        // The require is glsl_hlsl_spirv and glsl/spirv are handled above, so HLSL is the
-        // only target reaching here; apply the bias via SampleCmpBias.
+        // HLSL (the only target reaching default: here) applies the bias via SampleCmpBias.
         return sampler.SampleCmpBias(location, compareValue, bias);
     }
 }
@@ -2023,8 +2022,7 @@ public float texture(sampler2DShadow sampler, vec3 p, float bias)
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
         };
     default:
-        // The require is glsl_hlsl_spirv and glsl/spirv are handled above, so HLSL is the
-        // only target reaching here; apply the bias via SampleCmpBias.
+        // HLSL (the only target reaching default: here) applies the bias via SampleCmpBias.
         return sampler.SampleCmpBias(location, compareValue, bias);
     }
 }
@@ -2059,8 +2057,7 @@ public float texture(samplerCubeShadow sampler, vec4 p, float bias)
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
         };
     default:
-        // The require is glsl_hlsl_spirv and glsl/spirv are handled above, so HLSL is the
-        // only target reaching here; apply the bias via SampleCmpBias.
+        // HLSL (the only target reaching default: here) applies the bias via SampleCmpBias.
         return sampler.SampleCmpBias(location, compareValue, bias);
     }
 }
@@ -2086,8 +2083,7 @@ public float texture(samplerCubeArrayShadow sampler, vec4 location, float compar
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
         };
     default:
-        // The require is glsl_hlsl_spirv and glsl/spirv are handled above, so HLSL is the
-        // only target reaching here; apply the bias via SampleCmpBias.
+        // HLSL (the only target reaching default: here) applies the bias via SampleCmpBias.
         return sampler.SampleCmpBias(location, compareValue, bias);
     }
 }
@@ -2122,8 +2118,7 @@ public float texture(sampler1DArrayShadow sampler, vec3 p, float bias)
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
         };
     default:
-        // The require is glsl_hlsl_spirv and glsl/spirv are handled above, so HLSL is the
-        // only target reaching here; apply the bias via SampleCmpBias.
+        // HLSL (the only target reaching default: here) applies the bias via SampleCmpBias.
         return sampler.SampleCmpBias(location, compareValue, bias);
     }
 }
@@ -2673,8 +2668,7 @@ public float textureOffset(sampler2DShadow sampler, vec3 p, constexpr ivec2 offs
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias|ConstOffset $bias $offset;
         };
     default:
-        // The require is glsl_hlsl_spirv and glsl/spirv are handled above, so HLSL is the
-        // only target reaching here; apply the bias via SampleCmpBias.
+        // HLSL (the only target reaching default: here) applies the bias via SampleCmpBias.
         return sampler.SampleCmpBias(location, compareValue, bias, offset);
     }
 }
@@ -2723,8 +2717,7 @@ public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias|ConstOffset $bias $offset;
         };
     default:
-        // The require is glsl_hlsl_spirv and glsl/spirv are handled above, so HLSL is the
-        // only target reaching here; apply the bias via SampleCmpBias.
+        // HLSL (the only target reaching default: here) applies the bias via SampleCmpBias.
         return sampler.SampleCmpBias(location, compareValue, bias, offset);
     }
 }
@@ -2796,8 +2789,7 @@ public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int o
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias|ConstOffset $bias $offset;
         };
     default:
-        // The require is glsl_hlsl_spirv and glsl/spirv are handled above, so HLSL is the
-        // only target reaching here; apply the bias via SampleCmpBias.
+        // HLSL (the only target reaching default: here) applies the bias via SampleCmpBias.
         return sampler.SampleCmpBias(location, compareValue, bias, vector<int,1>(offset));
     }
 }

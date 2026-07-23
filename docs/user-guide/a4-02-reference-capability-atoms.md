@@ -1572,10 +1572,10 @@ Compound Capabilities
 > Capabilities required for shadow texture sampling with bias and gradients.
 > New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 > This is the method-level baseline: it does NOT include GL_EXT_texture_shadow_lod,
-> because the bias/gradient shadow forms that actually need the extension
-> (sampler2DArrayShadow, samplerCubeArrayShadow) request it branch-locally via
-> __requireCapability in their GLSL wrapper helpers — mirroring how texture_shadowlod
-> (no extension) relates to the extension-only textureLod shadow forms.
+> because only the bias forms of sampler2DArrayShadow and samplerCubeArrayShadow need
+> the extension (all gradient shadow forms are core GLSL). Those bias forms request it
+> branch-locally via __requireCapability in their GLSL wrapper helpers — mirroring how
+> texture_shadowlod (no extension) relates to the extension-only textureLod shadow forms.
 
 `texture_shadowlod`
 > Capabilities required for shadow texture LOD sampling on types
