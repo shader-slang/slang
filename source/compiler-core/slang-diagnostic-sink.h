@@ -337,6 +337,14 @@ public:
     uint32_t getEnabledWarningLevels() const { return m_enabledWarningLevels; }
     void setEnabledWarningLevels(uint32_t levels) { m_enabledWarningLevels = levels; }
 
+    /// Get/set the per-diagnostic severity overrides (the map populated by -W<name>/-Wno-<name>
+    /// through overrideDiagnosticSeverity).
+    const Dictionary<int, Severity>& getSeverityOverrides() const { return m_severityOverrides; }
+    void setSeverityOverrides(const Dictionary<int, Severity>& overrides)
+    {
+        m_severityOverrides = overrides;
+    }
+
     /// Get the (optional) diagnostic sink lexer. This is used to
     /// improve quality of highlighting a locations token. If not set, will just have a single
     /// character caret at location
@@ -410,6 +418,7 @@ public:
     {
         init(sourceManager, sourceLocationLexer);
     }
+
     /// Ctor that also copies display/settings state from an optional parent sink.
     DiagnosticSink(
         SourceManager* sourceManager,
@@ -423,8 +432,10 @@ public:
             setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
             setEnableUnicode(parentSink->getEnableUnicode());
             setEnabledWarningLevels(parentSink->getEnabledWarningLevels());
+            setSeverityOverrides(parentSink->getSeverityOverrides());
         }
     }
+
     /// Default Ctor
     DiagnosticSink()
         : m_sourceManager(nullptr), m_sourceLocationLexer(nullptr)
