@@ -23,7 +23,7 @@ struct VSOutput {
 [shader("vertex")]
 VSOutput vsmain(float3 PositionOS : POSITION, float3 Color : COLOR0)
 {
-    VSOutput output = (VSOutput)0;
+    VSOutput output = VSOutput();
     output.PositionCS = mul(Cam.MVP, float4(PositionOS, 1));
     output.Color = Color;
     return output;

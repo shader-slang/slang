@@ -11,6 +11,7 @@ bool isValidSlangLanguageVersion(int version)
     case SLANG_LANGUAGE_VERSION_LEGACY:
     case SLANG_LANGUAGE_VERSION_2025:
     case SLANG_LANGUAGE_VERSION_2026:
+    case SLANG_LANGUAGE_VERSION_2027:
         return true;
     default:
         return false;

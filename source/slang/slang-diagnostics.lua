@@ -1733,6 +1733,13 @@ warning(
     span { loc = "expr:Expr", message = "implicit float-to-double conversion may cause unexpected performance issues, use explicit cast if intended." }
 )
 
+warning(
+    "deprecated-struct-cast-from-zero",
+    30087,
+    "casting literal 0 to a struct type changes semantics in Slang 2027",
+    span { loc = "expr:Expr", message = "casting literal 0 to a struct type becomes a conversion in Slang 2027. To keep the current semantics, switch to a constructor with no parameters." }
+)
+
 -- try/throw diagnostics
 
 err(

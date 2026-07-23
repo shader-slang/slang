@@ -7404,9 +7404,10 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
         arg = CheckTerm(arg);
     }
 
-    if (auto declRefType = as<DeclRefType>(typeExp.type))
+    if (auto declRefType = as<DeclRefType>(typeExp.type); declRefType && !isSlang2027OrLater(this))
     {
-        // LEGACY FEATURE: As a backwards-compatibility feature for HLSL, we will allow for a cast
+        // SLANG <=2026 LEGACY FEATURE:
+        // As a backwards-compatibility feature for HLSL, we will allow for a cast
         // to a `struct` type from a literal zero, with the semantics of default initialization.
         if (const auto structDeclRef = as<StructDecl>(declRefType->getDeclRef()))
         {
@@ -7462,6 +7463,17 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                         initListExpr->useCStyleInitialization = false;
                         auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
 
+                        // In Slang 2026 mode, warn that a cast from literal 0
+                        // changes semantics for regular structs (i.e., anything
+                        // that the user defines).
+                        //
+                        // We don't warn about casts from literal 0 to core
+                        // module types (e.g., float, vector, etc). The default
+                        // initializers of these types have the zeroing
+                        // semantics.
+                        if (isSlang2026OrLater(this) && !isFromCoreModule(structDeclRef.getDecl()))
+                            getSink()->diagnose(
+                                Diagnostics::DeprecatedStructCastFromZero{.expr = expr});
 
                         return coerce(
                             CoercionSite::General,
