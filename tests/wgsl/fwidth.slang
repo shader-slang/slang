@@ -3,6 +3,8 @@
 // `fwidth` (glsl_hlsl_metal_spirv_wgsl); this pins the WGSL emission so a regression in
 // either the vector case or the matrix row-decomposition path fails on its own.
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl
+// Validate the emitted WGSL through Tint on CI (ignored where the downstream compiler is absent).
+//TEST:SIMPLE(filecheck=SPV): -target wgsl-spirv-asm
 
 struct FSInput
 {
@@ -12,6 +14,8 @@ struct FSInput
 
 // The vector overload emits a direct `fwidth(<vector>)` call at the use site, here wrapped
 // in the return's `vec4<f32>(...)` — a shape the matrix path never produces.
+// The SPV check confirms Tint accepted the emitted WGSL and produced valid SPIR-V.
+// SPV: OpEntryPoint
 [shader("fragment")]
 float4 fragVector(FSInput input) : SV_Target
 {
