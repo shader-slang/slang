@@ -346,6 +346,11 @@ struct CompilerOptionSet
         return getBoolOption(CompilerOptionName::GLSLForceScalarLayout);
     }
 
+    bool shouldUseDirectResourceParams()
+    {
+        return getBoolOption(CompilerOptionName::VulkanUseDirectResourceParams);
+    }
+
     bool shouldUseDXLayout() { return getBoolOption(CompilerOptionName::ForceDXLayout); }
 
     bool shouldUseCLayout() { return getBoolOption(CompilerOptionName::ForceCLayout); }

@@ -64,7 +64,10 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         if (isKhronosTarget(targetRequest))
         {
             if (targetProgram->getOptionSet().shouldEmitSPIRVDirectly())
-                return isIllegalSPIRVParameterType(type, isArray);
+                return isIllegalSPIRVParameterType(
+                    type,
+                    isArray,
+                    targetProgram->getOptionSet().shouldUseDirectResourceParams());
             else
                 return isIllegalGLSLParameterType(type);
         }
@@ -1361,14 +1364,18 @@ bool isIllegalGLSLParameterType(IRType* type)
     return false;
 }
 
-bool isIllegalSPIRVParameterType(IRType* type, bool isArray)
+bool isIllegalSPIRVParameterType(IRType* type, bool isArray, bool allowTextureParams)
 {
     if (isIllegalGLSLParameterType(type))
         return true;
 
-    // If we are emitting SPIRV direclty, we need to specialize
-    // all Texture types.
-    if (as<IRTextureType>(type))
+    // When emitting SPIRV directly we normally specialize all texture parameters into a bindless
+    // descriptor index, because some drivers mishandle a read-only texture passed directly as a
+    // function parameter. `allowTextureParams` (the -fvk-use-direct-resource-params opt-in) skips
+    // this so read-only textures pass as resource-typed parameters, as HLSL already does.
+    // RW/storage images are rejected above by isIllegalGLSLParameterType and stay specialized
+    // regardless.
+    if (!allowTextureParams && as<IRTextureType>(type))
         return true;
     if (isArray)
     {

@@ -1244,6 +1244,12 @@ typedef uint32_t SlangSizeT;
                  //   stdout. A value of "-" writes the separate debug information to stdout when
                  //   the main artifact is written to a file. Query/set with the string option APIs.
 
+        // bool, experimental opt-in. When set, pass read-only texture/image resources directly as
+        // SPIR-V function parameters instead of specializing them into a bindless descriptor-index
+        // parameter re-loaded in the callee. Off by default; the index-passing form is a driver
+        // workaround (shader-slang/slang#3252, #12120) and remains the default.
+        VulkanUseDirectResourceParams = 157,
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,

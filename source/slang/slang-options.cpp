@@ -851,6 +851,13 @@ void initCommandOptions(CommandOptions& options)
          "-fvk-use-dx-layout",
          nullptr,
          "Pack members using FXCs member packing rules when targeting GLSL or SPIRV."},
+        {OptionKind::VulkanUseDirectResourceParams,
+         "-fvk-use-direct-resource-params",
+         nullptr,
+         "When targeting SPIRV, pass read-only texture/image resources directly as function "
+         "parameters instead of as a bindless descriptor index. Experimental and off by default; "
+         "the index-passing behavior is a driver workaround that remains the default "
+         "(see shader-slang/slang#12120)."},
         {OptionKind::ForceCLayout,
          "-fvk-use-c-layout",
          nullptr,
@@ -3354,6 +3361,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ForceDXLayout:
             {
                 getCurrentTarget()->optionSet.add(CompilerOptionName::ForceDXLayout, true);
+                break;
+            }
+        case OptionKind::VulkanUseDirectResourceParams:
+            {
+                getCurrentTarget()->optionSet.add(
+                    CompilerOptionName::VulkanUseDirectResourceParams,
+                    true);
                 break;
             }
         case OptionKind::ForceCLayout:

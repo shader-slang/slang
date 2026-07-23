@@ -548,6 +548,11 @@ Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, Byt
 Pack members using FXCs member packing rules when targeting GLSL or SPIRV. 
 
 
+<a id="fvk-use-direct-resource-params"></a>
+### -fvk-use-direct-resource-params
+When targeting SPIRV, pass read-only texture/image resources directly as function parameters instead of as a bindless descriptor index. Experimental and off by default; the index-passing behavior is a driver workaround that remains the default (see shader-slang/slang#12120). 
+
+
 <a id="fvk-use-c-layout"></a>
 ### -fvk-use-c-layout
 Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the C/C++ structure layout rules when targeting SPIRV. 
