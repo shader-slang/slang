@@ -43,7 +43,10 @@
 
 // The invalid flag is reported by spirv-opt and the compile fails: assert both the failing result
 // code (a successful compile would print `result code = 0`) and the surfaced diagnostic, so the
-// test fails if the error is emitted but the compile wrongly reports success.
+// test fails if the error is emitted but the compile wrongly reports success. `result code = -1`
+// and the `Unknown flag` wording are external contracts (slang-test's harness and SPIRV-Tools'
+// message); if either drifts, this is wording drift, not a Slang regression -- the `{{[Ee]rror}}`
+// line guards the actual intent (an invalid flag surfaces an error and fails the compile).
 // INVALID: result code = -1
 // INVALID: {{[Ee]rror}}
 // INVALID: Unknown flag

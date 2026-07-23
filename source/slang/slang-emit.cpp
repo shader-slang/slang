@@ -3383,10 +3383,12 @@ static SlangResult createArtifactFromIR(
         downstreamOptions.targetType = SLANG_SPIRV;
         downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
 
-        // The allocator owns the copied `-Xspirv-opt` arg strings and slice array, so it must
-        // outlive the compile() call below. At `-O0` the downstream compiler is loaded only for
-        // validation/linking/debug-info and the optimizer early-returns, so these args are
-        // populated but never registered (inert), matching the additive-to-`-OX` contract.
+        // Forward the `-Xspirv-opt` args to the downstream optimizer; at `-O1`/default they are
+        // registered on top of the preset. We attach them unconditionally (before the level switch
+        // below) and let the downstream decide whether they apply: at `-O0` the compiler is loaded
+        // only for validation/linking/debug-info and `glslang_optimizeSPIRV` early-returns without
+        // registering them (inert), matching the additive-to-`-OX` contract. The allocator owns the
+        // copied arg strings and slice array, so it must outlive the compile() call below.
         SliceAllocator allocator;
         downstreamOptions.compilerSpecificArguments = allocator.allocate(
             codeGenContext->getTargetProgram()->getOptionSet().getDownstreamArgs("spirv-opt"));
