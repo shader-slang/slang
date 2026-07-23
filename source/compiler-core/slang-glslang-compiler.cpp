@@ -139,6 +139,19 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
 
 SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_3& request)
 {
+    // The `-Xspirv-opt` pass flags only exist in the _1_3 request. If the loaded library predates
+    // _1_3 we must downgrade to an older struct, which cannot carry them -- so honoring the user's
+    // explicit request is impossible. Rather than silently drop the flags and emit unmodified
+    // SPIR-V, fail with a diagnostic (the flags are only populated when the user passed them).
+    if (request.spirvOptimizationFlagCount != 0 && !m_compile_1_3 && request.diagnosticFunc)
+    {
+        const char msg[] =
+            "error: -Xspirv-opt requires a newer slang-glslang library; the loaded version does "
+            "not support forwarding optimizer pass flags.\n";
+        request.diagnosticFunc(msg, sizeof(msg) - 1, request.diagnosticUserData);
+        return SLANG_FAIL;
+    }
+
     int err = 1;
     if (m_compile_1_3)
     {
@@ -146,8 +159,8 @@ SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_3& reque
     }
     else if (m_compile_1_2)
     {
-        // Older libraries don't understand the _1_3 fields (`-Xspirv-opt` pass flags); downgrade
-        // by copying the shared prefix. The extra passes are silently dropped in that case.
+        // Older libraries don't understand the _1_3 fields; downgrade by copying the shared prefix.
+        // (Any `-Xspirv-opt` flags were already rejected above, so nothing user-requested is lost.)
         glslang_CompileRequest_1_2 request_1_2;
         memcpy(&request_1_2, &request, sizeof(request_1_2));
         request_1_2.sizeInBytes = sizeof(request_1_2);
@@ -293,11 +306,13 @@ SlangResult GlslangDownstreamCompiler::compile(
 
     request.entryPointName = options.entryPointName.begin();
 
-    // Forward `-Xspirv-opt` arguments as spirv-opt pass flags. This class also backs the `glslang`
-    // passthrough, whose `compilerSpecificArguments` are `-Xglslang` args and must not be handed to
-    // the optimizer, so only the spirv-opt instance populates these fields. Each
-    // TerminatedCharSlice is already a null-terminated C string, so a plain pointer array suffices;
-    // it must outlive the synchronous `_invoke` call below.
+    // This class also backs the `glslang` passthrough, whose `compilerSpecificArguments` are
+    // `-Xglslang` args and must not be handed to the optimizer, so only the spirv-opt instance
+    // populates these fields. (As a consequence the `GLSL->SPIRV` path -- `-emit-spirv-via-glsl`,
+    // which optimizes on the glslang instance -- does not receive `-Xspirv-opt`; out of scope
+    // here.) `spirvOptFlags` holds raw pointers into `options.compilerSpecificArguments` (each a
+    // null-terminated TerminatedCharSlice), so both `spirvOptFlags` and `options` must outlive the
+    // synchronous `_invoke` call below; they do.
     List<const char*> spirvOptFlags;
     if (m_compilerType == SLANG_PASS_THROUGH_SPIRV_OPT)
     {
