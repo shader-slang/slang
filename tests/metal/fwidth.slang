@@ -23,13 +23,14 @@ float4 fragVector(FSInput input) : SV_Target
 }
 
 // The matrix overload lowers via MATRIX_MAP_UNARY into a generated per-row helper named
-// `fwidth_<n>` (which itself calls the vector overload); that helper is unique to this path.
+// `fwidth_<n>` (which itself calls the vector overload); the call to that helper is the
+// matrix path's use site, and its name is unique to this path.
 // METALLIB-DAG: define {{.*}} @fragMatrix
 [shader("fragment")]
 float4 fragMatrix(FSInput input) : SV_Target
 {
     float2x2 m = float2x2(input.uv.x, input.uv.y, input.uv.y, input.uv.x);
-    // METAL-DAG: fwidth_{{[0-9]+}}(
+    // METAL-DAG: = fwidth_{{[0-9]+}}(
     float2x2 mw = fwidth(m);
     return float4(mw[0][0], mw[1][1], 0.0, 1.0);
 }
