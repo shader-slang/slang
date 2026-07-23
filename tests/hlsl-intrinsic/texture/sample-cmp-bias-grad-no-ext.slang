@@ -46,6 +46,11 @@ float4 fragMain(float4 pos : SV_Position) : SV_Target
     shadow += sampler2d.SampleCmpBias(float2(0.1, 0.2), depth, bias);
     shadow += samplerCube.SampleCmpBias(float3(0.1, 0.2, 0.3), depth, bias);
 
+    // Bias + offset — baseline forms route through __glsl150_texture_bias_offset (textureOffset),
+    // which is a distinct wrapper from the plain-bias one, so exercise it under the CHECK-NOT too.
+    shadow += sampler1d.SampleCmpBias(0.1, depth, bias, 1);
+    shadow += sampler2d.SampleCmpBias(float2(0.1, 0.2), depth, bias, int2(1, 0));
+
     // Gradients — always core, never the extension, including sampler2DArrayShadow.
     shadow += sampler1d.SampleCmpGrad(0.1, depth, 0.001, 0.001);
     shadow += sampler2d.SampleCmpGrad(float2(0.1, 0.2), depth, float2(0.001, 0), float2(0, 0.001));
@@ -53,9 +58,10 @@ float4 fragMain(float4 pos : SV_Position) : SV_Target
     shadow += sampler2dArray.SampleCmpGrad(float3(0.1, 0.2, 0), depth, float2(0.001, 0), float2(0, 0.001));
     shadow += sampler2dArray.SampleCmpGrad(float3(0.1, 0.2, 0), depth, float2(0.001, 0), float2(0, 0.001), int2(1, 0));
 
-    // Separate-sampler path — baseline bias and gradient forms, also core.
+    // Separate-sampler path — baseline bias (plain and +offset) and gradient forms, also core.
     shadow += tex1d.SampleCmpBias(cmp, 0.1, depth, bias);
     shadow += tex2d.SampleCmpBias(cmp, float2(0.1, 0.2), depth, bias);
+    shadow += tex2d.SampleCmpBias(cmp, float2(0.1, 0.2), depth, bias, int2(1, 0));
     shadow += tex2d.SampleCmpGrad(cmp, float2(0.1, 0.2), depth, float2(0.001, 0), float2(0, 0.001));
 
     return float4(shadow, shadow, shadow, 1.0);
