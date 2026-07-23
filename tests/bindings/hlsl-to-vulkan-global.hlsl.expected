@@ -77,6 +77,13 @@ standard output = {
                 {
                     "name": "sampler",
                     "binding": {"kind": "descriptorTableSlot", "index": 1, "used": 1}
+                },
+                {
+                    "name": "$Globals",
+                    "binding": {"kind": "descriptorTableSlot", "space": 9, "index": 5, "used": 1},
+                    "usedByteRanges": [
+                        {"offset": 0, "size": 8}
+                    ]
                 }
             ]
         }

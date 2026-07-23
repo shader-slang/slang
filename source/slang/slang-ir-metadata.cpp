@@ -2,6 +2,7 @@
 #include "slang-ir-metadata.h"
 
 #include "../compiler-core/slang-artifact-associated-impl.h"
+#include "slang-ir-byte-granularity-usage.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
@@ -318,6 +319,21 @@ void collectMetadata(
         collectMetadataFromInst(param, outMetadata);
     }
     outMetadata.m_usesBindlessResourceHeap = usesBindlessResourceHeap;
+
+    for (auto& info : collectApproximateByteGranularityUsageInformationForParameterGroups(irModule))
+    {
+        UniformParamUsage entry;
+        entry.parentBindingSpace = info.parentBindingSpace;
+        entry.parentBindingIndex = info.parentBindingIndex;
+        for (auto& r : info.ranges)
+        {
+            ShaderBindingRange sbr;
+            sbr.registerIndex = r.offset;
+            sbr.registerCount = r.size;
+            entry.usedRanges.add(sbr);
+        }
+        outMetadata.m_uniformParamUsage.add(_Move(entry));
+    }
 }
 
 static SlangScalarType _getScalarTypeFromIRType(IRType* type)

@@ -5537,6 +5537,56 @@ struct IComponentType2 : public ISlangUnknown
 };
     #define SLANG_UUID_IComponentType2 IComponentType2::getTypeGuid()
 
+/** A contiguous range of bytes in a buffer or other backing storage.
+ */
+struct ByteRange
+{
+    SlangUInt offset;
+    SlangUInt size;
+};
+
+/** Information about byte-granularity usage of parameters by a program.
+
+This interface is intended to support host applications that want to avoid
+expensive operations to compute, write, or transfer parameter data within
+buffers, and that cannot achieve their performance goals using the simpler but
+more coarse-grained query provided by `IMetadata::isParameterLocationUsed`.
+
+An untracked parameter reports one range covering the whole parameter (all
+used). A fully unused one reports a count of zero.
+*/
+struct IParameterByteRangeUsageInfo : public ISlangUnknown
+{
+    SLANG_COM_INTERFACE(
+        0xae41cb10,
+        0x5bca,
+        0x4721,
+        {0xbb, 0x3c, 0xdb, 0xf7, 0x08, 0x7a, 0x1a, 0xdc})
+
+    /** Number of used byte ranges within the constant buffer or parameter
+    block bound at `spaceIndex` and `registerIndex`, for the given entry
+    point and target. See the interface comment for the untracked and unused
+    conventions.
+    */
+    virtual SLANG_NO_THROW SlangInt SLANG_MCALL getUsedByteRangeCount(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        SlangUInt spaceIndex,
+        SlangUInt registerIndex) = 0;
+
+    /** Write the used byte range at `index` for the binding at `spaceIndex`
+    and `registerIndex` to `outRange`.
+    */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getUsedByteRange(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        SlangUInt spaceIndex,
+        SlangUInt registerIndex,
+        SlangInt index,
+        ByteRange* outRange) = 0;
+};
+    #define SLANG_UUID_IParameterByteRangeUsageInfo IParameterByteRangeUsageInfo::getTypeGuid()
+
 /** A module is the granularity of shader code compilation and loading.
 
 In most cases a module corresponds to a single compile "translation unit."

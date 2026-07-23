@@ -1662,6 +1662,55 @@ void printVarLayout(
 }
 ```
 
+### Byte-Granularity Usage Information
+
+The `isParameterLocationUsed()` API is able to determine if an entire texture, buffer, or parameter block might be accessed by a compiled kernel, but does not provide information on which bytes within a buffer or block might be accessed (and thus which are provably *not* accessed).
+Uniform byte usage is reported through the `IParameterByteRangeUsageInfo` interface instead.
+
+The `IParameterByteRangeUsageInfo` API allows an application to query whether a given range of bytes inside a given parameter binding location might be accessed by the compiled kernel at runtime.
+It does not guarantee that the kernel will access those bytes at runtime, but is a conservative estimate of what the kernel might access.
+An application developer can use this information to avoid filling in bytes in buffers that a kernel will provably never access, in cases where the CPU overhead of filling in the data is high, and the application codebase is not architected so that whole-buffer-granularity usage information is not enough to hit performance targets.
+Query it with `queryInterface()` from the `IComponentType` that reflection was obtained from.
+
+```c++
+Slang::ComPtr<slang::IParameterByteRangeUsageInfo> parameterUsage;
+if (SLANG_FAILED(program->queryInterface(
+    SLANG_UUID_IParameterByteRangeUsageInfo, (void**)parameterUsage.writeRef())))
+{
+    // This program does not report uniform byte usage.
+    return;
+}
+```
+
+`getUsedByteRangeCount()` returns how many byte ranges are read within a binding for a given entry point and target.
+`getUsedByteRange()` reads one of those ranges by index.
+A binding is identified by its space and register, the absolute location of the constant buffer or parameter block that holds the uniforms.
+This matches the target coordinate model of `isParameterLocationUsed`.
+
+```c++
+SlangInt rangeCount = parameterUsage->getUsedByteRangeCount(
+    entryPointIndex, targetIndex, spaceIndex, registerIndex);
+for (SlangInt i = 0; i < rangeCount; ++i)
+{
+    slang::ByteRange range;
+    parameterUsage->getUsedByteRange(
+        entryPointIndex, targetIndex, spaceIndex, registerIndex, i, &range);
+    // range gives a byte offset and a byte size within the parameter.
+}
+```
+
+The same information is available through the JSON reflection output (`-reflection-json`).
+Within each entry point's `bindings` array, a uniform parameter carries a `usedByteRanges` array of `{"offset": <byte>, "size": <byte>}` objects describing the bytes it reads.
+
+```json
+"usedByteRanges": [
+    {"offset": 0, "size": 64}
+]
+```
+
+When the `usedByteRanges` key is absent on a variable layout, an application should assume that any and all bytes of that variable might be accessed.
+A variable where it is known that none of its bytes will be accessed will have an empty array for its `usedByteRanges`.
+
 ### Target-Specific Limitations
 
 On targets where entry point varying inputs are packed into a single struct parameter during legalization (currently Metal and WGSL), `isParameterLocationUsed` cannot distinguish between used and unused individual varying inputs.

@@ -1,6 +1,7 @@
 
 #include "slang-reflection-json.h"
 
+#include "../compiler-core/slang-artifact-associated-impl.h"
 #include "../core/slang-blob.h"
 #include "slang-ast-support-types.h"
 #include "slang.h"
@@ -1081,17 +1082,114 @@ static void emitEntryPointParamJSON(
     PrettyWriter& writer,
     slang::VariableLayoutReflection* param,
     SlangCompileRequest* request,
-    int entryPointIndex)
+    int entryPointIndex,
+    char const* nameOverride = nullptr)
 {
     writer << "{\n";
     writer.indent();
 
-    if (auto name = param->getName())
+    CommaTrackerRAII commaTracker(writer);
+
+    char const* name = param->getName();
+    if (!name)
+        name = nameOverride;
+    if (name)
     {
+        writer.maybeComma();
         emitReflectionNameInfoJSON(writer, name);
     }
 
     emitReflectionVarBindingInfoJSON(writer, param, request, entryPointIndex);
+
+    if (auto typeLayout = param->getTypeLayout())
+    {
+        auto kind = typeLayout->getKind();
+        if (kind == slang::TypeReflection::Kind::ConstantBuffer ||
+            kind == slang::TypeReflection::Kind::ParameterBlock ||
+            kind == slang::TypeReflection::Kind::Struct)
+        {
+            // Look up the param's primary CB or parameter block binding.
+            // For a CB the binding lives in the ConstantBuffer category;
+            // for a parameter block on Vulkan style targets it lives in
+            // DescriptorTableSlot. We must pick the same one the IR pass
+            // picked (selectUniformParentBinding), and that choice is by
+            // category presence, not offset value: a zero offset is a
+            // real binding (register b0), so getOffset returning 0 cannot
+            // stand in for "category absent". We test presence by walking
+            // the categories the layout actually carries.
+            bool hasConstantBuffer = false;
+            bool hasDescriptorTableSlot = false;
+            for (unsigned int i = 0, n = param->getCategoryCount(); i < n; ++i)
+            {
+                switch (param->getCategoryByIndex(i))
+                {
+                case slang::ParameterCategory::ConstantBuffer:
+                    hasConstantBuffer = true;
+                    break;
+                case slang::ParameterCategory::DescriptorTableSlot:
+                    hasDescriptorTableSlot = true;
+                    break;
+                default:
+                    break;
+                }
+            }
+            UniformParentBinding parent = selectUniformParentBinding(
+                hasConstantBuffer,
+                param->getBindingSpace(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER),
+                param->getOffset(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER),
+                hasDescriptorTableSlot,
+                param->getBindingSpace(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT),
+                param->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT));
+            SlangUInt spaceIndex =
+                parent.found ? parent.space
+                             : param->getBindingSpace(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER);
+            SlangUInt parentBindingIndex = parent.bindingIndex;
+
+            // If the metadata is unavailable for any reason (codegen
+            // skipped, request without backing artifact, etc.) we just
+            // omit the usedByteRanges key. That matches how the rest of
+            // this emitter handles missing data.
+            ComPtr<slang::IComponentType> program;
+            ComPtr<slang::IMetadata> metadata;
+            IArtifactPostEmitMetadata* postEmit = nullptr;
+            if (request &&
+                SLANG_SUCCEEDED(request->getProgramWithEntryPoints(program.writeRef())) &&
+                SLANG_SUCCEEDED(
+                    program->getEntryPointMetadata(entryPointIndex, 0, metadata.writeRef())))
+            {
+                postEmit = static_cast<IArtifactPostEmitMetadata*>(
+                    metadata->castAs(IArtifactPostEmitMetadata::getTypeGuid()));
+            }
+            if (postEmit)
+            {
+                for (const auto& entry : postEmit->getUniformParamUsage())
+                {
+                    // Match the parent binding's own space (which includes
+                    // the descriptor set), since spaceIndex here came from
+                    // getBindingSpace on the parent CB or parameter block.
+                    if (entry.parentBindingSpace != spaceIndex ||
+                        entry.parentBindingIndex != parentBindingIndex)
+                        continue;
+                    // Empty ranges means nothing is used. A parameter with
+                    // no entry omits this key, read as all bytes used.
+                    writer << ",\n\"usedByteRanges\": [";
+                    writer.indent();
+                    bool first = true;
+                    for (const auto& r : entry.usedRanges)
+                    {
+                        if (!first)
+                            writer << ",";
+                        first = false;
+                        writer << "\n{\"offset\": " << (uint64_t)r.registerIndex
+                               << ", \"size\": " << (uint64_t)r.registerCount << "}";
+                    }
+                    writer.dedent();
+                    writer << "\n]";
+                    break;
+                }
+            }
+        }
+    }
 
     writer.dedent();
     writer << "\n}";
@@ -1231,6 +1329,40 @@ static void emitReflectionEntryPointJSON(
 
             auto parameter = programReflection->getParameterByIndex(pp);
             emitEntryPointParamJSON(writer, parameter, request, entryPointIndex);
+        }
+
+        // Loose global uniforms flatten into leaf params that carry no
+        // byte ranges; the implicit $Globals constant buffer holds their
+        // record. Emit it so a consumer can intersect each leaf's range.
+        // Guard on a real CB/descriptor binding: without loose uniforms
+        // the global scope is a Struct whose query would falsely match
+        // the constant buffer at binding index 0.
+        if (auto globalVarLayout = programReflection->getGlobalParamsVarLayout())
+        {
+            auto globalTypeLayout = globalVarLayout->getTypeLayout();
+            auto globalKind = globalTypeLayout ? globalTypeLayout->getKind()
+                                               : slang::TypeReflection::Kind::None;
+            bool isContainer = globalKind == slang::TypeReflection::Kind::ConstantBuffer ||
+                               globalKind == slang::TypeReflection::Kind::ParameterBlock;
+            bool hasParentBinding = false;
+            for (unsigned int i = 0, n = globalVarLayout->getCategoryCount(); i < n; ++i)
+            {
+                auto category = globalVarLayout->getCategoryByIndex(i);
+                if (category == slang::ParameterCategory::ConstantBuffer ||
+                    category == slang::ParameterCategory::DescriptorTableSlot)
+                    hasParentBinding = true;
+            }
+            if (isContainer && hasParentBinding)
+            {
+                if (programParameterCount != 0)
+                    writer << ",\n";
+                emitEntryPointParamJSON(
+                    writer,
+                    globalVarLayout,
+                    request,
+                    entryPointIndex,
+                    "$Globals");
+            }
         }
 
         writer.dedent();

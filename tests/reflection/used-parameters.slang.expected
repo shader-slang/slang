@@ -309,7 +309,10 @@ standard output = {
             "bindings": [
                 {
                     "name": "UsedCB",
-                    "binding": {"kind": "constantBuffer", "index": 1, "used": 1}
+                    "binding": {"kind": "constantBuffer", "index": 1, "used": 1},
+                    "usedByteRanges": [
+                        {"offset": 0, "size": 8}
+                    ]
                 },
                 {
                     "name": "UnusedCB",
@@ -382,6 +385,13 @@ standard output = {
                 {
                     "name": "UnusedUniform",
                     "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
+                },
+                {
+                    "name": "$Globals",
+                    "binding": {"kind": "constantBuffer", "index": 0, "used": 1},
+                    "usedByteRanges": [
+                        {"offset": 0, "size": 4}
+                    ]
                 }
             ]
         }

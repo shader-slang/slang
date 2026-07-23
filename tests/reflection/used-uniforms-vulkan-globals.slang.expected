@@ -1,0 +1,84 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "usedScalar",
+            "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0},
+            "type": {
+                "kind": "scalar",
+                "scalarType": "float32"
+            }
+        },
+        {
+            "name": "unusedScalar",
+            "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0},
+            "type": {
+                "kind": "scalar",
+                "scalarType": "float32"
+            }
+        },
+        {
+            "name": "usedVec",
+            "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4},
+            "type": {
+                "kind": "vector",
+                "elementCount": 4,
+                "elementType": {
+                    "kind": "scalar",
+                    "scalarType": "float32"
+                }
+            }
+        },
+        {
+            "name": "outBuf",
+            "binding": {"kind": "descriptorTableSlot", "index": 1},
+            "type": {
+                "kind": "resource",
+                "baseShape": "structuredBuffer",
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "float32"
+                }
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage": "compute",
+            "threadGroupSize": [1, 1, 1],
+            "bindings": [
+                {
+                    "name": "usedScalar",
+                    "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
+                },
+                {
+                    "name": "unusedScalar",
+                    "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
+                },
+                {
+                    "name": "usedVec",
+                    "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4}
+                },
+                {
+                    "name": "outBuf",
+                    "binding": {"kind": "descriptorTableSlot", "index": 1}
+                },
+                {
+                    "name": "$Globals",
+                    "binding": {"kind": "descriptorTableSlot", "index": 0},
+                    "usedByteRanges": [
+                        {"offset": 0, "size": 4},
+                        {"offset": 16, "size": 8}
+                    ]
+                }
+            ]
+        }
+    ],
+    "bindlessSpaceIndex": 1
+}
+}

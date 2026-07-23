@@ -94,6 +94,10 @@ standard output = {
                         {"kind": "shaderResource", "index": 10, "used": 0},
                         {"kind": "unorderedAccess", "index": 100, "used": 0}
                     ]
+                },
+                {
+                    "name": "$Globals",
+                    "binding": {"kind": "constantBuffer", "index": 1000, "used": 0}
                 }
             ]
         }
