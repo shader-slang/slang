@@ -2,6 +2,7 @@
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry main -stage raygeneration -O3
 //   Motion rays not supported on HLSL impl currently, so disable with NOMOTION define:
 //TEST:SIMPLE(filecheck=DXIL):-target dxil-assembly -entry main -stage raygeneration -profile sm_6_5 -DNOMOTION
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage raygeneration -DNOMOTION
 
 // SPIRV-NOT: OpCapability RayQueryKHR
 // SPIRV-DAG: OpCapability RayTracingKHR
@@ -30,6 +31,8 @@
 // DXIL: call void @dx.op.traceRay.struct.RayPayload_0
 // DXIL: call void @dx.op.callShader.struct.CallableParams_0
 
+// CUDA-LABEL: extern "C" __global__ void __raygen__main
+// CUDA: optixDirectCall<void>({{.*}}, {{.*&params.*}});
 
 [[vk::binding(0)]]
 uniform RaytracingAccelerationStructure accelStruct : register(t0);

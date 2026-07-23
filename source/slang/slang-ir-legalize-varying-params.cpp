@@ -10,6 +10,7 @@
 #include "slang-ir-util.h"
 #include "slang-parameter-binding.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-type-layout.h"
 
 #include <set>
 
@@ -410,7 +411,7 @@ protected:
     Stage m_stage = Stage::Unknown;
 
 
-    void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
+    virtual void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
     {
         m_entryPointFunc = entryPointFunc;
 
@@ -554,7 +555,7 @@ protected:
         m_param = param;
 
         // We expect and require all entry-point parameters to have layout
-        // information assocaited with them at this point.
+        // information associated with them at this point.
         //
         auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
         SLANG_ASSERT(paramLayoutDecoration);
@@ -609,10 +610,10 @@ protected:
 
     void processMutableParam(IRParam* param, IROutParamTypeBase* paramPtrType)
     {
-        // The deafult handling of any mutable (`out` or `inout`) parameter
+        // The default handling of any mutable (`out` or `inout`) parameter
         // will be to introduce a local variable of the corresponding
         // type and to use that in place of the actual parameter during
-        // exeuction of the function.
+        // execution of the function.
 
         // The replacement variable will have the type of the original
         // parameter (the `T` in `Out<T>` or `InOut<T>`).
@@ -644,7 +645,7 @@ protected:
         }
 
         // Because the `out` or `inout` parameter is represented
-        // as a pointer, and our local variabel is also a pointer
+        // as a pointer, and our local variable is also a pointer
         // we can directly replace all uses of the original parameter
         // with uses of the variable.
         //
@@ -836,7 +837,7 @@ protected:
 
     LegalizedVaryingVal _createLegalVaryingVal(VaryingParamInfo const& info)
     {
-        // By default, when we seek to creating a legalized value
+        // By default, when we seek to create a legalized value
         // for a varying parameter, we will look at its type to
         // decide what to do.
         //
@@ -2153,6 +2154,17 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         }
 
         return nullptr;
+    }
+
+    void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
+        SLANG_OVERRIDE
+    {
+        // OptiX direct-callable programs use the CUDA function-call ABI, so their signatures
+        // should not undergo varying-parameter legalization.
+        if (entryPointDecor->getProfile().getStage() == Stage::Callable)
+            return;
+
+        EntryPointVaryingParamLegalizeContext::processEntryPoint(entryPointFunc, entryPointDecor);
     }
 
     void beginModuleImpl() SLANG_OVERRIDE

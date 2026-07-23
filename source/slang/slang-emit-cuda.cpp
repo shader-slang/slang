@@ -434,9 +434,23 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 {
     if (!inst)
         return;
-    if (inst->findDecoration<IREntryPointDecoration>())
+
+    if (auto entryPointDecor = inst->findDecoration<IREntryPointDecoration>())
     {
-        m_writer->emit("extern \"C\" __global__ ");
+        m_writer->emit("extern \"C\" ");
+
+        // Emit OptiX callables as __device__, which follows OptiX best
+        // practices and keeps pointer parameters for generated functions in the
+        // generic address space, allowing callees to write to them.
+        if (entryPointDecor->getProfile().getStage() == Stage::Callable)
+        {
+            m_writer->emit("__device__ ");
+        }
+        else
+        {
+            m_writer->emit("__global__ ");
+        }
+
         return;
     }
 
@@ -450,6 +464,23 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
     }
     else
     {
+        // OptiX requires `--relocatable-device-code=true` (see OptiX
+        // Programming Guide, section 6.1). Given that requirement, we assume
+        // that all ray tracing stages will be compiled with that flag.
+        //
+        // Device functions are local to the CUDA module by default, but
+        // enabling relocatable device code causes them to have public
+        // visibility. To keep behavior consistent across both modes, we
+        // add static to device functions that aren't explicitly exported to
+        // maintain the default behavior and avoid multiple definition errors.
+        auto func = as<IRFunc>(inst);
+        const bool isLocalFuncDefinition =
+            func && isDefinition(func) && !func->findDecoration<IRCudaDeviceExportDecoration>();
+        if (isRaytracingStage(m_entryPointStage) && isLocalFuncDefinition)
+        {
+            m_writer->emit("static ");
+        }
+
         m_writer->emit("__device__ ");
     }
 }
@@ -457,8 +488,8 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
 {
     // We have an entry-point function in the IR module, which we
-    // will want to emit as a `__global__` function in the generated
-    // CUDA C++.
+    // need to generate the name of the corresponding CUDA C++
+    // function.
     //
     // The most common case will be a compute kernel, in which case
     // we will emit the function more or less as-is, including
