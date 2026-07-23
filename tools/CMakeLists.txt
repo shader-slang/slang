@@ -283,6 +283,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             stage-dxc-headers
             copy-webgpu_dawn
             copy-slang-tint
+            copy-nvapi-headers
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
@@ -385,6 +386,9 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/render-test/slang-test-device-cache.cpp
     )
+    if(TARGET copy-nvapi-headers AND TARGET render-test)
+        add_dependencies(render-test copy-nvapi-headers)
+    endif()
 
     add_subdirectory(render-test)
 

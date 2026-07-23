@@ -87,6 +87,9 @@ auto_option(
     OptiX
     "Enable OptiX build/tests, requires SLANG_ENABLE_CUDA"
 )
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    include(FetchNVAPI)
+endif()
 auto_option(
     SLANG_ENABLE_NVAPI
     NVAPI
