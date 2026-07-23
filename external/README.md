@@ -122,11 +122,13 @@ flowchart LR
     mimalloc -.->|when enabled, shared with SPIRV-Tools| slang
 
     glslang & spirv_tools["spirv-tools"] --> glslang_lib["slang-glslang shared library"]
+    glslang_lib -.->|loaded at runtime| slang
 
-    dxc["DXC (fetched)"] -->|DXIL| downstream["downstream compilers Slang drives"]
+    dxc["DXC (fetched)"] -->|DXIL| downstream["downstream compilers"]
     slang_llvm["slang-llvm (fetched)"] -->|CPU / host| downstream
     slang_tint["slang-tint (fetched, runtime-loaded)"] -->|WGSL| downstream
     optix_dev["optix-dev"] -->|OptiX, via CUDA prelude| downstream
+    downstream -.->|loaded at runtime| slang
 
     slang_rhi["slang-rhi"] & imgui & stb & glm & tinyobjloader & renderdoc["renderdoc_app.h"] --> tools["tools, examples, tests"]
     metal_cpp["metal-cpp"] -->|tools + examples| tools
