@@ -1234,7 +1234,7 @@ Optimization Level
 
 Debug Level 
 
-* `0`, `none` : Don't emit debug information at all. 
+* `0`, `none` : Don't emit debug information. This is the default. For SPIR-V, OpSource, OpName and OpMemberName are still emitted. 
 * `1`, `minimal` : Emit as little debug information as possible, while still supporting stack traces. 
 * `2`, `standard` : Emit whatever is the standard level of debug information for each target. 
 * `3`, `maximal` : Emit as much debug information as possible for each target. 

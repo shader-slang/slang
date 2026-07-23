@@ -209,7 +209,10 @@ static const NamesDescriptionValue s_optimizationLevels[] = {
 };
 
 static const NamesDescriptionValue s_debugLevels[] = {
-    {SLANG_DEBUG_INFO_LEVEL_NONE, "0,none", "Don't emit debug information at all."},
+    {SLANG_DEBUG_INFO_LEVEL_NONE,
+     "0,none",
+     "Don't emit debug information. This is the default. For SPIR-V, OpSource, OpName and "
+     "OpMemberName are still emitted."},
     {SLANG_DEBUG_INFO_LEVEL_MINIMAL,
      "1,minimal",
      "Emit as little debug information as possible, while still supporting stack traces."},
