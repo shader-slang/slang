@@ -1,7 +1,53 @@
-> Note: This document is a work in progress. It is both incomplete and, in many cases, inaccurate.
-
 Statements
 ==========
+
+Statements define the actions by the program. In Slang, statements are confined in
+[function](declarations-functions.md) bodies.
+
+Slang statements are divided into following categories:
+
+- Control flow statements
+- Expression and declaration statements
+- Exception handling statements
+- Miscellaneous statements
+
+Control flow statements define the control flow of the program. The control flow statements are:
+
+- [if statement](statements-if.md) — conditional branching.
+- [for statement](statements-loop.md) — loop execution consisting of initialization, loop
+  condition (evaluated before iteration), loop statement, and a post-loop action.
+- [while statement](statements-loop.md) — loop execution consisting of loop condition (evaluated before
+  iteration) and loop statement
+- [do-while statement](statements-loop.md) — loop execution consisting of loop condition (evaluated after
+  iteration) and loop statement
+- [switch, case, and default statements](statements-switch.md) — multi-way branching.
+- [break and continue statements](statements-break-and-continue.md) — loop exit, loop continue
+- [return statement](statements-return.md) — exit the current function, possibly with a return value
+- [discard statement](statements-discard.md) — terminate the current thread (fragment shaders only)
+- [defer statement](statements-defer.md) — deferred statement execution, executed on current scope exit (in
+  reverse order)
+
+Expression statements evaluate expressions, and declaration statements declare types and variables for
+successive statements in the current scope:
+
+- [declaration statement](statements-declaration.md) — declares a type or variable in the current scope. The
+  declaration is available for successive statements.
+- [expression statement](statements-expression.md) — evaluates an expression. An expression statement
+  typically has a side effect such as writing to a memory. This can be either directly (e.g.,
+  [variable assignment](expressions-operators.md)) or indirectly (e.g., via a
+  [call expression](expressions-operators.md)).
+
+Exception handling statements are:
+
+- [do-catch statement](statements-do-catch-throw.md) — structured error handling block.
+- [throw statement](statements-do-catch-throw.md) — throws an exception.
+
+Miscellaneous:
+
+- [block statement](statements-block.md) — groups multiple statements in a single statement
+- [empty statement](statements-empty.md) — does nothing
+
+
 
 Statements are used to define the bodies of functions and determine order of evaluation and control flow for an entire program.
 Statements are distinct from expressions in that statements do not yield results and do not have types.
