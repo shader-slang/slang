@@ -639,6 +639,13 @@ struct IRGenContext
     // (For use by functions that returns non-copyable types)
     LoweredValInfo returnDestination;
 
+    // For named-return-value optimization of a function that returns via `returnDestination`:
+    // the single function-local variable that every value-returning `return` names, if any. That
+    // local is lowered to alias `returnDestination` instead of getting its own storage, so an
+    // opaque non-copyable result (e.g. `RayQuery`) is written in place rather than copied by value
+    // at the return (shader-slang/slang#12197). Null when NRVO does not apply.
+    VarDeclBase* nrvoReturnLocalDecl = nullptr;
+
     // A reference to the Function decl to identify the parent function
     // that contains the Inst.
     FunctionDeclBase* funcDecl = nullptr;
@@ -4225,6 +4232,119 @@ void addThisParameter(
     info.isThisParam = true;
 
     ioParameterLists->params.add(info);
+}
+
+/// Walk a function body looking for the single function-local variable that every value-returning
+/// `return` statement names, for named-return-value optimization (NRVO).
+///
+/// On success `ioReturnedVar` is that local `VarDecl`. `ioBailed` is set (and the result must be
+/// ignored) if the body returns different values on different paths, returns anything other than a
+/// direct reference to a function-scope local, contains a `defer` (a deferred statement runs after
+/// the return value is chosen and could mutate a local aliased to the destination), or contains a
+/// control-flow shape this walk does not recognize — in any of those cases NRVO cannot soundly
+/// alias one local to the single return destination, so the caller falls back to the ordinary
+/// return path. Nested declarations are not descended into: their returns belong to a different
+/// function.
+///
+/// Consider `RayQuery<F> q; q.TraceRayInline(...); return q;` — this reports `q`, so the caller can
+/// make `q` alias the return destination and avoid an opaque by-value copy
+/// (shader-slang/slang#12197).
+static void findCommonReturnedLocalVar(Stmt* stmt, VarDeclBase*& ioReturnedVar, bool& ioBailed)
+{
+    if (ioBailed || !stmt)
+        return;
+
+    if (auto returnStmt = as<ReturnStmt>(stmt))
+    {
+        auto expr = returnStmt->expression;
+        if (!expr)
+            return;
+        auto varExpr = as<VarExpr>(expr);
+        if (!varExpr)
+        {
+            ioBailed = true;
+            return;
+        }
+        auto varDecl = as<VarDecl>(varExpr->declRef.getDecl());
+        // Only a genuine, mutable function-scope local can safely become the return destination.
+        // A parameter or a static/global has storage whose lifetime is not owned by this call; a
+        // `let` is lowered to an SSA value rather than to storage this optimization can alias.
+        if (!varDecl || as<LetDecl>(varDecl) || !isLocalVar(varDecl) ||
+            isFunctionStaticVarDecl(varDecl))
+        {
+            ioBailed = true;
+            return;
+        }
+        if (ioReturnedVar && ioReturnedVar != varDecl)
+        {
+            ioBailed = true;
+            return;
+        }
+        ioReturnedVar = varDecl;
+        return;
+    }
+
+    if (auto seqStmt = as<SeqStmt>(stmt))
+    {
+        for (auto s : seqStmt->stmts)
+            findCommonReturnedLocalVar(s, ioReturnedVar, ioBailed);
+    }
+    else if (auto blockStmt = as<BlockStmt>(stmt))
+        findCommonReturnedLocalVar(blockStmt->body, ioReturnedVar, ioBailed);
+    else if (auto labelStmt = as<LabelStmt>(stmt))
+        findCommonReturnedLocalVar(labelStmt->innerStmt, ioReturnedVar, ioBailed);
+    else if (auto ifStmt = as<IfStmt>(stmt))
+    {
+        findCommonReturnedLocalVar(ifStmt->positiveStatement, ioReturnedVar, ioBailed);
+        findCommonReturnedLocalVar(ifStmt->negativeStatement, ioReturnedVar, ioBailed);
+    }
+    else if (auto switchStmt = as<SwitchStmt>(stmt))
+        findCommonReturnedLocalVar(switchStmt->body, ioReturnedVar, ioBailed);
+    else if (auto forStmt = as<ForStmt>(stmt))
+    {
+        findCommonReturnedLocalVar(forStmt->initialStatement, ioReturnedVar, ioBailed);
+        findCommonReturnedLocalVar(forStmt->statement, ioReturnedVar, ioBailed);
+    }
+    else if (auto whileStmt = as<WhileStmt>(stmt))
+        findCommonReturnedLocalVar(whileStmt->statement, ioReturnedVar, ioBailed);
+    else if (auto doWhileStmt = as<DoWhileStmt>(stmt))
+        findCommonReturnedLocalVar(doWhileStmt->statement, ioReturnedVar, ioBailed);
+    else if (as<DeferStmt>(stmt))
+    {
+        // A `defer` runs after the return value has been chosen, so if it mutated a local that
+        // NRVO had aliased to the return destination it would corrupt the returned value. Bail.
+        ioBailed = true;
+    }
+    else if (auto catchStmt = as<CatchStmt>(stmt))
+    {
+        findCommonReturnedLocalVar(catchStmt->tryBody, ioReturnedVar, ioBailed);
+        findCommonReturnedLocalVar(catchStmt->handleBody, ioReturnedVar, ioBailed);
+    }
+    else if (auto targetSwitchStmt = as<TargetSwitchStmt>(stmt))
+    {
+        for (auto targetCase : targetSwitchStmt->targetCases)
+            findCommonReturnedLocalVar(targetCase, ioReturnedVar, ioBailed);
+    }
+    else if (auto targetCaseStmt = as<TargetCaseStmt>(stmt))
+        findCommonReturnedLocalVar(targetCaseStmt->body, ioReturnedVar, ioBailed);
+    else if (
+        as<ExpressionStmt>(stmt) || as<EmptyStmt>(stmt) || as<DeclStmt>(stmt) ||
+        as<CaseStmtBase>(stmt) || as<BreakStmt>(stmt) || as<ContinueStmt>(stmt) ||
+        as<DiscardStmt>(stmt) || as<ThrowStmt>(stmt) || as<UnparsedStmt>(stmt) ||
+        as<IntrinsicAsmStmt>(stmt) || as<RequireCapabilityStmt>(stmt))
+    {
+        // Leaf statements that cannot themselves contain a `return` of this function. A
+        // `DeclStmt`'s only nested returns would live in a nested declaration, which is not part
+        // of this function's control flow, so it is intentionally not descended into. A function
+        // that can exit via a propagating error is excluded at the call site (see the
+        // `throws`-clause check where NRVO is enabled), so a `ThrowStmt` needs no handling here.
+    }
+    else
+    {
+        // An unrecognized control-flow shape might hide a `return` on a different value; bail so
+        // the caller does not alias unsoundly.
+        ioBailed = true;
+    }
 }
 
 /// If the `resultType` of a function needs to be returned via an `out` parameter, then add it.
@@ -8845,7 +8965,17 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             if (context->returnDestination.flavor != LoweredValInfo::Flavor::None)
             {
                 // If this function should return via a __ref parameter, do that and return void.
-                lowerRValueExprWithDestination(context, context->returnDestination, expr);
+                //
+                // Under named-return-value optimization the returned local already aliases the
+                // return destination (see visitVarDeclBase / findCommonReturnedLocalVar), so
+                // writing it into the destination would be a redundant self-copy — and for an
+                // opaque non-copyable type that copy is exactly the broken by-value load/store we
+                // are eliminating (shader-slang/slang#12197). Just return.
+                if (auto varExpr = as<VarExpr>(expr);
+                    !(varExpr && varExpr->declRef.getDecl() == context->nrvoReturnLocalDecl))
+                {
+                    lowerRValueExprWithDestination(context, context->returnDestination, expr);
+                }
                 getBuilder()->emitReturn();
                 return;
             }
@@ -11564,6 +11694,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContextStorage.thisTypeWitness = outerContext->thisTypeWitness;
 
             subContextStorage.returnDestination = LoweredValInfo();
+            subContextStorage.nrvoReturnLocalDecl = nullptr;
             subContextStorage.catchHandler = nullptr;
             subContextStorage.funcDecl = nullptr;
         }
@@ -11985,6 +12116,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
+
+        // Named-return-value optimization: when this local is the one every `return` names in a
+        // function that returns via a return-destination parameter, use that destination as the
+        // local's storage instead of allocating a fresh var. The body then initializes the result
+        // in place and the `return` needs no copy (shader-slang/slang#12197). See
+        // findCommonReturnedLocalVar / the return-destination setup in lowerFuncDeclInContext.
+        if (decl == context->nrvoReturnLocalDecl)
+        {
+            LoweredValInfo varVal = context->returnDestination;
+            if (auto initExpr = decl->initExpr)
+            {
+                assignExpr(context, varVal, initExpr, decl->loc);
+            }
+            context->setGlobalValue(decl, varVal);
+            return varVal;
+        }
 
         LoweredValInfo varVal = createVar(context, varType, decl);
         maybeAddDebugLocationDecoration(context, varVal.val);
@@ -14173,6 +14320,68 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 if (paramInfo.isReturnDestination)
                 {
                     subContext->returnDestination = paramVal;
+
+                    // Named-return-value optimization: if every value-returning `return` names one
+                    // and the same function-local, lower that local to alias the return
+                    // destination instead of giving it its own storage. The result is then built
+                    // in place, so an opaque non-copyable handle (a `RayQuery`) is never copied by
+                    // value at the `return` (shader-slang/slang#12197). The alias is a pointer
+                    // l-value, which matches how a return-destination `Out` parameter is lowered,
+                    // so `visitVarDeclBase` can install it directly.
+                    //
+                    // This is restricted to opaque non-copyable handles — the types for which a
+                    // whole-value load/store is genuinely a no-op. Types merely marked
+                    // `[__NonCopyableType]` but still bit-copyable (e.g. a plain struct) already
+                    // return correctly by value; aliasing them to the destination would instead
+                    // change observable behavior when the destination is written incrementally
+                    // (e.g. via `defer`, handled in findCommonReturnedLocalVar, or when the caller
+                    // aliases the destination with an argument, handled just below), so they keep
+                    // the ordinary copying return path.
+                    bool destIsNonCopyableOpaque =
+                        paramVal.flavor == LoweredValInfo::Flavor::Ptr &&
+                        isNonCopyableOpaqueType(lowerType(subContext, paramInfo.type));
+
+                    // A caller may pass the same variable as both an argument and the assignment
+                    // destination (`x = f(x)`), so the return destination can alias a
+                    // by-reference parameter. NRVO writes the destination incrementally through
+                    // the body, which would corrupt such an aliased argument; a non-NRVO return
+                    // only writes it once at the end. An opaque non-copyable handle is always
+                    // passed by reference, so if any other parameter has that same handle type,
+                    // fall back to the ordinary return path to stay sound.
+                    bool anotherParamCouldAlias = false;
+                    if (destIsNonCopyableOpaque)
+                    {
+                        for (auto otherParam : parameterLists.params)
+                        {
+                            if (otherParam.isReturnDestination)
+                                continue;
+                            if (isNonCopyableOpaqueType(lowerType(subContext, otherParam.type)))
+                            {
+                                anotherParamCouldAlias = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // A function that can exit via a propagating error must not use NRVO: on the
+                    // throwing path the `return` never runs, but writes the body made to the
+                    // aliased local would already have landed in the caller's destination, so the
+                    // caller's `try`/`catch` would observe a value the failed call never produced.
+                    // This covers both an explicit `throw` and error propagation from a `try`
+                    // call, either of which requires the function to declare a (non-bottom) error
+                    // type.
+                    bool canThrow =
+                        decl->errorType.type &&
+                        !decl->errorType.type->equals(subContext->astBuilder->getBottomType());
+
+                    if (destIsNonCopyableOpaque && !anotherParamCouldAlias && !canThrow)
+                    {
+                        VarDeclBase* returnedVar = nullptr;
+                        bool bailed = false;
+                        findCommonReturnedLocalVar(decl->body, returnedVar, bailed);
+                        if (!bailed && returnedVar)
+                            subContext->nrvoReturnLocalDecl = returnedVar;
+                    }
                 }
             }
 
