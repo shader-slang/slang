@@ -550,7 +550,7 @@ Pack members using FXCs member packing rules when targeting GLSL or SPIRV.
 
 <a id="fvk-use-direct-resource-params"></a>
 ### -fvk-use-direct-resource-params
-When targeting SPIRV, pass read-only texture/image resources directly as function parameters instead of as a bindless descriptor index. Experimental and off by default; the index-passing behavior is a driver workaround that remains the default (see shader-slang/slang#12120). 
+On the direct-SPIRV path, pass a read-only texture directly as a function parameter instead of as a bindless descriptor index. Experimental and off by default; the index-passing behavior is a driver workaround that remains the default (see shader-slang/slang#12120). 
 
 
 <a id="fvk-use-c-layout"></a>

@@ -1369,14 +1369,20 @@ bool isIllegalSPIRVParameterType(IRType* type, bool isArray, bool allowTexturePa
     if (isIllegalGLSLParameterType(type))
         return true;
 
-    // When emitting SPIRV directly we normally specialize all texture parameters into a bindless
-    // descriptor index, because some drivers mishandle a read-only texture passed directly as a
-    // function parameter. `allowTextureParams` (the -fvk-use-direct-resource-params opt-in) skips
-    // this so read-only textures pass as resource-typed parameters, as HLSL already does.
-    // RW/storage images are rejected above by isIllegalGLSLParameterType and stay specialized
-    // regardless.
-    if (!allowTextureParams && as<IRTextureType>(type))
-        return true;
+    // When emitting SPIRV directly we normally specialize every texture parameter into a bindless
+    // descriptor index, as a workaround for old graphics drivers that mishandle a read-only texture
+    // passed directly as a function parameter. The -fvk-use-direct-resource-params opt-in relaxes
+    // this, but only for a plain (non-array) read-only texture: those are exactly the HLSL-style
+    // resource parameters the experiment is meant to probe. Feedback/unknown-access textures and
+    // arrays-of-textures keep being specialized even under the flag, since they have no established
+    // direct-parameter form here (the sampler branch below likewise refuses arrays).
+    if (auto texType = as<IRTextureType>(type))
+    {
+        bool allowDirect =
+            allowTextureParams && !isArray && texType->getAccess() == SLANG_RESOURCE_ACCESS_READ;
+        if (!allowDirect)
+            return true;
+    }
     if (isArray)
     {
         if (as<IRSamplerStateTypeBase>(type))

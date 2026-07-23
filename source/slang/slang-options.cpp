@@ -854,9 +854,9 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::VulkanUseDirectResourceParams,
          "-fvk-use-direct-resource-params",
          nullptr,
-         "When targeting SPIRV, pass read-only texture/image resources directly as function "
-         "parameters instead of as a bindless descriptor index. Experimental and off by default; "
-         "the index-passing behavior is a driver workaround that remains the default "
+         "On the direct-SPIRV path, pass a read-only texture directly as a function parameter "
+         "instead of as a bindless descriptor index. Experimental and off by default; the "
+         "index-passing behavior is a driver workaround that remains the default "
          "(see shader-slang/slang#12120)."},
         {OptionKind::ForceCLayout,
          "-fvk-use-c-layout",
