@@ -73,6 +73,26 @@ else()
         ${SLANG_OVERRIDE_LUA_PATH}
     )
 endif()
+
+# Embeds Lua (like slang-fiddle) to parse the IR stable-names table when
+# enforcing the module version-bump policy in CI.
+if(NOT SLANG_OVERRIDE_LUA_PATH)
+    generator(
+        slang-ir-version-check
+        LINK_WITH_PRIVATE
+        compiler-core
+        INCLUDE_DIRECTORIES_PUBLIC
+        ${slang_SOURCE_DIR}/external
+    )
+else()
+    generator(
+        slang-ir-version-check
+        LINK_WITH_PRIVATE
+        compiler-core
+        INCLUDE_DIRECTORIES_PUBLIC
+        ${SLANG_OVERRIDE_LUA_PATH}
+    )
+endif()
 generator(slang-embed)
 generator(slang-core-module-cache)
 generator(slang-generate USE_FEWER_WARNINGS)
