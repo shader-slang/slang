@@ -2,6 +2,7 @@
 
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
+#include "slang-parameter-binding.h"
 #include "slang-rich-diagnostics.h"
 
 // A note on row/column "terminology reversal".
@@ -263,6 +264,36 @@ static bool isPowerOf2(const uint32_t n)
     return (n != 0U) && ((n - 1U) & n) == 0U;
 }
 
+// Resolve a varying field's WGSL `@location` from its semantic. `getSemanticIndex()` is -1 for
+// structs that skip entry-point varying-parameter legalization (e.g. one returned by a helper
+// function); their ordinal still lives in the name ("SV_TARGET1"), so recover it there. This
+// mirrors the entry-point normalization in `fixFieldSemanticsOfFlatStruct`
+// (slang-ir-legalize-varying-params.cpp), which non-entry-point structs never reach.
+static int resolveWGSLLocation(IRSemanticDecoration* semantic)
+{
+    // An explicit index is authoritative -- this is the path entry-point I/O takes once
+    // legalization has parsed the ordinal into the index field.
+    if (const int explicitIndex = semantic->getSemanticIndex(); explicitIndex >= 0)
+        return explicitIndex;
+
+    // No explicit index: recover the ordinal from the trailing digits of the name. Only the digit
+    // slice is needed; `baseName` is a mandatory out-param we ignore.
+    UnownedStringSlice baseName;
+    UnownedStringSlice trailingDigits;
+    if (splitNameAndIndex(semantic->getSemanticName(), baseName, trailingDigits))
+    {
+        // `splitNameAndIndex` returns true only after consuming a non-empty trailing digit run, so
+        // the parse is always well-formed -- there is no empty/failed case to guard here.
+        SLANG_ASSERT(trailingDigits.getLength() > 0);
+        return stringToInt(trailingDigits);
+    }
+
+    // Neither an explicit index nor a trailing ordinal in the name (e.g. a bare `SV_TARGET` or
+    // `COLOR`): there is no sibling ordinal to collide with, so location 0 is unambiguous. This is
+    // the genuine index-less case, distinct from the -1 collapse this function exists to avoid.
+    return 0;
+}
+
 bool WGSLSourceEmitter::maybeEmitSystemSemantic(IRInst* inst)
 {
     if (auto sysSemanticDecor = inst->findDecoration<IRTargetSystemValueDecoration>())
@@ -282,7 +313,7 @@ void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
         if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
         {
             m_writer->emit("@location(");
-            m_writer->emit(semanticDecoration->getEffectiveSemanticIndex());
+            m_writer->emit(resolveWGSLLocation(semanticDecoration));
             m_writer->emit(")");
             return;
         }
