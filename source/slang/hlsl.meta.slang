@@ -19551,16 +19551,6 @@ struct RaytracingAccelerationStructure
     }
 };
 
-__generic<T, Access access, AddressSpace addrSpace, L:IBufferDataLayout>
-__glsl_extension(GL_EXT_ray_tracing)
-[require(spirv)]
-[ForceInline]
-__prefix Ref<T, access, addrSpace> operator*(Ptr<T, access, addrSpace, L> ptr)
-    where T == RaytracingAccelerationStructure
-{
-    return RaytracingAccelerationStructure(bit_cast<uint64_t>(ptr));
-}
-
 // 10.1.4 - Subobject Definitions
 
 // TODO: We may decide to support these, but their reliance on C++ implicit
@@ -20726,6 +20716,16 @@ uint64_t GetTransformListHandle(uint index)
     {
     case cuda: __intrinsic_asm "optixGetTransformListHandle";
     }
+}
+
+//@ hidden:
+__generic<T, Access access, AddressSpace addrSpace, L:IBufferDataLayout>
+[require(spirv)]
+[ForceInline]
+__prefix RaytracingAccelerationStructure operator*(Ptr<T, access, addrSpace, L> ptr)
+    where T == RaytracingAccelerationStructure
+{
+    return RaytracingAccelerationStructure(bit_cast<uint64_t>(ptr));
 }
 
 //
