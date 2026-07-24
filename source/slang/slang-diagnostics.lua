@@ -1392,6 +1392,13 @@ err(
 )
 
 err(
+    "cannot-overload-builtin-operator-on-builtin-operands",
+    30073,
+    "cannot overload builtin operator '~name:Name' on builtin scalar/vector/matrix operand types",
+    span { loc = "decl:Decl", message = "overloading builtin operator '~name' on builtin scalar/vector/matrix operand types is not supported; the builtin operator is always used. If you are overriding a matrix operator (e.g. a column-major matrix product) or vector equality, enable GLSL operator semantics with '-allow-glsl' or 'import glsl;'; there is no override for scalar operators or other vector operators." }
+)
+
+err(
     "expected-a-type",
     30060,
     "expected a type",

@@ -4691,14 +4691,12 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
         if (!uBasic)
             return nullptr;
         auto uBaseType = uBasic->getBaseType();
-        auto uFlags = BaseTypeInfo::getInfo(uBaseType).flags;
-        bool uInt = (uFlags & BaseTypeInfo::Flag::Integer) != 0;
-        bool uFloat = (uFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
-        bool uBool = (uBaseType == BaseType::Bool);
-        // `-` => signed/float negate; `~` => integer bitwise-not; `!` => bool logical-not.
-        bool uEligible = isNeg ? (uInt || uFloat) : (isBitNot ? uInt : /*isLogicalNot*/ uBool);
-        if (!uEligible)
+        // `-` => signed/float negate; `~` => integer bitwise-not; `!` => bool logical-not. Shared
+        // with the declaration-time check (see `isBuiltinOperationKindEligibleForBaseType`).
+        if (!isBuiltinOperationKindEligibleForBaseType(uKind, uBaseType))
         {
+            bool uFloat =
+                (BaseTypeInfo::getInfo(uBaseType).flags & BaseTypeInfo::Flag::FloatingPoint) != 0;
             // `~` on a builtin floating-point operand has no integer interpretation; diagnose it
             // with the same error as the binary case (issue #11648) instead of a confusing "no
             // overload for 'operator~'". Non-builtin operands already returned above.
@@ -4821,28 +4819,15 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
     if (!basicElementType)
         return nullptr;
     auto baseType = basicElementType->getBaseType();
-    auto baseFlags = BaseTypeInfo::getInfo(baseType).flags;
-    bool isIntegerBase = (baseFlags & BaseTypeInfo::Flag::Integer) != 0;
-    bool isFloatBase = (baseFlags & BaseTypeInfo::Flag::FloatingPoint) != 0;
-    bool isBoolBase = (baseType == BaseType::Bool);
-    // Some operators do not apply to every element type. For example, it is invalid to apply a
-    // bitwise operator to a floating-point operand, and arithmetic does not apply to `bool`. When
-    // the element type is not valid for the operator family we return null, so the expression
-    // falls back to normal overload resolution (which will either find a user-provided overload
-    // or produce the appropriate diagnostic) instead of being lowered as a builtin operation.
-    // (Floating-point bitwise/shift operands are rejected earlier with a dedicated diagnostic, so
-    // a non-integer bitwise operand reaching here is `bool`, which still resolves via `ILogical`.)
-    //   - bitwise/shift (`& | ^ << >> ~`): integer only;
-    //   - equality (`== !=`): integer, floating-point, or bool;
-    //   - arithmetic (`+ - * / %`) and ordering comparison (`< > <= >=`): integer or float.
-    bool eligible;
-    if (isBitwise)
-        eligible = isIntegerBase;
-    else if (isEquality)
-        eligible = isIntegerBase || isFloatBase || isBoolBase;
-    else
-        eligible = isIntegerBase || isFloatBase;
-    if (!eligible)
+    // Some operators do not apply to every element type (e.g. bitwise on a float, arithmetic on
+    // `bool`). When the element type is not valid for the operator family we return null so the
+    // expression falls back to normal overload resolution (which finds a user-provided overload or
+    // produces the appropriate diagnostic) instead of being lowered as a builtin operation. The
+    // per-operator element-type rule is `isBuiltinOperationKindEligibleForBaseType` -- shared with
+    // the declaration-time check in slang-check-decl.cpp so the two stay in lock-step. (A
+    // floating-point bitwise/shift operand is rejected earlier with a dedicated diagnostic, so a
+    // non-integer bitwise operand reaching here is `bool`, which still resolves via `ILogical`.)
+    if (!isBuiltinOperationKindEligibleForBaseType(kind, baseType))
         return nullptr;
 
     // Result type: arithmetic/bitwise preserve the operand type; comparison yields a
@@ -4900,7 +4885,7 @@ Expr* SemanticsExprVisitor::convertToBuiltinArithmeticOp(InvokeExpr* expr)
 // resolution would converge on for `left OP right` (the usual arithmetic conversions, with
 // scalar/vector/matrix broadcast), or null when the operands are not both builtin numeric
 // scalar/vector/matrix types or are not broadcast-compatible.
-Type* SemanticsExprVisitor::getBuiltinArithmeticCommonType(Type* left, Type* right)
+Type* SemanticsVisitor::getBuiltinArithmeticCommonType(Type* left, Type* right)
 {
     BaseType leftBase, rightBase;
     IntVal *leftRows, *leftCols, *rightRows, *rightCols;

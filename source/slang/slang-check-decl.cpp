@@ -731,6 +731,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void checkCallableDeclCommon(CallableDecl* decl);
     void maybeInferPrefixModifierForOperator(CallableDecl* decl);
+    void checkOverloadedBuiltinOperatorDecl(CallableDecl* decl);
     void checkPublicCallableOperandVisibility(CallableDecl* decl);
 
     void checkCallableConstraints(CallableDecl* decl);
@@ -15566,6 +15567,147 @@ void SemanticsDeclHeaderVisitor::maybeInferPrefixModifierForOperator(CallableDec
     addModifier(decl, prefixModifier);
 }
 
+// True if `operandType` is a builtin scalar/vector/matrix whose element type is eligible for the
+// builtin operator `kind` -- i.e. exactly the operand the fast path (`convertToBuiltinArithmeticOp`
+// in slang-check-expr.cpp) rewrites to a `BuiltinOperatorExpr` for that operator. Delegates the
+// per-operator element-type rule to `isBuiltinOperationKindEligibleForBaseType` -- the same
+// predicate the fast path uses -- so the two cannot drift. An element outside the operator's set is
+// not fast-pathed (the fast path instead defers to normal overload resolution, or, for a
+// floating-point bitwise operand, emits its own dedicated diagnostic), so this check leaves it
+// alone rather than emitting E30073.
+static bool isFastPathedOperandFor(BuiltinOperationKind kind, Type* operandType)
+{
+    if (!operandType)
+        return false;
+    Type* elementType = operandType;
+    if (auto vecType = as<VectorExpressionType>(operandType))
+        elementType = vecType->getElementType();
+    else if (auto matType = as<MatrixExpressionType>(operandType))
+        elementType = matType->getElementType();
+    auto basicType = as<BasicExpressionType>(elementType);
+    if (!basicType)
+        return false;
+    return isBuiltinOperationKindEligibleForBaseType(kind, basicType->getBaseType());
+}
+
+// Diagnose a user-defined operator overload that the builtin-operator fast path
+// (`convertToBuiltinArithmeticOp` in slang-check-expr.cpp) would rewrite to a
+// `BuiltinOperatorExpr`, which shadows the overload silently. To fire on exactly that set and no
+// more, this stays aligned with the fast path's eligibility: the arity-appropriate operation kind,
+// the same broadcast/common-type oracle (`getBuiltinArithmeticCommonType`) and per-operator
+// element-type eligibility (`isFastPathedOperandFor`), and the same GLSL-scope carve-out (only
+// matrix operators and vector equality are deferred there). An instance-method operator's implicit
+// `this` receiver counts as an operand.
+void SemanticsDeclHeaderVisitor::checkOverloadedBuiltinOperatorDecl(CallableDecl* decl)
+{
+    // Core-module operator declarations legitimately overload builtin operand types; only user code
+    // is restricted.
+    if (isFromCoreModule(decl))
+        return;
+
+    Name* opName = decl->getName();
+    if (!opName)
+        return;
+
+    // Collect the operand types. For an instance-method operator (a member of an aggregate or an
+    // `extension`, and not effectively static) the first operand is the implicit `this` receiver;
+    // the rest are the explicit parameters. Use `getParentAggTypeDeclBase`/`isEffectivelyStatic`
+    // for the same generic-unwrapping as `maybeInferPrefixModifierForOperator`.
+    List<Type*> operandTypes;
+    if (auto parentAggDecl = getParentAggTypeDeclBase(decl))
+    {
+        if (!isEffectivelyStatic(decl))
+            operandTypes.add(calcThisType(getDefaultDeclRef(parentAggDecl)));
+    }
+    for (auto paramDecl : decl->getParameters())
+    {
+        // Parameters were brought to `ReadyForReference` at the top of `checkCallableDeclCommon`,
+        // so their types are resolved.
+        operandTypes.add(paramDecl->getType());
+    }
+
+    // Determine the fast-path operation kind and the (broadcast) operand type whose shape drives
+    // the GLSL carve-out below, per arity. Return -- leaving the declaration legal -- whenever the
+    // fast path would not rewrite this operator on these operands.
+    auto opText = getText(opName).getUnownedSlice();
+    BuiltinOperationKind kind;
+    Type* operandShapeType;
+    if (operandTypes.getCount() == 1)
+    {
+        // Unary: the fast path rewrites only `-` (`Neg`), `!` (`Not`), and `~` (`BitNot`).
+        kind = getBuiltinOperationKindFromString(opText, OperatorArity::Unary);
+        if (kind != BuiltinOperationKind::Neg && kind != BuiltinOperationKind::Not &&
+            kind != BuiltinOperationKind::BitNot)
+            return;
+        operandShapeType = operandTypes[0];
+        if (!isFastPathedOperandFor(kind, operandShapeType))
+            return;
+    }
+    else if (operandTypes.getCount() == 2)
+    {
+        // The fast path rewrites a binary operator only for the arithmetic/comparison/bitwise kinds
+        // (see its `isArithmetic || isComparison || isBitwise` gate). `&&` (`And`), `||` (`Or`),
+        // `?:` (`Conditional`), the unary-only `!` (`Not`) / `~` (`BitNot`) reached with two
+        // operands, and unmapped names (`++`, `+=`, `()`, `[]`, ...) (`Unknown`) are not rewritten.
+        kind = getBuiltinOperationKindFromString(opText, OperatorArity::Binary);
+        switch (kind)
+        {
+        case BuiltinOperationKind::Add:
+        case BuiltinOperationKind::Sub:
+        case BuiltinOperationKind::Mul:
+        case BuiltinOperationKind::Div:
+        case BuiltinOperationKind::Mod:
+        case BuiltinOperationKind::Eql:
+        case BuiltinOperationKind::Neq:
+        case BuiltinOperationKind::Less:
+        case BuiltinOperationKind::Greater:
+        case BuiltinOperationKind::Leq:
+        case BuiltinOperationKind::Geq:
+        case BuiltinOperationKind::BitAnd:
+        case BuiltinOperationKind::BitOr:
+        case BuiltinOperationKind::BitXor:
+        case BuiltinOperationKind::Lsh:
+        case BuiltinOperationKind::Rsh:
+            break;
+        default:
+            return;
+        }
+        Type* left = operandTypes[0];
+        Type* right = operandTypes[1];
+        // Shifts do not broadcast: the fast path defers a shift whose operand types differ.
+        if ((kind == BuiltinOperationKind::Lsh || kind == BuiltinOperationKind::Rsh) &&
+            !left->equals(right))
+            return;
+        // Reuse the fast path's exact broadcast/common-type oracle; null means the operands are not
+        // both builtin numeric scalar/vector/matrix, or not broadcast-compatible, so it is
+        // deferred.
+        operandShapeType = getBuiltinArithmeticCommonType(left, right);
+        if (!operandShapeType || !isFastPathedOperandFor(kind, operandShapeType))
+            return;
+    }
+    else
+    {
+        // Not a unary or binary operator arity the fast path handles.
+        return;
+    }
+
+    // In GLSL operator scope the fast path defers matrix operators and vector equality (only) to
+    // normal resolution, so those overloads are honored -- leave them legal. Everything else is
+    // still rewritten in GLSL scope, so it is still diagnosed.
+    if (getShared()->isGLSLOperatorScope())
+    {
+        const bool isMatrix = as<MatrixExpressionType>(operandShapeType) != nullptr;
+        const bool isVector = as<VectorExpressionType>(operandShapeType) != nullptr;
+        const bool isEquality =
+            kind == BuiltinOperationKind::Eql || kind == BuiltinOperationKind::Neq;
+        if (isMatrix || (isEquality && isVector))
+            return;
+    }
+
+    getSink()->diagnose(
+        Diagnostics::CannotOverloadBuiltinOperatorOnBuiltinOperands{.name = opName, .decl = decl});
+}
+
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 {
     for (auto paramDecl : decl->getParameters())
@@ -15574,6 +15716,7 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     }
 
     maybeInferPrefixModifierForOperator(decl);
+    checkOverloadedBuiltinOperatorDecl(decl);
 
     // Check that no parameter without a default value follows a parameter with one.
     bool seenDefaultParam = false;
