@@ -2459,10 +2459,14 @@ static IRIntLit* _getDefaultThreadCount(IRInst* threadCount)
     if (auto intLit = as<IRIntLit>(threadCount))
         return intLit;
 
-    auto defaultValueDecor =
-        cast<IRGlobalParam>(threadCount)->findDecoration<IRDefaultValueDecoration>();
-    SLANG_RELEASE_ASSERT(defaultValueDecor);
-    return cast<IRIntLit>(defaultValueDecor->getOperand(0));
+    auto globalParam = as<IRGlobalParam>(threadCount);
+    auto defaultValueDecor = globalParam ? globalParam->findDecoration<IRDefaultValueDecoration>() : nullptr;
+    if (defaultValueDecor)
+        if (auto defaultIntLit = as<IRIntLit>(defaultValueDecor->getOperand(0)))
+            return defaultIntLit;
+
+    IRBuilder builder(globalParam ? (IRInst*)globalParam : threadCount);
+    return cast<IRIntLit>(builder.getIntValue(globalParam ? globalParam->getDataType() : builder.getIntType(), 0));
 }
 
 void verifyComputeDerivativeGroupModifiers(
