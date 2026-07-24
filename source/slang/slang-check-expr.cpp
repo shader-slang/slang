@@ -7895,6 +7895,12 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     addModifier(lambdaStructDecl, m_astBuilder->create<SynthesizedModifier>());
     synthesizer.pushScopeForContainer(lambdaStructDecl);
     lambdaStructDecl->loc = lambdaExpr->loc;
+    // Append a disambiguating suffix so that multiple lambdas parented to the same
+    // container get distinct synthesized names and do not trip the name-keyed
+    // redeclaration check. The current member count of the parent container is a
+    // unique suffix here because each lambda reads the count and then immediately
+    // adds itself, and lambda expressions in a container are checked sequentially,
+    // so consecutive lambdas observe distinct counts.
     StringBuilder nameBuilder;
     nameBuilder << "_slang_Lambda_";
     if (m_parentFunc)
@@ -7906,6 +7912,7 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     }
     else
     {
+        nameBuilder << m_outerScope->containerDecl->getDirectMemberDeclCount();
         m_outerScope->containerDecl->addMember(lambdaStructDecl);
     }
     auto name = getName(nameBuilder.getBuffer());
