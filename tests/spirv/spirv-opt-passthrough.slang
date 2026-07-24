@@ -25,6 +25,17 @@
 // fails and its diagnostic is surfaced (the compiler does not run a partially-registered pipeline).
 //TEST:SIMPLE(filecheck=INVALID): -target spirv-asm -entry computeMain -stage compute -O1 -Xspirv-opt --this-pass-does-not-exist
 
+// Every `-Xspirv-opt` occurrence accumulates: the forwarding collects a list, not just the first
+// flag. A valid first flag plus an invalid second one must still fail on the second -- proving the
+// whole list is forwarded (a first-only or mis-counted regression would ignore the second and
+// succeed).
+//TEST:SIMPLE(filecheck=MULTIFLAG): -target spirv-asm -entry computeMain -stage compute -O1 -Xspirv-opt --strip-debug -Xspirv-opt --this-pass-does-not-exist
+
+// The forwarding is gated to the `spirv-opt` passthrough instance, so `-Xglslang` args are NOT
+// handed to the optimizer. `-Xglslang --strip-debug` must therefore leave the debug names intact
+// (if it were misrouted it would either strip them or fail as an unknown flag).
+//TEST:SIMPLE(filecheck=XGLSLANG): -target spirv-asm -entry computeMain -stage compute -O1 -Xglslang --strip-debug
+
 // At `-O1` the preset keeps the debug names and inlines the call.
 // BASE: {{^}}OpName %
 // BASE-NOT: {{^}}%{{[0-9]+}} = OpFunctionCall
@@ -51,6 +62,16 @@
 // INVALID: result code = -1
 // INVALID: {{[Ee]rror}}
 // INVALID: Unknown flag
+
+// The second `-Xspirv-opt` flag is the invalid one, so the failure names it -- proving the second
+// list element was forwarded, not dropped.
+// MULTIFLAG: result code = -1
+// MULTIFLAG: Unknown flag {{.*}}this-pass-does-not-exist
+
+// `-Xglslang --strip-debug` is not routed to the optimizer, so the debug names survive and the
+// compile succeeds.
+// XGLSLANG: result code = 0
+// XGLSLANG: {{^}}OpName %
 
 RWStructuredBuffer<float> outputBuffer;
 

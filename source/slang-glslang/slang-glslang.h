@@ -45,10 +45,12 @@ struct glsl_SPIRVVersion
 struct glslang_CompileRequest_1_1;
 
 // The glslang_CompileRequest_1_N structs form a versioned chain across the slang-glslang shared
-// library boundary. The invariant every version conversion depends on: a version only ever appends
-// fields to the previous one, never reordering or resizing existing fields. `_1_0`..`_1_2` restate
-// the shared prefix inline; `_1_3` inherits it from `_1_2`. When adding a `_1_(N+1)`, append its
-// new fields and zero them in its `set()`.
+// library boundary. From `_1_1` onward each version only appends fields to the previous one (never
+// reordering or resizing existing fields), so those `set()` conversions can copy the shared prefix
+// (`_1_1`..`_1_2` restate it inline; `_1_3` inherits it from `_1_2`). `_1_0`<->`_1_1` is the one
+// exception -- `_1_1` prepends `sizeInBytes` ahead of the `_1_0` fields, so those two convert
+// field-by-field, not by prefix copy. When adding a `_1_(N+1)`, append its new fields and zero them
+// in its `set()`.
 
 // 1.0 version
 struct glslang_CompileRequest_1_0
@@ -151,8 +153,10 @@ struct glslang_CompileRequest_1_3 : public glslang_CompileRequest_1_2
     /// Set from 1.2
     void set(const glslang_CompileRequest_1_2& in);
 
-    // spirv-opt CLI-style pass flags forwarded from `-Xspirv-opt`, registered on top of the
-    // preset passes for the selected optimization level. Null / zero count means none.
+    // spirv-opt CLI-style pass flags forwarded from `-Xspirv-opt`, registered on top of the preset
+    // passes for the selected optimization level. Null / zero count means none. Borrowed, not
+    // owned: the producer points these at storage it keeps alive for the synchronous compile call,
+    // and the callee copies them before returning -- neither side frees them.
     const char* const* spirvOptimizationFlags;
     size_t spirvOptimizationFlagCount;
 };
@@ -161,6 +165,11 @@ struct glslang_CompileRequest_1_3 : public glslang_CompileRequest_1_2
 // stay trivially copyable, and it must remain a _1_2 subclass so callers can slice to the base.
 static_assert(std::is_trivially_copyable<glslang_CompileRequest_1_3>::value);
 static_assert(std::is_base_of<glslang_CompileRequest_1_2, glslang_CompileRequest_1_3>::value);
+// Total-size regression guard: the two appended fields must be exactly the growth over _1_2 (this
+// catches an accidental added/removed field or padding change; it does not police field order).
+static_assert(
+    sizeof(glslang_CompileRequest_1_3) ==
+    sizeof(glslang_CompileRequest_1_2) + sizeof(const char* const*) + sizeof(size_t));
 
 inline void glslang_CompileRequest_1_0::set(const glslang_CompileRequest_1_1& in)
 {
