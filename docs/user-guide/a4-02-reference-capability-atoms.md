@@ -155,6 +155,9 @@ Versions
 `GLSL_460`
 > GLSL 460 and related capabilities of other targets.
 
+`GLSL_latest`
+> Represents the latest GLSL version.
+
 `cuda_sm_1_0`
 > cuda 1.0 and related capabilities of other targets.
 
@@ -358,6 +361,9 @@ Versions
 `sm_6_9_version`
 > HLSL shader model 6.9 and related capabilities of other targets.
 > Does not include related GLSL/SPIRV extensions.
+
+`sm_latest`
+> Represents the latest HLSL shader model version.
 
 `spirv_1_0`
 > Represents SPIR-V 1.0 version.
