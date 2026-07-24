@@ -69,11 +69,12 @@ public:
     }
 
 protected:
-    SlangResult _invoke(glslang_CompileRequest_1_2& request);
+    SlangResult _invoke(glslang_CompileRequest_1_3& request);
 
     glslang_CompileFunc_1_0 m_compile_1_0 = nullptr;
     glslang_CompileFunc_1_1 m_compile_1_1 = nullptr;
     glslang_CompileFunc_1_2 m_compile_1_2 = nullptr;
+    glslang_CompileFunc_1_3 m_compile_1_3 = nullptr;
     glslang_ValidateSPIRVFunc m_validate = nullptr;
     glslang_DisassembleSPIRVFunc m_disassemble = nullptr;
     glslang_DisassembleSPIRVWithResultFunc m_disassembleWithResult = nullptr;
@@ -90,6 +91,7 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_compile_1_0 = (glslang_CompileFunc_1_0)library->findFuncByName("glslang_compile");
     m_compile_1_1 = (glslang_CompileFunc_1_1)library->findFuncByName("glslang_compile_1_1");
     m_compile_1_2 = (glslang_CompileFunc_1_2)library->findFuncByName("glslang_compile_1_2");
+    m_compile_1_3 = (glslang_CompileFunc_1_3)library->findFuncByName("glslang_compile_1_3");
     m_validate = (glslang_ValidateSPIRVFunc)library->findFuncByName("glslang_validateSPIRV");
     m_disassemble =
         (glslang_DisassembleSPIRVFunc)library->findFuncByName("glslang_disassembleSPIRV");
@@ -99,7 +101,8 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
         (glslang_FreeDisassemblyFunc)library->findFuncByName("glslang_freeDisassembly");
     m_link = (glslang_LinkSPIRVFunc)library->findFuncByName("glslang_linkSPIRV");
 
-    if (m_compile_1_0 == nullptr && m_compile_1_1 == nullptr && m_compile_1_2 == nullptr)
+    if (m_compile_1_0 == nullptr && m_compile_1_1 == nullptr && m_compile_1_2 == nullptr &&
+        m_compile_1_3 == nullptr)
     {
         return SLANG_FAIL;
     }
@@ -110,7 +113,11 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_desc = Desc(m_compilerType);
 
     Slang::String filename;
-    if (m_compile_1_2)
+    if (m_compile_1_3)
+    {
+        filename = Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)m_compile_1_3);
+    }
+    else if (m_compile_1_2)
     {
         filename = Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)m_compile_1_2);
     }
@@ -130,28 +137,64 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
-SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_2& request)
+SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_3& request)
 {
+    // The `-Xspirv-opt` pass flags only exist in the _1_3 request. If the loaded library predates
+    // _1_3 we must downgrade to an older struct, which cannot carry them -- so honoring the user's
+    // explicit request is impossible. Fail rather than silently drop the flags and emit unmodified
+    // SPIR-V. This only matters when the optimizer would actually run: at optimization level None
+    // no passes run (the flags are inert regardless of library version), so don't fail there. The
+    // failure does not depend on a diagnostic sink; the message is emitted only if one is present
+    // (compile(), the only caller that populates flags, always sets one).
+    if (request.spirvOptimizationFlagCount != 0 && !m_compile_1_3 &&
+        request.optimizationLevel != SLANG_OPTIMIZATION_LEVEL_NONE)
+    {
+        if (request.diagnosticFunc)
+        {
+            const char msg[] =
+                "error: -Xspirv-opt requires a newer slang-glslang library; the loaded version "
+                "does not support forwarding optimizer pass flags.\n";
+            request.diagnosticFunc(msg, sizeof(msg) - 1, request.diagnosticUserData);
+        }
+        return SLANG_FAIL;
+    }
+
     int err = 1;
-    if (m_compile_1_2)
+    if (m_compile_1_3)
     {
-        err = m_compile_1_2(&request);
+        err = m_compile_1_3(&request);
     }
-    else if (m_compile_1_1)
+    else
     {
-        glslang_CompileRequest_1_1 request_1_1;
-        memcpy(&request_1_1, &request, sizeof(request_1_1));
-        request_1_1.sizeInBytes = sizeof(request_1_1);
-        err = m_compile_1_1(&request_1_1);
-    }
-    else if (m_compile_1_0)
-    {
-        glslang_CompileRequest_1_1 request_1_1;
-        memcpy(&request_1_1, &request, sizeof(request_1_1));
-        request_1_1.sizeInBytes = sizeof(request_1_1);
-        glslang_CompileRequest_1_0 request_1_0;
-        request_1_0.set(request_1_1);
-        err = m_compile_1_0(&request_1_0);
+        // Older libraries don't understand the _1_3 fields; downgrade by slicing to the _1_2 base
+        // and copying its (standard-layout) prefix into the older struct. Reaching here with
+        // `-Xspirv-opt` flags present implies optimization level None (any higher level was
+        // rejected by the guard above), where the optimizer doesn't run -- so dropping the flags in
+        // the downgrade loses nothing the request would have used. Going through the typed base
+        // keeps the copies independent of _1_3's non-standard layout.
+        const glslang_CompileRequest_1_2& request_1_2 = request;
+        if (m_compile_1_2)
+        {
+            glslang_CompileRequest_1_2 downgraded = request_1_2;
+            downgraded.sizeInBytes = sizeof(downgraded);
+            err = m_compile_1_2(&downgraded);
+        }
+        else if (m_compile_1_1)
+        {
+            glslang_CompileRequest_1_1 request_1_1;
+            memcpy(&request_1_1, &request_1_2, sizeof(request_1_1));
+            request_1_1.sizeInBytes = sizeof(request_1_1);
+            err = m_compile_1_1(&request_1_1);
+        }
+        else if (m_compile_1_0)
+        {
+            glslang_CompileRequest_1_1 request_1_1;
+            memcpy(&request_1_1, &request_1_2, sizeof(request_1_1));
+            request_1_1.sizeInBytes = sizeof(request_1_1);
+            glslang_CompileRequest_1_0 request_1_0;
+            request_1_0.set(request_1_1);
+            err = m_compile_1_0(&request_1_0);
+        }
     }
 
     return err ? SLANG_FAIL : SLANG_OK;
@@ -224,7 +267,7 @@ SlangResult GlslangDownstreamCompiler::compile(
 
     String sourcePath = ArtifactUtil::findPath(sourceArtifact);
 
-    glslang_CompileRequest_1_2 request;
+    glslang_CompileRequest_1_3 request;
     memset(&request, 0, sizeof(request));
     request.sizeInBytes = sizeof(request);
 
@@ -276,6 +319,19 @@ SlangResult GlslangDownstreamCompiler::compile(
     request.debugInfoType = (unsigned)options.debugInfoType;
 
     request.entryPointName = options.entryPointName.begin();
+
+    // Only the spirv-opt instance forwards these; this class also backs `glslang`, whose args
+    // (`-Xglslang`) must not reach the optimizer.
+    List<const char*> spirvOptFlags;
+    if (m_compilerType == SLANG_PASS_THROUGH_SPIRV_OPT)
+    {
+        for (const auto& arg : options.compilerSpecificArguments)
+        {
+            spirvOptFlags.add(arg.begin());
+        }
+        request.spirvOptimizationFlags = spirvOptFlags.getBuffer();
+        request.spirvOptimizationFlagCount = (size_t)spirvOptFlags.getCount();
+    }
 
     const SlangResult invokeResult = _invoke(request);
 
@@ -418,7 +474,7 @@ SlangResult GlslangDownstreamCompiler::convert(
     auto outputFunc = [](void const* data, size_t size, void* userData)
     { (*(StringBuilder*)userData).append((char const*)data, (char const*)data + size); };
 
-    glslang_CompileRequest_1_2 request;
+    glslang_CompileRequest_1_3 request;
     memset(&request, 0, sizeof(request));
     request.sizeInBytes = sizeof(request);
 
@@ -448,8 +504,17 @@ SlangResult GlslangDownstreamCompiler::convert(
 
 SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersionString)
 {
+    // Prefer the newest available entry point, matching init()'s selection.
     uint64_t timestamp;
-    if (m_compile_1_1)
+    if (m_compile_1_3)
+    {
+        timestamp = SharedLibraryUtils::getSharedLibraryTimestamp((void*)m_compile_1_3);
+    }
+    else if (m_compile_1_2)
+    {
+        timestamp = SharedLibraryUtils::getSharedLibraryTimestamp((void*)m_compile_1_2);
+    }
+    else if (m_compile_1_1)
     {
         timestamp = SharedLibraryUtils::getSharedLibraryTimestamp((void*)m_compile_1_1);
     }

@@ -9,6 +9,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-writer.h"
+#include "compiler-core/slang-slice-allocator.h"
 #include "slang-capability.h"
 #include "slang-check-out-of-bound-access.h"
 #include "slang-emit-c-like.h"
@@ -3381,6 +3382,16 @@ static SlangResult createArtifactFromIR(
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
         downstreamOptions.targetType = SLANG_SPIRV;
         downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
+
+        // Forward the `-Xspirv-opt` args to the downstream optimizer; at `-O1`/default they are
+        // registered on top of the preset. We attach them unconditionally (before the level switch
+        // below) and let the downstream decide whether they apply: at `-O0` the compiler is loaded
+        // only for validation/linking/debug-info and `glslang_optimizeSPIRV` early-returns without
+        // registering them (inert), matching the additive-to-`-OX` contract. The allocator owns the
+        // copied arg strings and slice array, so it must outlive the compile() call below.
+        SliceAllocator allocator;
+        downstreamOptions.compilerSpecificArguments = allocator.allocate(
+            codeGenContext->getTargetProgram()->getOptionSet().getDownstreamArgs("spirv-opt"));
         switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
         {
         case OptimizationLevel::None:

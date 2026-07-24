@@ -90,7 +90,7 @@ static void dump(
     }
 }
 
-static void dumpDiagnostics(const glslang_CompileRequest_1_2& request, std::string const& log)
+static void dumpDiagnostics(const glslang_CompileRequest_1_3& request, std::string const& log)
 {
     dump(log.c_str(), log.length(), request.diagnosticFunc, request.diagnosticUserData, stderr);
 }
@@ -261,11 +261,13 @@ extern "C"
     return succ;
 }
 
-// Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
+// Apply the SPIRV-Tools optimizer to generated SPIR-V: the passes of the requested optimization
+// level preset, plus any passthrough passes from `request.spirvOptimizationFlags` (`-Xspirv-opt`)
+// registered on top. Returns SLANG_FAIL if a passthrough flag is invalid.
 // TODO: add flag for optimizing SPIR-V size as well
 static int glslang_optimizeSPIRV(
     spv_target_env targetEnv,
-    const glslang_CompileRequest_1_2& request,
+    const glslang_CompileRequest_1_3& request,
     std::vector<SPIRVOptimizationDiagnostic>& outDiags,
     std::vector<unsigned int>& ioSpirv)
 {
@@ -511,6 +513,21 @@ static int glslang_optimizeSPIRV(
         }
     }
 
+    // These `-Xspirv-opt` passes are additive: they run on top of the preset registered above.
+    // RegisterPassesFromFlags stops at the first invalid flag (reporting it through the message
+    // consumer) and leaves the earlier flags registered, so a false return means the pipeline is
+    // only partially built -- fail rather than run a partial pipeline.
+    if (request.spirvOptimizationFlags && request.spirvOptimizationFlagCount)
+    {
+        std::vector<std::string> flags(
+            request.spirvOptimizationFlags,
+            request.spirvOptimizationFlags + request.spirvOptimizationFlagCount);
+        if (!optimizer.RegisterPassesFromFlags(flags))
+        {
+            return SLANG_FAIL;
+        }
+    }
+
     spvOptOptions.set_run_validator(false); // Don't run the validator by default
 
     {
@@ -545,7 +562,7 @@ static int glslang_optimizeSPIRV(
     return 0;
 }
 
-static int spirv_Optimize_1_2(const glslang_CompileRequest_1_2& request)
+static int spirv_Optimize_1_3(const glslang_CompileRequest_1_3& request)
 {
     std::vector<SPIRVOptimizationDiagnostic> diagnostics;
     std::vector<uint32_t> spirvBuffer((uint32_t*)request.inputBegin, (uint32_t*)request.inputEnd);
@@ -677,7 +694,7 @@ static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion i
     return SPV_ENV_UNIVERSAL_1_2;
 }
 
-static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
+static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_3 request)
 {
     // Check that the encoding matches
     assert(glslang::EShTargetSpv_1_4 == _makeTargetLanguageVersion(1, 4));
@@ -892,7 +909,7 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
     return 0;
 }
 
-static int glslang_dissassembleSPIRV(const glslang_CompileRequest_1_2& request)
+static int glslang_dissassembleSPIRV(const glslang_CompileRequest_1_3& request)
 {
     typedef unsigned int SPIRVWord;
 
@@ -945,7 +962,7 @@ public:
     bool m_isInitialized = false;
 };
 
-static int _compile(const glslang_CompileRequest_1_2& request)
+static int _compile(const glslang_CompileRequest_1_3& request)
 {
     int result = 0;
     switch (request.action)
@@ -963,7 +980,7 @@ static int _compile(const glslang_CompileRequest_1_2& request)
         break;
 
     case GLSLANG_ACTION_OPTIMIZE_SPIRV:
-        result = spirv_Optimize_1_2(request);
+        result = spirv_Optimize_1_3(request);
         break;
     }
 
@@ -976,7 +993,7 @@ extern "C"
 #else
     __attribute__((__visibility__("default")))
 #endif
-        int glslang_compile_1_2(glslang_CompileRequest_1_2* inRequest)
+        int glslang_compile_1_3(glslang_CompileRequest_1_3* inRequest)
 {
     static ProcessInitializer g_processInitializer;
     if (!g_processInitializer.init())
@@ -986,7 +1003,7 @@ extern "C"
     }
 
     // If it's the right size just use it
-    if (inRequest->sizeInBytes == sizeof(glslang_CompileRequest_1_2))
+    if (inRequest->sizeInBytes == sizeof(glslang_CompileRequest_1_3))
     {
         return _compile(*inRequest);
     }
@@ -996,7 +1013,7 @@ extern "C"
 
         // Try to ensure some binary compatibility, by using sizeInBytes member, and copying
 
-        glslang_CompileRequest_1_2 request;
+        glslang_CompileRequest_1_3 request;
 
         // Copy into request
         const size_t copySize =
@@ -1007,6 +1024,35 @@ extern "C"
 
         return _compile(request);
     }
+}
+
+extern "C"
+#ifdef _MSC_VER
+    _declspec(dllexport)
+#else
+    __attribute__((__visibility__("default")))
+#endif
+        int glslang_compile_1_2(glslang_CompileRequest_1_2* inRequest)
+{
+    // Exported entry point that a client may load by name (see GlslangDownstreamCompiler::init),
+    // so `inRequest` crosses the library boundary. `_1_2` is the version this PR supersedes: while
+    // it was the newest struct its size could grow across builds, so a client may pass a shorter
+    // or longer `_1_2` than this build knows -- normalize by its declared `sizeInBytes` to avoid
+    // over-reading before converting to `_1_3`. (The `_1_1`/`_1_0` shims below don't need this:
+    // they are older versions whose sizes are permanently frozen, so `sizeof` is authoritative for
+    // any conforming client.)
+    glslang_CompileRequest_1_2 normalized;
+    const size_t copySize =
+        (inRequest->sizeInBytes > sizeof(normalized)) ? sizeof(normalized) : inRequest->sizeInBytes;
+    ::memcpy(&normalized, inRequest, copySize);
+    memset(((uint8_t*)&normalized) + copySize, 0, sizeof(normalized) - copySize);
+    normalized.sizeInBytes = sizeof(normalized);
+
+    glslang_CompileRequest_1_3 request;
+    memset(&request, 0, sizeof(request));
+    request.sizeInBytes = sizeof(request);
+    request.set(normalized);
+    return glslang_compile_1_3(&request);
 }
 
 extern "C"
