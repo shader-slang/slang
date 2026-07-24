@@ -220,6 +220,16 @@ Under those assumptions, the `out` and `inout` cases may be optimized to use pas
 
 > Note: Applications that rely on the precise order in which write-back for `out` and `in out` parameters is performed are already on shaky semantic ground.
 
+### Group-shared parameters are passed by reference
+
+A parameter marked `groupshared` names a single storage location in the group-shared address space that is shared by the whole thread group, so it is always passed *by reference* rather than copied per invocation:
+
+```hlsl
+void scan(uint tid, groupshared uint scratch[N]) { ... }
+```
+
+Writes through such a parameter are visible to every invocation in the group. The reference is read-write by default; the recommended read-only spelling is `__constref groupshared`. Because a `groupshared` parameter denotes shared storage rather than a per-invocation value, the copy-direction modifiers `in`, `out`, and `inout` cannot be used with `groupshared` and are reported as an error.
+
 Body
 ----
 

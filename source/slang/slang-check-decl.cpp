@@ -13975,6 +13975,26 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 
     maybeApplyLayoutModifier(paramDecl);
 
+    // A `groupshared` parameter names one thread-group-shared storage location and is therefore
+    // passed by reference (see `getExplicitlyDeclaredParamPassingMode`), so the copy-direction
+    // modifiers `in`/`out`/`inout` are not applicable to it. Reject them here at the producer
+    // rather than letting lowering silently reinterpret the shape: an `in groupshared` parameter,
+    // for instance, would otherwise revert to a per-thread by-value copy -- exactly the #10641
+    // defect. Mutability is instead spelled with `__constref` (read-only) vs the bare read-write
+    // default. `InOutModifier` derives from `OutModifier`, so it is checked first to report the
+    // most specific keyword.
+    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
+    {
+        Modifier* directionModifier = paramDecl->findModifier<InOutModifier>();
+        if (!directionModifier)
+            directionModifier = paramDecl->findModifier<OutModifier>();
+        if (!directionModifier)
+            directionModifier = paramDecl->findModifier<InModifier>();
+        if (directionModifier)
+            getSink()->diagnose(Diagnostics::GroupsharedParameterCannotHaveDirectionModifier{
+                .modifier = directionModifier});
+    }
+
     // Only texture types are allowed to have memory qualifiers on parameters
     if (!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
     {
