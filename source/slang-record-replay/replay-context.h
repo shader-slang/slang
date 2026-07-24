@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../core/slang-blob.h"
-#include "../core/slang-dictionary.h"
-#include "../core/slang-list.h"
-#include "../core/slang-memory-arena.h"
+#include "core/slang-blob.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-list.h"
+#include "core/slang-memory-arena.h"
 #include "replay-shared.h"
 #include "replay-stream.h"
 

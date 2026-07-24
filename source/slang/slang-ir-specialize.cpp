@@ -1,7 +1,7 @@
 // slang-ir-specialize.cpp
 #include "slang-ir-specialize.h"
 
-#include "../core/slang-performance-profiler.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-inline.h"

@@ -11,9 +11,9 @@
 //
 // * `slang-check-conversion.cpp` is responsible for the logic of handling type conversion/coercion
 
-#include "../core/slang-math.h"
-#include "../core/slang-string-util.h"
 #include "core/slang-char-util.h"
+#include "core/slang-math.h"
+#include "core/slang-string-util.h"
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
 #include "slang-ast-print.h"

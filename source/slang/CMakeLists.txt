@@ -250,6 +250,7 @@ set(slang_build_args
     INCLUDE_DIRECTORIES_PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
     ${CMAKE_CURRENT_BINARY_DIR}/../standard-modules/slang-standard-module-config-header
+    ${slang_SOURCE_DIR}/tools
     EXPORT_MACRO_PREFIX
     SLANG
     EXPORT_TYPE_AS
