@@ -38,7 +38,7 @@ void legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL(
     CodeGenContext* codeGenContext);
 
 bool isIllegalGLSLParameterType(IRType* type);
-bool isIllegalSPIRVParameterType(IRType* type, bool isArray);
+bool isIllegalSPIRVParameterType(IRType* type, bool isArray, bool allowTextureParams);
 bool isIllegalWGSLParameterType(IRType* type);
 
 } // namespace Slang
