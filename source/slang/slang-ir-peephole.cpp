@@ -364,9 +364,13 @@ struct PeepholeContext : InstPassBase
                         underlyingType = builder.getVectorType(uintType, 2);
                     }
 
+                    // A handle's size/alignment must match its underlying representation under the
+                    // requested layout rule, not always the natural rule: a `uint2` handle has
+                    // std430/std140 alignment 8 but natural alignment 4.
                     IRSizeAndAlignment sizeAlign;
-                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                    if (SLANG_FAILED(getSizeAndAlignment(
                             targetProgram->getTargetReq(),
+                            layoutRules,
                             underlyingType,
                             &sizeAlign)))
                         break;
