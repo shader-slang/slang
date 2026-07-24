@@ -154,9 +154,9 @@ struct glslang_CompileRequest_1_3 : public glslang_CompileRequest_1_2
     void set(const glslang_CompileRequest_1_2& in);
 
     // spirv-opt CLI-style pass flags forwarded from `-Xspirv-opt`, registered on top of the preset
-    // passes for the selected optimization level. Null / zero count means none. Borrowed, not
-    // owned: the producer points these at storage it keeps alive for the synchronous compile call,
-    // and the callee copies them before returning -- neither side frees them.
+    // passes for the selected optimization level. Null / zero count means none. Borrowed for the
+    // duration of the synchronous compile call: the producer keeps the storage alive across the
+    // call, and the callee neither retains nor frees it.
     const char* const* spirvOptimizationFlags;
     size_t spirvOptimizationFlagCount;
 };
