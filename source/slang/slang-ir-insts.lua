@@ -383,6 +383,31 @@ local insts = {
 						},
 					},
 					{
+						PhysicalParamStorage = {
+							-- Semantically a `T*` in the IR (an `IRLoad` is required to read the `T`),
+							-- whose referent is the target's physical by-value parameter storage. Used only
+							-- by the CUDA-family address-forwarding in `transformParamsToConstRef`: an
+							-- entry-point by-value uniform aggregate param is retyped to
+							-- `PhysicalParamStorage<T>` so its address can be forwarded into a `borrow in`
+							-- callee without a per-thread copy, instead of taking `GetAddress` of an SSA
+							-- value. The C++/CUDA backend emits such a param as the plain value `T p` (the
+							-- kernel ABI is unchanged) and emits a reference of `p` as `&p`. It is never
+							-- valid for the SPIR-V/WGSL/Metal backends.
+							--
+							-- The three trailing operands exist only for structural compatibility with
+							-- the `IRPtrTypeBase` accessors (so `getValueType()` etc. work); the builder
+							-- always fixes them to Read / Generic / default-layout and they are not meant
+							-- to vary.
+							struct_name = "PhysicalParamStorageType",
+							operands = {
+								{ "valueType", "IRType" },
+								{ "accessQualifierOperand", "IRIntLit", optional = true },
+								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
+							},
+						},
+					},
+					{
 						OutParamTypeBase = {
 							{ OutParam = { struct_name = "OutParamType", operands = { { "valueType", "IRType" } } } },
 							{

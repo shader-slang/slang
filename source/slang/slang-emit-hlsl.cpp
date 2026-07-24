@@ -2061,6 +2061,11 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             emitSimpleTypeImpl(as<IRBorrowInParamType>(type)->getValueType());
             return;
         }
+    case kIROp_PhysicalParamStorageType:
+        // `PhysicalParamStorage<T>` is a CUDA-family-only representation for forwarding a by-value
+        // uniform aggregate parameter by address; it must never reach the HLSL backend.
+        SLANG_UNEXPECTED("PhysicalParamStorage type emitted for HLSL target");
+        break;
     default:
         break;
     }

@@ -1863,6 +1863,18 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
             // resulting code.
             m_writer->emit(getName(inst));
             return;
+        case kIROp_Param:
+            // A parameter of type `PhysicalParamStorage<T>` is emitted by-value as `T p`, so its
+            // pointer value is `&p`; dereferencing it is just `p` (i.e. *&p ==> p), the same
+            // peephole as for a local variable above. A genuinely pointer-like parameter
+            // (`borrow in`/`ref`/`out`) needs no such peephole and falls through the `break` to the
+            // generic `*operand` emit below.
+            if (as<IRPhysicalParamStorageType>(inst->getDataType()))
+            {
+                m_writer->emit(getName(inst));
+                return;
+            }
+            break;
         case kIROp_FieldAddress:
             {
                 auto innerPrec = getInfo(EmitOp::Postfix);

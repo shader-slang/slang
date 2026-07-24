@@ -2919,6 +2919,20 @@ IRBorrowInParamType* IRBuilder::getBorrowInParamType(IRType* valueType, AddressS
         getDefaultBufferLayoutType());
 }
 
+IRPhysicalParamStorageType* IRBuilder::getPhysicalParamStorageType(IRType* valueType)
+{
+    // Only `valueType` is meaningful for this type. The three trailing `IRPtrTypeBase` operands
+    // (access qualifier / address space / data layout) exist only for structural compatibility with
+    // the ptr-base accessors and are fixed placeholders - do not read `getAddressSpace()` etc. off
+    // a `PhysicalParamStorage<T>` expecting a real value.
+    return (IRPhysicalParamStorageType*)getPtrType(
+        kIROp_PhysicalParamStorageType,
+        valueType,
+        AccessQualifier::Read,
+        AddressSpace::Generic,
+        getDefaultBufferLayoutType());
+}
+
 
 IRGLSLOutputParameterGroupType* IRBuilder::getGLSLOutputParameterGroupType(IRType* elementType)
 {

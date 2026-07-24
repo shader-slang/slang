@@ -7,6 +7,8 @@
 namespace Slang
 {
 
+bool isCUDATarget(TargetRequest* targetReq);
+
 struct TransformParamsToConstRefContext
 {
     IRModule* module;
@@ -14,8 +16,19 @@ struct TransformParamsToConstRefContext
     IRBuilder builder;
     bool changed = false;
 
-    TransformParamsToConstRefContext(IRModule* module, DiagnosticSink* sink)
-        : module(module), sink(sink), builder(module)
+    // When set (CUDA only), a call argument that is an entry-point by-value uniform aggregate
+    // parameter is forwarded by address instead of via a temporary copy. See the header comment on
+    // `transformParamsToConstRef`.
+    bool forwardEntryPointUniformAddress;
+
+    TransformParamsToConstRefContext(
+        IRModule* module,
+        DiagnosticSink* sink,
+        bool forwardEntryPointUniformAddress)
+        : module(module)
+        , sink(sink)
+        , builder(module)
+        , forwardEntryPointUniformAddress(forwardEntryPointUniformAddress)
     {
     }
 
@@ -209,6 +222,122 @@ struct TransformParamsToConstRefContext
         return nullptr;
     }
 
+    // True if the address of `arg` can be forwarded into the `borrow in` callee at a call site,
+    // instead of copying the whole aggregate into a per-thread temporary (the #11774 slowdown).
+    //
+    // Forwarding retypes the parameter to `PhysicalParamStorage<T>` (a pointer), so it is sound
+    // only if *every* use of the parameter can cope with it becoming a pointer:
+    //   - non-call uses are redirected through an inserted load (always fine), and
+    //   - each call use must land in a callee slot this pass rewrites to `borrow in` (a pointer);
+    //     a callee that keeps its by-value slot would be handed a pointer for a `T` argument.
+    // Retyping is all-or-nothing across the parameter, so we forward only when this holds for all
+    // call uses; otherwise the caller falls back to the temp-copy path. An already-forwarded
+    // `PhysicalParamStorage<T>` parameter (the multi-forward case) trivially qualifies - it is the
+    // pointer to forward again.
+    bool canForwardParamStorageAddress(IRInst* arg)
+    {
+        auto param = as<IRParam>(arg);
+        if (!param)
+            return false;
+        if (as<IRPhysicalParamStorageType>(param->getDataType()))
+            return true;
+        if (!isEntryPointByValueUniformAggregateParam(param))
+            return false;
+
+        for (auto use = param->firstUse; use; use = use->nextUse)
+        {
+            auto call = as<IRCall>(use->getUser());
+            if (!call)
+                continue;
+            // A call use only stays sound if this pass rewrites the callee slot that receives the
+            // forwarded pointer to a `borrow in` pointer. Checking the callee *function* is
+            // transformable is sufficient because of the type chain: `param` is a
+            // struct/sized-array aggregate (established by
+            // `isEntryPointByValueUniformAggregateParam` above), so the callee slot it lands in has
+            // that same aggregate type, and `shouldTransformParam` unconditionally rewrites every
+            // struct/array/tuple slot to `borrow in`. So a transformable callee necessarily
+            // rewrites the matching slot. (If `shouldTransformParam` ever became selective about
+            // which aggregates it rewrites, this would need to check the specific slot at the arg
+            // index rather than just the callee.) The callee must be a concrete `IRFunc` we
+            // actually transform - not an indirect call, and not a
+            // signature-preserving/untransformable callee; by this late pass such shapes are
+            // specialized away, but gate on them rather than assume it.
+            auto callee = as<IRFunc>(call->getCallee());
+            if (!callee || !shouldProcessFunction(callee) || hasSignaturePreservingUse(callee))
+                return false;
+        }
+        return true;
+    }
+
+    // Forward the address of an entry-point uniform aggregate parameter into a `borrow in` callee.
+    // Rather than take `GetAddress` of an SSA value, retype the parameter to
+    // `PhysicalParamStorage<T>` - a pointer to the target's physical parameter storage - so the
+    // parameter itself is the pointer value to forward. Its existing in-kernel value reads are
+    // redirected through an explicit `IRLoad` so they still observe a `T`. Idempotent: a parameter
+    // forwarded to more than one call site is retyped and its reads redirected only on the first
+    // forward; later forwards return the pointer directly.
+    //
+    // Returns `param` itself (now retyped to `PhysicalParamStorage<T>`) - it *is* the pointer value
+    // to forward, not a freshly-built address instruction.
+    //
+    // Precondition: `canForwardParamStorageAddress(param)` (checked at the call site), which
+    // guarantees every call use of `param` lands in a callee slot this pass rewrites to a pointer,
+    // so leaving those call uses pointing at the now-pointer parameter is sound.
+    IRInst* forwardParamStorageAddress(IRParam* param)
+    {
+        auto valueType = param->getDataType();
+        SLANG_ASSERT(valueType);
+        // Idempotency guard for the multi-forward case: a parameter forwarded to a second call site
+        // is already the pointer, so reuse it without a second retype or load. See
+        // `cuda-forward-uniform-multi-forward.slang`.
+        if (as<IRPhysicalParamStorageType>(valueType))
+            return param;
+
+        // Collect the parameter's current value reads before changing anything. Only non-call uses
+        // read the value `T` and need an explicit load once the parameter becomes a pointer; call
+        // arguments either forward the pointer (kept as the parameter) or belong to the old call
+        // instructions that `updateCallSites` is about to discard, so they must not be redirected.
+        List<IRUse*> readUses;
+        for (auto use = param->firstUse; use; use = use->nextUse)
+        {
+            if (!as<IRCall>(use->getUser()))
+                readUses.add(use);
+        }
+
+        param->setFullType(builder.getPhysicalParamStorageType(valueType));
+
+        // Retyping the parameter changed the entry function's signature, so rebuild the parent
+        // function's type from its (now-updated) parameter types. `processFunc` only calls
+        // `fixUpFuncType` for the transformed callee; the entry point is skipped there, so the fix
+        // must happen here or the function type would keep saying `T` while the param says
+        // `PhysicalParamStorage<T>`.
+        auto entryBlock = as<IRBlock>(param->getParent());
+        auto entryFunc = as<IRFunc>(entryBlock->getParent());
+        SLANG_ASSERT(entryFunc);
+
+        // One load suffices for all reads: every value read of an entry-point parameter is an
+        // ordinary inst, and the entry block's first ordinary inst dominates every ordinary inst in
+        // the function, so this single load dominates all the uses it replaces.
+        //
+        // Save and restore the shared builder's insert location: the sole caller
+        // (`updateCallSites`) sets it to the original call and then rebuilds that call after this
+        // returns, so leaking the entry-block insert point here would mis-place the rebuilt call at
+        // the top of the entry block - before the definitions of its own arguments (use-before-def
+        // / broken SSA).
+        if (readUses.getCount())
+        {
+            auto savedLoc = builder.getInsertLoc();
+            builder.setInsertBefore(entryBlock->getFirstOrdinaryInst());
+            auto loaded = builder.emitLoad(valueType, param);
+            builder.setInsertLoc(savedLoc);
+            for (auto use : readUses)
+                use->set(loaded);
+        }
+
+        fixUpFuncType(entryFunc);
+        return param;
+    }
+
     // Update call sites to pass an address instead of value for each updated-param
     void updateCallSites(IRFunc* func, HashSet<IRParam*>& updatedParams)
     {
@@ -237,6 +366,28 @@ struct TransformParamsToConstRefContext
                     // If existing argument is a load from an immutable buffer address,
                     // we can pass in the address as is, without making a temporary copy.
                     newArgs.add(addr);
+                }
+                else if (forwardEntryPointUniformAddress && canForwardParamStorageAddress(arg))
+                {
+                    // Forward the entry-point uniform aggregate by address instead of copying the
+                    // whole aggregate into a per-thread temporary - the #11774 slowdown. Rather
+                    // than take `GetAddress` of an SSA value (an `IRParam` has no storage in the
+                    // IR), we retype the parameter to `PhysicalParamStorage<T>`, which *is*
+                    // semantically a pointer to the target's physical parameter storage. The
+                    // parameter itself is then the pointer value to forward into the callee's
+                    // `borrow in T*` slot, and the C++/CUDA backend still emits it as the by-value
+                    // `T p` (so the kernel ABI is unchanged) and emits this reference as `&p`.
+                    //
+                    // Forwarding the storage's address is sound because no write can reach it: an
+                    // `IRStore` destination must be pointer-typed, and a by-value `IRParam` is an
+                    // SSA value, so the front end proxies any source-level mutation of the uniform
+                    // onto a fresh local rather than the parameter. The callee slot is `borrow in`
+                    // (read-only), and its own body likewise copies the pointee before any write
+                    // (`T _t = *b;`). This is a type-system guarantee, not a convention - a future
+                    // caller or pass reordering cannot make a write land on the forwarded storage
+                    // without first violating the SSA/pointer typing.
+                    auto argParam = as<IRParam>(arg);
+                    newArgs.add(forwardParamStorageAddress(argParam));
                 }
                 else
                 {
@@ -299,15 +450,11 @@ struct TransformParamsToConstRefContext
         return true;
     }
 
-    // Process a single function
-    void processFunc(IRFunc* func)
+    // True if `func` has a use that requires its signature be preserved - i.e. a use other than as
+    // the direct callee of an `IRCall` (for example, taken as a function value / callback). Such a
+    // function cannot have its parameters rewritten, so `processFunc` leaves it untransformed.
+    bool hasSignaturePreservingUse(IRFunc* func)
     {
-        HashSet<IRParam*> updatedParams;
-
-        // If the function is used in any way that is not understood by the
-        // compiler, do not modify it.
-        // For example, if the function is used as callback, we must preserve
-        // its signature.
         for (auto use = func->firstUse; use; use = use->nextUse)
         {
             auto user = use->getUser();
@@ -323,10 +470,20 @@ struct TransformParamsToConstRefContext
                 if (call->getCalleeUse() == use)
                     continue;
             }
-            // If we reach here, we encountered a non-call use of the func,
-            // we will stop processing.
-            return;
+            return true;
         }
+        return false;
+    }
+
+    // Process a single function
+    void processFunc(IRFunc* func)
+    {
+        HashSet<IRParam*> updatedParams;
+
+        // If the function is used in any way that is not understood by the compiler (e.g. as a
+        // callback), we must preserve its signature, so do not modify it.
+        if (hasSignaturePreservingUse(func))
+            return;
 
         // First pass: Transform parameter types
         for (auto param = func->getFirstParam(); param; param = param->getNextParam())
@@ -422,16 +579,26 @@ struct TransformParamsToConstRefContext
     }
 };
 
-SlangResult transformParamsToConstRef(IRModule* module, DiagnosticSink* sink)
+SlangResult transformParamsToConstRef(
+    IRModule* module,
+    TargetRequest* targetReq,
+    DiagnosticSink* sink)
 {
-    TransformParamsToConstRefContext context(module, sink);
+    // The entry-point uniform address-forward (the #11774 fix) is specific to how CUDA lowers a
+    // by-value kernel parameter, so it is enabled only for the CUDA family. Other targets keep the
+    // temp-copy path, leaving their codegen unchanged.
+    const bool forwardEntryPointUniformAddress = isCUDATarget(targetReq);
+    TransformParamsToConstRefContext context(module, sink, forwardEntryPointUniformAddress);
     return context.processModule();
 }
 
 struct EntryPointInParamToBorrowContext : public TransformParamsToConstRefContext
 {
     EntryPointInParamToBorrowContext(IRModule* module, DiagnosticSink* sink)
-        : TransformParamsToConstRefContext(module, sink)
+        : TransformParamsToConstRefContext(
+              module,
+              sink,
+              /* forwardEntryPointUniformAddress */ false)
     {
     }
     virtual bool shouldProcessFunction(IRFunc* func) override
