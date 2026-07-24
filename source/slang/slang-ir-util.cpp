@@ -2468,7 +2468,7 @@ static IRIntLit* _getDefaultThreadCount(IRInst* threadCount)
 
     IRBuilder builder(globalParam ? (IRInst*)globalParam : threadCount);
     return cast<IRIntLit>(
-        builder.getIntValue(globalParam ? globalParam->getDataType() : builder.getIntType(), 0));
+        builder.getIntValue(globalParam ? globalParam->getDataType() : builder.getIntType(), 1));
 }
 
 void verifyComputeDerivativeGroupModifiers(
