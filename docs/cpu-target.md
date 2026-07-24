@@ -218,7 +218,7 @@ Making a function or variable `public` does not mean that the name remains the s
 __global public __extern_cpp int myGlobal;
 
 // myFunc is available to the application
-public __extern_cpp myFunc(int a) 
+public __extern_cpp int myFunc(int a)
 {
     return a * a;
 }

@@ -1419,7 +1419,8 @@ static void addLinkageDecoration(
     }
 
     bool explicitExtern = false;
-    if (isImportedDecl(context, decl, explicitExtern))
+    bool isImported = isImportedDecl(context, decl, explicitExtern);
+    if (isImported)
     {
         builder->addImportDecoration(inst, mangledName);
         if (explicitExtern)
@@ -1443,6 +1444,17 @@ static void addLinkageDecoration(
         else if (as<ExternCppModifier>(modifier))
         {
             builder->addExternCppDecoration(inst, mangledName);
+            // A host-callable function must be a linking root (HLSLExport) and survive DCE
+            // (KeepAlive), else it is culled before host C++ emission and its unmangled name has
+            // nothing to attach to. Restrict this to locally-defined functions: types/fields/
+            // globals are already emitted through the header path (rooting them reorders header
+            // output), and an imported/`[__extern]` function has no definition here to root, so
+            // rooting it would demand a symbol the linker cannot resolve.
+            if (as<CallableDecl>(decl) && !isImported)
+            {
+                builder->addHLSLExportDecoration(inst);
+                builder->addKeepAliveDecoration(inst);
+            }
         }
         else if (auto dllImportModifier = as<DllImportAttribute>(modifier))
         {
