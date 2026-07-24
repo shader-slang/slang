@@ -253,6 +253,11 @@ void TestReporter::consolidateWith(TestReporter* other)
     m_passedTestCount += other->m_passedTestCount;
     m_expectedFailedTestCount += other->m_expectedFailedTestCount;
     m_totalTestCount += other->m_totalTestCount;
+    // A pending-retry is marked in one (pass-1) sub-reporter and resolved in a
+    // different (retry-pass) one, so accumulate the pending set as a union here;
+    // reconcilePendingRetries() later resolves it against the merged m_testInfos.
+    for (const auto& name : other->m_pendingRetryTests)
+        m_pendingRetryTests.add(name);
 }
 
 void TestReporter::dumpOutputDifference(const String& expectedOutput, const String& actualOutput)
@@ -364,10 +369,12 @@ void TestReporter::_addResult(TestInfo info)
         return;
     }
 
-    // If test is pending retry, don't count it in any statistics yet
-    // The test will be re-run and reported again with a final result
+    // If test is pending retry, don't count it in any statistics yet.
+    // The test will be re-run and reported again with a final result.
+    // Remember it so reconcilePendingRetries() can fail it if that never happens.
     if (info.testResult == TestResult::PendingRetry)
     {
+        m_pendingRetryTests.add(info.name);
         printf("failed(pending retry) '%S'\n", info.name.toWString().begin());
         fflush(stdout);
         return;
@@ -679,6 +686,35 @@ void TestReporter::message(TestMessageType type, const char* messageContent)
     message(type, String(messageContent));
 }
 
+
+void TestReporter::reconcilePendingRetries()
+{
+    if (m_pendingRetryTests.getCount() == 0)
+        return;
+
+    // A test received a final, counted result iff it appears in m_testInfos
+    // (PendingRetry is excluded from m_testInfos by _addResult). Any pending
+    // test that is not resolved never re-ran (e.g. Defect A: the unit-test
+    // registry was drained between passes), so count it as a failure.
+    HashSet<String> resolved;
+    for (const auto& info : m_testInfos)
+        resolved.add(info.name);
+
+    for (const auto& name : m_pendingRetryTests)
+    {
+        if (!resolved.contains(name))
+        {
+            printf(
+                "error: test '%s' was marked pending retry but never re-run; "
+                "counting it as failed\n",
+                name.getBuffer());
+            fflush(stdout);
+            addTest(name, TestResult::Fail);
+        }
+    }
+
+    m_pendingRetryTests.clear();
+}
 
 bool TestReporter::didAllSucceed() const
 {

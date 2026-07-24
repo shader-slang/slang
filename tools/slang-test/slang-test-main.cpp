@@ -5593,6 +5593,46 @@ static TestResult _asTestResult(ToolReturnCode retCode)
     }
 }
 
+/// Loads the shared library for a unit-test module and returns its
+/// IUnitTestModule (the process-lifetime registry singleton), or null on
+/// failure. The loaded library is written into `outLibrary`, which the caller
+/// must keep alive for as long as it uses the returned module or its test
+/// functions. Whether a later load of the same module re-runs the module's
+/// static constructors (repopulating the registry) is platform loader state we
+/// don't rely on: the registry must persist across the retry pass, so callers
+/// must not destroy() the returned module until all passes over it are done.
+static IUnitTestModule* getUnitTestModule(
+    TestContext* context,
+    const char* moduleName,
+    ComPtr<ISlangSharedLibrary>& outLibrary)
+{
+    ISlangSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
+
+    if (SLANG_FAILED(loader->loadSharedLibrary(
+            Path::combine(context->dllDirectoryPath, moduleName).getBuffer(),
+            outLibrary.writeRef())))
+        return nullptr;
+
+    UnitTestGetModuleFunc getModuleFunc =
+        (UnitTestGetModuleFunc)outLibrary->findFuncByName("slangUnitTestGetModule");
+    if (!getModuleFunc)
+        return nullptr;
+
+    return getModuleFunc();
+}
+
+/// Clears the registered unit tests in a module. The registry is a
+/// process-lifetime static populated once by the module's load-time static
+/// constructors, so it must persist across the retry pass; draining it is
+/// therefore deferred until all passes over the module are complete (called
+/// once by the driver after the retry loop), not done inside runUnitTestModule.
+static void destroyUnitTestModule(TestContext* context, const char* moduleName)
+{
+    ComPtr<ISlangSharedLibrary> moduleLibrary;
+    if (IUnitTestModule* testModule = getUnitTestModule(context, moduleName, moduleLibrary))
+        testModule->destroy();
+}
+
 /// Loads a DLL containing unit test functions and run them one by one.
 static SlangResult runUnitTestModule(
     TestContext* context,
@@ -5600,19 +5640,8 @@ static SlangResult runUnitTestModule(
     SpawnType spawnType,
     const char* moduleName)
 {
-    ISlangSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
     ComPtr<ISlangSharedLibrary> moduleLibrary;
-
-    SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary(
-        Path::combine(context->dllDirectoryPath, moduleName).getBuffer(),
-        moduleLibrary.writeRef()));
-
-    UnitTestGetModuleFunc getModuleFunc =
-        (UnitTestGetModuleFunc)moduleLibrary->findFuncByName("slangUnitTestGetModule");
-    if (!getModuleFunc)
-        return SLANG_FAIL;
-
-    IUnitTestModule* testModule = getModuleFunc();
+    IUnitTestModule* testModule = getUnitTestModule(context, moduleName, moduleLibrary);
     if (!testModule)
         return SLANG_FAIL;
 
@@ -5801,7 +5830,10 @@ static SlangResult runUnitTestModule(
             runUnitTest(t);
     }
 
-    testModule->destroy();
+    // Note: the module's test registry is intentionally NOT destroyed here. It
+    // must survive so the retry pass can re-enumerate and re-run the failed
+    // tests; the driver destroys it once via destroyUnitTestModule() after the
+    // final pass.
     return SLANG_OK;
 }
 
@@ -6120,6 +6152,11 @@ SlangResult innerMain(int argc, char** argv)
                 }
             }
 
+            // All passes over the unit-test modules are done; release their
+            // registries now (deferred so the retry pass could re-run tests).
+            destroyUnitTestModule(&context, "slang-unit-test-tool");
+            destroyUnitTestModule(&context, "gfx-unit-test-tool");
+
             TestReporter::set(nullptr);
         }
 
@@ -6181,6 +6218,11 @@ SlangResult innerMain(int argc, char** argv)
                 }
             }
         }
+
+        // Safety net: after all retries, count any test still marked
+        // PendingRetry (never resolved to a final result) as a failure so it is
+        // not silently dropped from the totals and reported as an overall pass.
+        reporter.reconcilePendingRetries();
 
         reporter.outputSummary();
 
