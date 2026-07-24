@@ -655,17 +655,25 @@ public:
             break;
         case kIROp_Store:
             {
+                auto storeInst = as<IRStore>(inst);
+                IRBuilder builder(inst);
+                // Use the destination type to determine how many bytes the store writes. For
+                // example, a string literal stored into a NativeString field has a zero-sized
+                // literal type, but the destination field holds a pointer-sized NativeString.
+                auto storedType =
+                    tryGetPointedToType(&builder, storeInst->getPtr()->getDataType());
+                SLANG_RELEASE_ASSERT(storedType);
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
                     codeGenContext->getTargetReq(),
-                    inst->getOperand(1)->getDataType(),
+                    storedType,
                     &sizeAlignment);
                 writeInst(
                     funcBuilder,
                     VMOp::Store,
                     (uint32_t)sizeAlignment.getStride(),
-                    ensureInst(inst->getOperand(0)),
-                    ensureInst(inst->getOperand(1)));
+                    ensureInst(storeInst->getPtr()),
+                    ensureInst(storeInst->getVal()));
             }
             break;
         case kIROp_Add:
