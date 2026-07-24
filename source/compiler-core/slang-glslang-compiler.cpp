@@ -162,32 +162,35 @@ SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_3& reque
     {
         err = m_compile_1_3(&request);
     }
-    else if (m_compile_1_2)
+    else
     {
-        // Older libraries don't understand the _1_3 fields; downgrade by copying the shared prefix.
-        // (Any `-Xspirv-opt` flags were already rejected above, so nothing user-requested is lost.)
-        // Unlike the cross-boundary up-convert in glslang_compile_1_2 (which clamps by the caller's
-        // sizeInBytes), no clamp is needed here: `request` is a same-build _1_3, always >= _1_2.
-        glslang_CompileRequest_1_2 request_1_2;
-        memcpy(&request_1_2, &request, sizeof(request_1_2));
-        request_1_2.sizeInBytes = sizeof(request_1_2);
-        err = m_compile_1_2(&request_1_2);
-    }
-    else if (m_compile_1_1)
-    {
-        glslang_CompileRequest_1_1 request_1_1;
-        memcpy(&request_1_1, &request, sizeof(request_1_1));
-        request_1_1.sizeInBytes = sizeof(request_1_1);
-        err = m_compile_1_1(&request_1_1);
-    }
-    else if (m_compile_1_0)
-    {
-        glslang_CompileRequest_1_1 request_1_1;
-        memcpy(&request_1_1, &request, sizeof(request_1_1));
-        request_1_1.sizeInBytes = sizeof(request_1_1);
-        glslang_CompileRequest_1_0 request_1_0;
-        request_1_0.set(request_1_1);
-        err = m_compile_1_0(&request_1_0);
+        // Older libraries don't understand the _1_3 fields; downgrade by slicing to the _1_2 base
+        // and copying its (standard-layout) prefix into the older struct. (Any `-Xspirv-opt` flags
+        // were already rejected above, so nothing user-requested is lost.) Going through the typed
+        // base keeps the copies independent of _1_3's non-standard layout.
+        const glslang_CompileRequest_1_2& request_1_2 = request;
+        if (m_compile_1_2)
+        {
+            glslang_CompileRequest_1_2 downgraded = request_1_2;
+            downgraded.sizeInBytes = sizeof(downgraded);
+            err = m_compile_1_2(&downgraded);
+        }
+        else if (m_compile_1_1)
+        {
+            glslang_CompileRequest_1_1 request_1_1;
+            memcpy(&request_1_1, &request_1_2, sizeof(request_1_1));
+            request_1_1.sizeInBytes = sizeof(request_1_1);
+            err = m_compile_1_1(&request_1_1);
+        }
+        else if (m_compile_1_0)
+        {
+            glslang_CompileRequest_1_1 request_1_1;
+            memcpy(&request_1_1, &request_1_2, sizeof(request_1_1));
+            request_1_1.sizeInBytes = sizeof(request_1_1);
+            glslang_CompileRequest_1_0 request_1_0;
+            request_1_0.set(request_1_1);
+            err = m_compile_1_0(&request_1_0);
+        }
     }
 
     return err ? SLANG_FAIL : SLANG_OK;

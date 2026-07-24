@@ -6,6 +6,7 @@
 #include <cstring>
 #include <memory>
 #include <stddef.h>
+#include <type_traits>
 
 typedef void (*glslang_OutputFunc)(void const* data, size_t size, void* userData);
 
@@ -44,10 +45,10 @@ struct glsl_SPIRVVersion
 struct glslang_CompileRequest_1_1;
 
 // The glslang_CompileRequest_1_N structs form a versioned chain across the slang-glslang shared
-// library boundary. Each version must be a layout-compatible prefix of the next: new fields are
-// appended only, never reordered or resized. The `set()` converters here, the up-convert prefix
-// copies in slang-glslang.cpp, and the downgrade prefix copies in slang-glslang-compiler.cpp all
-// rely on this. When adding a `_1_(N+1)`, append its new fields and zero them in its `set()`.
+// library boundary. The invariant every version conversion depends on: a version only ever appends
+// fields to the previous one, never reordering or resizing existing fields. `_1_0`..`_1_2` restate
+// the shared prefix inline; `_1_3` inherits it from `_1_2`. When adding a `_1_(N+1)`, append its
+// new fields and zero them in its `set()`.
 
 // 1.0 version
 struct glslang_CompileRequest_1_0
@@ -145,48 +146,21 @@ struct glslang_CompileRequest_1_2
 };
 
 // 1.3 version
-struct glslang_CompileRequest_1_3
+struct glslang_CompileRequest_1_3 : public glslang_CompileRequest_1_2
 {
     /// Set from 1.2
     void set(const glslang_CompileRequest_1_2& in);
-
-    size_t sizeInBytes; ///< Size in bytes of this structure
-
-    // START! Embed the glslang_CompileRequest_1_0 fields
-    char const* sourcePath;
-
-    void const* inputBegin;
-    void const* inputEnd;
-
-    glslang_OutputFunc diagnosticFunc;
-    void* diagnosticUserData;
-
-    glslang_OutputFunc outputFunc;
-    void* outputUserData;
-
-    int slangStage;
-
-    unsigned action;
-
-    unsigned optimizationLevel;
-    unsigned debugInfoType;
-    // END! Embed the glslang_CompileRequest_1_0 fields
-
-    const char* spirvTargetName;    /// A valid TargetName. If null will use universal based on the
-                                    /// spirVersion.
-    glsl_SPIRVVersion spirvVersion; ///< The SPIR-V version. If all are 0 will use the default which
-                                    ///< is 1.2 currently
-
-    // glslang_CompileRequest_1_2 fields
-    const char* entryPointName; // The name of the entrypoint that will appear in output spirv.
-
-    // glslang_CompileRequest_1_3 fields
 
     // spirv-opt CLI-style pass flags forwarded from `-Xspirv-opt`, registered on top of the
     // preset passes for the selected optimization level. Null / zero count means none.
     const char* const* spirvOptimizationFlags;
     size_t spirvOptimizationFlagCount;
 };
+
+// _1_3 is copied/zeroed bytewise (memset + same-type memcpy in the entry-point shims), so it must
+// stay trivially copyable, and it must remain a _1_2 subclass so callers can slice to the base.
+static_assert(std::is_trivially_copyable<glslang_CompileRequest_1_3>::value);
+static_assert(std::is_base_of<glslang_CompileRequest_1_2, glslang_CompileRequest_1_3>::value);
 
 inline void glslang_CompileRequest_1_0::set(const glslang_CompileRequest_1_1& in)
 {
@@ -205,10 +179,10 @@ inline void glslang_CompileRequest_1_2::set(const glslang_CompileRequest_1_1& in
 
 inline void glslang_CompileRequest_1_3::set(const glslang_CompileRequest_1_2& in)
 {
-    // Copy the _1_2 prefix, then zero the fields appended by _1_3 so an old caller that only
-    // knows about _1_2 doesn't leave them with garbage. `in.sizeInBytes` is the _1_2 size, so
-    // restore this struct's own size after the copy.
-    memcpy(this, &in, sizeof(in));
+    // Copy the _1_2 base, then zero the fields _1_3 adds so an old caller that only knows about
+    // _1_2 doesn't leave them with garbage. `in.sizeInBytes` is the _1_2 size, so restore this
+    // struct's own size after the copy.
+    static_cast<glslang_CompileRequest_1_2&>(*this) = in;
     sizeInBytes = sizeof(*this);
     spirvOptimizationFlags = nullptr;
     spirvOptimizationFlagCount = 0;
