@@ -4510,7 +4510,25 @@ static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
                 namespaceDecl->nameAndLoc = nameAndLoc;
                 namespaceDecl->loc = nameAndLoc.loc;
                 AddMember(parentDecl, namespaceDecl);
-                if (auto parentNamespace = as<NamespaceDecl>(parentDecl))
+                // Push a fresh scope for the parent namespace only when it is
+                // not already the current scope. The reopened namespace's
+                // `ownedScope` must stay the same `Scope` object its lexical
+                // members are parsed under, because the semantic checker wires
+                // cross-module same-name namespaces (and thus their imports)
+                // onto `ownedScope->nextSibling`
+                // (`SemanticsDeclScopeWiringVisitor::visitNamespaceDecl` ->
+                // `addSiblingScopeForContainerDecl`) while unqualified lookup
+                // walks the lexical scope; if the two diverge, imported names
+                // become unreachable from the body (#11442). `PushScope`
+                // overwrites `ownedScope`, so it must run only for a
+                // not-yet-entered parent: it nests `B` in `namespace A.B {}`
+                // (and `A` in `namespace Foo { namespace A.B {} }`), but is
+                // skipped for a namespace nested in an already-entered body
+                // (`namespace Foo { namespace Nested {} }`), which would
+                // otherwise stomp the enclosing scope after its members were
+                // parsed.
+                if (auto parentNamespace = as<NamespaceDecl>(parentDecl);
+                    parentNamespace && parentDecl != parser->currentScope->containerDecl)
                 {
                     parser->PushScope(parentDecl);
                     nestedNamespaceDecls.add(parentNamespace);
