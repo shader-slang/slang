@@ -31,9 +31,12 @@
 // succeed).
 //TEST:SIMPLE(filecheck=MULTIFLAG): -target spirv-asm -entry computeMain -stage compute -O1 -Xspirv-opt --strip-debug -Xspirv-opt --this-pass-does-not-exist
 
-// The forwarding is gated to the `spirv-opt` passthrough instance, so `-Xglslang` args are NOT
-// handed to the optimizer. `-Xglslang --strip-debug` must therefore leave the debug names intact
-// (if it were misrouted it would either strip them or fail as an unknown flag).
+// Only `-Xspirv-opt` args are forwarded to the optimizer; `-Xglslang` args target a different
+// downstream tool and must not affect a `-target spirv` compile. `-Xglslang --strip-debug` must
+// therefore be a no-op here -- the debug names survive and the compile succeeds, rather than the
+// flag being misrouted into the optimizer (which would strip the names or fail as an unknown flag).
+// (This exercises the direct-SPIR-V arg routing; the `SLANG_PASS_THROUGH_SPIRV_OPT` instance gate
+// itself only matters on the `-emit-spirv-via-glsl` path, which is out of scope -- see the docs.)
 //TEST:SIMPLE(filecheck=XGLSLANG): -target spirv-asm -entry computeMain -stage compute -O1 -Xglslang --strip-debug
 
 // At `-O1` the preset keeps the debug names and inlines the call.
