@@ -1560,6 +1560,7 @@ struct TypeLayoutContext
     std::optional<Dictionary<String, Type*>> externTypeMap;
 
     Type* lookupExternDeclRefType(DeclRefType* declRefType);
+    Type* resolveLinkTimeAssociatedType(DeclRefType* declRefType);
     void buildExternTypeMap();
 
     LayoutRulesImpl* getRules() { return rules; }

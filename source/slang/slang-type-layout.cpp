@@ -5780,10 +5780,13 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {
-        // If we are trying to get the layout of some extern type, do our best
-        // to look it up in other loaded modules and generate the type layout
-        // based on that.
-        auto resolvedType = context.lookupExternDeclRefType(declRefType);
+        // If we are trying to get the layout of some link-time type, do our best to resolve it to
+        // something concrete before laying it out. First resolve an associated type reached through
+        // a link-time wrapper's conformance (e.g. `ShaderMode::FragOut`), then fall back to looking
+        // a directly-`extern`/`export` type up in other loaded modules.
+        auto resolvedType = context.resolveLinkTimeAssociatedType(declRefType);
+        if (resolvedType == type)
+            resolvedType = context.lookupExternDeclRefType(declRefType);
         if (resolvedType != type)
             return _createTypeLayout(context, resolvedType);
 
@@ -6497,6 +6500,85 @@ DeclRef<GenericDecl> getOuterGeneric(DeclRef<Decl> declRef)
         return DeclRef<GenericDecl>(genAppDeclRef->getBase());
     }
     return DeclRef<GenericDecl>();
+}
+
+// Resolve an associated type that is reached through the conformance of a link-time
+// `export`/`extern` wrapper type to its concrete satisfying type, or return `declRefType`
+// unchanged when it is not such an associated type.
+//
+// Consider `export struct ShaderMode : IShaderMode = SolidMode; typedef ShaderMode::FragOut
+// FragOut;` with a fragment entry point returning `FragOut`. `FragOut` is the associated type
+// `IShaderMode::FragOut` looked up on the `export` wrapper `ShaderMode`, so it is a
+// `DeclRefType` wrapping a `LookupDeclRef` whose witness proves `ShaderMode : IShaderMode`.
+// `lookupExternDeclRefType` only concretizes a type whose *own* decl is `extern`/`export`; the
+// associated type's own decl is the `associatedtype FragOut` in interface `IShaderMode`, which is
+// not `extern`, so the varying layout would otherwise be built against the opaque associated type
+// while link-time IR specialization resolves the concrete return type to `SolidMode::FragOut`
+// (`ColorOutput`), leaving a concrete `IRStructType` with a null layout that crashes GLSL/SPIR-V
+// legalization (see shader-slang/slang#9580).
+//
+// The `export struct ... = SolidMode` inheritance clause already stores the concrete
+// `SolidMode : IShaderMode` witness in `InheritanceDecl::witnessVal` (filled in during checking and
+// used by IR lowering). We re-resolve the associated-type requirement against that concrete
+// witness, which walks `SolidMode`'s own witness table and yields `ColorOutput`.
+Type* TypeLayoutContext::resolveLinkTimeAssociatedType(DeclRefType* declRefType)
+{
+    // We only handle a type reached through a witness lookup (a `LookupDeclRef`) — for
+    // `ShaderMode::FragOut` this is "look up the `FragOut` requirement of `IShaderMode` from
+    // `ShaderMode`, through the `ShaderMode : IShaderMode` witness." A plain `struct`/`enum`
+    // reference is not a `LookupDeclRef`, so it is returned unchanged.
+    auto lookup = as<LookupDeclRef>(declRefType->getDeclRef().declRefBase);
+    if (!lookup)
+        return declRefType;
+
+    // The lookup witness proves `wrapperType : interfaceType` (e.g. `ShaderMode : IShaderMode`):
+    // `getSub()` is the type the member is projected from (`ShaderMode`), `getSup()` is the
+    // interface that declares it (`IShaderMode`). We only proceed when `wrapperType` is a link-time
+    // wrapper, i.e. a nominal type (`AggTypeDecl`) declared with the `struct X : I = Y;` alias
+    // syntax (`aliasedType` is set); in this scenario the source is always such a nominal type, so
+    // the `!wrapperType` cast check is just a defensive guard, not part of that test.
+    //
+    // NOTE: this handles an associated type declared on the interface the wrapper *directly*
+    // conforms to. An associated type declared on a *base* of that interface roots the lookup
+    // witness at the base, which the wrapper carries no `witnessVal` for, so it is not resolved
+    // here and still hits the layout path that #9580 fixes; that transitive case is tracked in
+    // shader-slang/slang#12134.
+    auto interfaceType = lookup->getWitness()->getSup();
+    auto wrapperType = as<DeclRefType>(lookup->getWitness()->getSub());
+    if (!wrapperType)
+        return declRefType;
+    auto wrapperDeclRef = wrapperType->getDeclRef().as<AggTypeDecl>();
+    if (!wrapperDeclRef || !wrapperDeclRef.getDecl()->aliasedType)
+        return declRefType;
+
+    // Find the concrete `aliasedType : interfaceType` witness that checking stored on the wrapper's
+    // inheritance clause (`witnessVal`, e.g. `SolidMode : IShaderMode`), then re-resolve the
+    // associated-type requirement against it. Resolution reads the concrete type's own witness
+    // table and yields the satisfying type (e.g. `ColorOutput`). The witness is substituted through
+    // `inheritanceDeclRef` so a generic wrapper's arguments are bound into it: for
+    // `ShaderMode<ColorOutput> = SolidMode<T>` the substitution binds `T = ColorOutput`, without
+    // which the unbound `T` would leak into layout.
+    for (auto inheritanceDeclRef : getMembersOfType<InheritanceDecl>(astBuilder, wrapperDeclRef))
+    {
+        auto witnessVal = inheritanceDeclRef.getDecl()->witnessVal;
+        if (!witnessVal)
+            continue;
+        if (!getSup(astBuilder, inheritanceDeclRef)->equals(interfaceType))
+            continue;
+
+        auto concreteWitness = as<SubtypeWitness>(
+            witnessVal->substitute(astBuilder, SubstitutionSet(inheritanceDeclRef)));
+        if (!concreteWitness)
+            continue;
+
+        DeclRef<Decl> concreteLookup =
+            astBuilder->getLookupDeclRef(concreteWitness, lookup->getDecl());
+        auto resolved = DeclRefType::create(astBuilder, concreteLookup)->resolve();
+        if (auto resolvedType = as<Type>(resolved))
+            return resolvedType;
+    }
+
+    return declRefType;
 }
 
 Type* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
