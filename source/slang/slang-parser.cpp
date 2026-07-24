@@ -94,6 +94,7 @@ struct ParserOptions
     bool enableEffectAnnotations = false;
     bool allowGLSLInput = false;
     bool isInLanguageServer = false;
+    bool isCoreModule = false;
     ParsingStage stage = ParsingStage::Body;
     CompilerOptionSet optionSet;
 };
@@ -9413,7 +9414,14 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
         if (parser->LookAheadToken(TokenType::IntegerLiteral) ||
             parser->LookAheadToken(TokenType::Identifier))
         {
-            return SPIRVAsmOperand{SPIRVAsmOperand::Id, parser->ReadToken()};
+            const auto idToken = parser->ReadToken();
+            // A named `%id` register leaks an `OpName` into the emitted SPIR-V, so core-module
+            // registers must be `__`-prefixed to read as compiler-internal
+            // (shader-slang/slang#12108). Integer ids (`%6`) carry no name.
+            SLANG_ASSERT(
+                !parser->options.isCoreModule || idToken.type != TokenType::Identifier ||
+                idToken.getContent().startsWith("__"));
+            return SPIRVAsmOperand{SPIRVAsmOperand::Id, idToken};
         }
     }
     // A &foo variable reference (for the address of foo)
@@ -9959,6 +9967,7 @@ Stmt* parseUnparsedStmt(
         sourceLanguage == SourceLanguage::GLSL;
     options.isInLanguageServer =
         translationUnit->compileRequest->getLinkage()->isInLanguageServer();
+    options.isCoreModule = translationUnit->compileRequest->m_isCoreModuleCode;
     options.optionSet = translationUnit->compileRequest->optionSet;
 
     Parser parser(astBuilder, tokens, sink, outerScope, options);
@@ -9990,6 +9999,7 @@ void parseSourceFile(
         sourceLanguage == SourceLanguage::GLSL;
     options.isInLanguageServer =
         translationUnit->compileRequest->getLinkage()->isInLanguageServer();
+    options.isCoreModule = translationUnit->compileRequest->m_isCoreModuleCode;
     options.optionSet = translationUnit->compileRequest->optionSet;
 
     Parser parser(astBuilder, tokens, sink, outerScope, options);
