@@ -18971,6 +18971,98 @@ static void checkDerivativeAttribute(
     FunctionDeclBase* funcDecl,
     PrimalSubstituteAttribute* attr);
 
+static bool _isLeftValueParamPassingMode(ParamPassingMode mode)
+{
+    return mode == ParamPassingMode::Out || mode == ParamPassingMode::BorrowInOut ||
+           mode == ParamPassingMode::Ref;
+}
+
+static Expr* _createImaginaryArgForParamType(
+    ASTBuilder* astBuilder,
+    Type* paramTypeWithModeWrapper,
+    SourceLoc loc)
+{
+    auto [argType, argDirection] =
+        splitParameterTypeAndDirection(astBuilder, paramTypeWithModeWrapper);
+    auto arg = astBuilder->create<VarExpr>();
+    arg->type.type = argType;
+    arg->type.isLeftValue = _isLeftValueParamPassingMode(argDirection);
+    arg->loc = loc;
+    return arg;
+}
+
+static Expr* _tryCreateImaginaryThisArgFromHigherOrderCandidate(
+    SemanticsVisitor* visitor,
+    Expr* candidateExpr,
+    Index explicitArgCount,
+    SourceLoc loc)
+{
+    auto higherOrderExpr = as<HigherOrderInvokeExpr>(candidateExpr);
+    if (!higherOrderExpr)
+        return nullptr;
+
+    // Higher-order checking names the synthesized receiver parameter `this`. Derivative-of
+    // attributes build an imaginary call only to resolve the original function, so include a
+    // matching argument exactly when the checked callable exposes that parameter.
+    if (higherOrderExpr->newParameterNames.getCount() == 0 ||
+        higherOrderExpr->newParameterNames[0] != visitor->getName("this"))
+        return nullptr;
+
+    auto funcType = as<FuncType>(higherOrderExpr->type.type);
+    if (!funcType || funcType->getParamCount() != explicitArgCount + 1)
+        return nullptr;
+
+    return _createImaginaryArgForParamType(
+        visitor->getASTBuilder(),
+        funcType->getParamTypeWithModeWrapper(0),
+        loc);
+}
+
+static Expr* _tryCreateImaginaryThisArgForDerivativeOfAttribute(
+    SemanticsVisitor* visitor,
+    Expr* checkedHigherOrderExpr,
+    Index explicitArgCount,
+    SourceLoc loc)
+{
+    if (auto thisArg = _tryCreateImaginaryThisArgFromHigherOrderCandidate(
+            visitor,
+            checkedHigherOrderExpr,
+            explicitArgCount,
+            loc))
+        return thisArg;
+
+    if (auto overloadedExpr = as<OverloadedExpr2>(checkedHigherOrderExpr))
+    {
+        Expr* result = nullptr;
+        for (auto candidateExpr : overloadedExpr->candidateExprs)
+        {
+            auto candidateThisArg = _tryCreateImaginaryThisArgFromHigherOrderCandidate(
+                visitor,
+                candidateExpr,
+                explicitArgCount,
+                loc);
+            if (!candidateThisArg)
+                continue;
+
+            // Viable member candidates must agree on the receiver type. If they do not, leave the
+            // argument list unchanged so overload resolution reports the mismatch.
+            if (result)
+            {
+                if (result->type.isLeftValue != candidateThisArg->type.isLeftValue ||
+                    !result->type.type->equals(candidateThisArg->type.type))
+                    return nullptr;
+            }
+            else
+            {
+                result = candidateThisArg;
+            }
+        }
+        return result;
+    }
+
+    return nullptr;
+}
+
 template<typename TDerivativeAttr, typename TDifferentiateExpr, typename TDerivativeOfAttr>
 void checkDerivativeOfAttributeImpl(
     SemanticsVisitor* visitor,
@@ -18998,6 +19090,14 @@ void checkDerivativeOfAttributeImpl(
     }
     List<Expr*> imaginaryArgs =
         getImaginaryArgsToFunc(astBuilder, funcDecl, derivativeOfAttr->loc).args;
+    if (auto thisArg = _tryCreateImaginaryThisArgForDerivativeOfAttribute(
+            visitor,
+            checkedHigherOrderFuncExpr,
+            imaginaryArgs.getCount(),
+            derivativeOfAttr->loc))
+    {
+        imaginaryArgs.insert(0, thisArg);
+    }
     auto invokeExpr =
         visitor->constructUncheckedInvokeExpr(checkedHigherOrderFuncExpr, imaginaryArgs);
     SemanticsContext::ExprLocalScope scope;

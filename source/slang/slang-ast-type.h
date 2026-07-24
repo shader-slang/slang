@@ -87,6 +87,15 @@ bool isTypePack(Type* type);
 bool isAbstractTypePack(Type* type);
 bool isPackType(Type* type);
 
+/// Appends the parameter types produced by applying a backward-derivative parameter mode.
+/// Concrete type packs are flattened, while abstract packs retain an expansion with the mode
+/// applied to its pattern.
+void addBackwardDiffParameterTypes(
+    ASTBuilder* astBuilder,
+    List<Type*>& outParamTypes,
+    Type* diffPairOrPrimalType,
+    ParamPassingMode mode);
+
 // Base class for types that can be used in arithmetic expressions
 FIDDLE(abstract)
 class ArithmeticExpressionType : public DeclRefType

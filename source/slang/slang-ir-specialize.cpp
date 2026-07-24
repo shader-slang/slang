@@ -790,6 +790,7 @@ struct SpecializationContext
             return maybeSpecializeExpand(as<IRExpand>(inst));
 
         case kIROp_GetTupleElement:
+        case kIROp_Swizzle:
             return maybeSpecializeFoldableInst(inst);
 
         case kIROp_ExtractFirstFromPack:
@@ -1848,7 +1849,16 @@ struct SpecializationContext
 
     bool specializeChildInsts(IRInst* rootInst)
     {
-        return processSpecializationWorkListFromRoot(rootInst);
+        bool hasChanges = processSpecializationWorkListFromRoot(rootInst);
+        if (hasChanges)
+        {
+            // Expanding a concrete pack parameter temporarily reconstructs the pack from the new
+            // scalar parameters. Its element projections have now been folded by the worklist, so
+            // remove the dead reconstruction before returning the function to an on-demand
+            // consumer such as autodiff.
+            hasChanges |= eliminateDeadCode(rootInst);
+        }
+        return hasChanges;
     }
 
     // Returns true if the call inst represents a call to

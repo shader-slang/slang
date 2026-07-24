@@ -5704,10 +5704,11 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
             {
                 if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
                 {
-                    if (as<DifferentialPairType>(diffPairValType))
-                        paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairValType));
-                    else if (as<DifferentialPtrPairType>(diffPairValType))
-                        paramTypes.add(diffPairValType);
+                    addBackwardDiffParameterTypes(
+                        m_astBuilder,
+                        paramTypes,
+                        diffPairValType,
+                        paramPassingMode);
                 }
                 else
                 {
@@ -5722,7 +5723,11 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
             {
                 if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
                 {
-                    paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairValType));
+                    addBackwardDiffParameterTypes(
+                        m_astBuilder,
+                        paramTypes,
+                        diffPairValType,
+                        paramPassingMode);
                 }
                 else
                 {
@@ -5737,7 +5742,11 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
             {
                 if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
                 {
-                    paramTypes.add(m_astBuilder->getConstRefParamType(diffPairValType));
+                    addBackwardDiffParameterTypes(
+                        m_astBuilder,
+                        paramTypes,
+                        diffPairValType,
+                        paramPassingMode);
                 }
                 else
                 {
@@ -5768,6 +5777,10 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
 
 struct HigherOrderInvokeExprCheckingActions
 {
+    // Keep the operand syntax while its resolved form is built. Member checking types the
+    // original base expression in place before lookup adds any interface upcast.
+    Expr* originalFuncExpr = nullptr;
+
     virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) = 0;
     virtual void fillHigherOrderInvokeExpr(
         HigherOrderInvokeExpr* resultDiffExpr,
@@ -5800,20 +5813,31 @@ struct HigherOrderInvokeExprCheckingActions
         return nullptr;
     }
 
-    // Extract the implicit `this` type for a statically-referenced non-static
-    // member method (e.g. `Type::method`).  Returns a null QualType for free
-    // functions, static methods, constructors, and member methods referenced
-    // by name within their own type (e.g. `[BackwardDerivativeOf(f)]`).
+    // Extract the explicit `this` parameter type for a non-static member method
+    // used as the operand of a higher-order operator.
+    //
+    // A method reference spelled as `Type::method` uses the method's declared
+    // `this` type. A method reference spelled as `value.method` uses the checked
+    // type of `value`; the derivative callable is static, so that value must be
+    // provided as the first argument at the derivative call site.
+    //
+    // Returns a null QualType for free functions, static methods, constructors, and
+    // member methods referenced by name within their own type (e.g.
+    // `[BackwardDerivativeOf(f)]`).
     QualType getThisTypeForBaseFunc(SemanticsVisitor* semantics, Expr* funcExpr)
     {
         auto innerExpr = getInnerMostExprFromHigherOrderExpr(funcExpr);
-        // Only produce a this-type when the method is accessed via Type::method
-        // (StaticMemberExpr). When referenced by name within the same struct
-        // (plain DeclRefExpr), the derivative is itself a member method and
-        // the this parameter is handled implicitly.
-        if (!as<StaticMemberExpr>(innerExpr))
+        auto declRefExpr = as<DeclRefExpr>(innerExpr);
+        auto originalMemberExpr =
+            as<MemberExpr>(getInnerMostExprFromHigherOrderExpr(originalFuncExpr));
+
+        // Only member references can contribute an explicit `this` parameter. A plain
+        // DeclRefExpr inside the same type still means "use the current implicit
+        // this", so the differentiated function remains an instance member.
+        if (!as<MemberExpr>(innerExpr) && !as<StaticMemberExpr>(innerExpr) && !originalMemberExpr)
             return QualType();
-        if (auto declRefExpr = as<DeclRefExpr>(innerExpr))
+
+        if (declRefExpr)
         {
             auto declRef = declRefExpr->declRef;
             // Unwrap GenericDecl to get to the inner callable.
@@ -5829,7 +5853,45 @@ struct HigherOrderInvokeExprCheckingActions
                 if (!callableDecl->hasModifier<HLSLStaticModifier>() &&
                     !as<ConstructorDecl>(callableDecl))
                 {
-                    return getTypeForThisExpr(semantics, callableDeclRef);
+                    // Ask the method declaration how its implicit `this` is passed.
+                    // For example, a mutating method needs writable `this`, while a
+                    // [NoDiffThis] method usually passes `this` by value.
+                    auto declaredThisType = getTypeForThisExpr(semantics, callableDeclRef);
+                    if (!declaredThisType.type)
+                        return QualType();
+
+                    // Consider `bwd_diff(dFunction.p.operator())` where the receiver has type
+                    // `F : IUnary`. Member lookup inserts an upcast to `IUnary`, and overload
+                    // expansion rebuilds the candidate without its bound base expression. The
+                    // original member expression still owns the checked `dFunction.p` expression,
+                    // so use its type to keep the explicit receiver parameter as `F`.
+                    if (originalMemberExpr)
+                    {
+                        return QualType(
+                            originalMemberExpr->baseExpression->type.type,
+                            declaredThisType.isLeftValue);
+                    }
+
+                    if (auto memberExpr = as<MemberExpr>(innerExpr))
+                    {
+                        // For `value.method`, the explicit `this` argument should have the
+                        // checked type of `value`. This is important for generic/interface
+                        // values: `shape.distance` in a `S : IShape3D` function should
+                        // expect `S`, not the interface requirement's `This` type.
+                        //
+                        // Preserve the declared l-value-ness so the generated
+                        // derivative signature still matches the method's `this`
+                        // parameter passing mode.
+                        return QualType(
+                            memberExpr->baseExpression->type.type,
+                            declaredThisType.isLeftValue);
+                    }
+                    else
+                    {
+                        // For `Type::method`, there is no object expression to inspect,
+                        // so use the method's declared/specialized `this` type directly.
+                        return declaredThisType;
+                    }
                 }
             }
         }
@@ -5972,6 +6034,7 @@ static Expr* _checkHigherOrderInvokeExpr(
     HigherOrderInvokeExprCheckingActions* actions)
 {
     // Check/Resolve inner function declaration.
+    actions->originalFuncExpr = expr->baseFunction;
     SemanticsVisitor subVisitor(semantics->getShared());
     subVisitor = subVisitor.withSink(semantics->getSink()).allowStaticReferenceToNonStaticMember();
     // expr->baseFunction = subVisitor.CheckExpr(expr->baseFunction);
