@@ -17,12 +17,12 @@ sys.path.insert(0, HERE)  # allow running from any directory
 
 import breakdown
 import daily_movers
-from lib import analyze, manifest
+from lib import analyze, manifest, render
 
 # One escaper for both report generators. Neither escapes quotes: the
 # interpolated values are controlled workload/tag/date names, never user
 # input, so the &, <, > set is sufficient.
-html_escape = breakdown.esc
+html_escape = render.esc
 
 CSS = """
 body{font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;margin:0;color:#1a1a1a;background:#fafafa}
@@ -41,17 +41,10 @@ def combined_index(release_index, results_dir):
     release charts span the post-release daily ToT runs too: daily recs carry a
     placeholder 'slangc' so they pass the loaders' presence filter."""
     recs = [dict(r, kind="release") for r in release_index]
-    ddir = os.path.join(results_dir, "daily")
-    if os.path.isdir(ddir):
-        for label in sorted(os.listdir(ddir)):
-            if not os.path.exists(os.path.join(ddir, label, "results.json")):
-                continue
-            mp = os.path.join(ddir, label, "meta.json")
-            meta = analyze.read_json(mp) if os.path.exists(mp) else {}
-            recs.append({"tag": label, "date": meta.get("date", label[:10]),
-                         "version": meta.get("commit", ""), "slangc": "tot",
-                         "kind": "daily",
-                         "commit_time": meta.get("commit_time", "")})
+    for d in analyze.daily_labels(results_dir):
+        recs.append({"tag": d["label"], "date": d["date"],
+                     "version": d["commit"], "slangc": "tot",
+                     "kind": "daily", "commit_time": d["commit_time"]})
     # Same-date daily points order by the commit's full timestamp (true code
     # order) when meta carries it; the tag is the deterministic fallback for
     # points registered before commit_time existed. See track.py.
@@ -154,6 +147,42 @@ def grid_page(path, title, sub, note, svg, extra_html=""):
     print(f"wrote {path}")
 
 
+def memory_series(results_dir, recs, metric):
+    """Per-point kb-counter series for a cadence: (labels, {(workload,
+    counter): [kb_or_None per label]}). Reads every point's canonical
+    records once; points that predate memory collection yield gaps.
+
+    Invariant: every series in `per` has exactly len(labels) entries. The
+    back-fill length is len(labels) - 1 BECAUSE the label for the current
+    point is appended before the series loop runs — a brand-new key gets
+    len(labels)-1 Nones for the points it missed plus one appended value."""
+    labels, per = [], {}
+    for rec in recs:
+        tag = rec["tag"]
+        labels.append(rec["date"] if rec.get("kind") == "daily" else tag)
+        vals = {}
+        p = analyze.results_path(results_dir, tag)
+        if os.path.exists(p):
+            for run in analyze.canonical_runs(analyze.read_json(p)):
+                for cnt, st in (run.get("timers") or {}).items():
+                    if analyze.unit_of(cnt) == "kb" and st:
+                        vals[(run["workload"], cnt)] = st.get(metric)
+        for key in set(per) | set(vals):
+            per.setdefault(key, [None] * (len(labels) - 1)).append(vals.get(key))
+        # Fail loudly if the alignment ever skews: consumers pair values to
+        # labels positionally (own-memory zips against the floor series, and
+        # line_panel maps value index to x position), so a length mismatch
+        # would render a plausible-but-wrong chart, not an error.
+        assert all(len(v) == len(labels) for v in per.values()), \
+            "memory_series: series/label length skew"
+    return labels, per
+
+
+def mib(vs):
+    """kb series -> MiB series, preserving None gaps."""
+    return [v / 1024.0 if v is not None else None for v in vs]
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -243,9 +272,88 @@ def main():
                       extra_html=(movers_block(dpoints_all[-args.daily_window:], names)
                                   if cad == "tot" else ""))
 
+    # Memory cadence pages: see module-level memory_series/mib.
+
+    def memory_page(recs, fname, cad_title, note):
+        labels, per = memory_series(args.results, recs, args.metric)
+        floor = per.get(("minimal", "peakRssKb"), [None] * len(labels))
+        panels = []
+        if any(v is not None for v in floor):
+            panels.append(render.line_panel(
+                labels, [("minimal peak RSS", "#2171b5", mib(floor))],
+                "Session floor — minimal workload peak RSS", unit="MiB"))
+        sc = [(wl, vs) for (wl, cnt), vs in per.items()
+              if cnt == "apiCreateGlobalSessionRssDeltaKb"
+              and any(v is not None for v in vs)]
+        if sc:
+            colors = ["#e6550d", "#6a51a3", "#41ab5d", "#2171b5"]
+            series = [(wl, colors[i % len(colors)], mib(vs))
+                      for i, (wl, vs) in enumerate(sorted(sc)[:4])]
+            panels.append(render.line_panel(
+                labels, series,
+                "createGlobalSession RSS delta (api driver)", unit="MiB"))
+        # Each tracked workload's OWN memory: process peak minus the same
+        # point's session floor — the floor panel above carries the absolute
+        # story once, so subtracting it here leaves the pure workload signal
+        # (where changes like v2026.11's front-end memory optimization live).
+        wls = []
+        for (wl, cnt), vs in per.items():
+            if cnt != "peakRssKb" or wl == "minimal":
+                continue
+            own = [v - f if v is not None and f is not None else None
+                   for v, f in zip(vs, floor)]
+            if any(v is not None for v in own):
+                last = next((v for v in reversed(own) if v is not None), 0.0)
+                wls.append((last, wl, own))
+        for _mag, wl, own in sorted(wls, reverse=True):
+            panels.append(render.line_panel(
+                labels, [(f"{wl} − minimal", "#e6550d", mib(own))],
+                f"{wl} — own memory (peak − session floor)", unit="MiB"))
+        body = "".join(f'<span style="display:inline-block;margin:6px">{p}</span>'
+                       for p in panels)
+        explainer = (
+            "<p class='small'><b>Session floor</b> — peak resident memory of "
+            "compiling an <i>empty</i> shader: the cost of starting the "
+            "compiler (createGlobalSession + core module), paid by every "
+            "compile. <b>Workload panels</b> — each tracked workload's OWN "
+            "memory: its process peak minus the same point's session floor, "
+            "i.e. what the workload's work added beyond compiler startup. "
+            "Raw peak RSS is recorded for every workload in results.json; "
+            "only the curated set (the realistic rt/mdl workloads and the "
+            "microbenchmarks with meaningful own memory) is charted and "
+            "alerted on. "
+            "<b>createGlobalSession RSS delta</b> — measured inside the api "
+            "driver: process memory immediately before vs after that one "
+            "call. Panels are line charts, not stacked areas, because these "
+            "are separate memory <i>peaks</i> — maxima do not add up to a "
+            "total the way the time pages' phase buckets sum to "
+            "compileInner.</p>")
+        grid_page(os.path.join(outdir, fname),
+                  f"Memory — {cad_title}",
+                  "peak resident memory per workload and api-driver "
+                  "session-create deltas",
+                  note, body or None, extra_html=explainer)
+        return bool(panels)
+
+    have_memory = memory_page(dailies, "memory-tot.html",
+                              "daily tip-of-tree", day_note)
+    have_memory |= memory_page(releases, "memory-releases.html",
+                               "across releases", rel_note)
+
     # Landing page: stacked section rows — API & RT on top, microbenchmarks,
     # then the sweeps archive.
     n_rel, n_day = len(releases), len(dailies)
+    # latest daily point's minimal-workload peak RSS — the #9817 headline
+    floor_mib = None
+    if dailies:
+        p = analyze.results_path(args.results, dailies[-1]["tag"])
+        if os.path.exists(p):
+            for run in analyze.canonical_runs(analyze.read_json(p)):
+                if run["workload"] == "minimal":
+                    st = (run.get("timers") or {}).get("peakRssKb")
+                    if st and st.get(args.metric):
+                        floor_mib = st[args.metric] / 1024.0
+                    break
     last_daily = dailies[-1]["tag"] if dailies else "-"
     last_rel = releases[-1]["tag"] if releases else "-"
     d0 = dailies[0]["date"] if dailies else "-"
@@ -273,6 +381,12 @@ def main():
         "Compiler microbenchmarks", "microbench",
         f"{len(compiler_names)} workloads, one compiler pass each — parse "
         "&rarr; sema &rarr; IR &rarr; specialization &rarr; backends."))
+    rows.append(secrow(
+        "Memory footprint", "memory",
+        "peak RSS per workload and createGlobalSession deltas — see "
+        "shader-slang/slang#9817 / #12113." +
+        ("" if have_memory else " No data yet: points appear from the first "
+         "nightly after memory collection landed.")))
     rows.append('<div class="secrow"><b>Complexity sweeps</b>'
                 # explicit index.html so the link also works when the report
                 # is browsed from disk (file:// has no directory index)
@@ -287,7 +401,9 @@ def main():
          '<div class="wrap">', "<h1>Slang compile-time performance</h1>",
          f'<p class="status">latest nightly: <b>{html_escape(last_daily)}</b> &nbsp;·&nbsp; '
          f'latest release in charts: <b>{html_escape(last_rel)}</b> &nbsp;·&nbsp; '
-         f'{n_rel} releases + {n_day} daily points · metric: {args.metric}</p>',
+         f'{n_rel} releases + {n_day} daily points · metric: {args.metric}'
+         + (f" &nbsp;·&nbsp; session floor: <b>{floor_mib:.0f} MiB</b>"
+            if floor_mib else "") + "</p>",
          *rows,
          '<p class="small">Data: <a href="https://github.com/shader-slang/slang-compile-perf">'
          "slang-compile-perf</a> · methodology: tools/compile-perf/DESIGN.md in the slang "

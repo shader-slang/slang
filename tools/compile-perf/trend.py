@@ -31,12 +31,29 @@ from lib import analyze, manifest
 
 
 def timers_for(workload):
-    """The timers worth alerting on for a workload: its manifest primary timers,
-    always including compileInner (the holistic signal)."""
+    """The counters worth alerting on for a workload: its manifest primary
+    timers, always including compileInner (the holistic signal)."""
     spec = manifest.BY_NAME.get(workload)
     timers = set(spec.primary_timers) if spec else set()
     timers.add("compileInner")
     return timers
+
+
+def abs_floor_for(counter, ms_floor):
+    """The absolute-delta gate for a counter: `ms_floor` (the --abs argument)
+    for time, a fixed 1 MiB for the kb-unit memory counters — a few-KB wobble
+    on a ~200 MB value must not page anyone (the ratio gate is the primary
+    filter for both units)."""
+    return 1024.0 if analyze.unit_of(counter) == "kb" else ms_floor
+
+
+def judged(workload, counter):
+    """Whether the trend check judges this (workload, counter) series: the
+    workload's alert timers, plus EVERY kb-unit memory counter — memory
+    counters are not in any primary_timers list (they are synthesized by
+    canonical_runs, not declared per workload), and without this the memory
+    alert path would be unreachable."""
+    return counter in timers_for(workload) or analyze.unit_of(counter) == "kb"
 
 
 def emit_gha_command(line):
@@ -156,7 +173,7 @@ def main():
     regressions = []
     for key, cur in sorted(current.get("metrics", {}).items()):
         wl, _, timer = key.partition("|")
-        if timer not in timers_for(wl):
+        if not judged(wl, timer):
             continue
         baseline = [p["metrics"][key] for p in window if key in p.get("metrics", {})]
         if len(baseline) < args.min_baseline:
@@ -166,7 +183,8 @@ def main():
             continue
         ratio = cur / med
         delta = cur - med
-        if ratio >= args.rel and delta >= args.abs:
+        abs_floor = abs_floor_for(timer, args.abs)
+        if ratio >= args.rel and delta >= abs_floor:
             regressions.append((wl, timer, med, cur, ratio, delta))
 
     regressions.sort(key=lambda r: -r[4])
@@ -180,23 +198,40 @@ def main():
                 f"(`{base_labels}`).")
         return
 
-    print(f"{'workload':20s}{'timer':26s}{'median':>10}{'current':>10}{'ratio':>8}{'Δms':>9}")
+    print(f"{'workload':20s}{'timer':26s}{'median':>12}{'current':>12}{'ratio':>8}{'Δ':>12}")
     rows = ["### ⚠️ Compile-perf regressions — " + current["label"],
             f"\nvs trailing {len(window)}-point median (`{base_labels}`), "
             f"runner `{cur_runner}`.\n",
-            "| workload | timer | median (ms) | current (ms) | ratio | Δ ms |",
+            "| workload | timer | median | current | ratio | Δ |",
             "|---|---|--:|--:|--:|--:|"]
     for wl, timer, med, cur, ratio, delta in regressions:
-        print(f"{wl:20s}{timer:26s}{med:10.1f}{cur:10.1f}{ratio:7.2f}x{delta:+9.1f}")
-        emit_gha_command(f"::error title=Perf regression {wl}/{timer}::"
-           f"{ratio:.2f}x ({med:.1f} -> {cur:.1f} ms, +{delta:.1f}) vs trailing median")
-        rows.append(f"| {wl} | {timer} | {med:.1f} | {cur:.1f} | "
-                    f"{ratio:.2f}× | +{delta:.1f} |")
+        print(f"{wl:20s}{timer:26s}{analyze.fmt_qty(timer, med):>12s}"
+              f"{analyze.fmt_qty(timer, cur):>12s}{ratio:7.2f}x"
+              f"{analyze.fmt_qty(timer, delta, signed=True):>12s}")
+        emit_gha_command(
+            f"::error title=Perf regression {wl}/{timer}::"
+            f"{ratio:.2f}x ({analyze.fmt_qty(timer, med)} -> "
+            f"{analyze.fmt_qty(timer, cur)}, "
+            f"{analyze.fmt_qty(timer, delta, signed=True)}) vs trailing median")
+        rows.append(f"| {wl} | {timer} | {analyze.fmt_qty(timer, med)} | "
+                    f"{analyze.fmt_qty(timer, cur)} | {ratio:.2f}× | "
+                    f"{analyze.fmt_qty(timer, delta, signed=True)} |")
     write_step_summary("\n".join(rows))
 
     print(f"\n{len(regressions)} regression(s) flagged.")
     if not args.no_fail:
         raise SystemExit(1)
+
+
+# Import-time self-checks (the directory idiom): judged() and the per-unit
+# absolute floor ARE the memory alert path — if either regressed, memory
+# alerting would silently never fire.
+assert judged("minimal", "peakRssKb"), "kb counters must always be judged"
+assert judged("minimal", "compileInner"), "compileInner is always judged"
+assert not judged("minimal", "emitEntryPointsSourceFromIR"), \
+    "non-primary ms timers are not judged for workloads that do not list them"
+assert abs_floor_for("peakRssKb", 2.0) == 1024.0, "memory floor is 1 MiB"
+assert abs_floor_for("compileInner", 2.0) == 2.0, "time floor is --abs"
 
 
 if __name__ == "__main__":

@@ -31,6 +31,35 @@ import time
 from lib import analyze, manifest
 
 
+def parse_mem(text):
+    """Extract {name: kb} from the api-driver's "[MEM] name\tNNNkb" lines —
+    point-in-time RSS deltas recorded around selected API phases (see
+    native/api-driver.cpp reportMemDeltas, the producing printf), kept
+    separate from the ms timers so nothing downstream mistakes kilobytes for
+    milliseconds. Fields are TAB-delimited, matching the producer exactly.
+    Counter names must end in "Kb" — that suffix is what analyze.unit_of
+    keys the kb-vs-ms display classification on."""
+    out = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("[MEM]"):
+            continue
+        toks = line[len("[MEM]"):].strip().split("\t")
+        # Two DIFFERENT suffix contracts meet here, and the case matters:
+        # the VALUE token ends in lowercase "kb" (the api-driver's %.0fkb
+        # print format), while the counter NAME must end in capitalized
+        # "Kb" (analyze.unit_of's display-classification convention).
+        if len(toks) == 2 and toks[1].endswith("kb"):
+            try:
+                val = float(toks[1][:-2])
+            except ValueError:
+                continue
+            assert toks[0].endswith("Kb"), \
+                f"memory counter '{toks[0]}' must end in Kb (analyze.unit_of contract)"
+            out[toks[0]] = val
+    return out
+
+
 def parse_timers(text):
     """Extract {phase: total_ms} from slangc -report*-perf-benchmark output.
 
@@ -214,45 +243,74 @@ def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
     }
 
 
-# GNU /usr/bin/time -v gives per-process peak RSS; detect once.
-def _detect_gnu_time():
+# Peak RSS collection: per-child ru_maxrss via os.wait4 on POSIX,
+# PeakWorkingSetSize via GetProcessMemoryInfo on Windows (below).
+def _windows_peak_rss_kb(popen):
+    """PeakWorkingSetSize of a finished subprocess in KB via
+    GetProcessMemoryInfo — the Windows equivalent of POSIX ru_maxrss. Reads
+    through the still-open Popen handle, so it must run before the Popen is
+    garbage-collected. Depends on the CPython-internal `popen._handle`
+    attribute (no public accessor exists); if a CPython release renames it,
+    the AttributeError lands in the except below and Windows memory
+    collection degrades to None — check here first if rss_kb goes null on
+    the runner after a Python upgrade. Returns None if the query fails."""
     try:
-        r = subprocess.run(["/usr/bin/time", "-v", "true"],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        return b"Maximum resident set size" in r.stderr
+        import ctypes
+        from ctypes import wintypes
+
+        class PMC(ctypes.Structure):
+            _fields_ = [("cb", wintypes.DWORD),
+                        ("PageFaultCount", wintypes.DWORD),
+                        ("PeakWorkingSetSize", ctypes.c_size_t),
+                        ("WorkingSetSize", ctypes.c_size_t),
+                        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                        ("PagefileUsage", ctypes.c_size_t),
+                        ("PeakPagefileUsage", ctypes.c_size_t)]
+
+        pmc = PMC()
+        pmc.cb = ctypes.sizeof(PMC)
+        psapi = ctypes.WinDLL("psapi")
+        fn = psapi.GetProcessMemoryInfo
+        # Declare the signature: without argtypes ctypes coerces the handle
+        # through a C int, which can truncate 64-bit HANDLE values.
+        fn.argtypes = [wintypes.HANDLE, ctypes.POINTER(PMC), wintypes.DWORD]
+        fn.restype = wintypes.BOOL
+        if fn(wintypes.HANDLE(popen._handle), ctypes.byref(pmc), pmc.cb):
+            return pmc.PeakWorkingSetSize / 1024.0
     except Exception:  # noqa: BLE001
-        return False
-
-
-_GNU_TIME = _detect_gnu_time()
+        pass
+    return None
 
 
 def run_once(cmd):
     """Run one compile; return (rc, wall_ms, combined_text, rss_kb_or_None).
 
-    When GNU time is available the command is wrapped so its peak RSS is written
-    to a side file (keeping the compiler's own stdout/stderr clean for parsing)."""
-    memfile = None
-    runcmd = cmd
-    if _GNU_TIME:
-        memfd, memfile = tempfile.mkstemp(prefix="bench_mem_")
-        os.close(memfd)
-        runcmd = ["/usr/bin/time", "-v", "-o", memfile] + cmd
+    rss is the child's peak resident set (peak working set on Windows) in KB.
+    On POSIX the child is reaped with os.wait4 so ru_maxrss is per-child (a
+    getrusage(RUSAGE_CHILDREN) high-water mark would smear one workload's
+    peak onto every later one); ru_maxrss is KB on Linux and BYTES on macOS.
+    Platform constants differ slightly (working set vs RSS), but the tracked
+    series compares within one runner fingerprint, never across platforms."""
     t0 = time.perf_counter()
-    proc = subprocess.run(runcmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    wall = (time.perf_counter() - t0) * 1000.0
-    text = proc.stdout.decode("utf-8", "replace")
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT)
+    out = proc.stdout.read()
     rss = None
-    if memfile:
+    if os.name == "nt":
+        proc.wait()
+        rss = _windows_peak_rss_kb(proc)
+    else:
         try:
-            with open(memfile, encoding="utf-8", errors="replace") as fh:
-                for line in fh:
-                    if "Maximum resident set size" in line:
-                        rss = float(line.rsplit(":", 1)[1].strip())  # kbytes
-                        break
-        except Exception:  # noqa: BLE001
-            pass
-        os.unlink(memfile)
+            _pid, status, ru = os.wait4(proc.pid, 0)
+            proc.returncode = os.waitstatus_to_exitcode(status)
+            rss = ru.ru_maxrss / (1024.0 if sys.platform == "darwin" else 1.0)
+        except ChildProcessError:
+            proc.wait()  # already reaped elsewhere; lose rss, keep rc
+    wall = (time.perf_counter() - t0) * 1000.0
+    text = out.decode("utf-8", "replace")
     return proc.returncode, wall, text, rss
 
 
@@ -309,7 +367,7 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
             "workload": spec.name, "bucket": spec.bucket, "size": size,
             "mode": spec.mode, "ok": False, "setup_ok": False,
             "got_timers": False, "samples": samples, "warmup": warmup,
-            "wall_ms": None, "rss_kb": None, "timers": {},
+            "wall_ms": None, "rss_kb": None, "memory": None, "timers": {},
             "primary_timers": spec.primary_timers, "cmd": "",
             "error": "api-driver or libslang unavailable (see stderr)",
             "crash_codes": None,
@@ -336,6 +394,7 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
         run_once(timed)
 
     per_timer = {}
+    per_mem = {}
     walls = []
     rsses = []
     last_text = ""
@@ -366,6 +425,8 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
         sample_ok.append(err is None)  # ok when no compile error
         for name, ms in parse_timers(text).items():
             per_timer.setdefault(name, []).append(ms)
+        for name, kb in parse_mem(text).items():
+            per_mem.setdefault(name, []).append(kb)
 
     err = real_error(last_text, benign)
     got_timers = bool(per_timer)
@@ -389,6 +450,8 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
         "warmup": warmup,
         "wall_ms": stats(walls),
         "rss_kb": stats(rsses) if rsses else None,
+        "memory": ({k: stats(v) for k, v in sorted(per_mem.items())}
+                   if per_mem else None),
         "timers": {k: stats(v) for k, v in sorted(per_timer.items())},
         "primary_timers": spec.primary_timers,
         "cmd": " ".join(timed),
@@ -492,7 +555,7 @@ def main():
                     "mode": spec.mode, "ok": False, "setup_ok": False,
                     "got_timers": False, "samples": args.samples,
                     "warmup": args.warmup, "wall_ms": None, "rss_kb": None,
-                    "timers": {}, "primary_timers": spec.primary_timers,
+                    "memory": None, "timers": {}, "primary_timers": spec.primary_timers,
                     "cmd": "", "error": str(e), "crash_codes": None,
                 }
             rec["label"] = args.label
@@ -529,6 +592,15 @@ def main():
     print(f"wrote {jpath}")
     if n_ok != len(this_run):
         sys.exit(1)
+
+
+# Import-time self-check pinning the [MEM] line contract to api-driver.cpp's
+# printf format (TAB-delimited, kb suffix): a format drift would otherwise
+# silently degrade the memory feature to "no data" with nothing failing.
+assert parse_mem("[MEM] apiCreateGlobalSessionRssDeltaKb\t20480kb\nnoise\n[*] x\t1\t2ms") == \
+    {"apiCreateGlobalSessionRssDeltaKb": 20480.0}, \
+    "parse_mem: [MEM] line contract drifted vs api-driver.cpp"
+assert parse_mem("[MEM] malformed") == {}, "parse_mem must ignore malformed lines"
 
 
 if __name__ == "__main__":

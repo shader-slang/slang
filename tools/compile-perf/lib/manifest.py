@@ -40,6 +40,16 @@ class WorkloadSpec:
     # bench.py --sweep). default_size must be a member so a swept run also
     # yields the canonical point used for cross-release comparison.
     sweep_sizes: list = field(default_factory=list)
+    # Promote this workload's memory measurements (peak RSS, api-driver RSS
+    # deltas) into the tracked counter series, trend alerts, and memory
+    # pages. Raw rss_kb is RECORDED for every workload regardless (free, and
+    # preserved in results.json for deep dives); tracking is curated because
+    # most workloads' peaks are floor-bound and just re-draw the session
+    # floor. The tracked set is the most user-relevant three: minimal (the
+    # session floor itself — the shader-slang/slang#9817 headline) and the
+    # realistic end-to-end workloads (mdl_dxr and the rt renderers, whose
+    # api-driver runs also carry the createGlobalSession RSS delta).
+    track_memory: bool = False
     # emit reflection JSON (bench.py supplies a writable per-run path). Exercises
     # the reflection serializer in addition to the layout engine.
     reflection_json: bool = False
@@ -92,6 +102,7 @@ WORKLOADS = [
     # ---- real-shader corpus ----------------------------------------------
     WorkloadSpec(
         name="mdl_dxr",
+        track_memory=True,
         bucket="real_world",
         gen=workloads.gen_mdl_dxr,
         default_size=0,  # fixed corpus; size ignored
@@ -128,6 +139,7 @@ WORKLOADS = [
     # program pays the whole library's import cost. n = material count.
     WorkloadSpec(
         name="rt_renderer",
+        track_memory=True,
         bucket="rt_renderer",
         gen=workloads.gen_rt_renderer,
         default_size=24,
@@ -140,6 +152,7 @@ WORKLOADS = [
     # link-time specialization against interface-heavy cross-module code.
     WorkloadSpec(
         name="rt_renderer_specialize",
+        track_memory=True,
         bucket="rt_renderer",
         gen=workloads.gen_rt_renderer,
         default_size=24,
@@ -220,6 +233,7 @@ WORKLOADS = [
     # ---- per-compile floor (core-module load + link) ---------------------
     WorkloadSpec(
         name="minimal",
+        track_memory=True,
         bucket="core_link",
         gen=workloads.gen_minimal,
         default_size=0,  # fixed; near-empty shader

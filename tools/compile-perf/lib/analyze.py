@@ -42,6 +42,30 @@ def open_output(path, mode="w"):
     return open(path, mode, encoding="utf-8", newline="\n")
 
 
+def daily_labels(results_dir):
+    """One record per daily/<label>/ directory that has a results.json:
+    [{label, date, commit, commit_time, path}], label-sorted. The single
+    place that knows the daily storage layout and its meta.json fields —
+    report.py's combined index, daily_movers' point loader, and any future
+    consumer enumerate through here so layout knowledge cannot fork.
+    `date` falls back to the label prefix and `commit` to the label suffix
+    for points registered before meta carried them."""
+    out = []
+    ddir = os.path.join(results_dir, "daily")
+    for label in sorted(os.listdir(ddir)) if os.path.isdir(ddir) else []:
+        rpath = os.path.join(ddir, label, "results.json")
+        if not os.path.exists(rpath):
+            continue
+        mpath = os.path.join(ddir, label, "meta.json")
+        meta = read_json(mpath) if os.path.exists(mpath) else {}
+        out.append({"label": label,
+                    "date": meta.get("date", label[:10]),
+                    "commit": (meta.get("commit") or label.split("-")[-1]),
+                    "commit_time": meta.get("commit_time", ""),
+                    "path": rpath})
+    return out
+
+
 def read_json(path):
     """json.load with explicit UTF-8, the read-side twin of open_output.
 
@@ -109,12 +133,37 @@ def leaf_deltas(lookup, ptag, tag, wl):
     return out
 
 
+def unit_of(counter):
+    """Unit of a per-workload counter series: "kb" for the memory counters
+    (their names end in Kb by convention — peakRssKb and the api-driver's
+    [MEM] deltas), "ms" for everything else. One classifier so display code
+    and filters cannot disagree about what a value means."""
+    return "kb" if counter.endswith("Kb") else "ms"
+
+
+def fmt_qty(counter, value, signed=False):
+    """Human form of a counter value: milliseconds stay ms, kb renders MiB."""
+    sign = "+" if signed else ""
+    if unit_of(counter) == "kb":
+        return f"{value / 1024:{sign}.1f} MiB"
+    return f"{value:{sign}.1f} ms"
+
+
 def canonical_runs(runs):
     """One row per workload for per-release/trend views.
 
     results.json may contain multiple size rows per workload; collapse to each
     workload's default_size so history and daily points compare like-with-like.
     Falls back to the first row seen for workloads not in the manifest.
+
+    The returned records' `timers` dict is a MIXED-UNIT counter map: ms phase
+    timers plus, for manifest track_memory workloads, the kb memory counters
+    (peakRssKb and the api-driver deltas). The units are distinguished by
+    unit_of()'s Kb-suffix convention — asserted where counters are
+    synthesized — which is what lets every consumer (tracking, trend,
+    pages) handle one uniform {counter: stats} shape without a second
+    channel, at the cost that display code must format through fmt_qty
+    rather than assuming milliseconds.
     """
     from . import manifest
     best = {}
@@ -124,7 +173,31 @@ def canonical_runs(runs):
         default = spec.default_size if spec else None
         if wl not in best or (r["size"] == default and best[wl]["size"] != default):
             best[wl] = r
-    return list(best.values())
+    out = []
+    for r in best.values():
+        # Surface the memory measurements as counter series next to the
+        # timers (a shallow copy; the record itself is not mutated) — but
+        # only for workloads the manifest flags with track_memory: raw
+        # rss_kb is recorded everywhere, while the TRACKED memory surface is
+        # deliberately small (most peaks are floor-bound and would only
+        # re-draw the session floor across dozens of panels and alert
+        # series). unit_of() keeps kb from masquerading as ms in display
+        # code, and the bucket partition is unaffected — these names are
+        # not in any TREE.
+        spec = manifest.BY_NAME.get(r["workload"])
+        extra = {}
+        if spec is not None and getattr(spec, "track_memory", False):
+            if r.get("rss_kb"):
+                extra["peakRssKb"] = r["rss_kb"]
+            for name, st in (r.get("memory") or {}).items():
+                extra[name] = st
+        if extra:
+            for name in extra:
+                assert name.endswith("Kb"), \
+                    f"memory counter '{name}' must end in Kb (unit_of contract)"
+            r = dict(r, timers=dict(r.get("timers") or {}, **extra))
+        out.append(r)
+    return out
 
 
 def load_series(index, results_dir, metric):
@@ -260,3 +333,25 @@ def short_tag(tag):
 def is_daily(tag):
     """True for a daily ToT label '<YYYY-MM-DD>-<sha>' (vs a release 'vX.Y')."""
     return bool(re.match(r"\d{4}-\d{2}-\d{2}-", tag))
+
+
+# Import-time self-checks (the directory idiom): the memory pivot in
+# canonical_runs is the hinge every consumer relies on, and unit_of/fmt_qty
+# are what keep kilobytes from rendering as milliseconds.
+assert unit_of("peakRssKb") == "kb" and unit_of("SemanticChecking") == "ms"
+assert fmt_qty("peakRssKb", 215040) == "210.0 MiB"
+assert fmt_qty("simplifyIR", 12.34, signed=True) == "+12.3 ms"
+_rec = {
+    "size": 1, "rss_kb": {"median": 5.0},
+    "memory": {"apiCreateGlobalSessionRssDeltaKb": {"median": 7.0}},
+    "timers": {"compileInner": {"median": 1.0}},
+}
+_mr = canonical_runs([dict(_rec, workload="rt_renderer")])
+assert _mr[0]["timers"]["peakRssKb"] == {"median": 5.0}
+assert _mr[0]["timers"]["apiCreateGlobalSessionRssDeltaKb"] == {"median": 7.0}
+assert _mr[0]["timers"]["compileInner"] == {"median": 1.0}, "originals preserved"
+assert _mr[0]["rss_kb"] == {"median": 5.0}, "source fields not consumed"
+_mu = canonical_runs([dict(_rec, workload="conformance")])
+assert "peakRssKb" not in _mu[0]["timers"], \
+    "memory promotion must be curated: only track_memory workloads"
+del _rec, _mr, _mu

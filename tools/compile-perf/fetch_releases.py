@@ -112,12 +112,36 @@ def find_slangc(root):
 
 
 def _safe_extract(archive, names, dest):
-    """extractall, but reject any member that would escape `dest` (zip/tar-slip)."""
+    """extractall, but reject any member that would escape `dest` (zip/tar-slip).
+
+    Zip members that are SYMLINKS (macOS release zips ship
+    lib/libslang-compiler.dylib -> libslang-compiler.<ver>.dylib) are
+    recreated as symlinks: zipfile.extractall writes them as small text files
+    holding the target path, which dlopen then rejects with "slice is not
+    valid mach-o file". Link targets must stay inside `dest` too."""
     base = os.path.realpath(dest)
     for name in names:
         target = os.path.realpath(os.path.join(dest, name))
         if target != base and not target.startswith(base + os.sep):
             raise SystemExit(f"refusing unsafe archive member '{name}' (escapes {dest})")
+    if isinstance(archive, zipfile.ZipFile) and os.name != "nt":
+        links, regular = [], []
+        for i in archive.infolist():
+            (links if (i.external_attr >> 16) & 0o170000 == 0o120000
+             else regular).append(i)
+        archive.extractall(dest, members=regular)
+        for i in links:
+            linkto = archive.read(i).decode("utf-8")
+            path = os.path.join(dest, i.filename)
+            resolved = os.path.realpath(os.path.join(os.path.dirname(path), linkto))
+            if not resolved.startswith(base + os.sep):
+                raise SystemExit(
+                    f"refusing unsafe symlink '{i.filename}' -> '{linkto}'")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            if os.path.lexists(path):
+                os.unlink(path)
+            os.symlink(linkto, path)
+        return
     archive.extractall(dest)
 
 
@@ -212,6 +236,43 @@ def main():
     print(f"\n{ok}/{len(index)} releases ready. wrote {ipath}")
     if ok != len(index):
         sys.exit(1)
+
+
+# Import-time self-check for the zip-symlink extraction and its escape
+# guard (POSIX only, matching the branch in _safe_extract): a symlink member
+# must be recreated as a real symlink — zipfile's default text-file
+# placeholder is exactly the dlopen-breaking bug this fixed — and a link
+# target escaping the destination must be rejected.
+if os.name != "nt":
+    import io
+    import shutil
+    import tempfile
+
+    def _mkzip(linkto):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("lib/real.dylib", b"x")
+            info = zipfile.ZipInfo("lib/link.dylib")
+            info.external_attr = (0o120777 << 16)
+            z.writestr(info, linkto)
+        buf.seek(0)
+        return zipfile.ZipFile(buf)
+
+    _d = tempfile.mkdtemp(prefix="fetch_selfcheck_")
+    try:
+        with _mkzip("real.dylib") as _z:
+            _safe_extract(_z, _z.namelist(), _d)
+        assert os.path.islink(os.path.join(_d, "lib/link.dylib")), \
+            "zip symlink member must extract as a real symlink"
+        try:
+            with _mkzip("../../outside") as _z:
+                _safe_extract(_z, _z.namelist(), _d)
+            raise AssertionError("escaping symlink target must be rejected")
+        except SystemExit:
+            pass
+    finally:
+        shutil.rmtree(_d, ignore_errors=True)
+    del _d, _mkzip
 
 
 if __name__ == "__main__":

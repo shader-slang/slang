@@ -39,8 +39,10 @@ regression points at a specific release.
   steadier than the min when a build's run-to-run spread shifts). All of
   `median`/`min`/`mean`/`stdev` are kept in `results.json`; the reporting tools
   take `--metric` to switch (default `median`).
-- **Memory:** when GNU `/usr/bin/time` is present, peak RSS per compile is also
-  captured (`rss_kb`) — a heavier core module inflates memory, not just time.
+- **Memory:** peak RSS per compile is captured when the platform query
+  succeeds (`rss_kb`: `os.wait4` `ru_maxrss` on POSIX,
+  `GetProcessMemoryInfo` on Windows; `None` if it fails — a gap in the
+  memory charts is that, not a bug) — see the Memory footprint section
 - **Floor + slope:** `ladder_scaling.py --workload <name>` fits
   `time = floor + slope·N` per release from `--sweep` (multi-size) runs,
   separating a fixed-cost regression (heavier stdlib) from a per-element one
@@ -101,9 +103,10 @@ dominated by generic-constraint cost, so neither isolates this. These compile to
 
 ### Shared-infrastructure & scaling tests
 
-Added after a real investigation (PR #9808) showed that a _fixed per-compile_
-regression — the standard module growing, inflating `linkIR`/deserialization for
-**every** compile — was nearly invisible to feature-targeted tests. These
+Added after a real investigation (the v2026.7 compile-time regressions)
+showed that a _fixed per-compile_ regression — the standard module growing,
+inflating `linkIR`/deserialization for **every** compile — was nearly
+invisible to feature-targeted tests. These
 isolate the shared machinery and scaling behavior directly.
 
 | Test            | What it generates                                        | Targets                                            | Primary timer                                           |
@@ -281,16 +284,17 @@ via `--results <checkout-path>`.
 
 **Regenerable / local only (gitignored from the results repo):**
 
-| Path                                                    | What it is                                                |
-| ------------------------------------------------------- | --------------------------------------------------------- |
-| `results/analysis/*.svg`                                | charts                                                    |
-| `results/analysis/index.html`                           | landing page (status strip + section navigation)          |
-| `results/analysis/{api,microbench}-{tot,releases}.html` | the four cadence pages (charts + ToT movers tables)       |
-| `results/analysis/report_per_workload.html`             | old-bookmark redirect to `index.html`                     |
-| `results/analysis/workloads/<name>.html`                | per-workload stacked-area history + drill-down pages      |
-| `results/releases/<tag>/sweep/`                         | complexity-sweep report for swept releases                |
-| `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)      |
-| `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored) |
+| Path                                                    | What it is                                                                                                       |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `results/analysis/*.svg`                                | charts                                                                                                           |
+| `results/analysis/index.html`                           | landing page (status strip + section navigation)                                                                 |
+| `results/analysis/{api,microbench}-{tot,releases}.html` | the four cadence pages (charts + ToT movers tables)                                                              |
+| `results/analysis/memory-{tot,releases}.html`           | memory line panels: session floor (absolute), createGlobalSession deltas, per-workload OWN memory (peak − floor) |
+| `results/analysis/report_per_workload.html`             | old-bookmark redirect to `index.html`                                                                            |
+| `results/analysis/workloads/<name>.html`                | per-workload stacked-area history + drill-down pages                                                             |
+| `results/releases/<tag>/sweep/`                         | complexity-sweep report for swept releases                                                                       |
+| `releases/`                                             | cached prebuilt `slangc` per tag (large, gitignored)                                                             |
+| `corpus/`                                               | fetched real-shader corpora, e.g. MDL (large, gitignored)                                                        |
 
 ---
 
@@ -303,3 +307,30 @@ via `--results <checkout-path>`.
   compare such timers version-over-version, not as a fraction of the total.
 - **Cross-version error formats:** the runner recognizes both modern
   (`error[E30015]:`) and legacy (`error 30015:`) slangc diagnostics.
+
+## Memory footprint
+
+Every sample also records the child process's **peak RSS** (`rss_kb`:
+`ru_maxrss` via `os.wait4` on POSIX, `PeakWorkingSetSize` via
+`GetProcessMemoryInfo` on Windows), and the api driver reports the RSS
+delta across its **first** `createGlobalSession` (`[MEM]` output lines,
+parsed into the record's `memory` dict) — the cold-session footprint of
+#9817. **Everything is stored; only the meaningful set is shown**: raw
+peak RSS lands in results.json for every workload (deep dives never need
+a re-bench), but `analyze.canonical_runs` promotes memory into the
+tracked counter series (`peakRssKb`,
+`apiCreateGlobalSessionRssDeltaKb`) only for workloads the manifest
+flags with `track_memory` — `minimal` (the session floor, the #9817
+headline) and the realistic end-to-end workloads (`mdl_dxr`,
+`rt_renderer`, `rt_renderer_specialize`; the rt api-driver runs also
+carry the createGlobalSession RSS delta) — because most workloads'
+peaks are floor-bound and would just re-draw the floor across dozens
+of panels and alert series. The tracked series
+feed the nightly trend check (1 MiB absolute floor, same ratio gate)
+and the progress tables like timers; `analyze.unit_of`/`fmt_qty` keep
+kilobytes from rendering as milliseconds. The site presents memory on `memory-{tot,releases}.html` as a compact
+dashboard of line panels — the session floor (the one absolute chart),
+the createGlobalSession delta, then each tracked workload's OWN memory
+(its peak minus the same point's floor, the pure workload signal) —
+because memory components do not tile a total and a stacked area would
+lie.
