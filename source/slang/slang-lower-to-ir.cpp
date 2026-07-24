@@ -15188,6 +15188,46 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
     return info;
 }
 
+// Stamp the entry point's user-specified target language-version atoms (those accepted by
+// `isTargetVersionAtom` — e.g. `_spirv_1_x`, `metallib_2_x`) onto `entryPointInst` as
+// IRRequireCapabilityAtomDecoration, so the SPIR-V backend can raise the emitted binary version to
+// match a source-level `[require(spirv_1_x)]` the same way `-capability`/`-profile` does (see
+// determineSpirvVersion in slang-ir-spirv-legalize.cpp).
+//
+// The atoms come from the *explicitly declared* capability set
+// (`ExplicitlyDeclaredCapabilityModifier` — the user's `[require]`, expanded and parent-merged by
+// the semantic checker), not the body-inferred set. Reading the declared set is what keeps codegen
+// stable for shaders that never wrote `[require]`: capability inference can conclude that a
+// ray-tracing shader needs `_spirv_1_4`, but promoting an *inferred* requirement into the emitted
+// version would change output for code the user never annotated. An entry point with no `[require]`
+// has no modifier and contributes nothing.
+//
+// Both the codegen lowering and the layout/reflection IR module call this, so the codegen module
+// carries the same per-entry-point requirement the reflection module records.
+static void addEntryPointRequireCapabilityDecorations(
+    IRBuilder* builder,
+    IRInst* entryPointInst,
+    FuncDecl* entryPointFuncDecl)
+{
+    auto declaredCapModifier =
+        entryPointFuncDecl->findModifier<ExplicitlyDeclaredCapabilityModifier>();
+    if (!declaredCapModifier || !declaredCapModifier->declaredCapabilityRequirements)
+        return;
+
+    CapabilitySet declaredCaps{declaredCapModifier->declaredCapabilityRequirements};
+    for (auto atomSet : declaredCaps.getAtomSets())
+    {
+        for (auto atomVal : atomSet)
+        {
+            auto atom = asAtom(atomVal);
+            if (isTargetVersionAtom(atom))
+            {
+                builder->addRequireCapabilityAtomDecoration(entryPointInst, (CapabilityName)atom);
+            }
+        }
+    }
+}
+
 static void lowerFrontEndEntryPointToIR(
     IRGenContext* context,
     EntryPoint* entryPoint,
@@ -15278,6 +15318,10 @@ static void lowerFrontEndEntryPointToIR(
         if (requiresShader64BitIndexing)
             builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(instToDecorate);
     }
+
+    // Carry the entry point's user-specified `[require(...)]` target-version atoms onto the codegen
+    // entry function so the SPIR-V backend's version scan can raise the emitted binary version.
+    addEntryPointRequireCapabilityDecorations(builder, instToDecorate, entryPointFuncDecl);
 }
 
 static void lowerProgramEntryPointToIR(
@@ -16424,9 +16468,6 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
     builder->addLayoutDecoration(irModule->getModuleInst(), irGlobalScopeVarLayout);
 
-    auto latestSpirvAtom = getLatestSpirvAtom();
-    auto latestMetalAtom = getLatestMetalAtom();
-
     for (auto entryPointLayout : programLayout->entryPoints)
     {
         auto funcDeclRef = entryPointLayout->entryPoint;
@@ -16454,19 +16495,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
         auto asFuncDecl = as<FuncDecl>(funcDeclRef.getDecl());
         SLANG_ASSERT(asFuncDecl);
-        CapabilitySet set{asFuncDecl->inferredCapabilityRequirements};
-        for (auto atomSet : set.getAtomSets())
-        {
-            for (auto atomVal : atomSet)
-            {
-                auto atom = asAtom(atomVal);
-                if (atom >= CapabilityAtom::_spirv_1_0 && atom <= latestSpirvAtom ||
-                    atom >= CapabilityAtom::metallib_2_3 && atom <= latestMetalAtom)
-                {
-                    builder->addRequireCapabilityAtomDecoration(irFunc, (CapabilityName)atom);
-                }
-            }
-        }
+        addEntryPointRequireCapabilityDecorations(builder, irFunc, asFuncDecl);
 
         auto irEntryPointLayout = lowerEntryPointLayout(context, entryPointLayout);
 
