@@ -220,6 +220,38 @@ jobs:
               --commit-time "$COMMIT_TIME"
           fi
 
+      # The runner-built LTO binaries are otherwise discarded with the
+      # workspace. Short 2-day retention: enough to grab the binary behind
+      # the latest points (local repro, provenance comparison, api-driver
+      # dlopen); error (not warn) on no files so a silently empty artifact
+      # cannot masquerade as an export.
+      #
+      # Who exports:
+      #   - scheduled nightlies
+      #   - plain dispatches (ref blank = master HEAD)
+      #   - debug dispatches (ref=<suspect sha> + publish=false) — the
+      #     grab-a-binary-for-local-debugging case
+      # Who does not:
+      #   - backfill dispatches (ref set AND publishing into the series) —
+      #     historical binaries are rebuilt on demand
+      #
+      # always(): a failed bench night is exactly when the binary is worth
+      # keeping; the PERF_LABEL guard skips runs that died before building.
+      - name: Upload ToT slang binaries
+        if: always() && env.PERF_LABEL != '' && (github.event.inputs.ref == '' || env.PUBLISH != 'true')
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: slang-binaries-${{ env.PERF_LABEL }}
+          retention-days: 2
+          if-no-files-found: error
+          path: |
+            build/Release/bin/slangc.exe
+            build/Release/bin/slang.dll
+            build/Release/bin/slang-compiler.dll
+            build/Release/bin/slang-glslang.dll
+            build/Release/bin/dxcompiler.dll
+            build/Release/bin/dxil.dll
+
       - name: Upload results artifact (publish=false)
         if: always() && env.PUBLISH != 'true'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
