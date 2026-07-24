@@ -3286,6 +3286,68 @@ bool isReadNoneCallee(IRInst* callee)
     return false;
 }
 
+bool isReadNoneCalleeAndAllDerivatives(IRInst* callee)
+{
+    // The primary callee must be read-none first; the carry-set gate cannot
+    // weaken its existing guarantee.
+    if (!isReadNoneCallee(callee))
+        return false;
+
+    // Look annotations up on the resolved inner function rather than on the
+    // unresolved callee. This is intentionally conservative: stdlib generics
+    // (e.g. `sqrt`) attach `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]`
+    // annotations on the `IRSpecialize` wrapper, and those derivatives are
+    // genuinely pure but typically NOT marked `[__readNone]` (the stdlib
+    // doesn't bother). Looking them up on the unresolved callee would find
+    // them and force a non-readNone verdict on every call site to a stdlib
+    // math function, regressing the false-positive fixes from #11286.
+    //
+    // The trade-off is that user-defined generic primaries (whose
+    // `[ForwardDerivative]` / `[BackwardDerivative]` annotations also live
+    // on the `IRSpecialize`) bypass this gate. That's an under-approximation
+    // — a generic `[__readNone]` primary with a side-effecting user-supplied
+    // derivative is not currently caught. A more accurate fix would
+    // distinguish "stdlib-style pure derivative not explicitly annotated"
+    // from "user-supplied derivative with possible side effects" without
+    // requiring stdlib annotation churn; see follow-up tracking.
+    IRInst* annotated = getResolvedInstForDecorations(callee);
+    if (!annotated)
+        return true;
+
+    IRBuilder builder(annotated->getModule());
+
+    auto isAssociatedDerivativeReadNone = [&](AnnotationKind kind) -> bool
+    {
+        IRInst* derivativeFunc = builder.tryLookupAnnotation(annotated, kind);
+        if (!derivativeFunc)
+            return true;
+        return isReadNoneCallee(derivativeFunc);
+    };
+
+    // ForwardDerivative points directly at the user's fwd-diff function.
+    if (!isAssociatedDerivativeReadNone(AnnotationKind::ForwardDerivative))
+        return false;
+
+    // BackwardDerivativePropagate points at the synthesized propagate-phase
+    // wrapper. `isReadNoneCallee`'s `IRTranslateBase` switch above unwraps
+    // that wrapper via `kIROp_BackwardPropagateFromLegacyBwdDiffFunc`
+    // (operand 1 = user's bwd-diff function copy), so the wrapper's
+    // readNone-ness correctly inherits from the user-supplied backward
+    // function.
+    //
+    // `AnnotationKind::BackwardDerivativeApply` is intentionally NOT
+    // consulted: its wrapper is `BackwardPrimalFromLegacyBwdDiffFunc(primary,
+    // bwd_diff)`, which the same switch unwraps via
+    // `kIROp_BackwardPrimalFromLegacyBwdDiffFunc` -> operand 0 = primary.
+    // Apply therefore inherits its readNone-ness from the already-checked
+    // primary callee and adds no information beyond the first
+    // `isReadNoneCallee(callee)` gate above.
+    if (!isAssociatedDerivativeReadNone(AnnotationKind::BackwardDerivativePropagate))
+        return false;
+
+    return true;
+}
+
 
 bool isNoSideEffectCallee(IRInst* callee)
 {
