@@ -8718,27 +8718,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitLoad(SpvInstParent* parent, IRInst* inst, IRInst* ptr)
     {
-        if (inst->getDataType()->getOp() == kIROp_RaytracingAccelerationStructureType)
-        {
-            // We can't load RaytracingAccelerationStructure with OpLoad, but
-            // SpvOpConvertUToAccelerationStructureKHR is equivalent.
-            requireSPIRVAnyCapability({SpvCapabilityRayTracingKHR, SpvCapabilityRayQueryKHR});
-            ensureAnyExtensionDeclaration(
-                {UnownedStringSlice("SPV_KHR_ray_tracing"), UnownedStringSlice("SPV_KHR_ray_query")});
-
-            IRBuilder builder(m_irModule);
-            builder.setInsertInto(m_irModule->getModuleInst());
-            auto addressType = builder.getUInt64Type();
-            auto address = emitOpBitcast(parent, nullptr, addressType, ptr);
-            return emitInst(
-                parent,
-                inst,
-                SpvOpConvertUToAccelerationStructureKHR,
-                inst->getDataType(),
-                kResultID,
-                address);
-        }
-
         requireVariableBufferCapabilityIfNeeded(inst->getDataType());
 
         IRBuilder builder(inst);
