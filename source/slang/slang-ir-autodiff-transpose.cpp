@@ -2364,45 +2364,6 @@ struct DiffTransposePass
         }
     }
 
-    void safeSetInsertAfterInst(IRBuilder* builder, IRInst* inst)
-    {
-        // If the inst is in the first or second block of the parent function, then
-        // insert into the third block, otherwise simply call
-        // setInsertAfterOrdinaryInst. The second block is the block that the first
-        // block branches into unconditionaly.
-        //
-        bool shouldGoIntoNextBlock = false;
-        if (auto block = as<IRBlock>(inst->getParent()))
-        {
-            // Primal parameters block.
-            auto firstBlock = cast<IRFunc>(block->getParent())->getFirstBlock();
-            if (block == firstBlock)
-                shouldGoIntoNextBlock = true;
-
-            // Check if block is bwd-prop parameters block.
-            if (block->getPredecessors().getCount() == 1)
-            {
-                auto predBlock = getUniquePredecessor(block);
-                if (isDifferentialOrRecomputeBlock(block) &&
-                    !isDifferentialOrRecomputeBlock(predBlock))
-                    shouldGoIntoNextBlock = true;
-            }
-
-            if (shouldGoIntoNextBlock)
-            {
-                auto nextBlock =
-                    as<IRUnconditionalBranch>(block->getTerminator())->getTargetBlock();
-                if (auto ordInst = nextBlock->getFirstOrdinaryInst())
-                    builder->setInsertAfter(ordInst);
-                else
-                    builder->setInsertBefore(nextBlock->getTerminator());
-                return;
-            }
-        }
-
-        setInsertAfterOrdinaryInst(builder, inst);
-    }
-
     IRInst* promoteOperandsToTargetType(IRBuilder* builder, IRInst* fwdInst)
     {
         auto oldLoc = builder->getInsertLoc();
@@ -2418,17 +2379,28 @@ struct DiffTransposePass
             auto operandType = unwrapAttributedType(operand->getDataType());
             if (operandType != targetType)
             {
-                // Insert new operand just after the old operand, so we have the old
-                // operands available.
-                //
-                safeSetInsertAfterInst(builder, operand);
-
-                IRInst* newOperand = promoteToType(builder, targetType, operand);
-
+                IRInst* newOperand = nullptr;
                 if (isDifferentialInst(operand))
+                {
+                    // A differential promotion must stay in the forward block so that it is
+                    // transposed in turn.
+                    builder->setInsertBefore(fwdInst);
+                    newOperand = promoteToType(builder, targetType, operand);
                     builder->markInstAsDifferential(
                         newOperand,
                         tryGetPrimalTypeFromDiffInst(fwdInst));
+                }
+                else
+                {
+                    // A primal promotion is consumed by the reverse instruction emitted below,
+                    // so place it at that use directly in the reverse-mode block. Consider a
+                    // vector/scalar division after a loop where the scalar is a loop parameter.
+                    // Inserting the broadcast after that parameter puts it inside the primal loop,
+                    // while the reverse division runs before the reverse loop and cannot use it
+                    // there.
+                    builder->setInsertLoc(oldLoc);
+                    newOperand = promoteToType(builder, targetType, operand);
+                }
 
                 newOperands.add(newOperand);
 
