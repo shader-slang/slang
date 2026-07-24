@@ -130,6 +130,10 @@ summary=()
 failure_count=0
 skip_count=0
 sample_count=0
+# Keep the captured output in the invocation directory. The absolute path remains valid while
+# each example runs from bin_dir below.
+sample_output_file=$(mktemp "$PWD/ci-examples.XXXXXX")
+trap 'rm -f "$sample_output_file"' EXIT
 
 function skip {
   local p
@@ -151,9 +155,19 @@ function skip {
   return 1
 }
 
+# Return success when the output contains a rendered Slang warning or error. Match both the
+# current `warning[E41017]:` form and the legacy `warning 41017:` form so that testing older
+# compiler configurations cannot silently accept diagnostics.
+function contains_compiler_diagnostic {
+  local diagnostic_pattern
+  diagnostic_pattern='(^|[^[:alnum:]_])(warning|error)(\[E[[:digit:]]+\]|[[:space:]]+[[:digit:]]+):'
+  LC_ALL=C grep -Eq "$diagnostic_pattern" "$1"
+}
+
 function run_sample {
   local sample
   local args
+  local result
   sample="$1"
   shift
   args=("$@")
@@ -167,18 +181,23 @@ function run_sample {
   fi
   echo "Running '$sample ${args[*]}'..."
   result=0
+  : >"$sample_output_file"
   pushd "$bin_dir" 1>/dev/null 2>&1
   if [[ ! "$dry_run" = true ]]; then
-    ./"$sample" "${args[@]}" || result=$?
+    ./"$sample" "${args[@]}" >"$sample_output_file" 2>&1 || result=$?
     if [[ -f ./"log-$sample.txt" ]]; then
-      cat ./"log-$sample.txt"
+      cat ./"log-$sample.txt" >>"$sample_output_file"
     fi
   fi
-  if [[ $result -eq 0 ]]; then
-    summary=("${summary[@]}" "  success")
-  else
+  cat "$sample_output_file"
+  if [[ $result -ne 0 ]]; then
     summary=("${summary[@]}" "  failure (exit code: $result)")
     failure_count=$((failure_count + 1))
+  elif contains_compiler_diagnostic "$sample_output_file"; then
+    summary=("${summary[@]}" "  failure (compiler diagnostics found)")
+    failure_count=$((failure_count + 1))
+  else
+    summary=("${summary[@]}" "  success")
   fi
   popd 1>/dev/null 2>&1
 }
