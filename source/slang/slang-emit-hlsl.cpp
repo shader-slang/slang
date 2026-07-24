@@ -1967,30 +1967,42 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             // (`NvHitObject`) and DXR-1.3 native SER (`dx::HitObject`) are distinct,
             // non-interchangeable ABIs. We test capability implication with the same single-set
             // primitive `specializeTargetSwitch` uses to pick a HitObject op's `__target_switch`
-            // case, so the emitted type agrees with how the operations lower. The user selects a
-            // SER path via capabilities (e.g. `ser_nvapi` vs a native SM 6.9 DXR profile).
+            // case, so the emitted type agrees with how the operations lower. NVAPI is used only
+            // when the explicit `nvapiHitObjects` capability was requested (its atom set is a
+            // strict superset of the native `case hlsl` arm, so it out-specializes it); otherwise
+            // the platform-standard native DXR path (SM 6.9) is the default. Keying on
+            // `nvapiHitObjects` rather than the coarse `hlsl_nvapi` is what lets a shader use the
+            // native HitObject while still enabling `hlsl_nvapi` for atomics.
             auto targetCaps = getTargetReq()->getTargetCaps();
             auto impliesCap = [&](CapabilityName atom)
             {
                 return targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(atom)) ==
                        CapabilitySet::ImpliesReturnFlags::Implied;
             };
-            if (impliesCap(CapabilityName::hlsl_nvapi))
+            if (impliesCap(CapabilityName::nvapiHitObjects))
             {
-                // NVAPI extension: use NvHitObject (matches `case hlsl_nvapi:` op calls).
+                // Explicit NVAPI opt-in: use NvHitObject (matches `case nvapiHitObjects:` op
+                // calls).
                 m_writer->emit("NvHitObject");
                 // Ensure NVAPI header is included when using NvHitObject type.
                 m_extensionTracker->m_requiresNVAPI = true;
             }
             else if (impliesCap(CapabilityName::_sm_6_9))
             {
-                // DXR 1.3 native: use the dx::HitObject namespace type.
+                // DXR 1.3 native (the default): use the dx::HitObject namespace type.
                 m_writer->emit("dx::HitObject");
             }
             else
             {
-                SLANG_UNEXPECTED("HitObjectType requires either SM 6.9+ (DXR 1.3 native) or "
-                                 "hlsl_nvapi capability");
+                // Neither SM 6.9 nor nvapiHitObjects: emit a hard error (E55215) rather than crash.
+                // The dx::HitObject placeholder just keeps emission well-formed; no valid artifact
+                // is ever produced from it. On the direct -target hlsl path the error flag makes
+                // generateOutput() discard this text; on the -target dxil path the placeholder is
+                // handed to DXC, but DXC likewise rejects dx::HitObject on a sub-6.9 target, so the
+                // compile still fails (with a redundant downstream diagnostic).
+                getSink()->diagnose(
+                    Diagnostics::HitObjectRequiresSerCapability{.location = type->sourceLoc});
+                m_writer->emit("dx::HitObject");
             }
             return;
         }

@@ -1365,6 +1365,7 @@ A capability describes an optional feature that a target may or may not support.
 * `metallib_3_1` 
 * `metallib_4_0` 
 * `hlsl_nvapi` 
+* `nvapiHitObjects` 
 * `hlsl_2018` 
 * `optix_coopvec` 
 * `optix_multilevel_traversal` 
@@ -1519,6 +1520,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cpp_hlsl` 
 * `cuda_glsl_hlsl` 
 * `cuda_glsl_nvapi` 
+* `cuda_glsl` 
 * `cuda_hlsl_metal_spirv` 
 * `cuda_glsl_hlsl_spirv` 
 * `cuda_glsl_hlsl_spirv_llvm` 

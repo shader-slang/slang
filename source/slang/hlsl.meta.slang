@@ -23200,8 +23200,9 @@ struct HitObject
     [ForceInline]
     [require(cuda, ser_raygen_closesthit_miss)]
     [require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
-    [require(nvapi, ser_raygen_closesthit_miss)]
-    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    // Single hlsl arm covers both native DXR and explicit NVAPI; __hlslMakeHit picks the ABI (and
+    // enforces SM 6.9 for the native path through its own ser_dxr require).
+    [require(hlsl, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -23215,23 +23216,9 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl_nvapi:
-            HitObject hitObj_nvapi;
-            __hlslMakeHit_NVAPI(
-                AccelerationStructure,
-                InstanceIndex,
-                GeometryIndex,
-                PrimitiveIndex,
-                HitKind,
-                RayContributionToHitGroupIndex,
-                MultiplierForGeometryContributionToHitGroupIndex,
-                Ray,
-                attributes,
-                hitObj_nvapi);
-            return hitObj_nvapi;
         case hlsl:
-            HitObject hitObj_dxr;
-            __hlslMakeHit_DXR(
+            HitObject hitObj;
+            __hlslMakeHit(
                 AccelerationStructure,
                 InstanceIndex,
                 GeometryIndex,
@@ -23241,8 +23228,8 @@ struct HitObject
                 MultiplierForGeometryContributionToHitGroupIndex,
                 Ray,
                 attributes,
-                hitObj_dxr);
-            return hitObj_dxr;
+                hitObj);
+            return hitObj;
         case glsl:
             {
                 // Save the attributes
@@ -23535,16 +23522,21 @@ struct HitObject
         /// Creates a HitObject representing a miss based on values explicitly passed as arguments, without
         /// tracing a ray. The provided shader table index must reference a valid miss record in the shader
         /// table.
+    // The 2-argument MakeMiss(MissShaderIndex, Ray) is NVAPI-only: native DXR 1.3 has no
+    // dx::HitObject::MakeMiss with this signature, so unlike the sibling Make* methods this one
+    // intentionally drops the native `hlsl` disjunct (cuda_glsl_spirv, not cuda_glsl_hlsl_spirv)
+    // and requires the explicit nvapiHitObjects atom for its NVAPI arm.
     [__requiresNVAPI]
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     static HitObject MakeMiss(
         uint MissShaderIndex,
         RayDesc Ray)
     {
         __target_switch
         {
-        case hlsl_nvapi: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
+        case nvapiHitObjects: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
         case _GL_NV_shader_invocation_reorder:
             __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __glslMakeMissNV(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
@@ -23658,13 +23650,13 @@ struct HitObject
         /// miss.
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
-    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static HitObject MakeNop()
     {
         __target_switch
         {
-        case hlsl_nvapi:
+        case nvapiHitObjects:
             __intrinsic_asm "($0 = NvMakeNop())";
         case glsl:
             __glslMakeNop(__return_val);
@@ -23686,7 +23678,7 @@ struct HitObject
     }
 
     [__requiresNVAPI]
-    [require(nvapi, ser_nvapi)]
+    [require(nvapiHitObjects, ser_nvapi)]
     __generic<payload_t>
     static void __InvokeHLSL_NVAPI(
         RaytracingAccelerationStructure AccelerationStructure,
@@ -23695,7 +23687,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl_nvapi: __intrinsic_asm "NvInvokeHitObject";
+        case nvapiHitObjects: __intrinsic_asm "NvInvokeHitObject";
         }
     }
 
@@ -23715,7 +23707,7 @@ struct HitObject
         /// shader is invoked. (NVAPI/SPIRV/CUDA variant with AccelerationStructure parameter)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
-    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
@@ -23723,7 +23715,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl_nvapi:
+        case nvapiHitObjects:
             __InvokeHLSL_NVAPI(
                 AccelerationStructure,
                 HitOrMiss,
@@ -23794,6 +23786,14 @@ struct HitObject
         /// shader is invoked. (DXR 1.3 variant without AccelerationStructure parameter)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    // This 2-argument Invoke lowers only to native dx::HitObject::Invoke; the nvapiHitObjects
+    // requirement exists solely so the __target_switch below can carry a reachable
+    // `case nvapiHitObjects:` that diagnoses under explicit NVAPI, instead of falling through to
+    // `case hlsl:` and emitting a native Invoke applied to an NvHitObject. It uses the plain
+    // ser_raygen_closesthit_miss (not the ser_dxr_ SM 6.9 variant the native arm needs) so the
+    // diagnostic is reachable on a pre-6.9 NVAPI target rather than being masked by a "requires
+    // SM 6.9" capability error.
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         HitObject HitOrMiss,
         inout payload_t Payload)
@@ -23804,7 +23804,7 @@ struct HitObject
             __InvokeHLSL_DXR(
                 HitOrMiss,
                 __forceVarIntoRayPayloadStructTemporarily(Payload));
-        case hlsl_nvapi:
+        case nvapiHitObjects:
             // This 2-argument Invoke is DXR-1.3-native-SER-only; NVAPI SER has no equivalent
             // (its Invoke requires an AccelerationStructure). Without this case the NVAPI target
             // would select `case hlsl:` and emit `dx::HitObject::Invoke` applied to an
@@ -23913,12 +23913,12 @@ struct HitObject
         /// Note: This is an NVAPI/SPIRV/CUDA extension. DXR 1.3 uses individual accessors (GetRayTMin, GetRayTCurrent, etc.)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
-    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     RayDesc GetRayDesc()
     {
         __target_switch
         {
-        case hlsl_nvapi:
+        case nvapiHitObjects:
             __intrinsic_asm ".GetRayDesc";
         case _GL_NV_shader_invocation_reorder:
             {
@@ -24204,13 +24204,14 @@ struct HitObject
     __glsl_extension(GL_NV_cluster_acceleration_structure)
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(cuda_glsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl, ser_raygen_closesthit_miss)]
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     [require(spirv, spvShaderInvocationReorderNV)]
     int GetClusterID()
     {
         __target_switch
         {
-        case hlsl_nvapi: __intrinsic_asm ".GetClusterID";
+        case nvapiHitObjects: __intrinsic_asm ".GetClusterID";
         case glsl: __intrinsic_asm "hitObjectGetClusterIdNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetClusterId";
         case spvShaderInvocationReorderNV:
@@ -24227,13 +24228,15 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(cuda, raytracing_lss_ho)]
+    [require(nvapiHitObjects, raytracing_lss_ho)]
     [require(spirv, spvShaderInvocationReorderNV)]
     float4 GetSpherePositionAndRadius()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetSphereObjectPositionAndRadius";
+        // NVAPI-only: no native dx::HitObject equivalent, so the HLSL arm is the NVAPI opt-in.
+        case nvapiHitObjects: __intrinsic_asm ".GetSphereObjectPositionAndRadius";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
@@ -24255,13 +24258,15 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(cuda, raytracing_lss_ho)]
+    [require(nvapiHitObjects, raytracing_lss_ho)]
     [require(spirv, spvShaderInvocationReorderNV)]
     float2x4 GetLssPositionsAndRadii()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetLssObjectPositionsAndRadii";
+        // NVAPI-only: no native dx::HitObject equivalent, so the HLSL arm is the NVAPI opt-in.
+        case nvapiHitObjects: __intrinsic_asm ".GetLssObjectPositionsAndRadii";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
@@ -24289,13 +24294,15 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(cuda, raytracing_lss_ho)]
+    [require(nvapiHitObjects, raytracing_lss_ho)]
     [require(spirv, spvShaderInvocationReorderNV)]
     bool IsSphereHit()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".IsSphereHit";
+        // NVAPI-only: no native dx::HitObject equivalent, so the HLSL arm is the NVAPI opt-in.
+        case nvapiHitObjects: __intrinsic_asm ".IsSphereHit";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectIsSphereHit";
@@ -24314,13 +24321,15 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(cuda, raytracing_lss_ho)]
+    [require(nvapiHitObjects, raytracing_lss_ho)]
     [require(spirv, spvShaderInvocationReorderNV)]
     bool IsLssHit()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".IsLssHit";
+        // NVAPI-only: no native dx::HitObject equivalent, so the HLSL arm is the NVAPI opt-in.
+        case nvapiHitObjects: __intrinsic_asm ".IsLssHit";
         case cuda:
             {
                 __intrinsic_asm "optixHitObjectIsLSSHit";
@@ -24342,12 +24351,12 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
-    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     float4x3 GetWorldToObject()
     {
         __target_switch
         {
-        case hlsl_nvapi: __intrinsic_asm ".GetWorldToObject";
+        case nvapiHitObjects: __intrinsic_asm ".GetWorldToObject";
         case _GL_NV_shader_invocation_reorder:
             __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
@@ -24379,12 +24388,12 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
-    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     float4x3 GetObjectToWorld()
     {
         __target_switch
         {
-        case hlsl_nvapi: __intrinsic_asm ".GetObjectToWorld";
+        case nvapiHitObjects: __intrinsic_asm ".GetObjectToWorld";
         case _GL_NV_shader_invocation_reorder:
             __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
@@ -24549,11 +24558,15 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    // nvapiHitObjects must be declared explicitly even though the disjunct above includes hlsl
+    // (and nvapiHitObjects derives from hlsl): a require disjunct that contains a base atom does
+    // not cover a derived `case nvapiHitObjects:` label, so without this the checker reports E36104.
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     attr_t GetAttributes<attr_t>()
     {
         __target_switch
         {
-        case hlsl_nvapi:
+        case nvapiHitObjects:
             {
                 attr_t v;
                 __hlslGetAttributesFromHitObject(v);
@@ -24875,13 +24888,13 @@ struct HitObject
     /// !!!! Internal NVAPI HLSL impl. Not part of interface! !!!!!!!!!!!!
     ///
 
-    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     void __hlslGetAttributesFromHitObject<T>(out T t)
     {
         __target_switch
         {
-        case hlsl_nvapi:
+        case nvapiHitObjects:
             __intrinsic_asm "NvGetAttributesFromHitObject($0, $1)";
         case hlsl:
             // DXR 1.3 native path - use method call syntax
@@ -24889,7 +24902,7 @@ struct HitObject
         }
     }
 
-    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static void __hlslMakeHitWithRecordIndex<attr_t>(
         uint HitGroupRecordIndex,
@@ -24904,32 +24917,17 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl_nvapi: __intrinsic_asm "NvMakeHitWithRecordIndex";
+        case nvapiHitObjects: __intrinsic_asm "NvMakeHitWithRecordIndex";
         case hlsl: __intrinsic_asm "($8 = dx::HitObject::MakeHit($0, $1, $2, $3, $4, $5, $6, $7))";
         }
     }
 
-    [__requiresNVAPI]
-    [require(nvapi, ser_raygen_closesthit_miss)]
-    static void __hlslMakeHit_NVAPI<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
-        uint InstanceIndex,
-        uint GeometryIndex,
-        uint PrimitiveIndex,
-        uint HitKind,
-        uint RayContributionToHitGroupIndex,
-        uint MultiplierForGeometryContributionToHitGroupIndex,
-        RayDesc Ray,
-        attr_t attributes,
-        out HitObject hitObj)
-    {
-        __target_switch
-        {
-        case hlsl_nvapi: __intrinsic_asm "NvMakeHit";
-        }
-    }
-
+    // Combined native/NVAPI MakeHit dispatcher (mirrors __hlslMakeHitWithRecordIndex): one switch
+    // carrying both arms. A single generic helper with only the NVAPI arm would fail E41011 when
+    // force-instantiated on the (unreached) native path; keeping a native `case hlsl:` here avoids it.
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
-    static void __hlslMakeHit_DXR<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
+    static void __hlslMakeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
         uint GeometryIndex,
         uint PrimitiveIndex,
@@ -24942,11 +24940,12 @@ struct HitObject
     {
         __target_switch
         {
+        case nvapiHitObjects: __intrinsic_asm "NvMakeHit";
         case hlsl: __intrinsic_asm "($9 = dx::HitObject::MakeHit($0, $1, $2, $3, $4, $5, $6, $7, $8))";
         }
     }
 
-    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapiHitObjects, ser_raygen_closesthit_miss)]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static void __hlslTraceRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
@@ -24961,7 +24960,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl_nvapi: __intrinsic_asm "NvTraceRayHitObject";
+        case nvapiHitObjects: __intrinsic_asm "NvTraceRayHitObject";
         case hlsl: __intrinsic_asm "($8 = dx::HitObject::TraceRay($0, $1, $2, $3, $4, $5, $6, $7))";
         }
     }
@@ -25960,12 +25959,16 @@ struct HitObject
     /// (DispatchRaysIndex in DXR).
 __glsl_extension(GL_EXT_ray_tracing)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, ser_raygen)]
+// Native DXR MaybeReorderThread is SM 6.9-only: gate the native `hlsl` arm on ser_dxr so a plain
+// hlsl_nvapi target (no 6.9, no nvapiHitObjects opt-in) gets a clean capability error.
+[require(cuda_glsl_spirv, ser_raygen)]
+[require(nvapiHitObjects, ser_raygen)]
+[require(hlsl, ser_dxr_raygen)]
 void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
-    case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
+    case nvapiHitObjects: __intrinsic_asm "NvReorderThread";
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case _GL_NV_shader_invocation_reorder:
         __requireTargetExtension("GL_NV_shader_invocation_reorder");
@@ -26011,12 +26014,14 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 
 __glsl_extension(GL_EXT_ray_tracing)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, ser_raygen)]
+[require(cuda_glsl_spirv, ser_raygen)]
+[require(nvapiHitObjects, ser_raygen)]
+[require(hlsl, ser_dxr_raygen)]
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
-    case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
+    case nvapiHitObjects: __intrinsic_asm "NvReorderThread";
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case _GL_NV_shader_invocation_reorder:
         __requireTargetExtension("GL_NV_shader_invocation_reorder");
@@ -26052,12 +26057,14 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
 
 __glsl_extension(GL_EXT_ray_tracing)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, ser_raygen)]
+[require(cuda_glsl_spirv, ser_raygen)]
+[require(nvapiHitObjects, ser_raygen)]
+[require(hlsl, ser_dxr_raygen)]
 void ReorderThread( HitObject HitOrMiss )
 {
     __target_switch
     {
-    case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
+    case nvapiHitObjects: __intrinsic_asm "NvReorderThread";
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case _GL_NV_shader_invocation_reorder:
         __requireTargetExtension("GL_NV_shader_invocation_reorder");

@@ -5629,6 +5629,13 @@ err(
 )
 
 err(
+    "hit-object-requires-ser-capability",
+    55215,
+    "HitObject requires a shader-execution-reordering capability",
+    span { loc = "location", message = "cannot emit HitObject for the current target: shader-execution-reordering on HLSL requires either SM 6.9 (native DXR) or the explicit 'nvapiHitObjects' capability." }
+)
+
+err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
     "CUDA type mapping failed",
