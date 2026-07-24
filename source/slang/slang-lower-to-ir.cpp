@@ -8967,7 +8967,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 // If this function should return via a __ref parameter, do that and return void.
                 //
                 // Under named-return-value optimization the returned local already aliases the
-                // return destination (see visitVarDeclBase / findCommonReturnedLocalVar), so
+                // return destination (see visitVarDecl / findCommonReturnedLocalVar), so
                 // writing it into the destination would be a redundant self-copy — and for an
                 // opaque non-copyable type that copy is exactly the broken by-value load/store we
                 // are eliminating (shader-slang/slang#12197). Just return.
@@ -12124,6 +12124,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // findCommonReturnedLocalVar / the return-destination setup in lowerFuncDeclInContext.
         if (decl == context->nrvoReturnLocalDecl)
         {
+            // No createVar and no maybeAddDebugLocationDecoration here: the storage is the
+            // return-destination parameter (an IRParam already emitted by the parameter loop in
+            // lowerFuncDeclInContext), not a fresh local IRVar. The debug-value pass
+            // (slang-ir-insert-debug-value-store.cpp) surfaces return-destination parameters
+            // through its parameter loop, so this local needs no IRDebugLocationDecoration of its
+            // own; attaching one would in any case bind the local's decl location to a parameter
+            // that is not that local's own storage.
             LoweredValInfo varVal = context->returnDestination;
             if (auto initExpr = decl->initExpr)
             {
@@ -14327,7 +14334,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     // in place, so an opaque non-copyable handle (a `RayQuery`) is never copied by
                     // value at the `return` (shader-slang/slang#12197). The alias is a pointer
                     // l-value, which matches how a return-destination `Out` parameter is lowered,
-                    // so `visitVarDeclBase` can install it directly.
+                    // so `visitVarDecl` can install it directly.
                     //
                     // This is restricted to opaque non-copyable handles — the types for which a
                     // whole-value load/store is genuinely a no-op. Types merely marked
@@ -14346,8 +14353,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     // by-reference parameter. NRVO writes the destination incrementally through
                     // the body, which would corrupt such an aliased argument; a non-NRVO return
                     // only writes it once at the end. An opaque non-copyable handle is always
-                    // passed by reference, so if any other parameter has that same handle type,
-                    // fall back to the ordinary return path to stay sound.
+                    // passed by reference, and proving two handles cannot alias would require
+                    // type- and call-site analysis we do not do here, so we take the deliberately
+                    // conservative guard: if *any* other parameter is an opaque non-copyable
+                    // handle (not just one of the destination's exact type), disable NRVO and
+                    // keep the ordinary return path.
                     bool anotherParamCouldAlias = false;
                     if (destIsNonCopyableOpaque)
                     {
@@ -14374,6 +14384,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         decl->errorType.type &&
                         !decl->errorType.type->equals(subContext->astBuilder->getBottomType());
 
+                    // When an opaque handle hits any of the guards above, or when
+                    // findCommonReturnedLocalVar bails, we fall back to the copying return path.
+                    // For an opaque handle that fallback is memory-safe but still emits the broken
+                    // by-value load/store this optimization exists to eliminate — i.e. those
+                    // shapes remain miscompiled, exactly as on `master`. NRVO deliberately only
+                    // covers the common `return <local>;` case; diagnosing the copy that survives
+                    // in the fallback shapes is left to a separate copy-site diagnostic (see the
+                    // "Known limitation" note on shader-slang/slang#12197).
                     if (destIsNonCopyableOpaque && !anotherParamCouldAlias && !canThrow)
                     {
                         VarDeclBase* returnedVar = nullptr;
