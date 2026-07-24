@@ -2696,8 +2696,13 @@ struct IRDebugScope : IRInst
 {
     FIDDLE(leafInst())
     IRInst* getScope() { return getOperand(0); }
-    IRInst* getInlinedAt() { return getOperand(1); }
-    void setInlinedAt(IRInst* inlinedAt) { setOperand(1, inlinedAt); }
+    // The inlinedAt operand is optional: a DebugScope that restores a non-inlined caller's own
+    // function scope has only the scope operand (see IRBuilder::emitDebugScope), mirroring how
+    // IRDebugInlinedAt makes its outer-inlinedAt operand optional via operand count. The
+    // `min_operands = 2` for DebugScope in slang-ir-insts.lua is generator metadata, not a runtime
+    // floor: this inst is valid with one or two operands (as DebugInlinedAt is with four or five).
+    IRInst* getInlinedAt() { return operandCount == 2 ? getOperand(1) : nullptr; }
+    bool isInlinedAtPresent() { return operandCount == 2; }
 };
 
 FIDDLE()
