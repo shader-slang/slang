@@ -406,8 +406,28 @@ void calcRequiredLoweringPassSet(
     CodeGenContext* codeGenContext,
     IRInst* inst)
 {
-    if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst))
+    // The autodiff finalization passes (finalizeAutoDiffPass / lowerDiffTypeInfoInsts in
+    // linkAndOptimizeIR) lower or strip these constructs. They can appear in modules that
+    // never call fwd_diff/bwd_diff (e.g. direct DifferentialPair use, or a no_diff type),
+    // so mark autodiff here too; otherwise those passes would be skipped and autodiff IR
+    // would survive into emission.
+    //
+    // These stay as base-class checks (not switch cases) because each spans several
+    // concrete opcodes; `as<Base>` keeps matching if a new leaf op is added under the
+    // base later. Single-opcode autodiff insts live in the switch below.
+    if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst) ||
+        as<IRDifferentialPairTypeBase>(inst) || as<IRMakeDifferentialPairBase>(inst) ||
+        as<IRDifferentialPairGetDifferentialBase>(inst) ||
+        as<IRDifferentialPairGetPrimalBase>(inst))
+    {
         result.autodiff = true;
+    }
+    // no_diff is an attribute payload, not a distinct opcode, so it needs findAttr.
+    if (auto attrType = as<IRAttributedType>(inst))
+    {
+        if (attrType->findAttr<IRNoDiffAttr>())
+            result.autodiff = true;
+    }
 
     switch (inst->getOp())
     {
@@ -481,8 +501,11 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetRegisterSpace:
         result.bindingQuery = true;
         break;
+    case kIROp_Annotation:
+    case kIROp_DetachDerivative:
     case kIROp_BackwardDifferentiate:
     case kIROp_ForwardDifferentiate:
+    case kIROp_DiffTypeInfo:
         result.autodiff = true;
         break;
     case kIROp_VerticesType:
@@ -1406,7 +1429,27 @@ Result linkAndOptimizeIR(
         SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
     }
 
-    SLANG_PASS(finalizeAutoDiffPass, targetProgram);
+    // finalizeAutoDiffPass walks the whole module and builds an AutoDiffSharedContext. It
+    // only has work to do when the module contains autodiff constructs, which
+    // calcRequiredLoweringPassSet records in requiredLoweringPassSet.autodiff (covering
+    // direct DifferentialPair / no_diff use, not just fwd_diff/bwd_diff). Skip it for
+    // modules with none so they don't pay the per-compile cost.
+    //
+    // Even a module with no autodiff constructs still links in the core-module autodiff
+    // builtins (types marked [__AutoDiffBuiltin], e.g. NullDifferential), which carry
+    // Export/HLSLExport/KeepAlive decorations that keep them alive through DCE. Those
+    // must still be stripped so the eliminateDeadCode pass below can drop the unused
+    // builtins. stripAutoDiffDecorations removes those pins (along with the other
+    // autodiff-only transient decorations) and needs no AutoDiffSharedContext, so run it
+    // directly on the skip path.
+    if (requiredLoweringPassSet.autodiff)
+    {
+        SLANG_PASS(finalizeAutoDiffPass, targetProgram);
+    }
+    else
+    {
+        SLANG_PASS(stripAutoDiffDecorations);
+    }
     if (requiredLoweringPassSet.matrixSwizzleStore)
         SLANG_PASS(lowerMatrixSwizzleStores);
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
@@ -1415,7 +1458,11 @@ Result linkAndOptimizeIR(
 
     // Lower DiffTypeInfo instructions to MakeTuple.
     // This must happen after specialization since DiffTypeInfo is hoistable.
-    lowerDiffTypeInfoInsts(irModule);
+    // DiffTypeInfo originates from autodiff (calcRequiredLoweringPassSet marks it in
+    // requiredLoweringPassSet.autodiff), so skip the whole-module walk when the module
+    // contains no autodiff constructs.
+    if (requiredLoweringPassSet.autodiff)
+        lowerDiffTypeInfoInsts(irModule);
 
     if (requiredLoweringPassSet.conditionalType)
         SLANG_PASS(lowerConditionalType, sink);
