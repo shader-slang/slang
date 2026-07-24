@@ -4526,59 +4526,131 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
     }
 }
 
+// Translates a language token (TokenType::IntegerLiteral or
+// TokenType::Identifier) to SlangLanguageVersion. Returns
+// SLANG_LANGUAGE_VERSION_UNKNOWN on error.
+static SlangLanguageVersion TranslateSlangLanguageVersionToken(const Token& token)
+{
+    SlangLanguageVersion version = SLANG_LANGUAGE_VERSION_UNKNOWN;
+
+    if (token.getContent() == "latest")
+        version = SLANG_LANGUAGE_VERSION_LATEST;
+    else if (token.getContent() == "legacy")
+        version = SLANG_LANGUAGE_VERSION_LEGACY;
+    else if (token.getContent() == "next")
+        version = SLANG_LANGUAGE_VERSION_NEXT;
+    else if (token.getContent().caseInsensitiveEquals(toSlice("202a")))
+        version = SLANG_LANGUAGE_VERSION_202A;
+    else if (token.getContent().caseInsensitiveEquals(toSlice("202b")))
+        version = SLANG_LANGUAGE_VERSION_202B;
+    else if (token.getContent().caseInsensitiveEquals(toSlice("202c")))
+        version = SLANG_LANGUAGE_VERSION_202C;
+    else if (token.type == TokenType::IntegerLiteral)
+        version = (SlangLanguageVersion)stringToInt(token.getContent());
+
+    return version;
+}
+
 static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
 {
     int version = SLANG_LANGUAGE_VERSION_UNKNOWN;
-    switch (PeekTokenType(context))
+    bool languageSpecified = false;
+    bool hasVersionToken = false;
+    Token versionToken{};
+    SourceLanguage language = SourceLanguage::Slang;
+
+    if (PeekTokenType(context) == TokenType::Identifier)
     {
-    case TokenType::IntegerLiteral:
-        version = stringToInt(AdvanceToken(context).getContent());
-        break;
-    case TokenType::Identifier:
+        // start by parsing the language (optional)
+        auto token = AdvanceToken(context);
+        if (token.getContent().caseInsensitiveEquals(toSlice("slang")))
         {
-            auto token = AdvanceToken(context);
-            if (token.getContent().caseInsensitiveEquals(toSlice("slang")))
-            {
-                context->m_preprocessor->language = SourceLanguage::Slang;
-                token = AdvanceToken(context);
-            }
-            else if (token.getContent() == "glsl")
-            {
-                context->m_preprocessor->language = SourceLanguage::GLSL;
-                token = AdvanceToken(context);
-            }
-            if (token.getContent() == "latest")
-                version = SLANG_LANGUAGE_VERSION_LATEST;
-            else if (token.getContent() == "legacy")
-                version = SLANG_LANGUAGE_VERSION_LEGACY;
-            else if (token.type == TokenType::IntegerLiteral)
-                version = stringToInt(token.getContent());
-            else
-            {
-                GetSink(context)->diagnose(Diagnostics::UnknownLanguage{
-                    .language = token.getContent(),
-                    .location = GetDirectiveLoc(context)});
-            }
+            language = SourceLanguage::Slang;
+            token = AdvanceToken(context);
+            languageSpecified = true;
         }
-        break;
-    default:
+        else if (token.getContent() == "glsl")
+        {
+            language = SourceLanguage::GLSL;
+            token = AdvanceToken(context);
+            languageSpecified = true;
+        }
+
+        // set language version token
+        versionToken = token;
+        hasVersionToken = true;
+    }
+    else if (PeekTokenType(context) == TokenType::IntegerLiteral)
+    {
+        versionToken = AdvanceToken(context);
+        hasVersionToken = true;
+    }
+    else
+    {
         GetSink(context)->diagnose(
             Diagnostics::ExpectedIntegralVersionNumber{.location = GetDirectiveLoc(context)});
-        break;
     }
 
     SkipToEndOfLine(context);
 
-    if (isValidSlangLanguageVersion(version))
+    if (hasVersionToken)
     {
-        context->m_preprocessor->language = SourceLanguage::Slang;
-        context->m_preprocessor->languageVersion = (SlangLanguageVersion)version;
-    }
-    else
-    {
-        GetSink(context)->diagnose(Diagnostics::UnknownLanguageVersion{
-            .version = String(version),
-            .location = GetDirectiveLoc(context)});
+        bool validVersion = false;
+
+        if (language == SourceLanguage::Slang)
+        {
+            // Slang version
+            version = TranslateSlangLanguageVersionToken(versionToken);
+
+            if (isValidSlangLanguageVersion(version))
+            {
+                context->m_preprocessor->language = SourceLanguage::Slang;
+                context->m_preprocessor->languageVersion = (SlangLanguageVersion)version;
+                validVersion = true;
+            }
+        }
+        else
+        {
+            // GLSL version, but note that we don't actually care about the GLSL
+            // version number
+            version = stringToInt(versionToken.getContent());
+            if (isValidGLSLVersion(version))
+            {
+                context->m_preprocessor->language = SourceLanguage::GLSL;
+                validVersion = true;
+            }
+        }
+
+        if (!validVersion)
+        {
+            // Invalid/bad version, figure out the correct diagnostics
+
+            if ((!languageSpecified) && (versionToken.type == TokenType::Identifier))
+            {
+                // Language not specified, so we interpret identifier as language
+                GetSink(context)->diagnose(Diagnostics::UnknownLanguage{
+                    .language = versionToken.getContent(),
+                    .location = GetDirectiveLoc(context)});
+            }
+            else if (
+                (versionToken.type == TokenType::IntegerLiteral) ||
+                (versionToken.type == TokenType::Identifier))
+            {
+                // Either:
+                // - integer literal (always interpreted as a version)
+                // - identifier AND language was specified (interpret as a version)
+                GetSink(context)->diagnose(Diagnostics::UnknownLanguageVersion{
+                    .version = versionToken.getContent(),
+                    .location = GetDirectiveLoc(context)});
+            }
+            else
+            {
+                // Something other than identifier or an integer literal, assume
+                // this is bad version
+                GetSink(context)->diagnose(Diagnostics::ExpectedIntegralVersionNumber{
+                    .location = GetDirectiveLoc(context)});
+            }
+        }
     }
 }
 

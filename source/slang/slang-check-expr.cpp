@@ -7413,11 +7413,15 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
         arg = CheckTerm(arg);
     }
 
-    if (auto declRefType = as<DeclRefType>(typeExp.type); declRefType && !isSlang2027OrLater(this))
+    if (auto declRefType = as<DeclRefType>(typeExp.type); declRefType && !isSlang202cOrLater(this))
     {
         // SLANG <=2026 LEGACY FEATURE:
+        //
         // As a backwards-compatibility feature for HLSL, we will allow for a cast
         // to a `struct` type from a literal zero, with the semantics of default initialization.
+        //
+        // In Slang 2026, a warning is issued to encourage migrating away from
+        // this feature.
         if (const auto structDeclRef = as<StructDecl>(declRefType->getDeclRef()))
         {
             if (expr->arguments.getCount() == 1)

@@ -1,12 +1,12 @@
 // cast-zero-to-struct.slang
 
 // Test that HLSL legacy syntax for casting from literal zero to a
-// struct is enabled in Slang 2026 and disabled in Slang 2027.
+// struct is enabled in Slang 2026 and disabled in Slang 202c.
 //
 // In Slang 2026, cast from literal zero is the same as invoking the
 // default initializer.
 //
-// In Slang 2027, cast from literal zero has no special meaning. It is
+// In Slang 202c, cast from literal zero has no special meaning. It is
 // the same as conversion from value zero. That is, the same as
 // invocation of __init(0).
 
@@ -14,20 +14,20 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_2025_2026): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_2025_2026):-cpu -shaderobj -output-using-type
 
-// 2026 - warn about (S)0  (semantics change in 2027)
+// 2026 - warn about (S)0  (semantics change in 202c)
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_2025_2026): -shaderobj -output-using-type -xslang -Wno-30087 -xslang -DSLANG2026=1
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_2025_2026):-cpu -shaderobj -output-using-type -xslang -Wno-30087 -xslang -DSLANG2026=1
 
-// 2027 - verify that the semantics changed
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK2027): -shaderobj -output-using-type -xslang -DSLANG2027=1
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK2027):-cpu -shaderobj -output-using-type -xslang -DSLANG2027=1
+// 202c - verify that the semantics changed
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK202C): -shaderobj -output-using-type -xslang -DSLANG202C=1
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK202C):-cpu -shaderobj -output-using-type -xslang -DSLANG202C=1
 
 //TEST:SIMPLE(filecheck=WARNCHECK2025): -no-codegen -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=WARNCHECK2026): -no-codegen -stage compute -entry computeMain -DSLANG2026=1
-//TEST:SIMPLE(filecheck=WARNCHECK2027): -no-codegen -stage compute -entry computeMain -DSLANG2027=1
+//TEST:SIMPLE(filecheck=WARNCHECK202C): -no-codegen -stage compute -entry computeMain -DSLANG202C=1
 
-#if defined(SLANG2027)
-#language 2027
+#if defined(SLANG202C)
+#language 202c
 #elif defined(SLANG2026)
 #language 2026
 #else
@@ -84,19 +84,19 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK_2025_2026-NEXT: 0
 //CHECK_2025_2026-NEXT: 0
 
-//CHECK2027: int32_t
-//CHECK2027-NEXT: 0
-//CHECK2027-NEXT: 0
-//CHECK2027-NEXT: 0
-//CHECK2027-NEXT: 0
-//CHECK2027-NEXT: 0
-//CHECK2027-NEXT: 0
-//CHECK2027-NEXT: 1
-//CHECK2027-NEXT: 1
-//CHECK2027-NEXT: 0
-//CHECK2027-NEXT: 0
-//CHECK2027-NEXT: 0
-//CHECK2027-NEXT: 0
+//CHECK202C: int32_t
+//CHECK202C-NEXT: 0
+//CHECK202C-NEXT: 0
+//CHECK202C-NEXT: 0
+//CHECK202C-NEXT: 0
+//CHECK202C-NEXT: 0
+//CHECK202C-NEXT: 0
+//CHECK202C-NEXT: 1
+//CHECK202C-NEXT: 1
+//CHECK202C-NEXT: 0
+//CHECK202C-NEXT: 0
+//CHECK202C-NEXT: 0
+//CHECK202C-NEXT: 0
 
 //WARNCHECK2025: result code = 0
 //WARNCHECK2025-NOT: warning[E30087]
@@ -106,6 +106,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //WARNCHECK2026: warning[E30087]
 //WARNCHECK2026: standard output = {
 
-//WARNCHECK2027: result code = 0
-//WARNCHECK2027-NOT: warning[E30087]
-//WARNCHECK2027: standard output = {
+//WARNCHECK202C: result code = 0
+//WARNCHECK202C-NOT: warning[E30087]
+//WARNCHECK202C: standard output = {

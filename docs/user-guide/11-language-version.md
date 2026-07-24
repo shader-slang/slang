@@ -10,13 +10,14 @@ Users are advised to provide a `#language` directive as the first non-whitespace
 #language slang 2026
 ```
 
-The following version strings are allowed:
-- `latest`: use the latest language version supported by the current compiler.
-- `legacy`: use the legacy Slang language.
-- `2018`: equivalent to `legacy`.
-- `2025`: Slang language version 2025.
-- `2026`: Slang language version 2026.
-- `2027`: Slang language version 2027.
+The following language versions are recognized by the compiler:
+
+Language version | Aliases      | Development status  | Remarks
+---------------- | ------------ | ------------------- | --------------------------------------------
+2018             | legacy       | Stable              | Current default, breaking changes avoided
+2025             | 202a         | Stable              | Breaking changes avoided
+2026             | 202b, latest | Stable              | Breaking changes avoided
+202c             | next         | In development      | Development version, expect breaking changes
 
 If no `#language` line exists and no version is specified via compiler options, the default setting is `legacy`.
 
@@ -52,11 +53,11 @@ Slang language version 2026 brings these changes on top of Slang 2025:
   versions, these initializers implicitly converted the scalar `T` argument into a `vector<T,2>`, producing unexpected results.
   See GitHub issue [#12093](https://github.com/shader-slang/slang/issues/12093) for details.
 - Casting a literal `0` to a user-defined struct type (e.g., `(MyStruct)0`) triggers a warning about future
-  compatibility (see _Slang 2027_).
+  compatibility (see _Slang 202c_).
 
-## Slang 2027
+## Slang 202c (in development)
 
-Slang language version 2027 brings these changes on top of Slang 2026:
+Slang language version 202c brings these changes on top of Slang 2026:
 
 - Casting a literal `0` to a user-defined struct type (e.g., `(MyStruct)0`) has lost its special meaning, and
   it is now a regular conversion. To maintain the previous semantics, a constructor call with no arguments can

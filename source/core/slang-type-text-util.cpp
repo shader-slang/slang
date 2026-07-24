@@ -118,9 +118,9 @@ static const NamesDescriptionValue s_languageInfos[] = {
 
 static const NamesDescriptionValue s_languageVersionInfos[] = {
     {SLANG_LANGUAGE_VERSION_LEGACY, "legacy,default,2018", "Legacy Slang language"},
-    {SLANG_LANGUAGE_VERSION_2025, "2025", "Slang language rules for 2025 and older"},
-    {SLANG_LANGUAGE_VERSION_2026, "2026", "Slang language rules for 2026"},
-    {SLANG_LANGUAGE_VERSION_2027, "2027,latest", "Slang language rules for 2027 and newer"},
+    {SLANG_LANGUAGE_VERSION_2025, "2025,202a", "Slang language rules for 2025 and older"},
+    {SLANG_LANGUAGE_VERSION_2026, "2026,202b,latest", "Slang language rules for 2026"},
+    {SLANG_LANGUAGE_VERSION_202C, "202c,next", "Slang language rules for 202c"},
 };
 
 static const NamesDescriptionValue s_compilerInfos[] = {
