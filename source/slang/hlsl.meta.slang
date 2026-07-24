@@ -27492,19 +27492,32 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         }
     }
 
+    // Ordering compares in the handle's native representation. Handles that are `uint64` (all kinds
+    // on `cuda`; the texture/sampler family under `spvBindlessTextureNV`) compare as `uint64`;
+    // everything else — including buffer and acceleration-structure handles under
+    // `spvBindlessTextureNV`, whose representation is `uint2` — uses the `uint2` lexicographic order,
+    // so a given handle orders the same whether or not the extension is enabled. `equals` needs no
+    // such split: bit-equality is the same in either representation.
     [ForceInline]
     bool lessThan(DescriptorHandle<T> other)
     {
         __target_switch
         {
-        case spvBindlessTextureNV:
         case cuda:
             return (uint64_t)this < (uint64_t)other;
+        case spvBindlessTextureNV:
+            if (T.kind == DescriptorKind.Texture ||
+                T.kind == DescriptorKind.Sampler ||
+                T.kind == DescriptorKind.CombinedTextureSampler ||
+                T.kind == DescriptorKind.UniformTexelBuffer ||
+                T.kind == DescriptorKind.StorageTexelBuffer)
+                return (uint64_t)this < (uint64_t)other;
         default:
-            let vthis = ((uint2)this);
-            let vother = (uint2)other;
-            return vthis.x < vother.x || (vthis.x == vother.x && vthis.y < vother.y);
+            break;
         }
+        let vthis = ((uint2)this);
+        let vother = (uint2)other;
+        return vthis.x < vother.x || (vthis.x == vother.x && vthis.y < vother.y);
     }
 
     [ForceInline]
@@ -27512,14 +27525,21 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
     {
         __target_switch
         {
-        case spvBindlessTextureNV:
         case cuda:
             return (uint64_t)this <= (uint64_t)other;
+        case spvBindlessTextureNV:
+            if (T.kind == DescriptorKind.Texture ||
+                T.kind == DescriptorKind.Sampler ||
+                T.kind == DescriptorKind.CombinedTextureSampler ||
+                T.kind == DescriptorKind.UniformTexelBuffer ||
+                T.kind == DescriptorKind.StorageTexelBuffer)
+                return (uint64_t)this <= (uint64_t)other;
         default:
-            let vthis = ((uint2)this);
-            let vother = (uint2)other;
-            return vthis.x < vother.x || (vthis.x == vother.x && vthis.y <= vother.y);
+            break;
         }
+        let vthis = ((uint2)this);
+        let vother = (uint2)other;
+        return vthis.x < vother.x || (vthis.x == vother.x && vthis.y <= vother.y);
     }
 }
 
@@ -27693,25 +27713,17 @@ public enum BindlessDescriptorOptions
     VkMutable = 1, /// **Current Default** Bind assuming `VK_EXT_mutable_descriptor_type`
 }
 
-/// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
-/// to a descriptor object.
+/// Look up `handleValue` in the Vulkan dynamic-resource heap and return the descriptor. This is the
+/// `uint2`-handle path used directly on plain SPIR-V / GLSL, and reused by the `spvBindlessTextureNV`
+/// arm of `defaultGetDescriptorFromHandle` for the kinds that extension does not convert (buffers and
+/// acceleration structures), so the heap lowering lives in exactly one place. Capabilities are
+/// inferred from the body (as for `defaultGetDescriptorFromHandle`) rather than declared, so the
+/// acceleration-structure path's `__asuint64` / ray-tracing requirements are picked up automatically.
 [ForceInline]
-T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
+T getDescriptorFromDynamicResourceHeap<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions)
 {
-    __target_switch
+    switch(bindlessOptions)
     {
-    case hlsl:
-        if (T.kind == DescriptorKind.Sampler)
-            return __loadSamplerDescriptorFromHeap<T>(((uint2)handleValue).x);
-        else if (T.kind == DescriptorKind.CombinedTextureSampler)
-            return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
-        else
-            return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
-    case spirv:
-    case glsl:
-
-        switch(bindlessOptions)
-        {
 ${
 {
     static const struct
@@ -27781,10 +27793,41 @@ $}
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
     }
     }
+}
+
+/// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
+/// to a descriptor object.
+[ForceInline]
+T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
+{
+    __target_switch
+    {
+    case hlsl:
+        if (T.kind == DescriptorKind.Sampler)
+            return __loadSamplerDescriptorFromHeap<T>(((uint2)handleValue).x);
+        else if (T.kind == DescriptorKind.CombinedTextureSampler)
+            return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
+        else
+            return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
+    case spirv:
+    case glsl:
+        return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
+    case spvBindlessTextureNV:
+        // The texture/sampler-family kinds are converted with the dedicated NV opcode via
+        // `__castDescriptorHandleToResource` (their handle is a `uint64`); every other kind reuses
+        // the dynamic-resource-heap path (their handle is a `uint2`), including acceleration
+        // structures, whose `__asuint64((uint2)handle)` packing feeds
+        // `OpConvertUToAccelerationStructureKHR`.
+        if (T.kind == DescriptorKind.Texture ||
+            T.kind == DescriptorKind.Sampler ||
+            T.kind == DescriptorKind.CombinedTextureSampler ||
+            T.kind == DescriptorKind.UniformTexelBuffer ||
+            T.kind == DescriptorKind.StorageTexelBuffer)
+            return __castDescriptorHandleToResource<T>(handleValue);
+        else
+            return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
     case wgsl:
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
-    case spvBindlessTextureNV:
-        return __castDescriptorHandleToResource<T>(handleValue);
     case spvDescriptorHeapEXT:
         if (T.kind == DescriptorKind.Sampler)
             return __spirvLoadDescriptorFromHeap<T>(__spirvSamplerHeap(), ((uint2)handleValue).x);

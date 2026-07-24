@@ -1742,19 +1742,20 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     void processDefaultConstruct(IRInst* inst)
     {
         // Handle DefaultConstruct for DescriptorHandleType.
-        // In SPIRV, DescriptorHandle is lowered to uint64 (spvBindlessTextureNV) or uint2.
-        // A default-constructed handle should be a zero value.
+        // In SPIRV, DescriptorHandle is lowered to uint64 (spvBindlessTextureNV, texture/sampler
+        // kinds only) or uint2. A default-constructed handle should be a zero value.
         auto type = inst->getDataType();
         if (type && type->getOp() == kIROp_DescriptorHandleType)
         {
             IRBuilder builder(m_module);
             builder.setInsertBefore(inst);
             auto targetCaps = m_sharedContext->m_targetProgram->getTargetReq()->getTargetCaps();
+            bool hasBindlessTextureNV = targetCaps.implies(CapabilityAtom::spvBindlessTextureNV);
 
             IRInst* castInst = nullptr;
-            if (targetCaps.implies(CapabilityAtom::spvBindlessTextureNV))
+            if (isDescriptorHandleRepresentedAsUInt64(type, hasBindlessTextureNV))
             {
-                // spvBindlessTextureNV: DescriptorHandle is uint64_t
+                // uint64 form (texture/sampler kinds under spvBindlessTextureNV)
                 auto uint64Type = builder.getUInt64Type();
                 auto zero64 = builder.getIntValue(uint64Type, 0);
                 castInst =

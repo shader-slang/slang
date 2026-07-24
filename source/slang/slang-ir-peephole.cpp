@@ -340,16 +340,19 @@ struct PeepholeContext : InstPassBase
                 // target-dependent
                 if (as<IRDescriptorHandleType>(baseType))
                 {
-                    bool useUint64 = targetProgram->getTargetReq()->getTargetCaps().implies(
-                        CapabilityAtom::spvBindlessTextureNV);
+                    bool hasBindlessTextureNV =
+                        targetProgram->getTargetReq()->getTargetCaps().implies(
+                            CapabilityAtom::spvBindlessTextureNV);
+                    bool useUint64 =
+                        isDescriptorHandleRepresentedAsUInt64(baseType, hasBindlessTextureNV);
 
                     IRBuilder builder(module);
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                     builder.setInsertBefore(inst);
 
-                    // Get the underlying type based on capability:
-                    // - With spvBindlessTextureNV: uint64_t
-                    // - Without: uint2
+                    // Get the underlying type based on the handle's representation:
+                    // - uint64_t for texture/sampler kinds under spvBindlessTextureNV
+                    // - uint2 otherwise
                     IRType* underlyingType;
                     if (useUint64)
                     {
