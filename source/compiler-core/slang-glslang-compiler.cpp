@@ -141,11 +141,13 @@ SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_3& reque
 {
     // The `-Xspirv-opt` pass flags only exist in the _1_3 request. If the loaded library predates
     // _1_3 we must downgrade to an older struct, which cannot carry them -- so honoring the user's
-    // explicit request is impossible. Fail unconditionally rather than silently drop the flags and
-    // emit unmodified SPIR-V. The failure does not depend on a diagnostic sink; the message is
-    // emitted only if one is present (compile(), the only caller that populates flags, always sets
-    // one).
-    if (request.spirvOptimizationFlagCount != 0 && !m_compile_1_3)
+    // explicit request is impossible. Fail rather than silently drop the flags and emit unmodified
+    // SPIR-V. This only matters when the optimizer would actually run: at optimization level None
+    // no passes run (the flags are inert regardless of library version), so don't fail there. The
+    // failure does not depend on a diagnostic sink; the message is emitted only if one is present
+    // (compile(), the only caller that populates flags, always sets one).
+    if (request.spirvOptimizationFlagCount != 0 && !m_compile_1_3 &&
+        request.optimizationLevel != SLANG_OPTIMIZATION_LEVEL_NONE)
     {
         if (request.diagnosticFunc)
         {
@@ -165,9 +167,11 @@ SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_3& reque
     else
     {
         // Older libraries don't understand the _1_3 fields; downgrade by slicing to the _1_2 base
-        // and copying its (standard-layout) prefix into the older struct. (Any `-Xspirv-opt` flags
-        // were already rejected above, so nothing user-requested is lost.) Going through the typed
-        // base keeps the copies independent of _1_3's non-standard layout.
+        // and copying its (standard-layout) prefix into the older struct. Reaching here with
+        // `-Xspirv-opt` flags present implies optimization level None (any higher level was
+        // rejected by the guard above), where the optimizer doesn't run -- so dropping the flags in
+        // the downgrade loses nothing the request would have used. Going through the typed base
+        // keeps the copies independent of _1_3's non-standard layout.
         const glslang_CompileRequest_1_2& request_1_2 = request;
         if (m_compile_1_2)
         {

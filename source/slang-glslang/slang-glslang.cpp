@@ -1034,12 +1034,13 @@ extern "C"
 #endif
         int glslang_compile_1_2(glslang_CompileRequest_1_2* inRequest)
 {
-    // Exported entry point: a client that loaded this symbol by name (see
-    // GlslangDownstreamCompiler::init) still calls it after the internal request was bumped to
-    // _1_3. Unlike the _1_1/_1_0 shims below -- which receive an in-process request this same build
-    // just constructed at the exact current size -- `inRequest` here crosses the library boundary
-    // and may come from a client built against a shorter/older _1_2, so normalize by its declared
-    // sizeInBytes to avoid over-reading before converting to _1_3.
+    // Exported entry point that a client may load by name (see GlslangDownstreamCompiler::init),
+    // so `inRequest` crosses the library boundary. `_1_2` is the version this PR supersedes: while
+    // it was the newest struct its size could grow across builds, so a client may pass a shorter
+    // or longer `_1_2` than this build knows -- normalize by its declared `sizeInBytes` to avoid
+    // over-reading before converting to `_1_3`. (The `_1_1`/`_1_0` shims below don't need this:
+    // they are older versions whose sizes are permanently frozen, so `sizeof` is authoritative for
+    // any conforming client.)
     glslang_CompileRequest_1_2 normalized;
     const size_t copySize =
         (inRequest->sizeInBytes > sizeof(normalized)) ? sizeof(normalized) : inRequest->sizeInBytes;
