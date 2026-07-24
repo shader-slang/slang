@@ -20718,7 +20718,7 @@ uint64_t GetTransformListHandle(uint index)
     }
 }
 
-//@ hidden:
+//@hidden:
 // This overload allows dereferencing an acceleration structure pointer, as the
 // machinery to do so is available in SPIR-V but does not operate through
 // OpLoad, which is what the regular dereferencing operator would eventually
@@ -20726,7 +20726,7 @@ uint64_t GetTransformListHandle(uint index)
 //
 // The overload is limited to SPIR-V only, because targets other than SPIR-V
 // and GLSL do not allow constructing RaytracingAccelerationStructures from
-// pointers and the GLSL lowering of a buffer device address to
+// pointers and the GLSL lowering of a buffer device address block containing a
 // RaytracingAccelerationStructure is not legal.
 __generic<T, Access access, AddressSpace addrSpace, L:IBufferDataLayout>
 [require(spirv)]
@@ -20734,8 +20734,10 @@ __generic<T, Access access, AddressSpace addrSpace, L:IBufferDataLayout>
 __prefix RaytracingAccelerationStructure operator*(Ptr<T, access, addrSpace, L> ptr)
     where T == RaytracingAccelerationStructure
 {
-    return RaytracingAccelerationStructure(bit_cast<uint64_t>(ptr));
+    return RaytracingAccelerationStructure(uint64_t(ptr));
 }
+
+//@public:
 
 //
 // Shader Model 6.4

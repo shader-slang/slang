@@ -3,7 +3,7 @@
 uniform RaytracingAccelerationStructure* accelStructAddr;
 RWStructuredBuffer<int> output;
 
-// CHECK: %[[REGA:[A-Za-z0-9_]+]] = OpBitcast
+// CHECK: %[[REGA:[A-Za-z0-9_]+]] = OpConvertPtrToU
 // CHECK: %[[REGB:[A-Za-z0-9_]+]] = OpConvertUToAccelerationStructureKHR{{.*}} %[[REGA]]
 // CHECK: OpRayQueryInitializeKHR %rayQuery{{.*}} %[[REGB]]
 
