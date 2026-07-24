@@ -4,11 +4,13 @@
 #include "../core/slang-crypto.h"
 #include "../core/slang-io.h"
 #include "../core/slang-platform.h"
+#include "../core/slang-process.h"
 #include "../slang/slang-ast-type.h"
 #include "../slang/slang-compiler-api.h"
 #include "../slang/slang-syntax.h"
 #include "proxy/proxy-component-type.h"
 
+#include <atomic>
 #include <chrono>
 #include <cinttypes>
 #include <cstdio>
@@ -328,6 +330,8 @@ const char* ReplayContext::getCurrentReplayPath() const
 
 String ReplayContext::generateTimestampFolderName()
 {
+    static std::atomic<uint64_t> nextRecordingId = 0;
+
     // Get current time with milliseconds
     auto now = std::chrono::system_clock::now();
     auto time_t_now = std::chrono::system_clock::to_time_t(now);
@@ -340,19 +344,28 @@ String ReplayContext::generateTimestampFolderName()
     localtime_r(&time_t_now, &tm_now);
 #endif
 
-    // Format: YYYY-MM-DD_HH-MM-SS-mmm
-    char buffer[64];
+    // The timestamp keeps directory sorting chronological. The process ID prevents concurrent
+    // recorders from choosing the same directory, and the counter distinguishes recordings made
+    // by one process during the same millisecond.
+    //
+    // Consider two compiler processes that begin recording at 12:00:00.123. A timestamp-only
+    // name sends both processes to the same stream.bin. Including the process and recording IDs
+    // gives each recording its own directory while preserving the timestamp as the primary sort
+    // key used by findLatestReplayFolder().
+    char buffer[96];
     snprintf(
         buffer,
         sizeof(buffer),
-        "%04d-%02d-%02d_%02d-%02d-%02d-%03d",
+        "%04d-%02d-%02d_%02d-%02d-%02d-%03d-%010u-%020" PRIu64,
         tm_now.tm_year + 1900,
         tm_now.tm_mon + 1,
         tm_now.tm_mday,
         tm_now.tm_hour,
         tm_now.tm_min,
         tm_now.tm_sec,
-        static_cast<int>(ms.count()));
+        static_cast<int>(ms.count()),
+        static_cast<unsigned int>(Slang::Process::getId()),
+        nextRecordingId.fetch_add(1, std::memory_order_relaxed));
 
     return String(buffer);
 }
@@ -371,12 +384,35 @@ void ReplayContext::setupRecordingMirror()
     }
     else
     {
-        // Generate timestamped folder path
-        String timestamp = generateTimestampFolderName();
-        m_currentReplayPath = Path::combine(m_replayDirectory, timestamp);
+        // A prior playback can leave its folder in m_currentReplayPath. Clear it before trying to
+        // claim a recording directory so failed attempts cannot reuse the playback folder.
+        m_currentReplayPath = String();
+
+        if (!Path::createDirectoryRecursive(m_replayDirectory))
+        {
+            // If we can't create the base directory, just record without mirroring
+            return;
+        }
+
+        // Claim a new recording directory atomically. The process and recording IDs make a
+        // collision unlikely, while exclusive creation guarantees that an existing directory is
+        // never reused even after process-ID reuse or external directory creation.
+        constexpr int kMaxCreateAttempts = 100;
+        for (int attempt = 0; attempt < kMaxCreateAttempts; ++attempt)
+        {
+            String candidate = Path::combine(m_replayDirectory, generateTimestampFolderName());
+            if (Path::createDirectory(candidate))
+            {
+                m_currentReplayPath = candidate;
+                break;
+            }
+        }
+
+        if (m_currentReplayPath.getLength() == 0)
+            return;
     }
 
-    // Create the directory structure
+    // An explicit SLANG_RECORD_PATH may include parent directories that do not exist yet.
     if (!Path::createDirectoryRecursive(m_currentReplayPath))
     {
         // If we can't create the directory, just record without mirroring

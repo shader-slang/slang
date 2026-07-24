@@ -14,8 +14,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyLoadFile)
 {
     REPLAY_TEST;
 
-    // Use a unique test directory for this test's replays
-    ctx().setReplayDirectory(".slang-replays-fs-test");
+    ScopedReplayTestDirectory replayDirectory("file-system-proxy-load-file");
 
     // Create a file system proxy wrapping the OS file system
     auto osFileSystem = Slang::OSFileSystem::getMutableSingleton();
@@ -58,10 +57,6 @@ SLANG_UNIT_TEST(replayFileSystemProxyLoadFile)
     SLANG_CHECK(replayedBlob != nullptr);
     SLANG_CHECK(replayedBlob->getBufferSize() == testContentSize);
     SLANG_CHECK(memcmp(replayedBlob->getBufferPointer(), testContent, testContentSize) == 0);
-
-    // Clean up
-    ctx().reset();
-    ctx().setReplayDirectory(".slang-replays");
 }
 
 // =============================================================================
