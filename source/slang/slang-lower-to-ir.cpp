@@ -519,6 +519,13 @@ struct SharedIRGenContext
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
     Dictionary<IRInst*, DebugSourceLineColumnCache> mapDebugSourceToLineColumnCache;
 
+    // Map each non-included source file's IRDebugSource to its IRDebugCompilationUnit, so a
+    // DebugFunction can be scoped to the compilation unit of its own source file. Only non-included
+    // sources have a compilation unit; a function defined in an #include'd/#line-remapped source
+    // has no entry here and is left with a null parent scope (see the creation site). Populated in
+    // generateIRForTranslationUnit before any function is lowered.
+    Dictionary<IRInst*, IRInst*> mapDebugSourceToCompilationUnit;
+
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
 
     // Concrete pack-count witnesses prove facts that have already been checked
@@ -14677,12 +14684,23 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             if (locationDecor && debugType)
             {
+                // Parent the function to the compilation unit of its own source file. Only
+                // non-included files have a compilation unit, so this is null for a function whose
+                // source is an #include'd/__include'd file or a #line-remapped source, and for
+                // every function at Minimal debug level (where no compilation unit is built at
+                // all).
+                IRInst* parentScope = nullptr;
+                context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
+                    locationDecor->getSource(),
+                    parentScope);
+
                 auto debugFuncCallee = getBuilder()->emitDebugFunction(
                     nameOperand,
                     locationDecor->getLine(),
                     locationDecor->getCol(),
                     locationDecor->getSource(),
-                    debugType);
+                    debugType,
+                    parentScope);
 
                 // Add a decoration to link the function to its debug function
                 getBuilder()->addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);
@@ -15442,7 +15460,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             // SPIR-V emission.
             if (context->debugInfoLevel >= DebugInfoLevel::Standard && !source->isIncludedFile())
             {
-                builder->emitDebugCompilationUnit(debugSource);
+                auto compilationUnit = builder->emitDebugCompilationUnit(debugSource);
+                context->shared->mapDebugSourceToCompilationUnit[debugSource] = compilationUnit;
             }
         }
     }

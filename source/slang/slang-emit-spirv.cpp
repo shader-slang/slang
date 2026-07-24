@@ -10438,7 +10438,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return debugFuncInfo;
         }
 
-        auto scope = findDebugScope(debugFunc);
+        // Use the parent scope bound to the function at IR-gen, which is the compilation unit of
+        // the module the function belongs to, so an imported function resolves to its own module's
+        // compilation unit rather than the entry point's. The parent scope is absent for a function
+        // whose source has no compilation unit of its own (an #include'd/#line-remapped source) and
+        // for a function from an IR blob that predates the operand; in those cases fall back to the
+        // module-global scope. findDebugScope also handles a null debugFunc (a function with no
+        // IRDebugFuncDecoration), so the getParentScope() read is guarded by that null check.
+        SpvInst* scope = nullptr;
+        if (debugFunc)
+        {
+            if (auto irParentScope = debugFunc->getParentScope())
+                scope = ensureInst(irParentScope);
+        }
+        if (!scope)
+            scope = findDebugScope(debugFunc);
         if (!scope)
             return nullptr;
 
