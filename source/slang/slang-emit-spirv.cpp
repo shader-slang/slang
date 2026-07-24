@@ -501,6 +501,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // A hash set to prevent redecorating the same spv inst.
     HashSet<SpvId> m_decoratedSpvInsts;
 
+    // The floating-point arithmetic instructions that must carry `NoContraction` because
+    // they contribute to a `precise`-qualified value; lazily filled by `computePreciseInsts()`.
+    HashSet<IRInst*> m_preciseInsts;
+    bool m_preciseInstsComputed = false;
+
     SpvAddressingModel m_addressingMode = SpvAddressingModelLogical;
 
     // We will store the logical sections of the SPIR-V module
@@ -10248,6 +10253,138 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
 
+    // Return true if `inst` is a floating-point arithmetic instruction that
+    // `emitArithmetic` lowers to a `NoContraction`-eligible opcode (OpFAdd/OpFSub/
+    // OpFMul/OpFDiv/OpFRem/OpFNegate). These are exactly the instructions through which
+    // `precise`-ness must propagate, because reassociation by the downstream optimizer
+    // happens among them. The float-classification test reuses the emitter's own
+    // `isFloatOrPackedFloatType` (which unwraps vector/matrix and covers the packed-float
+    // types) so it stays in step with how `emitArithmetic` decides to emit an F* opcode.
+    bool isPreciseCandidateFloatArithmetic(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_Add:
+        case kIROp_Sub:
+        case kIROp_Mul:
+        case kIROp_Div:
+        case kIROp_FRem:
+        case kIROp_Neg:
+            return isFloatOrPackedFloatType(inst->getDataType());
+        default:
+            return false;
+        }
+    }
+
+    // Populate `m_preciseInsts` with every floating-point arithmetic instruction that
+    // transitively contributes to a `precise`-qualified value, so `emitArithmetic` can
+    // decorate them with `NoContraction` even when the global floating-point mode is not
+    // `Precise`.
+    //
+    // The `precise` qualifier lowers to an `IRPreciseDecoration` on the directly-qualified
+    // value only (slang-lower-to-ir.cpp), so consider:
+    //
+    //     precise float s = axy + ayz + azx;
+    //
+    // This lowers to two adds -- a temporary `t = axy + ayz` and then `s = t + azx` -- but
+    // only `s` carries the decoration; the temporary `t` does not. Without marking `t`, the
+    // downstream SPIR-V optimizer is free to algebraically reassociate the whole expression
+    // (issue #12198). We therefore seed from every `precise`-decorated value and walk
+    // backward over value-flow edges to a fixpoint, marking each floating-point arithmetic
+    // instruction reached. This mirrors the whole-function decoration that `-fp-mode precise`
+    // already produces, but scoped to the `precise` cone so fast math is preserved for the
+    // rest of the module. Marking an extra op is safe -- `NoContraction` only forbids the
+    // optimizer from contracting/reassociating it, so decorating an op that did not need it
+    // can at worst forgo an optimization -- so the walk over-approximates rather than risk
+    // missing a contributor. For instance, a value projected out of an aggregate reaches the
+    // whole aggregate's initializer, so a `precise` field's siblings may be decorated too;
+    // that is a conservative loss of fast math, not a change to their permitted result.
+    //
+    // Value-flow edges are followed by inst kind, because a value can reach a `precise`
+    // consumer without being one of its direct operands: through a phi when the initializer
+    // crosses control flow (`precise float s = cond ? a*b + c*d : 0;` puts the decoration on
+    // the block parameter, whose incoming values are the predecessors' branch args), or
+    // through a store when the `precise` local is address-taken (its value comes from the
+    // stores into it, not an operand).
+    void computePreciseInsts()
+    {
+        if (m_preciseInstsComputed)
+            return;
+        m_preciseInstsComputed = true;
+
+        HashSet<IRInst*> visited;
+        List<IRInst*> workList;
+        auto enqueue = [&](IRInst* inst)
+        {
+            if (inst && visited.add(inst))
+                workList.add(inst);
+        };
+
+        // Seed from every `precise`-decorated value inside a function body, then walk backward
+        // to a fixpoint. Propagation stays within a function: a value computed in a callee is
+        // reached only if that callee is inlined before emit. Making a called function's body
+        // precise for one precise call site -- without penalizing its other, non-precise
+        // callers -- would require specializing the callee, which is out of scope here. (A
+        // `precise` global variable is likewise not covered: by the time the SPIR-V emitter
+        // runs, its decoration is no longer reachable from the module's global insts.)
+        for (auto globalInst : m_irModule->getGlobalInsts())
+        {
+            auto func = as<IRGlobalValueWithCode>(globalInst);
+            if (!func)
+                continue;
+            for (auto block : func->getBlocks())
+                for (auto inst : block->getChildren())
+                    if (inst->findDecoration<IRPreciseDecoration>())
+                        enqueue(inst);
+        }
+
+        for (Index i = 0; i < workList.getCount(); i++)
+        {
+            IRInst* inst = workList[i];
+            if (isPreciseCandidateFloatArithmetic(inst))
+                m_preciseInsts.add(inst);
+
+            if (as<IRParam>(inst))
+            {
+                // A phi/block parameter's incoming values are the branch arguments of its
+                // predecessor blocks. (For a function-entry parameter there are none, so
+                // `getPhiArgs` returns empty and propagation simply stops.)
+                for (auto arg : getPhiArgs(inst))
+                    enqueue(arg);
+            }
+            else
+            {
+                for (UInt opIndex = 0; opIndex < inst->getOperandCount(); opIndex++)
+                    enqueue(inst->getOperand(opIndex));
+            }
+
+            // A pointer's contents are the precise value, so follow the values written
+            // into it. Stores may target the pointer directly, or a sub-address derived
+            // from it (`value.x` / `arr[i]` lower to a store through a `getElementPtr` /
+            // `fieldAddress`), so also enqueue those derived pointers -- each is itself a
+            // pointer and gets the same treatment, so a store behind any depth of
+            // element/field access is reached.
+            if (as<IRPtrTypeBase>(inst->getDataType()))
+            {
+                for (auto use = inst->firstUse; use; use = use->nextUse)
+                {
+                    IRInst* user = use->getUser();
+                    if (auto store = as<IRStore>(user))
+                    {
+                        if (store->getPtr() == inst)
+                            enqueue(store->getVal());
+                    }
+                    else if (
+                        as<IRPtrTypeBase>(user->getDataType()) && user->getOperandCount() > 0 &&
+                        user->getOperand(0) == inst)
+                    {
+                        enqueue(user);
+                    }
+                }
+            }
+        }
+    }
+
     // Return true when floating-point contraction must be disabled for `inst`, i.e.
     // the effective floating-point mode is `Precise`. The mode comes from the global
     // `-fp-mode` option, but a function may override it via
@@ -10300,7 +10437,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
     {
-        const bool isPrecise = isFloatingPointModePrecise(inst);
+        computePreciseInsts();
+        const bool isPrecise = isFloatingPointModePrecise(inst) || m_preciseInsts.contains(inst);
         if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
         {
             auto rowCount = getIntVal(matrixType->getRowCount());
