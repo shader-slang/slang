@@ -320,13 +320,8 @@ SlangResult GlslangDownstreamCompiler::compile(
 
     request.entryPointName = options.entryPointName.begin();
 
-    // This class also backs the `glslang` passthrough, whose `compilerSpecificArguments` are
-    // `-Xglslang` args and must not be handed to the optimizer, so only the spirv-opt instance
-    // populates these fields. (As a consequence the `GLSL->SPIRV` path -- `-emit-spirv-via-glsl`,
-    // which optimizes on the glslang instance -- does not receive `-Xspirv-opt`; out of scope
-    // here.) `spirvOptFlags` holds raw pointers into `options.compilerSpecificArguments` (each a
-    // null-terminated TerminatedCharSlice), so both `spirvOptFlags` and `options` must outlive the
-    // synchronous `_invoke` call below; they do.
+    // Only the spirv-opt instance forwards these; this class also backs `glslang`, whose args
+    // (`-Xglslang`) must not reach the optimizer.
     List<const char*> spirvOptFlags;
     if (m_compilerType == SLANG_PASS_THROUGH_SPIRV_OPT)
     {
