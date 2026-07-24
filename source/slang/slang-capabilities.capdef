@@ -179,6 +179,7 @@ def _GLSL_430 : _GLSL_420;
 def _GLSL_440 : _GLSL_430;
 def _GLSL_450 : _GLSL_440;
 def _GLSL_460 : _GLSL_450;
+alias _GLSL_latest = _GLSL_460;
 
 // Metal versions
 
@@ -223,6 +224,7 @@ def _sm_6_7 : _sm_6_6;
 def _sm_6_8 : _sm_6_7;
 def _sm_6_9 : _sm_6_8;
 def _sm_6_10 : _sm_6_9;
+alias _sm_latest = _sm_6_10;
 
 /// Represents HLSL NVAPI support.
 /// [Version]

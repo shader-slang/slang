@@ -134,6 +134,10 @@ struct Options
     // Maximum number of test servers to run.
     int serverCount = 1;
 
+    // The slangc optimization-level argument injected for tests that do not specify their own
+    // optimization level. It can be set from "-O0" through "-O3" and defaults to "-O0".
+    Slang::String defaultOptimizationLevel = "-O0";
+
     bool emitSPIRVDirectly = true;
 
     // Whether to enable RHI device caching in render-test (default: true in slang-test)

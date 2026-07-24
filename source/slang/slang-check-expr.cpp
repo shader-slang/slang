@@ -369,10 +369,19 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
     // What we do instead is see if there's already been a declRef
     // constructed for this expression and rest assured that it's already
     // had a diagnostic emitted.
+    //
+    // The already-resolved declRef must refer to the *same* declaration we are
+    // about to diagnose. For a constructor call such as `int4(int2(1,2), 3)` the
+    // invoke's `functionExpr` is a reference to the *type* `int4`, which always
+    // carries a declRef (to the type, not the constructor). Without the
+    // same-decl check we would treat the type reference as "already diagnosed"
+    // and silently skip the constructor's own `[deprecated]` / `[RemovedSince]`
+    // diagnostic.
     auto originalAppExpr = as<AppExprBase>(originalExpr);
     auto originalAppFunDecl =
         originalAppExpr ? as<DeclRefExpr>(originalAppExpr->functionExpr) : nullptr;
-    if (originalAppFunDecl && originalAppFunDecl->declRef)
+    if (originalAppFunDecl && originalAppFunDecl->declRef &&
+        originalAppFunDecl->declRef.getDecl() == declRef.getDecl())
     {
         return;
     }

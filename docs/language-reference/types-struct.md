@@ -123,7 +123,9 @@ A structure may conform to one or more [interface](types-interface.md) types.
 A structure may be extended with a [type extension](types-extension.md).
 
 `struct` members may be declared with access control specifiers `public`, `internal`, or `private` (specified
-in *`modifier-list`*). The default member visibility is `internal`. Nested `struct` members have access to
+in *`modifier-list`*). The default member visibility is `internal`, except that starting with language version
+2026 a member with no explicit specifier inherits the visibility of its enclosing `struct` (so an unmodified
+member of a `public` struct is `public`). Nested `struct` members have access to
 `private` members of the enclosing `struct`. See [access control (TODO)](TODO) for further information.
 
 

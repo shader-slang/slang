@@ -320,6 +320,12 @@ warning("same-profile-specified-more-than-once", 40, "the '~profile' was specifi
 err("conflicting-profiles-specified-for-target", 41, "conflicting profiles have been specified for target '~target'")
 
 err(
+    "conflicting-explicit-capability-and-profile",
+    46,
+    "a requested '-capability' requires a higher target version than the explicitly requested profile '~profile'; specify a higher '-profile' or remove the conflicting '-capability'"
+)
+
+err(
     "profile-specification-ignored-because-no-targets",
     42,
     "a '-profile' option was specified, but no target was specified with '-target'"
@@ -916,10 +922,10 @@ err(
 )
 
 err(
-    "operator-name-used-as-variable-name",
+    "operator-name-on-non-function",
     20020,
-    "operator name used as variable name",
-    span { loc = "location", message = "an operator name cannot be used as the name of a variable; an 'operator' declaration must be a function" }
+    "operator name used to declare a non-function",
+    span { loc = "location", message = "an operator name can only be used to declare an operator function, not a variable, parameter, typedef, or property" }
 )
 
 err(

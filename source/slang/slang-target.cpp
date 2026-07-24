@@ -115,7 +115,8 @@ CapabilitySet TargetRequest::getTargetCaps()
                 {
                     for (auto atom : profileCapAtomSet)
                     {
-                        if (isTargetVersionAtom(asAtom(atom)))
+                        // SPIR-V code-gen path: pull only SPIR-V version atoms from the profile.
+                        if (isSpirvVersionAtom(asAtom(atom)))
                         {
                             atoms.add((CapabilityName)atom);
                             hasTargetVersionAtom = true;
