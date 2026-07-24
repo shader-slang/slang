@@ -16,7 +16,7 @@ void main()
     ray.Origin = float3(0, 0, 0);
     ray.TMax = 1000;
     ray.TMin = 0;
-    let rs = rayQuery.TraceRayInline(accelStruct, 0, 0, ray);
+    rayQuery.TraceRayInline(accelStruct, 0, 0, ray);
     output[0] = rayQuery.CandidateGeometryIndex();
 }
 
