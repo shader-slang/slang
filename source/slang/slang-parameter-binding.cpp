@@ -2943,6 +2943,31 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     return processParamOfType(_Move(processParamOfType), type);
 }
 
+/// Returns true if `type` is a fixed-size array whose (possibly nested) leaf element is a resource.
+///
+/// This mirrors the IR-side predicate `isFixedSizeResourceArrayType`
+/// (slang-ir-transform-params-to-constref.cpp): the decision to pass such a CUDA entry-point
+/// uniform by reference must agree at this stage (reflection / parameter binding) and at emit, and
+/// neither stage can see the other's representation, so both key off the same type shape. See that
+/// file for the full rationale (the by-value `.param` serial-`ld.param` slowdown this avoids).
+static bool isFixedSizeResourceArrayTypeAST(Type* type)
+{
+    auto arrayType = as<ArrayExpressionType>(type);
+    if (!arrayType || arrayType->isUnsized())
+        return false;
+    // Unwrap nested fixed-size arrays to the leaf element (mirrors `isResourceType`'s array
+    // unwrap).
+    Type* elementType = arrayType->getElementType();
+    while (auto innerArray = as<ArrayExpressionType>(elementType))
+    {
+        if (innerArray->isUnsized())
+            return false;
+        elementType = innerArray->getElementType();
+    }
+    return as<ResourceType>(elementType) || as<HLSLStructuredBufferTypeBase>(elementType) ||
+           as<UntypedBufferResourceType>(elementType) || as<SamplerStateType>(elementType);
+}
+
 /// Compute the type layout for a parameter declared directly on an entry point.
 static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
     ParameterBindingContext* context,
@@ -2972,6 +2997,19 @@ static RefPtr<TypeLayout> computeEntryPointParameterTypeLayout(
             layoutRules = context->getRulesFamily()->getConstantBufferRules(
                 context->getTargetRequest()->getOptionSet(),
                 paramType);
+        }
+        // On CUDA a fixed-size resource-array uniform is passed by reference (a pointer) rather than
+        // by value in the un-indexable `.param` kernel-argument space; the matching emit-stage
+        // transform is in slang-ir-transform-params-to-constref.cpp. Lay it out as a
+        // `ParameterBlock<array>` sub-object so it reflects as a parameter group the slang-rhi host
+        // already recurses into — allocating a device buffer, writing the descriptors, and packing
+        // an 8-byte device pointer at the uniform offset, which is exactly the by-reference binding.
+        // (A bare pointer layout instead collapses the array's resource binding ranges, leaving the
+        // host with no descriptors to bind.)
+        if (isCUDATarget(context->getTargetRequest()) && isFixedSizeResourceArrayTypeAST(paramType))
+        {
+            auto paramBlockType = context->getASTBuilder()->getParameterBlockType(paramType);
+            return createTypeLayoutWith(context->layoutContext, layoutRules, paramBlockType);
         }
         return createTypeLayoutWith(context->layoutContext, layoutRules, paramType);
     }
