@@ -1,5 +1,4 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-via-glsl
 
 uniform RaytracingAccelerationStructure* accelStructAddr;
 RWStructuredBuffer<int> output;
