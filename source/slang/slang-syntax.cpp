@@ -1119,7 +1119,10 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         paramTypes.add(paramType);
     };
     auto parent = declRef.getParent();
-    if (as<SubscriptDecl>(parent) || as<PropertyDecl>(parent))
+    // A subscript accessor's effective signature includes the subscript's index
+    // parameters, so they are prepended here. Only SubscriptDecl carries such a
+    // parameter list; a property accessor's parent (PropertyDecl) has none.
+    if (as<SubscriptDecl>(parent))
     {
         for (auto paramDeclRef : getParameters(astBuilder, parent.as<CallableDecl>()))
         {
