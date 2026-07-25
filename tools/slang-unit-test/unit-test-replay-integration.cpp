@@ -307,6 +307,18 @@ SLANG_UNIT_TEST(replayContextLoadLatestReplay)
 
     SLANG_CHECK(readValue1 == 123);
     SLANG_CHECK(readValue2 == 3.14f);
+
+    // A failed transition back to recording must not retain the loaded playback path. Put a file
+    // where the new base directory needs a parent directory so mirror setup fails
+    // deterministically.
+    String playbackPath(ctx().getCurrentReplayPath());
+    String blockingFile = Path::combine(replayDirectory.getPath(), "recording-blocker");
+    SLANG_CHECK(SLANG_SUCCEEDED(File::writeAllBytes(blockingFile, "x", 1)));
+    String unavailableReplayDirectory = Path::combine(blockingFile, "child");
+    ctx().setReplayDirectory(unavailableReplayDirectory.getBuffer());
+    ctx().setMode(Mode::Record);
+    SLANG_CHECK(ctx().getCurrentReplayPath() == nullptr);
+    SLANG_CHECK(playbackPath.getLength() > 0);
 }
 
 SLANG_UNIT_TEST(replayContextFindLatestFolder)

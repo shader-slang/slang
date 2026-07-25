@@ -4,10 +4,10 @@
 #include "../core/slang-crypto.h"
 #include "../core/slang-io.h"
 #include "../core/slang-platform.h"
-#include "../core/slang-process.h"
 #include "../slang/slang-ast-type.h"
 #include "../slang/slang-compiler-api.h"
 #include "../slang/slang-syntax.h"
+#include "core/slang-process.h"
 #include "proxy/proxy-component-type.h"
 
 #include <atomic>
@@ -352,6 +352,8 @@ String ReplayContext::generateTimestampFolderName()
     // name sends both processes to the same stream.bin. Including the process and recording IDs
     // gives each recording its own directory while preserving the timestamp as the primary sort
     // key used by findLatestReplayFolder().
+    // The maximum formatted name is 55 characters plus the null terminator. The process ID is
+    // only a disambiguator; exclusive directory creation below remains the uniqueness guarantee.
     char buffer[96];
     snprintf(
         buffer,
@@ -379,8 +381,14 @@ void ReplayContext::setupRecordingMirror()
             envPath)) &&
         envPath.getLength() > 0)
     {
-        // Use the explicit path directly
+        // An explicit path may include parent directories that do not exist yet.
         m_currentReplayPath = envPath.toString();
+        if (!Path::createDirectoryRecursive(m_currentReplayPath))
+        {
+            // If we can't create the directory, just record without mirroring
+            m_currentReplayPath = String();
+            return;
+        }
     }
     else
     {
@@ -394,9 +402,11 @@ void ReplayContext::setupRecordingMirror()
             return;
         }
 
-        // Claim a new recording directory atomically. The process and recording IDs make a
-        // collision unlikely, while exclusive creation guarantees that an existing directory is
-        // never reused even after process-ID reuse or external directory creation.
+        // Claim a new recording directory atomically. The process and recording IDs should make
+        // the first candidate unique. Retrying handles preexisting directories left after
+        // process-ID reuse or created externally, while the bound avoids looping indefinitely
+        // when the filesystem refuses every create attempt. Exhaustion intentionally follows the
+        // existing mirror-error policy and records only in memory.
         constexpr int kMaxCreateAttempts = 100;
         for (int attempt = 0; attempt < kMaxCreateAttempts; ++attempt)
         {
@@ -410,14 +420,6 @@ void ReplayContext::setupRecordingMirror()
 
         if (m_currentReplayPath.getLength() == 0)
             return;
-    }
-
-    // An explicit SLANG_RECORD_PATH may include parent directories that do not exist yet.
-    if (!Path::createDirectoryRecursive(m_currentReplayPath))
-    {
-        // If we can't create the directory, just record without mirroring
-        m_currentReplayPath = String();
-        return;
     }
 
     // Set up mirror file for main stream

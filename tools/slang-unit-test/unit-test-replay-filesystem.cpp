@@ -21,10 +21,13 @@ SLANG_UNIT_TEST(replayFileSystemProxyLoadFile)
     ComPtr<MutableFileSystemProxy> fsProxy(new MutableFileSystemProxy(osFileSystem));
 
     // Define test file content and write it out (using non-recorded FS)
-    const char* testFileName = ".slang-test-temp-file.txt";
+    StringBuilder testFileNameBuilder;
+    testFileNameBuilder << ".slang-test-temp-file-" << Process::getId() << ".txt";
+    String testFileName = testFileNameBuilder.produceString();
     const char* testContent = "Hello from file system proxy test!\nLine 2\nLine 3";
     size_t testContentSize = strlen(testContent);
-    SlangResult writeResult = osFileSystem->saveFile(testFileName, testContent, testContentSize);
+    SlangResult writeResult =
+        osFileSystem->saveFile(testFileName.getBuffer(), testContent, testContentSize);
     SLANG_CHECK(SLANG_SUCCEEDED(writeResult));
 
     // Enable recording - this creates the replay directory
@@ -35,14 +38,14 @@ SLANG_UNIT_TEST(replayFileSystemProxyLoadFile)
 
     // Load the file through the proxy - this should capture its content
     ComPtr<ISlangBlob> blob;
-    SlangResult result = fsProxy->loadFile(testFileName, blob.writeRef());
+    SlangResult result = fsProxy->loadFile(testFileName.getBuffer(), blob.writeRef());
     SLANG_CHECK(SLANG_SUCCEEDED(result));
     SLANG_CHECK(blob != nullptr);
     SLANG_CHECK(blob->getBufferSize() == testContentSize);
     SLANG_CHECK(memcmp(blob->getBufferPointer(), testContent, testContentSize) == 0);
 
     // Delete the file (using non-recorded FS)
-    SlangResult removeResult = osFileSystem->remove(testFileName);
+    SlangResult removeResult = osFileSystem->remove(testFileName.getBuffer());
     SLANG_CHECK(SLANG_SUCCEEDED(removeResult));
 
     // Switch to playback - the file system proxy should serve from captured files
@@ -52,7 +55,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyLoadFile)
 
     // Should be able to replay, even though the file is gone.
     ComPtr<ISlangBlob> replayedBlob;
-    SlangResult replayResult = fsProxy->loadFile(testFileName, replayedBlob.writeRef());
+    SlangResult replayResult = fsProxy->loadFile(testFileName.getBuffer(), replayedBlob.writeRef());
     SLANG_CHECK(SLANG_SUCCEEDED(replayResult));
     SLANG_CHECK(replayedBlob != nullptr);
     SLANG_CHECK(replayedBlob->getBufferSize() == testContentSize);
