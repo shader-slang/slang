@@ -35,6 +35,7 @@
 #include "slang-ir-cleanup-void.h"
 #include "slang-ir-collect-global-uniforms.h"
 #include "slang-ir-com-interface.h"
+#include "slang-ir-constexpr.h"
 #include "slang-ir-coverage-instrument.h"
 #include "slang-ir-cuda-immutable-load.h"
 #include "slang-ir-dce.h"
@@ -108,6 +109,7 @@
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-specialize-arrays.h"
 #include "slang-ir-specialize-buffer-load-arg.h"
+#include "slang-ir-specialize-function-call.h"
 #include "slang-ir-specialize-matrix-layout.h"
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-specialize-stage-switch.h"
@@ -807,6 +809,27 @@ static void addDenormalModeDecorations(IRModule* irModule, CodeGenContext* codeG
     }
 }
 
+static void forceInlineConstExprParamFuncs(IRModule* irModule)
+{
+    IRBuilder builder(irModule);
+
+    for (auto globalInst : irModule->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func || func->findDecoration<IRForceInlineDecoration>())
+            continue;
+
+        for (auto param : func->getParams())
+        {
+            if (isConstExprRateQualifiedType(param->getFullType()))
+            {
+                builder.addForceInlineDecoration(func);
+                break;
+            }
+        }
+    }
+}
+
 // Helper function to convert a 20 byte SHA1 to a hexadecimal string,
 // needed for the build identifier instruction.
 String getBuildIdentifierString(ComponentType* component)
@@ -1407,6 +1430,23 @@ Result linkAndOptimizeIR(
     }
 
     SLANG_PASS(finalizeAutoDiffPass, targetProgram);
+
+    // Re-run force inlining and constexpr propagation for newly generated autodiff
+    // wrapper functions. Functions with constexpr parameters are already marked
+    // [ForceInline] during lowering; autodiff can introduce new calls to those
+    // functions after the earlier inlining/constexpr propagation has run. It can
+    // also synthesize new constexpr-param helpers, so mark those helpers the same
+    // way, inline them, and remove dead originals before checking static_assert.
+    if (requiredLoweringPassSet.autodiff)
+    {
+        forceInlineConstExprParamFuncs(irModule);
+        SLANG_PASS(performForceInlining);
+        SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
+        SLANG_PASS(propagateConstExpr, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
+    }
+
     if (requiredLoweringPassSet.matrixSwizzleStore)
         SLANG_PASS(lowerMatrixSwizzleStores);
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
