@@ -3567,21 +3567,21 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         case OptionKind::DenormalModeFp16:
             {
-                FloatingPointDenormalMode value;
+                FloatingPointDenormalMode value = FloatingPointDenormalMode::Any;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp16, value);
                 break;
             }
         case OptionKind::DenormalModeFp32:
             {
-                FloatingPointDenormalMode value;
+                FloatingPointDenormalMode value = FloatingPointDenormalMode::Any;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp32, value);
                 break;
             }
         case OptionKind::DenormalModeFp64:
             {
-                FloatingPointDenormalMode value;
+                FloatingPointDenormalMode value = FloatingPointDenormalMode::Any;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp64, value);
                 break;
