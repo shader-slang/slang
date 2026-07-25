@@ -89,6 +89,19 @@ set_source_files_properties(
         COMPILE_OPTIONS "${RICH_DIAG_SIZE_OPT_FLAGS}"
 )
 
+# These FIDDLE-heavy TUs include slang-ir-insts.h, which re-expands the
+# transient __LINE__-keyed FIDDLE macros via slang-ir-insts.h.fiddle. A stale
+# cmake_pch.hxx.gch can snapshot the wrong FIDDLE macro state and mis-expand
+# those macros at namespace scope; it is not rebuilt because unchanged .fiddle
+# keep their old mtimes. Compiling these TUs without the PCH sets up their
+# FIDDLE macros fresh per-TU. This allowlist may need to grow if more affected
+# TUs are identified. See shader-slang/slang#12227.
+set_source_files_properties(
+    slang-ir-autodiff-rev.cpp
+    slang-ir-autodiff-unzip.cpp
+    PROPERTIES SKIP_PRECOMPILE_HEADERS ON
+)
+
 #
 # generate capability files
 #
