@@ -3,9 +3,6 @@
 
 #include "unit-test-replay-common.h"
 
-#include <chrono>
-#include <thread>
-
 // =============================================================================
 // Integration Test: Record actual API calls and verify exact bytes
 // =============================================================================
@@ -250,8 +247,7 @@ SLANG_UNIT_TEST(replayContextMirrorFileCreation)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    // Use a unique test directory
-    ctx().setReplayDirectory(".slang-replays-test");
+    ScopedReplayTestDirectory replayDirectory("mirror-file-creation");
 
     // Enable recording - this should create the mirror file
     ctx().setMode(Mode::Record);
@@ -261,7 +257,7 @@ SLANG_UNIT_TEST(replayContextMirrorFileCreation)
     SLANG_CHECK(replayPath != nullptr);
 
     // The path should contain our test directory
-    SLANG_CHECK(strstr(replayPath, ".slang-replays-test") != nullptr);
+    SLANG_CHECK(strstr(replayPath, replayDirectory.getPath().getBuffer()) != nullptr);
 
     // Record some data
     int32_t value = 42;
@@ -272,9 +268,6 @@ SLANG_UNIT_TEST(replayContextMirrorFileCreation)
 
     // Current replay path should be nullptr now
     SLANG_CHECK(ctx().getCurrentReplayPath() == nullptr);
-
-    // Restore default directory
-    ctx().setReplayDirectory(".slang-replays");
 }
 
 SLANG_UNIT_TEST(replayContextLoadLatestReplay)
@@ -282,8 +275,7 @@ SLANG_UNIT_TEST(replayContextLoadLatestReplay)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    // Use a unique test directory
-    ctx().setReplayDirectory(".slang-replays-test");
+    ScopedReplayTestDirectory replayDirectory("load-latest-replay");
 
     // Create a recording
     ctx().setMode(Mode::Record);
@@ -316,9 +308,17 @@ SLANG_UNIT_TEST(replayContextLoadLatestReplay)
     SLANG_CHECK(readValue1 == 123);
     SLANG_CHECK(readValue2 == 3.14f);
 
-    // Clean up - reset and restore default directory
-    ctx().reset();
-    ctx().setReplayDirectory(".slang-replays");
+    // A failed transition back to recording must not retain the loaded playback path. Put a file
+    // where the new base directory needs a parent directory so mirror setup fails
+    // deterministically.
+    String playbackPath(ctx().getCurrentReplayPath());
+    String blockingFile = Path::combine(replayDirectory.getPath(), "recording-blocker");
+    SLANG_CHECK(SLANG_SUCCEEDED(File::writeAllBytes(blockingFile, "x", 1)));
+    String unavailableReplayDirectory = Path::combine(blockingFile, "child");
+    ctx().setReplayDirectory(unavailableReplayDirectory.getBuffer());
+    ctx().setMode(Mode::Record);
+    SLANG_CHECK(ctx().getCurrentReplayPath() == nullptr);
+    SLANG_CHECK(playbackPath.getLength() > 0);
 }
 
 SLANG_UNIT_TEST(replayContextFindLatestFolder)
@@ -326,10 +326,9 @@ SLANG_UNIT_TEST(replayContextFindLatestFolder)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    // Test that the timestamp sorting works correctly
-    // We'll create two recordings with a small delay between them
-
-    ctx().setReplayDirectory(".slang-replays-test");
+    // Test that recording names are unique and sort chronologically even when the clock does not
+    // advance between recordings.
+    ScopedReplayTestDirectory replayDirectory("find-latest-folder");
 
     // First recording
     ctx().setMode(Mode::Record);
@@ -337,9 +336,6 @@ SLANG_UNIT_TEST(replayContextFindLatestFolder)
     ctx().record(RecordFlag::None, val1);
     String firstPath(ctx().getCurrentReplayPath());
     ctx().disable();
-
-    // Small delay to ensure different timestamp
-    std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
     // Second recording
     ctx().setMode(Mode::Record);
@@ -352,15 +348,11 @@ SLANG_UNIT_TEST(replayContextFindLatestFolder)
     SLANG_CHECK(firstPath != secondPath);
 
     // Find latest should return the second one's folder name
-    String latest = ReplayContext::findLatestReplayFolder(".slang-replays-test");
+    String latest = ReplayContext::findLatestReplayFolder(replayDirectory.getPath().getBuffer());
     SLANG_CHECK(latest.getLength() > 0);
 
     // The full second path should end with the latest folder name
     SLANG_CHECK(secondPath.endsWith(latest));
-
-    // Clean up
-    ctx().reset();
-    ctx().setReplayDirectory(".slang-replays");
 }
 
 SLANG_UNIT_TEST(replayContextRejectsInvalidBlobHash)
@@ -368,7 +360,8 @@ SLANG_UNIT_TEST(replayContextRejectsInvalidBlobHash)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    const char* replayDirectory = ".slang-replays-security-test";
+    ScopedReplayTestDirectory scopedReplayDirectory("reject-invalid-blob-hash");
+    const char* replayDirectory = scopedReplayDirectory.getPath().getBuffer();
     const char* sensitiveFileName = "sensitive-blob.bin";
     const char* sensitiveContent = "content outside the replay blob store";
 
@@ -384,8 +377,6 @@ SLANG_UNIT_TEST(replayContextRejectsInvalidBlobHash)
         {"0123456789aBcDeFfedcba9876543210AbCdEf01", "mixed-case hash content"},
     };
 
-    Path::removeNonEmpty(String(replayDirectory));
-    ctx().setReplayDirectory(replayDirectory);
     ctx().setMode(Mode::Record);
 
     const char* replayPath = ctx().getCurrentReplayPath();
@@ -491,10 +482,6 @@ SLANG_UNIT_TEST(replayContextRejectsInvalidBlobHash)
     checkNextReplayBlobRejected(); // Empty hash.
     checkNextReplayBlobRejected(); // Windows-style traversal.
     SLANG_CHECK(ctx().getStream().atEnd());
-
-    ctx().reset();
-    Path::removeNonEmpty(String(replayDirectory));
-    ctx().setReplayDirectory(".slang-replays");
 }
 
 // =============================================================================
