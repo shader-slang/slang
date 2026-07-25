@@ -1,9 +1,9 @@
 // main.cpp
 
-#include "../core/slang-io.h"
-#include "../core/slang-test-tool-util.h"
-#include "../slang/slang-internal.h"
+#include "core/slang-io.h"
+#include "core/slang-test-tool-util.h"
 #include "slang.h"
+#include "slang/slang-internal.h"
 
 using namespace Slang;
 

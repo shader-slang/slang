@@ -2,7 +2,7 @@
 #ifndef SLANG_EMIT_CPP_H
 #define SLANG_EMIT_CPP_H
 
-#include "../core/slang-string-slice-pool.h"
+#include "core/slang-string-slice-pool.h"
 #include "slang-emit-c-like.h"
 #include "slang-ir-clone.h"
 

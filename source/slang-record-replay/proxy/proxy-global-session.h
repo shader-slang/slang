@@ -1,7 +1,7 @@
 #ifndef SLANG_PROXY_GLOBAL_SESSION_H
 #define SLANG_PROXY_GLOBAL_SESSION_H
 
-#include "../../core/slang-file-system.h"
+#include "core/slang-file-system.h"
 #include "proxy-base.h"
 #include "proxy-macros.h"
 #include "proxy-mutable-file-system.h"

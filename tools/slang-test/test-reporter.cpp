@@ -1,8 +1,8 @@
 // test-reporter.cpp
 #include "test-reporter.h"
 
-#include "../../source/core/slang-process-util.h"
-#include "../../source/core/slang-string-util.h"
+#include "core/slang-process-util.h"
+#include "core/slang-string-util.h"
 #include "options.h"
 
 #include <mutex>

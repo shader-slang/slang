@@ -1,9 +1,9 @@
 // slang-unix-process.cpp
-#include "../slang-common.h"
-#include "../slang-memory-arena.h"
-#include "../slang-process.h"
-#include "../slang-string-escape-util.h"
-#include "../slang-string-util.h"
+#include "core/slang-common.h"
+#include "core/slang-memory-arena.h"
+#include "core/slang-process.h"
+#include "core/slang-string-escape-util.h"
+#include "core/slang-string-util.h"
 
 #include <stdio.h>
 #include <stdlib.h>
