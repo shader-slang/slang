@@ -7,6 +7,24 @@
 #include <memory>
 #include <stddef.h>
 
+// Decorate the entry points that make up the `slang-glslang` ABI.
+//
+// `slang-glslang` can be built in two ways. By default it is a runtime-loaded module, and
+// its entry points have to be exported from the shared library so that
+// `ISlangSharedLibrary::findFuncByName` can find them by name at runtime. When
+// `SLANG_EMBED_SLANG_GLSLANG` is enabled it is instead built as a static library that is
+// linked directly into `slang-compiler`; in that build there is no shared library to export
+// from, the entry points are called through the ordinary prototypes declared at the bottom
+// of this header, and any export decoration would be wrong (on MSVC, `__declspec(dllexport)`
+// on a declaration in a translation unit that does not define the function is an error).
+#ifdef SLANG_GLSLANG_STATIC
+#define SLANG_GLSLANG_EXPORT
+#elif defined(_MSC_VER)
+#define SLANG_GLSLANG_EXPORT __declspec(dllexport)
+#else
+#define SLANG_GLSLANG_EXPORT __attribute__((__visibility__("default")))
+#endif
+
 typedef void (*glslang_OutputFunc)(void const* data, size_t size, void* userData);
 
 enum
@@ -173,4 +191,32 @@ typedef bool (*glslang_DisassembleSPIRVWithResultFunc)(
     char** outString);
 typedef void (*glslang_FreeDisassemblyFunc)(char* disassembly);
 typedef int (*glslang_LinkSPIRVFunc)(glslang_LinkRequest* request);
+
+#ifdef SLANG_GLSLANG_STATIC
+// Declare the `slang-glslang` entry points for the static build.
+//
+// In the default (runtime-loaded module) build these symbols are only ever reached through
+// `ISlangSharedLibrary::findFuncByName`, so no consumer needs a prototype. When
+// `slang-glslang` is linked statically into `slang-compiler`, `slang-glslang-compiler.cpp`
+// binds its function-pointer table to these symbols directly, so it needs declarations whose
+// signatures match the definitions in `slang-glslang.cpp` exactly. Declaring them here rather
+// than in the consumer keeps a single source of truth for the ABI: the typedefs above and
+// these prototypes are checked against the definitions by the compiler when `slang-glslang.cpp`
+// includes this header.
+extern "C"
+{
+    SLANG_GLSLANG_EXPORT int glslang_compile(glslang_CompileRequest_1_0* request);
+    SLANG_GLSLANG_EXPORT int glslang_compile_1_1(glslang_CompileRequest_1_1* request);
+    SLANG_GLSLANG_EXPORT int glslang_compile_1_2(glslang_CompileRequest_1_2* request);
+    SLANG_GLSLANG_EXPORT bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize);
+    SLANG_GLSLANG_EXPORT bool glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize);
+    SLANG_GLSLANG_EXPORT bool glslang_disassembleSPIRVWithResult(
+        const uint32_t* contents,
+        int contentsSize,
+        char** outString);
+    SLANG_GLSLANG_EXPORT void glslang_freeDisassembly(char* disassembly);
+    SLANG_GLSLANG_EXPORT int glslang_linkSPIRV(glslang_LinkRequest* request);
+}
+#endif
+
 #endif

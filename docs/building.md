@@ -260,6 +260,7 @@ works for any given binary.
 | `SLANG_ENABLE_SLANGI`                 | `TRUE`                        | Enable Slang interpreter target                                                                                                          |
 | `SLANG_ENABLE_SLANGRT`                | `TRUE`                        | Enable runtime target                                                                                                                    |
 | `SLANG_ENABLE_SLANG_GLSLANG`          | `TRUE`                        | Enable glslang dependency and slang-glslang wrapper target                                                                               |
+| `SLANG_EMBED_SLANG_GLSLANG`           | `FALSE`                       | Link the slang-glslang wrapper into slang-compiler instead of runtime loading (see "Static linking")                                     |
 | `SLANG_ENABLE_SLANG_PROXY`            | `TRUE`                        | Build the legacy `slang.dll` proxy and `libslang` symlink backward-compatibility outputs for `slang-compiler`                           |
 | `SLANG_ENABLE_TESTS`                  | `TRUE`                        | Enable test targets, requires `SLANG_ENABLE_SLANG_RHI`; some tests require other CMake options                                           |
 | `SLANG_ENABLE_EXAMPLES`               | `TRUE`                        | Enable example targets, requires SLANG_ENABLE_SLANG_RHI                                                                                  |
@@ -524,6 +525,62 @@ ${SLANG_DIR}/build/Release/lib/libcore.a
 ${SLANG_DIR}/build/external/miniz/libminiz.a
 ${SLANG_DIR}/build/external/lz4/build/cmake/liblz4.a
 ```
+
+### Removing the runtime dependency on slang-glslang
+
+`SLANG_LIB_TYPE=STATIC` gives you a static `libslang-compiler.a`, but it does not by
+itself give you a self-contained compiler. Slang emits SPIR-V natively, so a plain
+`-O0 -target spirv` compile needs nothing else. Four things do reach for the
+`slang-glslang` module, which is normally loaded from disk at runtime:
+
+- running the SPIRV-Tools optimizer, for any optimization level above `-O0`,
+- linking several SPIR-V modules together, when precompiled/embedded downstream
+  modules are used,
+- SPIR-V validation (`SLANG_RUN_SPIRV_VALIDATION=1`),
+- emitting separate SPIR-V debug info, and disassembly for `-target spirv-asm`.
+
+Set `SLANG_EMBED_SLANG_GLSLANG=ON` to compile that wrapper (and with it glslang and
+SPIRV-Tools) into a `slang-glslang-static` archive that is linked into
+`slang-compiler`. The compiler then resolves those entry points directly instead of
+calling into the OS loader, so no `slang-glslang` shared library needs to be shipped or
+found. Combine it with `SLANG_ENABLE_SLANG_GLSLANG=OFF` so the now-redundant module
+target is not built as well.
+
+A fully static SPIR-V/WGSL compiler configures roughly like this:
+
+```bash
+cmake --preset default \
+  -DSLANG_LIB_TYPE=STATIC \
+  -DSLANG_EMBED_SLANG_GLSLANG=ON \
+  -DSLANG_ENABLE_SLANG_GLSLANG=OFF \
+  -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+  -DSLANG_ENABLE_DXIL=OFF \
+  -DSLANG_ENABLE_GFX=OFF \
+  -DSLANG_ENABLE_SLANG_RHI=OFF \
+  -DSLANG_ENABLE_TESTS=OFF \
+  -DSLANG_ENABLE_EXAMPLES=OFF \
+  -DSLANG_ENABLE_REPLAYER=OFF \
+  -DSLANG_EXCLUDE_TINT=ON
+```
+
+On Windows also pass `-DSLANG_EXCLUDE_DAWN=ON` (it defaults to `OFF` there and fetches
+`webgpu_dawn.dll`) and `-DSLANG_ENABLE_SPIRV_TOOLS_MIMALLOC=OFF` (it defaults to `ON`
+there and links a replacement allocator into the archive). Keep
+`CMAKE_MSVC_RUNTIME_LIBRARY` consistent across the whole build, including the glslang
+and SPIRV-Tools subprojects.
+
+Caveats:
+
+- WGSL is emitted natively, but the `wgsl-spirv` target still goes through the
+  `slang-tint` shared library, which is only distributed as a prebuilt binary and
+  cannot be embedded.
+- The GLSL compatibility module (`import glsl;`) is still loaded from the separate
+  `slang-glsl-module` shared library.
+- The `slang-glslang` module is built with `-Wl,--exclude-libs,ALL`, which keeps the
+  glslang and SPIRV-Tools symbols private. The static archive cannot do that at link
+  time, so a `SHARED` build that also sets `SLANG_EMBED_SLANG_GLSLANG=ON` may re-export
+  some of them. If your application links its own copy of SPIRV-Tools, expect
+  duplicate-symbol conflicts.
 
 ## Deprecation of libslang and slang.dll filenames
 

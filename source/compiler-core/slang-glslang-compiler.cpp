@@ -468,6 +468,84 @@ SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersio
     return SLANG_OK;
 }
 
+#ifdef SLANG_GLSLANG_STATIC
+
+/* An `ISlangSharedLibrary` over the `slang-glslang` entry points that are linked directly into
+this binary, rather than over a library loaded from disk.
+
+When Slang is built with `SLANG_EMBED_SLANG_GLSLANG`, the wrapper's objects are already part of
+whatever executable or library is running, so there is nothing for the OS loader to open. Every
+other layer can stay exactly as it is, though: `GlslangDownstreamCompiler::init` never names a
+file, it only asks an `ISlangSharedLibrary` for each entry point by name. So the static build
+hands it a library implementation whose lookup is a fixed table of statically linked symbols.
+`ISlangSharedLibrary` is documented to allow this -- "an implementation does not have to
+implement the library as a shared library" (`include/slang.h`).
+
+Note that `GlslangDownstreamCompiler::getVersionString` reports
+`SharedLibraryUtils::getSharedLibraryTimestamp` of one of these function pointers. For the
+static build that address lies in the host module, so the version string becomes the host
+module's timestamp -- which is the honest answer, since the wrapper is that module. */
+class StaticGlslangSharedLibrary : public ComBaseObject, public ISlangSharedLibrary
+{
+public:
+    // ISlangUnknown
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    // ICastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) SLANG_OVERRIDE
+    {
+        return getInterface(guid);
+    }
+
+    // ISlangSharedLibrary
+    virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name)
+        SLANG_OVERRIDE
+    {
+        struct Entry
+        {
+            const char* name;
+            void* address;
+        };
+
+        // Every entry point `GlslangDownstreamCompiler::init` looks for. Keeping this list
+        // complete is what makes the static path behave identically to the loaded module; a
+        // missing name here silently degrades into a null function pointer, which `init` and
+        // the `validate`/`disassemble` methods then report as SLANG_FAIL.
+        static const Entry kEntries[] = {
+            {"glslang_compile", (void*)&glslang_compile},
+            {"glslang_compile_1_1", (void*)&glslang_compile_1_1},
+            {"glslang_compile_1_2", (void*)&glslang_compile_1_2},
+            {"glslang_validateSPIRV", (void*)&glslang_validateSPIRV},
+            {"glslang_disassembleSPIRV", (void*)&glslang_disassembleSPIRV},
+            {"glslang_disassembleSPIRVWithResult", (void*)&glslang_disassembleSPIRVWithResult},
+            {"glslang_freeDisassembly", (void*)&glslang_freeDisassembly},
+            {"glslang_linkSPIRV", (void*)&glslang_linkSPIRV},
+        };
+
+        for (const auto& entry : kEntries)
+        {
+            if (::strcmp(entry.name, name) == 0)
+            {
+                return entry.address;
+            }
+        }
+        return nullptr;
+    }
+
+protected:
+    void* getInterface(const Guid& guid)
+    {
+        if (guid == ISlangUnknown::getTypeGuid() || guid == ICastable::getTypeGuid() ||
+            guid == ISlangSharedLibrary::getTypeGuid())
+        {
+            return static_cast<ISlangSharedLibrary*>(this);
+        }
+        return nullptr;
+    }
+};
+
+#endif // SLANG_GLSLANG_STATIC
+
 static SlangResult locateGlslangSpirvDownstreamCompiler(
     const String& path,
     ISlangSharedLibraryLoader* loader,
@@ -475,6 +553,15 @@ static SlangResult locateGlslangSpirvDownstreamCompiler(
     SlangPassThrough compilerType)
 {
     ComPtr<ISlangSharedLibrary> library;
+
+#ifdef SLANG_GLSLANG_STATIC
+
+    // The wrapper is linked into this binary, so there is nothing to search for or load.
+    SLANG_UNUSED(path);
+    SLANG_UNUSED(loader);
+    library = ComPtr<ISlangSharedLibrary>(new StaticGlslangSharedLibrary());
+
+#else
 
 #if SLANG_UNIX_FAMILY
     // On unix systems we need to ensure pthread is loaded first.
@@ -507,6 +594,8 @@ static SlangResult locateGlslangSpirvDownstreamCompiler(
         nullptr,
         libraryName.getBuffer(),
         library));
+
+#endif // SLANG_GLSLANG_STATIC
 
     SLANG_ASSERT(library);
     if (!library)
