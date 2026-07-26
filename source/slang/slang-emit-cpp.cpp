@@ -1,9 +1,9 @@
 // slang-emit-cpp.cpp
 #include "slang-emit-cpp.h"
 
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../core/slang-token-reader.h"
-#include "../core/slang-writer.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "core/slang-token-reader.h"
+#include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-util.h"

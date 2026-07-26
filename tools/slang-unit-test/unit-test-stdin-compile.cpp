@@ -1,9 +1,9 @@
 // unit-test-stdin-compile.cpp
 
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process-util.h"
-#include "../../source/slang/slang-internal.h"
+#include "core/slang-io.h"
+#include "core/slang-process-util.h"
 #include "slang-com-ptr.h"
+#include "slang/slang-internal.h"
 #include "unit-test/slang-unit-test.h"
 
 #ifdef _WIN32

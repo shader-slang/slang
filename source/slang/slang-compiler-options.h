@@ -1,8 +1,8 @@
 #ifndef SLANG_COMPILER_OPTIONS_H
 #define SLANG_COMPILER_OPTIONS_H
 
-#include "../core/slang-basic.h"
-#include "../core/slang-crypto.h"
+#include "core/slang-basic.h"
+#include "core/slang-crypto.h"
 #include "slang-generated-capability-defs.h"
 #include "slang-profile.h"
 #include "slang.h"

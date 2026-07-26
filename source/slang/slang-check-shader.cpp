@@ -6,8 +6,8 @@
 // enumerating specialization parameters, and validating
 // attempts to specialize shader code.
 
-#include "../core/slang-char-util.h"
-#include "../core/slang-type-text-util.h"
+#include "core/slang-char-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-lookup.h"
 #include "slang-parameter-binding.h"
 #include "slang-profile.h"

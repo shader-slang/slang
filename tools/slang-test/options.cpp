@@ -1,8 +1,8 @@
 // options.cpp
 #include "options.h"
 
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-string-util.h"
+#include "core/slang-io.h"
+#include "core/slang-string-util.h"
 #include "slang-test-optimization-options.h"
 
 #include <stdio.h>

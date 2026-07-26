@@ -1,6 +1,6 @@
 // slang-ir-glsl-legalize.h
 #pragma once
-#include "../core/slang-list.h"
+#include "core/slang-list.h"
 #include "slang-compiler.h"
 
 namespace Slang

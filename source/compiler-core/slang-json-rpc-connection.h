@@ -1,8 +1,8 @@
 #ifndef SLANG_COMPILER_CORE_JSON_RPC_CONNECTION_H
 #define SLANG_COMPILER_CORE_JSON_RPC_CONNECTION_H
 
-#include "../../source/core/slang-http.h"
-#include "../../source/core/slang-process.h"
+#include "core/slang-http.h"
+#include "core/slang-process.h"
 #include "slang-diagnostic-sink.h"
 #include "slang-json-diagnostics.h"
 #include "slang-json-rpc.h"

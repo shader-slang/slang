@@ -1,9 +1,9 @@
 #ifndef SLANG_DIAGNOSTIC_SINK_H
 #define SLANG_DIAGNOSTIC_SINK_H
 
-#include "../core/slang-basic.h"
-#include "../core/slang-memory-arena.h"
-#include "../core/slang-writer.h"
+#include "core/slang-basic.h"
+#include "core/slang-memory-arena.h"
+#include "core/slang-writer.h"
 #include "slang-source-loc.h"
 #include "slang-token.h"
 #include "slang.h"

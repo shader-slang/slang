@@ -116,6 +116,19 @@ Functions that are only needed within that one source file can be marked `static
 
 ### Includes
 
+Cross-directory project-internal includes should name a header from an include root and should not
+use `../` to traverse directories. The `source/` directory is an include root, so cross-module
+includes should use paths such as:
+
+```c++
+#include "compiler-core/slang-source-loc.h"
+#include "core/slang-string.h"
+```
+
+Targets that consume headers under another project directory, such as `tools/` or `examples/`,
+should expose that directory through their CMake include directories and use paths relative to that
+root. Prefer a private include directory unless it is part of the target's public interface.
+
 In general, includes should be grouped as follows:
 
 * First, the correspodning feature/module header, if we are in a source file

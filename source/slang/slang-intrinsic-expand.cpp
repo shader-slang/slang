@@ -1,7 +1,7 @@
 // slang-intrinsic-expand.cpp
 #include "slang-intrinsic-expand.h"
 
-#include "../core/slang-char-util.h"
+#include "core/slang-char-util.h"
 #include "slang-emit-cuda.h"
 #include "slang-ir-util.h"
 

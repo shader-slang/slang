@@ -1,7 +1,7 @@
 // slang-emit-metal.cpp
 #include "slang-emit-metal.h"
 
-#include "../core/slang-writer.h"
+#include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-util.h"
