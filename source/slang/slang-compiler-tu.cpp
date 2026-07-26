@@ -1,7 +1,7 @@
 // slang-compiler-tu.cpp: Compiles translation units to target language
 // and emit precompiled blobs into IR
 
-#include "../core/slang-basic.h"
+#include "core/slang-basic.h"
 #include "slang-capability.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"

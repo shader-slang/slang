@@ -1,9 +1,9 @@
 // slang-capability.h
 #pragma once
 
-#include "../core/slang-dictionary.h"
-#include "../core/slang-list.h"
-#include "../core/slang-string.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-list.h"
+#include "core/slang-string.h"
 
 #include <optional>
 #include <stdint.h>

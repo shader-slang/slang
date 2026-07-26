@@ -2,12 +2,12 @@
 
 #include "options.h"
 
-#include "../../source/compiler-core/slang-command-line-args.h"
-#include "../../source/core/slang-list.h"
-#include "../../source/core/slang-render-api-util.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-type-text-util.h"
-#include "../../source/core/slang-writer.h"
+#include "compiler-core/slang-command-line-args.h"
+#include "core/slang-list.h"
+#include "core/slang-render-api-util.h"
+#include "core/slang-string-util.h"
+#include "core/slang-type-text-util.h"
+#include "core/slang-writer.h"
 #include "diagnostics.h"
 
 #include <stdio.h>

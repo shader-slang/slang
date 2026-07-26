@@ -1,7 +1,7 @@
 // slang-emit-source-writer.cpp
 #include "slang-emit-source-writer.h"
 
-#include "../core/slang-char-encode.h"
+#include "core/slang-char-encode.h"
 
 
 // Note: using C++ stdio just to get a locale-independent

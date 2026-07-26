@@ -1,7 +1,7 @@
 // slang-parameter-binding.cpp
 #include "slang-parameter-binding.h"
 
-#include "../compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
 #include "slang-compiler.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"

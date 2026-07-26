@@ -1,7 +1,7 @@
 // slang-ir-ssa-simplification.cpp
 #include "slang-ir-ssa-simplification.h"
 
-#include "../core/slang-performance-profiler.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-deduplicate-generic-children.h"
 #include "slang-ir-peephole.h"
