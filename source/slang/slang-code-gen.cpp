@@ -1,18 +1,18 @@
 // slang-code-gen.cpp
 #include "slang-code-gen.h"
 
-#include "../compiler-core/slang-slice-allocator.h"
-#include "../core/slang-type-convert-util.h"
-#include "../core/slang-type-text-util.h"
+#include "compiler-core/slang-slice-allocator.h"
+#include "core/slang-type-convert-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 #include "slang-emit-cuda.h"         // for `CUDAExtensionTracker`
 #include "slang-extension-tracker.h" // for `ShaderExtensionTracker`
 #include "slang-rich-diagnostics.h"
 
 // TODO: The "artifact" system is a scourge.
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../compiler-core/slang-artifact-impl.h"
-#include "../compiler-core/slang-artifact-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-impl.h"
+#include "compiler-core/slang-artifact-util.h"
 #include "slang-artifact-output-util.h"
 
 namespace Slang

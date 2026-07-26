@@ -4,7 +4,7 @@
 // This file defines the `Name` type, used to represent
 // the name of types, variables, etc. in the AST.
 
-#include "../core/slang-basic.h"
+#include "core/slang-basic.h"
 #include "slang-diagnostic-sink.h"
 #include "slang-source-loc.h"
 

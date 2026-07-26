@@ -1,7 +1,7 @@
 
 #include "slang-reflection-json.h"
 
-#include "../core/slang-blob.h"
+#include "core/slang-blob.h"
 #include "slang-ast-support-types.h"
 #include "slang.h"
 
