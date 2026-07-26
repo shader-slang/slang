@@ -2,11 +2,11 @@
 #ifndef SLANG_SOURCE_LOC_H_INCLUDED
 #define SLANG_SOURCE_LOC_H_INCLUDED
 
-#include "../core/slang-basic.h"
-#include "../core/slang-castable.h"
-#include "../core/slang-crypto.h"
-#include "../core/slang-memory-arena.h"
-#include "../core/slang-string-slice-pool.h"
+#include "core/slang-basic.h"
+#include "core/slang-castable.h"
+#include "core/slang-crypto.h"
+#include "core/slang-memory-arena.h"
+#include "core/slang-string-slice-pool.h"
 #include "slang-com-ptr.h"
 #include "slang-source-map.h"
 #include "slang.h"

@@ -1,6 +1,6 @@
 // slang-emit-spirv.cpp
 
-#include "../core/slang-memory-arena.h"
+#include "core/slang-memory-arena.h"
 #include "slang-compiler.h"
 #include "slang-emit-base.h"
 #include "slang-ir-call-graph.h"

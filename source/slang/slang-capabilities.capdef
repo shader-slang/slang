@@ -1995,6 +1995,10 @@ alias sm_6_10 = sm_6_10_version
              | sm_6_9
              ;
 
+/// Represents the latest HLSL shader model version.
+/// [Version]
+alias sm_latest = _sm_6_10;
+
 // Profiles
 /// Use `sm_4_0` instead
 /// [Other]
@@ -2198,6 +2202,10 @@ alias GLSL_460 = _GLSL_460
                // previous
                | GLSL_450
                ;
+
+/// Represents the latest GLSL version.
+/// [Version]
+alias GLSL_latest = _GLSL_460;
 
 /// User should not use this capability
 /// [Other]
