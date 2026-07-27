@@ -140,7 +140,11 @@ standard output = {
             "format": "r32ui",
             "type": {
                 "kind": "resource",
-                "baseShape": "textureBuffer"
+                "baseShape": "textureBuffer",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "uint32"
+                }
             }
         },
         {
@@ -149,7 +153,11 @@ standard output = {
             "format": "r32ui",
             "type": {
                 "kind": "resource",
-                "baseShape": "textureBuffer"
+                "baseShape": "textureBuffer",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "uint32"
+                }
             }
         },
         {
@@ -217,7 +225,11 @@ standard output = {
             "type": {
                 "kind": "resource",
                 "baseShape": "textureBuffer",
-                "access": "readWrite"
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "uint32"
+                }
             }
         },
         {
@@ -227,7 +239,11 @@ standard output = {
             "type": {
                 "kind": "resource",
                 "baseShape": "textureBuffer",
-                "access": "readWrite"
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "uint32"
+                }
             }
         },
         {
