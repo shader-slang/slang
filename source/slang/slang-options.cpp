@@ -961,6 +961,14 @@ void initCommandOptions(CommandOptions& options)
          "path derived from `-o <path>`. Requires `-separate-debug-info` and allows the main "
          "artifact to be written to stdout. Use `-` to write the separate debug information to "
          "stdout when the main artifact is written to a file."},
+        {OptionKind::DebugInfoIncludeSource,
+         "-debug-info-include-source",
+         nullptr,
+         "Embed the shader source text into the debug information, independently of the `-g` "
+         "debug level. At `-g1` the source is embedded via the core SPIR-V `OpSource` "
+         "instruction (no NonSemantic extension required); at `-g2`/`-g3` the source is already "
+         "embedded so this is a no-op. Requires debug information: using it with `-g0`, or without "
+         "any `-g` option, is an error. Only affects SPIR-V output."},
         {OptionKind::EmitCPUViaCPP,
          "-emit-cpu-via-cpp",
          nullptr,
@@ -2778,6 +2786,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::TraceBranchCoverage:
         case OptionKind::TraceCoverageBoolean:
         case OptionKind::SPIRVUnifiedDescriptorHeapStride:
+        case OptionKind::DebugInfoIncludeSource:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:
@@ -4542,6 +4551,17 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             m_sink->diagnose(Diagnostics::SpirvConflictingDescriptorHeapStrideOptions{});
         }
 
+        // `-debug-info-include-source` embeds the source into debug information, so it needs
+        // debug information to exist. At `DebugInfoLevel::None` there is no debug scaffolding to
+        // attach the source to, so reject the combination here rather than silently ignoring it.
+        // Note `getDebugInfoLevel()` cannot distinguish an explicit `-g0` from the default (no
+        // `-g`), which also resolves to `None`; both cases are a conflict for this flag.
+        if (linkage->m_optionSet.shouldIncludeSourceInDebugInfo() &&
+            linkage->m_optionSet.getDebugInfoLevel() == DebugInfoLevel::None)
+        {
+            m_sink->diagnose(Diagnostics::DebugInfoIncludeSourceRequiresDebugInfo{});
+        }
+
         // TODO: do we need to require that a target must have a profile specified,
         // or will we continue to allow the profile to be inferred from the target?
 
@@ -4870,6 +4890,34 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 m_sink->diagnose(
                     Diagnostics::SeparateDebugInfoUnsupportedForTarget{.target = targetName});
             }
+        }
+    }
+
+    // `-debug-info-include-source` only affects the SPIR-V core `OpSource` path. The producer
+    // change that carries source content into the IR runs once for all targets, so warn (rather
+    // than silently do nothing) when it is requested for a non-SPIR-V target, mirroring the
+    // `-separate-debug-info` precedent above.
+    if (linkage->m_optionSet.shouldIncludeSourceInDebugInfo())
+    {
+        // `isSPIRV` covers both the `spirv` and `spirv-asm` targets, which share the SPIR-V
+        // emitter that honors this option.
+        for (const auto& rawTarget : m_rawTargets)
+        {
+            if (!isSPIRV(rawTarget.format))
+            {
+                UnownedStringSlice targetName =
+                    TypeTextUtil::getCompileTargetName(asExternal(rawTarget.format));
+                m_sink->diagnose(
+                    Diagnostics::DebugInfoIncludeSourceUnsupportedForTarget{.target = targetName});
+            }
+        }
+
+        if (m_rawTargets.getCount() == 0 && !isSPIRV(m_defaultTarget.format))
+        {
+            UnownedStringSlice targetName =
+                TypeTextUtil::getCompileTargetName(asExternal(m_defaultTarget.format));
+            m_sink->diagnose(
+                Diagnostics::DebugInfoIncludeSourceUnsupportedForTarget{.target = targetName});
         }
     }
 

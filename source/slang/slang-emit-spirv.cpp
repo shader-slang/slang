@@ -2138,6 +2138,99 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return true;
     }
 
+    static const Index kSpvLiteralStringByteLimit = 65535;
+
+    // Longest prefix of `text` that fits one SPIR-V string operand and ends on a UTF-8 code-point
+    // boundary, so a multi-byte code point is never split across two operands. Falls back to the
+    // hard limit on ill-formed input so a chunking loop always makes progress.
+    static Index getSpvLiteralStringChunkLength(UnownedStringSlice text)
+    {
+        if (text.getLength() <= kSpvLiteralStringByteLimit)
+            return text.getLength();
+
+        Index end = kSpvLiteralStringByteLimit;
+        while (end > 0 && isUtf8ContinuationByte(text[end]))
+            end--;
+        return end > 0 ? end : kSpvLiteralStringByteLimit;
+    }
+
+    static UnownedStringSlice getSourceContent(IRDebugSource* debugSource)
+    {
+        return as<IRStringLit>(debugSource->getSource())->getStringSlice();
+    }
+
+    // Emit the module's `OpSource` instruction(s). With `-debug-info-include-source` at `-g1`,
+    // emits one File+Source `OpSource` per source file that has embedded content (matching the
+    // `-g2`/`-g3` per-file `DebugSource` behavior); otherwise a single bare language/version
+    // `OpSource`. The two forms are mutually exclusive so a source extractor sees no spurious
+    // file-less record.
+    void emitSource(SpvInstParent* parent, SpvWord sourceLanguage)
+    {
+        // SPIR-V's `OpSource` "version" operand; Slang has always emitted 1 here.
+        static const SpvWord kSlangSourceLanguageVersion = 1;
+
+        bool embedSource =
+            m_targetProgram->getOptionSet().getDebugInfoLevel() == DebugInfoLevel::Minimal &&
+            m_targetProgram->getOptionSet().shouldIncludeSourceInDebugInfo();
+
+        bool emittedFileSource = false;
+        if (embedSource)
+        {
+            for (auto inst : m_irModule->getGlobalInsts())
+            {
+                auto debugSource = as<IRDebugSource>(inst);
+                if (!debugSource)
+                    continue;
+                if (getSourceContent(debugSource).getLength() == 0)
+                    continue;
+                emitSourceFile(parent, sourceLanguage, kSlangSourceLanguageVersion, debugSource);
+                emittedFileSource = true;
+            }
+        }
+
+        if (!emittedFileSource)
+        {
+            emitInst(
+                parent,
+                nullptr,
+                SpvOpSource,
+                SpvLiteralInteger::from32(sourceLanguage),
+                SpvLiteralInteger::from32(kSlangSourceLanguageVersion));
+        }
+    }
+
+    // Emit one `OpSource` (File + Source) for `debugSource`, splitting a source larger than a
+    // single SPIR-V string operand across `OpSourceContinued` on UTF-8 code-point boundaries. The
+    // File operand reuses the `OpString` already emitted for `debugSource` (via `ensureInst`)
+    // rather than emitting a duplicate.
+    void emitSourceFile(
+        SpvInstParent* parent,
+        SpvWord sourceLanguage,
+        SpvWord sourceLanguageVersion,
+        IRDebugSource* debugSource)
+    {
+        auto sourceStr = getSourceContent(debugSource);
+        auto fileNameSpvInst = ensureInst(debugSource);
+        auto headLength = getSpvLiteralStringChunkLength(sourceStr);
+
+        emitInst(
+            parent,
+            nullptr,
+            SpvOpSource,
+            SpvLiteralInteger::from32(sourceLanguage),
+            SpvLiteralInteger::from32(sourceLanguageVersion),
+            fileNameSpvInst,
+            sourceStr.head(headLength));
+
+        for (Index start = headLength; start < sourceStr.getLength();)
+        {
+            auto rest = sourceStr.tail(start);
+            auto chunkLength = getSpvLiteralStringChunkLength(rest);
+            emitInst(parent, nullptr, SpvOpSourceContinued, rest.head(chunkLength));
+            start += chunkLength;
+        }
+    }
+
 
     /// Process debug-related global instructions with centralized debug level checking.
     ///
@@ -2159,7 +2252,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DebugSource:
             {
                 auto debugSource = as<IRDebugSource>(inst);
-                auto sourceStr = as<IRStringLit>(debugSource->getSource())->getStringSlice();
+                auto sourceStr = getSourceContent(debugSource);
 
                 if (debugLevel == DebugInfoLevel::Minimal)
                 {
@@ -2189,16 +2282,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return true;
                 }
 
-                // SPIRV does not allow string lits longer than 65535, so we need to split the
-                // source string in OpDebugSourceContinued instructions.
-                auto sourceStrHead =
-                    sourceStr.getLength() > 65535 ? sourceStr.head(65535) : sourceStr;
+                // A SPIR-V string literal cannot exceed the byte limit, so split the source into a
+                // head plus DebugSourceContinued tails. Use the shared chunker so this path and
+                // the core-OpSource path in emitSource split identically, on UTF-8 code-point
+                // boundaries.
+                auto headLength = getSpvLiteralStringChunkLength(sourceStr);
                 auto spvStrHead = emitInst(
                     getSection(SpvLogicalSectionID::DebugStringsAndSource),
                     nullptr,
                     SpvOpString,
                     kResultID,
-                    SpvLiteralBits::fromUnownedStringSlice(sourceStrHead));
+                    SpvLiteralBits::fromUnownedStringSlice(sourceStr.head(headLength)));
 
                 auto result = emitOpDebugSource(
                     getSection(SpvLogicalSectionID::ConstantsAndTypes),
@@ -2208,22 +2302,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     debugSource->getFileName(),
                     spvStrHead);
 
-                for (Index start = 65535; start < sourceStr.getLength(); start += 65535)
+                for (Index start = headLength; start < sourceStr.getLength();)
                 {
-                    auto slice = sourceStr.tail(start);
-                    slice = slice.getLength() > 65535 ? slice.head(65535) : slice;
+                    auto rest = sourceStr.tail(start);
+                    auto chunkLength = getSpvLiteralStringChunkLength(rest);
                     auto sliceSpvStr = emitInst(
                         getSection(SpvLogicalSectionID::DebugStringsAndSource),
                         nullptr,
                         SpvOpString,
                         kResultID,
-                        SpvLiteralBits::fromUnownedStringSlice(slice));
+                        SpvLiteralBits::fromUnownedStringSlice(rest.head(chunkLength)));
                     emitOpDebugSourceContinued(
                         getSection(SpvLogicalSectionID::ConstantsAndTypes),
                         nullptr,
                         m_voidType,
                         getNonSemanticDebugInfoExtInst(),
                         sliceSpvStr);
+                    start += chunkLength;
                 }
 
                 *emittedSpvInst = result;
@@ -11989,8 +12084,9 @@ SlangResult emitSPIRVFromIR(
 
     // Note: Debug info emission is controlled by the IR generation phase based on the debug level:
     // - None (g0): No debug instructions in IR
-    // - Minimal (g1): IRDebugSource (without content) and IRDebugLine for line numbers only
-    //                 Emits standard SPIR-V debug instructions (OpString, OpLine, OpSource)
+    // - Minimal (g1): IRDebugSource (content only when `-debug-info-include-source` is set) and
+    //                 IRDebugLine for line numbers only. Emits standard SPIR-V debug instructions
+    //                 (OpString, OpLine, OpSource)
     // - Standard (g2): Full NonSemantic debug info including IRDebugVar for local variables
     // - Maximal (g3): Same as Standard
     //
@@ -12080,13 +12176,9 @@ SlangResult emitSPIRVFromIR(
     {
         sourceLanguage = SpvSourceLanguageUnknown;
     }
-    context.emitInst(
+    context.emitSource(
         context.getSection(SpvLogicalSectionID::DebugStringsAndSource),
-        nullptr,
-        SpvOpSource,
-        SpvLiteralInteger::from32(
-            sourceLanguage),           // language identifier, should be SpvSourceLanguageSlang.
-        SpvLiteralInteger::from32(1)); // language version.
+        sourceLanguage);
 
     for (auto irEntryPoint : irEntryPoints)
     {

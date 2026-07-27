@@ -9713,8 +9713,12 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
     UnownedStringSlice content;
     bool isIncludedFile = false;
 
-    // Only embed source content for Standard and Maximal debug level.
-    bool embedContent = context->debugInfoLevel >= DebugInfoLevel::Standard;
+    // Embed source content for Standard/Maximal, or at any level when
+    // `-debug-info-include-source` is set. Must match the per-source-file loop in
+    // generateIRForTranslationUnit so a source reached only through this producer still carries
+    // content at `-g1` (otherwise the SPIR-V `OpSource` for it would have an empty Source operand).
+    bool embedContent = context->debugInfoLevel >= DebugInfoLevel::Standard ||
+                        context->getLinkage()->m_optionSet.shouldIncludeSourceInDebugInfo();
     if (source)
     {
         if (embedContent)
@@ -15424,6 +15428,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // This is needed for Minimal level and above (for line number correlation)
     if (context->debugInfoLevel != DebugInfoLevel::None)
     {
+        // Minimal normally keeps only the path, but `-debug-info-include-source` carries the source
+        // text into every `IRDebugSource` so the SPIR-V emitter can embed it via core `OpSource`.
+        const bool includeSource = linkage->m_optionSet.shouldIncludeSourceInDebugInfo();
+
         builder->setInsertInto(module->getModuleInst());
         for (auto source : translationUnit->getSourceFiles())
         {
@@ -15431,8 +15439,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             // path
             auto debugSource = builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
-                (context->debugInfoLevel >= DebugInfoLevel::Standard) ? source->getContent()
-                                                                      : UnownedStringSlice(),
+                (context->debugInfoLevel >= DebugInfoLevel::Standard || includeSource)
+                    ? source->getContent()
+                    : UnownedStringSlice(),
                 source->isIncludedFile());
             context->shared->mapSourceFileToDebugSourceInst[source] = debugSource;
 
