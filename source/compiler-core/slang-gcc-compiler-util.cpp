@@ -1,12 +1,12 @@
 // slang-gcc-compiler-util.cpp
 #include "slang-gcc-compiler-util.h"
 
-#include "../core/slang-char-util.h"
-#include "../core/slang-common.h"
-#include "../core/slang-io.h"
-#include "../core/slang-shared-library.h"
-#include "../core/slang-string-slice-pool.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-char-util.h"
+#include "core/slang-common.h"
+#include "core/slang-io.h"
+#include "core/slang-shared-library.h"
+#include "core/slang-string-slice-pool.h"
+#include "core/slang-string-util.h"
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-diagnostic-util.h"
 #include "slang-artifact-representation-impl.h"

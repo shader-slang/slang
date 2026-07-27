@@ -1,7 +1,7 @@
 #include "slang-parser.h"
 
-#include "../core/slang-semantic-version.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-semantic-version.h"
+#include "core/slang-string-util.h"
 #include "slang-ast-decl.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"

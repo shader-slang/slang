@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../compiler-core/slang-doc-extractor.h"
-#include "../compiler-core/slang-lexer.h"
-#include "../compiler-core/slang-name.h"
-#include "../core/slang-basic.h"
-#include "../core/slang-semantic-version.h"
+#include "compiler-core/slang-doc-extractor.h"
+#include "compiler-core/slang-lexer.h"
+#include "compiler-core/slang-name.h"
+#include "core/slang-basic.h"
+#include "core/slang-semantic-version.h"
 #include "slang-ast-forward-declarations.h"
 #include "slang-profile.h"
 #include "slang-type-system-shared.h"

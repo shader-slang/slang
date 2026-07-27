@@ -1,11 +1,11 @@
 // unit-test-process.cpp
 
-#include "../../source/core/slang-http.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-platform.h"
-#include "../../source/core/slang-process-util.h"
-#include "../../source/core/slang-random-generator.h"
-#include "../../source/core/slang-string-util.h"
+#include "core/slang-http.h"
+#include "core/slang-io.h"
+#include "core/slang-platform.h"
+#include "core/slang-process-util.h"
+#include "core/slang-random-generator.h"
+#include "core/slang-string-util.h"
 #include "unit-test/slang-unit-test.h"
 
 #if defined(_WIN32)

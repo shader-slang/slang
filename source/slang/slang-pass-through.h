@@ -42,7 +42,7 @@
 // pass-through compilation).
 //
 
-#include "../core/slang-string.h"
+#include "core/slang-string.h"
 #include "slang-target.h"
 
 namespace Slang

@@ -1,12 +1,12 @@
 // capabilities-generator-main.cpp
 
-#include "../../source/compiler-core/slang-lexer.h"
-#include "../../source/compiler-core/slang-perfect-hash-codegen.h"
-#include "../../source/core/slang-file-system.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-secure-crt.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-uint-set.h"
+#include "compiler-core/slang-lexer.h"
+#include "compiler-core/slang-perfect-hash-codegen.h"
+#include "core/slang-file-system.h"
+#include "core/slang-io.h"
+#include "core/slang-secure-crt.h"
+#include "core/slang-string-util.h"
+#include "core/slang-uint-set.h"
 
 #include <stdio.h>
 

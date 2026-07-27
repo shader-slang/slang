@@ -1,7 +1,7 @@
 // metal-device.cpp
 #include "metal-device.h"
 
-#include "../resource-desc-utils.h"
+#include "gfx/resource-desc-utils.h"
 #include "metal-buffer.h"
 #include "metal-render-pass.h"
 #include "metal-shader-program.h"

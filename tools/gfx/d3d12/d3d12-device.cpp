@@ -1,7 +1,6 @@
 // d3d12-device.cpp
 #include "d3d12-device.h"
 
-#include "../nvapi/nvapi-util.h"
 #include "d3d12-buffer.h"
 #include "d3d12-fence.h"
 #include "d3d12-framebuffer.h"
@@ -16,9 +15,10 @@
 #include "d3d12-shader-table.h"
 #include "d3d12-swap-chain.h"
 #include "d3d12-vertex-layout.h"
+#include "gfx/nvapi/nvapi-util.h"
 
 #ifdef GFX_NVAPI
-#include "../nvapi/nvapi-include.h"
+#include "gfx/nvapi/nvapi-include.h"
 #endif
 
 #ifdef GFX_NV_AFTERMATH
