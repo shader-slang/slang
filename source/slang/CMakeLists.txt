@@ -364,6 +364,32 @@ set_target_properties(
 )
 
 #
+# Single self-contained archive for static distribution
+#
+# A STATIC build leaves the caller responsible for naming slang-compiler plus every archive
+# it links -- core, compiler-core, slang-glslang-static, glslang, the SPIRV-Tools archives,
+# miniz, lz4 and cmark-gfm -- in a working order. Worse, the installed package cannot even
+# describe that list: slang_add_target wraps private dependencies in
+# $<BUILD_LOCAL_INTERFACE:...> so they stay out of the export set, which leaves the
+# installed slang::slang target with an empty INTERFACE_LINK_LIBRARIES. Bundling produces
+# one archive that a consumer links on its own, which is what a prebuilt static release
+# needs to be usable outside of a CMake build.
+#
+if(SLANG_BUNDLE_STATIC_LIB)
+    if(NOT SLANG_LIB_TYPE STREQUAL "STATIC")
+        message(
+            FATAL_ERROR
+            "SLANG_BUNDLE_STATIC_LIB requires SLANG_LIB_TYPE=STATIC (it is currently ${SLANG_LIB_TYPE}); there are no archives to bundle otherwise."
+        )
+    endif()
+
+    include(BundleStaticLibrary)
+    slang_bundle_static_library(slang slang-static SLANG_BUNDLED_STATIC_LIB)
+
+    install(FILES "${SLANG_BUNDLED_STATIC_LIB}" DESTINATION ${library_subdir})
+endif()
+
+#
 # Windows proxy DLL for backward compatibility
 # Creates slang.dll that forwards all calls to slang-compiler.dll
 #

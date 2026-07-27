@@ -261,6 +261,7 @@ works for any given binary.
 | `SLANG_ENABLE_SLANGRT`                | `TRUE`                        | Enable runtime target                                                                                                                    |
 | `SLANG_ENABLE_SLANG_GLSLANG`          | `TRUE`                        | Enable glslang dependency and slang-glslang wrapper target                                                                               |
 | `SLANG_EMBED_SLANG_GLSLANG`           | `FALSE`                       | Link the slang-glslang wrapper into slang-compiler instead of runtime loading (see "Static linking")                                     |
+| `SLANG_BUNDLE_STATIC_LIB`             | `FALSE`                       | Merge slang-compiler and all static libraries it links into one archive (requires SLANG_LIB_TYPE=STATIC)                                 |
 | `SLANG_ENABLE_SLANG_PROXY`            | `TRUE`                        | Build the legacy `slang.dll` proxy and `libslang` symlink backward-compatibility outputs for `slang-compiler`                           |
 | `SLANG_ENABLE_TESTS`                  | `TRUE`                        | Enable test targets, requires `SLANG_ENABLE_SLANG_RHI`; some tests require other CMake options                                           |
 | `SLANG_ENABLE_EXAMPLES`               | `TRUE`                        | Enable example targets, requires SLANG_ENABLE_SLANG_RHI                                                                                  |
@@ -526,6 +527,47 @@ ${SLANG_DIR}/build/external/miniz/libminiz.a
 ${SLANG_DIR}/build/external/lz4/build/cmake/liblz4.a
 ```
 
+### Bundling everything into one archive
+
+`SLANG_LIB_TYPE=STATIC` produces `libslang-compiler.a`, but that archive is not usable on
+its own — linking it also requires `core`, `compiler-core`, `slang-glslang-static`,
+`glslang`, the three SPIRV-Tools archives, `miniz`, `lz4` and `cmark-gfm`. That list is an
+internal detail that changes between releases, and the installed package cannot even
+describe it: `slang_add_target` wraps private dependencies in `$<BUILD_LOCAL_INTERFACE:...>`
+to keep them out of the export set, so the installed `slang::slang` target has an empty
+`INTERFACE_LINK_LIBRARIES`.
+
+`SLANG_BUNDLE_STATIC_LIB=ON` merges all of them into a single `libslang-static.a` (or
+`slang-static.lib`), installed next to the other libraries. A consumer then links one
+archive and the C++ runtime:
+
+```bash
+c++ -std=c++17 -DSLANG_STATIC -I<prefix>/include main.cpp \
+    <prefix>/lib/libslang-static.a -lstdc++ -lm -lpthread -ldl
+```
+
+`-DSLANG_STATIC` matters: without it `slang.h` defaults to `SLANG_DYNAMIC`, which on MSVC
+decorates the API with `__declspec(dllimport)` and fails to link. Swap `-lstdc++` for
+`-static-libstdc++ -static-libgcc` if you want the result to depend only on libc.
+
+Notes:
+
+- The option requires `SLANG_LIB_TYPE=STATIC` and fails configuration otherwise.
+- Merging is flat, not nested: the output holds every member object, so the linker resolves
+  symbols across the whole set. Colliding member names are fine (SPIRV-Tools and
+  SPIRV-Tools-opt both contain a `basic_block.cpp.o`); only extraction with `ar x` would
+  clobber one with the other.
+- Archives are merged with `ar -M` (GNU/LLVM), `libtool -static` (Apple) or `lib.exe`
+  (MSVC). Other toolchains fail configuration with an explicit message rather than
+  producing a broken archive.
+- `libslang-compiler.a` is still installed alongside the bundle. A static distribution only
+  needs `libslang-static.a` and can drop the rest.
+- Release builds keep debug info by default, so the bundle is large (over 1 GB) until it is
+  stripped — `strip --strip-debug` brings it down by more than an order of magnitude. Build
+  with `-DSLANG_ENABLE_RELEASE_DEBUG_INFO=OFF` if you never want it.
+- Do not combine this with `SLANG_ENABLE_RELEASE_LTO=ON`. LTO fills the archive with
+  compiler IR instead of object code, which only links with a matching compiler version.
+
 ### Removing the runtime dependency on slang-glslang
 
 `SLANG_LIB_TYPE=STATIC` gives you a static `libslang-compiler.a`, but it does not by
@@ -553,6 +595,7 @@ cmake --preset default \
   -DSLANG_LIB_TYPE=STATIC \
   -DSLANG_EMBED_SLANG_GLSLANG=ON \
   -DSLANG_ENABLE_SLANG_GLSLANG=OFF \
+  -DSLANG_BUNDLE_STATIC_LIB=ON \
   -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
   -DSLANG_ENABLE_DXIL=OFF \
   -DSLANG_ENABLE_GFX=OFF \
