@@ -1,3 +1,8 @@
+---
+layout: user-guide
+permalink: /user-guide/language-version
+---
+
 # Language Version
 
 Like many programming languages, Slang experiences a tension between the desire for rapid innovation/evolution and stability. One of the benefits that users of Slang have so far enjoyed has been the rapid pace of innovation in the language and its standard library. However, as developers start to have larger bodies of Slang code, they may become concerned that changes to the language could break existing code. There is no magical way to keep innovating while also keeping the language static.
