@@ -574,8 +574,17 @@ Caveats:
 - WGSL is emitted natively, but the `wgsl-spirv` target still goes through the
   `slang-tint` shared library, which is only distributed as a prebuilt binary and
   cannot be embedded.
-- The GLSL compatibility module (`import glsl;`) is still loaded from the separate
-  `slang-glsl-module` shared library.
+- The GLSL compatibility module (`import glsl;`) is still *preferred* from the separate
+  `slang-glsl-module` shared library, but it is not required: when that library and the
+  on-disk cache are both unavailable, `slang-api.cpp` falls back to
+  `compileBuiltinModule(GLSL, 0)` and compiles it from embedded source. Omitting it costs
+  startup time on sessions created with `enableGLSL`, not functionality.
+- Statically linked or not, the standard modules under
+  `lib/slang-standard-module-<version>/` are still loaded from disk if a shader imports
+  them (`slang.neural`, `experimental.workgraph`, ...). `getStandardModuleDirPath()` in
+  `slang-session.cpp` locates them next to whichever binary contains
+  `slang_createGlobalSession`, which for a static build is the host executable, so that
+  directory has to be deployed alongside it.
 - The `slang-glslang` module is built with `-Wl,--exclude-libs,ALL`, which keeps the
   glslang and SPIRV-Tools symbols private. The static archive cannot do that at link
   time, so a `SHARED` build that also sets `SLANG_EMBED_SLANG_GLSLANG=ON` may re-export
