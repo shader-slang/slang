@@ -2150,7 +2150,7 @@ LanguageServerResult<List<LanguageServerProtocol::TextEdit>> LanguageServerCore:
     }
     if (m_formatOptions.clangFormatLocation.getLength() == 0)
         m_formatOptions.clangFormatLocation = findClangFormatTool();
-    auto options = getFormatOptions(m_workspace, m_formatOptions);
+    auto options = m_formatOptions;
     options.fileName = canonicalPath;
     List<TextRange> exclusionRange =
         extractFormattingExclusionRanges(doc->getText().getUnownedSlice());
@@ -2195,7 +2195,7 @@ LanguageServerResult<List<LanguageServerProtocol::TextEdit>> LanguageServerCore:
     Index endOffset = doc->getOffset(endLine, endCol);
     if (m_formatOptions.clangFormatLocation.getLength() == 0)
         m_formatOptions.clangFormatLocation = findClangFormatTool();
-    auto options = getFormatOptions(m_workspace, m_formatOptions);
+    auto options = m_formatOptions;
     if (!m_formatOptions.allowLineBreakInRangeFormatting)
         options.behavior = FormatBehavior::PreserveLineBreak;
     List<TextRange> exclusionRange =
@@ -2246,7 +2246,7 @@ LanguageServerResult<List<LanguageServerProtocol::TextEdit>> LanguageServerCore:
     Index line, col;
     doc->zeroBasedUTF16LocToOneBasedUTF8Loc(args.position.line, args.position.character, line, col);
     auto cursorOffset = doc->getOffset(line, col);
-    auto options = getFormatOptions(m_workspace, m_formatOptions);
+    auto options = m_formatOptions;
     if (!m_formatOptions.allowLineBreakInOnTypeFormatting)
         options.behavior = FormatBehavior::PreserveLineBreak;
     List<TextRange> exclusionRange =
@@ -2410,7 +2410,18 @@ void LanguageServer::updateFormattingOptions(
     if (enableFormatOnType.isValid())
         converter.convert(enableFormatOnType, &m_core.m_formatOptions.enableFormatOnType);
     if (clangFormatLoc.isValid())
-        converter.convert(clangFormatLoc, &m_core.m_formatOptions.clangFormatLocation);
+    {
+        String clangFormatLocation;
+        if (SLANG_SUCCEEDED(converter.convert(clangFormatLoc, &clangFormatLocation)) &&
+            isSafeClangFormatLocation(clangFormatLocation.getUnownedSlice()))
+        {
+            m_core.m_formatOptions.clangFormatLocation = findClangFormatTool();
+        }
+        else
+        {
+            m_core.m_formatOptions.clangFormatLocation = String();
+        }
+    }
     if (clangFormatStyle.isValid())
         converter.convert(clangFormatStyle, &m_core.m_formatOptions.style);
     if (clangFormatFallbackStyle.isValid())
@@ -2586,19 +2597,6 @@ void LanguageServer::logMessage(int type, String message)
     args.type = type;
     args.message = message;
     m_connection->sendCall(LanguageServerProtocol::LogMessageParams::methodName, &args);
-}
-
-FormatOptions LanguageServerCore::getFormatOptions(Workspace* workspace, FormatOptions inOptions)
-{
-    FormatOptions result = inOptions;
-    if (workspace->rootDirectories.getCount())
-    {
-        result.clangFormatLocation = StringUtil::replaceAll(
-            result.clangFormatLocation.getUnownedSlice(),
-            toSlice("${workspaceFolder}"),
-            workspace->rootDirectories.getFirst().getUnownedSlice());
-    }
-    return result;
 }
 
 LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::tryGetMacroHoverInfo(

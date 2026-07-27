@@ -156,7 +156,6 @@ public:
 private:
     slang::IGlobalSession* getOrCreateGlobalSession();
 
-    FormatOptions getFormatOptions(Workspace* workspace, FormatOptions inOptions);
     LanguageServerResult<LanguageServerProtocol::Hover> tryGetMacroHoverInfo(
         WorkspaceVersion* version,
         DocumentVersion* doc,

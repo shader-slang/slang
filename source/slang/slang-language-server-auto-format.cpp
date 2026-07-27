@@ -3,26 +3,57 @@
 #include "compiler-core/slang-lexer.h"
 #include "core/slang-char-util.h"
 #include "core/slang-file-system.h"
+#include "core/slang-platform.h"
 
 namespace Slang
 {
 
+static String _findClangFormatOnPath(UnownedStringSlice processName)
+{
+    StringBuilder pathValue;
+    if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(toSlice("PATH"), pathValue)))
+        return String();
+
+    List<UnownedStringSlice> directories;
+#if SLANG_WINDOWS_FAMILY
+    StringUtil::split(pathValue.getUnownedSlice(), ';', directories);
+#else
+    StringUtil::split(pathValue.getUnownedSlice(), ':', directories);
+#endif
+
+    for (auto directory : directories)
+    {
+        directory = directory.trim();
+        if (directory.startsWith("\"") && directory.endsWith("\""))
+            directory = directory.head(directory.getLength() - 1).tail(1);
+
+        // Relative and empty PATH entries resolve against the current directory, which can be the
+        // workspace opened by the user.
+        if (!Path::isAbsolute(directory))
+            continue;
+
+        String candidate = Path::combine(directory, processName);
+        SlangPathType pathType;
+        if (SLANG_FAILED(Path::getPathType(candidate, &pathType)) ||
+            pathType != SLANG_PATH_TYPE_FILE)
+        {
+            continue;
+        }
+
+        String canonicalCandidate;
+        if (SLANG_SUCCEEDED(Path::getCanonical(candidate, canonicalCandidate)))
+            return canonicalCandidate;
+    }
+    return String();
+}
+
 String findClangFormatTool()
 {
     String processName = String("clang-format") + String(Process::getExecutableSuffix());
-    if (File::exists(processName))
-        return processName;
-    RefPtr<Process> proc;
-    CommandLine cmdLine;
-    cmdLine.setExecutableLocation(ExecutableLocation(processName));
-    if (Process::create(cmdLine, 0, proc) == SLANG_OK)
-    {
-        auto inStream = proc->getStream(StdStreamType::In);
-        if (inStream)
-            inStream->close();
-        proc->kill(0);
-        return processName;
-    }
+    auto pathLocation = _findClangFormatOnPath(processName.getUnownedSlice());
+    if (pathLocation.getLength())
+        return pathLocation;
+
     auto fileName =
         Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)slang_createGlobalSession);
     auto dirName = Slang::Path::getParentDirectory(fileName);
@@ -246,6 +277,9 @@ List<Edit> formatSource(
     List<Edit> edits;
 
     String clangProcessName = options.clangFormatLocation;
+    if (!isSafeClangFormatExecutablePath(clangProcessName.getUnownedSlice()))
+        return edits;
+
     CommandLine cmdLine;
     cmdLine.setExecutableLocation(ExecutableLocation(clangProcessName));
 
