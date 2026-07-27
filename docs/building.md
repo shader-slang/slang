@@ -215,6 +215,39 @@ of a known incompatibility that causes linker errors. If
 
 See the [documentation on debugging](/docs/debugging.md).
 
+### Optimization level of Debug builds
+
+On GCC/Clang, Debug builds compile with `-Og` rather than `-O0`. `-Og` runs the
+optimizations that do not interfere with debugging and makes the Debug build (and
+especially the `slang-test` suite) several times faster to run, at the cost of some
+locals reading as `<optimized out>` and coarser single-stepping on recent compilers.
+
+If you want a different optimization level -- for example a fully debuggable `-O0`
+build -- supply your own `-O` level at configure time and Slang will not add `-Og`
+on top of it:
+
+```bash
+# Fully debuggable build (no -Og)
+CXXFLAGS='-O0 -g3' cmake --preset default
+
+# Equivalently, via the per-config flags
+cmake --preset default -DCMAKE_CXX_FLAGS_DEBUG='-O0 -g3'
+```
+
+Other flags (such as `-march=native`) are always passed through regardless; supplying
+your own `-O` level additionally lets you pin the optimization level alongside them
+instead of getting `-Og`:
+
+```bash
+CXXFLAGS='-O0 -g3 -march=native' cmake --preset default
+```
+
+The `-Og` default is only applied when neither `CMAKE_CXX_FLAGS` (which receives the
+`CXXFLAGS` environment variable) nor `CMAKE_CXX_FLAGS_DEBUG` already specifies an `-O`
+level. The `CXXFLAGS` environment variable is only read when a build tree is first
+configured, so use a clean build directory when setting it; to change the flags of an
+existing build tree, pass `-DCMAKE_CXX_FLAGS_DEBUG=...` directly instead.
+
 ## Distributing
 
 ### Versioned Libraries

@@ -172,29 +172,49 @@ function(set_default_compile_options target)
         )
     endif()
 
-    # Use `-Og` for Debug builds on GCC/Clang. `-Og` enables the
-    # optimizations that do not interfere with debugging, producing
-    # noticeably faster Debug binaries while keeping a faithful
-    # step-through/inspection experience.
+    # Use `-Og` for GCC/Clang Debug builds: it runs the optimizations that do
+    # not interfere with debugging, making Debug builds (and the `slang-test`
+    # suite) noticeably faster while staying mostly debuggable.
     #
-    # This is appended after `CMAKE_CXX_FLAGS_DEBUG` (which is `-O0 -g` for
-    # GCC/Clang), so `-Og` overrides CMake's default `-O0` by last-`-O`-wins
-    # semantics.
+    # Omit `-Og` when the user has already selected an optimization level
+    # through `CMAKE_CXX_FLAGS` (from the `CXXFLAGS` environment variable) or
+    # `CMAKE_CXX_FLAGS_DEBUG`: a target compile option is placed after those
+    # variables on the command line, so an unconditional `-Og` would override
+    # the user's choice by last-`-O`-wins. Tokenizing the flag strings ensures
+    # only a whole `-O`/`-O<level>` flag counts, not an unrelated `-O`-prefixed
+    # option such as Clang's `-ObjC`. See docs/building.md for the override
+    # recipe.
     #
     # The `NOT MSVC` guard excludes the MSVC-compatible frontend: `clang-cl`
     # reports `CMAKE_CXX_COMPILER_ID` as `Clang` but expects MSVC-style flags,
-    # so it must keep the default `/Od` optimization level rather than receive
-    # the GNU-style `-Og`. Plain MSVC (`cl`) has no `-Og` equivalent either.
+    # so it keeps the default `/Od` rather than the GNU-style `-Og`. Plain MSVC
+    # (`cl`) has no `-Og` equivalent either.
     #
     # `-Og` is applied with a raw `target_compile_options` rather than through
-    # `add_supported_cxx_flags`: that helper feature-tests via
-    # `check_cxx_compiler_flag`, which operates on a literal flag string and
-    # cannot see through the `$<$<CONFIG:Debug>:...>` generator expression
-    # needed to condition `-Og` on the Debug config. Hardcoding is safe since
+    # `add_supported_cxx_flags`, whose `check_cxx_compiler_flag` feature test
+    # operates on a literal flag string and cannot see through the
+    # `$<$<CONFIG:Debug>:...>` generator expression. Hardcoding is safe since
     # `-Og` has been supported by GCC since 4.8 and by Clang for years.
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT MSVC)
+    separate_arguments(
+        _slangDebugFlagTokens
+        UNIX_COMMAND
+        "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_DEBUG}"
+    )
+    set(_slangUserPickedOptLevel FALSE)
+    foreach(_flag IN LISTS _slangDebugFlagTokens)
+        if(_flag MATCHES "^-O([0-9]+|s|g|z|fast)?$")
+            set(_slangUserPickedOptLevel TRUE)
+        endif()
+    endforeach()
+    if(
+        CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang"
+        AND NOT MSVC
+        AND NOT _slangUserPickedOptLevel
+    )
         target_compile_options(${target} PRIVATE $<$<CONFIG:Debug>:-Og>)
     endif()
+    unset(_slangDebugFlagTokens)
+    unset(_slangUserPickedOptLevel)
 
     if(NOT WIN32)
         # these options are for ELF specific and not for Windows
