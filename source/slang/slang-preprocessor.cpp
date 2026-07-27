@@ -4529,7 +4529,7 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
 // Translates a language token (TokenType::IntegerLiteral or
 // TokenType::Identifier) to SlangLanguageVersion. Returns
 // SLANG_LANGUAGE_VERSION_UNKNOWN on error.
-static SlangLanguageVersion TranslateSlangLanguageVersionToken(const Token& token)
+static int TranslateSlangLanguageVersionToken(const Token& token)
 {
     if (token.getContent() == "latest")
         return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_LATEST;
@@ -4544,7 +4544,7 @@ static SlangLanguageVersion TranslateSlangLanguageVersionToken(const Token& toke
     else if (token.getContent().caseInsensitiveEquals(toSlice("202c")))
         return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_202C;
     else if (token.type == TokenType::IntegerLiteral)
-        return static_cast<SlangLanguageVersion>(stringToInt(token.getContent()));
+        return stringToInt(token.getContent());
 
     return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_UNKNOWN;
 }
@@ -4591,13 +4591,12 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
 
     if (hasVersionToken)
     {
-        // Slang version
-        SlangLanguageVersion version = TranslateSlangLanguageVersionToken(versionToken);
+        int version = TranslateSlangLanguageVersionToken(versionToken);
 
         if (isValidSlangLanguageVersion(version))
         {
             context->m_preprocessor->language = SourceLanguage::Slang;
-            context->m_preprocessor->languageVersion = version;
+            context->m_preprocessor->languageVersion = static_cast<SlangLanguageVersion>(version);
         }
         else
         {
