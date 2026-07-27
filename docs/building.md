@@ -574,7 +574,7 @@ Caveats:
 - WGSL is emitted natively, but the `wgsl-spirv` target still goes through the
   `slang-tint` shared library, which is only distributed as a prebuilt binary and
   cannot be embedded.
-- The GLSL compatibility module (`import glsl;`) is still *preferred* from the separate
+- The GLSL compatibility module (`import glsl;`) is still _preferred_ from the separate
   `slang-glsl-module` shared library, but it is not required: when that library and the
   on-disk cache are both unavailable, `slang-api.cpp` falls back to
   `compileBuiltinModule(GLSL, 0)` and compiles it from embedded source. Omitting it costs
@@ -585,6 +585,11 @@ Caveats:
   `slang-session.cpp` locates them next to whichever binary contains
   `slang_createGlobalSession`, which for a static build is the host executable, so that
   directory has to be deployed alongside it. See the note below on excluding them.
+- The `slang-glslang` module is built with `-Wl,--exclude-libs,ALL`, which keeps the
+  glslang and SPIRV-Tools symbols private. The static archive cannot do that at link
+  time, so a `SHARED` build that also sets `SLANG_EMBED_SLANG_GLSLANG=ON` may re-export
+  some of them. If your application links its own copy of SPIRV-Tools, expect
+  duplicate-symbol conflicts.
 
 #### The standard modules are excluded from a static distribution
 
@@ -615,11 +620,6 @@ Both modules are built and installed unconditionally today
 packaging step: omit `lib/slang-standard-module-<version>/` when assembling the release
 archive. If the build-time cost matters, gating both `add_subdirectory()` calls in
 `source/standard-modules/CMakeLists.txt` behind an option is the natural follow-up.
-- The `slang-glslang` module is built with `-Wl,--exclude-libs,ALL`, which keeps the
-  glslang and SPIRV-Tools symbols private. The static archive cannot do that at link
-  time, so a `SHARED` build that also sets `SLANG_EMBED_SLANG_GLSLANG=ON` may re-export
-  some of them. If your application links its own copy of SPIRV-Tools, expect
-  duplicate-symbol conflicts.
 
 ## Deprecation of libslang and slang.dll filenames
 
