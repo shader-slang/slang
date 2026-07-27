@@ -2152,7 +2152,6 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             }
             else
             {
-                static_assert(Shape.dimensions == 3, "_Texture::SampleCmpBias(location, compareValue, bias): Unimplemented shape dimension");
                 if (isArray == 0)
                     return __glsl150_texture_bias(this, __makeVector(location, compareValue), bias);
                 else
@@ -2194,7 +2193,6 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             }
             else
             {
-                static_assert(Shape.dimensions == 2, "_Texture::SampleCmpBias with offset: only 1D/2D shadow shapes are supported in GLSL");
                 if (isArray == 0)
                     return __glsl150_texture_bias_offset(this, __makeVector(location, compareValue), offset, bias);
                 else
@@ -3654,7 +3652,6 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             }
             else
             {
-                static_assert(Shape.dimensions == 3, "_Texture::SampleCmpBias(s, location, compareValue, bias): Unimplemented shape dimension");
                 if (isArray == 0)
                     return __glsl150_texture_bias(this, s, __makeVector(location, compareValue), bias);
                 else
@@ -3695,7 +3692,6 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             }
             else
             {
-                static_assert(Shape.dimensions == 2, "_Texture::SampleCmpBias with offset: only 1D/2D shadow shapes are supported in GLSL");
                 if (isArray == 0)
                     return __glsl150_texture_bias_offset(this, s, __makeVector(location, compareValue), offset, bias);
                 else
