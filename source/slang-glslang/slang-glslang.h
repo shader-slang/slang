@@ -44,14 +44,6 @@ struct glsl_SPIRVVersion
 // Pre-declare
 struct glslang_CompileRequest_1_1;
 
-// The glslang_CompileRequest_1_N structs form a versioned chain across the slang-glslang shared
-// library boundary. From `_1_1` onward each version only appends fields to the previous one (never
-// reordering or resizing existing fields), so those `set()` conversions can copy the shared prefix
-// (`_1_1`..`_1_2` restate it inline; `_1_3` inherits it from `_1_2`). `_1_0`<->`_1_1` is the one
-// exception -- `_1_1` prepends `sizeInBytes` ahead of the `_1_0` fields, so those two convert
-// field-by-field, not by prefix copy. When adding a `_1_(N+1)`, append its new fields and zero them
-// in its `set()`.
-
 // 1.0 version
 struct glslang_CompileRequest_1_0
 {

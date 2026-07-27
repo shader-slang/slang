@@ -139,13 +139,8 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
 
 SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_3& request)
 {
-    // The `-Xspirv-opt` pass flags only exist in the _1_3 request. If the loaded library predates
-    // _1_3 we must downgrade to an older struct, which cannot carry them -- so honoring the user's
-    // explicit request is impossible. Fail rather than silently drop the flags and emit unmodified
-    // SPIR-V. (These flags run the optimizer even at `-O0`, so the failure is not conditioned on
-    // the optimization level.) The failure does not depend on a diagnostic sink; the message is
-    // emitted only if one is present (compile(), the only caller that populates flags, always sets
-    // one).
+    // A library predating _1_3 cannot carry the `-Xspirv-opt` flags, so fail rather than silently
+    // drop them and emit unmodified SPIR-V.
     if (request.spirvOptimizationFlagCount != 0 && !m_compile_1_3)
     {
         if (request.diagnosticFunc)
@@ -165,11 +160,8 @@ SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_3& reque
     }
     else
     {
-        // Older libraries don't understand the _1_3 fields; downgrade by slicing to the _1_2 base
-        // and copying its (standard-layout) prefix into the older struct. Any request carrying
-        // `-Xspirv-opt` flags was already rejected by the guard above, so nothing user-requested is
-        // dropped here. Going through the typed base keeps the copies independent of _1_3's
-        // non-standard layout.
+        // Downgrade for an older library by slicing to the _1_2 base. Requests carrying
+        // `-Xspirv-opt` flags were already rejected above, so nothing user-requested is dropped.
         const glslang_CompileRequest_1_2& request_1_2 = request;
         if (m_compile_1_2)
         {
@@ -318,8 +310,6 @@ SlangResult GlslangDownstreamCompiler::compile(
 
     request.entryPointName = options.entryPointName.begin();
 
-    // Only the spirv-opt instance forwards these; this class also backs `glslang`, whose args
-    // (`-Xglslang`) must not reach the optimizer.
     List<const char*> spirvOptFlags;
     if (m_compilerType == SLANG_PASS_THROUGH_SPIRV_OPT)
     {
@@ -502,7 +492,6 @@ SlangResult GlslangDownstreamCompiler::convert(
 
 SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersionString)
 {
-    // Prefer the newest available entry point, matching init()'s selection.
     uint64_t timestamp;
     if (m_compile_1_3)
     {
