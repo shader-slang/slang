@@ -12,13 +12,16 @@
 // OpString, and FileCheck would then match the mnemonics in these comments instead of the real
 // instructions.
 
-// `-O1` is explicit because slang-test otherwise injects `-O0`, which would skip the optimizer and
-// make the passthrough flag inert (see the O0 case below).
+// These two cases use `-O1` to exercise the preset: BASE shows the preset alone (inlines the call,
+// keeps debug names) and STRIP shows the passthrough `--strip-debug` running on top of that preset
+// (still inlined, names now removed). `-O1` is explicit because slang-test otherwise injects `-O0`,
+// which has no preset -- the `-O0` case below covers passthrough-without-a-preset separately.
 //TEST:SIMPLE(filecheck=BASE): -target spirv-asm -entry computeMain -stage compute -O1
 //TEST:SIMPLE(filecheck=STRIP): -target spirv-asm -entry computeMain -stage compute -O1 -Xspirv-opt --strip-debug
 
-// Under explicit `-O0` the optimizer is not run at all, so neither the preset inlining nor the
-// passthrough flag applies -- the option is additive to `-OX`, it does not turn the optimizer on.
+// `-Xspirv-opt` runs the selected passes even at `-O0`: `--strip-debug` removes the debug names.
+// `-O0` has no preset, so the passthrough passes are the only ones that run -- the call is NOT
+// inlined (OpFunctionCall survives), which distinguishes this from the `-O1` preset behavior.
 //TEST:SIMPLE(filecheck=O0): -target spirv-asm -entry computeMain -stage compute -O0 -Xspirv-opt --strip-debug
 
 // An invalid pass flag is rejected by SPIRV-Tools rather than silently ignored: the optimize step
@@ -51,8 +54,13 @@
 // STRIP-NOT: {{^}}OpName %
 // STRIP-NOT: {{^}}%{{[0-9]+}} = OpFunctionCall
 
-// At `-O0` nothing runs: the call is not inlined and the debug names are not stripped.
-// O0: {{^}}OpName %
+// At `-O0` the passthrough `--strip-debug` still runs (debug names gone), but there is no preset,
+// so the call is not inlined (OpFunctionCall survives). In SPIR-V module layout OpEntryPoint comes
+// first, the debug-name (OpName) section next, then the function bodies -- so anchoring on
+// OpEntryPoint and asserting no OpName appears before the surviving OpFunctionCall covers the
+// stripped debug section and the un-inlined call in one ordered scan.
+// O0: {{^}}OpEntryPoint
+// O0-NOT: {{^}}OpName %
 // O0: {{^}}%{{[0-9]+}} = OpFunctionCall
 
 // The invalid flag is reported by spirv-opt and the compile fails: assert both the failing result

@@ -272,9 +272,13 @@ static int glslang_optimizeSPIRV(
     std::vector<unsigned int>& ioSpirv)
 {
     const auto optimizationLevel = request.optimizationLevel;
+    const bool hasPassthroughFlags =
+        request.spirvOptimizationFlags && request.spirvOptimizationFlagCount;
 
-    // If there is no optimization then we are done
-    if (optimizationLevel == SLANG_OPTIMIZATION_LEVEL_NONE)
+    // At optimization level None there are no preset passes to run. We still run the optimizer if
+    // the user selected passes explicitly via `-Xspirv-opt`, so those run on their own; otherwise
+    // there is nothing to do.
+    if (optimizationLevel == SLANG_OPTIMIZATION_LEVEL_NONE && !hasPassthroughFlags)
     {
         return 0;
     }
@@ -316,8 +320,12 @@ static int glslang_optimizeSPIRV(
     bool compactPassRun = false;
 
     // TODO confirm which passes we want to invoke for each level
+    // Level None has no preset (it is only reached here when `-Xspirv-opt` passes were requested,
+    // which are registered below); skip the preset switch so we don't fall into the Default case.
     switch (optimizationLevel)
     {
+    case SLANG_OPTIMIZATION_LEVEL_NONE:
+        break;
     default:
     case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
         {
@@ -1035,12 +1043,11 @@ extern "C"
         int glslang_compile_1_2(glslang_CompileRequest_1_2* inRequest)
 {
     // Exported entry point that a client may load by name (see GlslangDownstreamCompiler::init),
-    // so `inRequest` crosses the library boundary. `_1_2` is the version this PR supersedes: while
-    // it was the newest struct its size could grow across builds, so a client may pass a shorter
-    // or longer `_1_2` than this build knows -- normalize by its declared `sizeInBytes` to avoid
-    // over-reading before converting to `_1_3`. (The `_1_1`/`_1_0` shims below don't need this:
-    // they are older versions whose sizes are permanently frozen, so `sizeof` is authoritative for
-    // any conforming client.)
+    // so `inRequest` crosses the library boundary. `_1_2` is not the final version in the chain, so
+    // its size can differ between the client and this build -- normalize by its declared
+    // `sizeInBytes` to avoid over-reading before converting to `_1_3`. (The `_1_1`/`_1_0` shims
+    // below don't need this: their sizes are permanently frozen as older versions, so `sizeof` is
+    // authoritative for any conforming client.)
     glslang_CompileRequest_1_2 normalized;
     const size_t copySize =
         (inRequest->sizeInBytes > sizeof(normalized)) ? sizeof(normalized) : inRequest->sizeInBytes;
