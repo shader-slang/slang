@@ -3131,6 +3131,14 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
         auto paramLayout = findVarLayout(param);
         if (!isVaryingParameter(paramLayout))
             continue;
+        // A parameter with a system-value semantic (e.g. `SV_PrimitiveID` in an
+        // intersection shader) is an ordinary builtin input rather than a
+        // ray-tracing payload/attributes parameter, so it must not be turned
+        // into a plain global here. It is legalized by the standard varying
+        // path in `legalizeEntryPointParameterForGLSL`, which maps it to the
+        // corresponding builtin (e.g. `gl_PrimitiveID`).
+        if (paramLayout && paramLayout->findSystemValueSemanticAttr())
+            continue;
         builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
         if (as<IROutParamType>(param->getDataType()) ||
             as<IRBorrowInOutParamType>(param->getDataType()))
@@ -4247,7 +4255,15 @@ void legalizeEntryPointParameterForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        return;
+        // The exception is a parameter with a system-value semantic (e.g.
+        // `SV_PrimitiveID` in an intersection shader): it is an ordinary
+        // builtin input rather than a payload/attributes parameter (those
+        // were already legalized by `consolidateRayTracingParameters`), so
+        // it takes the default varying-input path below, which maps it to
+        // the corresponding builtin (e.g. `gl_PrimitiveID`).
+        if (!(paramLayout && paramLayout->findSystemValueSemanticAttr()))
+            return;
+        break;
     }
 
     // Is the parameter type a special pointer type
