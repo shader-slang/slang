@@ -670,6 +670,11 @@ Emit debug data to a separate file, and strip it from the main output file. By d
 Write separate debug information to an explicit sidecar path, overriding the fallback path derived from `-o &lt;path&gt;`. Requires `-separate-debug-info` and allows the main artifact to be written to stdout. Use `-` to write the separate debug information to stdout when the main artifact is written to a file. 
 
 
+<a id="debug-info-include-source"></a>
+### -debug-info-include-source
+Embed the shader source text into the debug information, independently of the `-g` debug level. At `-g1` the source is embedded via the core SPIR-V `OpSource` instruction (no NonSemantic extension required); at `-g2`/`-g3` the source is already embedded so this is a no-op. Requires debug information: using it with `-g0`, or without any `-g` option, is an error. Only affects SPIR-V output. 
+
+
 <a id="emit-cpu-via-cpp"></a>
 ### -emit-cpu-via-cpp
 Generate CPU targets using C++ (default) 
