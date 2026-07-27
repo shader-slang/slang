@@ -1,6 +1,6 @@
 #include "slang-compiler-options.h"
 
-#include "../core/slang-writer.h"
+#include "core/slang-writer.h"
 #include "slang-compiler.h"
 
 #include <cstdio>
@@ -248,6 +248,8 @@ CompilerOptionValue Slang::CompilerOptionSet::getDefault(CompilerOptionName name
         return CompilerOptionValue::fromEnum(OptimizationLevel::Default);
     case CompilerOptionName::LanguageVersion:
         return CompilerOptionValue::fromEnum(SLANG_LANGUAGE_VERSION_DEFAULT);
+    case CompilerOptionName::DebugInformation:
+        return CompilerOptionValue::fromEnum(DebugInfoLevel::None);
     default:
         return CompilerOptionValue();
     }

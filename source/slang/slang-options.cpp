@@ -5,24 +5,24 @@
 
 #include "slang-options.h"
 
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../compiler-core/slang-artifact-impl.h"
-#include "../compiler-core/slang-artifact-representation-impl.h"
-#include "../compiler-core/slang-command-line-args.h"
-#include "../compiler-core/slang-core-diagnostics.h"
-#include "../compiler-core/slang-name-convention-util.h"
-#include "../compiler-core/slang-source-embed-util.h"
-#include "../core/slang-castable.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-command-options-writer.h"
-#include "../core/slang-file-system.h"
-#include "../core/slang-hex-dump-util.h"
-#include "../core/slang-name-value.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-string-slice-pool.h"
-#include "../core/slang-string-util.h"
-#include "../core/slang-type-text-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-impl.h"
+#include "compiler-core/slang-artifact-representation-impl.h"
+#include "compiler-core/slang-command-line-args.h"
+#include "compiler-core/slang-core-diagnostics.h"
+#include "compiler-core/slang-name-convention-util.h"
+#include "compiler-core/slang-source-embed-util.h"
+#include "core/slang-castable.h"
+#include "core/slang-char-util.h"
+#include "core/slang-command-options-writer.h"
+#include "core/slang-file-system.h"
+#include "core/slang-hex-dump-util.h"
+#include "core/slang-name-value.h"
+#include "core/slang-platform.h"
 #include "core/slang-stream.h"
+#include "core/slang-string-slice-pool.h"
+#include "core/slang-string-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-compiler-options.h"
 #include "slang-compiler.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
@@ -961,6 +961,14 @@ void initCommandOptions(CommandOptions& options)
          "path derived from `-o <path>`. Requires `-separate-debug-info` and allows the main "
          "artifact to be written to stdout. Use `-` to write the separate debug information to "
          "stdout when the main artifact is written to a file."},
+        {OptionKind::DebugInfoIncludeSource,
+         "-debug-info-include-source",
+         nullptr,
+         "Embed the shader source text into the debug information, independently of the `-g` "
+         "debug level. At `-g1` the source is embedded via the core SPIR-V `OpSource` "
+         "instruction (no NonSemantic extension required); at `-g2`/`-g3` the source is already "
+         "embedded so this is a no-op. Requires debug information: using it with `-g0`, or without "
+         "any `-g` option, is an error. Only affects SPIR-V output."},
         {OptionKind::EmitCPUViaCPP,
          "-emit-cpu-via-cpp",
          nullptr,
@@ -2778,6 +2786,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::TraceBranchCoverage:
         case OptionKind::TraceCoverageBoolean:
         case OptionKind::SPIRVUnifiedDescriptorHeapStride:
+        case OptionKind::DebugInfoIncludeSource:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:
@@ -3567,21 +3576,21 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         case OptionKind::DenormalModeFp16:
             {
-                FloatingPointDenormalMode value;
+                FloatingPointDenormalMode value = FloatingPointDenormalMode::Any;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp16, value);
                 break;
             }
         case OptionKind::DenormalModeFp32:
             {
-                FloatingPointDenormalMode value;
+                FloatingPointDenormalMode value = FloatingPointDenormalMode::Any;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp32, value);
                 break;
             }
         case OptionKind::DenormalModeFp64:
             {
-                FloatingPointDenormalMode value;
+                FloatingPointDenormalMode value = FloatingPointDenormalMode::Any;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp64, value);
                 break;
@@ -4467,6 +4476,67 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     .target =
                         TypeTextUtil::getCompileTargetName(SlangCompileTarget(rawTarget.format))});
             }
+
+            // Reject a `-capability` that raises the emitted version above what an explicit
+            // `-profile` pins. Only run when the profile's family matches the target's version
+            // family: a cross-family profile (e.g. `glsl_450` on a SPIR-V target) contributes
+            // version atoms that would misread as a pin, wrongly flagging `-profile
+            // glsl_450+spirv_1_4`.
+            Profile profile = rawTarget.optionSet.getProfile();
+            CapabilityAtom targetVersionFamily = CapabilityAtom::Invalid;
+            switch (profile.getFamily())
+            {
+            case ProfileFamily::SPIRV:
+                // `isSPIRV`, not `isKhronosTarget`: the GLSL text target emits no SPIR-V version.
+                if (isSPIRV(rawTarget.format))
+                    targetVersionFamily = CapabilityAtom::_spirv_1_0;
+                break;
+            case ProfileFamily::METAL:
+                if (isMetalTarget(rawTarget.format))
+                    targetVersionFamily = CapabilityAtom::metallib_2_3;
+                break;
+            case ProfileFamily::DX:
+                if (isD3DTarget(rawTarget.format))
+                    targetVersionFamily = CapabilityAtom::_sm_4_0;
+                break;
+            case ProfileFamily::GLSL:
+                if (rawTarget.format == CodeGenTarget::GLSL)
+                    targetVersionFamily = CapabilityAtom::_GLSL_130;
+                break;
+            default:
+                break;
+            }
+            if (!rawTarget.conflictingProfilesSet && targetVersionFamily != CapabilityAtom::Invalid)
+            {
+                // Collect the explicit `-capability` atoms, then ask once whether — folded in the
+                // way `getTargetCaps()` folds them — they raise the emitted target version above
+                // what the profile pins.
+                List<CapabilityName> requestedCapabilities;
+                for (auto atomVal : rawTarget.optionSet.getArray(CompilerOptionName::Capability))
+                {
+                    CapabilityName capabilityName = CapabilityName::Invalid;
+                    switch (atomVal.kind)
+                    {
+                    case CompilerOptionValueKind::Int:
+                        capabilityName = CapabilityName(atomVal.intValue);
+                        break;
+                    case CompilerOptionValueKind::String:
+                        capabilityName = findCapabilityName(atomVal.stringValue.getUnownedSlice());
+                        break;
+                    }
+                    if (capabilityName != CapabilityName::Invalid)
+                        requestedCapabilities.add(capabilityName);
+                }
+
+                if (doRequestedCapabilitiesRaiseTargetVersionAboveProfile(
+                        profile.getCapabilityName(),
+                        requestedCapabilities,
+                        targetVersionFamily))
+                {
+                    m_sink->diagnose(Diagnostics::ConflictingExplicitCapabilityAndProfile{
+                        .profile = profile.getName()});
+                }
+            }
         }
 
         // `-spirv-unified-descriptor-heap-stride` and an explicit non-zero
@@ -4479,6 +4549,17 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             linkage->m_optionSet.getIntOption(CompilerOptionName::SPIRVResourceHeapStride) != 0)
         {
             m_sink->diagnose(Diagnostics::SpirvConflictingDescriptorHeapStrideOptions{});
+        }
+
+        // `-debug-info-include-source` embeds the source into debug information, so it needs
+        // debug information to exist. At `DebugInfoLevel::None` there is no debug scaffolding to
+        // attach the source to, so reject the combination here rather than silently ignoring it.
+        // Note `getDebugInfoLevel()` cannot distinguish an explicit `-g0` from the default (no
+        // `-g`), which also resolves to `None`; both cases are a conflict for this flag.
+        if (linkage->m_optionSet.shouldIncludeSourceInDebugInfo() &&
+            linkage->m_optionSet.getDebugInfoLevel() == DebugInfoLevel::None)
+        {
+            m_sink->diagnose(Diagnostics::DebugInfoIncludeSourceRequiresDebugInfo{});
         }
 
         // TODO: do we need to require that a target must have a profile specified,
@@ -4809,6 +4890,34 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 m_sink->diagnose(
                     Diagnostics::SeparateDebugInfoUnsupportedForTarget{.target = targetName});
             }
+        }
+    }
+
+    // `-debug-info-include-source` only affects the SPIR-V core `OpSource` path. The producer
+    // change that carries source content into the IR runs once for all targets, so warn (rather
+    // than silently do nothing) when it is requested for a non-SPIR-V target, mirroring the
+    // `-separate-debug-info` precedent above.
+    if (linkage->m_optionSet.shouldIncludeSourceInDebugInfo())
+    {
+        // `isSPIRV` covers both the `spirv` and `spirv-asm` targets, which share the SPIR-V
+        // emitter that honors this option.
+        for (const auto& rawTarget : m_rawTargets)
+        {
+            if (!isSPIRV(rawTarget.format))
+            {
+                UnownedStringSlice targetName =
+                    TypeTextUtil::getCompileTargetName(asExternal(rawTarget.format));
+                m_sink->diagnose(
+                    Diagnostics::DebugInfoIncludeSourceUnsupportedForTarget{.target = targetName});
+            }
+        }
+
+        if (m_rawTargets.getCount() == 0 && !isSPIRV(m_defaultTarget.format))
+        {
+            UnownedStringSlice targetName =
+                TypeTextUtil::getCompileTargetName(asExternal(m_defaultTarget.format));
+            m_sink->diagnose(
+                Diagnostics::DebugInfoIncludeSourceUnsupportedForTarget{.target = targetName});
         }
     }
 

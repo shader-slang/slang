@@ -47,3 +47,6 @@ Slang language version 2026 brings these changes on top of Slang 2025:
   in GLSL source code for compatibility reasons.
 - Interface-typed variables can no longer be default-initialized. See GitHub issue
   [#9191](https://github.com/shader-slang/slang/issues/9191) for details.
+- Constructing a 4-dimensional vector from `(vector<T,2>, T)` and `(T, vector<T,2>)` has been removed. In previous language
+  versions, these initializers implicitly converted the scalar `T` argument into a `vector<T,2>`, producing unexpected results.
+  See GitHub issue [#12093](https://github.com/shader-slang/slang/issues/12093) for details.

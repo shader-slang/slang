@@ -2,14 +2,14 @@
 // Shared header file for D3D11 implementation
 #pragma once
 
-#include "../d3d/d3d-swapchain.h"
-#include "../d3d/d3d-util.h"
-#include "../flag-combiner.h"
-#include "../immediate-renderer-base.h"
-#include "../mutable-shader-object.h"
-#include "../nvapi/nvapi-util.h"
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
+#include "gfx/d3d/d3d-swapchain.h"
+#include "gfx/d3d/d3d-util.h"
+#include "gfx/flag-combiner.h"
+#include "gfx/immediate-renderer-base.h"
+#include "gfx/mutable-shader-object.h"
+#include "gfx/nvapi/nvapi-util.h"
 #include "slang-com-ptr.h"
 
 #pragma push_macro("WIN32_LEAN_AND_MEAN")
@@ -29,7 +29,7 @@
 // NVAPI integration is described here
 // https://developer.nvidia.com/unlocking-gpu-intrinsics-hlsl
 
-#include "../nvapi/nvapi-include.h"
+#include "gfx/nvapi/nvapi-include.h"
 #endif
 
 // We will use the C standard library just for printing error messages.

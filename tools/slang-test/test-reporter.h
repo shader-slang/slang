@@ -3,10 +3,10 @@
 #ifndef TEST_REPORTER_H_INCLUDED
 #define TEST_REPORTER_H_INCLUDED
 
-#include "../../source/core/slang-dictionary.h"
-#include "../../source/core/slang-platform.h"
-#include "../../source/core/slang-std-writers.h"
-#include "../../source/core/slang-string-util.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-platform.h"
+#include "core/slang-std-writers.h"
+#include "core/slang-string-util.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <mutex>

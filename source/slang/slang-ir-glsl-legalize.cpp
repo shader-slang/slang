@@ -4354,49 +4354,31 @@ void legalizeEntryPointParameterForGLSL(
             if (dec->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
                 continue;
             auto globalVar = dec->getOperand(0);
-            auto globalVarType = cast<IRPtrTypeBase>(globalVar->getDataType())->getValueType();
-            if (as<IRStructType>(globalVarType))
+            // Route by the scalarized shape, not by the proxy var's syntactic type.
+            // A struct scalarizes to a `tuple` whether standalone or array-nested
+            // (`in triangle S arr[3];`); the array-nested proxy var has array type even
+            // though its scalarized value is a tuple, so a syntactic type test does not
+            // identify the tuple case. `tryReplaceUsesOfStageInput` rewrites the reads of
+            // a tuple structurally (by array element, then by field); it leaves the proxy
+            // var and the stores that initialize it in place (they persist to the emitted
+            // output). The `address` branch below instead splices in the real input and
+            // deallocates the proxy here.
+            if (globalValue.flavor == ScalarizedVal::Flavor::tuple)
             {
                 tryReplaceUsesOfStageInput(context, globalValue, globalVar);
             }
             else
             {
-
-                auto key = dec->getOperand(1);
                 IRInst* realGlobalVar = nullptr;
-
-                // When we relate a "global variable" to a "global parameter" using
-                // kIROp_GlobalVariableShadowingGlobalParameterDecoration, the globalValue flavor
-                // is dependent on the global parameter's type. Struct types for example will relate
-                // to the tuple flavor, while vector types will be related to the address flavor.
-                if (globalValue.flavor == ScalarizedVal::Flavor::tuple)
-                {
-                    if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
-                    {
-                        for (auto elem : tupleVal->elements)
-                        {
-                            if (elem.key == key)
-                            {
-                                realGlobalVar = elem.val.irValue;
-                                if (!realGlobalVar &&
-                                    ScalarizedVal::Flavor::typeAdapter == elem.val.flavor)
-                                {
-                                    if (auto typeAdapterVal =
-                                            as<ScalarizedTypeAdapterValImpl>(elem.val.impl))
-                                    {
-                                        realGlobalVar = typeAdapterVal->val.irValue;
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-                else if (globalValue.flavor == ScalarizedVal::Flavor::address)
+                if (globalValue.flavor == ScalarizedVal::Flavor::address)
                 {
                     realGlobalVar = globalValue.irValue;
                 }
                 else
+                    // Other flavors (e.g. a top-level `typeAdapter` for a
+                    // type-adapted system value) had their uses rewritten by the
+                    // `tryReplaceUsesOfStageInput(context, globalValue, pp)` call above,
+                    // so there is nothing to splice here.
                     continue;
                 SLANG_ASSERT(realGlobalVar);
 
@@ -4418,9 +4400,6 @@ void legalizeEntryPointParameterForGLSL(
                             }
                         }
                     });
-                // we will be replacing uses of `globalVarToReplace`. We need
-                // globalVarToReplaceNextUse to catch the next use before it is removed from the
-                // list of uses.
                 globalVar->replaceUsesWith(realGlobalVar);
                 globalVar->removeAndDeallocate();
             }

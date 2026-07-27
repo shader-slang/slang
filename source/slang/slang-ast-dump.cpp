@@ -1,7 +1,7 @@
 // slang-ast-dump.cpp
 #include "slang-ast-dump.h"
 
-#include "../core/slang-string.h"
+#include "core/slang-string.h"
 #include "slang-ast-dispatch.h"
 #include "slang-compiler.h"
 
