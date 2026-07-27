@@ -11,15 +11,13 @@
 //TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -DVER_2027
 //TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -DVER_2027_2
 
-//TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv -DLANG_GLSL
-
 //TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIAG1): -target spirv -DVER_ILLEGAL
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIAG2): -target spirv -DVER_ILLEGAL2
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIAG3): -target spirv -DVER_ILLEGAL3
 //DIAGNOSTIC_TEST:SIMPLE(diag=DIAG4): -target spirv -DVER_ILLEGAL4
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG5): -target spirv -DVER_ILLEGAL5
-//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG6): -target spirv -DLANG_ILLEGAL
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG5): -target spirv -DLANG_ILLEGAL
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG6): -target spirv -DLANG_ILLEGAL_2
 
 // Note: tests/compute/cast-zero-to-struct.slang has testing for Slang 2026 vs 2027 behavior
 
@@ -37,10 +35,6 @@
 
 #ifdef VER_2027_2
 #language 202c
-#endif
-
-#ifdef LANG_GLSL
-#language glsl 450
 #endif
 
 #ifdef VER_LATEST1
@@ -83,19 +77,19 @@
 */
 #endif
 
-#ifdef VER_ILLEGAL5
-#lang glsl 1234
+#ifdef LANG_ILLEGAL
+#lang illegal
 /*DIAG5:
- ^^^^ unknown language version
- ^^^^ unknown language version '1234'
+ ^^^^ unknown language
+ ^^^^ unknown language 'illegal'
 */
 #endif
 
-#ifdef LANG_ILLEGAL
-#lang illegal
+#ifdef LANG_ILLEGAL_2
+#language glsl 450
 /*DIAG6:
- ^^^^ unknown language
- ^^^^ unknown language 'illegal'
+ ^^^^^^^^ unknown language
+ ^^^^^^^^ unknown language 'glsl'
 */
 #endif
 

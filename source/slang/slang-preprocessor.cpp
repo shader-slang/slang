@@ -4531,33 +4531,36 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
 // SLANG_LANGUAGE_VERSION_UNKNOWN on error.
 static SlangLanguageVersion TranslateSlangLanguageVersionToken(const Token& token)
 {
-    SlangLanguageVersion version = SLANG_LANGUAGE_VERSION_UNKNOWN;
-
     if (token.getContent() == "latest")
-        version = SLANG_LANGUAGE_VERSION_LATEST;
+        return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_LATEST;
     else if (token.getContent() == "legacy")
-        version = SLANG_LANGUAGE_VERSION_LEGACY;
+        return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_LEGACY;
     else if (token.getContent() == "next")
-        version = SLANG_LANGUAGE_VERSION_NEXT;
+        return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_NEXT;
     else if (token.getContent().caseInsensitiveEquals(toSlice("202a")))
-        version = SLANG_LANGUAGE_VERSION_202A;
+        return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_202A;
     else if (token.getContent().caseInsensitiveEquals(toSlice("202b")))
-        version = SLANG_LANGUAGE_VERSION_202B;
+        return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_202B;
     else if (token.getContent().caseInsensitiveEquals(toSlice("202c")))
-        version = SLANG_LANGUAGE_VERSION_202C;
+        return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_202C;
     else if (token.type == TokenType::IntegerLiteral)
-        version = (SlangLanguageVersion)stringToInt(token.getContent());
+        return static_cast<SlangLanguageVersion>(stringToInt(token.getContent()));
 
-    return version;
+    return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_UNKNOWN;
 }
 
+// Handle language directive. The syntax is:
+//
+//     "#lang" ["slang"] <version>
+//
+// or
+//
+//     "#language" ["slang"] <version>
 static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
 {
-    int version = SLANG_LANGUAGE_VERSION_UNKNOWN;
     bool languageSpecified = false;
     bool hasVersionToken = false;
     Token versionToken{};
-    SourceLanguage language = SourceLanguage::Slang;
 
     if (PeekTokenType(context) == TokenType::Identifier)
     {
@@ -4565,13 +4568,6 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
         auto token = AdvanceToken(context);
         if (token.getContent().caseInsensitiveEquals(toSlice("slang")))
         {
-            language = SourceLanguage::Slang;
-            token = AdvanceToken(context);
-            languageSpecified = true;
-        }
-        else if (token.getContent() == "glsl")
-        {
-            language = SourceLanguage::GLSL;
             token = AdvanceToken(context);
             languageSpecified = true;
         }
@@ -4595,39 +4591,21 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
 
     if (hasVersionToken)
     {
-        bool validVersion = false;
+        // Slang version
+        SlangLanguageVersion version = TranslateSlangLanguageVersionToken(versionToken);
 
-        if (language == SourceLanguage::Slang)
+        if (isValidSlangLanguageVersion(version))
         {
-            // Slang version
-            version = TranslateSlangLanguageVersionToken(versionToken);
-
-            if (isValidSlangLanguageVersion(version))
-            {
-                context->m_preprocessor->language = SourceLanguage::Slang;
-                context->m_preprocessor->languageVersion = (SlangLanguageVersion)version;
-                validVersion = true;
-            }
+            context->m_preprocessor->language = SourceLanguage::Slang;
+            context->m_preprocessor->languageVersion = version;
         }
         else
-        {
-            // GLSL version, but note that we don't actually care about the GLSL
-            // version number
-            version = stringToInt(versionToken.getContent());
-            if (isValidGLSLVersion(version))
-            {
-                context->m_preprocessor->language = SourceLanguage::GLSL;
-                validVersion = true;
-            }
-        }
-
-        if (!validVersion)
         {
             // Invalid/bad version, figure out the correct diagnostics
 
             if ((!languageSpecified) && (versionToken.type == TokenType::Identifier))
             {
-                // Language not specified, so we interpret identifier as language
+                // Language not specified, so we interpret the bad identifier token as a language
                 GetSink(context)->diagnose(Diagnostics::UnknownLanguage{
                     .language = versionToken.getContent(),
                     .location = GetDirectiveLoc(context)});
@@ -4638,7 +4616,7 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
             {
                 // Either:
                 // - integer literal (always interpreted as a version)
-                // - identifier AND language was specified (interpret as a version)
+                // - identifier token AND language was specified (interpret as a version)
                 GetSink(context)->diagnose(Diagnostics::UnknownLanguageVersion{
                     .version = versionToken.getContent(),
                     .location = GetDirectiveLoc(context)});
