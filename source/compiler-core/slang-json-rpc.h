@@ -1,7 +1,7 @@
 #ifndef SLANG_COMPILER_CORE_JSON_RPC_H
 #define SLANG_COMPILER_CORE_JSON_RPC_H
 
-#include "../core/slang-http.h"
+#include "core/slang-http.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang-json-parser.h"

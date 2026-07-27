@@ -1718,6 +1718,7 @@ A capability describes an optional feature that a target may or may not support.
 * `sm_6_9` 
 * `sm_6_10_version` 
 * `sm_6_10` 
+* `sm_latest` 
 * `DX_4_0` 
 * `DX_4_1` 
 * `DX_5_0` 
@@ -1744,6 +1745,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GLSL_440` : enables the GLSL_440 extension 
 * `GLSL_450` : enables the GLSL_450 extension 
 * `GLSL_460` : enables the GLSL_460 extension 
+* `GLSL_latest` : enables the GLSL_latest extension 
 * `GLSL_410_SPIRV_1_0` : enables the GLSL_410_SPIRV_1_0 extension 
 * `GLSL_420_SPIRV_1_0` : enables the GLSL_420_SPIRV_1_0 extension 
 * `GLSL_430_SPIRV_1_0` : enables the GLSL_430_SPIRV_1_0 extension 

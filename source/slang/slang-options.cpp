@@ -5,24 +5,24 @@
 
 #include "slang-options.h"
 
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../compiler-core/slang-artifact-impl.h"
-#include "../compiler-core/slang-artifact-representation-impl.h"
-#include "../compiler-core/slang-command-line-args.h"
-#include "../compiler-core/slang-core-diagnostics.h"
-#include "../compiler-core/slang-name-convention-util.h"
-#include "../compiler-core/slang-source-embed-util.h"
-#include "../core/slang-castable.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-command-options-writer.h"
-#include "../core/slang-file-system.h"
-#include "../core/slang-hex-dump-util.h"
-#include "../core/slang-name-value.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-string-slice-pool.h"
-#include "../core/slang-string-util.h"
-#include "../core/slang-type-text-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-impl.h"
+#include "compiler-core/slang-artifact-representation-impl.h"
+#include "compiler-core/slang-command-line-args.h"
+#include "compiler-core/slang-core-diagnostics.h"
+#include "compiler-core/slang-name-convention-util.h"
+#include "compiler-core/slang-source-embed-util.h"
+#include "core/slang-castable.h"
+#include "core/slang-char-util.h"
+#include "core/slang-command-options-writer.h"
+#include "core/slang-file-system.h"
+#include "core/slang-hex-dump-util.h"
+#include "core/slang-name-value.h"
+#include "core/slang-platform.h"
 #include "core/slang-stream.h"
+#include "core/slang-string-slice-pool.h"
+#include "core/slang-string-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-compiler-options.h"
 #include "slang-compiler.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
@@ -3567,21 +3567,21 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         case OptionKind::DenormalModeFp16:
             {
-                FloatingPointDenormalMode value;
+                FloatingPointDenormalMode value = FloatingPointDenormalMode::Any;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp16, value);
                 break;
             }
         case OptionKind::DenormalModeFp32:
             {
-                FloatingPointDenormalMode value;
+                FloatingPointDenormalMode value = FloatingPointDenormalMode::Any;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp32, value);
                 break;
             }
         case OptionKind::DenormalModeFp64:
             {
-                FloatingPointDenormalMode value;
+                FloatingPointDenormalMode value = FloatingPointDenormalMode::Any;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp64, value);
                 break;

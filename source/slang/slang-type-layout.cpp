@@ -1,7 +1,7 @@
 // slang-type-layout.cpp
 #include "slang-type-layout.h"
 
-#include "../compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
 #include "slang-check-impl.h"
 #include "slang-ir-insts.h"
 #include "slang-mangle.h"
