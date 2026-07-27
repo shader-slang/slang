@@ -2263,6 +2263,7 @@ Result linkAndOptimizeIR(
             // global. Reuse the GLSL resource-return fallback pass restricted to that single case.
             // WGSL cannot keep a `[noinline]` groupshared-parameter boundary; that conflict is
             // normally FE-diagnosed, and the pass reports it as a backstop if one survives to here.
+            auto errorCountBeforeInlining = sink->getErrorCount();
             SLANG_PASS(
                 performGLSLResourceReturnFunctionInlining,
                 targetProgram,
@@ -2270,9 +2271,10 @@ Result linkAndOptimizeIR(
                 true,
                 GroupSharedNoInlinePolicy::NoInlineBoundaryIllegal);
 
-            // Abort if the fallback pass reported an illegal `[noinline]` groupshared boundary,
-            // before `legalizeIRForWGSL` runs on IR it cannot legalize.
-            if (sink->getErrorCount() != 0)
+            // Abort if this pass reported an illegal `[noinline]` groupshared boundary, before
+            // `legalizeIRForWGSL` runs on IR it cannot legalize. Compare against the pre-pass count
+            // so an unrelated earlier diagnostic does not suppress the WGSL legalization pass.
+            if (sink->getErrorCount() != errorCountBeforeInlining)
                 return SLANG_FAIL;
 
             SLANG_PASS(legalizeIRForWGSL, targetProgram, sink);
@@ -2450,6 +2452,7 @@ Result linkAndOptimizeIR(
             isSPIRV(target) && targetProgram->getOptionSet().shouldEmitSPIRVDirectly();
         auto noInlinePolicy = isDirectSpirv ? GroupSharedNoInlinePolicy::AllowNoInlineBoundary
                                             : GroupSharedNoInlinePolicy::NoInlineBoundaryIllegal;
+        auto errorCountBeforeInlining = sink->getErrorCount();
         SLANG_PASS(
             performGLSLResourceReturnFunctionInlining,
             targetProgram,
@@ -2457,9 +2460,11 @@ Result linkAndOptimizeIR(
             false,
             noInlinePolicy);
 
-        // If the pass reported an illegal `[noinline]` groupshared boundary, stop before later
-        // passes run on IR they cannot legalize.
-        if (sink->getErrorCount() != 0)
+        // If this pass reported an illegal `[noinline]` groupshared boundary, stop before later
+        // passes run on IR they cannot legalize. Compare against the count taken just above rather
+        // than testing for any error, so an unrelated earlier diagnostic does not suppress the
+        // later diagnostic passes (which a diagnostic test may also expect to fire).
+        if (sink->getErrorCount() != errorCountBeforeInlining)
             return SLANG_FAIL;
     }
     validateIRModuleIfEnabled(codeGenContext, irModule);
