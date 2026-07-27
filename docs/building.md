@@ -584,7 +584,37 @@ Caveats:
   them (`slang.neural`, `experimental.workgraph`, ...). `getStandardModuleDirPath()` in
   `slang-session.cpp` locates them next to whichever binary contains
   `slang_createGlobalSession`, which for a static build is the host executable, so that
-  directory has to be deployed alongside it.
+  directory has to be deployed alongside it. See the note below on excluding them.
+
+#### The standard modules are excluded from a static distribution
+
+The standard modules are the one part of Slang that a static link cannot absorb. They are
+pre-compiled `.slang-module` data files, not code, and `findStandardModulePath()` resolves
+them by looking for `<dir-of-slang_createGlobalSession>/slang-standard-module-<version>/`
+on disk at import time. Linking Slang into a host binary does not change that; it only
+moves the directory the compiler searches, from next to `libslang-compiler.so` to next to
+the host executable.
+
+For a static distribution whose whole point is a single self-contained binary, shipping a
+5.9 MB sibling directory defeats the exercise, and build systems that consume a static
+library (Cargo, in particular) have no supported way to place data files next to the final
+executable. So a static release built from this branch deliberately ships **only** the
+library and headers, and drops `slang.neural` and `experimental.workgraph`.
+
+The cost is bounded and explicit: a shader that says `import slang.neural;` or
+`import experimental.workgraph;` gets a module-not-found diagnostic instead of compiling.
+Nothing else is affected — `findStandardModulePath()` returns an empty path when the
+directory is missing, and the core module is embedded in the binary
+(`SLANG_EMBED_CORE_MODULE`), so ordinary SPIR-V and WGSL compilation needs no files on
+disk at all.
+
+Both modules are built and installed unconditionally today
+(`add_custom_target(... ALL ...)` plus an unconditional `install()` in
+`source/standard-modules/neural/CMakeLists.txt` and
+`source/standard-modules/experimental/CMakeLists.txt`), so excluding them is currently a
+packaging step: omit `lib/slang-standard-module-<version>/` when assembling the release
+archive. If the build-time cost matters, gating both `add_subdirectory()` calls in
+`source/standard-modules/CMakeLists.txt` behind an option is the natural follow-up.
 - The `slang-glslang` module is built with `-Wl,--exclude-libs,ALL`, which keeps the
   glslang and SPIRV-Tools symbols private. The static archive cannot do that at link
   time, so a `SHARED` build that also sets `SLANG_EMBED_SLANG_GLSLANG=ON` may re-export
