@@ -3327,7 +3327,8 @@ static SlangResult createArtifactFromIR(
     const bool needsLink = downstreamLinkingAllowed && spirvFiles.getCount() > 1;
     // `-Xspirv-opt <flag>` selects individual optimizer passes explicitly, so it must run the
     // optimizer even at `-O0` (where the preset is empty). Detecting them here also keeps a plain
-    // `-O0` compile -- with no such flags -- from loading `slang-glslang` at all (issue #11662).
+    // `-O0` compile -- with no such flags, and no link/validation/separate-debug-info -- from
+    // loading `slang-glslang` (issue #11662).
     List<String> spirvOptArgs =
         codeGenContext->getTargetProgram()->getOptionSet().getDownstreamArgs("spirv-opt");
     const bool needsOptimization =
