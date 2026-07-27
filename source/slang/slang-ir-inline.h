@@ -31,14 +31,37 @@ bool performPreAutoDiffForceInlining(IRGlobalValueWithCode* func);
 /// Perform force inlining of all functions in a module that does not have custom derivatives.
 bool performPreAutoDiffForceInlining(IRModule* module);
 
+/// Policy for a callee that carries a bare `groupshared` (by-reference) parameter together with
+/// `[noinline]` (`IRNoInlineDecoration`). The `[noinline]` boundary is always preserved (the
+/// callee is never force-inlined for either policy); the policy only decides whether that boundary
+/// is legal on the target:
+///   - `AllowNoInlineBoundary`: direct SPIR-V keeps the boundary, and emit declares
+///     `SPV_KHR_variable_pointers` for the surviving Workgroup-pointer signature.
+///   - `NoInlineBoundaryIllegal`: GLSL / SPIR-V-via-GLSL / WGSL cannot represent such a boundary.
+///     The front end normally diagnoses this at the producer; when this policy is selected the pass
+///     also reports it as a backstop (see the function comment) so the drift path yields a clean
+///     error rather than emitting invalid code.
+enum class GroupSharedNoInlinePolicy
+{
+    AllowNoInlineBoundary,
+    NoInlineBoundaryIllegal,
+};
+
 /// Inline calls to functions that returns a resource/sampler via either return value or output
 /// parameter. When `groupSharedByRefOnly` is true, only functions with a `groupshared`
 /// by-reference parameter are inlined (used for WGSL, which handles resources fine but cannot take
 /// a `ptr<workgroup>` as a function parameter); otherwise the full GLSL fallback set is inlined.
+/// `noInlinePolicy` governs a `[noinline]` callee with a groupshared parameter (see the enum). When
+/// the policy is `NoInlineBoundaryIllegal`, `sink` receives a diagnostic for any such callee that
+/// survives to this pass; the front end normally diagnoses the conflict first, but link-time option
+/// changes (e.g. `linkWithOptions` selecting SPIR-V-via-GLSL after semantic checking) can select
+/// this policy for a module the front end accepted, so a clean diagnostic here is the backstop.
 void performGLSLResourceReturnFunctionInlining(
     IRModule* module,
     TargetProgram* targetProgram,
-    bool groupSharedByRefOnly = false);
+    DiagnosticSink* sink,
+    bool groupSharedByRefOnly = false,
+    GroupSharedNoInlinePolicy noInlinePolicy = GroupSharedNoInlinePolicy::NoInlineBoundaryIllegal);
 
 /// Inline simple intrinsic functions whose definition is a single asm block.
 void performIntrinsicFunctionInlining(IRModule* module);

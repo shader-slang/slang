@@ -3693,6 +3693,27 @@ err(
     span { loc = "modifier:Modifier" }
 )
 
+err(
+    "groupshared-parameter-not-allowed-on-hlsl-with-boundary",
+    30708,
+    "a 'groupshared' parameter is not allowed on a function marked '~modifierName' when targeting HLSL; HLSL cannot pass thread-group-shared memory across a function boundary",
+    span { loc = "paramDecl:Decl", message = "'groupshared' parameter here" }
+)
+
+err(
+    "groupshared-parameter-requires-inlining-on-target",
+    30709,
+    "'[noinline]' on a function with a 'groupshared' parameter cannot be honored on the '~targetName' target, which requires the function to be inlined to pass thread-group-shared memory; remove '[noinline]' or the 'groupshared' parameter",
+    span { loc = "paramDecl:Decl", message = "'groupshared' parameter here" }
+)
+
+err(
+    "groupshared-parameter-requires-inlining-on-target-ir",
+    30710,
+    "function '~func:IRInst' has a 'groupshared' parameter and '[noinline]', which the current target requires to be inlined to pass thread-group-shared memory; remove '[noinline]' or the 'groupshared' parameter",
+    span { loc = "func:IRInst" }
+)
+
 --
 -- 308xx: inheritance
 --

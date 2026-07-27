@@ -11976,6 +11976,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         requireVariableBufferCapabilityIfNeeded(funcType->getResultType());
         for (UInt i = 0; i < funcType->getParamCount(); i++)
             requireVariableBufferCapabilityIfNeeded(funcType->getParamType(i));
+
+        // A bare `groupshared` (by-reference) parameter (#10641) carries its Workgroup storage on
+        // the parameter's *rate* (`IRGroupSharedRate`), not on the pointer type recorded in the
+        // function type -- so the func-type walk above never sees the Workgroup address space. Walk
+        // the parameter insts directly and require `VariablePointers` for any that are
+        // group-shared.
+        for (auto param : irFunc->getParams())
+        {
+            if (as<IRGroupSharedRate>(param->getRate()) && as<IRPtrTypeBase>(param->getDataType()))
+                requireSPIRVVariablePointersCapability(SpvCapabilityVariablePointers);
+        }
     }
 
     // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode
