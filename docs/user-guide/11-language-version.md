@@ -17,12 +17,12 @@ Users are advised to provide a `#language` directive as the first non-whitespace
 
 The following language versions are recognized by the compiler:
 
-Language version | Aliases      | Development status  | Remarks
----------------- | ------------ | ------------------- | --------------------------------------------
-2018             | legacy       | Stable              | Current default, breaking changes avoided
-2025             | 202a         | Stable              | Breaking changes avoided
-2026             | 202b, latest | Stable              | Breaking changes avoided
-202c             | next         | In development      | Development version, expect breaking changes
+Language version | Aliases         | Development status  | Remarks
+---------------- | --------------- | ------------------- | --------------------------------------------
+2018             | default, legacy | Stable              | Current default, breaking changes avoided
+2025             | 202a            | Stable              | Breaking changes avoided
+2026             | 202b, latest    | Stable              | Breaking changes avoided
+202c             | next            | In development      | Development version, expect breaking changes
 
 If no `#language` line exists and no version is specified via compiler options, the default setting is `legacy`.
 
