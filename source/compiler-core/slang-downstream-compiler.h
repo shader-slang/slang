@@ -277,6 +277,12 @@ struct DownstreamCompileOptions
     /// The stage being compiled for
     SlangStage stage = SLANG_STAGE_NONE;
 
+    /// For Metal (MetalAIR) compiles, the Metal language standard to request via `-std=metalX.Y`.
+    /// Left unset (all-zero) for every other target and for Metal targets that do not opt into a
+    /// specific version; in that case the downstream Metal compile falls back to its historical
+    /// default standard (`-std=metal3.1`).
+    SemanticVersion metalLanguageVersion;
+
     /// Arguments that are specific to a particular compiler implementation.
     Slice<TerminatedCharSlice> compilerSpecificArguments;
 
@@ -293,15 +299,11 @@ struct DownstreamCompileOptions
     FloatingPointDenormalMode denormalModeFp32 = FloatingPointDenormalMode::Any;
     FloatingPointDenormalMode denormalModeFp64 = FloatingPointDenormalMode::Any;
 
-    /// For Metal (MetalAIR) compiles, the Metal language standard to request via `-std=metalX.Y`.
-    /// Left unset (all-zero) for every other target and for Metal targets that do not opt into a
-    /// specific version; in that case the downstream Metal compile falls back to its historical
-    /// default standard (`-std=metal3.1`).
-    SemanticVersion metalLanguageVersion;
-
     /// For Metal (MetalAIR) compiles, request `-fmetal-enable-logging`. Without it the metallib
     /// carries no logging metadata and shader `os_log` calls are dropped at runtime.
-    bool enableMetalLogging = false;
+    /// `alignas` keeps this off the previous version's trailing padding byte, so that the struct
+    /// also grows in size and `getCompatibleVersion` defaults it rather than reading that padding.
+    alignas(8) bool enableMetalLogging = false;
 };
 static_assert(std::is_trivially_copyable_v<DownstreamCompileOptions>);
 
