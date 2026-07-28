@@ -6967,8 +6967,8 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt, AllowCaseDefaultStatements allowC
         statement = parseIntrinsicAsmStmt(this);
     else if (LookAheadToken("case"))
     {
-        statement = ParseCaseStmt(this);    // should always return non-null
-        SLANG_RELEASE_ASSERT(statement);    // ... so we'll assert that it's the case
+        statement = ParseCaseStmt(this); // should always return non-null
+        SLANG_RELEASE_ASSERT(statement); // ... so we'll assert that it's the case
         if (allowCaseDefault != AllowCaseDefaultStatements::Allow)
             sink->diagnose(Diagnostics::CaseOutsideSwitch{.stmt = statement});
     }
