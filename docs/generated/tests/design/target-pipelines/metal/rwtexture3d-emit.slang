@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00Z
 //META: source_commit=1106750632bd5fb062ea9e50319f7763d34f78d5
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#legalizeimagesubscript
-//META: doc_section_digest=dc38574e0fa7014bd162d7abd7e6c65c7f19c4c34a5ad5406321c1963ab37f95
+//META: doc_section_digest=25850c290ac50a3e82687e98c46c2de0d091ae0c4c7fe779c2a1f56a5456831e
 //META: purpose=RWTexture3D<float4> emits as metal::texture3d<float, access::read_write> and legalizeImageSubscript rewrites subscript-store into .write() / subscript-load into .read().
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

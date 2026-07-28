@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#per-keyword-semantics
-//META: doc_section_digest=ce44867411acd029099bae586609553fe57570c9431906d8d42a8d17c424b6bc
+//META: doc_section_digest=5ed89b211beca6ec6df445f7d63a9889da0768b35a383df6c7c268b0424663dc
 //META: purpose=A `private` field is not visible outside its enclosing aggregate; access from a free function is rejected.
 //META: intent=negative
 //META: pipeline_stage=check

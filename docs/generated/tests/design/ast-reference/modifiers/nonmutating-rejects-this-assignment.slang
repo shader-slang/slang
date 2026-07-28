@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:50:00+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#mutability-autodiff-annotations
-//META: doc_section_digest=017266f7b5d727836de4cd07bb1c2bfcdb0d82e30647d5be27f19fbfcea1a2dc
+//META: doc_section_digest=3959c707a386e75c3eea38b819f320935508e4d38543a0a9aeb0a01aca4d3471
 //META: purpose=A non-`[mutating]` struct method cannot assign through `this`; the checker diagnoses it.
 //META: intent=negative
 //META: pipeline_stage=check

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#accessordecl-family
-//META: doc_section_digest=1ed46d6cbf110c7915cfeb70b35be1654971c6062c82f1442ee85f909657d1e8
+//META: doc_section_digest=7ab459ecbfa076cb34ec94ae11dca1b7bd65f74d607addf906138dac14f78530
 //META: purpose=A RefAccessorDecl is emitted by the HLSL backend as a return-by-reference helper; the ref accessor's body appears in the emitted text.
 //META: intent=functional
 //META: pipeline_stage=emit

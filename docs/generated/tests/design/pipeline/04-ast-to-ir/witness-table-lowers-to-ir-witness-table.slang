@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:30:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#generics-and-existentials
-//META: doc_section_digest=6c19be2b98b712dfb44e27eac1a62628a55a8795cf5a111496e7292369d1578c
+//META: doc_section_digest=d6ee07799b141a6850f1700c9e4ae870d18815ea897d847d8fe60117b962be60
 //META: purpose=A WitnessTable synthesized in checking lowers to an `IRWitnessTable` whose entries map interface requirements to concrete implementations.
 //META: intent=functional
 //META: pipeline_stage=lower

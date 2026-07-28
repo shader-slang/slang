@@ -1,22 +1,22 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-12T13:17:33+00:00
+reviewed_at: 2026-06-30T13:26:46+00:00
 target_doc: architecture/overview.md
-target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_watched_paths_digest: 27462c385136ef073434b5258573aa3428e1b1ede07eb649ae3e32b68e3a86c3
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: afbd89494a4fc2b1e32feff2a72cd537b19b3ce0b699732634ab56f8de8603f1
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
   factual_accuracy: pass
   cross_references: pass
-  completeness: pass
+  completeness: partial
   style_consistency: pass
-  source_alignment: pass
+  source_alignment: partial
   front_matter_validity: pass
-finding_count: 0
+finding_count: 1
 severity_breakdown:
   critical: 0
-  major: 0
+  major: 1
   minor: 0
   nit: 0
 ---
@@ -24,20 +24,21 @@ severity_breakdown:
 # Review report for architecture/overview.md
 
 ## Summary
-The page passes the review checklist. Its required sections are present, the relative links checked cleanly, and the source spot checks matched the current request, module, public API, build, and source-tree organization code.
+The overview is broadly accurate for the central compiler objects and the included watched CMake/header claims. The main issue is prompt conformance: many required top-level subsystem entries cite only directories or files outside this page's resolved watched paths, even though the prompt requires each listed subsystem to cite at least one concrete file path that exists in the watched paths.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show architecture/overview.md` and reviewed the per-doc prompt, common prompt, manifest entry, and resolved watched files.
-- Checked front matter for all required keys, the recorded source commit, the warning string, and a 64-character hex watched-path digest.
-- Checked relative links in the document body, including source directories, public headers, generated peer documents, and handwritten design docs; no dangling links were found in the final lint run.
-- Verified the required sections: `## Purpose`, `## Top-level decomposition`, `## Compilation request lifecycle`, `## Where the public API lives`, and `## Reading guide`.
-- Spot-checked more than 10 factual claims against source, including `slangc` and `slang-rt` build targets, `libslang` wiring in `source/slang/CMakeLists.txt`, `Session` / `Linkage`, `FrontEndCompileRequest`, `EndToEndCompileRequest`, `CodeGenContext`, `TargetRequest`, `Module`, `IComponentType`, and public API interfaces in `include/slang.h`.
-- Checked that no body line-number citations needed verification; the document uses file links without source line anchors.
+- Ran `regenerate.py show architecture/overview.md` and reviewed the target document, `_common.md`, `architecture-overview.md`, and all 9 resolved watched files for this document.
+- Checked front matter for all required keys, the recorded target source commit, the warning string, and a 64-character hex watched-path digest copied from the target document.
+- Spot-checked more than 10 concrete claims against watched files, including the `slang` target's CMake links, `source/core/` external-only link list, `source/compiler-core/` linking to `core` and `fast_float`, `CompileRequestBase`, `FrontEndCompileRequest`, `FrontEndEntryPointRequest`, `TranslationUnitRequest`, `Module`, `IModule`, `IComponentType`, `IGlobalSession`, and `ISession`.
+- Checked the compilation-request lifecycle section against `source/slang/slang-compile-request.h`, `source/slang/slang-module.h`, `source/slang/slang-compile-request.cpp`, `source/slang/slang-module.cpp`, and `include/slang.h`.
+- Checked the visible relative links used for generated peer documents and representative workspace files; no dangling relative links were found in the checked set.
 
 ## Findings
-(no findings)
+| ID | Severity | Location | Description | Evidence | Recommendation |
+| --- | --- | --- | --- | --- | --- |
+| F-001 | major | `## Top-level decomposition`, lines 88-127 | Several required subsystem entries do not satisfy the per-doc prompt's citation contract. The standard libraries, downstream shims, runtime/bindings, driver/tooling, and auxiliary-tree entries mostly cite directories or files outside this page's resolved watched paths, rather than at least one concrete file path that exists in the watched paths. | `docs/generated/design/_meta/prompts/architecture-overview.md:61-62` requires each listed subsystem to cite at least one concrete file path that exists in the watched paths; `regenerate.py show architecture/overview.md` resolves only `CLAUDE.md`, `include/slang.h`, `source/compiler-core/CMakeLists.txt`, `source/core/CMakeLists.txt`, `source/slang/CMakeLists.txt`, `source/slang/slang-compile-request.{h,cpp}`, and `source/slang/slang-module.{h,cpp}`. | Either expand the manifest watched paths to include representative files for every required subsystem and cite them, or revise the affected entries to follow `_common.md` by saying the information was not located in the watched paths and proposing the additional paths to add. |
 
 ## No-issues notes
-- The lifecycle section accurately avoids presenting `BackEndCompileRequest` as a current standalone type and points readers at `CodeGenContext` for backend work.
-- The top-level decomposition stays at architecture level and does not drift into pass-by-pass pipeline documentation.
-- The public API section correctly distinguishes `include/slang.h` from implementation code under `source/`.
+- The front matter is structurally valid and uses the target document's own source commit and watched-path digest.
+- The `Module` description matches `source/slang/slang-module.h`, including its role as `IModule`, front-end output, checked AST/IR holder, and `ComponentType` subclass.
+- The public API section correctly identifies `include/slang.h` as the COM-style API surface and distinguishes `IGlobalSession`, `ISession`, `IModule`, and `IComponentType`.

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#enumdecl-and-enumcasedecl
-//META: doc_section_digest=b72726890459268d21bfd18ef8977151c7699c0ba49e17682e79c4cb2cfa2ff4
+//META: doc_section_digest=c018493cff4ea0d125fd96032328c7a624df200e9019bef0883c86de143f6642
 //META: purpose=An EnumDecl is treated as an AggTypeDecl so enum types can have conformances; an interface-constrained generic accepts an enum value.
 //META: intent=functional
 //META: pipeline_stage=check

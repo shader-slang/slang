@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T18:00:00+00:00
-//META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
-//META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=7d43267959b0c547516266beea43e6e96622d37270bfab810d9819a48f90812b
-//META: purpose=A BinaryExpr `a % b` on integers lowers to an `irem` IR opcode — the integer-remainder pure-value inst in the arithmetic row.
+//META: model=claude-fable-5
+//META: generated_at=2026-07-08T16:30:00Z
+//META: source_commit=110ca68915f1b6690e19a647e3437e1ad1f78a03
+//META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#builtin-operators-bypass-call-lowering
+//META: doc_section_digest=e70a29d1d218a8caa31a9b05ae27e6e9e79c2c46f8f65751d8428df1ad6141c2
+//META: purpose=A builtin `a % b` on integer operands lowers to an `irem` IR opcode — the doc says `%` picks `IRIRem` for non-floating-point operands.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Boundary: arithmetic-operator axis. Integer modulo is a documented
-// arithmetic operator; the doc's pure-value-inst row covers any
-// arithmetic Expr. The dump opcode is `irem` (integer remainder)
-// rather than `mod` — the IR-side spelling.
+// Verifies the element-type selection for `%`: non-floating-point
+// operands pick the integer-remainder opcode. The dump opcode is
+// `irem` (integer remainder) rather than `mod` — the IR-side
+// spelling of `IRIRem`.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

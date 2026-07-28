@@ -23,9 +23,15 @@ standard output = {
                                     "elementType": {
                                         "kind": "scalar",
                                         "scalarType": "float32"
-                                    }
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 16, "alignment": 4}
+                                    ]
                                 },
-                                "uniformStride": 16
+                                "uniformStride": 16,
+                                "sizes": [
+                                    {"kind": "uniform", "value": 64, "alignment": 16}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 0, "size": 64, "elementStride": 16}
                         },
@@ -37,10 +43,16 @@ standard output = {
                                 "elementType": {
                                     "kind": "scalar",
                                     "scalarType": "float32"
-                                }
+                                },
+                                "sizes": [
+                                    {"kind": "uniform", "value": 16, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 64, "size": 16, "elementStride": 4}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "uniform", "value": 80, "alignment": 16}
                     ]
                 },
                 "containerVarLayout": {
@@ -61,9 +73,15 @@ standard output = {
                                         "elementType": {
                                             "kind": "scalar",
                                             "scalarType": "float32"
-                                        }
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 16, "alignment": 4}
+                                        ]
                                     },
-                                    "uniformStride": 16
+                                    "uniformStride": 16,
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 64, "alignment": 16}
+                                    ]
                                 },
                                 "binding": {"kind": "uniform", "offset": 0, "size": 64, "elementStride": 16}
                             },
@@ -75,14 +93,23 @@ standard output = {
                                     "elementType": {
                                         "kind": "scalar",
                                         "scalarType": "float32"
-                                    }
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 16, "alignment": 4}
+                                    ]
                                 },
                                 "binding": {"kind": "uniform", "offset": 64, "size": 16, "elementStride": 4}
                             }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 80, "alignment": 16}
                         ]
                     },
                     "binding": {"kind": "uniform", "offset": 0, "size": 80, "elementStride": 0}
-                }
+                },
+                "sizes": [
+                    {"kind": "constantBuffer", "value": 1}
+                ]
             }
         },
         {
@@ -98,8 +125,14 @@ standard output = {
                     "elementType": {
                         "kind": "scalar",
                         "scalarType": "float32"
-                    }
-                }
+                    },
+                    "sizes": [
+                        {"kind": "uniform", "value": 16, "alignment": 4}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "unorderedAccess", "value": 1}
+                ]
             }
         }
     ],
@@ -113,7 +146,10 @@ standard output = {
                     "semanticName": "SV_DISPATCHTHREADID",
                     "type": {
                         "kind": "scalar",
-                        "scalarType": "uint32"
+                        "scalarType": "uint32",
+                        "sizes": [
+
+                        ]
                     }
                 }
             ],

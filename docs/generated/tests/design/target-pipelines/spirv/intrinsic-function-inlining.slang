@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:30:00+00:00
 //META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination
-//META: doc_section_digest=0621b76c92d5c66950f6bf752610276ae5f48c99c52c396b6035b11ef340daa4
+//META: doc_section_digest=adbc9f62b2b56295371ba0ea74f7f7385925be80ae5d4b3005d64a60b8337c56
 //META: purpose=performIntrinsicFunctionInlining (SPIR-V-only, gated on emitSpirvDirectly) and performForceInlining fold a small helper into the caller - no separate OpFunction survives.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
@@ -15,7 +15,7 @@
 // helpers into the caller. Observation: only %main appears as
 // an OpFunction in the emit; the helper does not survive.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage compute -O1
 
 struct S { int a; int b; }
 int sumPair(S s) { return s.a + s.b; }
@@ -31,5 +31,5 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // CHECK: %main = OpFunction %void None
-// CHECK-NOT: OpFunction
+// CHECK-NOT: OpFunctionCall
 // CHECK: OpFunctionEnd

@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00Z
 //META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools
-//META: doc_section_digest=15e31694fd5ee22d184f1b99f92912686150441a720712b25e415c394b7ce97f
+//META: doc_section_digest=3b19519e792b092406320b661c62d171b0f8cdff6f282ae48cf30ac091136ae8
 //META: purpose=Boundary: half-precision values survive end-to-end: `half` typed buffer and uniform produce `half device*` and `half v_0` fields in the emitted Metal text.
 //META: intent=boundary
 //META: pipeline_stage=emit

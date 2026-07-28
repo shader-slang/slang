@@ -1,40 +1,35 @@
 //META: generated=true
-//META: model=claude-sonnet-4-6
-//META: generated_at=2026-06-02T07:02:43+00:00
-//META: source_commit=9c1a6a00ef413932805da5b813465a7a9d517fb9
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/language-reference/generics.md#type-checking
-//META: doc_section_digest=7b3e1c2f4d8a0e9f5b2c6d1e3f7a4b8c0d2e6f9a1b5c3e7f0d4a8b2c6e0f4a
-//META: purpose=Type checking is performed before specialization: operations on a constrained generic type T only those allowed by the constraint are legal, and the correct operations are callable.
+//META: doc_section_digest=4f712396b718dc4245b0d7a122fe7c024d74b3b4a70dd75948a651b3aa074c9c
+//META: purpose=A generic body is type-checked before specialization using only the declared constraints, so an operation valid for all conforming types compiles once and works for every specialization.
 //META: intent=functional
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that operations permitted by a type constraint compile and execute correctly
-// before any specific type is substituted. `scaleBy10<T : IScalable>` calls `x.scale(10)`,
-// which is valid for any IScalable conformer; CHECK asserts 70 for the concrete `ScalableInt` case.
+// Verifies before-specialization checking: `sq<T : IArithmetic>` uses `a * a`,
+// which is legal for every IArithmetic conformer, so the body checks once
+// against the constraint (not per instantiation). Two distinct specializations
+// int and float both reuse that checked body; CHECK asserts 36 and 2.25,
+// proving the single pre-specialization check served both concrete types.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-interface IScalable
+T sq<T : IArithmetic>(T a)
 {
-    int scale(int factor);
+    return a * a;
 }
 
-struct ScalableInt : IScalable
-{
-    int _val;
-    int scale(int factor) { return _val * factor; }
-}
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
+RWStructuredBuffer<float> outputBuffer;
 
-func scaleBy10<T : IScalable>(T x) -> int
+[numthreads(1, 1, 1)]
+void computeMain()
 {
-    return x.scale(10);
+    outputBuffer[0] = float(sq(6));
+    outputBuffer[1] = sq(1.5f);
 }
-
-void main()
-{
-    ScalableInt si;
-    si._val = 7;
-    // CHECK: 70
-    printf("%d\n", scaleBy10(si));
-}
+// CHECK: 36.0
+// CHECK: 2.25

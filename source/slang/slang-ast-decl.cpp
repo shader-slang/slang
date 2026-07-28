@@ -35,8 +35,54 @@ InterfaceDecl* findParentInterfaceDecl(Decl* decl)
     return nullptr;
 }
 
+bool isGenericConstraintParameterDecl(Decl* decl)
+{
+    if (!isConstraintDecl(decl))
+        return false;
+
+    if (auto parentGenericDecl = as<GenericDecl>(decl->parentDecl))
+    {
+        // A `GenericDecl` can either own signature constraints for its inner declaration, or
+        // wrap a `GenericTypeConstraintDecl` that is itself a standalone interface requirement.
+        // Consider this example after expanding `[Differentiable]` on a generic requirement:
+        //
+        //     interface IFoo
+        //     {
+        //         void bar<T>();
+        //         __generic<T>
+        //         __constraint bar<T> : IForwardDifferentiableFunc<bar<T>>;
+        //     }
+        //
+        // The method requirement is `GenericDecl { inner = CallableDecl bar }`, and the
+        // differentiability requirement is a separate `GenericDecl { inner =
+        // GenericTypeConstraintDecl }`. Because the constraint is the generic's `inner`, it does
+        // not occupy a hidden generic argument slot for another declaration; it is the standalone
+        // interface requirement for `bar<T>`.
+        return parentGenericDecl->inner != decl;
+    }
+
+    return false;
+}
+
 bool isInterfaceRequirement(Decl* decl)
 {
+    // A generic signature constraint belongs to the generic requirement it parameterizes:
+    //
+    //     interface ITensor<T, int D>
+    //     {
+    //         T load<each I>(I indices)
+    //             where I == int
+    //             where countof(I) == D;
+    //     }
+    //
+    // The `countof(I) == D` proof is a hidden argument of `load<each I>` and is supplied when
+    // `load` is specialized; it is not an independent witness-table requirement on every
+    // conforming type. By contrast, a synthesized differentiability constraint whose generic
+    // `inner` is the constraint itself remains an interface requirement, as described in
+    // `isGenericConstraintParameterDecl`.
+    if (isGenericConstraintParameterDecl(decl))
+        return false;
+
     auto ancestor = decl->parentDecl;
     for (; ancestor; ancestor = ancestor->parentDecl)
     {

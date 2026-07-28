@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:19:22Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
+generated_at: 2026-06-29T18:20:46Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -26,34 +26,35 @@ opcodes.
 The opcodes documented here are scattered through
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua):
 
-- `AtomicOperation` group at line ~1071, plus the coverage markers
-  `IncrementCoverageCounter` (line ~1111),
-  `IncrementFunctionCoverageCounter` (line ~1116), and
-  `IncrementBranchCoverageCounter` (line ~1129), each also synthesized
+- `AtomicOperation` group at line ~1100, plus the coverage markers
+  `IncrementCoverageCounter` (line ~1140),
+  `IncrementFunctionCoverageCounter` (line ~1145), and
+  `IncrementBranchCoverageCounter` (line ~1158), each also synthesized
   as an atomic add.
 - Image and texture access opcodes (`imageSubscript`, `imageLoad`,
-  `imageStore`, `ImageTexelPointer`) at lines ~1180-1207.
+  `imageStore`, `ImageTexelPointer`, `SubpassLoad`) at lines
+  ~1209-1221.
 - Buffer access opcodes (`byteAddressBufferLoad/Store`,
   `structuredBuffer*`, `rwstructuredBuffer*`,
-  `StructuredBufferAppend/Consume/GetDimensions`) at lines ~1198-1243.
+  `StructuredBufferAppend/Consume/GetDimensions`) at lines ~1229-1274.
 - Resource modifiers and queries (`nonUniformResourceIndex`,
-  `getNaturalStride`, `castDynamicResource`) at lines ~1166 and
-  ~1245-1246.
-- Mesh-shader outputs at lines ~1251-1257.
+  `getNaturalStride`, `castDynamicResource`) at lines ~1195,
+  ~1276-1277.
+- Mesh-shader outputs at lines ~1278-1284.
 - Texture-sampling shortcuts (`sample`, `sampleGrad`) and
-  wave-intrinsic mask ops at lines ~1502-1509.
+  wave-intrinsic mask ops at lines ~1536-1541.
 - Memory barriers (`GroupMemoryBarrierWithGroupSync`,
-  `ControlBarrier`) at lines ~1510-1511.
-- Raytracing-payload accessors at lines ~1516-1544.
-- Texture-access tagging helpers at lines ~1550-1556.
-- Descriptor-heap and buffer-pointer helpers at lines ~978-998 and
-  ~2640-2644.
-- Combined sampler accessors at lines ~1031-1032; combined-sampler
+  `ControlBarrier`) at lines ~1542-1543.
+- Raytracing-payload accessors at lines ~1548-1563.
+- Texture-access tagging helpers at lines ~1583-1591.
+- Descriptor-heap and buffer-pointer helpers at lines ~1007-1024 and
+  ~2696-2700.
+- Combined sampler accessors at lines ~1060-1061; combined-sampler
   constructor at line ~1000.
 - `GetWorkGroupSize`, `GetCurrentStage` (entry-point introspection)
-  at lines ~1052-1054.
+  at lines ~1081-1083.
 - `BindingQuery` (`getRegisterIndex`, `getRegisterSpace`) at line
-  ~1609.
+  ~1639.
 
 C++ wrappers are declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h). The
@@ -188,19 +189,19 @@ enum IRMemoryOrder
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `atomicLoad` | — | (variadic, `min=1`) | | Atomic intrinsic lowering in `slang-lower-to-ir.cpp` | Atomically reads from `ptr`. |
-| `atomicStore` | — | (variadic, `min=2`) | | Atomic intrinsic lowering | Atomically writes to `ptr`. |
-| `atomicExchange` | — | (variadic, `min=2`) | | Atomic intrinsic lowering | Atomically writes and returns the previous value. |
-| `atomicCompareExchange` | — | `ptr, expected, desired` | | `InterlockedCompareExchange` intrinsic | Atomic CAS; returns the value previously stored. |
-| `atomicAdd` | — | `ptr, val` | | `InterlockedAdd` intrinsic | Atomically adds `val` to `*ptr`. |
-| `atomicSub` | — | `ptr, val` | | Atomic intrinsic lowering | Atomically subtracts. |
-| `atomicAnd` | — | `ptr, val` | | `InterlockedAnd` intrinsic | Atomic bitwise AND. |
-| `atomicOr` | — | `ptr, val` | | `InterlockedOr` intrinsic | Atomic bitwise OR. |
-| `atomicXor` | — | `ptr, val` | | `InterlockedXor` intrinsic | Atomic bitwise XOR. |
-| `atomicMin` | — | `ptr, val` | | `InterlockedMin` intrinsic | Atomic minimum. |
-| `atomicMax` | — | `ptr, val` | | `InterlockedMax` intrinsic | Atomic maximum. |
-| `atomicInc` | — | `ptr` | | `InterlockedAdd` (with `1` constant) | Atomic increment. |
-| `atomicDec` | — | `ptr` | | `InterlockedAdd` (with `-1` constant) | Atomic decrement. |
+| `atomicLoad` | — | `ptr, memoryOrder` | | Atomic intrinsic lowering in `slang-lower-to-ir.cpp` | Atomically reads from `ptr`. |
+| `atomicStore` | — | `ptr, val, memoryOrder` | | Atomic intrinsic lowering | Atomically writes to `ptr`. |
+| `atomicExchange` | — | `ptr, val, memoryOrder` | | Atomic intrinsic lowering | Atomically writes and returns the previous value. |
+| `atomicCompareExchange` | — | `ptr, expected, desired, memoryOrderEqual, memoryOrderUnequal` | | `InterlockedCompareExchange` intrinsic | Atomic CAS; returns the value previously stored. |
+| `atomicAdd` | — | `ptr, val, memoryOrder` | | `InterlockedAdd` intrinsic | Atomically adds `val` to `*ptr`. |
+| `atomicSub` | — | `ptr, val, memoryOrder` | | Atomic intrinsic lowering | Atomically subtracts. |
+| `atomicAnd` | — | `ptr, val, memoryOrder` | | `InterlockedAnd` intrinsic | Atomic bitwise AND. |
+| `atomicOr` | — | `ptr, val, memoryOrder` | | `InterlockedOr` intrinsic | Atomic bitwise OR. |
+| `atomicXor` | — | `ptr, val, memoryOrder` | | `InterlockedXor` intrinsic | Atomic bitwise XOR. |
+| `atomicMin` | — | `ptr, val, memoryOrder` | | `InterlockedMin` intrinsic | Atomic minimum. |
+| `atomicMax` | — | `ptr, val, memoryOrder` | | `InterlockedMax` intrinsic | Atomic maximum. |
+| `atomicInc` | — | `ptr, memoryOrder` | | `InterlockedAdd` (with `1` constant) | Atomic increment. |
+| `atomicDec` | — | `ptr, memoryOrder` | | `InterlockedAdd` (with `-1` constant) | Atomic decrement. |
 | `IncrementCoverageCounter` | — | — | | (synthesized when line coverage is on) | Line-coverage marker rewritten to `atomicAdd` on the synthesized coverage buffer; documented in the Lua comment block. |
 | `IncrementFunctionCoverageCounter` | — | `functionName, functionMangledName` | | (synthesized when function coverage is on) | Function-entry coverage marker; carries display and mangled names as operands so later passes need no AST access. |
 | `IncrementBranchCoverageCounter` | — | `branchSiteID, branchArmID, branchArmKind` | | (synthesized when branch coverage is on) | Branch-arm coverage marker; site/arm ids are local to the emitted metadata and the arm kind distinguishes true/false/case for LCOV export. |
@@ -306,17 +307,22 @@ the whole struct.
 
 ### `atomicCompareExchange`
 
-`atomicCompareExchange(ptr, expected, desired)` is the IR encoding
-of the CAS primitive. The operand triple is exactly the one
-emitted by HLSL's `InterlockedCompareExchange`; the returned value
+`atomicCompareExchange(ptr, expected, desired, memoryOrderEqual,
+memoryOrderUnequal)` is the IR encoding of the CAS primitive. The
+`ptr`/`expected`/`desired` triple is exactly the one emitted by
+HLSL's `InterlockedCompareExchange`, followed by the two
+`IRMemoryOrder` operands for the matched and unmatched cases; the
+returned value
 is the value previously stored, which the user code typically
 compares to `expected` to decide whether the swap succeeded.
 
-### `EntryPointParam` and `GlobalParam` (cross-link)
+### `global_param` and `EntryPointParamDecoration` (cross-link)
 
-The shader-IO opcode hierarchy ultimately bottoms out at
-`global_param` (see [structure.md](structure.md) for its
-structural role). The layout opcodes documented in
+The shader-IO opcode hierarchy ultimately bottoms out at the
+`global_param` opcode (see [structure.md](structure.md) for its
+structural role); entry-point-origin information is carried by the
+`EntryPointParamDecoration` decoration on a `global_param`, not by a
+separate opcode. The layout opcodes documented in
 [metadata.md](metadata.md) attach to `global_param` instances to
 record their resource binding; backend emit walks the children of
 each `global_param` to discover them.

@@ -1,9 +1,9 @@
 // slang-ir.cpp
 #include "slang-ir.h"
 
-#include "../core/slang-basic.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-writer.h"
+#include "core/slang-basic.h"
+#include "core/slang-platform.h"
+#include "core/slang-writer.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
@@ -88,6 +88,10 @@ bool isSimpleDecoration(IROp op)
     switch (op)
     {
     case kIROp_EarlyDepthStencilDecoration:
+    case kIROp_GLSLFragDepthGreaterDecoration:
+    case kIROp_GLSLFragDepthLessDecoration:
+    case kIROp_Shader64BitIndexingDecoration:
+    case kIROp_SynthesizedParameterGroupDecoration:
     case kIROp_KeepAliveDecoration:
     case kIROp_LineAdjInputPrimitiveTypeDecoration:
     case kIROp_LineInputPrimitiveTypeDecoration:
@@ -4278,6 +4282,17 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
         SLANG_UNREACHABLE("cast from void type");
     }
 
+    if (toStyle == TypeCastStyle::Void)
+    {
+        // A cast to `void` discards `value` and yields the canonical void value
+        // (`IRVoidLit`). There is no data-carrying "cast to void" instruction:
+        // `void` has a single canonical spelling, and materializing a dedicated
+        // cast op would only create a second representation that no backend emits.
+        // Any side effects needed to produce `value` are already present as the
+        // instructions that computed it.
+        return getVoidValue();
+    }
+
     if (toStyle == TypeCastStyle::Unknown || fromStyle == TypeCastStyle::Unknown)
     {
         if (fallbackToBuiltinCast)
@@ -4305,45 +4320,43 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
         }
     };
 
-    static const OpSeq opMap[5][6] = {
-        /*      To:      Int, Float, Bool, Ptr, Enum, Void */
+    // Casts to `void` are handled above, so this table only covers the
+    // data-carrying target styles (Int, Float, Bool, Ptr, Enum).
+    static const OpSeq opMap[5][5] = {
+        /*      To:      Int, Float, Bool, Ptr, Enum */
         /* From Int   */ {
             kIROp_IntCast,
             kIROp_CastIntToFloat,
             kIROp_IntCast,
             kIROp_CastIntToPtr,
-            kIROp_CastIntToEnum,
-            kIROp_CastToVoid},
+            kIROp_CastIntToEnum},
         /* From Float */
         {kIROp_CastFloatToInt,
          kIROp_FloatCast,
          {kIROp_Neq},
          {kIROp_CastFloatToInt, kIROp_CastIntToPtr},
-         {kIROp_CastFloatToInt, kIROp_CastIntToEnum},
-         kIROp_CastToVoid},
+         {kIROp_CastFloatToInt, kIROp_CastIntToEnum}},
         /* From Bool  */
-        {kIROp_IntCast,
-         kIROp_CastIntToFloat,
-         kIROp_Nop,
-         kIROp_CastIntToPtr,
-         kIROp_CastIntToEnum,
-         kIROp_CastToVoid},
+        {kIROp_IntCast, kIROp_CastIntToFloat, kIROp_Nop, kIROp_CastIntToPtr, kIROp_CastIntToEnum},
         /* From Ptr   */
         {kIROp_CastPtrToInt,
          {kIROp_CastPtrToInt, kIROp_CastIntToFloat},
          kIROp_CastPtrToBool,
          kIROp_BitCast,
-         {kIROp_CastPtrToInt, kIROp_CastIntToEnum},
-         kIROp_CastToVoid},
+         {kIROp_CastPtrToInt, kIROp_CastIntToEnum}},
         /* From Enum   */
         {kIROp_CastEnumToInt,
          {kIROp_CastEnumToInt, kIROp_CastIntToFloat},
          {kIROp_CastEnumToInt, kIROp_IntCast},
          {kIROp_CastEnumToInt, kIROp_CastIntToPtr},
-         kIROp_EnumCast,
-         kIROp_CastToVoid},
+         kIROp_EnumCast},
     };
 
+    // bounds checks
+    SLANG_ASSERT((int)fromStyle >= 0);
+    SLANG_ASSERT((int)fromStyle < 5);
+    SLANG_ASSERT((int)toStyle >= 0);
+    SLANG_ASSERT((int)toStyle < 5);
     auto op = opMap[(int)fromStyle][(int)toStyle];
     if (op.op0 == kIROp_Nop)
         return value;
@@ -9254,7 +9267,9 @@ void IRInst::transferDecorationsTo(IRInst* target)
     }
 }
 
-bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
+bool IRInst::mightHaveSideEffects(
+    SideEffectAnalysisOptions options,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
     // TODO: We should drive this based on flags specified
     // in `ir-inst-defs.yaml` isntead of hard-coding things here,
@@ -9308,7 +9323,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
             //
             auto call = cast<IRCall>(this);
             return !(
-                isSideEffectFreeFunctionalCall(call, options) ||
+                isSideEffectFreeFunctionalCall(call, options, calleeSideEffectCache) ||
                 call->findDecoration<IRIgnoreSideEffectsDecoration>());
         }
         break;
@@ -9421,6 +9436,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetOptiXRayPayloadPtr:
     case kIROp_UpdateElement:
     case kIROp_MeshOutputRef:
+    case kIROp_NodeOutputRecordGetElementPtr:
     case kIROp_MakeVectorFromScalar:
     case kIROp_Swizzle:
     case kIROp_SwizzleSet: // Doesn't actually "set" anything - just returns the resulting
@@ -9498,6 +9514,10 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_CastDescriptorHandleToUInt64:
     case kIROp_CastDescriptorHandleToResource:
     case kIROp_CastResourceToDescriptorHandle:
+    case kIROp_CastUIntToUntypedResourceHandle:
+    case kIROp_CastUntypedResourceHandleToUInt:
+    case kIROp_CastUIntToUntypedSamplerHandle:
+    case kIROp_CastUntypedSamplerHandleToUInt:
     case kIROp_GetDynamicResourceHeap:
     case kIROp_CastDynamicResource:
     case kIROp_AllocObj:
@@ -9972,6 +9992,7 @@ bool isMovableInst(IRInst* inst)
     case kIROp_FieldAddress:
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
+    case kIROp_NodeOutputRecordGetElementPtr:
     case kIROp_GetOffsetPtr:
     case kIROp_UpdateElement:
     case kIROp_Specialize:
@@ -10043,6 +10064,25 @@ bool isMovableInst(IRInst* inst)
             default:
                 break;
             }
+            // A load of a resource *element* from `UniformConstant` memory is movable.
+            // `UniformConstant` is read-only opaque-resource storage that is never written from
+            // within the shader, so two loads of the same address always yield the same result and
+            // redundancy removal may safely CSE (and, when hoisting is enabled, hoist) them. This
+            // lets a descriptor read once from a heap/array and used many times (e.g. a hoisted
+            // `DescriptorHandle<T>` or a `Texture2D t[N]` element sampled in a loop) collapse to a
+            // single load, matching HLSL. Only SPIR-V legalization produces `UniformConstant`
+            // pointers, so this is a no-op on other targets.
+            //
+            // The address must be an element access (`kIROp_GetElementPtr`): the scope is
+            // descriptor-heap / resource-array element reuse. A combined sampler/texture that is
+            // its own scalar global is loaded directly from that global (no element access) and is
+            // deliberately left non-movable -- its per-use loads must stay distinct for the
+            // combined-sampler emit path.
+            if (auto ptrType = as<IRPtrTypeBase>(addrType);
+                ptrType && ptrType->hasAddressSpace() &&
+                ptrType->getAddressSpace() == AddressSpace::UniformConstant &&
+                load->getPtr()->getOp() == kIROp_GetElementPtr)
+                return true;
         }
         return false;
     default:

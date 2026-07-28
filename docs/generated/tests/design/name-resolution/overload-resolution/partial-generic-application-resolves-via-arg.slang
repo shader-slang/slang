@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:48:41Z
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#partial-generic-application
-//META: doc_section_digest=2653a18d403f024fba71e245d5bf2fc8cd9e7d1b5cc2b2a59cc47fac18f87e89
+//META: doc_section_digest=b26e753d2e537fba4eb99322e5bdf496b8dbb6792283415ba45b24c59a14fc6e
 //META: purpose=A generic candidate's TryCheckGenericOverloadCandidateTypes infers the type parameter from the argument's type when the call does not supply explicit generic arguments; the resolved call is callable and returns the typed result.
 //META: intent=functional
 //META: pipeline_stage=check

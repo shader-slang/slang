@@ -1,5 +1,16 @@
 -- Helper functions for defining diagnostics
 
+-- Warning-level (group) sentinels. These are passed positionally to warning()/err() alongside
+-- the spans (e.g. `warning("my-warning", 123, "msg", span{...}, pedantic)`), and recognised by
+-- add_diagnostic so they don't get mistaken for a span. They mirror the clang/gcc groups: a
+-- warning tagged with one of these is emitted only when the matching -Wall/-Wextra/-Wpedantic
+-- flag is enabled. Untagged warnings stay in the always-on "default" group.
+-- (There is no `default` sentinel because `default` is a Lua keyword and the absence of any
+-- sentinel already means the default group.)
+local warning_all = { is_warning_level = true, level = "all" }
+local warning_extra = { is_warning_level = true, level = "extra" }
+local warning_pedantic = { is_warning_level = true, level = "pedantic" }
+
 -- Calculate Levenshtein edit distance between two strings
 local function edit_distance(s1, s2)
   local len1, len2 = #s1, #s2
@@ -378,6 +389,8 @@ local function add_diagnostic(name, code, severity, message, primary_span, ...)
     severity = severity,
     message = message,
     primary_span = primary_span,
+    -- Warning group; "default" (always emitted) unless a sentinel below overrides it.
+    level = "default",
   }
 
   local extra_spans = { ... }
@@ -386,7 +399,11 @@ local function add_diagnostic(name, code, severity, message, primary_span, ...)
     local notes = {}
 
     for _, s in ipairs(extra_spans) do
-      if s.is_note then
+      if s.is_warning_level then
+        -- A warning-level sentinel (all/extra/pedantic): record the group and skip it; it is
+        -- not a span or note.
+        diag.level = s.level
+      elseif s.is_note then
         table.insert(notes, {
           location = s.location,
           message = s.message,
@@ -1055,6 +1072,7 @@ local function process_diagnostics(diagnostics_table)
         name = diag.name,
         code = diag.code,
         severity = diag.severity,
+        level = diag.level or "default",
         message = diag.message,
         message_parts = main_parts,
         message_required_params = main_required,
@@ -1110,6 +1128,10 @@ return {
   warning = warning,
   internal = internal,
   fatal = fatal,
+  -- Warning-level (group) sentinels passed positionally to warning()/err().
+  all = warning_all,
+  extra = warning_extra,
+  pedantic = warning_pedantic,
   process_diagnostics = process_diagnostics,
   -- Utility functions for typo suggestions
   edit_distance = edit_distance,

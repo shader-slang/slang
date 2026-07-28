@@ -1,13 +1,13 @@
 #include "replay-context.h"
 
-#include "../core/slang-blob.h"
-#include "../core/slang-crypto.h"
-#include "../core/slang-io.h"
-#include "../core/slang-platform.h"
-#include "../slang/slang-ast-type.h"
-#include "../slang/slang-compiler-api.h"
-#include "../slang/slang-syntax.h"
+#include "core/slang-blob.h"
+#include "core/slang-crypto.h"
+#include "core/slang-io.h"
+#include "core/slang-platform.h"
 #include "proxy/proxy-component-type.h"
+#include "slang/slang-ast-type.h"
+#include "slang/slang-compiler-api.h"
+#include "slang/slang-syntax.h"
 
 #include <chrono>
 #include <cinttypes>
@@ -446,6 +446,14 @@ void ReplayContext::requireReplayArenaAllocation(size_t offset, size_t size)
         throw DataMismatchException(offset, size);
 
     m_replayArenaAllocationSize += size;
+}
+
+void* ReplayContext::allocateReplayArena(size_t sizeInBytes, size_t alignment)
+{
+    if (sizeInBytes == 0)
+        return nullptr;
+
+    return m_arena.allocateAligned(sizeInBytes, alignment);
 }
 
 // =============================================================================

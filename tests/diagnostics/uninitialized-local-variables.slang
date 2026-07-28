@@ -2,11 +2,12 @@
 
 float f(float) { return 1; }
 
-// k0 and k1 are only conditionally assigned (inside if).
-// Note: this case is optimized away by constexpr propagation before
-// the uninit check runs, so no warning is produced at IR level.
-// The must-init warning (41035) catches this pattern when the variable
-// survives optimization (e.g. structs, out params).
+// k0 and k1 are only conditionally assigned (inside if), so on the `mode != 1`
+// path they are still uninitialized when read at `return k0 + k1`. The
+// conditionally-assigned value reaches the use through an if-merge phi; the
+// uninitialized-use analysis follows that phi and, because a defined value reaches
+// the merge on the assigning path, reports a must-init ("may be uninitialized on
+// some paths") diagnostic rather than a never-initialized one.
 float3 unconditional(int mode)
 {
     float k0;
@@ -23,6 +24,10 @@ float3 unconditional(int mode)
     }
 
     return k0 + k1;
+//CHK:        ^ possible use of uninitialized variable
+//CHK:        ^ variable 'k0' may be uninitialized on some paths; it is only conditionally assigned
+//CHK:        ^ possible use of uninitialized variable
+//CHK:        ^ variable 'k1' may be uninitialized on some paths; it is only conditionally assigned
 }
 
 // Warn here for branches using the variables

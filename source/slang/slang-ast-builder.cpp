@@ -1385,10 +1385,10 @@ DeclaredVariadicPackCountWitness* ASTBuilder::getDeclaredVariadicPackCountWitnes
 }
 
 ConcreteVariadicPackCountWitness* ASTBuilder::getConcreteVariadicPackCountWitness(
-    Val* pack,
+    IntVal* actualCount,
     IntVal* expectedCount)
 {
-    return getOrCreate<ConcreteVariadicPackCountWitness>(pack, expectedCount);
+    return getOrCreate<ConcreteVariadicPackCountWitness>(actualCount, expectedCount);
 }
 
 HasDiffTypeInfoWitness* ASTBuilder::getHasDiffTypeInfoWitness(

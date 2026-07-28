@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T13:48:38Z
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#transparent-members
-//META: doc_section_digest=ac9ff1bb7fdc57f330cb4aab07ddae7ce2c0b3db8c51e76a2dcc91b672f6a7a9
+//META: doc_section_digest=3f6f9feca4572a11e9ad8cb2520184a82c598ff15f5b9d04699e543806e7510b
 //META: purpose=An HLSL cbuffer is lowered to a __transparent ConstantBuffer; an unqualified reference to its inner field resolves through the transparent (Member) + deref breadcrumb chain.
 //META: intent=functional
 //META: pipeline_stage=check

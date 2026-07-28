@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:50:00Z
 //META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#wrapcbufferelementsformetal
-//META: doc_section_digest=2a4fe67f3530d551446e5a52ff530daaceb47c541972fbd77fc4832e5e0aa6a6
+//META: doc_section_digest=7c7d795ac586fc9a43d8f516471cbb51d13125d3966e4bace07617573baf24f0
 //META: purpose=ConstantBuffer<T> emits as a wrapper-struct pointer in Metal's `constant` address space with a positional [[buffer(N)]] attribute.
 //META: intent=functional
 //META: pipeline_stage=emit

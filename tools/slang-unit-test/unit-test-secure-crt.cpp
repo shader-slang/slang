@@ -4,7 +4,7 @@
 
 #if !defined(_WIN32) || defined(__MINGW32__) || defined(__CYGWIN__)
 
-#include "../../source/core/slang-secure-crt.h"
+#include "core/slang-secure-crt.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <errno.h>

@@ -2,12 +2,6 @@ name: Verify PR Labels
 on:
   pull_request:
     types: [opened, labeled, unlabeled, synchronize, ready_for_review]
-    paths-ignore:
-      - "docs/**"
-      - "LICENSES/**"
-      - "LICENSE"
-      - "CONTRIBUTING.md"
-      - "README.md"
 jobs:
   check-pr-label:
     if: github.event.pull_request.draft != true

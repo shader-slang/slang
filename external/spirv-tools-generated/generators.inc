@@ -48,3 +48,5 @@
 {47, "ARM", "", "ARM"},
 {48, "Goopax", "", "Goopax"},
 {49, "Icyllis Milica", "Arc3D Shader Compiler", "Icyllis Milica Arc3D Shader Compiler"},
+{50, "Isochron", "Pred", "Isochron Pred"},
+{51, "apilatosba", "Apila Jai Compiler", "apilatosba Apila Jai Compiler"},

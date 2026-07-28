@@ -1,7 +1,7 @@
 // slang-type-layout.cpp
 #include "slang-type-layout.h"
 
-#include "../compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
 #include "slang-check-impl.h"
 #include "slang-ir-insts.h"
 #include "slang-mangle.h"
@@ -3232,9 +3232,9 @@ static bool isOpenGLTarget(TargetRequest*)
     return false;
 }
 
-bool isD3DTarget(TargetRequest* targetReq)
+bool isD3DTarget(CodeGenTarget target)
 {
-    switch (targetReq->getTarget())
+    switch (target)
     {
     case CodeGenTarget::HLSL:
     case CodeGenTarget::DXBytecode:
@@ -3248,9 +3248,14 @@ bool isD3DTarget(TargetRequest* targetReq)
     }
 }
 
-bool isMetalTarget(TargetRequest* targetReq)
+bool isD3DTarget(TargetRequest* targetReq)
 {
-    switch (targetReq->getTarget())
+    return isD3DTarget(targetReq->getTarget());
+}
+
+bool isMetalTarget(CodeGenTarget target)
+{
+    switch (target)
     {
     default:
         return false;
@@ -3260,6 +3265,11 @@ bool isMetalTarget(TargetRequest* targetReq)
     case CodeGenTarget::MetalLibAssembly:
         return true;
     }
+}
+
+bool isMetalTarget(TargetRequest* targetReq)
+{
+    return isMetalTarget(targetReq->getTarget());
 }
 
 bool isKhronosTarget(CodeGenTarget target)
@@ -3355,6 +3365,16 @@ bool isWGPUTarget(CodeGenTarget target)
 bool isWGPUTarget(TargetRequest* targetReq)
 {
     return isWGPUTarget(targetReq->getTarget());
+}
+
+bool doesTargetSupportVkBindingOnEntryPointParameters(CodeGenTarget target)
+{
+    return isKhronosTarget(target) || isWGPUTarget(target);
+}
+
+bool doesTargetSupportVkBindingOnEntryPointParameters(TargetRequest* targetReq)
+{
+    return doesTargetSupportVkBindingOnEntryPointParameters(targetReq->getTarget());
 }
 
 bool isKernelTarget(CodeGenTarget codeGenTarget)

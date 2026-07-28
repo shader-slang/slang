@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:13:29Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 8b042e75fd998180a0b911649454d28b10dc08df645aa95b3ce5e8eb390b7f82
+generated_at: 2026-06-29T13:28:02Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: b2fdbecc7c8684a517087980212251808258fb9306248171e9069a3533bfec5b
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -24,7 +24,14 @@ Three flavors of payload exist, each with its own driver file:
   /
   [slang-serialize-ast.cpp](../../../../source/slang/slang-serialize-ast.cpp).
   The serialized form preserves the checked AST that backs an
-  `import`-able module.
+  `import`-able module. Most enum-valued AST fields are handled by a
+  FIDDLE template near the top of
+  [slang-serialize-ast.cpp](../../../../source/slang/slang-serialize-ast.cpp)
+  that generates a `serialize(...)` overload (delegating to
+  `serializeEnum`, which encodes the value as a `FossilUInt`) for each
+  name in a single `enumTypeNames` list. Serializing a new AST enum is
+  usually a matter of appending its type name to that list rather than
+  writing a bespoke `serialize` function.
 - **IR modules** — handled by
   [slang-serialize-ir.h](../../../../source/slang/slang-serialize-ir.h)
   /
@@ -58,7 +65,7 @@ The generic interface is
 [slang-serialize.h](../../../../source/slang/slang-serialize.h). The
 preamble of that header captures the central design choice: a single
 `serialize(serializer, value)` function handles both reading and
-writing, distinguished by a `SerializerMode` carried on the
+writing, distinguished by a `SerializationMode` carried on the
 `serializer` argument. Per the file's own example:
 
 ```cpp
@@ -117,11 +124,13 @@ types live in
 > mal-formed data.
 
 The validation cost is configurable via the macro
-`SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS` (default 1). When
-enabled, validation failures call `SLANG_UNEXPECTED("invalid format
-encountered in serialized data")`. When disabled — used for
-performance-critical paths such as loading the embedded core module —
-the same conditions become assertions.
+`SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS` (a compile-time
+define, default 1). When enabled, validation failures call
+`SLANG_UNEXPECTED("invalid format encountered in serialized data")`;
+when the define is set to 0 the same conditions become plain
+`SLANG_ASSERT`s. The header comment notes this toggle exists to
+measure the performance cost of validation on a key serialization
+path — loading the core module from the `slang.dll` binary.
 
 The format is designed for **memory-mapped** deserialization: pointers
 in the serialized data are relative offsets resolved against the start
@@ -194,10 +203,13 @@ Source locations are tricky to round-trip because the integer encoding
 in
 [slang-source-loc.h](../../../../source/compiler-core/slang-source-loc.h)
 is meaningful only relative to the live `SourceManager` of the
-session that produced it. The serializer therefore captures the
-contributing `SourceFile` records (path, content, expansion stack)
-alongside the integer locations and reconstructs them into a fresh
-`SourceManager` on load.
+session that produced it. The serializer therefore captures, per
+contributing source file, its path, its source-location range, and
+its line-start tables (both unadjusted and `#line`-adjusted) alongside
+the integer locations, then reconstructs each file into a fresh
+`SourceManager` on load with `createSourceFileWithSize` (a
+placeholder-sized file plus a single view — the file's content is not
+serialized).
 
 Driver: [slang-serialize-source-loc.cpp](../../../../source/slang/slang-serialize-source-loc.cpp).
 

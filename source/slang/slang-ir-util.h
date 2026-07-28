@@ -345,9 +345,19 @@ bool isPureFunctionalCall(
 // (no side effects).
 bool isSideEffectFreeFunctionalCall(
     IRCall* call,
-    SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None);
+    SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr);
 
+// Returns whether calling `callee` can have side effects, either directly or
+// through an associated function attached via an `IRAnnotation`. The
+// association lookup walks the callee's entire use list, so each query is
+// O(#call sites to that callee).
 bool doesCalleeHaveSideEffect(IRInst* callee);
+
+// Memoized variant of the above; `cache` may be null (uncached). See
+// IRDeadCodeEliminationOptions::calleeSideEffectCache for the sharing and
+// staleness contract.
+bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache);
 
 bool isPtrLikeOrHandleType(IRInst* type);
 
@@ -602,6 +612,16 @@ bool tryGetConstantIntLit(IRInst* inst, Int64& outValue);
 bool areKnownEqualShapeElements(IRInst* left, IRInst* right);
 
 IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> elements);
+
+/// Returns true if `type` is one of the work-graph record types (e.g.
+/// DispatchNodeInputRecord<T>, ThreadNodeInputRecord<T>, NodeOutput<T>, etc.).
+/// These types are opaque ABI objects that must survive type legalization unchanged.
+bool isWorkGraphRecordType(IRType* type);
+
+/// Returns the element type operand for generic work-graph record types, or null
+/// for non-generic record types. Empty record types such as `EmptyNodeOutput`
+/// intentionally return null because they carry no payload element type.
+IRType* getWorkGraphRecordElementType(IRType* type);
 
 } // namespace Slang
 

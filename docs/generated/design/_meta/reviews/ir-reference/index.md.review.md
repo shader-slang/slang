@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-12T12:06:07+00:00
+reviewed_at: 2026-06-30T13:27:15+00:00
 target_doc: ir-reference/index.md
-target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_watched_paths_digest: f57f85851515cdaf74d296849163598144fd9446405e6588774aac17250d6d39
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: b01105947bb6bdcf6a24a6d12b46521c4b6bfb52a24e7ee5da31dceb7f981082
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
   factual_accuracy: pass
   cross_references: pass
@@ -24,14 +24,20 @@ severity_breakdown:
 # Review report for ir-reference/index.md
 
 ## Summary
-No findings were identified. The navigation page includes all family links, required cross-cutting topics, the target-backends link, and sampled approximate counts and Lua-root claims are reasonable for an index-level summary.
+The IR reference index passes this review. I found no factual, link, front-matter, required-section, or source-alignment findings in the checked material.
 
 ## Items checked
-- Ran `regenerate.py show ir-reference/index.md` and used its prompt path, watched files, and dependency list.
-- Read `_common.md`, `ir-reference-index.md`, the full target document, all listed IR-reference dependency pages, and `source/slang/slang-ir-insts.lua`.
-- Verified front matter keys, target source commit, watched-path digest shape, required index sections, Pages table columns, mermaid taxonomy coverage, and all relative links via source inspection plus pending lint.
-- Checked that the `## Pages` table links every peer family page and that the taxonomy diagram includes types, values, structure, control flow, generics/existentials, resources/atomics, differentiation, decorations, metadata, and misc.
-- Spot-checked more than 10 factual claims: Lua roots for `Type`, `Constant`, `GlobalValueWithCode`, `TerminatorInst`, `specialize`, `AtomicOperation`, `MakeDifferentialPairBase`, `Decoration`, `Layout`, `Attr`, `SPIRVAsmOperand`, abstract/group-only examples, and AST-origin guidance from `slang-lower-to-ir.cpp`.
+- Ran `regenerate.py show ir-reference/index.md` and reviewed the target document, `_common.md`, `ir-reference-index.md`, the listed dependency docs, and the resolved watched source `source/slang/slang-ir-insts.lua`.
+- Checked front matter for all required generated-doc keys, the target source commit, the warning string, and a 64-character hex watched-path digest.
+- Resolved the relative links to all ten family pages plus the referenced generated pipeline, cross-cutting, AST-reference, glossary, and source files.
+- Verified the required `# IR Reference`, `## Family taxonomy`, `## Pages`, `## How AST nodes lower to IR`, `## Cross-cutting topics`, and `## How to navigate` sections against the per-doc prompt.
+- Spot-checked more than 10 claims against watched files and dependencies, including the `Type`, `Constant`, `GlobalValueWithCode`, `TerminatorInst`, `AtomicOperation`, `MakeDifferentialPairBase`, `Decoration`, `Layout`, `Attr`, and `SPIRVAsmOperand` Lua roots.
+- Counted opcode table rows in the ten family pages and confirmed the index's rounded approximate counts are within the prompt's +/- 10 tolerance.
 
 ## Findings
 (no findings)
+
+## No-issues notes
+- The mermaid taxonomy covers each family page exactly once.
+- The page stays in navigation scope and does not duplicate per-opcode reference content.
+- The recent-addition examples (`MetalPackedVec`, `Abort`, `glslFragDepthGreater`, `glslFragDepthLess`) resolve in the watched Lua source or dependency pages.

@@ -1,6 +1,6 @@
 import "glsl";
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
 
 // CHECK-DAG: %[[CONST:[A-Za-z0-9_]+]] = OpConstantComposite %v3int %int_1 %int_2 %int_3
 // CHECK: OpBitcast %v3uint %[[CONST]]

@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:15:50Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: cac7e2d9eb8ba3e143943a9ace5008f267481600341257629d6b70ee60b4f3a5
+generated_at: 2026-06-29T15:16:52Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: bb183348b2c07246bd0706641ccbb5c4867597747399350a43dc2a5e89db9fdd
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -45,6 +45,7 @@ flowchart TD
   VarExpr --> ThisInterfaceExpr
   ExprWithArgsBase --> AppExprBase
   ExprWithArgsBase --> AggTypeCtorExpr
+  ExprWithArgsBase --> BuiltinOperatorExpr
   AppExprBase --> InvokeExpr
   AppExprBase --> GenericAppExpr
   InvokeExpr --> ExplicitCtorInvokeExpr
@@ -90,6 +91,7 @@ flowchart TD
 | `ExpandExpr` | `Expr` | `baseExpr: Expr*` | [pack expansion](../syntax-reference/grammar.md#expressions) | `expand E` over a type/value pack. |
 | `EachExpr` | `Expr` | `baseExpr: Expr*` | [pack expansion](../syntax-reference/grammar.md#expressions) | `each E` inside an `expand`. |
 | `AggTypeCtorExpr` | `ExprWithArgsBase` | `base: TypeExp`, `arguments: List<Expr*>` | (none) | Aggregate-type constructor; used internally during checking. |
+| `BuiltinOperatorExpr` | `ExprWithArgsBase` | `op: BuiltinOperationKind`, `arguments: List<Expr*>` | (none) | Synthesized builtin operator on scalar/vector/matrix operands; carries the resolved operation kind directly (1 unary or 2 operands). |
 | `InvokeExpr` | `AppExprBase` | `functionExpr: Expr*`, `arguments: List<Expr*>`, `argumentDelimeterLocs` | [call](../syntax-reference/grammar.md#expressions) | `f(...)`; also the post-resolution form of operator and cast expressions. |
 | `ExplicitCtorInvokeExpr` | `InvokeExpr` | (inherits) | [constructor call](../syntax-reference/grammar.md#expressions) | Explicit `T(...)` constructor invocation. |
 | `TryExpr` | `Expr` | `base: Expr*`, `tryClauseType` (Standard / Optional / Assert) | [try](../syntax-reference/grammar.md#expressions) | `try expr` wrapper for fallible calls. |
@@ -184,6 +186,21 @@ treats them uniformly. The `originalFunctionExpr` field on
 `AppExprBase` lets the checker remember what the user wrote before it
 rewrote the function expression into a resolved decl-ref.
 
+### BuiltinOperatorExpr
+
+`OperatorExpr` (and its `InfixExpr` / `PrefixExpr` / `PostfixExpr`
+subclasses) is the post-parse form of `a OP b`, treated as a generic
+`operator OP` call. When the checker's fast path recognizes that the
+operands are builtin integer/floating-point/bool scalars, vectors, or
+matrices, it instead produces a `BuiltinOperatorExpr` that stores the
+resolved [`BuiltinOperationKind`](base.md) (`Add`, `Less`, ...)
+directly. Because the operator-name → kind mapping happens exactly
+once at creation, every downstream consumer — constant folding via
+`BuiltinOperationIntVal` (see [values.md](values.md)), IR lowering,
+and for-loop trip-count inference — reads the `op` field rather than
+re-parsing an operator name. `arguments` holds one operand for a unary
+operator or two for a binary one.
+
 ### OverloadedExpr and OverloadedExpr2
 
 Name lookup can return more than one candidate; when it does, the
@@ -200,9 +217,11 @@ into the IR.
 `MemberExpr` represents `a.b` where `a` is a value; `StaticMemberExpr`
 represents `T::b` where `T` is a type (or `T.b` on a type expression);
 `DerefMemberExpr` represents `a->b` on pointer-like values. The
-checker chooses between them by inspecting the type of the base
-expression; the parser emits `MemberExpr` by default and the checker
-may convert it.
+parser already distinguishes the three surface forms: it emits
+`StaticMemberExpr` for `::`, `MemberExpr` for `.`, and
+`DerefMemberExpr` for `->`. Checking can additionally synthesize or
+reinterpret a member access when the base resolves to a type-valued
+expression.
 
 ### VarExpr and DeclRefExpr
 
@@ -225,22 +244,28 @@ tokens — into a single `StringLiteralExpr` (see [tokens.md](../syntax-referenc
 
 ### PartiallyAppliedGenericExpr
 
-A consequence of Slang's two-stage parsing: `f<T>` can appear inside
-an expression and the parser cannot tell whether it is a generic
-application (yielding a `GenericAppExpr`) or a relational comparison.
-When the parser commits to "generic application" but only some
-parameters are explicitly supplied, the result is a
-`PartiallyAppliedGenericExpr`; overload resolution fills in the rest
-during checking.
+This node is produced by overload checking, not by the parser. The
+parser builds a `GenericAppExpr` for `f<...>` generic-application
+syntax (`parseGenericApp` in
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp)). When
+overload resolution finds a generic candidate flagged
+`IsPartiallyAppliedGeneric` — applied to fewer arguments than the
+generic declares — it rewrites that candidate into a
+`PartiallyAppliedGenericExpr`, preserving the explicitly supplied
+ordinary-argument prefix and deferring inference of the remaining
+arguments to a later pass.
 
 ### Differentiate-family expressions
 
-`PrimalSubstituteExpr`, `ForwardDifferentiateExpr`,
-`BackwardDifferentiateExpr`, and `DispatchKernelExpr` all derive from
-`HigherOrderInvokeExpr`, signaling that they take a callable as their
-primary operand. They are entry points for the autodiff machinery
-described in [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md);
-the checker resolves which derivative variant to invoke.
+`PrimalSubstituteExpr`, `ForwardDifferentiateExpr`, and
+`BackwardDifferentiateExpr` all derive from `HigherOrderInvokeExpr`,
+signaling that they take a callable as their primary operand. They are
+entry points for the autodiff machinery described in
+[../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md); the checker
+resolves which derivative variant to invoke. `DispatchKernelExpr` is
+also a `HigherOrderInvokeExpr`, but it is unrelated to autodiff: it is
+the host-side compute-kernel dispatch primitive
+(`__dispatch_kernel(fn, threadGroupSize, dispatchSize)`).
 
 ### AsTypeExpr / IsTypeExpr / CastToSuperTypeExpr
 

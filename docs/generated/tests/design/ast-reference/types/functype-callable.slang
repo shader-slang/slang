@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T22:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/types.md#functype
-//META: doc_section_digest=2b2f6df280d876721b915b8db1e96bed9f1bfdb17423498342a13971e8db1e4d
-//META: purpose=A FuncType holds parameter types and a result type; a function-typed value (a callable carrying a FuncType) is invokable to produce its result.
+//META: doc_section_digest=7e903f116cccaa2d6cdd7b7b3629e179d6417c0f583ea8c8d54a18facbc96121
+//META: purpose=A FuncType holds parameter types and a result type; a function-typed value is invokable to produce its result.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's `FuncType` note states: "holds parameter types, return
-// type, and an optional error type". The observable consequence is
-// that a callable value can be invoked with its parameter types and
-// returns its result type. We exercise this through the `IFunc`-like
-// callable-as-interface idiom that survives the interpreter.
+// Verifies FuncType's claim that it holds parameter types and a
+// return type: a callable value can be invoked with its parameter
+// type and returns its result type. The IFunc-like callable-as-
+// interface idiom survives the interpreter; CHECK asserts the
+// invoked result.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

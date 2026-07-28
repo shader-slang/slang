@@ -115,9 +115,8 @@ jobs:
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 -DSLANG_USE_SCCACHE=OFF \
-                -LA 2>/dev/null \
-              | grep -E "^${option}:(BOOL|STRING)=" \
-              | sed 's/.*=//' \
+                -LA \
+              | sed -n -E "s/^${option}:(BOOL|STRING)=//p" \
               | tr '[:upper:]' '[:lower:]'
             )
             case "$defaultVal" in
@@ -146,6 +145,42 @@ jobs:
           # don't abort the build when ASAN is enabled. No-op for other options.
           ASAN_OPTIONS: detect_leaks=0
         run: cmake --build build --config "$cmake_config"
+
+      - name: Verify slangc version (${{ matrix.option }})
+        if: matrix.windows_only != 'true'
+        run: |
+          slangc_enabled=$(
+            sed -n 's/^SLANG_ENABLE_SLANGC:[^=]*=//p' build/CMakeCache.txt \
+            | tr '[:upper:]' '[:lower:]'
+          )
+          case "$slangc_enabled" in
+            on|true|1|yes) ;;
+            off|false|0|no)
+              echo "SLANG_ENABLE_SLANGC is ${slangc_enabled}; skipping slangc runtime check."
+              exit 0
+              ;;
+            *)
+              echo "ERROR: could not determine SLANG_ENABLE_SLANGC from build/CMakeCache.txt"
+              exit 1
+              ;;
+          esac
+
+          slangc_path="build/$cmake_config/bin/slangc"
+          bin_dir="$PWD/build/$cmake_config/bin"
+          lib_dir="$PWD/build/$cmake_config/lib"
+
+          if [[ ! -f "$slangc_path" ]]; then
+            echo "ERROR: expected slangc at $slangc_path"
+            ls -la "$bin_dir" || true
+            exit 1
+          fi
+
+          export PATH="$bin_dir:$PATH"
+          if [[ -d "$lib_dir" ]]; then
+            export LD_LIBRARY_PATH="$lib_dir:${LD_LIBRARY_PATH:-}"
+          fi
+
+          "$slangc_path" -v
 
       # Exercise `cmake --install` and a `find_package(slang)` consumer for
       # entries that opt in via install_test. The static-lib build

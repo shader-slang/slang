@@ -1,5 +1,6 @@
-// Regression test: verifies that an explicitly wrapped element type still compiles
-// successfully and produces correct Uniform-storage-class SPIRV.
+// Regression test: verifies that a struct element type still compiles successfully and
+// produces correct StorageBuffer-storage-class SPIRV for the descriptor-heap buffer
+// pointer (since #11483 the descriptor-heap constant buffer is StorageBuffer, not Uniform).
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry main -stage compute -capability spvDescriptorHeapEXT
 
@@ -20,8 +21,8 @@ void main(
 // CHECK-NOT: %_ptr_Function_[[CB]]
 // CHECK: OpDecorate %[[CB]] Block
 // CHECK-NOT: %_ptr_Function_[[CB]]
-// CHECK: %[[CB_PTR:_ptr_Uniform_MyConstants_std140]] = OpTypePointer Uniform %[[CB]]
+// CHECK: %[[CB_PTR:_ptr_StorageBuffer_MyConstants_std140]] = OpTypePointer StorageBuffer %[[CB]]
 // CHECK-NOT: %_ptr_Function_[[CB]]
 // CHECK: OpBufferPointerEXT %[[CB_PTR]]
-// CHECK: OpAccessChain %_ptr_Uniform_v2float
+// CHECK: OpAccessChain %_ptr_StorageBuffer_v2float
 // CHECK-NOT: %_ptr_Function_[[CB]]

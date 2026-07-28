@@ -1,18 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T22:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/types.md#aggregate-collection-types
-//META: doc_section_digest=d3749fed9fbc71b7128e3f169c932422f533a751a10b2b556022f040c1cb72fb
-//META: purpose=An ArrayExpressionType carries an element-type and an element-count; each of the N elements is independently readable and writable.
+//META: doc_section_digest=acec388be6a124a34086d58d95713bb5cd33eeac4b8fcf6534173cfc8ec11143
+//META: purpose=An ArrayExpressionType carries an element-type and an element-count; each of the N elements of a sized array is independently readable and writable.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `ArrayExpressionType` is a DeclRefType-descendant for sized /
-// unsized arrays. The user-facing claim: an `int[4]` is a sized
-// array; writing each element and reading it back gives the
-// expected value.
+// Verifies ArrayExpressionType is a sized array of (element-type,
+// count): an int[4] has four independent slots. Each is written then
+// read back; CHECK asserts all four values, proving the count-4 shape.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

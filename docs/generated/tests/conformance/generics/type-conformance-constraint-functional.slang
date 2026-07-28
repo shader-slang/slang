@@ -1,43 +1,35 @@
 //META: generated=true
-//META: model=claude-sonnet-4-6
-//META: generated_at=2026-06-02T07:02:43+00:00
-//META: source_commit=9c1a6a00ef413932805da5b813465a7a9d517fb9
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/language-reference/generics.md#type-checking
-//META: doc_section_digest=7b3e1c2f4d8a0e9f5b2c6d1e3f7a4b8c0d2e6f9a1b5c3e7f0d4a8b2c6e0f4a
-//META: purpose=A conformance constraint `T : IInterface` means T implements all requirements of IInterface, enabling all interface methods to be called on T inside the generic body.
+//META: doc_section_digest=4f712396b718dc4245b0d7a122fe7c024d74b3b4a70dd75948a651b3aa074c9c
+//META: purpose=A `where T : IArithmetic` conformance constraint lets the generic body call the interface operations (here `+`) on values of type T.
 //META: intent=functional
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that a `T : IStringable` constraint lets the generic body call the interface's methods on T.
-// Two conformers (Alpha, Beta) are passed through `getCode<T>()`; CHECK asserts each returns its
-// own code(), which is only reachable if the constraint admits the interface method dispatch.
+// Verifies that a conformance constraint `T : IArithmetic` makes T implement
+// all of IArithmetic's requirements inside the body, so `a + b` type-checks
+// before specialization. The function is instantiated for both int and float;
+// CHECK asserts each specialization computes its own sum, proving the
+// constraint admitted the arithmetic requirement for both concrete types.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-interface IStringable
+func addTwo<T>(T a, T b) -> T where T : IArithmetic
 {
-    int code();
+    return a + b;
 }
 
-struct Alpha : IStringable
-{
-    int code() { return 65; }
-}
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
+RWStructuredBuffer<float> outputBuffer;
 
-struct Beta : IStringable
+[numthreads(1, 1, 1)]
+void computeMain()
 {
-    int code() { return 66; }
+    outputBuffer[0] = float(addTwo(3, 4));
+    outputBuffer[1] = addTwo(1.5f, 2.25f);
 }
-
-int getCode<T : IStringable>(T x) { return x.code(); }
-
-void main()
-{
-    Alpha a;
-    Beta  b;
-    // CHECK: 65
-    printf("%d\n", getCode(a));
-    // CHECK: 66
-    printf("%d\n", getCode(b));
-}
+// CHECK: 7.0
+// CHECK: 3.75

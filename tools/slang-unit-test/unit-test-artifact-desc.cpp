@@ -25,9 +25,9 @@
 // caller code to write "is this an HLSL-like source?" without
 // enumerating every concrete flavour.
 
-#include "../../source/compiler-core/slang-artifact-desc-util.h"
-#include "../../source/compiler-core/slang-artifact.h"
-#include "../../source/core/slang-string.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact.h"
+#include "core/slang-string.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

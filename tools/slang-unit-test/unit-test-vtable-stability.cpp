@@ -1,9 +1,9 @@
 // unit-test-vtable-stability.cpp
 //
-// Verifies that the vtable slot layout of every COM interface declared in
-// include/slang.h has not changed.  Each test creates a concrete probe object
-// that records which override was called, then dispatches through a specific
-// raw vtable slot and asserts the expected method fired.
+// Verifies that the vtable slot layout of public COM interfaces has not changed.
+// Each test creates a concrete probe object that records which override was called,
+// then dispatches through a specific raw vtable slot and asserts the expected method
+// fired.
 //
 // If a virtual method is inserted in the middle of an interface the slot
 // indices of all subsequent methods shift by one, causing a different probe
@@ -20,6 +20,7 @@
 // parameters, corrupting the stack when called with fewer arguments, so the
 // entire test is guarded by SLANG_PTR_IS_64.
 
+#include "slang-gfx.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -34,6 +35,13 @@ static void callSlot(void* obj, int slot)
 {
     void** vtbl = *reinterpret_cast<void***>(obj);
     reinterpret_cast<void(SLANG_MCALL*)(void*)>(vtbl[slot])(obj);
+}
+
+static gfx::Result callShaderProgramD3D12Slot(void* obj, int slot, void** outRootSignature)
+{
+    void** vtbl = *reinterpret_cast<void***>(obj);
+    return reinterpret_cast<gfx::Result(SLANG_MCALL*)(void*, void**)>(
+        vtbl[slot])(obj, outRootSignature);
 }
 
 // ---------------------------------------------------------------------------
@@ -68,6 +76,107 @@ SLANG_UNIT_TEST(vtableISlangUnknown)
     SLANG_CHECK(p.lastSlot == 1); // addRef
     callSlot(&p, 2);
     SLANG_CHECK(p.lastSlot == 2); // release
+}
+
+// ---------------------------------------------------------------------------
+// gfx::IShaderProgramD3D12 : ISlangUnknown  (own slot 3)
+// ---------------------------------------------------------------------------
+struct IShaderProgramD3D12Probe : gfx::IShaderProgramD3D12
+{
+    int lastSlot = -1;
+    void* expectedRootSignature() { return static_cast<gfx::IShaderProgramD3D12*>(this); }
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE
+    {
+        lastSlot = 0;
+        SlangUUID const interfaceID = SLANG_UUID_IShaderProgramD3D12;
+        if (uuid == interfaceID)
+        {
+            *outObject = static_cast<gfx::IShaderProgramD3D12*>(this);
+            return SLANG_OK;
+        }
+        *outObject = nullptr;
+        return SLANG_E_NO_INTERFACE;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
+    {
+        lastSlot = 1;
+        return 1;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        lastSlot = 2;
+        return 1;
+    }
+    SLANG_NO_THROW gfx::Result SLANG_MCALL getRootSignature(void** outRootSignature) SLANG_OVERRIDE
+    {
+        lastSlot = 3;
+        *outRootSignature = expectedRootSignature();
+        return SLANG_OK;
+    }
+};
+
+SLANG_UNIT_TEST(vtableIShaderProgramD3D12)
+{
+    IShaderProgramD3D12Probe p;
+
+    gfx::IShaderProgramD3D12* queried = nullptr;
+    SLANG_CHECK(p.queryInterface(SLANG_UUID_IShaderProgramD3D12, (void**)&queried) == SLANG_OK);
+    SLANG_CHECK(queried == &p);
+
+    void* rootSignature = nullptr;
+    SLANG_CHECK(callShaderProgramD3D12Slot(queried, 3, &rootSignature) == SLANG_OK);
+    SLANG_CHECK(p.lastSlot == 3); // getRootSignature
+    SLANG_CHECK(rootSignature == p.expectedRootSignature());
+}
+
+// ---------------------------------------------------------------------------
+// gfx::IComputeCommandEncoderD3D12 : ISlangUnknown  (own slot 3)
+// ---------------------------------------------------------------------------
+struct IComputeCommandEncoderD3D12Probe : gfx::IComputeCommandEncoderD3D12
+{
+    int lastSlot = -1;
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE
+    {
+        lastSlot = 0;
+        SlangUUID const interfaceID = SLANG_UUID_IComputeCommandEncoderD3D12;
+        if (uuid == interfaceID)
+        {
+            *outObject = static_cast<gfx::IComputeCommandEncoderD3D12*>(this);
+            return SLANG_OK;
+        }
+        *outObject = nullptr;
+        return SLANG_E_NO_INTERFACE;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
+    {
+        lastSlot = 1;
+        return 1;
+    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        lastSlot = 2;
+        return 1;
+    }
+    SLANG_NO_THROW gfx::Result SLANG_MCALL
+    bindRootObjectAsCompute(gfx::IShaderProgram*, gfx::IShaderObject*) SLANG_OVERRIDE
+    {
+        lastSlot = 3;
+        return SLANG_OK;
+    }
+};
+
+SLANG_UNIT_TEST(vtableIComputeCommandEncoderD3D12)
+{
+    IComputeCommandEncoderD3D12Probe p;
+
+    gfx::IComputeCommandEncoderD3D12* queried = nullptr;
+    SLANG_CHECK(
+        p.queryInterface(SLANG_UUID_IComputeCommandEncoderD3D12, (void**)&queried) == SLANG_OK);
+    SLANG_CHECK(queried == &p);
+    callSlot(queried, 3);
+    SLANG_CHECK(p.lastSlot == 3); // bindRootObjectAsCompute
 }
 
 // ---------------------------------------------------------------------------
@@ -665,7 +774,7 @@ SLANG_UNIT_TEST(vtableISlangProfiler)
 }
 
 // ---------------------------------------------------------------------------
-// IGlobalSession : ISlangUnknown  (own slots 3-31)
+// IGlobalSession : ISlangUnknown  (own slots 3-32)
 // ---------------------------------------------------------------------------
 struct IGlobalSessionProbe : IGlobalSession
 {
@@ -841,6 +950,12 @@ struct IGlobalSessionProbe : IGlobalSession
         lastSlot = 31;
         return SLANG_OK;
     }
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDownstreamCompilerVersion(SlangPassThrough, int*, int*) SLANG_OVERRIDE
+    {
+        lastSlot = 32;
+        return SLANG_OK;
+    }
 };
 
 SLANG_UNIT_TEST(vtableIGlobalSession)
@@ -862,6 +977,8 @@ SLANG_UNIT_TEST(vtableIGlobalSession)
     SLANG_CHECK(p.lastSlot == 26); // setSPIRVCoreGrammar
     callSlot(&p, 31);
     SLANG_CHECK(p.lastSlot == 31); // saveBuiltinModule
+    callSlot(&p, 32);
+    SLANG_CHECK(p.lastSlot == 32); // getDownstreamCompilerVersion
 }
 
 // ---------------------------------------------------------------------------

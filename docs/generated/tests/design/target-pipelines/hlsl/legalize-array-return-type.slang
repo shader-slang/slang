@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:16:11+00:00
 //META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-c-hlsl-legalization-lowering-phi-elimination
-//META: doc_section_digest=e8f525c4f3b39107c481bf03414c7c2ad6a1c96a430e84aae54c4f8e6a580692
+//META: doc_section_digest=549f8ae382ad795540f97904e8ba737a55b9729a516fa91350bc135710a2f1a2
 //META: purpose=legalizeArrayReturnType rewrites T[N] foo() into void foo(out T[N]) on HLSL because DXC disallows array return values.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

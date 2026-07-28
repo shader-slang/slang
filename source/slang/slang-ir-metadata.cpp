@@ -1,7 +1,7 @@
 // slang-ir-metadata.cpp
 #include "slang-ir-metadata.h"
 
-#include "../compiler-core/slang-artifact-associated-impl.h"
+#include "compiler-core/slang-artifact-associated-impl.h"
 #include "slang-ir-byte-granularity-usage.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"

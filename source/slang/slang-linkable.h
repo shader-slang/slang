@@ -12,7 +12,7 @@
 // `.slang-module` file).
 //
 
-#include "../compiler-core/slang-artifact.h"
+#include "compiler-core/slang-artifact.h"
 #include "slang-ast-base.h"
 #include "slang-compiler-fwd.h"
 #include "slang-compiler-options.h"

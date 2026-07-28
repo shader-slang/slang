@@ -21,10 +21,16 @@ standard output = {
                                 "elementType": {
                                     "kind": "scalar",
                                     "scalarType": "uint32"
-                                }
+                                },
+                                "sizes": [
+                                    {"kind": "uniform", "value": 8, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 4}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "uniform", "value": 8, "alignment": 16}
                     ]
                 },
                 "containerVarLayout": {
@@ -43,14 +49,23 @@ standard output = {
                                     "elementType": {
                                         "kind": "scalar",
                                         "scalarType": "uint32"
-                                    }
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 8, "alignment": 4}
+                                    ]
                                 },
                                 "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 4}
                             }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 8, "alignment": 16}
                         ]
                     },
                     "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
-                }
+                },
+                "sizes": [
+                    {"kind": "constantBuffer", "value": 1}
+                ]
             }
         },
         {
@@ -70,10 +85,16 @@ standard output = {
                                 "elementType": {
                                     "kind": "scalar",
                                     "scalarType": "uint32"
-                                }
+                                },
+                                "sizes": [
+                                    {"kind": "uniform", "value": 8, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 4}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "uniform", "value": 8, "alignment": 16}
                     ]
                 },
                 "containerVarLayout": {
@@ -92,14 +113,23 @@ standard output = {
                                     "elementType": {
                                         "kind": "scalar",
                                         "scalarType": "uint32"
-                                    }
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 8, "alignment": 4}
+                                    ]
                                 },
                                 "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 4}
                             }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 8, "alignment": 16}
                         ]
                     },
                     "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
-                }
+                },
+                "sizes": [
+                    {"kind": "constantBuffer", "value": 1}
+                ]
             }
         },
         {
@@ -115,7 +145,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -131,7 +164,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -140,7 +176,14 @@ standard output = {
             "format": "r32ui",
             "type": {
                 "kind": "resource",
-                "baseShape": "textureBuffer"
+                "baseShape": "textureBuffer",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "uint32"
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -149,7 +192,14 @@ standard output = {
             "format": "r32ui",
             "type": {
                 "kind": "resource",
-                "baseShape": "textureBuffer"
+                "baseShape": "textureBuffer",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "uint32"
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -160,8 +210,14 @@ standard output = {
                 "baseShape": "structuredBuffer",
                 "resultType": {
                     "kind": "scalar",
-                    "scalarType": "uint32"
-                }
+                    "scalarType": "uint32",
+                    "sizes": [
+                        {"kind": "uniform", "value": 4, "alignment": 4}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -172,8 +228,14 @@ standard output = {
                 "baseShape": "structuredBuffer",
                 "resultType": {
                     "kind": "scalar",
-                    "scalarType": "uint32"
-                }
+                    "scalarType": "uint32",
+                    "sizes": [
+                        {"kind": "uniform", "value": 4, "alignment": 4}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -190,7 +252,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "unorderedAccess", "value": 1}
+                ]
             }
         },
         {
@@ -207,7 +272,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "unorderedAccess", "value": 1}
+                ]
             }
         },
         {
@@ -217,7 +285,14 @@ standard output = {
             "type": {
                 "kind": "resource",
                 "baseShape": "textureBuffer",
-                "access": "readWrite"
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "uint32"
+                },
+                "sizes": [
+                    {"kind": "unorderedAccess", "value": 1}
+                ]
             }
         },
         {
@@ -227,7 +302,14 @@ standard output = {
             "type": {
                 "kind": "resource",
                 "baseShape": "textureBuffer",
-                "access": "readWrite"
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "uint32"
+                },
+                "sizes": [
+                    {"kind": "unorderedAccess", "value": 1}
+                ]
             }
         },
         {
@@ -239,8 +321,14 @@ standard output = {
                 "access": "readWrite",
                 "resultType": {
                     "kind": "scalar",
-                    "scalarType": "uint32"
-                }
+                    "scalarType": "uint32",
+                    "sizes": [
+                        {"kind": "uniform", "value": 4, "alignment": 4}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "unorderedAccess", "value": 1}
+                ]
             }
         },
         {
@@ -252,22 +340,34 @@ standard output = {
                 "access": "readWrite",
                 "resultType": {
                     "kind": "scalar",
-                    "scalarType": "uint32"
-                }
+                    "scalarType": "uint32",
+                    "sizes": [
+                        {"kind": "uniform", "value": 4, "alignment": 4}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "unorderedAccess", "value": 1}
+                ]
             }
         },
         {
             "name": "UsedSampler",
             "binding": {"kind": "samplerState", "index": 0},
             "type": {
-                "kind": "samplerState"
+                "kind": "samplerState",
+                "sizes": [
+                    {"kind": "samplerState", "value": 1}
+                ]
             }
         },
         {
             "name": "UnusedSampler",
             "binding": {"kind": "samplerState", "index": 1},
             "type": {
-                "kind": "samplerState"
+                "kind": "samplerState",
+                "sizes": [
+                    {"kind": "samplerState", "value": 1}
+                ]
             }
         },
         {
@@ -275,7 +375,10 @@ standard output = {
             "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0},
             "type": {
                 "kind": "scalar",
-                "scalarType": "uint32"
+                "scalarType": "uint32",
+                "sizes": [
+                    {"kind": "uniform", "value": 4, "alignment": 4}
+                ]
             }
         },
         {
@@ -283,7 +386,10 @@ standard output = {
             "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0},
             "type": {
                 "kind": "scalar",
-                "scalarType": "uint32"
+                "scalarType": "uint32",
+                "sizes": [
+                    {"kind": "uniform", "value": 4, "alignment": 4}
+                ]
             }
         }
     ],
@@ -301,7 +407,10 @@ standard output = {
                         "elementType": {
                             "kind": "scalar",
                             "scalarType": "uint32"
-                        }
+                        },
+                        "sizes": [
+
+                        ]
                     }
                 }
             ],

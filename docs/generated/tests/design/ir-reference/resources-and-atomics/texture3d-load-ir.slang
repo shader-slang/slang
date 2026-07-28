@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T09:40:00+00:00
 //META: source_commit=1106750632bd5fb062ea9e50319f7763d34f78d5
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#texture-and-image
-//META: doc_section_digest=0b65d4084486d3b0e44a1d4ae82fad284cfe750fe170e9c06ae248dedd65891c
+//META: doc_section_digest=6c8a0e2f5621fa8fe9870a96fba7f97261b6b3930a336ced3ad67bd4bfd658e6
 //META: purpose=`Texture3D::Load(int4(xyz, lod))` surfaces in `main` as a `call specialize(%Load, ..., TextureShape3DType, ...)(%tex, %coord)`.
 //META: intent=expansion
 //META: pipeline_stage=lower

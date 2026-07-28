@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T10:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=7d43267959b0c547516266beea43e6e96622d37270bfab810d9819a48f90812b
+//META: doc_section_digest=19eb09c072c556dd0799b5002c2f1b24781da93f2cebc122ca027062c24e0b84
 //META: purpose=An InterfaceDecl with three methods lowers to one `interface_req_entry(...)` instruction per method; the interface type aggregates them into a single `interface(...)` operand list.
 //META: intent=boundary
 //META: pipeline_stage=lower

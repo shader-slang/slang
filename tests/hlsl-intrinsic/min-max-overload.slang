@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -O0
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv
 
 // Test that min/max with IInteger and IFloat constraints emit optimized intrinsics (issue #9395)
 // This verifies that the IArithmetic overload routes to the correct SPIR-V instructions.

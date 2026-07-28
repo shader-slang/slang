@@ -599,10 +599,43 @@ struct IntroduceExplicitGlobalContextPass
         {
             nextUse = use->nextUse;
 
+            // Consider this example:
+            //
+            //     AppendStructuredBuffer<int> output;
+            //
+            // Earlier passes split `output` into `output.elements` and `output.counter`, then
+            // produce IR like this:
+            //
+            //     [CounterBuffer(%outputCounter)]
+            //     %outputElements = global_param
+            //     %outputCounter = global_param
+            //
+            // `CounterBuffer` identifies the counter associated with the elements parameter; it
+            // does not read the counter's runtime value. This pass moves both parameters into a
+            // structure:
+            //
+            //     %outputElementsKey = key
+            //     %outputCounterKey = key
+            //     struct KernelContext
+            //     {
+            //         field(%outputElementsKey, ...)
+            //         field(%outputCounterKey, ...)
+            //     }
+            //
+            // Therefore the decoration must become `CounterBuffer(%outputCounterKey)`. When this
+            // loop processes `%outputCounter`, `fieldInfo.key` is `%outputCounterKey`, so replace
+            // the decoration operand directly. Ordinary uses inside functions are instead
+            // replaced with loads from the corresponding field below.
+            auto user = use->getUser();
+            if (as<IRDecoration>(user))
+            {
+                use->set(fieldInfo.key);
+                continue;
+            }
+
             // At each use site, we need to look up the context
             // pointer that is appropriate for that use.
             //
-            auto user = use->getUser();
             auto contextParam = findOrCreateContextPtrForInst(user);
             builder.setInsertBefore(user);
 

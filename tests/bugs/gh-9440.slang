@@ -1,7 +1,7 @@
-//TEST:SIMPLE(filecheck=FUNC1): -target spirv -O0 -entry func1
-//TEST:SIMPLE(filecheck=FUNC2): -target spirv -O0 -entry func2
-//TEST:SIMPLE(filecheck=FUNC3): -target spirv -O0 -entry func3
-//TEST:SIMPLE(filecheck=FUNC4): -target spirv -O0 -entry func4
+//TEST:SIMPLE(filecheck=FUNC1): -target spirv -entry func1
+//TEST:SIMPLE(filecheck=FUNC2): -target spirv -entry func2
+//TEST:SIMPLE(filecheck=FUNC3): -target spirv -entry func3
+//TEST:SIMPLE(filecheck=FUNC4): -target spirv -entry func4
 
 // FUNC1: %func1 = OpFunction
 // FUNC1: OpLoad %int %a_value_value

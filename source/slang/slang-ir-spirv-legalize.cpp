@@ -1287,6 +1287,54 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         addUsersToWorkList(newInst);
     }
 
+    // Retypes a descriptor-heap `ConstantBuffer<T>` fetch into the StorageBuffer storage
+    // class. A descriptor-heap constant buffer is fetched through an `OpBufferPointerEXT`
+    // raw-memory buffer pointer (not a bound UBO), so it must live in StorageBuffer like
+    // the StructuredBuffer-via-heap path. Left in Uniform, its pointer types carry no
+    // pointer-type `ArrayStride` (Uniform uses logical addressing), so addressing a nested
+    // array through the buffer pointer computes an undefined offset while the leading
+    // scalar at offset 0 stays correct -- the miscompile in #11483. Retyping the load
+    // result here lets the existing pointer-stride emission fire, and the StorageBuffer
+    // address space propagates to the chained field/element-address pointers via
+    // `processFieldAddress`/`processGetElementPtrImpl`.
+    void processConstantBufferDescriptorHeapLoad(IRSPIRVLoadDescriptorFromHeap* loadInst)
+    {
+        auto cbType = as<IRConstantBufferType>(loadInst->getDataType());
+        if (!cbType)
+            return;
+
+        // Only retype constant buffers whose element is already a block struct at this
+        // point: user structs and (already-wrapped) array elements qualify. Scalar,
+        // vector, and matrix elements are wrapped into a block struct by a later pass
+        // (`wrapRemainingConstantBufferElementTypes`), so they are not yet structs here and
+        // are left to the generic post-worklist ConstantBuffer translation (which keeps
+        // them Uniform); retyping a not-yet-wrapped element would produce a non-block
+        // buffer pointer. Those non-array elements have no nested-array addressing through
+        // the buffer pointer, so the Uniform class is harmless for them.
+        auto elementType = cbType->getElementType();
+        if (!as<IRStructType>(elementType))
+            return;
+
+        IRBuilder builder(m_sharedContext->m_irModule);
+        builder.setInsertBefore(loadInst);
+        builder.addDecorationIfNotExist(elementType, kIROp_SPIRVBlockDecoration);
+        auto dataLayout = cbType->getDataLayout();
+        if (!dataLayout)
+            dataLayout = builder.getDefaultBufferLayoutType();
+        auto newPtrType = builder.getPtrType(
+            elementType,
+            AccessQualifier::Immutable,
+            getStorageBufferAddressSpace(),
+            dataLayout);
+        auto newLoad = builder.emitLoadDescriptorFromHeap(
+            newPtrType,
+            loadInst->getHeap(),
+            loadInst->getIndex());
+        loadInst->replaceUsesWith(newLoad);
+        loadInst->removeAndDeallocate();
+        addUsersToWorkList(newLoad);
+    }
+
     void processMeshOutputGetElementPtr(IRMeshOutputRef* gepInst)
     {
         processGetElementPtrImpl(gepInst, gepInst->getBase(), gepInst->getIndex());
@@ -2324,6 +2372,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_RWStructuredBufferGetElementPtr:
                 processRWStructuredBufferGetElementPtr(
                     cast<IRRWStructuredBufferGetElementPtr>(inst));
+                break;
+            case kIROp_SPIRVLoadDescriptorFromHeap:
+                processConstantBufferDescriptorHeapLoad(cast<IRSPIRVLoadDescriptorFromHeap>(inst));
                 break;
             case kIROp_MeshOutputRef:
                 processMeshOutputGetElementPtr(cast<IRMeshOutputRef>(inst));

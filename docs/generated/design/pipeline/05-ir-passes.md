@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:17:30Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 3c3b5585e80344fff65833edfb71495cd9350eddefb45844496574bcd283e01a
+generated_at: 2026-06-29T15:32:04Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: cdb8cb5584a28f89a0b7db40000011a37d1ed999cfb2fc9243256f34051010a7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -23,10 +23,10 @@ headings are approximate (precise at `source_commit`).
 
 The orchestrator is `linkAndOptimizeIR` in
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (declared
-around line 895 at `source_commit`). It is called by
-`emitEntryPointsSourceFromIR` (defined at line 2526; the call is at
-line 2670) and by the variants used when emitting LLVM, VM, or other
-non-textual targets (calls visible near lines 3245, 3286, 3340). The
+around line 896 at `source_commit`). It is called by
+`emitEntryPointsSourceFromIR` (defined at line 2540; the call is at
+line 2684) and by the variants used when emitting LLVM, VM, or other
+non-textual targets (calls visible near lines 3259, 3300, 3354). The
 function:
 
 1. Links the per-translation-unit IR modules together (using
@@ -68,9 +68,12 @@ that carries `IRLayoutDecoration`s is built separately by
 
 Individual category tables below still list a pass even when its
 *primary* call site is in the pre-link region above (for example,
-`constructSSA`, `propagateConstExpr`, `eliminateDeadCode`,
-`simplifyCFG`, and `peepholeOptimize` are all invoked both in
-`generateIRForTranslationUnit` and again from `linkAndOptimizeIR`).
+`constructSSA`, `eliminateDeadCode`, `simplifyCFG`, and
+`peepholeOptimize` are all invoked both in
+`generateIRForTranslationUnit` and again from `linkAndOptimizeIR`;
+`propagateConstExpr`, by contrast, runs only in the pre-link region,
+while the post-link cleanup uses the `simplifyIR` fixed point —
+SSA / SCCP / SimplifyCFG / DCE — rather than constexpr propagation).
 Treat 04b as the authoritative ordering for the pre-link region and
 the per-target pages under [../target-pipelines/](../target-pipelines)
 as the authoritative ordering for the post-link region.
@@ -283,7 +286,6 @@ These passes run only for their named target.
 | HLSL legalize | [slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp) | HLSL |
 | Metal legalize | [slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp) | Metal |
 | SPIR-V legalize | [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) | SPIR-V |
-| SPIR-V snippet | [slang-ir-spirv-snippet.cpp](../../../../source/slang/slang-ir-spirv-snippet.cpp) | SPIR-V |
 | WGSL legalize | [slang-ir-wgsl-legalize.cpp](../../../../source/slang/slang-ir-wgsl-legalize.cpp) | WGSL |
 | CUDA immutable load | [slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp) | CUDA |
 | Vulkan invert Y | [slang-ir-vk-invert-y.cpp](../../../../source/slang/slang-ir-vk-invert-y.cpp) | Vulkan / SPIR-V |
@@ -292,7 +294,6 @@ These passes run only for their named target.
 | Mesh-output reads | [slang-ir-mesh-output-reads.cpp](../../../../source/slang/slang-ir-mesh-output-reads.cpp) | Mesh-shader-capable targets |
 | PyTorch C++ binding | [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | Torch |
 | COM interface | [slang-ir-com-interface.cpp](../../../../source/slang/slang-ir-com-interface.cpp) | CPU / COM |
-| Translate | [slang-ir-translate.cpp](../../../../source/slang/slang-ir-translate.cpp) | Generic translation step used by some targets |
 
 ### Instrumentation
 
@@ -351,6 +352,7 @@ cloning support that the categorized passes above rely on.
 | Util | [slang-ir-util.cpp](../../../../source/slang/slang-ir-util.cpp) | Common IR walking / mutation primitives |
 | Insts info | [slang-ir-insts-info.cpp](../../../../source/slang/slang-ir-insts-info.cpp) | Opcode tables, name lookup, and per-opcode metadata used by the pretty printer and passes that switch on opcode |
 | Insts stable names | [slang-ir-insts-stable-names.cpp](../../../../source/slang/slang-ir-insts-stable-names.cpp) | Maps between opcode enum values and serialization-stable string names |
+| Translate | [slang-ir-translate.cpp](../../../../source/slang/slang-ir-translate.cpp) | Shared translation dictionary and `TranslationContext` used by specialization and related analysis |
 
 ## What is not in this document
 

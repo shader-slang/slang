@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:50:55+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-c-mandatory-optimization-passes
-//META: doc_section_digest=b2bba5b4923f9f3b4fa76f2dbfcef4a05d4c5bbf61e50737eaabe8565887e46f
+//META: doc_section_digest=ea5fa74562394aae8870602d7884121af11d8d0462ee86377e7d298a8422bd4b
 //META: purpose=Phase C's constructSSA (C1) promotes addressable locals to SSA temporaries; trivial `int x = a; x = x + 1;` shows no var/load/store of a local Int.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:15:51Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 1e20209a27420ffb3b4a21146a697ad5de4a4148e92e47a97368c920b78d2800
+generated_at: 2026-06-29T15:17:07Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: ef75dc1de48b06f0b01fd7da196735cab6033928aab034bca2cebfd41fe221d7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -19,7 +19,7 @@ that handles statements.
 
 Statement classes are declared in
 [slang-ast-stmt.h](../../../../source/slang/slang-ast-stmt.h). The
-parser entry point is `parseStatement` in
+parser entry point is `Parser::ParseStatement` in
 [slang-parser.cpp](../../../../source/slang/slang-parser.cpp); the
 function-body parsing happens lazily under the two-stage parsing
 strategy explained in
@@ -109,10 +109,10 @@ parsed as a statement.
 | `ContinueStmt` | `JumpStmt` | (inherits) | [continue](../syntax-reference/grammar.md#statements) | `continue`. |
 | `ReturnStmt` | `Stmt` | `expression: Expr*` | [return](../syntax-reference/grammar.md#statements) | `return` (optionally with an expression). |
 | `DeferStmt` | `Stmt` | `statement: Stmt*` | [defer](../syntax-reference/grammar.md#statements) | `defer S;`; lowered to scope-exit handlers in the IR. |
-| `ThrowStmt` | `Stmt` | `expression: Expr*` | [throw](../syntax-reference/grammar.md#statements) | `throw e;` for errorable functions. |
+| `ThrowStmt` | `Stmt` | `expression: Expr*` | [throw](../syntax-reference/grammar.md#statements) | `throw e` for errorable functions (`ParseThrowStatement` does not itself consume a trailing `;`). |
 | `CatchStmt` | `Stmt` | `errorVar: ParamDecl*`, `tryBody: Stmt*`, `handleBody: Stmt*` | [do-catch](../syntax-reference/grammar.md#statements) | `do { ... } catch (e) { ... }`; `tryBody` is the protected body, `handleBody` the handler; `errorVar == null` means a catch-all. |
 | `ExpressionStmt` | `Stmt` | `expression: Expr*` | [expression stmt](../syntax-reference/grammar.md#statements) | An expression used for its side effects (`f();`, `a = b;`). |
-| `RequireCapabilityStmt` | `Stmt` | `requiredCaps: List<Token>` | [require_capability](../syntax-reference/grammar.md#statements) | Statement-level capability requirement scoped to the enclosing function. |
+| `RequireCapabilityStmt` | `Stmt` | `requiredCaps: List<Token>` | (none) | `__requireCapability(...)`; statement-level capability requirement scoped to the enclosing function. |
 | `UniqueStmtIDNode` | `Decl` | (no parsed state) | (none) | Synthesized identity helper that gives a statement a stable unique id; used by serialization and control-flow tracking rather than parsed as a statement. |
 
 ## Notable nodes
@@ -166,9 +166,9 @@ the expression against the enclosing function's declared return type.
 A range-based for whose bounds must be compile-time constants
 (`rangeBeginVal` and `rangeEndVal` are `IntVal*` filled in by
 checking). The IR lowering unrolls the loop and emits no runtime
-loop instructions; the body is duplicated once per iteration. This
-is the statement that backs Slang's `[ForceInline]`-style range
-loops over generic value parameters.
+loop instructions; the body is duplicated once per iteration. The
+parser produces it from the `$for (name in Range(...))` syntax
+(`parseCompileTimeForStmt`).
 
 ### TargetSwitchStmt, StageSwitchStmt, TargetCaseStmt
 
@@ -220,7 +220,9 @@ current pixel and carries no operands.
 ### RequireCapabilityStmt
 
 Asserts that the surrounding function requires the listed capability
-atoms. The parser stores them as raw tokens; the checker resolves
+atoms. The parser recognizes the `__requireCapability` keyword
+(`Parser::ParseRequireCapabilityStatement`) and stores the atoms as
+raw tokens; the checker resolves
 each token to a capability via the capability system documented in
 [../cross-cutting/targets.md](../cross-cutting/targets.md).
 

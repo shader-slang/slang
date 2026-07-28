@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:50:00+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#visibility-modifiers
-//META: doc_section_digest=52c3496b4c6eb147ea8a64ec9af718be37cc7621d3bab08948b2b5b741b87fda
+//META: doc_section_digest=0b85270cdc11d14a0cd871e0cb80fb27c01d6be160703736facd597770df0b42
 //META: purpose=A `public` member is accessible from outside its enclosing type and a `public` function from anywhere.
 //META: intent=functional
 //META: pipeline_stage=check

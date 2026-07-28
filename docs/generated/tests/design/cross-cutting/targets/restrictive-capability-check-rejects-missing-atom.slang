@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#runtime-representation
-//META: doc_section_digest=bd3a8a9e5737485c9a7ddbe47c464799f12940b6a68f5d5db5a85b41bbef6560
+//META: doc_section_digest=fae3c6ef7014af2bdec8e100159a7e70245328b5ad7fe9c05d4605254a8649a4
 //META: purpose=Capability sets are joined against the active profile. `-restrictive-capability-check` upgrades a missing-atom mismatch to an error; without the flag the same input emits an implicit-upgrade warning.
 //META: intent=negative
 //META: pipeline_stage=check

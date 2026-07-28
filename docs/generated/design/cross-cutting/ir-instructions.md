@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:13:27Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 48ed6f3a5c2185f6c92001fe814211a9e9a1c534cd93f7d7a112e99b17b02e52
+generated_at: 2026-06-29T13:28:22Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 4d00bbdf4b0ae52ef1c205b4c4aa6ce08a50ed9d00f0d7e09bdaa67a56261b9d
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -124,9 +124,10 @@ declarations live in
 | `Int`, `Float`, `Bool`, ... | `IntType`, `FloatType`, `BoolType`, ... | — | Basic scalar types; see [../ir-reference/types.md](../ir-reference/types.md). |
 | `Vec` | `VectorType` | `elementType, elementCount` | Vector types; hoistable. |
 | `Mat` | `MatrixType` | `elementType, rowCount, columnCount, layout` | Matrix types; hoistable. |
+| `MetalPackedVec` | `MetalPackedVectorType` | `elementType, elementCount` | Element-aligned, unpadded vector storage type for Metal device buffers; emitted as MSL `packed_T<N>`; hoistable. |
 | `Array` | `ArrayType` | `elementType, elementCount` | Fixed-size array; hoistable. |
 | `Ptr` | `PtrType` | `valueType, accessQualifier?, addressSpace?, dataLayout?` | Pointer type; hoistable. |
-| `Texture` | — | `elementType, shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format` | Texture types; hoistable. |
+| `TextureType` | — | `elementType, shape, isArray, isMS, sampleCount, accessOperand, isShadow, isCombined, format` | Texture types; hoistable. |
 | `struct` / `class` / `interface` | `StructType` / `ClassType` / `InterfaceType` | parent of `field` / `key` / `interface_req_entry` | Parent containers; also documented in [../ir-reference/structure.md](../ir-reference/structure.md). |
 | (...plus ~150 more type opcodes; see [../ir-reference/types.md](../ir-reference/types.md) for the full list) | | | |
 
@@ -134,7 +135,7 @@ declarations live in
 
 | Opcode | `struct_name` | Operands | Notes |
 | --- | --- | --- | --- |
-| `IntLit`, `FloatLit`, `StringLit`, ... | `IntLit`, `FloatLit`, `StringLit`, ... | (payload stored inline on the inst) | Literal constants; hoistable. |
+| `integer_constant`, `float_constant`, `string_constant`, ... | `IntLit`, `FloatLit`, `StringLit`, ... | (payload stored inline on the inst) | Literal constants; hoistable. |
 | `add`, `sub`, `mul`, `div` | `Add`, `Sub`, `Mul`, `Div` | `left, right` | Arithmetic. |
 | `cmpEQ`, `cmpLT`, ... | `Eql`, `Less`, ... | `left, right` | Comparisons. |
 | `bitCast`, `intCast`, `floatCast`, ... | — | `val` | Conversion ops. |
@@ -160,7 +161,7 @@ declarations live in
 | `param` | `IRParam` | (variadic) | Block or function parameter; replaces SSA `phi`. |
 | `unconditionalBranch` / `conditionalBranch` / `ifElse` / `switch` / `loop` | — | (terminator-specific) | Terminators in the `TerminatorInst` family. |
 | `return_val` / `unreachable` / `discard` | — | (terminator-specific) | Return and exit terminators. |
-| `RequirePrelude`, `RequireTargetExtension`, `Printf`, `StaticAssert`, ... | — | (variadic) | Other control-flow / backend-hint opcodes. |
+| `RequirePrelude`, `RequireTargetExtension`, `Printf`, `Abort`, `StaticAssert`, ... | — | (variadic) | Other control-flow / backend-hint opcodes (`Abort` carries a `format` operand, like `Printf`). |
 | (...see [../ir-reference/control-flow.md](../ir-reference/control-flow.md) for the full list) | | | |
 
 ### Function and module structure
@@ -195,6 +196,7 @@ declarations live in
 | `TargetIntrinsicDecoration` | `IRTargetIntrinsicDecoration` | `targetTokens, definition` | Maps an IR op to a target intrinsic. |
 | `EntryPointDecoration` | `IREntryPointDecoration` | `profile, name, moduleName` | Marks a function as a pipeline entry point. |
 | `BuiltinRequirementDecoration` | `IRBuiltinRequirementDecoration` | `kindOperand` | Tags an interface requirement key with its `BuiltinRequirementKind`, so consumers find the requirement by role rather than by entry order. |
+| `glslFragDepthGreater` / `glslFragDepthLess` | `GLSLFragDepthGreaterDecoration` / `GLSLFragDepthLessDecoration` | — | Mark a fragment entry point whose `gl_FragDepth` is constrained to only increase / decrease (HLSL `SV_DepthGreaterEqual` / `SV_DepthLessEqual`); drives the GLSL `layout(depth_greater)` / `layout(depth_less)` redeclaration. |
 | (...see [../ir-reference/decorations.md](../ir-reference/decorations.md) for the full list of ~180 decorations) | | | |
 
 ### Resource and shader-IO opcodes
@@ -284,7 +286,7 @@ deserialization of older `.slang-module` files unless the supported-
 version range is bumped. `IRModule` in
 [slang-ir.h](../../../../source/slang/slang-ir.h) tracks this range as
 `k_minSupportedModuleVersion` (4) and `k_maxSupportedModuleVersion`
-(20). The serialization rules are in
+(22). The serialization rules are in
 [../cross-cutting/serialization.md](serialization.md)
 and
 [../../../design/backwards-compat-for-ir-modules.md](../../../design/backwards-compat-for-ir-modules.md).

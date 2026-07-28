@@ -2,8 +2,8 @@
 #ifndef SLANG_ARTIFACT_ASSOCIATED_IMPL_H
 #define SLANG_ARTIFACT_ASSOCIATED_IMPL_H
 
-#include "../core/slang-com-object.h"
-#include "../core/slang-memory-arena.h"
+#include "core/slang-com-object.h"
+#include "core/slang-memory-arena.h"
 #include "slang-artifact-associated.h"
 #include "slang-artifact-diagnostic-util.h"
 #include "slang-artifact-util.h"

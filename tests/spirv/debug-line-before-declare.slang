@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -O0 -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -emit-spirv-directly
 
 // Minimal reproduction: any function with at least one parameter
 // triggers the bug where DebugDeclare appears between DebugScope and DebugLine.

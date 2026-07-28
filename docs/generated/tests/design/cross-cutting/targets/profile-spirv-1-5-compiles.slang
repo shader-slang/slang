@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#profiles
-//META: doc_section_digest=40b4f2fae77db035dad60bd27fe1b81fe055b218323e5afdfe04adf91d306631
+//META: doc_section_digest=d4fdc256b63091b576a1224e1ef7e5c69edbdda207c4f87eb2742b3fb509fb67
 //META: purpose=The doc's Profiles section gives `-target spirv -profile glsl_450` as an example that selects a profile-driven capability set. A profile that pairs SPIR-V with GLSL 450 parses and compiles a vanilla compute shader.
 //META: intent=functional
 //META: pipeline_stage=check

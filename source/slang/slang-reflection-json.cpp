@@ -1,8 +1,8 @@
 
 #include "slang-reflection-json.h"
 
-#include "../compiler-core/slang-artifact-associated-impl.h"
-#include "../core/slang-blob.h"
+#include "compiler-core/slang-artifact-associated-impl.h"
+#include "core/slang-blob.h"
 #include "slang-ast-support-types.h"
 #include "slang.h"
 
@@ -67,6 +67,47 @@ static void emitReflectionSize(PrettyWriter& writer, size_t size)
                                  : writer << (uint64_t)size;
 }
 
+// Single source of truth for the JSON spelling of a layout unit, so binding/offset and size
+// printing name a given unit identically.
+static UnownedStringSlice getReflectionParameterCategoryName(SlangParameterCategory category)
+{
+    switch (category)
+    {
+#define CASE(NAME, KIND)                  \
+    case SLANG_PARAMETER_CATEGORY_##NAME: \
+        return toSlice(#KIND)
+        CASE(UNIFORM, uniform);
+        CASE(CONSTANT_BUFFER, constantBuffer);
+        CASE(SHADER_RESOURCE, shaderResource);
+        CASE(UNORDERED_ACCESS, unorderedAccess);
+        CASE(VARYING_INPUT, varyingInput);
+        CASE(VARYING_OUTPUT, varyingOutput);
+        CASE(SAMPLER_STATE, samplerState);
+        CASE(PUSH_CONSTANT_BUFFER, pushConstantBuffer);
+        CASE(DESCRIPTOR_TABLE_SLOT, descriptorTableSlot);
+        CASE(SPECIALIZATION_CONSTANT, specializationConstant);
+        CASE(MIXED, mixed);
+        CASE(REGISTER_SPACE, registerSpace);
+        CASE(SUB_ELEMENT_REGISTER_SPACE, subElementRegisterSpace);
+        CASE(GENERIC, generic);
+        CASE(RAY_PAYLOAD, rayPayload);
+        CASE(HIT_ATTRIBUTES, hitAttributes);
+        CASE(CALLABLE_PAYLOAD, callablePayload);
+        CASE(SHADER_RECORD, shaderRecord);
+        CASE(EXISTENTIAL_TYPE_PARAM, existentialTypeParam);
+        CASE(EXISTENTIAL_OBJECT_PARAM, existentialObjectParam);
+        CASE(SUBPASS, inputAttachmentIndex);
+        CASE(METAL_ARGUMENT_BUFFER_ELEMENT, metalArgumentBufferElement);
+        CASE(METAL_ATTRIBUTE, metalAttribute);
+        CASE(METAL_PAYLOAD, metalPayload);
+#undef CASE
+
+    default:
+        SLANG_ASSERT(!"unhandled case");
+        return toSlice("unknown");
+    }
+}
+
 static void emitReflectionVarBindingInfoJSON(
     PrettyWriter& writer,
     SlangParameterCategory category,
@@ -77,8 +118,9 @@ static void emitReflectionVarBindingInfoJSON(
 {
     if (category == SLANG_PARAMETER_CATEGORY_UNIFORM)
     {
-        writer << "\"kind\": \"uniform\"";
-        writer << ", ";
+        writer << "\"kind\": \"";
+        writer.write(getReflectionParameterCategoryName(category));
+        writer << "\", ";
         writer << "\"offset\": ";
         emitReflectionSize(writer, index);
         writer << ", ";
@@ -91,43 +133,7 @@ static void emitReflectionVarBindingInfoJSON(
     else
     {
         writer << "\"kind\": \"";
-        switch (category)
-        {
-#define CASE(NAME, KIND)                  \
-    case SLANG_PARAMETER_CATEGORY_##NAME: \
-        writer.write(toSlice(#KIND));     \
-        break
-            CASE(CONSTANT_BUFFER, constantBuffer);
-            CASE(SHADER_RESOURCE, shaderResource);
-            CASE(UNORDERED_ACCESS, unorderedAccess);
-            CASE(VARYING_INPUT, varyingInput);
-            CASE(VARYING_OUTPUT, varyingOutput);
-            CASE(SAMPLER_STATE, samplerState);
-            CASE(UNIFORM, uniform);
-            CASE(PUSH_CONSTANT_BUFFER, pushConstantBuffer);
-            CASE(DESCRIPTOR_TABLE_SLOT, descriptorTableSlot);
-            CASE(SPECIALIZATION_CONSTANT, specializationConstant);
-            CASE(MIXED, mixed);
-            CASE(REGISTER_SPACE, registerSpace);
-            CASE(SUB_ELEMENT_REGISTER_SPACE, subElementRegisterSpace);
-            CASE(GENERIC, generic);
-            CASE(RAY_PAYLOAD, rayPayload);
-            CASE(HIT_ATTRIBUTES, hitAttributes);
-            CASE(CALLABLE_PAYLOAD, callablePayload);
-            CASE(SHADER_RECORD, shaderRecord);
-            CASE(EXISTENTIAL_TYPE_PARAM, existentialTypeParam);
-            CASE(EXISTENTIAL_OBJECT_PARAM, existentialObjectParam);
-            CASE(SUBPASS, inputAttachmentIndex);
-            CASE(METAL_ARGUMENT_BUFFER_ELEMENT, metalArgumentBufferElement);
-            CASE(METAL_ATTRIBUTE, metalAttribute);
-            CASE(METAL_PAYLOAD, metalPayload);
-#undef CASE
-
-        default:
-            writer << "unknown";
-            SLANG_ASSERT(!"unhandled case");
-            break;
-        }
+        writer.write(getReflectionParameterCategoryName(category));
         writer << "\"";
         if (space && category != SLANG_PARAMETER_CATEGORY_REGISTER_SPACE)
         {
@@ -183,6 +189,9 @@ static void emitReflectionVarBindingInfoJSON(
             break;
         case SLANG_STAGE_AMPLIFICATION:
             stageName = "amplification";
+            break;
+        case SLANG_STAGE_NODE:
+            stageName = "node";
             break;
 
         default:
@@ -594,6 +603,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
                 break;
 
             case SLANG_STRUCTURED_BUFFER:
+            case SLANG_TEXTURE_BUFFER:
             case SLANG_TEXTURE_1D:
             case SLANG_TEXTURE_2D:
             case SLANG_TEXTURE_3D:
@@ -767,6 +777,9 @@ static void emitReflectionParameterGroupTypeLayoutInfoJSON(
     slang::TypeLayoutReflection* typeLayout,
     const char* kind)
 {
+    // Go through the comma tracker so a key appended after this object (e.g. `sizes`) is
+    // correctly separated.
+    writer.maybeComma();
     writer << "\"kind\": \"";
     writer.write(kind);
     writer << "\"";
@@ -830,7 +843,7 @@ static void emitReflectionParameterGroupTypeLayoutInfoJSON(
     emitReflectionVarLayoutJSON(writer, typeLayout->getElementVarLayout());
 }
 
-static void emitReflectionTypeLayoutInfoJSON(
+static void emitReflectionTypeLayoutKindInfoJSON(
     PrettyWriter& writer,
     slang::TypeLayoutReflection* typeLayout)
 {
@@ -1008,6 +1021,54 @@ static void emitReflectionTypeLayoutInfoJSON(
         }
         break;
     }
+}
+
+static void emitReflectionTypeLayoutSizeInfoJSON(
+    PrettyWriter& writer,
+    slang::TypeLayoutReflection* typeLayout)
+{
+    writer.maybeComma();
+    writer << "\"sizes\": [\n";
+    writer.indent();
+
+    bool first = true;
+    auto categoryCount = typeLayout->getCategoryCount();
+    for (uint32_t cc = 0; cc < categoryCount; ++cc)
+    {
+        auto category = SlangParameterCategory(typeLayout->getCategoryByIndex(cc));
+        auto size = typeLayout->getSize(category);
+        if (size == 0)
+            continue;
+
+        if (!first)
+            writer << ",\n";
+        first = false;
+
+        writer << "{";
+        writer << "\"kind\": \"";
+        writer.write(getReflectionParameterCategoryName(category));
+        writer << "\", ";
+        writer << "\"value\": ";
+        emitReflectionSize(writer, size);
+        if (category == SLANG_PARAMETER_CATEGORY_UNIFORM)
+        {
+            writer << ", ";
+            writer << "\"alignment\": ";
+            emitReflectionSize(writer, typeLayout->getAlignment(category));
+        }
+        writer << "}";
+    }
+
+    writer.dedent();
+    writer << "\n]";
+}
+
+static void emitReflectionTypeLayoutInfoJSON(
+    PrettyWriter& writer,
+    slang::TypeLayoutReflection* typeLayout)
+{
+    emitReflectionTypeLayoutKindInfoJSON(writer, typeLayout);
+    emitReflectionTypeLayoutSizeInfoJSON(writer, typeLayout);
 }
 
 static void emitReflectionTypeLayoutJSON(
@@ -1262,6 +1323,9 @@ static void emitReflectionEntryPointJSON(
     case SLANG_STAGE_AMPLIFICATION:
         writer << ",\n\"stage\": \"amplification\"";
         break;
+    case SLANG_STAGE_NODE:
+        writer << ",\n\"stage\": \"node\"";
+        break;
     default:
         break;
     }
@@ -1334,8 +1398,8 @@ static void emitReflectionEntryPointJSON(
         if (auto globalVarLayout = programReflection->getGlobalParamsVarLayout())
         {
             auto globalTypeLayout = globalVarLayout->getTypeLayout();
-            auto globalKind = globalTypeLayout ? globalTypeLayout->getKind()
-                                               : slang::TypeReflection::Kind::None;
+            auto globalKind =
+                globalTypeLayout ? globalTypeLayout->getKind() : slang::TypeReflection::Kind::None;
             bool isContainer = globalKind == slang::TypeReflection::Kind::ConstantBuffer ||
                                globalKind == slang::TypeReflection::Kind::ParameterBlock;
             bool hasParentBinding = false;

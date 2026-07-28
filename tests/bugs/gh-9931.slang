@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute -bindless-space-index 2 -O0
-//TEST:SIMPLE(filecheck=CHECK_NV): -target spirv-asm -entry computeMainNV -stage compute -bindless-space-index 2 -capability spvBindlessTextureNV -DNV_HANDLE -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute -bindless-space-index 2
+//TEST:SIMPLE(filecheck=CHECK_NV): -target spirv-asm -entry computeMainNV -stage compute -bindless-space-index 2 -capability spvBindlessTextureNV -DNV_HANDLE
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=RESULT): -vk -compute -shaderobj -xslang -bindless-space-index -xslang 2
 
 // CHECK-DAG: %[[UINT:[A-Za-z0-9_]+]] = OpTypeInt 32 0
@@ -50,7 +50,10 @@ void computeMainNV()
 {
     DescriptorHandle<Texture2D<float4>> h =
         inputBuffer.Load<DescriptorHandle<Texture2D<float4>>>(4);
-    outputByteBuffer.Store<DescriptorHandle<Texture2D<float4>>>(4, h, 8);
+    // Offset 4 is below the 8-byte alignment of a `DescriptorHandle`, so there is no honest
+    // explicit-alignment promise for it (an 8 promise trips E41303); the plain `Store` scalarizes,
+    // which is exactly the unaligned path this test exercises.
+    outputByteBuffer.Store<DescriptorHandle<Texture2D<float4>>>(4, h);
 
     uint64_t handleBits = (uint64_t)h;
 

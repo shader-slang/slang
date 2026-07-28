@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-4-7
-generated_at: 2026-05-21T08:00:00+00:00
-source_commit: 2964da04de136705348240f2bd9affa5f3818226
-watched_paths_digest: d978c673bd877c4c2dbdf69ee7ae59f91418131f0d86559e7a80b68c78f20ed3
+model: claude-fable-5
+generated_at: 2026-07-08T14:58:28+00:00
+source_commit: 8ac9e49a5b7020af6a8040544b9f76f0fbf40898
+watched_paths_digest: baa2df8be32434db0476c93d671a991e74f71e90dc2b41c9c787969e75bf16ab
 source_doc: docs/generated/design/cross-cutting/diagnostics.md
-source_doc_digest: 35cfb9612e0af198f089e0c87a82055a4f43737c2865d74d83133722d9f18bda
+source_doc_digest: e9b5a870e02f2b8ebc65d021bed4b0316369df893fb8835ea6ead9831968d7f4
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -360,7 +360,19 @@ catalog code.
 
 ## Untested claims
 
-NA
+The rows below track normative claims in the narrative source doc
+(`docs/generated/design/cross-cutting/diagnostics.md`) that have no
+test in this bundle. Per-code catalog claims that could not be
+reached are tracked separately under
+`## Codes dropped (could not reach from minimum input)`.
+
+| Claim                                                                                                                                                                                                                                                        | Reason               | Anchor                                                                                                                           | Why untested                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The doc's legacy-diagnostic worked example: redeclaring a function with a different return type fires E30202 with the short title "function return type mismatch" and a span message whose `~name:Type` interpolation parameters render the supplied values. | out-of-bundle        | [#anatomy-of-a-legacy-diagnostic](../../../../design/cross-cutting/diagnostics.md#anatomy-of-a-legacy-diagnostic)                 | Fully pinned (code, title, and the interpolated span message `function 'f' declared to return 'float' was previously declared to return 'int'`) by the sibling test [`design/pipeline/03-semantic-check/function-return-type-mismatch-rejected.slang`](../../pipeline/03-semantic-check/function-return-type-mismatch-rejected.slang). |
+| The primary span of a legacy diagnostic is optional: locationless diagnostics such as the command-line error `cannot-deduce-source-language` (E12) omit it entirely.                                                                                        | needs-cli-test       | [#anatomy-of-a-legacy-diagnostic](../../../../design/cross-cutting/diagnostics.md#anatomy-of-a-legacy-diagnostic)                 | E12 fires only from a `slangc` invocation whose input path defeats language deduction; slang-test's DIAGNOSTIC_TEST always feeds a `.slang` file, so a wrapper script invoking `slangc` directly is what would verify the locationless rendering. (E12 also appears in Codes dropped below.)    |
+| Setting `DiagnosticSink::Flag::MachineReadableDiagnostics` switches rendering to a tab-separated record of the form `E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>` (not a JSON schema).                          | needs-unit-test      | [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | The flag is a C++ sink API with no `slangc` CLI surface named by the doc; a C++ unit test (in `tools/slang-unit-test/`) constructing a sink with the flag set and asserting the tab-separated record shape would verify it.                                  |
+| Diagnostic ids are normally unique but may be intentionally shared by more than one diagnostic; `getDiagnosticById` returns only the first-added entry for a shared id, so tools targeting a precise diagnostic should prefer the `name` or `flag` group.   | needs-unit-test      | [#error-codes-and-the-name-field](../../../../design/cross-cutting/diagnostics.md#error-codes-and-the-name-field)                 | `getDiagnosticById` and `overrideDiagnostic` / `overrideDiagnostics` are C++ API entry points; no `.slang` input reveals which of two same-id diagnostics a lookup returned. A C++ unit test registering two diagnostics with one id could verify it.        |
+| `SLANG_ASSERT` / `SLANG_RELEASE_ASSERT` / `SLANG_ASSERT_FAILURE` route through `::Slang::handleAssert` and `SLANG_UNREACHABLE` through `::Slang::handleSignal` with `SignalType::Unreachable`, bypassing the diagnostic sink; only `SLANG_INTERNAL_ERROR` / `SLANG_UNIMPLEMENTED` / `SLANG_DIAGNOSE_UNEXPECTED` go through the sink. | internal-source-fact | [#internal-compiler-errors-and-assertions](../../../../design/cross-cutting/diagnostics.md#internal-compiler-errors-and-assertions) | Internal C++ routing between assert handlers and the sink; no well-formed `.slang` input triggers these macros deterministically, and which handler an assert routed through has no diagnostic-stream consequence a CHECK pattern could observe.             |
 
 ## Doc gaps observed
 

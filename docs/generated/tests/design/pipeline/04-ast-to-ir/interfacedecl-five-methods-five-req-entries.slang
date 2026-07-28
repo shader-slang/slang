@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T18:00:00+00:00
-//META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
+//META: model=claude-fable-5
+//META: generated_at=2026-07-08T16:30:00Z
+//META: source_commit=110ca68915f1b6690e19a647e3437e1ad1f78a03
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=7d43267959b0c547516266beea43e6e96622d37270bfab810d9819a48f90812b
-//META: purpose=An InterfaceDecl with five methods lowers to five `interface_req_entry(...)` rows referenced by a single `interface(%1, %2, %3, %4, %5)` declaration, scaling the "InterfaceDecl -> IRInterfaceType plus per-method requirement insts" claim.
+//META: doc_section_digest=19eb09c072c556dd0799b5002c2f1b24781da93f2cebc122ca027062c24e0b84
+//META: purpose=An InterfaceDecl with five methods lowers to five `interface_req_entry(...)` rows referenced by a single `interface(%1, %2, %3, %4, %5)` declaration, scaling the doc's InterfaceDecl requirement-entry claim.
 //META: intent=stress
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.

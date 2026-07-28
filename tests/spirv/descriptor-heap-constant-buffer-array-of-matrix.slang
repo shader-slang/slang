@@ -5,14 +5,14 @@
 //
 // Scope: this is a COMPILE + EMITTED-LAYOUT test (`-target spirv-asm`). It guards
 //   (a) the SPIR-V emission crash #11211 fixed — a regression would fail to compile;
-//   (b) future divergence of the descriptor-heap block-layout decorations.
-// It does NOT reproduce #11483's runtime wrong-data-readback symptom: no value is
-// executed or compared, so the readback half needs GPU verification (out of scope
-// for GPU-free CI). The #11483 diagnosis found no emission/layout defect on current
-// master — the descriptor-heap path's block layout matched a bound `[[vk::binding]]`
-// ConstantBuffer of the same struct (a property of the shared std140/scalar layout
-// rules, established by an external diff during triage; not re-diffed in this file,
-// which pins only the descriptor-heap path's absolute offsets/strides).
+//   (b) the descriptor-heap block layout (member offsets / array + matrix strides);
+//   (c) that the descriptor-heap ConstantBuffer is fetched as a StorageBuffer-class
+//       buffer pointer. (#11483 was miscompiled because it was emitted Uniform-class,
+//       and a Uniform pointer carries no pointer-type ArrayStride, so nested-array
+//       reads through the buffer pointer were undefined; the dedicated pointer-stride
+//       regression lives in descriptor-heap-constant-buffer-nested-array-stride.slang.)
+// It does NOT execute on the GPU, so the runtime readback half of #11483 still needs
+// hardware verification.
 //
 // The reporter hit this under scalar layout, so both the default std140 path and the
 // `-fvk-use-scalar-layout` (`_natural`) path the reporter actually used are pinned.
@@ -42,7 +42,7 @@ void main(uniform DescriptorHandle<RWStructuredBuffer<float>> output, uniform ui
 }
 
 // --- default std140 layout ---
-// The constant-buffer element struct must carry Block (required for the Uniform
+// The constant-buffer element struct must carry Block (required for the StorageBuffer
 // storage class the descriptor-heap buffer pointer uses).
 // CHECK: OpName %[[CB:CameraData_std140]] "CameraData_std140"
 // CHECK-DAG: OpDecorate %[[CB]] Block
@@ -56,10 +56,11 @@ void main(uniform DescriptorHandle<RWStructuredBuffer<float>> output, uniform ui
 // CHECK-DAG: OpDecorate %_arr_mat4v4float_int_4 ArrayStride 64
 // CHECK-DAG: OpMemberDecorate %_Array_std140_matrix_float_4_4_4 0 MatrixStride 16
 // CHECK-DAG: OpMemberDecorate %_Array_std140_matrix_float_4_4_4 0 RowMajor
-// The descriptor-heap load must produce a Uniform-class buffer pointer to the block,
-// never a Function-class pointer (which would mean a copy lowering, not the heap path).
+// The descriptor-heap load must produce a StorageBuffer-class buffer pointer to the
+// block (#11483: a Uniform-class pointer carries no pointer-type ArrayStride), never a
+// Function-class pointer (which would mean a copy lowering, not the heap path).
 // CHECK-NOT: %_ptr_Function_[[CB]]
-// CHECK: %[[CBPTR:_ptr_Uniform_CameraData_std140]] = OpTypePointer Uniform %[[CB]]
+// CHECK: %[[CBPTR:_ptr_StorageBuffer_CameraData_std140]] = OpTypePointer StorageBuffer %[[CB]]
 // CHECK: OpBufferPointerEXT %[[CBPTR]]
 
 // --- scalar layout (-fvk-use-scalar-layout): the configuration the #11483 reporter used ---
@@ -74,5 +75,5 @@ void main(uniform DescriptorHandle<RWStructuredBuffer<float>> output, uniform ui
 // CHECKSCALAR-DAG: OpMemberDecorate %_Array_natural_matrix_float_4_4_4 0 MatrixStride 16
 // CHECKSCALAR-DAG: OpMemberDecorate %_Array_natural_matrix_float_4_4_4 0 RowMajor
 // CHECKSCALAR-NOT: %_ptr_Function_[[CBN]]
-// CHECKSCALAR: %[[CBNPTR:_ptr_Uniform_CameraData_natural]] = OpTypePointer Uniform %[[CBN]]
+// CHECKSCALAR: %[[CBNPTR:_ptr_StorageBuffer_CameraData_natural]] = OpTypePointer StorageBuffer %[[CBN]]
 // CHECKSCALAR: OpBufferPointerEXT %[[CBNPTR]]

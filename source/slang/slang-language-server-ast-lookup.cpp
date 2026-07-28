@@ -499,6 +499,12 @@ public:
             return true;
         return dispatchIfNotNull(expr->value);
     }
+    bool visitCastOptionalExpr(CastOptionalExpr* expr)
+    {
+        if (dispatchIfNotNull(expr->valueArg))
+            return true;
+        return dispatchIfNotNull(expr->innerCoercedExpr);
+    }
     bool visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr* expr)
     {
         return dispatchIfNotNull(expr->originalExpr);
