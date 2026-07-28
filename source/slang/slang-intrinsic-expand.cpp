@@ -767,32 +767,66 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             auto arg = m_args[argIndex].get();
             auto argType = arg->getDataType();
 
+            // `$P` is the single expansion site for the type-prefix used by ~100 `__intrinsic_asm`
+            // bodies (`$P_abs`, `$P_cos`, `$P_asfloat`, … as well as `$P_min`/`$P_max`); the prefix
+            // names the *element* type (`F32` for `float` or `float3`). A `$P`-using intrinsic is
+            // only reached with operands conforming to the interface it is declared for (all are
+            // arithmetic/`IComparable`-family), so the operand is always a builtin scalar, vector,
+            // or matrix of a scalar element type — never an arbitrary struct/resource. For a vector
+            // operand the prefix is that of its element type, so `<prefix>_<op>(wholeVector)`
+            // resolves as long as a matching vector-arity prelude helper exists (as the `min`/`max`
+            // helpers do); otherwise it would emit a call to an undeclared function. We therefore
+            // require a vector helper for a vector operand and diagnose when one is missing, and
+            // diagnose a composite (matrix) that has no `$P` prefix at all, rather than emitting
+            // unresolvable target code.
+            const bool argIsVector = as<IRVectorType>(argType) != nullptr;
+            if (auto vectorType = as<IRVectorType>(argType))
+                argType = vectorType->getElementType();
+
             const char* str = "";
+            // Whether the element prefix selected below has a vector-arity `<prefix>_min`/`_max`
+            // (and the other element-wise `$P` helpers) in the preludes. Only these may back a
+            // vector operand; the rest (I8/I16/U8/U16, IPTR/UPTR) have scalar helpers only.
+            bool hasVectorHelper = false;
             switch (argType->getOp())
             {
-#define CASE(OP, STR) \
-    case kIROp_##OP:  \
-        str = #STR;   \
+#define CASE(OP, STR, HAS_VEC)     \
+    case kIROp_##OP:               \
+        str = #STR;                \
+        hasVectorHelper = HAS_VEC; \
         break
 
-                CASE(Int8Type, I8);
-                CASE(Int16Type, I16);
-                CASE(IntType, I32);
-                CASE(Int64Type, I64);
-                CASE(UInt8Type, U8);
-                CASE(UInt16Type, U16);
-                CASE(UIntType, U32);
-                CASE(UInt64Type, U64);
-                CASE(IntPtrType, IPTR);
-                CASE(UIntPtrType, UPTR);
-                CASE(HalfType, F16);
-                CASE(FloatType, F32);
-                CASE(DoubleType, F64);
+                CASE(Int8Type, I8, false);
+                CASE(Int16Type, I16, false);
+                CASE(IntType, I32, true);
+                CASE(Int64Type, I64, true);
+                CASE(UInt8Type, U8, false);
+                CASE(UInt16Type, U16, false);
+                CASE(UIntType, U32, true);
+                CASE(UInt64Type, U64, true);
+                CASE(IntPtrType, IPTR, false);
+                CASE(UIntPtrType, UPTR, false);
+                CASE(HalfType, F16, true);
+                CASE(FloatType, F32, true);
+                CASE(DoubleType, F64, true);
 
 #undef CASE
 
             default:
-                SLANG_UNEXPECTED("unexpected type in intrinsic definition");
+                break;
+            }
+
+            // Diagnose the two cases that would otherwise emit unresolvable target code: an operand
+            // whose (element) type has no `$P` prefix at all (`str` empty — e.g. a matrix), and a
+            // vector operand whose element prefix has only scalar helpers (`IPTR`/`UPTR`, narrow
+            // int). Leaving `str` unemitted is harmless because raising an error makes the emit
+            // pipeline discard the generated source on its non-zero error count.
+            if (str[0] == '\0' || (argIsVector && !hasVectorHelper))
+            {
+                m_emitter->getSink()->diagnose(Diagnostics::UnsupportedTypeForTargetIntrinsic{
+                    .operation = _getIntrinsicOperationName(m_callInst),
+                    .type = arg->getDataType(),
+                    .location = m_callInst->sourceLoc});
                 break;
             }
             m_writer->emit(str);
