@@ -1691,8 +1691,38 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    // SPIR-V's OpSwitch requires an integer selector and integer case literals, but a
+    // `switch` on a `bool` condition reaches this pass with the condition still typed
+    // `bool` and the case values still `IRBoolLit` (`case true:`/`case false:`). Rewrite
+    // it into the equivalent integer switch: cast the condition bool->int (the emitter
+    // lowers this via OpSelect) and replace each `IRBoolLit` case value with the matching
+    // `IRIntLit` (true->1, false->0). Other targets accept a bool switch directly, so this
+    // normalization is SPIR-V-specific.
+    void normalizeBoolSwitch(IRSwitch* inst)
+    {
+        if (!as<IRBoolType>(inst->getCondition()->getDataType()))
+            return;
+
+        IRBuilder builder(inst);
+        auto intType = builder.getIntType();
+
+        builder.setInsertBefore(inst);
+        auto intCondition = builder.emitCast(intType, inst->getCondition());
+        inst->condition.set(intCondition);
+
+        for (UInt i = 0; i < inst->getCaseCount(); i++)
+        {
+            auto boolLit = as<IRBoolLit>(inst->getCaseValue(i));
+            SLANG_ASSERT(boolLit);
+            auto intLit = builder.getIntValue(intType, boolLit->getValue() ? 1 : 0);
+            inst->getCaseValueUse(i)->set(intLit);
+        }
+    }
+
     void processSwitch(IRSwitch* inst)
     {
+        normalizeBoolSwitch(inst);
+
         duplicateMergeBlockIfNeeded(&inst->breakLabel);
 
         // SPIRV does not allow using merge block directly as case block,
