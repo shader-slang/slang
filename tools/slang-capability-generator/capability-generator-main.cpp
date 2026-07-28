@@ -597,6 +597,8 @@ struct CapabilityDefParser
             def->sourceLoc = nameToken.loc;
         }
         validateInternalAtomExternalAtomPair();
+        if (m_sink->getErrorCount())
+            return SLANG_FAIL;
         return SLANG_OK;
     }
 };
@@ -1466,5 +1468,6 @@ int main(int argc, const char* const* argv)
         return 1;
     }
     printDiagnostics(&sink);
-    return 0;
+    // generateDefinitions can diagnose an error yet still return SLANG_OK, so consult the sink.
+    return sink.getErrorCount() ? 1 : 0;
 }
