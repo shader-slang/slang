@@ -435,7 +435,13 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
 
     if (profile.getFamily() == ProfileFamily::DX)
     {
-        if (profile.getVersion() >= ProfileVersion::DX_6_1 || stage == Stage::Node)
+        // In a whole-program compile nothing else names the entry points, so the attribute
+        // has to be emitted whatever the shader model.
+        const bool isWholeProgram = getTargetProgram()->getOptionSet().getBoolOption(
+            CompilerOptionName::GenerateWholeProgram);
+
+        if (isWholeProgram || profile.getVersion() >= ProfileVersion::DX_6_1 ||
+            stage == Stage::Node)
         {
             char const* stageName = getStageName(stage);
             if (stageName)

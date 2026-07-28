@@ -4743,6 +4743,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     case CodeGenTarget::MetalLib:
                     case CodeGenTarget::MetalLibAssembly:
                     case CodeGenTarget::Metal:
+                    case CodeGenTarget::HLSL:
                     case CodeGenTarget::WGSL:
                     case CodeGenTarget::HostVM:
                     case CodeGenTarget::HostObjectCode:
