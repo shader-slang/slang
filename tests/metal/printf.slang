@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
+
+// No METALLIB test: `os_log` needs MSL 3.2, and a metallib run is gated only on the Metal
+// toolchain being present, not on its version, so it fails on any CI tier holding an older one.
 
 // METAL: #include <metal_logging>
 
@@ -19,5 +21,3 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
     outputBuffer[0] = 1;
 }
-
-// METALLIB: define void @computeMain
