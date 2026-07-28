@@ -5442,12 +5442,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         emitOperand(switchInst->getCondition());
                         auto defaultLabel = switchInst->getDefaultLabel();
                         emitOperand(defaultLabel ? getID(ensureInst(defaultLabel)) : mergeBlockID);
+                        // Each OpSwitch case literal must occupy the same number of
+                        // words as the selector's type, so a 64-bit selector needs a
+                        // two-word literal.
+                        const IntInfo selectorInfo = getIntTypeInfo(
+                            m_targetRequest,
+                            switchInst->getCondition()->getDataType());
                         for (UInt c = 0; c < switchInst->getCaseCount(); c++)
                         {
                             auto value = switchInst->getCaseValue(c);
                             auto intLit = as<IRIntLit>(value);
                             SLANG_ASSERT(intLit);
-                            emitOperand((SpvWord)intLit->getValue());
+                            if (selectorInfo.width > 32)
+                                emitOperand(SpvLiteralInteger::from64((int64_t)intLit->getValue()));
+                            else
+                                emitOperand(SpvLiteralInteger::from32((int32_t)intLit->getValue()));
                             auto caseLabel = switchInst->getCaseLabel(c);
                             emitOperand(caseLabel ? getID(ensureInst(caseLabel)) : mergeBlockID);
                         }
