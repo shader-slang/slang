@@ -6,13 +6,16 @@
 
 //TEST:SIMPLE(filecheck=WHOLE): -target hlsl -whole-program
 //TEST:SIMPLE(filecheck=WHOLE): -target hlsl -o -
+//TEST:SIMPLE(filecheck=WHOLE): -target hlsl -whole-program -profile sm_6_5
 //TEST:SIMPLE(filecheck=HELPER): -target hlsl -whole-program
 //TEST:SIMPLE(filecheck=PAYLOAD): -target hlsl -whole-program
 //TEST:SIMPLE(filecheck=ENTRIES): -target hlsl -entry MainCH -entry MainAH -o -
 //TEST:SIMPLE(filecheck=SM51): -target hlsl -entry MainCS -profile cs_5_1
+//TEST:SIMPLE(filecheck=WHOLESM51): -target hlsl -whole-program -profile sm_5_1
 
 // Every entry point reaches the output carrying its stage. The `-o -` run covers the
-// implicit whole-program path that `-o` now selects for HLSL.
+// implicit whole-program path that `-o` now selects for HLSL, and the `sm_6_5` run covers
+// an explicit shader model that can accept the attribute on its own.
 // WHOLE: [shader("compute")]
 // WHOLE: MainCS
 // WHOLE: [shader("closesthit")]
@@ -38,6 +41,11 @@
 // A single entry point is named on the downstream command line, so it needs no attribute,
 // and a pre-SM6.1 profile would reject one.
 // SM51-NOT: [shader(
+
+// A shader model the user asked for explicitly stays authoritative, so a whole-program
+// compile pinned to SM 5.1 keeps emitting output that SM 5.1 can accept. Only the default
+// profile lets the whole-program option decide.
+// WHOLESM51-NOT: [shader(
 
 RWStructuredBuffer<uint> Output;
 

@@ -435,12 +435,17 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
 
     if (profile.getFamily() == ProfileFamily::DX)
     {
-        // In a whole-program compile nothing else names the entry points, so the attribute
-        // has to be emitted whatever the shader model.
-        const bool isWholeProgram = getTargetProgram()->getOptionSet().getBoolOption(
-            CompilerOptionName::GenerateWholeProgram);
+        // A whole-program compile names no entry point on the downstream command line, so
+        // `[shader("...")]` is all that identifies them. It also has no entry point to take a
+        // shader model from, leaving HLSL at its SM 5.1 default, so the version test below can
+        // never pass. A shader model the user named explicitly still wins, the same way it does
+        // over the DXIL default in `getEffectiveTargetProfile`.
+        const bool isWholeProgramWithDefaultProfile =
+            getTargetProgram()->getOptionSet().getBoolOption(
+                CompilerOptionName::GenerateWholeProgram) &&
+            !getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::Profile);
 
-        if (isWholeProgram || profile.getVersion() >= ProfileVersion::DX_6_1 ||
+        if (isWholeProgramWithDefaultProfile || profile.getVersion() >= ProfileVersion::DX_6_1 ||
             stage == Stage::Node)
         {
             char const* stageName = getStageName(stage);
