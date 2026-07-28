@@ -14089,9 +14089,9 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 /// @param T The variadic type pack parameter for the arguments to be printed.
 /// @param format The format string.
 /// @param args (optional) The arguments to be printed.
-/// @remarks The function maps to `printf` for HLSL, CPU and CUDA targets, and maps to `OpDebugPrintf` for SPIR-V target,
-/// and maps to `debugPrintfEXT` for GLSL target. Depending on the target and execution environment, the function may have
-/// no effect.
+/// @remarks The function maps to `printf` for HLSL, CPU and CUDA targets, maps to `OpDebugPrintf` for SPIR-V target,
+/// maps to `debugPrintfEXT` for GLSL target, and maps to `os_log_default.log` for Metal target.
+/// Depending on the target and execution environment, the function may have no effect.
 /// @example
 /// ```cpp
 /// void test(int x, float y)
@@ -14100,7 +14100,7 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 ///     printf(R"(x = "%d", y = "%f")", x, y);
 /// }
 /// ```
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, printf)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, printf)]
 [require(slangvm)]
 __intrinsic_op($(kIROp_Printf))
 void printf<each T>(NativeString format, expand each T args);

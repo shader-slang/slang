@@ -6,8 +6,29 @@
 
 namespace Slang
 {
+/// Carries the minimum Metal Shading Language version the emitted source needs back to code
+/// generation, which uses it to pick the `-std` for the downstream metal compile.
 class MetalExtensionTracker : public ExtensionTracker
 {
+public:
+    void requireMetalLanguageVersion(const SemanticVersion& version)
+    {
+        if (version > m_metalLanguageVersion)
+            m_metalLanguageVersion = version;
+    }
+
+    const SemanticVersion& getRequiredMetalLanguageVersion() const
+    {
+        return m_metalLanguageVersion;
+    }
+
+    void requireLogging() { m_requiresLogging = true; }
+
+    bool getRequiresLogging() const { return m_requiresLogging; }
+
+private:
+    SemanticVersion m_metalLanguageVersion;
+    bool m_requiresLogging = false;
 };
 
 class MetalSourceEmitter : public CLikeSourceEmitter
@@ -16,8 +37,11 @@ public:
     typedef CLikeSourceEmitter Super;
 
     MetalSourceEmitter(const Desc& desc)
-        : Super(desc), m_extensionTracker(new MetalExtensionTracker())
+        : Super(desc)
     {
+        m_extensionTracker =
+            dynamicCast<MetalExtensionTracker>(desc.codeGenContext->getExtensionTracker());
+        SLANG_ASSERT(m_extensionTracker);
     }
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
@@ -109,6 +133,7 @@ protected:
     static const char* kMetalBuiltinPreludeVectorReshape;
     static const char* kMetalBuiltinPreludeMatrixFmod;
     static const char* kMetalBuiltinPreludeSimdgroupMatrixOps;
+    static const char* kMetalBuiltinPreludeLogging;
 };
 
 } // namespace Slang

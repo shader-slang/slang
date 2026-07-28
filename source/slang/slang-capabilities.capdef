@@ -2458,7 +2458,7 @@ alias image_loadstore = GL_EXT_shader_image_load_store + GLSL_420;
 alias nonuniformqualifier = sm_5_1;
 /// Capabilities required to use 'printf'
 /// [Compound]
-alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | cpp | llvm;
+alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | metal | cpp | llvm;
 /// Capabilities required to use 'abort'
 /// [Compound]
 alias abort = GL_EXT_shader_abort;

@@ -283,6 +283,10 @@ struct DownstreamCompileOptions
     /// default standard (`-std=metal3.1`).
     SemanticVersion metalLanguageVersion;
 
+    /// For Metal (MetalAIR) compiles, request `-fmetal-enable-logging`. Without it the metallib
+    /// carries no logging metadata and shader `os_log` calls are dropped at runtime.
+    bool enableMetalLogging = false;
+
     /// Arguments that are specific to a particular compiler implementation.
     Slice<TerminatedCharSlice> compilerSpecificArguments;
 
