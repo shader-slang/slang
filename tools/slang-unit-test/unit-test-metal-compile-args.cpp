@@ -27,7 +27,7 @@ SLANG_UNIT_TEST(metalCompileArgs)
     {
         DownstreamCompileOptions options = baseOptions;
         options.metalLanguageVersion = SemanticVersion(3, 2);
-        options.enableMetalLogging = true;
+        options.flags |= DownstreamCompileOptions::Flag::EnableMetalLogging;
 
         SLANG_CHECK(hasArg(options, "-std=metal3.2"));
         SLANG_CHECK(!hasArg(options, "-std=metal3.1"));
@@ -38,7 +38,7 @@ SLANG_UNIT_TEST(metalCompileArgs)
         DownstreamCompileOptions options = baseOptions;
         options.targetType = SLANG_SHADER_SHARED_LIBRARY;
         options.metalLanguageVersion = SemanticVersion(3, 2);
-        options.enableMetalLogging = true;
+        options.flags |= DownstreamCompileOptions::Flag::EnableMetalLogging;
 
         SLANG_CHECK(!hasArg(options, "-std=metal3.2"));
         SLANG_CHECK(!hasArg(options, "-fmetal-enable-logging"));

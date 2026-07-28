@@ -172,7 +172,9 @@ struct DownstreamCompileOptions
             EnableFloat16 = 0x08,        ///< If set compiles with support for float16/half
             EnableFloat8 = 0x10,         ///< If set compiles with support for float8
             EnableBfloat16 = 0x20,       ///< If set compiles with support for bfloat16
-
+            EnableMetalLogging = 0x40,   ///< For Metal, request `-fmetal-enable-logging`. Without
+                                         ///< it the metallib carries no logging metadata and
+                                         ///< shader `os_log` calls are dropped at runtime.
         };
     };
 
@@ -298,12 +300,6 @@ struct DownstreamCompileOptions
     FloatingPointDenormalMode denormalModeFp16 = FloatingPointDenormalMode::Any;
     FloatingPointDenormalMode denormalModeFp32 = FloatingPointDenormalMode::Any;
     FloatingPointDenormalMode denormalModeFp64 = FloatingPointDenormalMode::Any;
-
-    /// For Metal (MetalAIR) compiles, request `-fmetal-enable-logging`. Without it the metallib
-    /// carries no logging metadata and shader `os_log` calls are dropped at runtime.
-    /// `alignas` keeps this off the previous version's trailing padding byte, so that the struct
-    /// also grows in size and `getCompatibleVersion` defaults it rather than reading that padding.
-    alignas(8) bool enableMetalLogging = false;
 };
 static_assert(std::is_trivially_copyable_v<DownstreamCompileOptions>);
 
