@@ -521,7 +521,7 @@ void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
     if (!switchStmt)
         return;
 
-    // We stash the ID of the target statement in the `case`
+    // We stash the ID of the target statement in the `default`
     // statement so that they can be correlated later, during
     // code generation.
     //
