@@ -54,7 +54,7 @@ void caseInIf(uint i)
         case 0U:
 //CHECK:^^^^ 'case' is not allowed outside a 'switch' body
 //CHECK:^^^^ 'case' is only allowed in a 'switch' body
-           break;
+            break;
 
         default:
 //CHECK:^^^^^^^ 'default' is not allowed outside a 'switch' body
