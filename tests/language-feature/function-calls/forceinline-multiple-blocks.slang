@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -g3
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -g3 -O0
 RWStructuredBuffer<int> outputBuffer;
 
 // This tests the following use cases:
@@ -19,7 +19,7 @@ int calculateAdjustment(int value)
 int inlineMultipleBasicBlocks(int value)
 {
     int result = 0;
-    
+
     result = value * 2;
     result = calculateAdjustment(result);
 
@@ -44,7 +44,7 @@ int inlineMultipleBasicBlocks(int value)
 
     result = value * 10;
     result = calculateAdjustment(result);
-    
+
     if (result < 250)
     {
         result = result + 100;
@@ -57,14 +57,14 @@ int inlineMultipleBasicBlocks(int value)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int i = dispatchThreadID.x;
-    
+
     // Call the forceinline function
     int result1 = inlineMultipleBasicBlocks(16);
 
     int result2 = inlineMultipleBasicBlocks(22);
 
     int result3 = calculateAdjustment(2);
-    
+
     outputBuffer[i] = result1 + result2 + result3;
 }
 
