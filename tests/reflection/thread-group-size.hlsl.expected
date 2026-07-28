@@ -13,8 +13,14 @@ standard output = {
                 "access": "readWrite",
                 "resultType": {
                     "kind": "scalar",
-                    "scalarType": "float32"
-                }
+                    "scalarType": "float32",
+                    "sizes": [
+                        {"kind": "uniform", "value": 4, "alignment": 4}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "unorderedAccess", "value": 1}
+                ]
             }
         }
     ],
@@ -32,7 +38,10 @@ standard output = {
                         "elementType": {
                             "kind": "scalar",
                             "scalarType": "uint32"
-                        }
+                        },
+                        "sizes": [
+
+                        ]
                     }
                 }
             ],
