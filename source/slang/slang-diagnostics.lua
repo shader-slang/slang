@@ -4008,15 +4008,15 @@ standalone_note(
 err(
     "case-outside-switch",
     39999,
-    "'case' not allowed outside of a 'switch' statement",
-    span { loc = "stmt:Stmt", message = "'case' not allowed outside of a 'switch' statement" }
+    "'case' is not allowed outside a 'switch' body",
+    span { loc = "stmt:Stmt", message = "'case' is only allowed in a 'switch' body" }
 )
 
 err(
     "default-outside-switch",
     39999,
-    "'default' not allowed outside of a 'switch' statement",
-    span { loc = "stmt:Stmt", message = "'default' not allowed outside of a 'switch' statement" }
+    "'default' is not allowed outside a 'switch' body",
+    span { loc = "stmt:Stmt", message = "'default' is only allowed in a 'switch' body" }
 )
 
 err(
