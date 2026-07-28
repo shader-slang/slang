@@ -28,17 +28,27 @@ standard output = {
                                         "kind": "scalar",
                                         "scalarType": "float32"
                                     }
-                                }
+                                },
+                                "sizes": [
+                                    {"kind": "shaderResource", "value": 1}
+                                ]
                             },
                             "binding": {"kind": "shaderResource", "index": 0}
                         },
                         {
                             "name": "s",
                             "type": {
-                                "kind": "samplerState"
+                                "kind": "samplerState",
+                                "sizes": [
+                                    {"kind": "samplerState", "value": 1}
+                                ]
                             },
                             "binding": {"kind": "samplerState", "index": 0}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1},
+                        {"kind": "samplerState", "value": 1}
                     ]
                 },
                 "containerVarLayout": {
@@ -61,24 +71,38 @@ standard output = {
                                             "kind": "scalar",
                                             "scalarType": "float32"
                                         }
-                                    }
+                                    },
+                                    "sizes": [
+                                        {"kind": "shaderResource", "value": 1}
+                                    ]
                                 },
                                 "binding": {"kind": "shaderResource", "index": 0}
                             },
                             {
                                 "name": "s",
                                 "type": {
-                                    "kind": "samplerState"
+                                    "kind": "samplerState",
+                                    "sizes": [
+                                        {"kind": "samplerState", "value": 1}
+                                    ]
                                 },
                                 "binding": {"kind": "samplerState", "index": 0}
                             }
+                        ],
+                        "sizes": [
+                            {"kind": "shaderResource", "value": 1},
+                            {"kind": "samplerState", "value": 1}
                         ]
                     },
                     "bindings": [
                         {"kind": "shaderResource", "index": 0},
                         {"kind": "samplerState", "index": 0}
                     ]
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1},
+                    {"kind": "samplerState", "value": 1}
+                ]
             }
         },
         {
@@ -94,7 +118,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         }
     ],
@@ -112,7 +139,10 @@ standard output = {
                     "elementType": {
                         "kind": "scalar",
                         "scalarType": "float32"
-                    }
+                    },
+                    "sizes": [
+                        {"kind": "varyingOutput", "value": 1}
+                    ]
                 }
             }
         }

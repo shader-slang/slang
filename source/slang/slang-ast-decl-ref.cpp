@@ -3,6 +3,7 @@
 #include "slang-ast-builder.h"
 #include "slang-ast-dispatch.h"
 #include "slang-ast-forward-declarations.h"
+#include "slang-ast-substitution.h"
 #include "slang-check-impl.h"
 
 namespace Slang
@@ -615,7 +616,18 @@ DeclRefBase* GenericAppDeclRef::_getBaseOverride()
 
 DeclRefBase* DeclRefBase::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
-    SLANG_AST_NODE_VIRTUAL_CALL(DeclRefBase, substituteImpl, (astBuilder, subst, ioDiff));
+    return static_cast<DeclRefBase*>(substituteValWithCache(
+        this,
+        astBuilder,
+        subst,
+        ioDiff,
+        [&](SubstitutionSet cachedSubst, int* cachedDiff) -> Val*
+        {
+            return ASTNodeDispatcher<DeclRefBase, DeclRefBase*>::dispatch(
+                this,
+                [&](auto declRef) -> DeclRefBase*
+                { return declRef->_substituteImplOverride(astBuilder, cachedSubst, cachedDiff); });
+        }));
 }
 
 DeclRefBase* DeclRefBase::getBase()

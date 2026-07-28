@@ -5,6 +5,7 @@
 #include "slang-ast-builder.h"
 #include "slang-ast-dispatch.h"
 #include "slang-ast-natural-layout.h"
+#include "slang-ast-substitution.h"
 #include "slang-check-impl.h"
 #include "slang-diagnostics.h"
 #include "slang-mangle.h"
@@ -43,7 +44,18 @@ Val* Val::substitute(ASTBuilder* astBuilder, SubstitutionSet subst)
 
 Val* Val::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
-    SLANG_AST_NODE_VIRTUAL_CALL(Val, substituteImpl, (astBuilder, subst, ioDiff))
+    return substituteValWithCache(
+        this,
+        astBuilder,
+        subst,
+        ioDiff,
+        [&](SubstitutionSet cachedSubst, int* cachedDiff) -> Val*
+        {
+            return ASTNodeDispatcher<Val, Val*>::dispatch(
+                this,
+                [&](auto value) -> Val*
+                { return value->_substituteImplOverride(astBuilder, cachedSubst, cachedDiff); });
+        });
 }
 
 void Val::toText(StringBuilder& out){SLANG_AST_NODE_VIRTUAL_CALL(Val, toText, (out))}

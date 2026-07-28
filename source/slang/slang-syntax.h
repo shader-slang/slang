@@ -539,6 +539,12 @@ ArrayExpressionType* getArrayType(ASTBuilder* astBuilder, Type* elementType);
 
 NamedExpressionType* getNamedType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> const& declRef);
 
+/// Returns the canonical AST lookup name shared by subscript declarations and expressions.
+inline Name* getSubscriptOperatorName(ASTBuilder* astBuilder)
+{
+    return astBuilder->getNamePool()->getName("operator[]");
+}
+
 FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef);
 
 GenericDeclRefType* getGenericDeclRefType(

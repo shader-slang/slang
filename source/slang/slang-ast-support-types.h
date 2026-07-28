@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../compiler-core/slang-doc-extractor.h"
-#include "../compiler-core/slang-lexer.h"
-#include "../compiler-core/slang-name.h"
-#include "../core/slang-basic.h"
-#include "../core/slang-semantic-version.h"
+#include "compiler-core/slang-doc-extractor.h"
+#include "compiler-core/slang-lexer.h"
+#include "compiler-core/slang-name.h"
+#include "core/slang-basic.h"
+#include "core/slang-semantic-version.h"
 #include "slang-ast-forward-declarations.h"
 #include "slang-profile.h"
 #include "slang-type-system-shared.h"
@@ -43,6 +43,7 @@ FIDDLE() namespace Slang
     class Val;
 
     class DeclRefBase;
+    struct SubstitutionCache;
     class NodeBase;
     class LookupDeclRef;
     class GenericAppDeclRef;
@@ -780,6 +781,9 @@ FIDDLE() namespace Slang
     struct SubstitutionSet
     {
         DeclRefBase* declRef = nullptr;
+
+        // An operation-local cache shared by recursive copies of this substitution set.
+        SubstitutionCache* substitutionCache = nullptr;
 
         // The element index if the substitution is happening inside a pack expansion.
         // For example, if we are substituting the pattern type of `expand each T`, where

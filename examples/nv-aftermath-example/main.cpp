@@ -1,9 +1,9 @@
 // main.cpp
 
-#include "../../source/core/slang-io.h"
 #include "GFSDK_Aftermath.h"
 #include "GFSDK_Aftermath_GpuCrashDump.h"
 #include "core/slang-basic.h"
+#include "core/slang-io.h"
 #include "examples/example-base/example-base.h"
 #include "platform/window.h"
 #include "slang-com-ptr.h"

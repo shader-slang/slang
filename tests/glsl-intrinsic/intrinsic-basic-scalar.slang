@@ -222,7 +222,7 @@ bool Test_ScalarType()
         && genDType(0) == fract(genDType(zero))
 
         // CHECK_GLSL-COUNT-2: mod(
-        // CHECK_SPIR-COUNT-2: Floor{{ }}
+        // CHECK_SPIR-COUNT-2: FMod{{ }}
         && genFType(0) == mod(genFType(zero), genFType(one))
         && genDType(0) == mod(genDType(zero), genDType(one))
 

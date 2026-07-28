@@ -34,6 +34,10 @@ public:
     // WGSL doesn't support fall-through in switch statements
     virtual bool supportsSwitchFallThrough() SLANG_OVERRIDE { return false; }
 
+    // WGSL cases never fall through, so the trailing break that only exits the switch is
+    // redundant; omit it (older naga rejects `break` outside a loop). Early breaks are kept.
+    virtual bool shouldEmitSwitchCaseTerminatingBreak() SLANG_OVERRIDE { return false; }
+
     virtual void emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator)
         SLANG_OVERRIDE;
     virtual void emitVarKeywordImpl(IRType* type, IRInst* varDecl) SLANG_OVERRIDE;

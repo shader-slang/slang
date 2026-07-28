@@ -10,8 +10,8 @@
 // fully specialized (no more generics/interfaces), so
 // that the concrete type of everything is known.
 
-#include "../compiler-core/slang-name.h"
-#include "../core/slang-performance-profiler.h"
+#include "compiler-core/slang-name.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"

@@ -2,8 +2,8 @@
 #ifndef SLANG_DOC_AST_H
 #define SLANG_DOC_AST_H
 
-#include "../compiler-core/slang-doc-extractor.h"
-#include "../core/slang-basic.h"
+#include "compiler-core/slang-doc-extractor.h"
+#include "core/slang-basic.h"
 #include "slang-ast-all.h"
 #include "slang-syntax.h"
 

@@ -1,6 +1,8 @@
 
 #include "slang-memory-arena.h"
 
+#include "slang-allocator.h"
+
 namespace Slang
 {
 
@@ -118,7 +120,7 @@ void MemoryArena::_deallocateBlocksPayload(Block* start)
     while (cur)
     {
         // Deallocate the block
-        ::free(cur->m_alloc);
+        StandardAllocator::deallocate(cur->m_alloc);
         cur = cur->m_next;
     }
 }
@@ -130,7 +132,7 @@ void MemoryArena::_deallocateBlocks(Block* start)
     {
         Block* next = cur->m_next;
         // Deallocate the block
-        ::free(cur->m_alloc);
+        StandardAllocator::deallocate(cur->m_alloc);
 
         m_blockFreeList.deallocate(cur);
         cur = next;
@@ -157,7 +159,7 @@ void MemoryArena::_deallocateBlock(Block* block)
     else
     {
         // Must be odd sized so free it
-        ::free(block->m_alloc);
+        StandardAllocator::deallocate(block->m_alloc);
         // Free it in the block list
         m_blockFreeList.deallocate(block);
     }
@@ -258,7 +260,7 @@ MemoryArena::Block* MemoryArena::_newBlock(size_t allocSize, size_t alignment)
     }
 
     // Allocate the memory
-    uint8_t* alloc = (uint8_t*)::malloc(allocSize);
+    uint8_t* alloc = (uint8_t*)StandardAllocator::allocate(allocSize);
     if (!alloc)
     {
         m_blockFreeList.deallocate(block);

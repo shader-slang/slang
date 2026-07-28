@@ -18,6 +18,8 @@ on:
     workflows: ["PR Review Fork Bridge"]
     types: [completed]
 
+permissions: {}
+
 jobs:
   board-sync:
     # Only when the bridge completed successfully (it always should; this guards

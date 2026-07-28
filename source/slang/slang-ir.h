@@ -6,10 +6,10 @@
 // similar in spirit to LLVM (but much simpler).
 //
 
-#include "../compiler-core/slang-source-loc.h"
-#include "../compiler-core/slang-source-map.h"
-#include "../core/slang-basic.h"
-#include "../core/slang-memory-arena.h"
+#include "compiler-core/slang-source-loc.h"
+#include "compiler-core/slang-source-map.h"
+#include "core/slang-basic.h"
+#include "core/slang-memory-arena.h"
 #include "slang-ast-type.h"
 #include "slang-container-pool.h"
 #include "slang-ir-insts-enum.h"
@@ -2258,7 +2258,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 25;
+    const static UInt k_maxSupportedModuleVersion = 26;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:

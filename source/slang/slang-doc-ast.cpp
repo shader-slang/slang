@@ -1,7 +1,7 @@
 // slang-doc-ast.cpp
 #include "slang-doc-ast.h"
 
-#include "../core/slang-string-util.h"
+#include "core/slang-string-util.h"
 #include "slang-ast-support-types.h"
 // #include "slang-ast-builder.h"
 // #include "slang-ast-print.h"

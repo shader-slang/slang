@@ -161,7 +161,7 @@ public:
     /// Rewind (and effectively deallocate) all allocations *after* the cursor
     void rewindToCursor(const void* cursor);
 
-    /// Add a block such that it will be freed when everything else is freed.
+    /// Adds a block allocated by StandardAllocator that the arena owns and deallocates.
     void addExternalBlock(void* data, size_t size);
 
     // Swap this with rhs
