@@ -1,5 +1,23 @@
 name: CI
 
+# FORK NOTE (Giesch/slang)
+#
+# Roughly a third of this workflow targets self-hosted runner pools that exist
+# only in the shader-slang org: the Windows build/GCP-T4 pools, the Linux
+# GPU/SM80Plus pools, and the falcor/regression/benchmark machines. On a fork
+# those jobs queue forever, so every job that names such a pool — directly or
+# through a reusable workflow's default `runs-on` — carries the guard
+#
+#     github.repository == 'shader-slang/slang'
+#
+# and is marked with a `# SELF-HOSTED:` comment. Jobs that only depend on a
+# guarded job (test-materialx-windows-release) are left alone; GitHub skips
+# them automatically once their dependency skips.
+#
+# `check-ci` accepts `skipped` as a passing result off upstream so the
+# aggregate gate can still go green here. Upstream semantics are unchanged:
+# on shader-slang/slang nothing is guarded and only `success` passes.
+
 on:
   workflow_dispatch:
   merge_group:
@@ -289,8 +307,10 @@ jobs:
   # Windows builds (self-hosted)
   build-windows-debug-cl-x86_64-gpu:
     needs: [filter, wait-for-human-priority]
+    # SELF-HOSTED: upstream only, see FORK NOTE at the top of this file.
     if: >-
       needs.filter.outputs.should-run == 'true' &&
+      github.repository == 'shader-slang/slang' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
@@ -303,8 +323,10 @@ jobs:
 
   build-windows-release-cl-x86_64-gpu:
     needs: [filter, wait-for-human-priority]
+    # SELF-HOSTED: upstream only, see FORK NOTE at the top of this file.
     if: >-
       needs.filter.outputs.should-run == 'true' &&
+      github.repository == 'shader-slang/slang' &&
       (needs.wait-for-human-priority.result == 'success' ||
        needs.wait-for-human-priority.result == 'skipped')
     uses: ./.github/workflows/ci-slang-build.yml
@@ -318,7 +340,10 @@ jobs:
   # Linux tests (self-hosted GPU runner, containerized)
   test-linux-debug-gcc-x86_64:
     needs: [filter, build-linux-debug-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
+    # SELF-HOSTED: upstream only, see FORK NOTE at the top of this file.
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      github.repository == 'shader-slang/slang'
     uses: ./.github/workflows/ci-slang-test-container.yml
     with:
       config: debug
@@ -326,14 +351,20 @@ jobs:
 
   test-linux-debug-gcc-x86_64-rhi:
     needs: [filter, build-linux-debug-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
+    # SELF-HOSTED: upstream only, see FORK NOTE at the top of this file.
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      github.repository == 'shader-slang/slang'
     uses: ./.github/workflows/ci-rhi-test-container.yml
     with:
       config: debug
 
   test-linux-release-gcc-x86_64:
     needs: [filter, build-linux-release-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
+    # SELF-HOSTED: upstream only, see FORK NOTE at the top of this file.
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      github.repository == 'shader-slang/slang'
     uses: ./.github/workflows/ci-slang-test-container.yml
     with:
       config: release
@@ -341,7 +372,10 @@ jobs:
 
   test-linux-release-gcc-x86_64-rhi:
     needs: [filter, build-linux-release-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
+    # SELF-HOSTED: upstream only, see FORK NOTE at the top of this file.
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      github.repository == 'shader-slang/slang'
     uses: ./.github/workflows/ci-rhi-test-container.yml
     with:
       config: release
@@ -351,7 +385,10 @@ jobs:
   # execute after CUDA coopmat moves to Ampere-only mma.sync PTX.
   test-linux-release-gcc-x86_64-sm80:
     needs: [filter, build-linux-release-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
+    # SELF-HOSTED: upstream only, see FORK NOTE at the top of this file.
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      github.repository == 'shader-slang/slang'
     uses: ./.github/workflows/ci-slang-test-container.yml
     with:
       config: release
@@ -457,7 +494,10 @@ jobs:
   # Windows GPU tests (self-hosted)
   test-windows-debug-cl-x86_64-gpu:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    # SELF-HOSTED: upstream only, see FORK NOTE at the top of this file.
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      github.repository == 'shader-slang/slang'
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: windows
@@ -470,7 +510,10 @@ jobs:
 
   test-windows-debug-cl-x86_64-gpu-rhi:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    # SELF-HOSTED: upstream only, see FORK NOTE at the top of this file.
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      github.repository == 'shader-slang/slang'
     uses: ./.github/workflows/ci-rhi-test.yml
     with:
       os: windows
@@ -481,7 +524,10 @@ jobs:
 
   test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    # SELF-HOSTED: upstream only, see FORK NOTE at the top of this file.
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      github.repository == 'shader-slang/slang'
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: windows
@@ -494,7 +540,10 @@ jobs:
 
   test-windows-release-cl-x86_64-gpu-rhi:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    # SELF-HOSTED: upstream only, see FORK NOTE at the top of this file.
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      github.repository == 'shader-slang/slang'
     uses: ./.github/workflows/ci-rhi-test.yml
     with:
       os: windows
@@ -610,7 +659,10 @@ jobs:
 
   test-falcor:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    # SELF-HOSTED: upstream only, see FORK NOTE at the top of this file.
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      github.repository == 'shader-slang/slang'
     permissions:
       contents: read
       actions: read
@@ -618,7 +670,10 @@ jobs:
 
   test-compile-regression:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    # SELF-HOSTED: upstream only, see FORK NOTE at the top of this file.
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      github.repository == 'shader-slang/slang'
     permissions:
       contents: read
       actions: read
@@ -626,7 +681,10 @@ jobs:
 
   test-benchmark:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    # SELF-HOSTED: upstream only, see FORK NOTE at the top of this file.
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      github.repository == 'shader-slang/slang'
     permissions:
       contents: read
       actions: read
@@ -699,8 +757,18 @@ jobs:
           # Require every needed job to succeed. Checking the generic
           # `needs` JSON (rather than enumerating each job) means any job
           # added to `needs` above is gated automatically.
-          unsuccessful=$(echo "$NEEDS_JSON" | jq -r 'to_entries[]
-            | select(.value.result != "success")
+          #
+          # FORK NOTE: off shader-slang/slang the self-hosted jobs are guarded
+          # off (see the note at the top of this file) and resolve to
+          # "skipped", so `skipped` is accepted as passing there. Upstream
+          # keeps the strict success-only rule.
+          if [[ "$GITHUB_REPOSITORY" == "shader-slang/slang" ]]; then
+            passing='["success"]'
+          else
+            passing='["success", "skipped"]'
+          fi
+          unsuccessful=$(echo "$NEEDS_JSON" | jq -r --argjson passing "$passing" 'to_entries[]
+            | select(.value.result as $r | $passing | index($r) | not)
             | "\(.key): \(.value.result)"')
           if [[ -n "$unsuccessful" ]]; then
             echo "These CI jobs did not succeed:"
