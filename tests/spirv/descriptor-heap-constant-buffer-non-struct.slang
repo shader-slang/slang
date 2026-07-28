@@ -119,7 +119,8 @@ void mainHandleArray(
 // HANDLE_ARRAY: OpName %[[CB:cbuffer_float_t]] "cbuffer_float_t"
 // HANDLE_ARRAY: OpDecorate %[[CB]] Block
 // HANDLE_ARRAY: OpMemberDecorate %[[CB]] 0 Offset 0
+// HANDLE_ARRAY-DAG: OpTypeArray %v2uint %int_4
 // HANDLE_ARRAY: %[[CB_PTR:_ptr_Uniform_cbuffer_float_t]] = OpTypePointer Uniform %[[CB]]
-// HANDLE_ARRAY: OpAccessChain %_ptr_PushConstant__arr_v2uint_int_4
+// HANDLE_ARRAY: OpAccessChain %_ptr_PushConstant_{{(_arr_v2uint_int_4|v2uint)}}
 // HANDLE_ARRAY: OpBufferPointerEXT %[[CB_PTR]]
 // HANDLE_ARRAY: OpAccessChain %_ptr_Uniform_float
