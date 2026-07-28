@@ -1,17 +1,17 @@
 // test-server.cpp
 
-#include "../../source/compiler-core/slang-json-rpc-connection.h"
-#include "../../source/compiler-core/slang-test-server-protocol.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process-util.h"
-#include "../../source/core/slang-secure-crt.h"
-#include "../../source/core/slang-shared-library.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-string.h"
-#include "../../source/core/slang-test-tool-util.h"
-#include "../../source/core/slang-writer.h"
-#include "../render-test/slang-support.h"
+#include "compiler-core/slang-json-rpc-connection.h"
+#include "compiler-core/slang-test-server-protocol.h"
+#include "core/slang-io.h"
+#include "core/slang-process-util.h"
+#include "core/slang-secure-crt.h"
+#include "core/slang-shared-library.h"
+#include "core/slang-string-util.h"
+#include "core/slang-string.h"
+#include "core/slang-test-tool-util.h"
+#include "core/slang-writer.h"
 #include "gfx-unit-test/gfx-test-util.h"
+#include "render-test/slang-support.h"
 #include "slang-com-helper.h"
 #include "slang-rhi.h"
 #include "test-server-diagnostics.h"
@@ -291,7 +291,7 @@ SlangResult innerMain(
 } // namespace SlangCTool
 
 // SlangITool
-#include "../slang-test/slangi-tool-impl.h"
+#include "slang-test/slangi-tool-impl.h"
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 

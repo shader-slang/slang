@@ -228,6 +228,24 @@ jobs:
           path: bench-results/
           if-no-files-found: ignore
 
+      # New releases (majors + patch releases from v2026.13 on) are swept into
+      # the tracked history the night they ship, riding the same results push
+      # below. continue-on-error: a failing new-release sweep must not cost the
+      # night's own point — the script removes partial baselines and the next
+      # nightly retries.
+      - name: Sweep newly published releases
+        if: env.PUBLISH == 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # API rate limit for asset downloads
+          SAMPLES: ${{ github.event.inputs.samples || '5' }}
+        run: |
+          set -euo pipefail
+          cd "$SUITE"
+          python3 new_release_check.py --results "$GITHUB_WORKSPACE/perf-results" \
+            --repo "$GITHUB_WORKSPACE" --samples "$SAMPLES"
+
       - name: Push results
         if: env.PUBLISH == 'true'
         shell: bash
@@ -317,9 +335,10 @@ jobs:
           git config user.email "slang-perf-bot@users.noreply.github.com"
 
           cp -r "$ANALYSIS/." .
-          mv report_per_workload.html index.html
-          # _combined_index.json is a derived intermediate — no need to serve it
-          rm -f _combined_index.json
+          # report.py writes index.html (the landing page) directly;
+          # report_per_workload.html is kept as a redirect for old bookmarks.
+          # the _*_index.json files are derived intermediates — no need to serve them
+          rm -f _combined_index.json _releases_index.json _daily_index.json
           # Serve files verbatim: without this marker GitHub Pages runs the
           # generated report through legacy Jekyll, whose builds have failed
           # or hung on this content. Must be re-created on every deploy

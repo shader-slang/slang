@@ -2,8 +2,8 @@
 #ifndef SLANG_AST_BUILDER_H
 #define SLANG_AST_BUILDER_H
 
-#include "../core/slang-memory-arena.h"
-#include "../core/slang-type-traits.h"
+#include "core/slang-memory-arena.h"
+#include "core/slang-type-traits.h"
 #include "slang-ast-all.h"
 #include "slang-ast-support-types.h"
 #include "slang-ir.h"

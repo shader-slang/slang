@@ -1,7 +1,7 @@
 #ifndef SLANG_PROXY_COMPILE_REQUEST_H
 #define SLANG_PROXY_COMPILE_REQUEST_H
 
-#include "../../core/slang-file-system.h"
+#include "core/slang-file-system.h"
 #include "proxy-base.h"
 #include "proxy-macros.h"
 #include "slang-com-helper.h"

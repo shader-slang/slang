@@ -1,6 +1,6 @@
 #include "slang-compiler-options.h"
 
-#include "../core/slang-writer.h"
+#include "core/slang-writer.h"
 #include "slang-compiler.h"
 
 #include <cstdio>
@@ -183,10 +183,12 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
 {
     for (auto& kv : options)
     {
-        // This is an output-policy knob (manifest sidecar path), not generated shader code.
-        // Locked by _testCoverageManifestOutputDoesNotAffectCompilerOptionHash; re-including it
-        // would invalidate persistent module caches on every sidecar-path change.
-        if (kv.key == CompilerOptionName::CoverageManifestOutput)
+        // These are output-policy sidecar paths, not generated shader code. Locked by
+        // _testCoverageManifestOutputDoesNotAffectCompilerOptionHash and
+        // _testSeparateDebugInfoOutputDoesNotAffectCompilerOptionHash; re-including them would
+        // invalidate persistent module caches on every sidecar-path change.
+        if (kv.key == CompilerOptionName::CoverageManifestOutput ||
+            kv.key == CompilerOptionName::SeparateDebugInfoOutput)
             continue;
 
         // This is a load-time acceptance-policy knob, not generated shader code: it only decides
@@ -246,6 +248,8 @@ CompilerOptionValue Slang::CompilerOptionSet::getDefault(CompilerOptionName name
         return CompilerOptionValue::fromEnum(OptimizationLevel::Default);
     case CompilerOptionName::LanguageVersion:
         return CompilerOptionValue::fromEnum(SLANG_LANGUAGE_VERSION_DEFAULT);
+    case CompilerOptionName::DebugInformation:
+        return CompilerOptionValue::fromEnum(DebugInfoLevel::None);
     default:
         return CompilerOptionValue();
     }

@@ -66,6 +66,24 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   `force=true` to re-measure the whole history onto a new runner.** Inputs:
   `since`, `until`, `samples`, `sweep` (default `false`, opt-in), `force`.
 
+**Site structure (2026-07 redesign).** `report.py` renders a landing page
+(`index.html`: status strip + navigation cards) and four cadence-split pages,
+one per family × cadence: `api-tot.html` / `api-releases.html` (api/rt
+workloads) and `microbench-tot.html` / `microbench-releases.html` (compiler
+workloads). The `*-releases` pages chart the release-only axis (official
+prebuilt binaries, minor releases plus patch releases from v2026.13 on); the
+`*-tot` pages chart the daily tip-of-tree axis (runner-built, trailing 30
+points) and open with the family's top-movers table. The cadences get
+separate axes because they differ in build provenance (official toolchain vs
+the runner's MSVC): each chart is internally comparable, the boundary is not —
+a methodology note on both pages says so. Per-workload detail pages carry the
+same two-chart split. trend.py's nightly judgment uses a DAILY-only baseline
+for the same reason (`--baseline-kind`). New releases (majors and patch
+releases from v2026.13) are swept into the history by the nightly's
+new-release check (`new_release_check.py`) the night they ship — no manual
+resync; a failed new-release sweep removes its partial results and retries the
+next night.
+
 **Sweep publication policy — a landing page plus every archived sweep.**
 Sweeping is opt-in on both workflows (`sweep=true`), so sweeps are few and all
 of them are served: `sweep_report.py --publish` (run by both workflows' report
@@ -156,8 +174,9 @@ Both CI workflows generate and publish an HTML report after each results push.
 points) and writes a self-contained report to `analysis/` (gitignored from the
 data branch). The deploy step pushes that output to the `gh-pages` branch of
 `shader-slang/slang-compile-perf`, which GitHub Pages serves at
-`https://shader-slang.org/slang-compile-perf/`. `report_per_workload.html` is
-renamed to `index.html` so that URL is the landing page. Per-workload detail
+`https://shader-slang.org/slang-compile-perf/`. `report.py` writes
+`index.html` directly (the landing page); `report_per_workload.html` is kept
+as a redirect for old bookmarks. Per-workload detail
 pages live under `workloads/<name>.html`. Panels render in the CANONICAL order —
 the `manifest.WORKLOADS` list order (real-world first, then pipeline stages
 front end → back end; see `manifest.display_order`) — so the page layout stays

@@ -64,17 +64,17 @@ Description:
   See [IArithmetic.div](../../../core-module-reference/interfaces/iarithmetic-01/div.html) for details.
 - The **remainder** operator returns the remainder of `lhs` by `rhs` division such that
   `rem = lhs - n * rhs` where `n` is an integer and `abs(rem)` < `abs(rhs)`. The sign of remainder matches the
-  sign of `lhs`.
+  sign of `lhs`. That is, `lhs % rhs == lhs - trunc(lhs / rhs) * rhs`.
   See [IArithmetic.mod](../../../core-module-reference/interfaces/iarithmetic-01/mod.html) for details.
 
 ### Logical Operators (scalar)
 
-| Operator  | Operator function               | Description                                  |
+| Operator  | Operator function                   | Description                                  |
 |-----------|-------------------------------------|----------------------------------------------|
-| `!`       | `__prefix T operator ! (T val)` | logical NOT                                  |
+| `!`       | `__prefix T operator ! (T val)`     | logical NOT                                  |
 | `&&`      | `T operator && (T lhs, T rhs)`      | logical AND                                  |
 | `\|\|`    | `T operator \|\| (T lhs, T rhs)`    | logical OR                                   |
-| `~`       | `__prefix T operator ~ (T val)` | bitwise NOT                                  |
+| `~`       | `__prefix T operator ~ (T val)`     | bitwise NOT                                  |
 | `&`       | `T operator & (T lhs, T rhs)`       | bitwise AND                                  |
 | `^`       | `T operator ^ (T lhs, T rhs)`       | bitwise XOR                                  |
 | `\|`      | `T operator \| (T lhs, T rhs)`      | bitwise OR                                   |
@@ -111,6 +111,12 @@ Description:
   See [ILogical.shl](../../../core-module-reference/interfaces/ilogical-01/shl.html) for details.
 - The **bitwise right shift** operator shifts all bits in `lhs` right by `amount`.
   See [ILogical.shr](../../../core-module-reference/interfaces/ilogical-01/shr.html) for details.
+
+The `&&` and `||` operators short-circuit when their operands are scalars: the right-hand operand is evaluated
+only when it can affect the result. That is, in `lhs && rhs`, `rhs` is evaluated only when `lhs` is `true`. In
+`lhs || rhs`, `rhs` is evaluated only when `lhs` is `false`. When the operands are vectors or matrices, `&&`
+and `||` do not short-circuit and evaluate both operands element-wise. Short-circuiting can be disabled
+globally with the `-disable-short-circuit` compiler option.
 
 
 ### Comparison Operators (scalar)
@@ -227,11 +233,14 @@ condition is `true`, `trueVal` is returned. Otherwise, `falseVal` is returned.
 
 The default ternary conditional operator is provided for all copyable types.
 
-> ⚠️ **Warning:** Unlike C, C++, GLSL, and most other C-family languages, Slang currently follows the precedent
-> of HLSL where `?:` does not short-circuit. That is, both `trueVal` and `falseVal` are evaluated before
-> either is selected. This is subject to change in future Slang language versions. It is recommended to write
-> code that does not depend on whether `?:` short-circuits or not. When short-circuiting is required,
-> use an `if`/`else` construct instead.
+The ternary conditional operator is short-circuiting for a scalar condition.
+
+> ⚠️ **Warning:** The ternary conditional operator is also defined for vector condition operands for legacy
+> reasons. In this deprecated form, the condition vector length must match the `trueVal` and `falseVal` vector
+> lengths, and for each element, the corresponding element of the condition selects the corresponding
+> element of either `trueVal` or `falseVal`. However, this form is non-short-circuiting. Use
+> [select()](../../../core-module-reference/global-decls/select.html) instead to make the non-short-circuiting
+> behavior explicit.
 
 ### Call Expression
 
@@ -345,6 +354,9 @@ vector or matrix element with the scalar operator.
 The matrix/matrix and matrix/vector multiplication are special, and they follow the matrix multiplication
 rules. See [Vector and Matrix Types](types-vector-and-matrix.md) for details.
 
+> 📝 **Remark:** The short-circuiting behavior of operators `&&`, `||`, and `?:` differs between scalar and
+> vector/matrix operands. See sections _Logical Operators (scalar)_ and _Ternary Conditional Operator_ for
+> details.
 
 ## Non-Overloadable Operators
 

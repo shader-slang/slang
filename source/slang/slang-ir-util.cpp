@@ -3078,8 +3078,39 @@ bool isIROpaqueType(IRType* type)
     }
 }
 
+// True if `addr`'s chain bottoms out at `GetOptiXSbtDataPtr` (the OptiX SBT), peeling every
+// forwarding op, including the `BitCast`/`GetOffsetPtr` that `getRootAddr` does not peel.
+static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
+{
+    for (;;)
+    {
+        switch (addr->getOp())
+        {
+        case kIROp_GetOptiXSbtDataPtr:
+            return true;
+        case kIROp_FieldAddress:
+        case kIROp_GetElementPtr:
+        case kIROp_GetOffsetPtr:
+        case kIROp_BitCast:
+        case kIROp_Reinterpret:
+        case kIROp_PtrCast:
+            addr = addr->getOperand(0);
+            continue;
+        default:
+            return false;
+        }
+    }
+}
+
 bool isPointerToImmutableLocation(IRInst* loc)
 {
+    // The OptiX SBT (`GetOptiXSbtDataPtr`) is typed as a `ConstantBuffer<>` but is mutated
+    // in place by the host between dispatches, so it is not immutable; otherwise CUDA emit
+    // would route its loads through the read-only cache (`__ldg`) and read stale data.
+    // Genuine `ConstantBuffer<>` (not SBT-rooted) is unaffected. See shader-slang/slang#10188.
+    if (isAddressIntoOptiXShaderBindingTable(loc))
+        return false;
+
     switch (loc->getOp())
     {
     case kIROp_GetStructuredBufferPtr:

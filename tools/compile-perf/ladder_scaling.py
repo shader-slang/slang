@@ -31,7 +31,7 @@ def main():
     ap.add_argument("--metric", default="median", choices=["min", "median", "mean"])
     args = ap.parse_args()
 
-    index = json.load(open(args.index))
+    index = analyze.read_json(args.index)
     rows = []
     for rec in index:
         tag = rec.get("tag")
@@ -41,7 +41,7 @@ def main():
         if not os.path.exists(p):
             continue
         pts = []
-        for r in json.load(open(p)):
+        for r in analyze.read_json(p):
             st = r["timers"].get("compileInner")
             if r["workload"] == args.workload and st and r["size"] > 0:
                 pts.append((r["size"], st[args.metric]))

@@ -1,6 +1,6 @@
 // unit-test-byte-encode.cpp
 
-#include "../../source/core/slang-byte-encode-util.h"
+#include "core/slang-byte-encode-util.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <stdlib.h>

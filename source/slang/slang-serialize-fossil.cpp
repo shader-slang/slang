@@ -1,7 +1,7 @@
 // slang-serialize-fossil.cpp
 #include "slang-serialize-fossil.h"
 
-#include "../core/slang-blob.h"
+#include "core/slang-blob.h"
 #include "core/slang-performance-profiler.h"
 
 namespace Slang

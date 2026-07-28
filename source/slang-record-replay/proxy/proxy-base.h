@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../../core/slang-smart-pointer.h"
-#include "../replay-context.h"
-#include "../replay-shared.h"
+#include "core/slang-smart-pointer.h"
 #include "slang-com-ptr.h"
+#include "slang-record-replay/replay-context.h"
+#include "slang-record-replay/replay-shared.h"
 #include "slang.h"
 
 namespace SlangRecord

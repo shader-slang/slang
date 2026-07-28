@@ -72,7 +72,7 @@ def main():
             # (non-swept) results.json from a prior run must not mask a pending
             # sweep. Tolerate an unreadable/partial file by re-running.
             try:
-                prev = json.load(open(done))
+                prev = analyze.read_json(done)
             except (json.JSONDecodeError, OSError) as e:
                 prev = []
                 print(f"  (note: unreadable {done} ({e}); re-running)")

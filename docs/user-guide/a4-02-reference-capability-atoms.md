@@ -155,6 +155,9 @@ Versions
 `GLSL_460`
 > GLSL 460 and related capabilities of other targets.
 
+`GLSL_latest`
+> Represents the latest GLSL version.
+
 `cuda_sm_1_0`
 > cuda 1.0 and related capabilities of other targets.
 
@@ -358,6 +361,9 @@ Versions
 `sm_6_9_version`
 > HLSL shader model 6.9 and related capabilities of other targets.
 > Does not include related GLSL/SPIRV extensions.
+
+`sm_latest`
+> Represents the latest HLSL shader model version.
 
 `spirv_1_0`
 > Represents SPIR-V 1.0 version.
@@ -641,8 +647,10 @@ Extensions
 
 `SPV_EXT_shader_invocation_reorder`
 > Represents the SPIR-V extension for shader invocation reorder (cross-vendor standard).
-> Requires SPV_KHR_ray_tracing and SPIR-V 1.5 (which includes physical storage buffer).
-> Note: Spec allows SPIR-V 1.4 + physical_storage_buffer extension, but we require 1.5 for simplicity.
+> Per the SER spec it requires SPIR-V 1.4, SPV_KHR_ray_tracing, and a physical-storage-buffer
+> extension. We model the physical-storage-buffer dependency as SPV_KHR_physical_storage_buffer
+> (the name the emitter declares); the emitter adds that `OpExtension` on the pre-1.5 path
+> (it is core from 1.5 on), while this dependency records the relationship in the model.
 
 `SPV_GOOGLE_user_type`
 > Represents the SPIR-V extension for SPV_GOOGLE_user_type.
@@ -670,6 +678,11 @@ Extensions
 
 `SPV_KHR_non_semantic_info`
 > Represents the SPIR-V extension for non-semantic information.
+
+`SPV_KHR_physical_storage_buffer`
+> Represents the SPIR-V extension for physical storage buffer (the KHR-promoted name for
+> the same feature as SPV_EXT_physical_storage_buffer; folded into core SPIR-V 1.5). Its
+> floor mirrors the EXT atom's, so requiring it does not raise the effective version.
 
 `SPV_KHR_quad_control`
 > Represents the SPIR-V extension for quad group control.

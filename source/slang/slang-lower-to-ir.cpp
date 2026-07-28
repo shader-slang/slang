@@ -1,11 +1,11 @@
 // lower.cpp
 #include "slang-lower-to-ir.h"
 
-#include "../core/slang-char-encode.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-hash.h"
-#include "../core/slang-performance-profiler.h"
-#include "../core/slang-random-generator.h"
+#include "core/slang-char-encode.h"
+#include "core/slang-char-util.h"
+#include "core/slang-hash.h"
+#include "core/slang-performance-profiler.h"
+#include "core/slang-random-generator.h"
 #include "slang-check-impl.h"
 #include "slang-check.h"
 #include "slang-ir-autodiff.h"
@@ -462,6 +462,14 @@ struct IRGenEnv
 {
     // Map an AST-level declaration to the IR-level value that represents it.
     Dictionary<Decl*, LoweredValInfo> mapDeclToValue;
+
+    // Map an AST-level value to its result in this IR lowering environment.
+    //
+    // Consider `Pair<Leaf, T>` where both generic parameters are constrained by `IModel`.
+    // The type `T` is reachable both as an ordinary generic argument and through its conformance
+    // witness. Both paths must lower to the same IR value in one environment, but a nested generic
+    // environment can bind `T` to a different IR parameter and therefore has its own cache.
+    Dictionary<Val*, LoweredValInfo> mapValToValue;
 
     // Associated vals working set. TODO: Document properly.
     HashSet<Val*> seenVals;
@@ -969,6 +977,15 @@ LoweredValInfo emitCallToDeclRef(
         case kIROp_GetOffsetPtr:
             SLANG_ASSERT(argCount == 2);
             return LoweredValInfo::simple(builder->emitGetOffsetPtr(args[0], args[1]));
+        case kIROp_CastToVoid:
+            // A `(void)expr` cast (the builtin `__init(T)` on `void`) has no data
+            // content: it evaluates `expr` for its side effects and yields `void`.
+            // Those side effects are already lowered into `args[0]`, so we discard
+            // the operand and produce the canonical void value (`IRVoidLit`) rather
+            // than a `kIROp_CastToVoid` instruction, which no backend can emit and
+            // which would only duplicate the one canonical spelling of a void value.
+            SLANG_RELEASE_ASSERT(argCount == 1);
+            return LoweredValInfo::simple(builder->getVoidValue());
         default:
             return LoweredValInfo::simple(
                 builder->emitIntrinsicInst(type, intrinsicOp, argCount, args));
@@ -3032,20 +3049,50 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 #undef UNEXPECTED_CASE
 };
 
+template<typename F>
+LoweredValInfo lowerValWithCache(IRGenContext* context, Val* val, F const& lower)
+{
+    if (auto cachedValue = context->env->mapValToValue.tryGetValue(val))
+        return *cachedValue;
+
+    auto loweredValue = lower();
+
+    // Cache only completed lowering. In particular, do not introduce an in-progress entry that
+    // would change how recursive Val graphs are handled.
+    context->env->mapValToValue.set(val, loweredValue);
+
+    return loweredValue;
+}
+
 LoweredValInfo lowerVal(IRGenContext* context, Val* val)
 {
-    ValLoweringVisitor visitor;
-    visitor.context = context;
     auto resolvedVal = val->resolve();
-    return visitor.dispatch(resolvedVal);
+    return lowerValWithCache(
+        context,
+        resolvedVal,
+        [&]()
+        {
+            ValLoweringVisitor visitor;
+            visitor.context = context;
+            return visitor.dispatch(resolvedVal);
+        });
 }
 
 IRType* lowerType(IRGenContext* context, Type* type)
 {
-    ValLoweringVisitor visitor;
-    visitor.context = context;
-    IRType* loweredType = (IRType*)getSimpleVal(context, visitor.dispatchType(type));
+    auto loweredValue = lowerValWithCache(
+        context,
+        type,
+        [&]()
+        {
+            ValLoweringVisitor visitor;
+            visitor.context = context;
+            return visitor.dispatchType(type);
+        });
+    IRType* loweredType = (IRType*)getSimpleVal(context, loweredValue);
 
+    // These operations are contextual side effects rather than part of the Val-to-IR mapping, so
+    // they must still run when the dispatch result came from the cache.
     lowerAssociatedVals(context, type, loweredType);
     lowerRelatedTypes(context, type, loweredType);
 
@@ -9618,13 +9665,25 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
     auto pathInfo = sourceView->getPathInfo(loc, SourceLocType::Emit);
     String sourcePath = pathInfo.getName();
 
-    // If the source file path corresponds to an existing SourceFile in the source manager, use it.
+    // getName() and getMostUniqueIdentity() can spell the same file differently. For a PathInfo of
+    // Type::Normal, getName() returns the found path, which may be relative (e.g. "m.slang" for a
+    // module reached by a relative import), while getMostUniqueIdentity() returns the unique
+    // identity, which for the default OS file system is the canonical absolute path (e.g.
+    // "/home/.../m.slang"). For FoundPath/FromString paths neither has a separate identity, so both
+    // return the same found path.
+    //
+    // We spell the emitted DebugSource filename with getMostUniqueIdentity() to match the
+    // per-source-file loop in generateIRForTranslationUnit, which also emits it via
+    // getMostUniqueIdentity(). DebugSource is hoistable, so an imported module's record only
+    // collapses onto the entry-point module's at link time when the filenames match byte-for-byte;
+    // the getName()-vs-identity mismatch previously left a duplicate, orphaned record (see
+    // shader-slang/slang#11982). The found-path lookup below still keys on the original
+    // getName()-based path; only sourcePath — the fallback-lookup key, the dedup-map key, and the
+    // emitted filename — is switched to the canonical identity.
     auto source = sourceManager->findSourceFileByPathRecursively(sourcePath);
+    sourcePath = pathInfo.getMostUniqueIdentity();
     if (!source)
-    {
-        sourcePath = pathInfo.getMostUniqueIdentity();
         source = sourceManager->findSourceFile(sourcePath);
-    }
     if (source &&
         context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
     {
@@ -9641,28 +9700,54 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
         return debugSourceInst;
     }
 
-    // If the source manager does not have an entry for the corresponding file name, make sure we
-    // still emit a source file entry in the spirv module.
-    ComPtr<ISlangBlob> outBlob;
+    // Emit the DebugSource. All three operands (filename, content, isIncludedFile) must match the
+    // per-source-file loop in generateIRForTranslationUnit so the hoistable records collapse at
+    // link time. Prefer the SourceFile*'s own (already BOM-decoded) content when it has any;
+    // otherwise fall back to reading it off disk. The fallback matters for separate compilation: a
+    // SourceFile deserialized from a precompiled .slang-module is found here but has no embedded
+    // content blob (hasContent() is false), so without the fallback we would drop the DebugSource
+    // source-text operand (see shader-slang/slang#11982's review) — loading from foundPath restores
+    // it, matching the pre-change behavior. A bare-path fallback (no SourceFile*) is never an
+    // #include'd file, so its isIncludedFile stays false.
+    ComPtr<ISlangBlob> contentBlob;
     UnownedStringSlice content;
+    bool isIncludedFile = false;
 
-    // Only embed source content for Standard and Maximal debug level
-    if (context->debugInfoLevel >= DebugInfoLevel::Standard)
+    // Embed source content for Standard/Maximal, or at any level when
+    // `-debug-info-include-source` is set. Must match the per-source-file loop in
+    // generateIRForTranslationUnit so a source reached only through this producer still carries
+    // content at `-g1` (otherwise the SPIR-V `OpSource` for it would have an empty Source operand).
+    bool embedContent = context->debugInfoLevel >= DebugInfoLevel::Standard ||
+                        context->getLinkage()->m_optionSet.shouldIncludeSourceInDebugInfo();
+    if (source)
     {
-        if (pathInfo.hasFileFoundPath())
+        if (embedContent)
+            content = source->getContent();
+        isIncludedFile = source->isIncludedFile();
+    }
+    if (embedContent && (!source || !source->hasContent()) && pathInfo.hasFileFoundPath())
+    {
+        ComPtr<ISlangBlob> rawBlob;
+        context->getLinkage()->getFileSystemExt()->loadFile(
+            pathInfo.foundPath.getBuffer(),
+            rawBlob.writeRef());
+        if (rawBlob)
         {
-            context->getLinkage()->getFileSystemExt()->loadFile(
-                pathInfo.foundPath.getBuffer(),
-                outBlob.writeRef());
+            // The raw file bytes may carry a UTF-8 BOM (or another encoding). Decode them the same
+            // way SourceFile::setContents does so that the embedded DebugSource text is BOM-free
+            // and stays aligned with the BOM-free line/column data. `contentBlob` owns the decoded
+            // storage; it must outlive the emitDebugSource call below.
+            contentBlob = SourceFile::decodeContentBlob(rawBlob);
+            content = UnownedStringSlice(
+                (char*)contentBlob->getBufferPointer(),
+                contentBlob->getBufferSize());
         }
-        if (outBlob)
-            content =
-                UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
     }
 
     IRBuilder builder(*context->irBuilder);
     builder.setInsertInto(context->irBuilder->getModule());
-    debugSourceInst = builder.emitDebugSource(sourcePath.getUnownedSlice(), content, false);
+    debugSourceInst =
+        builder.emitDebugSource(sourcePath.getUnownedSlice(), content, isIncludedFile);
     context->shared->mapSourcePathToDebugSourceInst[sourcePath] = debugSourceInst;
     if (source)
     {
@@ -14572,6 +14657,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // is needed for emitting debug information
         auto nameHint = irFunc->findDecoration<IRNameHintDecoration>();
         IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
+
+        // Consider a custom backward derivative written as
+        // `__func_extension bwd_diff(foo)(...) { ... }`. Its user-written implementation is
+        // intentionally unnamed because the generated extension also contains the public
+        // `bwd_diff` function that copies it. The implementation still has source-level debug
+        // locations and a linkage name, so use that linkage name as its debug name. This keeps
+        // every function with an IRDebugLocationDecoration paired with the IRDebugFuncDecoration
+        // that the inliner and debug-info emitters expect.
+        if (!nameOperand)
+        {
+            auto linkageInst = findOuterMostGeneric(irFunc);
+            if (auto linkage = linkageInst->findDecoration<IRLinkageDecoration>())
+                nameOperand = linkage->getMangledNameOperand();
+        }
+
         if (nameOperand)
         {
             getBuilder()->setInsertBefore(irFunc);
@@ -15328,6 +15428,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // This is needed for Minimal level and above (for line number correlation)
     if (context->debugInfoLevel != DebugInfoLevel::None)
     {
+        // Minimal normally keeps only the path, but `-debug-info-include-source` carries the source
+        // text into every `IRDebugSource` so the SPIR-V emitter can embed it via core `OpSource`.
+        const bool includeSource = linkage->m_optionSet.shouldIncludeSourceInDebugInfo();
+
         builder->setInsertInto(module->getModuleInst());
         for (auto source : translationUnit->getSourceFiles())
         {
@@ -15335,8 +15439,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             // path
             auto debugSource = builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
-                (context->debugInfoLevel >= DebugInfoLevel::Standard) ? source->getContent()
-                                                                      : UnownedStringSlice(),
+                (context->debugInfoLevel >= DebugInfoLevel::Standard || includeSource)
+                    ? source->getContent()
+                    : UnownedStringSlice(),
                 source->isIncludedFile());
             context->shared->mapSourceFileToDebugSourceInst[source] = debugSource;
 

@@ -1,8 +1,6 @@
-// Unit tests for the assignee/reviewer selection (the JS port of
-// select_assignee_and_reviewers), run against the copy INLINED in
+// Unit tests for assignee/reviewer selection, run against the copy INLINED in
 // pr-board-sync.yml (the single source of truth), extracted at run time.
 // No deps; run with: node .github/scripts/pr-assign.test.js
-// Mirrors TestSelectAssigneeAndReviewers in the slang-skills test_pr_sweep.py.
 "use strict";
 
 const assert = require("node:assert");

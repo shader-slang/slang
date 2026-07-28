@@ -1,7 +1,7 @@
 #if defined(SLANG_ENABLE_XLIB)
 
-#include "../window.h"
 #include "core/slang-basic.h"
+#include "platform/window.h"
 
 #include <X11/Xlib.h>
 #include <X11/keysym.h>

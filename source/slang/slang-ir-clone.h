@@ -1,7 +1,7 @@
 // slang-ir-clone.h
 #pragma once
 
-#include "../core/slang-dictionary.h"
+#include "core/slang-dictionary.h"
 #include "slang-ir.h"
 
 namespace Slang
