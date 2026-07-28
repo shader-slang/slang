@@ -5,6 +5,7 @@
 #include "compiler-core/slang-artifact-impl.h"
 #include "compiler-core/slang-artifact-util.h"
 #include "compiler-core/slang-name.h"
+#include "compiler-core/slang-slice-allocator.h"
 #include "core/slang-castable.h"
 #include "core/slang-performance-profiler.h"
 #include "core/slang-type-text-util.h"
@@ -3371,9 +3372,16 @@ static SlangResult createArtifactFromIR(
     }
 
     const bool needsLink = downstreamLinkingAllowed && spirvFiles.getCount() > 1;
+    // `-Xspirv-opt <flag>` selects individual optimizer passes explicitly, so it must run the
+    // optimizer even at `-O0` (where the preset is empty). Detecting them here also keeps a plain
+    // `-O0` compile -- with no such flags, and no link/validation/separate-debug-info -- from
+    // loading `slang-glslang` (issue #11662).
+    List<String> spirvOptArgs =
+        codeGenContext->getTargetProgram()->getOptionSet().getDownstreamArgs("spirv-opt");
     const bool needsOptimization =
         codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel() !=
-        OptimizationLevel::None;
+            OptimizationLevel::None ||
+        spirvOptArgs.getCount() != 0;
     const bool needsValidation = shouldRunSPIRVValidation(codeGenContext);
     const bool needsSeparateDebugInfo = targetCompilerOptions.shouldEmitSeparateDebugInfo();
     const bool needsDownstreamCompiler =
@@ -3428,6 +3436,13 @@ static SlangResult createArtifactFromIR(
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
         downstreamOptions.targetType = SLANG_SPIRV;
         downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
+
+        // Forward the `-Xspirv-opt` args (collected above) to the downstream optimizer, where they
+        // register on top of the `-OX` preset -- or as the only passes at `-O0`, whose preset is
+        // empty. The allocator owns the copied arg strings and slice array, so it must outlive the
+        // compile() call below.
+        SliceAllocator allocator;
+        downstreamOptions.compilerSpecificArguments = allocator.allocate(spirvOptArgs);
         switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
         {
         case OptimizationLevel::None:
