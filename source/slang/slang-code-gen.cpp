@@ -796,7 +796,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                 metalLanguageVersion = emittedVersion;
 
             if (metalTracker->getRequiresLogging())
-                options.flags |= CompileOptions::Flag::EnableMetalLogging;
+                options.flags |= CompileOptions::Flag::EnableLogging;
         }
 
         if (metalLanguageVersion.isSet())

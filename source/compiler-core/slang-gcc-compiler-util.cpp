@@ -987,7 +987,7 @@ static SlangResult _parseGCCFamilyLine(
             cmdLine.addArg("-std=metal3.1");
         }
 
-        if (options.flags & CompileOptions::Flag::EnableMetalLogging)
+        if (options.flags & CompileOptions::Flag::EnableLogging)
         {
             cmdLine.addArg("-fmetal-enable-logging");
         }

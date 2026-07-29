@@ -6,9 +6,6 @@
 
 namespace Slang
 {
-/// Carries the emitted source's requirements -- minimum MSL version, whether logging is needed --
-/// back to code generation, which turns them into `-std` and `-fmetal-enable-logging`. Emitter and
-/// code generation must share one instance, hence the assert in the constructor below.
 class MetalExtensionTracker : public ExtensionTracker
 {
 public:

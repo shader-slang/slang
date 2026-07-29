@@ -172,9 +172,7 @@ struct DownstreamCompileOptions
             EnableFloat16 = 0x08,        ///< If set compiles with support for float16/half
             EnableFloat8 = 0x10,         ///< If set compiles with support for float8
             EnableBfloat16 = 0x20,       ///< If set compiles with support for bfloat16
-            EnableMetalLogging = 0x40,   ///< For Metal, request `-fmetal-enable-logging`. Without
-                                         ///< it the metallib carries no logging metadata and
-                                         ///< shader `os_log` calls are dropped at runtime.
+            EnableLogging = 0x40,        ///< If set compiles with support for shader logging
         };
     };
 
