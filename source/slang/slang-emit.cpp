@@ -2218,6 +2218,10 @@ Result linkAndOptimizeIR(
                 codeGenContext,
                 glslExtensionTrackerPtr);
 
+            // GLSL and SPIR-V both require an integer `switch` selector; a `switch` on a
+            // `bool` reaches here unchanged, so rewrite it to an integer switch.
+            SLANG_PASS(legalizeBoolSwitchForKhronos);
+
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }
         break;
