@@ -5795,10 +5795,6 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
 
 struct HigherOrderInvokeExprCheckingActions
 {
-    // Keep the operand syntax while its resolved form is built. Member checking types the
-    // original base expression in place before lookup adds any interface upcast.
-    Expr* originalFuncExpr = nullptr;
-
     virtual HigherOrderInvokeExpr* createHigherOrderInvokeExpr(SemanticsVisitor* semantics) = 0;
     virtual void fillHigherOrderInvokeExpr(
         HigherOrderInvokeExpr* resultDiffExpr,
@@ -5834,10 +5830,9 @@ struct HigherOrderInvokeExprCheckingActions
     // Extract the explicit `this` parameter type for a non-static member method
     // used as the operand of a higher-order operator.
     //
-    // A method reference spelled as `Type::method` uses the method's declared
-    // `this` type. A method reference spelled as `value.method` uses the checked
-    // type of `value`; the derivative callable is static, so that value must be
-    // provided as the first argument at the derivative call site.
+    // Both `Type::method` and `value.method` use the specialized `this` type from
+    // the checked method declaration reference. The derivative callable is static,
+    // so that value must be provided as its first argument.
     //
     // Returns a null QualType for free functions, static methods, constructors, and
     // member methods referenced by name within their own type (e.g.
@@ -5846,13 +5841,11 @@ struct HigherOrderInvokeExprCheckingActions
     {
         auto innerExpr = getInnerMostExprFromHigherOrderExpr(funcExpr);
         auto declRefExpr = as<DeclRefExpr>(innerExpr);
-        auto originalMemberExpr =
-            as<MemberExpr>(getInnerMostExprFromHigherOrderExpr(originalFuncExpr));
 
         // Only member references can contribute an explicit `this` parameter. A plain
         // DeclRefExpr inside the same type still means "use the current implicit
         // this", so the differentiated function remains an instance member.
-        if (!as<MemberExpr>(innerExpr) && !as<StaticMemberExpr>(innerExpr) && !originalMemberExpr)
+        if (!as<MemberExpr>(innerExpr) && !as<StaticMemberExpr>(innerExpr))
             return QualType();
 
         if (declRefExpr)
@@ -5871,45 +5864,11 @@ struct HigherOrderInvokeExprCheckingActions
                 if (!callableDecl->hasModifier<HLSLStaticModifier>() &&
                     !as<ConstructorDecl>(callableDecl))
                 {
-                    // Ask the method declaration how its implicit `this` is passed.
-                    // For example, a mutating method needs writable `this`, while a
-                    // [NoDiffThis] method usually passes `this` by value.
-                    auto declaredThisType = getTypeForThisExpr(semantics, callableDeclRef);
-                    if (!declaredThisType.type)
-                        return QualType();
-
-                    // Consider `bwd_diff(dFunction.p.operator())` where the receiver has type
-                    // `F : IUnary`. Member lookup inserts an upcast to `IUnary`, and overload
-                    // expansion rebuilds the candidate without its bound base expression. The
-                    // original member expression still owns the checked `dFunction.p` expression,
-                    // so use its type to keep the explicit receiver parameter as `F`.
-                    if (originalMemberExpr)
-                    {
-                        return QualType(
-                            originalMemberExpr->baseExpression->type.type,
-                            declaredThisType.isLeftValue);
-                    }
-
-                    if (auto memberExpr = as<MemberExpr>(innerExpr))
-                    {
-                        // For `value.method`, the explicit `this` argument should have the
-                        // checked type of `value`. This is important for generic/interface
-                        // values: `shape.distance` in a `S : IShape3D` function should
-                        // expect `S`, not the interface requirement's `This` type.
-                        //
-                        // Preserve the declared l-value-ness so the generated
-                        // derivative signature still matches the method's `this`
-                        // parameter passing mode.
-                        return QualType(
-                            memberExpr->baseExpression->type.type,
-                            declaredThisType.isLeftValue);
-                    }
-                    else
-                    {
-                        // For `Type::method`, there is no object expression to inspect,
-                        // so use the method's declared/specialized `this` type directly.
-                        return declaredThisType;
-                    }
+                    // Ask the checked method declaration reference for its specialized
+                    // `this` type and passing mode. For `function.operator()` where
+                    // `F : IUnary`, the declaration starts with `IUnary.This`, and the
+                    // lookup substitution on the declaration reference resolves it to `F`.
+                    return getTypeForThisExpr(semantics, callableDeclRef);
                 }
             }
         }
@@ -6052,7 +6011,6 @@ static Expr* _checkHigherOrderInvokeExpr(
     HigherOrderInvokeExprCheckingActions* actions)
 {
     // Check/Resolve inner function declaration.
-    actions->originalFuncExpr = expr->baseFunction;
     SemanticsVisitor subVisitor(semantics->getShared());
     subVisitor = subVisitor.withSink(semantics->getSink()).allowStaticReferenceToNonStaticMember();
     // expr->baseFunction = subVisitor.CheckExpr(expr->baseFunction);
@@ -6074,10 +6032,10 @@ static Expr* _checkHigherOrderInvokeExpr(
         {
             auto lookupResultExpr = semantics->ConstructLookupResultExpr(
                 item,
-                nullptr,
+                overloadedExpr->base,
                 overloadedExpr->name,
                 overloadedExpr->loc,
-                nullptr);
+                overloadedExpr);
             auto candidateExpr = actions->createHigherOrderInvokeExpr(semantics);
             actions->fillHigherOrderInvokeExpr(candidateExpr, semantics, lookupResultExpr);
             candidateExpr->loc = expr->loc;

@@ -6,6 +6,12 @@ interface IUnary : IDifferentiable
 {
     [Differentiable]
     float operator()(float value);
+
+    // Keep this overload so higher-order checking expands the member lookup candidates.
+    // Each candidate must retain `dFunction.p` as its base while overload resolution selects
+    // the one-argument method at the derivative call.
+    [Differentiable]
+    float operator()(float left, float right);
 }
 
 void trigger<F : IUnary>(F function, float value)
@@ -24,6 +30,12 @@ struct Scale : IUnary
     float operator()(float value)
     {
         return factor * value;
+    }
+
+    [Differentiable]
+    float operator()(float left, float right)
+    {
+        return factor * (left + right);
     }
 }
 

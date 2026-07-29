@@ -32,6 +32,16 @@ float3 gradient3<S : IShape3D>(S shape, float3 p)
     return dp.d;
 }
 
+float3 pointerGradient(Sphere* sphere, float3 p)
+{
+    var dp = diffPair(p);
+
+    // The base of `sphere->distance` has type `Ptr<Sphere>`, but the method receives its
+    // pointee as `this`, so the static derivative's explicit `this` argument is `*sphere`.
+    __bwd_diff(sphere->distance)(*sphere, dp, 1.0);
+    return dp.d;
+}
+
 [shader("fragment")]
 float4 fs(float4 pos : SV_Position) : SV_Target
 {
