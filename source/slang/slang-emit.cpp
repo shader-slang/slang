@@ -2220,7 +2220,7 @@ Result linkAndOptimizeIR(
 
             // GLSL and SPIR-V both require an integer `switch` selector; a `switch` on a
             // `bool` reaches here unchanged, so rewrite it to an integer switch.
-            SLANG_PASS(legalizeBoolSwitchForKhronos);
+            SLANG_PASS(legalizeBoolSwitchForTargetsRequiringIntSwitch);
 
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }
@@ -2257,6 +2257,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::WGSLSPIRV:
     case CodeGenTarget::WGSLSPIRVAssembly:
         {
+            // WGSL, like GLSL and SPIR-V, requires an integer `switch` selector.
+            SLANG_PASS(legalizeBoolSwitchForTargetsRequiringIntSwitch);
             SLANG_PASS(legalizeIRForWGSL, targetProgram, sink);
         }
         break;
