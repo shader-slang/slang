@@ -875,7 +875,10 @@ void initCommandOptions(CommandOptions& options)
          "-fvk-bind-globals",
          "-fvk-bind-globals <N> <descriptor-set>",
          "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>.\n"
-         "It lets you specify the descriptor for the source at a certain register.",
+         "It lets you specify the descriptor for the source at a certain register.\n"
+         "Only the $Globals cbuffer is moved; resources split out of the global uniforms (e.g. "
+         "samplers/textures) stay in the descriptor set they would otherwise be auto-assigned to "
+         "(set 0 by default), regardless of the set requested for $Globals.",
          nullptr,
          kVulkanBindGlobalsLinks,
          SLANG_COUNT_OF(kVulkanBindGlobalsLinks)},

@@ -122,6 +122,28 @@ static void registerLegalizedValue(
 struct IRGlobalParamInfo
 {
     IRFunc* originatingEntryPoint = nullptr;
+
+    /// Single source of truth for the `-fvk-bind-globals` split-out-resource rule (issue #10668).
+    ///
+    /// Non-null only when this global param is the synthesized module-scope `$Globals` group and
+    /// `-fvk-bind-globals` is active. It points at the var-chain link recorded in
+    /// `legalizeGlobalParam` — the `$Globals` container binding, which is the chain root there.
+    ///
+    /// DXC's `-fvk-bind-globals <binding> <set>` relocates only the `$Globals` uniform buffer to
+    /// (set, binding); resources split out of the module-scope `uniform` globals (samplers/textures
+    /// nested in a `uniform` struct) must stay in the set they were originally allocated in, not
+    /// inherit the relocated container binding. `buildSimpleVarLayout` otherwise composes every
+    /// chain link's offset/space onto the leaf, so in `declareVars`' parameter-group `pair` case
+    /// the special (resource) half drops this link while the ordinary (uniform-buffer) half keeps
+    /// it.
+    ///
+    /// The drop is gated on `varChain.primaryChain == this link`. That pointer identity is
+    /// load-bearing: it holds only because the recursion from `legalizeGlobalParam` to the pair
+    /// adds no primary-chain link for a `ConstantBuffer<struct>` element (the `implicitDeref` case
+    /// leaves `elementVarLayout` null for a struct element, so `LegalVarChainLink` copies rather
+    /// than extends the chain). The field links for the split-out resources are pushed only in the
+    /// recursion below that pair, so the recorded root is untouched until the drop fires.
+    SimpleLegalVarChain* globalsContainerLinkToSkipForResources = nullptr;
 };
 
 static LegalVal declareVars(
@@ -3462,12 +3484,32 @@ static LegalVal declareVars(
                 leafVar,
                 globalParamInfo,
                 false);
+
+            // The ordinary half above keeps the full `varChain` unchanged, so the `$Globals`
+            // uniform buffer itself still lands at the relocated (set, binding). The special
+            // (resource) half drops the recorded `$Globals` container link so split-out resources
+            // keep their originally-allocated set — see `globalsContainerLinkToSkipForResources`
+            // for the full rationale this relies on. The pointer compare fires only at the outer
+            // `$Globals` pair whose chain head is still that container link; deeper pairs have
+            // pushed field links so the head differs and they are left untouched.
+            LegalVarChain specialVarChain = varChain;
+            if (globalParamInfo && globalParamInfo->globalsContainerLinkToSkipForResources &&
+                varChain.primaryChain == globalParamInfo->globalsContainerLinkToSkipForResources)
+            {
+                // The recorded link is the chain root: `legalizeGlobalParam` seeds it from an empty
+                // parent, so it has no parent link. Assert that, so a future change that records a
+                // non-root/inner link (whose `next` is non-null) is caught here rather than dropping
+                // the wrong link and silently mis-binding the split-out resources.
+                SLANG_ASSERT(varChain.primaryChain->next == nullptr);
+                specialVarChain.primaryChain = varChain.primaryChain->next;
+            }
+
             auto specialVal = declareVars(
                 context,
                 op,
                 pairType->specialType,
                 typeLayout,
-                varChain,
+                specialVarChain,
                 nameHint,
                 leafVar,
                 globalParamInfo,
@@ -3667,6 +3709,20 @@ static LegalVal legalizeGlobalParam(
                     irGlobalParam->findDecoration<IREntryPointParamDecoration>())
             {
                 globalParamInfo.originatingEntryPoint = entryPointParamDecoration->getEntryPoint();
+            }
+
+            // Record the `$Globals` container link so `declareVars` can keep split-out resources
+            // out of the relocated set (see `globalsContainerLinkToSkipForResources`). Gate: the
+            // flag is set, and this param is the module `$Globals` group — its wrapper param
+            // carries `SynthesizedParameterGroupDecoration`, which entry-point groups put only on
+            // their element struct, so the param-level check here does not match them.
+            if (auto vulkanOptions = context->targetProgram->getHLSLToVulkanLayoutOptions())
+            {
+                if (vulkanOptions->hasGlobalsBinding() &&
+                    irGlobalParam->findDecoration<IRSynthesizedParameterGroupDecoration>())
+                {
+                    globalParamInfo.globalsContainerLinkToSkipForResources = varChain.primaryChain;
+                }
             }
 
             // TODO: need to handle initializer here!
