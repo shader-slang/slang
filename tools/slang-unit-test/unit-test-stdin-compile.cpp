@@ -1900,6 +1900,19 @@ static slang::CompilerOptionEntry _makeStringCompilerOption(
     return entry;
 }
 
+static slang::CompilerOptionEntry _makeInt2CompilerOption(
+    slang::CompilerOptionName name,
+    int value0,
+    int value1)
+{
+    slang::CompilerOptionEntry entry = {};
+    entry.name = name;
+    entry.value.kind = slang::CompilerOptionValueKind::Int;
+    entry.value.intValue0 = value0;
+    entry.value.intValue1 = value1;
+    return entry;
+}
+
 static bool _blobContentEquals(ISlangBlob* left, ISlangBlob* right)
 {
     if (!left || !right || left->getBufferSize() != right->getBufferSize())
@@ -2031,6 +2044,31 @@ static SlangResult _testSeparateDebugInfoOutputDoesNotAffectCompilerOptionHash()
     return SLANG_OK;
 }
 
+static SlangResult _getBindGlobalsOptionEntryPointHash(
+    int index,
+    int set,
+    ComPtr<ISlangBlob>& outHash)
+{
+    slang::CompilerOptionEntry options[] = {
+        _makeInt2CompilerOption(slang::CompilerOptionName::VulkanBindGlobals, index, set),
+    };
+    return _getOptionEntryPointHash(options, SLANG_COUNT_OF(options), "bindGlobalsHash", outHash);
+}
+
+static SlangResult _testVulkanBindGlobalsSetAffectsCompilerOptionHash()
+{
+    ComPtr<ISlangBlob> set0Hash;
+    SLANG_RETURN_ON_FAIL(_getBindGlobalsOptionEntryPointHash(0, 0, set0Hash));
+
+    ComPtr<ISlangBlob> set1Hash;
+    SLANG_RETURN_ON_FAIL(_getBindGlobalsOptionEntryPointHash(0, 1, set1Hash));
+
+    if (_blobContentEquals(set0Hash, set1Hash))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
 SLANG_UNIT_TEST(SlangcReadFromStdin)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testSlangStdin(unitTestContext)));
@@ -2053,6 +2091,7 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeDiagnostic(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinDiagnostic(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpMentionsStdin(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testVulkanBindGlobalsSetAffectsCompilerOptionHash()));
 }
 
 SLANG_UNIT_TEST(SlangcCoverageManifestOutputMetalLib)

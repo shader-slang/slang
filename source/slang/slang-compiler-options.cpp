@@ -398,6 +398,7 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
             if (v.kind == CompilerOptionValueKind::Int)
             {
                 builder.append(v.intValue);
+                builder.append(v.intValue2);
             }
             else
             {
