@@ -7573,7 +7573,16 @@ DeferStmt* Parser::ParseDeferStatement()
     DeferStmt* deferStatement = astBuilder->create<DeferStmt>();
     FillPosition(deferStatement);
     ReadToken("defer");
+
+    // Scope the deferred statement so a bare declaration like `defer uint i = 1;`
+    // behaves like `defer { uint i = 1; }` instead of leaking `i` into the
+    // enclosing scope, mirroring the scope pushed for a block statement and a
+    // do/catch handler.
+    ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
+    pushScopeAndSetParent(scopeDecl);
     deferStatement->statement = ParseStatement();
+    PopScope();
+
     return deferStatement;
 }
 
