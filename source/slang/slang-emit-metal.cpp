@@ -888,6 +888,29 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
             return true;
         }
+    case kIROp_Printf:
+        {
+            // Metal has no `printf`; its equivalent is the MSL 3.2 shader logging facility. Of the
+            // severity levels `log` is the one whose `MTLLogLevelNotice` survives the widest range
+            // of host `MTLLogState` configurations.
+            ensurePrelude(kMetalBuiltinPreludeLogging);
+            m_extensionTracker->requireMetalLanguageVersion(SemanticVersion(3, 2));
+            m_extensionTracker->requireLogging();
+            m_writer->emit("os_log_default.log(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            if (inst->getOperandCount() > 1)
+            {
+                List<IRInst*> args;
+                collectFlattenedVariadicOperands(inst, 1, args);
+                for (auto arg : args)
+                {
+                    m_writer->emit(", ");
+                    emitOperand(arg, getInfo(EmitOp::General));
+                }
+            }
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_ByteAddressBufferLoad:
         {
             // This only works for loads of 4-byte values.
