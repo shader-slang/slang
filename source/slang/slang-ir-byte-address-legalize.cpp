@@ -1174,14 +1174,14 @@ struct ByteAddressBufferLegalizationContext
                 index);
         }
 
-        // Handle IRParam by changing its type to StructuredBuffer
         if (auto babParam = as<IRParam>(byteAddressBuffer))
         {
+            if (!m_options.translateToStructuredBufferOps)
+                return nullptr;
+
             IRType* babType = babParam->getDataType();
             IRType* structuredBufferType =
                 getEquivalentStructuredBufferParamType(elementType, babType);
-
-            // Propagate type change to all uses via replaceUsesWith
             babType->replaceUsesWith(structuredBufferType);
             return babParam;
         }
