@@ -1,0 +1,365 @@
+name: Static Release
+
+# Builds and publishes the fully static Slang distribution: one merged archive
+# plus headers and licences, for Linux, macOS and Windows.
+#
+# This is the fork's replacement for release.yml, which is disabled here. That
+# workflow ships shared libraries and needs Khronos code-signing secrets; this
+# one ships `libslang-static.a` / `slang-static.lib` and needs no secrets
+# beyond GITHUB_TOKEN.
+#
+# It doubles as CI for the archive-merging code. The macOS (`libtool -static`)
+# and Windows (`lib.exe`) merge paths were written but never executed, so the
+# pull_request trigger below builds all three platforms whenever the static
+# build's inputs change. Nothing is published for a pull request; the archives
+# are uploaded as run artifacts instead.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v20[2-9][0-9].[0-9]*"
+  pull_request:
+    paths:
+      - "CMakeLists.txt"
+      - "external/CMakeLists.txt"
+      - "cmake/BundleStaticLibrary.cmake"
+      - "cmake/BundleStaticLibraryImpl.cmake"
+      - "source/slang/CMakeLists.txt"
+      - "source/slang-glslang/**"
+      - "source/compiler-core/slang-glslang-compiler.cpp"
+      - "extras/static-release/**"
+      - ".github/workflows/release-static.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}
+    # Write access is needed only by the final publish step, which is gated on
+    # a tag push; pull_request and workflow_dispatch runs never reach it.
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Built inside manylinux_2_28 so the archive links against a glibc old
+          # enough for the distros downstream consumers actually run. A static
+          # archive does not remove the glibc floor -- it only moves it to the
+          # consumer's final link.
+          - platform: linux-x86_64
+            runs-on: ubuntu-22.04
+            docker-image: quay.io/pypa/manylinux_2_28_x86_64
+          # macos-latest runners are arm64, so this is a native build.
+          - platform: macos-aarch64
+            runs-on: macos-latest
+          - platform: windows-x86_64
+            runs-on: windows-latest
+    runs-on: ${{ matrix.runs-on }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          submodules: "recursive"
+          fetch-depth: "0"
+          fetch-tags: true
+
+      # Shared configure flags. SLANG_ENABLE_RELEASE_LTO is pinned off on
+      # purpose even though that is already the default: LTO fills the archive
+      # with compiler IR instead of object code, which only links against a
+      # matching compiler version and would quietly ruin the release.
+      #
+      # SLANG_ENABLE_RELEASE_DEBUG_INFO=OFF is what keeps the archive shippable.
+      # With debug info it is over 1 GB.
+      - name: Set configure flags
+        id: flags
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          flags=(
+            -DSLANG_LIB_TYPE=STATIC
+            -DSLANG_EMBED_SLANG_GLSLANG=ON
+            -DSLANG_ENABLE_SLANG_GLSLANG=OFF
+            -DSLANG_BUNDLE_STATIC_LIB=ON
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+            -DSLANG_ENABLE_DXIL=OFF
+            -DSLANG_ENABLE_GFX=OFF
+            -DSLANG_ENABLE_SLANG_RHI=OFF
+            -DSLANG_ENABLE_TESTS=OFF
+            -DSLANG_ENABLE_EXAMPLES=OFF
+            -DSLANG_ENABLE_REPLAYER=OFF
+            -DSLANG_EXCLUDE_TINT=ON
+            -DSLANG_ENABLE_RELEASE_DEBUG_INFO=OFF
+            -DSLANG_ENABLE_RELEASE_LTO=OFF
+            -DSLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF
+          )
+          # Windows needs three more. Dawn defaults to ON there and fetches
+          # webgpu_dawn.dll; the SPIRV-Tools mimalloc replacement would
+          # otherwise be linked into the archive; and the CRT has to match what
+          # Rust's *-pc-windows-msvc targets use by default (the dynamic CRT),
+          # or every downstream crate has to set +crt-static.
+          if [[ "$PLATFORM" == windows-* ]]; then
+            flags+=(
+              -DSLANG_EXCLUDE_DAWN=ON
+              -DSLANG_ENABLE_SPIRV_TOOLS_MIMALLOC=OFF
+              -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL
+            )
+          fi
+          # Emitted as one line: this value is forwarded into the manylinux
+          # container through `docker run -e`, where a multi-line value would
+          # need quoting rules that do not survive the round trip.
+          echo "flags=${flags[*]}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Windows dev tools
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        # msvc-dev-cmd has no Node 24 release yet (upstream ilammy/msvc-dev-cmd#105);
+        # force its node20 runtime onto node24 to clear the deprecation warning.
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        with:
+          arch: amd64
+
+      - name: Build and install (container)
+        if: matrix.docker-image != ''
+        env:
+          DOCKER_IMAGE: ${{ matrix.docker-image }}
+          CMAKE_FLAGS: ${{ steps.flags.outputs.flags }}
+        run: |
+          # The container writes as root; hand the outputs back to the runner
+          # user at the end so later steps do not need sudo.
+          docker run --rm \
+            -v "${{ github.workspace }}:/home/app" \
+            -v /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt \
+            -e "CMAKE_FLAGS=$CMAKE_FLAGS" \
+            "$DOCKER_IMAGE" \
+            bash -euo pipefail -c '
+              yum install -y gcc-toolset-11-gcc gcc-toolset-11-gcc-c++
+              source /opt/rh/gcc-toolset-11/enable
+              /opt/python/cp310-cp310/bin/pip install cmake==3.25.0 ninja==1.11.1.4
+              export PATH=/opt/python/cp310-cp310/bin:$PATH
+              cd /home/app
+              git config --global --add safe.directory /home/app
+              # shellcheck disable=SC2086
+              cmake --preset default --fresh $CMAKE_FLAGS
+              cmake --build --preset release -j "$(nproc)"
+              cmake --install build --config Release --prefix /home/app/install
+              chown -R "$(stat -c "%u:%g" /home/app)" /home/app/build /home/app/install
+            '
+
+      - name: Build and install (native)
+        if: matrix.docker-image == ''
+        env:
+          CMAKE_FLAGS: ${{ steps.flags.outputs.flags }}
+        run: |
+          # shellcheck disable=SC2086
+          cmake --preset default --fresh $CMAKE_FLAGS
+          cmake --build --preset release
+          cmake --install build --config Release --prefix install
+
+      # The point of SLANG_EMBED_SLANG_GLSLANG: slangc must not reach for a
+      # slang-glslang module at runtime any more.
+      - name: Verify slangc has no Slang shared-library dependencies
+        run: |
+          slangc=install/bin/slangc
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            slangc=install/bin/slangc.exe
+          fi
+          if [[ ! -x "$slangc" ]]; then
+            echo "::error::slangc not found at $slangc"
+            exit 1
+          fi
+
+          case "$RUNNER_OS" in
+            Linux)   deps=$(ldd "$slangc") ;;
+            macOS)   deps=$(otool -L "$slangc") ;;
+            Windows) deps=$(dumpbin //dependents "$slangc") ;;
+          esac
+          echo "$deps"
+
+          if echo "$deps" | grep -Eqi 'slang-glslang|slang-compiler'; then
+            echo "::error::slangc still depends on a Slang shared library"
+            exit 1
+          fi
+          echo "No slang-glslang or slang-compiler shared dependency."
+
+      # -O0 emits SPIR-V natively and proves nothing about the embedded
+      # wrapper. -O3, spirv-asm and validation each route through it.
+      - name: Smoke-test slangc
+        run: |
+          slangc=install/bin/slangc
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            slangc=install/bin/slangc.exe
+          fi
+          shader=extras/static-release/smoke.slang
+
+          "$slangc" "$shader" -target spirv -O0 -entry computeMain -o smoke-O0.spv
+          "$slangc" "$shader" -target spirv -O3 -entry computeMain -o smoke-O3.spv
+          "$slangc" "$shader" -target spirv-asm -entry computeMain -o smoke.spvasm
+          SLANG_RUN_SPIRV_VALIDATION=1 \
+            "$slangc" "$shader" -target spirv -O3 -entry computeMain -o smoke-validated.spv
+
+          for f in smoke-O0.spv smoke-O3.spv smoke.spvasm smoke-validated.spv; do
+            if [[ ! -s "$f" ]]; then
+              echo "::error::$f is missing or empty"
+              exit 1
+            fi
+          done
+          echo "slangc produced optimized, disassembled and validated SPIR-V."
+
+      # Stage exactly what ships. libslang-compiler.a is deliberately left
+      # behind: it is installed alongside the bundle but cannot be linked on its
+      # own, so shipping it would only mislead. The .slang-module files for
+      # slang.neural and experimental.workgraph are dropped for the same reason
+      # they are out of scope for a static build -- they are resolved from disk
+      # relative to the host binary, which a static link cannot absorb.
+      - name: Stage release tree
+        id: stage
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          version="${version//\//-}"
+          base="slang-static-${version}-${PLATFORM}"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+
+          mkdir -p "$base/lib" "$base/include" "$base/licenses"
+
+          archives=()
+          for candidate in install/lib/libslang-static.a install/lib/slang-static.lib; do
+            if [[ -f "$candidate" ]]; then
+              archives+=("$candidate")
+            fi
+          done
+          if [[ ${#archives[@]} -eq 0 ]]; then
+            echo "::error::no bundled static archive found in install/lib"
+            ls -la install/lib || true
+            exit 1
+          fi
+          cp "${archives[@]}" "$base/lib/"
+          cp -R install/include/. "$base/include/"
+
+      # The top-level LICENSES/ tree only covers Slang's own annotated files.
+      # Everything merged into the archive carries its own terms, so collect
+      # them all. A missing path is a hard failure: shipping the archive with
+      # an incomplete licences directory is worse than failing the build.
+      - name: Collect licenses
+        env:
+          BASE: ${{ steps.stage.outputs.base }}
+        run: |
+          cp LICENSE "$BASE/licenses/slang-LICENSE"
+          cp -R LICENSES "$BASE/licenses/slang-LICENSES"
+
+          missing=0
+          collect() {
+            local src="$1" dest="$2"
+            if [[ ! -e "$src" ]]; then
+              echo "::error::expected licence file not found: $src"
+              missing=1
+              return
+            fi
+            cp -R "$src" "$BASE/licenses/$dest"
+          }
+
+          collect external/glslang/LICENSE.txt      glslang-LICENSE.txt
+          collect external/spirv-tools/LICENSE      spirv-tools-LICENSE
+          collect external/spirv-headers/LICENSE    spirv-headers-LICENSE
+          collect external/lz4/LICENSE              lz4-LICENSE
+          collect external/miniz/LICENSE            miniz-LICENSE
+          collect external/cmark/COPYING            cmark-gfm-COPYING
+          collect external/unordered_dense/LICENSE  unordered_dense-LICENSE
+
+          for f in external/fast_float/LICENSE-*; do
+            [[ -e "$f" ]] || continue
+            collect "$f" "fast_float-$(basename "$f")"
+          done
+
+          if [[ $missing -ne 0 ]]; then
+            echo "::error::licence collection incomplete; refusing to package"
+            exit 1
+          fi
+          ls -la "$BASE/licenses"
+
+      - name: Package
+        id: package
+        env:
+          BASE: ${{ steps.stage.outputs.base }}
+        run: |
+          tar -czf "${BASE}.tar.gz" "$BASE"
+          if command -v 7z >/dev/null 2>&1; then
+            7z a "${BASE}.zip" "$BASE" >/dev/null
+          else
+            zip -qr "${BASE}.zip" "$BASE"
+          fi
+          ls -la "${BASE}.tar.gz" "${BASE}.zip"
+          {
+            echo "tarball=${BASE}.tar.gz"
+            echo "zip=${BASE}.zip"
+          } >> "$GITHUB_OUTPUT"
+
+      # Verify the packaged tree, not the build tree: compile and link a
+      # consumer against nothing but the staged include/ and the one archive.
+      # This is the check that exercises the macOS and Windows merge paths.
+      - name: Consumer link check
+        env:
+          BASE: ${{ steps.stage.outputs.base }}
+        run: |
+          src=extras/static-release/consumer-check.cpp
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            cl //nologo //EHsc //std:c++17 //DSLANG_STATIC "//I$BASE/include" \
+              "$src" "$BASE/lib/slang-static.lib" //Fe:consumer-check.exe
+            ./consumer-check.exe
+          else
+            if [[ "$RUNNER_OS" == macOS ]]; then
+              extra=(-lc++ -lm -lpthread)
+            else
+              extra=(-lstdc++ -lm -lpthread -ldl)
+            fi
+            c++ -std=c++17 -DSLANG_STATIC "-I$BASE/include" "$src" \
+              "$BASE/lib/libslang-static.a" "${extra[@]}" -o consumer-check
+            ./consumer-check
+          fi
+
+      - name: Report archive size
+        env:
+          BASE: ${{ steps.stage.outputs.base }}
+        run: |
+          {
+            echo "### ${BASE}"
+            echo
+            echo '| item | size |'
+            echo '| --- | --- |'
+            for f in "$BASE"/lib/* "${BASE}.tar.gz" "${BASE}.zip"; do
+              echo "| $(basename "$f") | $(du -h "$f" | cut -f1) |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ steps.stage.outputs.base }}
+          path: |
+            ${{ steps.package.outputs.tarball }}
+            ${{ steps.package.outputs.zip }}
+          retention-days: 14
+
+      - name: Publish to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          draft: ${{ contains(github.ref, 'draft') }}
+          prerelease: ${{ contains(github.ref, 'draft') }}
+          files: |
+            ${{ steps.package.outputs.tarball }}
+            ${{ steps.package.outputs.zip }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
