@@ -4777,6 +4777,13 @@ err(
     span { loc = "location", message = "the current compilation target does not support 'DescriptorHandle' types." }
 )
 
+err(
+    "target-does-not-support-ray-tracing-parameters",
+    39032,
+    "target does not support ray tracing entry point parameters",
+    span { loc = "location", message = "the current compilation target does not support ray tracing entry point parameters for the '~stage' stage" }
+)
+
 warning(
     "register-modifier-but-no-vk-binding-nor-shift",
     39029,

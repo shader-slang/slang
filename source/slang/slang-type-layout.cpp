@@ -6424,6 +6424,9 @@ RefPtr<TypeLayout> createTypeLayoutWith(
     LayoutRulesImpl* rules,
     Type* type)
 {
+    // `createTypeLayout` dereferences `rules` unconditionally, so a null here is
+    // a caller bug that would otherwise surface as a silent access violation.
+    SLANG_RELEASE_ASSERT(rules);
     auto c = context.with(rules);
     return createTypeLayout(c, type);
 }
