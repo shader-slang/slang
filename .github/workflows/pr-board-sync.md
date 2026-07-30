@@ -15,8 +15,10 @@ For each open PR the workflow:
 1. Adds the PR to the board (idempotent).
 2. Classifies and sets **Source** (`Internal` / `Community` / `Bot`) from
    bot-author config and membership in `source_internal_team` (default
-   `shader-slang/source-internal`; direct or nested). Repo write access is
-   **not** used for Source.
+   `shader-slang/source-internal`; direct or nested), plus sibling teams whose
+   slug starts with that base plus `-` (e.g. `source-internal-slangpy`) when
+   their description includes `Scope: repo1, repo2` for this repository. Repo
+   write access is **not** used for Source.
 3. Recomputes **Status** from live PR state (`In Review`, `Revising`, `Snagged`,
    `Approved`, `Done`).
 4. Backfills **assignee** and **reviewers** when the PR has no owner yet.

@@ -4,7 +4,14 @@
 "use strict";
 
 const assert = require("node:assert");
-const { isInternalLogin, classifyAuthorSource } = require("./extract-workflow-js.js").load({
+const {
+  isInternalLogin,
+  classifyAuthorSource,
+  repoShortName,
+  parseTeamScopeRepos,
+  isSourceInternalFamilySlug,
+  internalMembersForRepo,
+} = require("./extract-workflow-js.js").load({
   workflow: ".github/workflows/pr-board-sync.yml",
   block: "classify",
 });
@@ -37,6 +44,44 @@ test("isInternalLogin: empty / missing", () => {
 
 test("isInternalLogin: accepts Array members", () => {
   assert.ok(isInternalLogin("bob", ["alice", "bob"]));
+});
+
+test("repoShortName", () => {
+  assert.strictEqual(repoShortName("shader-slang/slangpy"), "slangpy");
+  assert.strictEqual(repoShortName("slang-rhi"), "slang-rhi");
+  assert.strictEqual(repoShortName(""), "");
+});
+
+test("parseTeamScopeRepos", () => {
+  assert.deepStrictEqual(
+    parseTeamScopeRepos(
+      "Internal team members. Scope: slangpy, slangpy-samples"),
+    ["slangpy", "slangpy-samples"]);
+  assert.deepStrictEqual(
+    parseTeamScopeRepos("Scope: shader-slang/slang-rhi"),
+    ["slang-rhi"]);
+  assert.deepStrictEqual(parseTeamScopeRepos("no scope here"), []);
+  assert.deepStrictEqual(parseTeamScopeRepos(""), []);
+});
+
+test("isSourceInternalFamilySlug", () => {
+  assert.ok(isSourceInternalFamilySlug("source-internal", "source-internal"));
+  assert.ok(isSourceInternalFamilySlug("source-internal", "source-internal-slangpy"));
+  assert.ok(!isSourceInternalFamilySlug("source-internal", "source-internally"));
+  assert.ok(!isSourceInternalFamilySlug("source-internal", "pr-owners"));
+});
+
+test("internalMembersForRepo unions base and matching scoped teams", () => {
+  const members = internalMembersForRepo(
+    "shader-slang/slangpy",
+    new Set(["alice"]),
+    [
+      { repos: ["slangpy", "slangpy-samples"], members: new Set(["bob"]) },
+      { repos: ["slang-rhi"], members: new Set(["carol"]) },
+    ]);
+  assert.ok(isInternalLogin("alice", members));
+  assert.ok(isInternalLogin("bob", members));
+  assert.ok(!isInternalLogin("carol", members));
 });
 
 test("classifyAuthorSource: bot short-circuit ignores membership", () => {

@@ -138,7 +138,7 @@ on:
         type: string
         default: "Bot"
       source_internal_team:
-        description: "org/team-slug whose members (direct or nested) are classified as Source Internal."
+        description: "Base org/team-slug for Source Internal (default shader-slang/source-internal). Also includes sibling teams whose slug starts with that slug plus '-' (e.g. source-internal-*) when their description has 'Scope: repo1, repo2' listing short names in this org."
         type: string
         default: "shader-slang/source-internal"
       bot_authors:
@@ -234,6 +234,24 @@ jobs:
 
             // Pure helpers mirrored from extract-js:classify in the reconcile step
             // (that block is the unit-tested source of truth). Keep in sync.
+            function repoShortName(repo) {
+              if (!repo) return "";
+              const slash = String(repo).lastIndexOf("/");
+              return (slash >= 0 ? String(repo).slice(slash + 1) : String(repo)).toLowerCase();
+            }
+            function parseTeamScopeRepos(description) {
+              if (!description) return [];
+              const match = String(description).match(/\bScope:\s*(.*)$/is);
+              if (!match) return [];
+              return match[1].split(",").map(s => s.trim()).filter(Boolean).map(s => {
+                const slash = s.lastIndexOf("/");
+                return (slash >= 0 ? s.slice(slash + 1) : s).toLowerCase();
+              });
+            }
+            function isSourceInternalFamilySlug(baseSlug, teamSlug) {
+              if (!baseSlug || !teamSlug) return false;
+              return teamSlug === baseSlug || teamSlug.startsWith(baseSlug + "-");
+            }
             function isInternalLogin(authorLogin, members) {
               if (!authorLogin || !members) return false;
               const lower = authorLogin.toLowerCase();
@@ -242,28 +260,65 @@ jobs:
               }
               return false;
             }
+            function internalMembersForRepo(repo, baseMembers, scopedTeams) {
+              const short = repoShortName(repo);
+              const out = new Set();
+              for (const m of (baseMembers || [])) if (m) out.add(m);
+              for (const t of (scopedTeams || [])) {
+                let hit = false;
+                for (const r of (t.repos || [])) {
+                  if ((r || "").toLowerCase() === short) { hit = true; break; }
+                }
+                if (!hit) continue;
+                for (const m of (t.members || [])) if (m) out.add(m);
+              }
+              return out;
+            }
             function classifyAuthorSource(opts) {
               if (opts.isBot) return opts.sourceBot;
               return isInternalLogin(opts.login, opts.members)
                 ? opts.sourceInternal : opts.sourceCommunity;
             }
 
-            // Internal iff the author is in source_internal_team (direct or nested).
+            // Internal iff author is on the base source_internal_team or on a
+            // sibling source-internal-* team whose Scope: includes this repo.
             // On any read error / unset team, fail safe to Community.
             let members = new Set();
             const teamSpec = process.env.SOURCE_INTERNAL_TEAM || "";
+            const repoName = context.repo.repo;
             if (!isBot && teamSpec.includes("/")) {
               const slash = teamSpec.indexOf("/");
               const org = teamSpec.slice(0, slash);
-              const slug = teamSpec.slice(slash + 1);
+              const baseSlug = teamSpec.slice(slash + 1);
+              let baseMembers = new Set();
+              const scopedTeams = [];
               try {
-                const data = await github.paginate(
-                  github.rest.teams.listMembersInOrg,
-                  { org, team_slug: slug, per_page: 100 });
-                members = new Set(data.map(m => m.login));
+                const teams = await github.paginate(
+                  github.rest.teams.list, { org, per_page: 100 });
+                for (const team of teams) {
+                  const slug = team.slug || "";
+                  if (!isSourceInternalFamilySlug(baseSlug, slug)) continue;
+                  let teamMembers = new Set();
+                  try {
+                    const data = await github.paginate(
+                      github.rest.teams.listMembersInOrg,
+                      { org, team_slug: slug, per_page: 100 });
+                    teamMembers = new Set(data.map(m => m.login));
+                  } catch (error) {
+                    core.warning(
+                      `could not list team ${org}/${slug} (${error.status})`);
+                  }
+                  if (slug === baseSlug) {
+                    baseMembers = teamMembers;
+                  } else {
+                    const repos = parseTeamScopeRepos(team.description || "");
+                    if (repos.length) scopedTeams.push({ repos, members: teamMembers });
+                  }
+                }
+                members = internalMembersForRepo(repoName, baseMembers, scopedTeams);
               } catch (error) {
                 core.warning(
-                  `could not list team ${teamSpec} (${error.status}); treating as Community`);
+                  `could not list teams in ${org} (${error.status}); treating as Community`);
               }
             }
             const source = classifyAuthorSource({
@@ -273,7 +328,7 @@ jobs:
               sourceCommunity: process.env.SOURCE_COMMUNITY,
             });
             console.log(
-              `PR author ${login}; source-internal member: ${isInternalLogin(login, members)}`);
+              `PR author ${login}; source-internal for ${repoName}: ${isInternalLogin(login, members)}`);
             core.setOutput("source", source);
 
       # --- Board writes: add + Source + Status (ProjectsV2 PAT) ---------------
@@ -1192,17 +1247,45 @@ jobs:
             }
 
             // Classify a PR's Source from observed state: Bot for a bot author,
-            // else Internal iff the author is in source_internal_team (direct or
-            // nested membership), else Community. Used when the board has no
+            // else Internal iff the author is in source_internal_team (org-wide)
+            // or a sibling source-internal-* team whose description Scope:
+            // includes this repo, else Community. Used when the board has no
             // Source yet and no freshly-classified value is available (sweep mode
-            // or a non-onboarding event). Fails safe to Community when the team
-            // cannot be read (listTeamMembers returns an empty set).
+            // or a non-onboarding event). Fails safe to Community when the org
+            // team list cannot be read.
             //
             // Pure helpers below are the unit-tested source of truth
             // (.github/scripts/pr-classify.test.js extracts this block). The
             // opened/reopened Classify PR Source step mirrors them.
             // ----- extract-js:classify:begin -----
-            // True when login is in the source-internal member set (case-insensitive).
+            // Short repo name (lowercased), from "owner/name" or a bare name.
+            function repoShortName(repo) {
+              if (!repo) return "";
+              const slash = String(repo).lastIndexOf("/");
+              return (slash >= 0 ? String(repo).slice(slash + 1) : String(repo)).toLowerCase();
+            }
+
+            // Parse "Scope: repo1, repo2" from a team description into short
+            // repo names (lowercased). Bare names and owner/name forms are both
+            // accepted. Returns [] when Scope: is absent.
+            function parseTeamScopeRepos(description) {
+              if (!description) return [];
+              const match = String(description).match(/\bScope:\s*(.*)$/is);
+              if (!match) return [];
+              return match[1].split(",").map((s) => s.trim()).filter(Boolean).map((s) => {
+                const slash = s.lastIndexOf("/");
+                return (slash >= 0 ? s.slice(slash + 1) : s).toLowerCase();
+              });
+            }
+
+            // True when teamSlug is the base source-internal team or a sibling
+            // whose slug starts with "<base>-" (e.g. source-internal-slangpy).
+            function isSourceInternalFamilySlug(baseSlug, teamSlug) {
+              if (!baseSlug || !teamSlug) return false;
+              return teamSlug === baseSlug || teamSlug.startsWith(baseSlug + "-");
+            }
+
+            // True when login is in the member set (case-insensitive).
             function isInternalLogin(login, members) {
               if (!login || !members) return false;
               const lower = login.toLowerCase();
@@ -1210,6 +1293,23 @@ jobs:
                 if ((m || "").toLowerCase() === lower) return true;
               }
               return false;
+            }
+
+            // Effective Internal member set for a repo: base team members plus
+            // any scoped sibling team's members whose Scope: includes the repo.
+            function internalMembersForRepo(repo, baseMembers, scopedTeams) {
+              const short = repoShortName(repo);
+              const out = new Set();
+              for (const m of (baseMembers || [])) if (m) out.add(m);
+              for (const t of (scopedTeams || [])) {
+                let hit = false;
+                for (const r of (t.repos || [])) {
+                  if ((r || "").toLowerCase() === short) { hit = true; break; }
+                }
+                if (!hit) continue;
+                for (const m of (t.members || [])) if (m) out.add(m);
+              }
+              return out;
             }
 
             // Classify Source from bot flag + already-fetched team membership.
@@ -1222,13 +1322,55 @@ jobs:
             }
             // ----- extract-js:classify:end -----
 
-            async function isInternal(login) {
-              return isInternalLogin(login, await listTeamMembers(SOURCE_INTERNAL_TEAM));
+            // Cached index of base + scoped source-internal teams for this org.
+            // null means the org team list was unreadable (fail safe to Community).
+            let _internalIndex;
+            async function loadSourceInternalIndex() {
+              if (_internalIndex !== undefined) return _internalIndex;
+              const teamSpec = SOURCE_INTERNAL_TEAM;
+              if (!teamSpec || !teamSpec.includes("/")) {
+                _internalIndex = { baseMembers: new Set(), scopedTeams: [] };
+                return _internalIndex;
+              }
+              const slash = teamSpec.indexOf("/");
+              const org = teamSpec.slice(0, slash);
+              const baseSlug = teamSpec.slice(slash + 1);
+              let baseMembers = new Set();
+              const scopedTeams = [];
+              try {
+                const teams = await github.paginate(
+                  github.rest.teams.list, { org, per_page: 100 });
+                for (const team of teams) {
+                  const slug = team.slug || "";
+                  if (!isSourceInternalFamilySlug(baseSlug, slug)) continue;
+                  const members = await listTeamMembers(`${org}/${slug}`);
+                  if (slug === baseSlug) {
+                    baseMembers = members;
+                  } else {
+                    const repos = parseTeamScopeRepos(team.description || "");
+                    if (repos.length) scopedTeams.push({ repos, members });
+                  }
+                }
+                _internalIndex = { baseMembers, scopedTeams };
+              } catch (error) {
+                core.warning(
+                  `could not list teams in ${org} (${error.status}); treating as Community`);
+                _internalIndex = null;
+              }
+              return _internalIndex;
+            }
+
+            async function isInternal(login, repo) {
+              const index = await loadSourceInternalIndex();
+              if (!index) return false;
+              const members = internalMembersForRepo(
+                repo || context.repo.repo, index.baseMembers, index.scopedTeams);
+              return isInternalLogin(login, members);
             }
 
             async function classifySource(info) {
               if (info.isBot) return process.env.SOURCE_BOT;
-              return (await isInternal(info.authorLogin))
+              return (await isInternal(info.authorLogin, context.repo.repo))
                 ? SOURCE_INTERNAL : SOURCE_COMMUNITY;
             }
 
