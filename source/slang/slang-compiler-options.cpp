@@ -370,16 +370,33 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
     }
 }
 
+// Append a string to the digest with a length prefix so it is self-delimiting. Without the prefix,
+// concatenated strings are ambiguous: MacroDefine("AB","C") and MacroDefine("A","BC") both feed the
+// byte stream "ABC" and would collide.
+static void appendDelimitedString(DigestBuilder<SHA1>& builder, const String& str)
+{
+    builder.append(str.getLength());
+    builder.append(str);
+}
+
 void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
 {
+    // Hash keys in a fixed (sorted-by-enum) order so the digest depends only on the option set, not
+    // on the order options happened to be inserted; otherwise the same logical options assembled in
+    // a different order would produce a spurious cache miss.
+    List<CompilerOptionName> keys;
     for (auto& kv : options)
+        keys.add(kv.key);
+    keys.sort();
+
+    for (auto key : keys)
     {
         // These are output-policy sidecar paths, not generated shader code. Locked by
         // _testCoverageManifestOutputDoesNotAffectCompilerOptionHash and
         // _testSeparateDebugInfoOutputDoesNotAffectCompilerOptionHash; re-including them would
         // invalidate persistent module caches on every sidecar-path change.
-        if (kv.key == CompilerOptionName::CoverageManifestOutput ||
-            kv.key == CompilerOptionName::SeparateDebugInfoOutput)
+        if (key == CompilerOptionName::CoverageManifestOutput ||
+            key == CompilerOptionName::SeparateDebugInfoOutput)
             continue;
 
         // This is a load-time acceptance-policy knob, not generated shader code: it only decides
@@ -388,13 +405,15 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
         // enables it (its sole purpose) would otherwise fold it into the recompute and never match
         // that baked digest, making the freshness check unable to accept any default-compiled
         // module (issue #6557). Excluding it keeps the write/read digest symmetric.
-        if (kv.key == CompilerOptionName::UseUpToDateBinaryModule)
+        if (key == CompilerOptionName::UseUpToDateBinaryModule)
             continue;
 
-        builder.append(kv.key);
-        builder.append(kv.value.getCount());
-        for (auto& v : kv.value)
+        auto values = options.tryGetValue(key);
+        builder.append(key);
+        builder.append(values->getCount());
+        for (auto& v : *values)
         {
+            builder.append(v.kind);
             if (v.kind == CompilerOptionValueKind::Int)
             {
                 builder.append(v.intValue);
@@ -402,8 +421,8 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
             }
             else
             {
-                builder.append(v.stringValue);
-                builder.append(v.stringValue2);
+                appendDelimitedString(builder, v.stringValue);
+                appendDelimitedString(builder, v.stringValue2);
             }
         }
     }
