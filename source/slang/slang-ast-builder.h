@@ -960,6 +960,63 @@ protected:
     MemoryArena m_arena;
 };
 
+/// Maps the element types represented by `type` into function-parameter entries in `outTypes`.
+///
+/// This helper does something deliberately unusual for type construction: it eagerly splits a
+/// resolved `ConcreteTypePack` and applies `mapElementType` to every element. A function
+/// parameter's direction (`out`, `inout`, `ref`, and so on) is represented by wrapping its
+/// individual type.
+/// Function-type substitution can flatten a bare pack, but it cannot distribute a direction
+/// wrapper around a pack to the pack's elements. Retaining the pack would require direction queries
+/// and substitution to understand and distribute that wrapper, which they do not currently support.
+///
+/// Consider a variadic parameter `expand each TArgs args` specialized with
+/// `TArgs = <float, float>`. Its backward derivative can require two separate
+/// `inout DifferentialPair<float>` parameters. Mapping the direction without first splitting the
+/// pack would instead produce one `inout ConcreteTypePack<...>` parameter. The function type would
+/// neither expose the two parameter directions nor splice the nested pack. Splitting before mapping
+/// produces the required two parameter entries.
+///
+/// An abstract `ExpandType` remains an expansion. Mapping its pattern puts the direction inside the
+/// expansion, so later substitution produces a bare pack of already-mapped parameter types that
+/// `FuncType` can splice. The mapping must return the type for one ordinary parameter.
+template<typename MapElementTypeFunc>
+void forEachElementType(
+    ASTBuilder* astBuilder,
+    List<Type*>& outTypes,
+    Type* type,
+    MapElementTypeFunc const& mapElementType)
+{
+    if (auto concretePack = as<ConcreteTypePack>(type))
+    {
+        for (Index i = 0; i < concretePack->getTypeCount(); ++i)
+        {
+            forEachElementType(
+                astBuilder,
+                outTypes,
+                concretePack->getElementType(i),
+                mapElementType);
+        }
+        return;
+    }
+
+    if (auto expandType = as<ExpandType>(type))
+    {
+        auto mappedPatternType = mapElementType(expandType->getPatternType());
+        SLANG_RELEASE_ASSERT(mappedPatternType);
+
+        List<Val*> capturedPacks;
+        for (Index i = 0; i < expandType->getCapturedPackCount(); ++i)
+            capturedPacks.add(expandType->getCapturedPack(i));
+        outTypes.add(astBuilder->getExpandType(mappedPatternType, capturedPacks.getArrayView()));
+        return;
+    }
+
+    auto mappedType = mapElementType(type);
+    SLANG_RELEASE_ASSERT(mappedType);
+    outTypes.add(mappedType);
+}
+
 /// An `ASTBuilder` that is at the root of its own hierarchy.
 ///
 /// Every AST builder that is not a `RootASTBuilder` must have
