@@ -1799,9 +1799,11 @@ A capability describes an optional feature that a target may or may not support.
 * `texture_size` 
 * `texture_querylod` 
 * `texture_querylevels` 
+* `texture_shadow` 
 * `texture_shadowlod` 
 * `texture_shadowlod_ext` 
 * `texture_shadowgrad` 
+* `texture_shadowbias` 
 * `atomic_glsl_float1` 
 * `atomic_glsl_float2` 
 * `atomic_glsl_halfvec` 
