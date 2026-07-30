@@ -114,11 +114,19 @@ protected:
 
     SlangResult _calcCPPTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 
+    void _emitEntryPointSignature(
+        IRFunc* func,
+        const String& funcName,
+        const UnownedStringSlice& varyingTypeName);
     void _emitEntryPointDefinitionStart(
         IRFunc* func,
         const String& funcName,
         const UnownedStringSlice& varyingTypeName);
     void _emitEntryPointDefinitionEnd(IRFunc* func);
+    void _emitEntryPointPrototype(
+        IRFunc* func,
+        const String& funcName,
+        const UnownedStringSlice& varyingTypeName);
     void _emitEntryPointGroup(
         const Int sizeAlongAxis[kThreadGroupAxisCount],
         const String& funcName);

@@ -81,4 +81,9 @@ Matrix _slang_simdgroup_load_transpose(const threadgroup T* src, ulong elements_
 }
 )";
 
+// Included on demand rather than in the front matter, since it only exists from MSL 3.2 onwards.
+const char* MetalSourceEmitter::kMetalBuiltinPreludeLogging = R"(
+#include <metal_logging>
+)";
+
 } // namespace Slang

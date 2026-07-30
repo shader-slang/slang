@@ -172,7 +172,7 @@ struct DownstreamCompileOptions
             EnableFloat16 = 0x08,        ///< If set compiles with support for float16/half
             EnableFloat8 = 0x10,         ///< If set compiles with support for float8
             EnableBfloat16 = 0x20,       ///< If set compiles with support for bfloat16
-
+            EnableLogging = 0x40,        ///< If set compiles with support for shader logging
         };
     };
 

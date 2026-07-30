@@ -236,6 +236,9 @@ Versions
 `metallib_3_1`
 > Represents MetalLib 3.1.
 
+`metallib_3_2`
+> Represents MetalLib 3.2.
+
 `metallib_4_0`
 > Represents MetalLib 4.0.
 
@@ -1573,6 +1576,14 @@ Compound Capabilities
 
 `texture_querylod`
 > Capabilities required to query texture LOD info
+
+`texture_shadow`
+> Capabilities required for plain shadow-comparison texture sampling that takes
+> no explicit LOD (SampleCmp, SampleCmpLevelZero).
+
+`texture_shadowbias`
+> Capabilities required for shadow-comparison texture sampling with an LOD bias
+> (SampleCmpBias). New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 
 `texture_shadowgrad`
 > Capabilities required for shadow texture sampling with bias and gradients.

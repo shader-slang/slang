@@ -2495,6 +2495,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 return emitOpTypeFloat(inst, SpvLiteralInteger::from32(int32_t(i.width)));
             }
+        case kIROp_SPIRVUntypedPtrType:
+            {
+                auto untypedPtrType = as<IRSPIRVUntypedPtrType>(inst);
+                SLANG_ASSERT(untypedPtrType);
+                auto storageClass = addressSpaceToStorageClass(untypedPtrType->getAddressSpace());
+                SLANG_RELEASE_ASSERT(
+                    storageClass == SpvStorageClassUniform ||
+                    storageClass == SpvStorageClassStorageBuffer);
+                // The pointee is still accessed through this pointer (via
+                // `OpUntypedAccessChainKHR`), so it needs the same 8/16-bit storage
+                // capabilities a typed pointer to it would require.
+                requireCapabilitiesForType(untypedPtrType->getValueType(), storageClass);
+                return ensureUntypedPointerType(storageClass);
+            }
         case kIROp_PtrType:
         case kIROp_RefParamType:
         case kIROp_BorrowInParamType:
@@ -4060,7 +4074,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             sb << " -entry " << entryPointName->getStringSlice();
         }
-        sb << " -g2";
         return sb.produceString();
     }
 
@@ -5428,12 +5441,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         emitOperand(switchInst->getCondition());
                         auto defaultLabel = switchInst->getDefaultLabel();
                         emitOperand(defaultLabel ? getID(ensureInst(defaultLabel)) : mergeBlockID);
+                        // Each OpSwitch case literal must occupy the same number of
+                        // words as the selector's type, so a 64-bit selector needs a
+                        // two-word literal.
+                        const IntInfo selectorInfo = getIntTypeInfo(
+                            m_targetRequest,
+                            switchInst->getCondition()->getDataType());
                         for (UInt c = 0; c < switchInst->getCaseCount(); c++)
                         {
                             auto value = switchInst->getCaseValue(c);
                             auto intLit = as<IRIntLit>(value);
                             SLANG_ASSERT(intLit);
-                            emitOperand((SpvWord)intLit->getValue());
+                            if (selectorInfo.width > 32)
+                                emitOperand(SpvLiteralInteger::from64((int64_t)intLit->getValue()));
+                            else
+                                emitOperand(SpvLiteralInteger::from32((int32_t)intLit->getValue()));
                             auto caseLabel = switchInst->getCaseLabel(c);
                             emitOperand(caseLabel ? getID(ensureInst(caseLabel)) : mergeBlockID);
                         }
@@ -8609,6 +8631,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             getStructFieldId(baseStructType, as<IRStructKey>(fieldAddress->getField())),
             builder.getIntType());
         SLANG_ASSERT(as<IRPtrTypeBase>(fieldAddress->getFullType()));
+
+        // An untyped pointer carries no pointee type, so `OpUntypedAccessChainKHR` takes the
+        // struct being indexed as an explicit Base Type operand.
+        if (as<IRSPIRVUntypedPtrType>(fieldAddress->getFullType()))
+        {
+            return emitInst(
+                parent,
+                fieldAddress,
+                SpvOpUntypedAccessChainKHR,
+                fieldAddress->getFullType(),
+                kResultID,
+                baseStructType,
+                baseId,
+                fieldId);
+        }
         return emitOpAccessChain(
             parent,
             fieldAddress,
@@ -8652,6 +8689,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRBuilder builder(m_irModule);
         auto base = inst->getBase();
         const SpvWord baseId = getID(ensureInst(base));
+
+        // An untyped pointer carries no pointee type, so `OpUntypedAccessChainKHR` takes the
+        // aggregate being indexed as an explicit Base Type operand -- that is the base
+        // pointer's logical pointee, not the (element) result pointee.
+        if (auto untypedPtrType = as<IRSPIRVUntypedPtrType>(base->getDataType()))
+        {
+            return emitInst(
+                parent,
+                inst,
+                SpvOpUntypedAccessChainKHR,
+                inst->getFullType(),
+                kResultID,
+                untypedPtrType->getValueType(),
+                baseId,
+                inst->getIndex());
+        }
 
         // We might replace resultType with a different storage class equivalent
         auto resultType = as<IRPtrTypeBase>(inst->getDataType());
