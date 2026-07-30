@@ -986,6 +986,11 @@ static SlangResult _parseGCCFamilyLine(
         {
             cmdLine.addArg("-std=metal3.1");
         }
+
+        if (options.flags & CompileOptions::Flag::EnableLogging)
+        {
+            cmdLine.addArg("-fmetal-enable-logging");
+        }
     }
 
     // Our generated code very often casts between dissimilar types with the
