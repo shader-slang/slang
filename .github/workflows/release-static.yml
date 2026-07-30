@@ -84,7 +84,7 @@ jobs:
       - name: Set configure flags
         id: flags
         env:
-          PLATFORM: ${{ matrix.platform }}
+          SLANG_TARGET_PLATFORM: ${{ matrix.platform }}
         run: |
           flags=(
             -DSLANG_LIB_TYPE=STATIC
@@ -108,13 +108,26 @@ jobs:
           # otherwise be linked into the archive; and the CRT has to match what
           # Rust's *-pc-windows-msvc targets use by default (the dynamic CRT),
           # or every downstream crate has to set +crt-static.
-          if [[ "$PLATFORM" == windows-* ]]; then
+          if [[ "$SLANG_TARGET_PLATFORM" == windows-* ]]; then
             flags+=(
               -DSLANG_EXCLUDE_DAWN=ON
               -DSLANG_ENABLE_SPIRV_TOOLS_MIMALLOC=OFF
               -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL
             )
           fi
+          # The variable is deliberately not called PLATFORM. Windows
+          # environment blocks are case-insensitive, msvc-dev-cmd exports
+          # `Platform=x64`, and a step-level `PLATFORM` collides with it --
+          # leaving bash's case-sensitive `$PLATFORM` expanding to nothing.
+          if [[ -z "$SLANG_TARGET_PLATFORM" ]]; then
+            echo "::error::SLANG_TARGET_PLATFORM is empty; matrix wiring is broken"
+            exit 1
+          fi
+
+          # Echoed so the log records exactly what configured this build.
+          echo "Configuring $SLANG_TARGET_PLATFORM with:"
+          printf '  %s\n' "${flags[@]}"
+
           # Emitted as one line: this value is forwarded into the manylinux
           # container through `docker run -e`, where a multi-line value would
           # need quoting rules that do not survive the round trip.
@@ -226,11 +239,15 @@ jobs:
       - name: Stage release tree
         id: stage
         env:
-          PLATFORM: ${{ matrix.platform }}
+          SLANG_TARGET_PLATFORM: ${{ matrix.platform }}
         run: |
+          if [[ -z "$SLANG_TARGET_PLATFORM" ]]; then
+            echo "::error::SLANG_TARGET_PLATFORM is empty; refusing to stage an unnamed archive"
+            exit 1
+          fi
           version="${GITHUB_REF_NAME#v}"
           version="${version//\//-}"
-          base="slang-static-${version}-${PLATFORM}"
+          base="slang-static-${version}-${SLANG_TARGET_PLATFORM}"
           echo "base=$base" >> "$GITHUB_OUTPUT"
 
           mkdir -p "$base/lib" "$base/include" "$base/licenses"
@@ -316,8 +333,17 @@ jobs:
         run: |
           src=extras/static-release/consumer-check.cpp
           if [[ "$RUNNER_OS" == Windows ]]; then
-            cl //nologo //EHsc //std:c++17 //DSLANG_STATIC "//I$BASE/include" \
-              "$src" "$BASE/lib/slang-static.lib" //Fe:consumer-check.exe
+            # Dash-form options, not `/I` or the `//I` MSYS escape. Under Git
+            # Bash a `//x` argument is only rewritten to `/x` when it does not
+            # look like a path; `//I<dir>/include` reads as a UNC path, so it
+            # reaches cl verbatim and is rejected (D9002). cl accepts `-I`,
+            # `-D`, `-Fe:` and friends, which MSYS leaves alone.
+            #
+            # -MD is required, not incidental: the library is built with
+            # CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL, cl defaults to the
+            # static CRT, and mixing the two is LNK2038.
+            cl -nologo -EHsc -MD -std:c++17 -DSLANG_STATIC "-I$BASE/include" \
+              "$src" "$BASE/lib/slang-static.lib" -Fe:consumer-check.exe
             ./consumer-check.exe
           else
             if [[ "$RUNNER_OS" == macOS ]]; then
