@@ -1,6 +1,7 @@
 #include "slang-llvm-jit-shared-library.h"
 
 #if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
+#include "llvm/Config/llvm-config.h"
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/RTDyldMemoryManager.h"
 #include "llvm/Support/Memory.h"
@@ -20,6 +21,13 @@ namespace slang_llvm
 #if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
 namespace
 {
+
+// TODO: LLVM 23 switches LLJIT's default object layer from RuntimeDyld to JITLink, whose
+// InProcessMemoryManager should not need this Windows SectionMemoryManager workaround.
+static_assert(
+    LLVM_VERSION_MAJOR < 23,
+    "Remove OrderedRTDyldMemoryManager when upgrading to LLVM 23 or later; LLJIT uses JITLink's "
+    "InProcessMemoryManager by default");
 
 // Places each JIT object's code, read-only data, and writable data in one contiguous mapping in
 // that order. This keeps every COFF ADDR32NB target at a non-negative 32-bit offset from the
