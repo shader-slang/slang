@@ -648,6 +648,16 @@ struct IRTypeLegalizationContext
     /// This function is called in `legalizeTypeImpl` to decide whether a parameter block
     /// type should be legalized. Not all legalization passes need to legalize parameter block.
     virtual bool shouldLegalizeParameterBlockElementType() { return false; }
+
+    /// Return true if this module contains anything this pass would actually rewrite. Called once
+    /// at pass entry as an early-out: when it returns false the mutating whole-module walk in
+    /// `legalizeTypes` would be a pure no-op, so we skip it after a single cheap scan.
+    ///
+    /// A pass may only skip when its answer is a *safe superset* of everything it mutates — a false
+    /// "nothing to do" that skips a real rewrite is a miscompile. The default is therefore `true`
+    /// (always run); a concrete pass overrides this only when it can characterize its mutation set
+    /// cheaply and conservatively.
+    virtual bool hasWorkToLegalize() { return true; }
 };
 
 // This typedef exists to support pre-existing code from when
@@ -691,6 +701,17 @@ void legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSi
 void legalizeEmptyTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
 bool isResourceType(IRType* type);
+
+/// Return true if `type` has one of the two structural shapes that empty-type legalization can
+/// drop: a `struct` with no fields, or an array whose (array-stripped) element is `void`. This is a
+/// conservative *detector* used by the entry-time early-out scan, not a guarantee that legalization
+/// will eliminate this particular type — e.g. a target-intrinsic type is left alone, and in the
+/// empty-type context a public-interface-decorated empty struct is treated as simple and kept. It
+/// only needs to find the mutation *roots*: a struct that becomes empty after its nested fields
+/// legalize away has, at its core, one of these two shapes as a hoisted global, so finding the root
+/// is sufficient to know the pass has work. Over-detection is harmless (the pass runs and no-ops);
+/// under-detection would wrongly skip a real rewrite.
+bool isEmptyTypeToLegalize(IRType* type);
 
 SourceLoc findBestSourceLocFromUses(IRInst* inst);
 } // namespace Slang

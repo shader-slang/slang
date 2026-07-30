@@ -3996,8 +3996,81 @@ struct IRTypeLegalizationPass
     }
 };
 
+// Return true if the module still contains a generic at global scope. This is the conservative
+// force-run condition for the entry-time early-out below.
+//
+// A type that appears only inside a generic body is not hoisted to module global scope (see
+// `addGlobalValue`, which stops hoisting at the enclosing generic), so the globals-scope type scans
+// below cannot see it — yet the shared legalization framework here descends into generic bodies
+// (its worklist has no `IRGeneric` bail, unlike the standalone matrix-legalization pass), so it
+// *would* rewrite such a type. Rather than try to match that blind spot, we force the pass to run
+// whenever a generic is present. This normally does not fire, because generics are specialized away
+// before these passes run; it is reachable under `-disable-specialization`, which is exactly why
+// the force-run is required for soundness rather than merely defensive.
+//
+// Checking only direct global children suffices: a generic nested inside another generic is still
+// enclosed by an outermost generic that IS a direct global child, so any surviving generic is
+// found.
+static bool hasAnyGeneric(IRModule* module)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (as<IRGeneric>(inst))
+            return true;
+    }
+    return false;
+}
+
+// Return true if the module contains anything that resource legalization *may* need to rewrite. The
+// scan keys on the pass's own trigger, `isResourceType`, so it conservatively over-detects (a bare
+// resource global is legal as-is and left alone, for instance) — only a false result guarantees the
+// pass has no resource work, which is all the early-out needs. (The pass also eliminates empty
+// structs incidentally, but that is not this gate's concern: the later unconditional
+// `legalizeEmptyTypes` removes any surviving empty type regardless.) Scanning only global type
+// insts is sound because resource types are hoisted/interned at module global scope (the same
+// argument the matrix pass uses); the generic force-run covers the non-hoisted generic-body case.
+static bool hasResourceLegalizationWork(IRModule* module)
+{
+    if (hasAnyGeneric(module))
+        return true;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto type = as<IRType>(inst))
+        {
+            if (isResourceType(type))
+                return true;
+        }
+    }
+    return false;
+}
+
+// Return true if the module contains anything that empty-type legalization *may* need to remove.
+// Its only mutation is eliminating empty types, so the scan keys on `isEmptyTypeToLegalize` (a
+// conservative over-detector — see its declaration) plus the generic force-run. Only a false result
+// guarantees the pass has no work.
+static bool hasEmptyTypeLegalizationWork(IRModule* module)
+{
+    if (hasAnyGeneric(module))
+        return true;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto type = as<IRType>(inst))
+        {
+            if (isEmptyTypeToLegalize(type))
+                return true;
+        }
+    }
+    return false;
+}
+
 static void legalizeTypes(IRTypeLegalizationContext* context)
 {
+    // Entry-time early-out: when this pass has nothing to rewrite, the whole-module walk below is a
+    // pure no-op, so skip it after a single cheap scan. `hasWorkToLegalize` defaults to true, so
+    // passes that do not override it (e.g. existential-type-layout legalization) are unaffected.
+    if (!context->hasWorkToLegalize())
+        return;
+
     IRTypeLegalizationPass pass;
     pass.context = context;
 
@@ -4033,6 +4106,8 @@ struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
     }
 
     bool isSimpleType(IRType*) override { return false; }
+
+    bool hasWorkToLegalize() override { return hasResourceLegalizationWork(module); }
 
     LegalType createLegalUniformBufferType(
         IROp op,
@@ -4125,6 +4200,8 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
         }
         return false;
     }
+
+    bool hasWorkToLegalize() override { return hasEmptyTypeLegalizationWork(module); }
 
     LegalType createLegalUniformBufferType(IROp, LegalType, IRInst*) override
     {

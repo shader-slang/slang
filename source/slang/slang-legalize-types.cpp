@@ -199,6 +199,32 @@ bool isResourceType(IRType* type)
     return false;
 }
 
+bool isEmptyTypeToLegalize(IRType* type)
+{
+    // A `struct` with no fields legalizes to nothing (see `TupleTypeBuilder::getResult`, which
+    // returns an empty `LegalType` when a struct contributed no ordinary/special/complex parts).
+    // We mirror that pass's own iteration over `getFields()` so a struct carrying only non-field
+    // children (which contributes no fields, and so is still dropped) reads as empty here too.
+    if (auto structType = as<IRStructType>(type))
+    {
+        auto fields = structType->getFields();
+        return !(fields.begin() != fields.end());
+    }
+
+    // An array whose element is `void` legalizes to nothing (see the array case in
+    // `legalizeTypeImpl`). We must check the element is *array-wrapped* void, not a bare `void`
+    // type: bare `void` appears in every module (e.g. a `void`-returning entry point) and is legal
+    // as-is, so treating it as empty would defeat the early-out entirely.
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+    {
+        IRType* element = arrayType->getElementType();
+        while (auto innerArray = as<IRArrayTypeBase>(element))
+            element = innerArray->getElementType();
+        return element->getOp() == kIROp_VoidType;
+    }
+
+    return false;
+}
 
 bool isOpaqueTypeImpl(IRType* type, HashSet<IRType*>& visited, IRType** outLeafOpaqueHandleType)
 {
