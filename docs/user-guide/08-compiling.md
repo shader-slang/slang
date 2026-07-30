@@ -1085,7 +1085,7 @@ meanings of their `CompilerOptionValue` encodings.
 | ReportDownstreamTime | Turn on/off downstream compilation time report. `intValue0` encodes a bool value for the setting. |
 | ReportPerfBenchmark | Turn on/off reporting of time spent in different parts of the compiler. `intValue0` encodes a bool value for the setting. |
 | SkipSPIRVValidation | Specifies whether or not to skip the validation step after emitting SPIR-V. `intValue0` encodes a bool value for the setting. |
-| Capability | Specify an additional capability available in the compilation target. `intValue0` encodes a capability defined in the `CapabilityName` enum. |
+| Capability | Specify an additional capability available in the compilation target. Can be a string or int value kind. `stringValue0` encodes the capability name as listed in [Capability Atoms](a4-02-reference-capability-atoms.md). `intValue0` encodes the raw capability representation returned by `IGlobalSession::findCapability`. |
 | DefaultImageFormatUnknown | Whether or not to use `unknown` as the image format when emitting SPIR-V for a texture/image resource parameter without a format specifier. `intValue0` encodes a bool value for the setting. |
 | DisableDynamicDispatch | (Internal use only) Disables generation of dynamic dispatch code. `intValue0` encodes a bool value for the setting. |
 | DisableSpecialization | (Internal use only) Disables specialization pass. `intValue0` encodes a bool value for the setting. |
