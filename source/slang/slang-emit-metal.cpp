@@ -1,6 +1,7 @@
 // slang-emit-metal.cpp
 #include "slang-emit-metal.h"
 
+#include "core/slang-type-text-util.h"
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-entry-point-decorations.h"
@@ -194,6 +195,17 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     {
         if (auto sysSemanticAttr = layout->findSystemValueSemanticAttr())
             _emitUserSemantic(sysSemanticAttr->getName(), sysSemanticAttr->getIndex());
+    }
+}
+
+void MetalSourceEmitter::emitTempModifiers(IRInst* temp)
+{
+    // Metal has no `precise` keyword; drop it and warn.
+    if (temp->findDecoration<IRPreciseDecoration>())
+    {
+        getSink()->diagnose(Diagnostics::PreciseQualifierUnsupportedOnTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+            .location = temp->sourceLoc});
     }
 }
 
