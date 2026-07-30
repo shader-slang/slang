@@ -29,6 +29,8 @@ By default, the Slang compiler produces SPIR-V code using the GLSL450 memory mod
 
 If the shader uses `CoopVec` or `CoopMat` intrinsics, then the Slang compiler will automatically use `vk_mem_model` capability.
 
+The same `CompilerOptionName::Capability` recipe works for any capability atom: set `stringValue0` to the atom name (for example `"spvGroupNonUniformArithmetic"`). The list of atom names is in the [capability atoms reference](a4-02-reference-capability-atoms.md). Alternatively, resolve an atom's ID at runtime with `IGlobalSession::findCapability(name)`.
+
 ## Combined texture sampler
 
 Slang supports combined texture samplers such as `Sampler2D`.

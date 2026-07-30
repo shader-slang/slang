@@ -1020,7 +1020,13 @@ typedef uint32_t SlangSizeT;
         PreserveParameters = 38, // bool: preserve all resource parameters in the output code.
 
         // Target
-        Capability = 39,                // intValue0: CapabilityName
+
+        // Add a capability to the target. Set value.kind to CompilerOptionValueKind::String
+        // and stringValue0 to the capability atom name (e.g. "spvGroupNonUniformArithmetic");
+        // atom names are listed in the capability-atom reference under docs/user-guide/. The
+        // int form (intValue0: CapabilityName) uses internal IDs that are not stable across
+        // versions; obtain one at runtime via IGlobalSession::findCapability(name).
+        Capability = 39,
         DefaultImageFormatUnknown = 40, // bool
         DisableDynamicDispatch = 41,    // bool
         DisableSpecialization = 42,     // bool
