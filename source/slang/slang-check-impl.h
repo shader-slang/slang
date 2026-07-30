@@ -3652,6 +3652,8 @@ public:
 
 
     void compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn);
+
+    void checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn);
     void _checkAliasedOutArguments(
         InvokeExpr* invoke,
         FuncType* funcType,

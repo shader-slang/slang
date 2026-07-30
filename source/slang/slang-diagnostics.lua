@@ -3714,6 +3714,13 @@ err(
     span { loc = "func:IRInst" }
 )
 
+err(
+    "groupshared-argument-must-be-groupshared-lvalue",
+    30711,
+    "argument to 'groupshared' parameter '~param' must name thread-group-shared memory (a 'groupshared' variable, a component of one, or a dereference of a group-shared pointer)",
+    span { loc = "arg:Expr", message = "this argument does not name 'groupshared' storage" }
+)
+
 --
 -- 308xx: inheritance
 --

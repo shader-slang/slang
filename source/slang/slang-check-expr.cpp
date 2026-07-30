@@ -4279,6 +4279,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                         paramDecl = funcDeclBase->getParameters()[pp];
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
+                checkGroupSharedArgumentOfParam(paramDecl, argExpr);
 
                 if (as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType))
                 {
@@ -7383,6 +7384,20 @@ static PtrType* getValidTypeForAddressOf(
         // Check if the base expression is something we can get the address-of.
         return getValidTypeForAddressOf(visitor, m_astBuilder, swizzleExpr->base, targetType);
     }
+    else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(baseExpr))
+    {
+        // As with vector swizzles, only a single matrix component (e.g. `m._m00`) is a
+        // contiguous, addressable location; a multi-element matrix swizzle is not.
+        if (matrixSwizzleExpr->elementCount > 1)
+            return nullptr;
+
+        return getValidTypeForAddressOf(visitor, m_astBuilder, matrixSwizzleExpr->base, targetType);
+    }
+    else if (auto parenExpr = as<ParenExpr>(baseExpr))
+    {
+        // Parentheses are value-preserving, so `(x)` is addressable exactly when `x` is.
+        return getValidTypeForAddressOf(visitor, m_astBuilder, parenExpr->base, targetType);
+    }
     return nullptr;
 }
 
@@ -7400,6 +7415,34 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
         expr->type = m_astBuilder->getErrorType();
     }
     return expr;
+}
+
+// A `groupshared` parameter is a by-reference alias of a single thread-group-shared location, so
+// its argument must itself name thread-group-shared storage: an addressable expression whose
+// address space is `GroupShared` (a `groupshared` variable/parameter, a component of one, or a
+// dereference of a group-shared pointer). Passing a private local, a copy, or an rvalue would
+// silently alias non-shared memory as shared, breaking the group-shared aliasing semantics HLSL
+// requires (DXC rejects it outright with error 0043). `getValidTypeForAddressOf` already computes
+// the addressable pointer type -- carrying its address space -- for an addressable expression, so
+// reuse it as the source of truth rather than re-deriving addressability here.
+void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn)
+{
+    if (!paramIn || !argIn || !paramIn->hasModifier<HLSLGroupSharedModifier>())
+        return;
+
+    bool namesGroupSharedStorage = false;
+    if (auto ptrType =
+            getValidTypeForAddressOf(this, m_astBuilder, argIn, getType(m_astBuilder, argIn)))
+    {
+        if (auto addrSpaceVal = as<ConstantIntVal>(ptrType->getAddressSpace()))
+            namesGroupSharedStorage =
+                (AddressSpace)addrSpaceVal->getValue() == AddressSpace::GroupShared;
+    }
+
+    if (!namesGroupSharedStorage)
+        getSink()->diagnose(Diagnostics::GroupsharedArgumentMustBeGroupsharedLvalue{
+            .param = getText(paramIn->getName()),
+            .arg = argIn});
 }
 
 Expr* SemanticsExprVisitor::visitBuiltinCastExpr(BuiltinCastExpr* expr)
