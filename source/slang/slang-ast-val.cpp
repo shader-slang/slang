@@ -2141,6 +2141,10 @@ Val* TypeCastIntVal::tryFoldImpl(
         case BaseType::UInt8:
             resultValue = (uint8_t)resultValue;
             return true;
+        case BaseType::Bool:
+            // Match the C `(bool)` cast: any nonzero value is `true`, not a low-bit mask.
+            resultValue = (resultValue != 0);
+            return true;
         default:
             return false;
         }

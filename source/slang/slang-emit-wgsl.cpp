@@ -1513,6 +1513,27 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             return true;
         }
 
+    case kIROp_IntCast:
+        {
+            // Emit a bool->int cast with `select`, the emitter's idiom for bool-conditioned
+            // values (cf. the `And`/`Or` case); `select(T(0), T(1), cond)` maps false->0, true->1.
+            auto operand = inst->getOperand(0);
+            if (as<IRBoolType>(getVectorElementType(operand->getDataType())))
+            {
+                auto type = inst->getDataType();
+                m_writer->emit("select(");
+                emitType(type);
+                m_writer->emit("(0), ");
+                emitType(type);
+                m_writer->emit("(1), ");
+                emitOperand(operand, getInfo(EmitOp::General));
+                m_writer->emit(")");
+                return true;
+            }
+            return false;
+        }
+        break;
+
     case kIROp_BitCast:
         {
             // In WGSL there is a built-in bitcast function!
