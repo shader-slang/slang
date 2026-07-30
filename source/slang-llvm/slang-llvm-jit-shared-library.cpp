@@ -21,6 +21,9 @@ namespace slang_llvm
 namespace
 {
 
+// Places each JIT object's code, read-only data, and writable data in one contiguous mapping in
+// that order. This keeps every COFF ADDR32NB target at a non-negative 32-bit offset from the
+// object's image base.
 class OrderedRTDyldMemoryManager : public llvm::RTDyldMemoryManager
 {
 public:
