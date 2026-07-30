@@ -10,58 +10,6 @@
 
 namespace Slang
 {
-// If `unwrap` is a `CastDescriptorHandleToUintN` of a matching `CastUintNToDescriptorHandle` wrap,
-// return the integer value the round trip reduces to; otherwise null. `unwrap` may be any inst.
-//
-// The wrap and unwrap integer widths need not match: with the kind-dependent handle representation
-// of shader-slang/slang#12186 the wrap can use a different width than the unwrap, with a `bit_cast`
-// on the wrapped value bridging them. The front end emits that bridge on the *inner* (wrapped)
-// side; an outer-side `bit_cast(unwrap(...))` is a separate inst that is left unfolded (a
-// conservative missed optimization, never an incorrect fold).
-static IRInst* findDescriptorHandleRoundTripSource(IRInst* unwrap)
-{
-    IRType* unwrapResultType = nullptr;
-    IRInst* handle = nullptr;
-    switch (unwrap->getOp())
-    {
-    case kIROp_CastDescriptorHandleToUInt2:
-    case kIROp_CastDescriptorHandleToUInt64:
-        unwrapResultType = unwrap->getDataType();
-        handle = unwrap->getOperand(0);
-        break;
-
-    default:
-        return nullptr;
-    }
-
-    IRInst* wrapped = nullptr;
-    switch (handle->getOp())
-    {
-    case kIROp_CastUInt2ToDescriptorHandle:
-    case kIROp_CastUInt64ToDescriptorHandle:
-        wrapped = handle->getOperand(0);
-        break;
-
-    default:
-        return nullptr;
-    }
-
-    // Same-width round trip: `unwrap(wrap(x))` is the identity when `x` already has the unwrap's
-    // result type.
-    if (isTypeEqual(wrapped->getDataType(), unwrapResultType))
-        return wrapped;
-    // Cross-width round trip: `unwrap ∘ wrap ∘ bit_cast<wrapWidth>` collapses to the identity
-    // exactly when the pre-bridge source type equals the unwrap's result type, so the fold is sound
-    // only under that type match.
-    if (auto bridge = as<IRBitCast>(wrapped))
-    {
-        auto source = bridge->getVal();
-        if (isTypeEqual(source->getDataType(), unwrapResultType))
-            return source;
-    }
-    return nullptr;
-}
-
 struct PeepholeContext : InstPassBase
 {
     PeepholeContext(IRModule* inModule)
@@ -1290,11 +1238,20 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_CastDescriptorHandleToUInt2:
+            {
+                if (auto wrap = as<IRCastUInt2ToDescriptorHandle>(inst->getOperand(0)))
+                {
+                    inst->replaceUsesWith(wrap->getValue());
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
         case kIROp_CastDescriptorHandleToUInt64:
             {
-                if (auto source = findDescriptorHandleRoundTripSource(inst))
+                if (auto wrap = as<IRCastUInt64ToDescriptorHandle>(inst->getOperand(0)))
                 {
-                    inst->replaceUsesWith(source);
+                    inst->replaceUsesWith(wrap->getValue());
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }
