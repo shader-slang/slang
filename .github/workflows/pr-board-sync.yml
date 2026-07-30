@@ -137,6 +137,10 @@ on:
       source_bot:
         type: string
         default: "Bot"
+      source_internal_team:
+        description: "org/team-slug whose members (direct or nested) are classified as Source Internal."
+        type: string
+        default: "shader-slang/source-internal"
       bot_authors:
         description: "Comma-separated logins always treated as bots."
         type: string
@@ -204,7 +208,7 @@ jobs:
           echo "(Fork-PR head-context event on a public repo, or unconfigured repo.)"
           echo "The nightly sweep / a later pull_request_target / the workflow_run path will reconcile."
 
-      # --- Classify Source (repo write-access read; opened/reopened only) ------
+      # --- Classify Source (source-internal team; opened/reopened only) --------
       - name: Classify PR Source
         id: classify
         if: >-
@@ -217,6 +221,7 @@ jobs:
           SOURCE_INTERNAL: ${{ inputs.source_internal }}
           SOURCE_COMMUNITY: ${{ inputs.source_community }}
           SOURCE_BOT: ${{ inputs.source_bot }}
+          SOURCE_INTERNAL_TEAM: ${{ inputs.source_internal_team }}
         with:
           github-token: ${{ secrets.SLANG_PR_BOT_TOKEN }}
           script: |
@@ -227,31 +232,48 @@ jobs:
             const isBot = user.type === "Bot" ||
               botAuthors.includes((login || "").toLowerCase());
 
-            let source;
-            if (isBot) {
-              source = process.env.SOURCE_BOT;
-            } else {
-              // Internal iff the author has write (push) access to this repo, i.e.
-              // they can approve workflow runs and approve/merge PRs. Everyone else
-              // -- org members without write here, and fork contributors -- is
-              // Community. On any read error, fail safe to Community.
-              let canWrite = false;
+            // Pure helpers mirrored from extract-js:classify in the reconcile step
+            // (that block is the unit-tested source of truth). Keep in sync.
+            function isInternalLogin(authorLogin, members) {
+              if (!authorLogin || !members) return false;
+              const lower = authorLogin.toLowerCase();
+              for (const m of members) {
+                if ((m || "").toLowerCase() === lower) return true;
+              }
+              return false;
+            }
+            function classifyAuthorSource(opts) {
+              if (opts.isBot) return opts.sourceBot;
+              return isInternalLogin(opts.login, opts.members)
+                ? opts.sourceInternal : opts.sourceCommunity;
+            }
+
+            // Internal iff the author is in source_internal_team (direct or nested).
+            // On any read error / unset team, fail safe to Community.
+            let members = new Set();
+            const teamSpec = process.env.SOURCE_INTERNAL_TEAM || "";
+            if (!isBot && teamSpec.includes("/")) {
+              const slash = teamSpec.indexOf("/");
+              const org = teamSpec.slice(0, slash);
+              const slug = teamSpec.slice(slash + 1);
               try {
-                const resp = await github.rest.repos.getCollaboratorPermissionLevel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  username: login,
-                });
-                canWrite = resp.data?.user?.permissions?.push === true;
+                const data = await github.paginate(
+                  github.rest.teams.listMembersInOrg,
+                  { org, team_slug: slug, per_page: 100 });
+                members = new Set(data.map(m => m.login));
               } catch (error) {
                 core.warning(
-                  `could not read ${login} permission (${error.status}); treating as Community`);
+                  `could not list team ${teamSpec} (${error.status}); treating as Community`);
               }
-              source = canWrite
-                ? process.env.SOURCE_INTERNAL
-                : process.env.SOURCE_COMMUNITY;
-              console.log(`PR author ${login}; write access: ${canWrite}`);
             }
+            const source = classifyAuthorSource({
+              isBot, login, members,
+              sourceBot: process.env.SOURCE_BOT,
+              sourceInternal: process.env.SOURCE_INTERNAL,
+              sourceCommunity: process.env.SOURCE_COMMUNITY,
+            });
+            console.log(
+              `PR author ${login}; source-internal member: ${isInternalLogin(login, members)}`);
             core.setOutput("source", source);
 
       # --- Board writes: add + Source + Status (ProjectsV2 PAT) ---------------
@@ -272,6 +294,7 @@ jobs:
           SOURCE_INTERNAL: ${{ inputs.source_internal }}
           SOURCE_COMMUNITY: ${{ inputs.source_community }}
           SOURCE_BOT: ${{ inputs.source_bot }}
+          SOURCE_INTERNAL_TEAM: ${{ inputs.source_internal_team }}
           BOT_AUTHORS: ${{ inputs.bot_authors }}
           IGNORED_REVIEWERS: ${{ inputs.ignored_reviewers }}
           OWNERS_TEAM: ${{ inputs.owners_team }}
@@ -301,6 +324,7 @@ jobs:
             const OWNERS_TEAM = process.env.OWNERS_TEAM || "";
             const BOT_OWNERS_TEAM = process.env.BOT_OWNERS_TEAM || "";
             const MAINTAINER_TEAM = process.env.MAINTAINER_TEAM || "";
+            const SOURCE_INTERNAL_TEAM = process.env.SOURCE_INTERNAL_TEAM || "";
             const FALLBACK_ASSIGNEE = process.env.FALLBACK_ASSIGNEE || "";
 
             // Committer-signal ranking + assignee/reviewer selection, inlined so
@@ -1168,24 +1192,44 @@ jobs:
             }
 
             // Classify a PR's Source from observed state: Bot for a bot author,
-            // else Internal iff the author has repo write access, else Community.
-            // Used when the board has no Source yet and no freshly-classified value
-            // is available (sweep mode or a non-onboarding event). Fails safe to
-            // Community on a read error.
+            // else Internal iff the author is in source_internal_team (direct or
+            // nested membership), else Community. Used when the board has no
+            // Source yet and no freshly-classified value is available (sweep mode
+            // or a non-onboarding event). Fails safe to Community when the team
+            // cannot be read (listTeamMembers returns an empty set).
+            //
+            // Pure helpers below are the unit-tested source of truth
+            // (.github/scripts/pr-classify.test.js extracts this block). The
+            // opened/reopened Classify PR Source step mirrors them.
+            // ----- extract-js:classify:begin -----
+            // True when login is in the source-internal member set (case-insensitive).
+            function isInternalLogin(login, members) {
+              if (!login || !members) return false;
+              const lower = login.toLowerCase();
+              for (const m of members) {
+                if ((m || "").toLowerCase() === lower) return true;
+              }
+              return false;
+            }
+
+            // Classify Source from bot flag + already-fetched team membership.
+            // Pass an empty members set when the team cannot be read so this
+            // fails safe to Community (caller's responsibility).
+            function classifyAuthorSource({ isBot, login, members,
+                                           sourceBot, sourceInternal, sourceCommunity }) {
+              if (isBot) return sourceBot;
+              return isInternalLogin(login, members) ? sourceInternal : sourceCommunity;
+            }
+            // ----- extract-js:classify:end -----
+
+            async function isInternal(login) {
+              return isInternalLogin(login, await listTeamMembers(SOURCE_INTERNAL_TEAM));
+            }
+
             async function classifySource(info) {
               if (info.isBot) return process.env.SOURCE_BOT;
-              let canWrite = false;
-              try {
-                const resp = await github.rest.repos.getCollaboratorPermissionLevel({
-                  owner: context.repo.owner, repo: context.repo.repo,
-                  username: info.authorLogin,
-                });
-                canWrite = resp.data?.user?.permissions?.push === true;
-              } catch (error) {
-                core.warning(
-                  `could not read ${info.authorLogin} permission (${error.status}); treating as Community`);
-              }
-              return canWrite ? SOURCE_INTERNAL : SOURCE_COMMUNITY;
+              return (await isInternal(info.authorLogin))
+                ? SOURCE_INTERNAL : SOURCE_COMMUNITY;
             }
 
             // Numbers of every open PR in this repo (paginated). The sweep's outer

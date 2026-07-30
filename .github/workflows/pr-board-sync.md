@@ -13,7 +13,10 @@ for copy-me caller templates.
 For each open PR the workflow:
 
 1. Adds the PR to the board (idempotent).
-2. Classifies and sets **Source** (`Internal` / `Community` / `Bot`).
+2. Classifies and sets **Source** (`Internal` / `Community` / `Bot`) from
+   bot-author config and membership in `source_internal_team` (default
+   `shader-slang/source-internal`; direct or nested). Repo write access is
+   **not** used for Source.
 3. Recomputes **Status** from live PR state (`In Review`, `Revising`, `Snagged`,
    `Approved`, `Done`).
 4. Backfills **assignee** and **reviewers** when the PR has no owner yet.
@@ -114,12 +117,13 @@ last approver of the introducing PR). A cheap total-LOC pass ranks candidates; a
 per-file LOC tiebreak runs only when the top two are close.
 
 The ranking/selection logic is inlined in `pr-board-sync.yml` (between
-`extract-js:assignment:begin/end` markers). Unit tests extract that block at run
-time:
+`extract-js:assignment:begin/end` markers); Source classification helpers live
+in `extract-js:classify:begin/end`. Unit tests extract those blocks at run time:
 
 ```bash
 node .github/scripts/pr-signal.test.js
 node .github/scripts/pr-assign.test.js
+node .github/scripts/pr-classify.test.js
 ```
 
 ## CI rollup

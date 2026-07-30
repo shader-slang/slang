@@ -11,26 +11,37 @@ don't need this — see [CONTRIBUTING.md](../../CONTRIBUTING.md).)
 > members (committers)**. Outside contributors can't see it — that's expected;
 > their PRs are still tracked on it by the committers who shepherd them.
 
-You never set the board fields by hand: they are maintained automatically from
-PR activity (open/close, pushes, reviews, CI results, merge-queue changes). Your
-job is to **read the state and act when it asks you to**.
+You never set **Status** by hand: it is maintained automatically from PR
+activity (open/close, pushes, reviews, CI results, merge-queue changes). Your
+job is to **read the state and act when it asks you to**. **Source** is also
+set by automation on first sight, but you may override it when it is wrong
+(see below).
 
 ## How a PR lands on your plate: the `Source` field
 
-Every PR carries a **`Source`** — one of:
+Automation classifies each PR's **`Source`**, then uses that to pick a default
+assignee (and reviewers, when appropriate). That is a best-effort default —
+not a final verdict.
 
-- **Internal** — opened by someone with write access to the repo. The **author
-  drives it**; they're the assignee, and **they are expected to identify and
-  request their own reviewer** (no reviewer is auto-requested for Internal PRs).
-  If you're a newer committer and unsure who to ask, pick someone who has
-  recently touched the same files, or ask in the team channel.
-- **Community** — opened by an outside contributor. A maintainer (you) is
-  assigned to shepherd it and arrange review.
+How Source is classified today:
+
+- **Internal** — the author is a member of the org `source-internal` team
+  (direct or nested; one team for all `shader-slang` repos). The author is
+  assigned; no reviewer is auto-requested (they are expected to find one).
+- **Community** — everyone else who is not a bot. A maintainer is assigned to
+  shepherd it and arrange review.
 - **Bot** — opened by an automated coworker. A maintainer is assigned to
   shepherd it to ready-for-review and merge.
 
-Being the assignee on a **Community** or **Bot** PR means you're responsible for
-moving it forward (or finding the right reviewer).
+Because Internal membership is org-wide, Source can be wrong for a given repo
+(someone on `source-internal` who does not actually own work here, or the
+reverse). If it is wrong, change Source on the board and reassign / request
+the right reviewers.
+
+If you are the assignee, you are responsible for either driving the PR forward
+or finding the correct assignee (and handing it off). Same idea for Internal
+authors who still need a reviewer: pick someone who has recently touched the
+same files, or ask in the team channel.
 
 ## What each `Status` means for you
 
