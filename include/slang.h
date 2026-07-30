@@ -1024,8 +1024,9 @@ typedef uint32_t SlangSizeT;
         // Add a capability to the target. Set value.kind to CompilerOptionValueKind::String
         // and stringValue0 to the capability atom name (e.g. "spvGroupNonUniformArithmetic");
         // atom names are listed in the capability-atom reference under docs/user-guide/. The
-        // int form (intValue0: CapabilityName) uses internal IDs that are not stable across
-        // versions; obtain one at runtime via IGlobalSession::findCapability(name).
+        // int form (value.kind = CompilerOptionValueKind::Int, intValue0 set to a
+        // SlangCapabilityID) uses IDs that are not stable across versions; obtain one at
+        // runtime via IGlobalSession::findCapability(name).
         Capability = 39,
         DefaultImageFormatUnknown = 40, // bool
         DisableDynamicDispatch = 41,    // bool
