@@ -1360,18 +1360,26 @@ jobs:
               return _internalIndex;
             }
 
-            async function isInternal(login, repo) {
+            // Effective Internal member set for this repo: the base team plus
+            // any scoped sibling covering it. An unreadable org team list yields
+            // an empty set, so classifyAuthorSource fails safe to Community.
+            async function internalMembersForThisRepo() {
               const index = await loadSourceInternalIndex();
-              if (!index) return false;
-              const members = internalMembersForRepo(
-                repo || context.repo.repo, index.baseMembers, index.scopedTeams);
-              return isInternalLogin(login, members);
+              if (!index) return new Set();
+              return internalMembersForRepo(
+                context.repo.repo, index.baseMembers, index.scopedTeams);
             }
 
             async function classifySource(info) {
-              if (info.isBot) return process.env.SOURCE_BOT;
-              return (await isInternal(info.authorLogin, context.repo.repo))
-                ? SOURCE_INTERNAL : SOURCE_COMMUNITY;
+              const members = info.isBot
+                ? new Set()
+                : await internalMembersForThisRepo();
+              return classifyAuthorSource({
+                isBot: info.isBot, login: info.authorLogin, members,
+                sourceBot: process.env.SOURCE_BOT,
+                sourceInternal: SOURCE_INTERNAL,
+                sourceCommunity: SOURCE_COMMUNITY,
+              });
             }
 
             // Numbers of every open PR in this repo (paginated). The sweep's outer
