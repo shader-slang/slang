@@ -29,9 +29,9 @@ How Source is classified today:
   with (`source_internal_team`, by default `shader-slang/source-internal`;
   direct or nested membership, org-wide), **or** of a sibling
   `source-internal-*` team whose description includes `Scope:` listing this
-  repository's short name (comma-separated inside brackets; e.g.
-  `Scope: [slangpy, slangpy-samples]`). The author is assigned; no reviewer is
-  auto-requested (they are expected to find one).
+  repository (bare short name or `owner/repo` inside brackets; matching is by
+  short name only, e.g. `Scope: [slangpy, slangpy-samples]`). The author is
+  assigned; no reviewer is auto-requested (they are expected to find one).
 - **Community** — everyone else who is not a bot. A maintainer is assigned to
   shepherd it and arrange review.
 - **Bot** — opened by an automated coworker. A maintainer is assigned to

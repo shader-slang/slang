@@ -215,10 +215,114 @@ test("classifyAuthorSource: unknown membership yields no Source", () => {
   }), null);
 });
 
+test("parseTeamScopeRepos: owner is stripped; short-name matching is cross-org", () => {
+  // Scope: [otherorg/slangpy] is stored as "slangpy", so it matches
+  // shader-slang/slangpy. Owners in Scope entries are never meaningful.
+  assert.deepStrictEqual(
+    parseTeamScopeRepos("Scope: [otherorg/slangpy]"),
+    ["slangpy"]);
+  const members = internalMembersForRepo("shader-slang/slangpy", [
+    BASE("alice"),
+    { repos: ["slangpy"], members: new Set(["bob"]) },
+  ]);
+  assert.ok(isInternalLogin("bob", members));
+});
+
 test("classifyAuthorSource: a bot stays Bot when membership is unknown", () => {
   assert.strictEqual(classifyAuthorSource({
     isBot: true, login: "dependabot", members: null, ...SRC,
   }), "Bot");
+});
+
+// --- team-roster cache (fake paginate, like pr-signal countingGh) -----------
+const { createTeamReadCache } = extractor.load({
+  workflow,
+  block: "team-roster",
+});
+
+function roster({
+  teams = [],
+  members = {},
+  failTeams = false,
+  failMembers = {},
+  maxAttempts = 2,
+} = {}) {
+  const warnings = [];
+  let teamCalls = 0;
+  const memberCalls = {};
+  const cache = createTeamReadCache({
+    maxAttempts,
+    warn: (m) => warnings.push(m),
+    paginateTeams: async () => {
+      teamCalls++;
+      if (failTeams) throw { status: 403 };
+      return teams;
+    },
+    paginateMembers: async ({ org, team_slug }) => {
+      const key = `${org}/${team_slug}`;
+      memberCalls[key] = (memberCalls[key] || 0) + 1;
+      if (failMembers[key]) throw { status: failMembers[key] };
+      return (members[key] || []).map((login) => ({ login }));
+    },
+  });
+  return { ...cache, warnings, get teamCalls() { return teamCalls; }, memberCalls };
+}
+
+test("tryListTeamMembers: bare slug is empty Set, not null", async () => {
+  const r = roster();
+  const set = await r.tryListTeamMembers("bare");
+  assert.ok(set instanceof Set);
+  assert.strictEqual(set.size, 0);
+  assert.deepStrictEqual(r.memberCalls, {});
+});
+
+test("tryListTeamMembers: failed read is null", async () => {
+  const r = roster({ failMembers: { "o/t": 403 } });
+  assert.strictEqual(await r.tryListTeamMembers("o/t"), null);
+  assert.ok(r.warnings.some((w) => w.includes("o/t")));
+});
+
+test("tryListTeamMembers: success is cached", async () => {
+  const r = roster({ members: { "o/t": ["alice"] } });
+  assert.ok(isInternalLogin("alice", await r.tryListTeamMembers("o/t")));
+  assert.ok(isInternalLogin("alice", await r.tryListTeamMembers("o/t")));
+  assert.strictEqual(r.memberCalls["o/t"], 1);
+});
+
+test("tryListTeamMembers: attempt budget is exactly maxAttempts", async () => {
+  const r = roster({ failMembers: { "o/t": 500 }, maxAttempts: 2 });
+  assert.strictEqual(await r.tryListTeamMembers("o/t"), null);
+  assert.strictEqual(await r.tryListTeamMembers("o/t"), null);
+  assert.strictEqual(await r.tryListTeamMembers("o/t"), null); // budget spent
+  assert.strictEqual(r.memberCalls["o/t"], 2);
+});
+
+test("listTeamMembers: null becomes empty Set for owner pools", async () => {
+  const r = roster({ failMembers: { "o/owners": 403 } });
+  const set = await r.listTeamMembers("o/owners");
+  assert.ok(set instanceof Set);
+  assert.strictEqual(set.size, 0);
+});
+
+test("listOrgTeams: caches success and budgets failures", async () => {
+  const ok = roster({ teams: [{ slug: "source-internal" }] });
+  assert.strictEqual((await ok.listOrgTeams("o")).length, 1);
+  assert.strictEqual((await ok.listOrgTeams("o")).length, 1);
+  assert.strictEqual(ok.teamCalls, 1);
+
+  const bad = roster({ failTeams: true, maxAttempts: 2 });
+  assert.strictEqual(await bad.listOrgTeams("o"), null);
+  assert.strictEqual(await bad.listOrgTeams("o"), null);
+  assert.strictEqual(await bad.listOrgTeams("o"), null);
+  assert.strictEqual(bad.teamCalls, 2);
+});
+
+test("warnOnce only emits once", () => {
+  const r = roster();
+  r.warnOnce("same");
+  r.warnOnce("same");
+  r.warnOnce("other");
+  assert.deepStrictEqual(r.warnings, ["same", "other"]);
 });
 
 (async () => {

@@ -138,7 +138,7 @@ on:
         type: string
         default: "Bot"
       source_internal_team:
-        description: "Base org/team-slug for Source Internal (default shader-slang/source-internal). Also includes sibling teams whose slug starts with that slug plus '-' (e.g. source-internal-*) when their description has 'Scope: [repo1, repo2]' listing short names in this org."
+        description: "Base org/team-slug for Source Internal (default shader-slang/source-internal). Also includes sibling teams whose slug starts with that slug plus '-' (e.g. source-internal-*) when their description has 'Scope: [repo1, repo2]' listing repositories (bare short names or owner/repo; matching is by short name)."
         type: string
         default: "shader-slang/source-internal"
       bot_authors:
@@ -1063,79 +1063,96 @@ jobs:
               return STATUS.inreview;
             }
 
-            // core.warning for a condition that would otherwise repeat for every
-            // PR a sweep walks (a misconfigured team is constant for the run), so
-            // the log names it once instead of hundreds of times.
-            const _warned = {};
-            function warnOnce(message) {
-              if (_warned[message]) return;
-              _warned[message] = true;
-              core.warning(message);
-            }
+            // Team-roster caching helpers. Extracted so unit tests can inject a
+            // fake paginate (see pr-classify.test.js), matching the pr-signal
+            // countingGh pattern.
+            // ----- extract-js:team-roster:begin -----
+            const DEFAULT_MAX_TEAM_READ_ATTEMPTS = 2;
 
-            // A per-run attempt budget for one team read. Only a SUCCESSFUL read is
-            // cached, so that a transient error on one PR does not poison the whole
-            // sweep; this bounds the other side of that choice, since a persistent
-            // failure (deleted team, token permission gap) would otherwise re-issue
-            // the same request for every one of the hundreds of PRs a sweep walks.
-            const MAX_TEAM_READ_ATTEMPTS = 2;
-            const _teamReadAttempts = {};
-            function canAttemptTeamRead(key) {
-              const used = _teamReadAttempts[key] || 0;
-              if (used >= MAX_TEAM_READ_ATTEMPTS) return false;
-              _teamReadAttempts[key] = used + 1;
-              return true;
-            }
-
-            // Every team in the org, as { slug, description }, or null when the
-            // listing could not be read. This is team metadata, not membership, so
-            // it is always safe to cache once read -- which is what keeps the family
-            // rebuild below a pure in-memory pass rather than a re-enumeration.
-            let _orgTeams;
-            async function listOrgTeams(org) {
-              if (_orgTeams) return _orgTeams;
-              if (!canAttemptTeamRead(`teams:${org}`)) return null;
-              try {
-                _orgTeams = await github.paginate(
-                  github.rest.teams.list, { org, per_page: 100 });
-                return _orgTeams;
-              } catch (error) {
-                core.warning(
-                  `could not list teams in ${org} (${error.status}); leaving Source unset`);
-                return null;
+            // Build the per-run team-read cache used by Source classification and
+            // by the owners/maintainer pools. paginateTeams({org}) and
+            // paginateMembers({org, team_slug}) return arrays; throw {status}
+            // on failure. warn(message) records a warning.
+            //
+            // tryListTeamMembers return shapes:
+            //   - empty Set — bare/blank teamSpec (definitely nobody)
+            //   - null — roster read failed, OR the per-run attempt budget for
+            //     that team is exhausted (also "unknown": do not guess Source).
+            //     Budget exhaustion suppresses Source for the rest of the sweep
+            //     for any PR whose repo that team covers.
+            //   - non-empty Set — successful read (cached for the run)
+            function createTeamReadCache({
+              paginateTeams, paginateMembers, warn,
+              maxAttempts = DEFAULT_MAX_TEAM_READ_ATTEMPTS,
+            }) {
+              const warned = {};
+              function warnOnce(message) {
+                if (warned[message]) return;
+                warned[message] = true;
+                warn(message);
               }
-            }
-
-            // Member logins of an org team given as "org/slug", or null when the
-            // roster could not be read -- so a caller that must not guess (Source
-            // classification) can leave its answer unknown. Empty for a bare slug.
-            // SUCCESSFUL reads are cached per run; a failure is retried up to the
-            // attempt budget above, so a later PR in the same sweep can recover.
-            const teamCache = {};
-            async function tryListTeamMembers(teamSpec) {
-              if (!teamSpec || !teamSpec.includes("/")) return new Set();
-              if (teamCache[teamSpec]) return teamCache[teamSpec];
-              if (!canAttemptTeamRead(`members:${teamSpec}`)) return null;
-              const slash = teamSpec.indexOf("/");
-              const org = teamSpec.slice(0, slash);
-              const slug = teamSpec.slice(slash + 1);
-              try {
-                const data = await github.paginate(
-                  github.rest.teams.listMembersInOrg, { org, team_slug: slug, per_page: 100 });
-                teamCache[teamSpec] = new Set(data.map(m => m.login));
-                return teamCache[teamSpec];
-              } catch (error) {
-                core.warning(`could not list team ${teamSpec} (${error.status})`);
-                return null;
+              const attempts = {};
+              function canAttempt(key) {
+                const used = attempts[key] || 0;
+                if (used >= maxAttempts) return false;
+                attempts[key] = used + 1;
+                return true;
               }
+              let orgTeams;
+              async function listOrgTeams(org) {
+                if (orgTeams) return orgTeams;
+                if (!canAttempt(`teams:${org}`)) return null;
+                try {
+                  orgTeams = await paginateTeams({ org });
+                  return orgTeams;
+                } catch (error) {
+                  warn(
+                    `could not list teams in ${org} (${error.status}); leaving Source unset`);
+                  return null;
+                }
+              }
+              const teamCache = {};
+              async function tryListTeamMembers(teamSpec) {
+                if (!teamSpec || !teamSpec.includes("/")) return new Set();
+                if (teamCache[teamSpec]) return teamCache[teamSpec];
+                if (!canAttempt(`members:${teamSpec}`)) return null;
+                const slash = teamSpec.indexOf("/");
+                const org = teamSpec.slice(0, slash);
+                const slug = teamSpec.slice(slash + 1);
+                try {
+                  const data = await paginateMembers({ org, team_slug: slug });
+                  teamCache[teamSpec] = new Set(data.map(m => m.login));
+                  return teamCache[teamSpec];
+                } catch (error) {
+                  warn(`could not list team ${teamSpec} (${error.status})`);
+                  return null;
+                }
+              }
+              // Empty on any read error — for owners/maintainer pools, where an
+              // unreadable team just means no pick from it.
+              async function listTeamMembers(teamSpec) {
+                return (await tryListTeamMembers(teamSpec)) || new Set();
+              }
+              return {
+                warnOnce, listOrgTeams, tryListTeamMembers, listTeamMembers,
+                canAttempt, maxAttempts,
+              };
             }
+            // ----- extract-js:team-roster:end -----
 
-            // Member logins of an org team, empty on any read error -- for the
-            // owners / maintainer pools, where an unreadable team just means no
-            // pick from it and must never fail the run.
-            async function listTeamMembers(teamSpec) {
-              return (await tryListTeamMembers(teamSpec)) || new Set();
-            }
+            // Wire the extracted helpers to the Actions github/core objects.
+            // Team metadata (listOrgTeams) is always safe to cache once read;
+            // that keeps loadSourceInternalIndex a pure in-memory rebuild per PR.
+            const {
+              warnOnce, listOrgTeams, tryListTeamMembers, listTeamMembers,
+            } = createTeamReadCache({
+              paginateTeams: ({ org }) => github.paginate(
+                github.rest.teams.list, { org, per_page: 100 }),
+              paginateMembers: ({ org, team_slug }) => github.paginate(
+                github.rest.teams.listMembersInOrg,
+                { org, team_slug, per_page: 100 }),
+              warn: (message) => core.warning(message),
+            });
 
             // Logins with write+ access to this repo (the extra-reviewer pool).
             // Empty on access error (listing collaborators needs repo admin/push),
@@ -1349,9 +1366,11 @@ jobs:
 
             // Parse "Scope: [repo1, repo2]" from a team description into short
             // repo names (lowercased). Bare names and owner/name forms are both
-            // accepted. Returns [] when Scope: [...] is absent. The brackets
-            // delimit the list so other description text can follow. The label
-            // is case-insensitive; a space before the colon (e.g. "Scope :") is
+            // accepted; the owner is stripped, so Scope: [otherorg/slangpy]
+            // matches shader-slang/slangpy (short names are unique in practice).
+            // Returns [] when Scope: [...] is absent. The brackets delimit the
+            // list so other description text can follow. The label is
+            // case-insensitive; a space before the colon (e.g. "Scope :") is
             // not accepted — write `Scope: [...]` exactly.
             function parseTeamScopeRepos(description) {
               if (!description) return [];

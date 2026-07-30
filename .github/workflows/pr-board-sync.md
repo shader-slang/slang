@@ -17,7 +17,8 @@ For each open PR the workflow:
    bot-author config and membership in `source_internal_team` (default
    `shader-slang/source-internal`; direct or nested), plus sibling teams whose
    slug starts with that base plus `-` (e.g. `source-internal-slangpy`) when
-   their description includes `Scope: [repo1, repo2]` for this repository. Repo
+   their description includes `Scope: [repo1, repo2]` for this repository
+   (bare short names or `owner/repo`; matching is by short name). Repo
    write access is **not** used for Source.
 3. Recomputes **Status** from live PR state (`In Review`, `Revising`, `Snagged`,
    `Approved`, `Done`).
