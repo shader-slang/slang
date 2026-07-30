@@ -15598,8 +15598,10 @@ void SemanticsDeclHeaderVisitor::maybeInferPrefixModifierForOperator(CallableDec
 // (e.g. `linkWithOptions` selecting SPIR-V-via-GLSL after this check) that makes a boundary
 // illegal.
 //
-//   - HLSL: cannot pass thread-group-shared memory across a function boundary at all, so a
-//     `groupshared` parameter with `[noinline]` OR `export` is rejected.
+//   - HLSL: cannot pass thread-group-shared memory across a function boundary at all (DXC rejects
+//     it with error 0043), so a `groupshared` parameter is rejected whenever the function forces a
+//     boundary -- both `[noinline]` and `export` do (an exported function is a separately compiled
+//     entry the caller reaches by call, so its parameter is never inlined away).
 //   - GLSL / SPIR-V-via-GLSL / WGSL: require the helper to be inlined away, so `[noinline]` on a
 //     `groupshared`-parameter function is rejected.
 //   - Direct SPIR-V / Metal / CUDA: allowed -- the boundary is kept (direct SPIR-V declares
