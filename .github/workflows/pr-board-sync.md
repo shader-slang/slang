@@ -17,7 +17,7 @@ For each open PR the workflow:
    bot-author config and membership in `source_internal_team` (default
    `shader-slang/source-internal`; direct or nested), plus sibling teams whose
    slug starts with that base plus `-` (e.g. `source-internal-slangpy`) when
-   their description includes `Scope: repo1, repo2` for this repository. Repo
+   their description includes `Scope: [repo1, repo2]` for this repository. Repo
    write access is **not** used for Source.
 3. Recomputes **Status** from live PR state (`In Review`, `Revising`, `Snagged`,
    `Approved`, `Done`).
@@ -83,6 +83,11 @@ In implementation terms:
 
 - The board's Source value is authoritative once set; automation only backfills
   Source when the board has none.
+- Because that written value is never re-derived, an unreadable team roster
+  yields no Source at all (`classifyAuthorSource` returns null and the write is
+  skipped, as is assignment, which needs Source) rather than a guessed
+  `Community`. A fully-read team family is cached per run; a partial read is not,
+  so a later PR in the same sweep retries.
 - `computeTarget()` maps observed PR state to Status for event and sweep mode.
 - `Done` is terminal: once the board Status is `Done`, later events leave it
   unchanged.

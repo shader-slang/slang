@@ -55,11 +55,18 @@ test("repoShortName", () => {
 test("parseTeamScopeRepos", () => {
   assert.deepStrictEqual(
     parseTeamScopeRepos(
-      "Internal team members. Scope: slangpy, slangpy-samples"),
+      "Internal team members. Scope: [slangpy, slangpy-samples]"),
     ["slangpy", "slangpy-samples"]);
   assert.deepStrictEqual(
-    parseTeamScopeRepos("Scope: shader-slang/slang-rhi"),
+    parseTeamScopeRepos("Scope: [shader-slang/slang-rhi]"),
     ["slang-rhi"]);
+  assert.deepStrictEqual(
+    parseTeamScopeRepos(
+      "Internal. Scope: [slangpy] Contact: alice, bob"),
+    ["slangpy"]);
+  assert.deepStrictEqual(
+    parseTeamScopeRepos("Scope: slangpy, slangpy-samples"),
+    []);
   assert.deepStrictEqual(parseTeamScopeRepos("no scope here"), []);
   assert.deepStrictEqual(parseTeamScopeRepos(""), []);
 });
@@ -71,17 +78,53 @@ test("isSourceInternalFamilySlug", () => {
   assert.ok(!isSourceInternalFamilySlug("source-internal", "pr-owners"));
 });
 
+// The base team is the entry with repos === null (it covers every repo); every
+// other entry covers only the repos its Scope: listed. members === null is a
+// team whose roster could not be read.
+const BASE = (...logins) => ({ repos: null, members: new Set(logins) });
+
 test("internalMembersForRepo unions base and matching scoped teams", () => {
-  const members = internalMembersForRepo(
-    "shader-slang/slangpy",
-    new Set(["alice"]),
-    [
-      { repos: ["slangpy", "slangpy-samples"], members: new Set(["bob"]) },
-      { repos: ["slang-rhi"], members: new Set(["carol"]) },
-    ]);
+  const members = internalMembersForRepo("shader-slang/slangpy", [
+    BASE("alice"),
+    { repos: ["slangpy", "slangpy-samples"], members: new Set(["bob"]) },
+    { repos: ["slang-rhi"], members: new Set(["carol"]) },
+  ]);
   assert.ok(isInternalLogin("alice", members));
   assert.ok(isInternalLogin("bob", members));
   assert.ok(!isInternalLogin("carol", members));
+});
+
+test("internalMembersForRepo: unknown when a covering roster is unreadable", () => {
+  assert.strictEqual(
+    internalMembersForRepo("shader-slang/slangpy", [
+      { repos: null, members: null },
+    ]),
+    null);
+  assert.strictEqual(
+    internalMembersForRepo("shader-slang/slangpy", [
+      BASE("alice"),
+      { repos: ["slangpy"], members: null },
+    ]),
+    null);
+});
+
+test("internalMembersForRepo: an unreadable roster for another repo is ignored", () => {
+  const members = internalMembersForRepo("shader-slang/slangpy", [
+    BASE("alice"),
+    { repos: ["slang-rhi"], members: null },
+  ]);
+  assert.ok(isInternalLogin("alice", members));
+  assert.ok(!isInternalLogin("carol", members));
+});
+
+test("internalMembersForRepo: unknown when the family itself is unreadable", () => {
+  assert.strictEqual(internalMembersForRepo("shader-slang/slang", null), null);
+});
+
+test("internalMembersForRepo: no configured team is Community, not unknown", () => {
+  const members = internalMembersForRepo("shader-slang/slang", []);
+  assert.ok(members);
+  assert.ok(!isInternalLogin("alice", members));
 });
 
 test("classifyAuthorSource: bot short-circuit ignores membership", () => {
@@ -105,11 +148,28 @@ test("classifyAuthorSource: non-member is Community", () => {
   }), "Community");
 });
 
-test("classifyAuthorSource: empty members fails safe to Community", () => {
-  // Simulates listTeamMembers returning [] on a read error / unset team.
+test("classifyAuthorSource: empty members is Community", () => {
+  // A successful read of a family nobody is on (e.g. no team configured).
   assert.strictEqual(classifyAuthorSource({
     isBot: false, login: "alice", members: new Set(), ...SRC,
   }), "Community");
+});
+
+test("classifyAuthorSource: unknown membership yields no Source", () => {
+  // internalMembersForRepo returned null (unreadable roster). The caller must
+  // leave Source unset rather than persist a transient error as Community.
+  assert.strictEqual(classifyAuthorSource({
+    isBot: false, login: "alice", members: null, ...SRC,
+  }), null);
+  assert.strictEqual(classifyAuthorSource({
+    isBot: false, login: "alice", members: undefined, ...SRC,
+  }), null);
+});
+
+test("classifyAuthorSource: a bot stays Bot when membership is unknown", () => {
+  assert.strictEqual(classifyAuthorSource({
+    isBot: true, login: "dependabot", members: null, ...SRC,
+  }), "Bot");
 });
 
 (async () => {

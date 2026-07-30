@@ -25,15 +25,20 @@ not a final verdict.
 
 How Source is classified today:
 
-- **Internal** — the author is a member of the org `source-internal` team
-  (direct or nested; org-wide), **or** of a sibling `source-internal-*` team
-  whose description includes `Scope:` listing this repository's short name
-  (comma-separated; e.g. `Scope: slangpy, slangpy-samples`). The author is
-  assigned; no reviewer is auto-requested (they are expected to find one).
+- **Internal** — the author is a member of the org team the board is configured
+  with (`source_internal_team`, by default `shader-slang/source-internal`;
+  direct or nested membership, org-wide), **or** of a sibling
+  `source-internal-*` team whose description includes `Scope:` listing this
+  repository's short name (comma-separated inside brackets; e.g.
+  `Scope: [slangpy, slangpy-samples]`). The author is assigned; no reviewer is
+  auto-requested (they are expected to find one).
 - **Community** — everyone else who is not a bot. A maintainer is assigned to
   shepherd it and arrange review.
 - **Bot** — opened by an automated coworker. A maintainer is assigned to
   shepherd it to ready-for-review and merge.
+
+If those team rosters cannot be read, automation leaves `Source` (and the
+assignee) blank rather than guessing, and the nightly sweep retries.
 
 Because Internal membership is org-wide (with optional per-repo scoped teams),
 Source can still be wrong for a given repo. If it is wrong, change Source on

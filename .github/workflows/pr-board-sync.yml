@@ -63,9 +63,9 @@ name: PR Board Sync (reusable)
 #     workflow makes (so growing its capabilities never changes the caller
 #     contract — you widen this PAT's scopes centrally, callers are untouched).
 #     Scopes needed: org Projects read+write (board) and Members read; repo
-#     Contents read, Pull requests write, Issues write, Metadata read. Reading a
-#     collaborator's permission needs repo read; on any read error the Source
-#     classification fails safe to Community.
+#     Contents read, Pull requests write, Issues write, Metadata read. Members
+#     read is what Source classification needs; when a team roster cannot be
+#     read, no Source is written and the sweep retries.
 #
 # Safety: every job runs only on PR metadata / API calls and never checks out or
 # executes PR code, so `pull_request_target` (secrets available for fork PRs) is
@@ -138,7 +138,7 @@ on:
         type: string
         default: "Bot"
       source_internal_team:
-        description: "Base org/team-slug for Source Internal (default shader-slang/source-internal). Also includes sibling teams whose slug starts with that slug plus '-' (e.g. source-internal-*) when their description has 'Scope: repo1, repo2' listing short names in this org."
+        description: "Base org/team-slug for Source Internal (default shader-slang/source-internal). Also includes sibling teams whose slug starts with that slug plus '-' (e.g. source-internal-*) when their description has 'Scope: [repo1, repo2]' listing short names in this org."
         type: string
         default: "shader-slang/source-internal"
       bot_authors:
@@ -232,8 +232,10 @@ jobs:
             const isBot = user.type === "Bot" ||
               botAuthors.includes((login || "").toLowerCase());
 
-            // Pure helpers mirrored from extract-js:classify in the reconcile step
-            // (that block is the unit-tested source of truth). Keep in sync.
+            // Pure helpers copied VERBATIM from extract-js:classify in the reconcile
+            // step (that block is the unit-tested source of truth) -- this is a
+            // separate github-script invocation, so it cannot share the functions.
+            // Keep the two byte-identical; see their doc comments there.
             function repoShortName(repo) {
               if (!repo) return "";
               const slash = String(repo).lastIndexOf("/");
@@ -241,9 +243,9 @@ jobs:
             }
             function parseTeamScopeRepos(description) {
               if (!description) return [];
-              const match = String(description).match(/\bScope:\s*(.*)$/is);
+              const match = String(description).match(/\bScope:\s*\[([^\]]*)\]/i);
               if (!match) return [];
-              return match[1].split(",").map(s => s.trim()).filter(Boolean).map(s => {
+              return match[1].split(",").map((s) => s.trim()).filter(Boolean).map((s) => {
                 const slash = s.lastIndexOf("/");
                 return (slash >= 0 ? s.slice(slash + 1) : s).toLowerCase();
               });
@@ -252,53 +254,60 @@ jobs:
               if (!baseSlug || !teamSlug) return false;
               return teamSlug === baseSlug || teamSlug.startsWith(baseSlug + "-");
             }
-            function isInternalLogin(authorLogin, members) {
-              if (!authorLogin || !members) return false;
-              const lower = authorLogin.toLowerCase();
+            function isInternalLogin(login, members) {
+              if (!login || !members) return false;
+              const lower = login.toLowerCase();
               for (const m of members) {
                 if ((m || "").toLowerCase() === lower) return true;
               }
               return false;
             }
-            function internalMembersForRepo(repo, baseMembers, scopedTeams) {
+            function internalMembersForRepo(repo, teams) {
+              if (!teams) return null;
               const short = repoShortName(repo);
               const out = new Set();
-              for (const m of (baseMembers || [])) if (m) out.add(m);
-              for (const t of (scopedTeams || [])) {
-                let hit = false;
-                for (const r of (t.repos || [])) {
-                  if ((r || "").toLowerCase() === short) { hit = true; break; }
+              for (const t of teams) {
+                if (t.repos) {
+                  let hit = false;
+                  for (const r of t.repos) {
+                    if ((r || "").toLowerCase() === short) { hit = true; break; }
+                  }
+                  if (!hit) continue;
                 }
-                if (!hit) continue;
-                for (const m of (t.members || [])) if (m) out.add(m);
+                if (!t.members) return null;
+                for (const m of t.members) if (m) out.add(m);
               }
               return out;
             }
-            function classifyAuthorSource(opts) {
-              if (opts.isBot) return opts.sourceBot;
-              return isInternalLogin(opts.login, opts.members)
-                ? opts.sourceInternal : opts.sourceCommunity;
+            function classifyAuthorSource({ isBot, login, members,
+                                           sourceBot, sourceInternal, sourceCommunity }) {
+              if (isBot) return sourceBot;
+              if (!members) return null;
+              return isInternalLogin(login, members) ? sourceInternal : sourceCommunity;
             }
 
-            // Internal iff author is on the base source_internal_team or on a
-            // sibling source-internal-* team whose Scope: includes this repo.
-            // On any read error / unset team, fail safe to Community.
-            let members = new Set();
+            // Internal iff the author is on the base source_internal_team or on a
+            // sibling source-internal-* team whose Scope: includes this repo. Any
+            // roster we could not read leaves membership unknown, and we then set
+            // no output at all: the board's Source is authoritative once written,
+            // so a transient API error must not land there as Community. The sweep
+            // (which retries) fills it in instead.
             const teamSpec = process.env.SOURCE_INTERNAL_TEAM || "";
             const repoName = context.repo.repo;
+            let teamFamily = [];
             if (!isBot && teamSpec.includes("/")) {
               const slash = teamSpec.indexOf("/");
               const org = teamSpec.slice(0, slash);
               const baseSlug = teamSpec.slice(slash + 1);
-              let baseMembers = new Set();
-              const scopedTeams = [];
+              teamFamily = null;
               try {
                 const teams = await github.paginate(
                   github.rest.teams.list, { org, per_page: 100 });
+                const family = [];
                 for (const team of teams) {
                   const slug = team.slug || "";
                   if (!isSourceInternalFamilySlug(baseSlug, slug)) continue;
-                  let teamMembers = new Set();
+                  let teamMembers = null;
                   try {
                     const data = await github.paginate(
                       github.rest.teams.listMembersInOrg,
@@ -309,27 +318,37 @@ jobs:
                       `could not list team ${org}/${slug} (${error.status})`);
                   }
                   if (slug === baseSlug) {
-                    baseMembers = teamMembers;
+                    family.push({ repos: null, members: teamMembers });
                   } else {
                     const repos = parseTeamScopeRepos(team.description || "");
-                    if (repos.length) scopedTeams.push({ repos, members: teamMembers });
+                    if (repos.length) family.push({ repos, members: teamMembers });
                   }
                 }
-                members = internalMembersForRepo(repoName, baseMembers, scopedTeams);
+                if (family.some(t => t.repos === null)) {
+                  teamFamily = family;
+                } else {
+                  core.warning(`team ${teamSpec} not found in ${org}`);
+                }
               } catch (error) {
-                core.warning(
-                  `could not list teams in ${org} (${error.status}); treating as Community`);
+                core.warning(`could not list teams in ${org} (${error.status})`);
               }
             }
+            const members = isBot
+              ? null : internalMembersForRepo(repoName, teamFamily);
             const source = classifyAuthorSource({
               isBot, login, members,
               sourceBot: process.env.SOURCE_BOT,
               sourceInternal: process.env.SOURCE_INTERNAL,
               sourceCommunity: process.env.SOURCE_COMMUNITY,
             });
-            console.log(
-              `PR author ${login}; source-internal for ${repoName}: ${isInternalLogin(login, members)}`);
-            core.setOutput("source", source);
+            if (source) {
+              console.log(
+                `PR author ${login}; source-internal for ${repoName}: ${isInternalLogin(login, members)}`);
+              core.setOutput("source", source);
+            } else {
+              core.warning(
+                `could not determine Source for ${login}; leaving it to the sweep`);
+            }
 
       # --- Board writes: add + Source + Status (ProjectsV2 PAT) ---------------
       - name: Reconcile board (add, Source, Status)
@@ -1035,25 +1054,34 @@ jobs:
               return STATUS.inreview;
             }
 
-            // Member logins of an org team given as "org/slug" (empty for a bare
-            // slug or on any read error -- callers then fall through). Cached per run.
+            // Member logins of an org team given as "org/slug", or null when the
+            // roster could not be read -- so a caller that must not guess (Source
+            // classification) can leave its answer unknown. Empty for a bare slug.
+            // SUCCESSFUL reads are cached per run; failures are not, so a later PR
+            // in the same sweep retries a transient error.
             const teamCache = {};
-            async function listTeamMembers(teamSpec) {
+            async function tryListTeamMembers(teamSpec) {
               if (!teamSpec || !teamSpec.includes("/")) return new Set();
               if (teamCache[teamSpec]) return teamCache[teamSpec];
               const slash = teamSpec.indexOf("/");
               const org = teamSpec.slice(0, slash);
               const slug = teamSpec.slice(slash + 1);
-              let members = new Set();
               try {
                 const data = await github.paginate(
                   github.rest.teams.listMembersInOrg, { org, team_slug: slug, per_page: 100 });
-                members = new Set(data.map(m => m.login));
+                teamCache[teamSpec] = new Set(data.map(m => m.login));
+                return teamCache[teamSpec];
               } catch (error) {
                 core.warning(`could not list team ${teamSpec} (${error.status})`);
+                return null;
               }
-              teamCache[teamSpec] = members;
-              return members;
+            }
+
+            // Member logins of an org team, empty on any read error -- for the
+            // owners / maintainer pools, where an unreadable team just means no
+            // pick from it and must never fail the run.
+            async function listTeamMembers(teamSpec) {
+              return (await tryListTeamMembers(teamSpec)) || new Set();
             }
 
             // Logins with write+ access to this repo (the extra-reviewer pool).
@@ -1251,8 +1279,9 @@ jobs:
             // or a sibling source-internal-* team whose description Scope:
             // includes this repo, else Community. Used when the board has no
             // Source yet and no freshly-classified value is available (sweep mode
-            // or a non-onboarding event). Fails safe to Community when the org
-            // team list cannot be read.
+            // or a non-onboarding event). Yields no Source at all when the team
+            // rosters cannot be read, since the value we write becomes
+            // authoritative and is never re-derived.
             //
             // Pure helpers below are the unit-tested source of truth
             // (.github/scripts/pr-classify.test.js extracts this block). The
@@ -1265,12 +1294,13 @@ jobs:
               return (slash >= 0 ? String(repo).slice(slash + 1) : String(repo)).toLowerCase();
             }
 
-            // Parse "Scope: repo1, repo2" from a team description into short
+            // Parse "Scope: [repo1, repo2]" from a team description into short
             // repo names (lowercased). Bare names and owner/name forms are both
-            // accepted. Returns [] when Scope: is absent.
+            // accepted. Returns [] when Scope: [...] is absent. The brackets
+            // delimit the list so other description text can follow.
             function parseTeamScopeRepos(description) {
               if (!description) return [];
-              const match = String(description).match(/\bScope:\s*(.*)$/is);
+              const match = String(description).match(/\bScope:\s*\[([^\]]*)\]/i);
               if (!match) return [];
               return match[1].split(",").map((s) => s.trim()).filter(Boolean).map((s) => {
                 const slash = s.lastIndexOf("/");
@@ -1295,85 +1325,107 @@ jobs:
               return false;
             }
 
-            // Effective Internal member set for a repo: base team members plus
-            // any scoped sibling team's members whose Scope: includes the repo.
-            function internalMembersForRepo(repo, baseMembers, scopedTeams) {
+            // Effective Internal member set for a repo, from the source-internal
+            // team family: one entry per team, { repos, members }, where
+            // repos === null marks the base team (it covers every repo) and any
+            // other entry covers just the repos its Scope: lists.
+            //
+            // Returns null -- meaning "membership is unknown for this repo" --
+            // when the family is null (the org team list was unreadable) or when
+            // a team that covers this repo has members === null (its roster was
+            // unreadable). Callers must not treat that as "not a member": a
+            // transient API error would then be persisted as Community.
+            function internalMembersForRepo(repo, teams) {
+              if (!teams) return null;
               const short = repoShortName(repo);
               const out = new Set();
-              for (const m of (baseMembers || [])) if (m) out.add(m);
-              for (const t of (scopedTeams || [])) {
-                let hit = false;
-                for (const r of (t.repos || [])) {
-                  if ((r || "").toLowerCase() === short) { hit = true; break; }
+              for (const t of teams) {
+                if (t.repos) {
+                  let hit = false;
+                  for (const r of t.repos) {
+                    if ((r || "").toLowerCase() === short) { hit = true; break; }
+                  }
+                  if (!hit) continue;
                 }
-                if (!hit) continue;
-                for (const m of (t.members || [])) if (m) out.add(m);
+                if (!t.members) return null;
+                for (const m of t.members) if (m) out.add(m);
               }
               return out;
             }
 
-            // Classify Source from bot flag + already-fetched team membership.
-            // Pass an empty members set when the team cannot be read so this
-            // fails safe to Community (caller's responsibility).
+            // Classify Source from bot flag + resolved team membership, or null
+            // when membership could not be determined so the caller leaves Source
+            // unset. members === null is that unknown; an EMPTY set is a
+            // successful read of a family nobody is on, hence Community.
             function classifyAuthorSource({ isBot, login, members,
                                            sourceBot, sourceInternal, sourceCommunity }) {
               if (isBot) return sourceBot;
+              if (!members) return null;
               return isInternalLogin(login, members) ? sourceInternal : sourceCommunity;
             }
             // ----- extract-js:classify:end -----
 
-            // Cached index of base + scoped source-internal teams for this org.
-            // null means the org team list was unreadable (fail safe to Community).
-            let _internalIndex;
+            // The source-internal team family in this org, as the { repos, members }
+            // entries internalMembersForRepo consumes: the base team (repos null,
+            // covering every repo) plus each sibling with a parseable Scope:.
+            // null means the org team list itself was unreadable.
+            //
+            // Only a fully-read family is cached, so a sweep that hit a transient
+            // error on one PR retries on the next rather than reusing a roster it
+            // knows is incomplete. An empty family (no team configured) is a
+            // successful read: every non-bot author is then Community.
+            let _internalTeams;
             async function loadSourceInternalIndex() {
-              if (_internalIndex !== undefined) return _internalIndex;
+              if (_internalTeams) return _internalTeams;
               const teamSpec = SOURCE_INTERNAL_TEAM;
               if (!teamSpec || !teamSpec.includes("/")) {
-                _internalIndex = { baseMembers: new Set(), scopedTeams: [] };
-                return _internalIndex;
+                _internalTeams = [];
+                return _internalTeams;
               }
               const slash = teamSpec.indexOf("/");
               const org = teamSpec.slice(0, slash);
               const baseSlug = teamSpec.slice(slash + 1);
-              let baseMembers = new Set();
-              const scopedTeams = [];
+              let teams;
               try {
-                const teams = await github.paginate(
+                teams = await github.paginate(
                   github.rest.teams.list, { org, per_page: 100 });
-                for (const team of teams) {
-                  const slug = team.slug || "";
-                  if (!isSourceInternalFamilySlug(baseSlug, slug)) continue;
-                  const members = await listTeamMembers(`${org}/${slug}`);
-                  if (slug === baseSlug) {
-                    baseMembers = members;
-                  } else {
-                    const repos = parseTeamScopeRepos(team.description || "");
-                    if (repos.length) scopedTeams.push({ repos, members });
-                  }
-                }
-                _internalIndex = { baseMembers, scopedTeams };
               } catch (error) {
                 core.warning(
-                  `could not list teams in ${org} (${error.status}); treating as Community`);
-                _internalIndex = null;
+                  `could not list teams in ${org} (${error.status}); leaving Source unset`);
+                return null;
               }
-              return _internalIndex;
+              const family = [];
+              for (const team of teams) {
+                const slug = team.slug || "";
+                if (!isSourceInternalFamilySlug(baseSlug, slug)) continue;
+                const members = await tryListTeamMembers(`${org}/${slug}`);
+                if (slug === baseSlug) {
+                  family.push({ repos: null, members });
+                } else {
+                  const repos = parseTeamScopeRepos(team.description || "");
+                  if (repos.length) family.push({ repos, members });
+                }
+              }
+              // A configured base team that is absent from the listing (renamed,
+              // deleted, or invisible to this token) would silently make every
+              // author Community, so treat it as unreadable instead.
+              if (!family.some(t => t.repos === null)) {
+                core.warning(
+                  `team ${teamSpec} not found in ${org}; leaving Source unset`);
+                return null;
+              }
+              if (family.every(t => t.members)) _internalTeams = family;
+              return family;
             }
 
-            // Effective Internal member set for this repo: the base team plus
-            // any scoped sibling covering it. An unreadable org team list yields
-            // an empty set, so classifyAuthorSource fails safe to Community.
-            async function internalMembersForThisRepo() {
-              const index = await loadSourceInternalIndex();
-              if (!index) return new Set();
-              return internalMembersForRepo(
-                context.repo.repo, index.baseMembers, index.scopedTeams);
-            }
-
+            // Classify a PR's Source, or null when membership for this repo could
+            // not be read -- reconcileStatus then leaves Source unset for a later
+            // run rather than persisting a transient error as Community.
             async function classifySource(info) {
               const members = info.isBot
-                ? new Set()
-                : await internalMembersForThisRepo();
+                ? null
+                : internalMembersForRepo(
+                    context.repo.repo, await loadSourceInternalIndex());
               return classifyAuthorSource({
                 isBot: info.isBot, login: info.authorLogin, members,
                 sourceBot: process.env.SOURCE_BOT,
@@ -1423,6 +1475,9 @@ jobs:
               // manual override), else the freshly-classified value (opened/reopened),
               // else classify now (sweep mode or an event without the classify step).
               // Backfill the board when it had none. is_bot is then "Source == Bot".
+              // Classification yields nothing when the source-internal rosters were
+              // unreadable; we then write no Source (and skip assignment, which
+              // depends on it) and leave both to a later sweep.
               let resolvedSource = await itemSingleSelect(itemId, SOURCE_FIELD);
               if (!resolvedSource) {
                 resolvedSource = process.env.SOURCE_VALUE || await classifySource(info);
