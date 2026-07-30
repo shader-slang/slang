@@ -1,6 +1,6 @@
 #include "slang-llvm-jit-shared-library.h"
 
-#if SLANG_WINDOWS_FAMILY && SLANG_PROCESSOR_X86_64
+#if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/RTDyldMemoryManager.h"
 #include "llvm/Support/Memory.h"
@@ -17,7 +17,7 @@
 namespace slang_llvm
 {
 
-#if SLANG_WINDOWS_FAMILY && SLANG_PROCESSOR_X86_64
+#if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
 namespace
 {
 
@@ -250,14 +250,14 @@ void disableAVX512ForJIT(llvm::orc::LLJITBuilder& jitBuilder)
     jitBuilder.setJITTargetMachineBuilder(std::move(*expectJTMB));
 }
 
-static void configureRTDyldForWindowsX64(llvm::orc::LLJITBuilder& jitBuilder)
+static void configureRTDyldForWindows64(llvm::orc::LLJITBuilder& jitBuilder)
 {
-#if SLANG_WINDOWS_FAMILY && SLANG_PROCESSOR_X86_64
+#if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
     // LLVM 21's default LLJIT layer uses RuntimeDyld with a separate SectionMemoryManager for
     // each object. SectionMemoryManager makes separate virtual-memory allocations for code,
     // read-only data, and writable data. Windows can place a later allocation below the first
-    // one, but IMAGE_REL_AMD64_ADDR32NB relocations require every target to have a non-negative
-    // 32-bit offset from the image base.
+    // one, but COFF ADDR32NB relocations require every target to have a non-negative 32-bit offset
+    // from the image base.
     //
     // Keep RuntimeDyld's established COFF behavior, but give each object one contiguous allocation
     // in the order required by its relocation model: code, read-only data, then writable data.
@@ -283,7 +283,7 @@ llvm::Expected<std::unique_ptr<llvm::orc::LLJIT>> createSlangLLJIT()
 {
     llvm::orc::LLJITBuilder jitBuilder;
     disableAVX512ForJIT(jitBuilder);
-    configureRTDyldForWindowsX64(jitBuilder);
+    configureRTDyldForWindows64(jitBuilder);
     return jitBuilder.create();
 }
 

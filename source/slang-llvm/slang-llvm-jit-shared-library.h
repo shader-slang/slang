@@ -32,7 +32,7 @@ void disableAVX512ForJIT(llvm::orc::LLJITBuilder& jitBuilder);
 /// Construct an LLJIT using Slang's platform configuration.
 ///
 /// `disableAVX512ForJIT` only fires when SLANG_DISABLE_AVX512=1 is set in
-/// the environment. On Windows x86-64, RuntimeDyld uses one ordered allocation
+/// the environment. On 64-bit Windows, RuntimeDyld uses one ordered allocation
 /// per object so COFF image-relative relocations always have valid offsets.
 /// Use this from every LLJIT construction site in slang-llvm so neither
 /// configuration can be forgotten.
