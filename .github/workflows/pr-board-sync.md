@@ -86,8 +86,14 @@ In implementation terms:
 - Because that written value is never re-derived, an unreadable team roster
   yields no Source at all (`classifyAuthorSource` returns null and the write is
   skipped, as is assignment, which needs Source) rather than a guessed
-  `Community`. A fully-read team family is cached per run; a partial read is not,
-  so a later PR in the same sweep retries.
+  `Community`.
+- Team reads are cached per run at the API level: the org team listing
+  (`listOrgTeams`) and each roster (`tryListTeamMembers`) are each fetched once
+  on success, so a sweep enumerates teams once and rebuilds the source-internal
+  family in memory per PR. A failed read is not cached — a later PR can recover
+  from a transient error — but each read gets an attempt budget
+  (`MAX_TEAM_READ_ATTEMPTS`) so a persistent failure costs a couple of requests
+  per run instead of one per PR.
 - `computeTarget()` maps observed PR state to Status for event and sweep mode.
 - `Done` is terminal: once the board Status is `Done`, later events leave it
   unchanged.

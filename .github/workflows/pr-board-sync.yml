@@ -321,7 +321,12 @@ jobs:
                     family.push({ repos: null, members: teamMembers });
                   } else {
                     const repos = parseTeamScopeRepos(team.description || "");
+                    // A sibling with no parseable Scope: [...] contributes nobody,
+                    // so its members would silently look Community. Name it in the
+                    // log rather than letting that pass as a plausible Source.
                     if (repos.length) family.push({ repos, members: teamMembers });
+                    else core.warning(
+                      `team ${org}/${slug} has no 'Scope: [repo, ...]'; ignoring it`);
                   }
                 }
                 if (family.some(t => t.repos === null)) {
@@ -1054,15 +1059,59 @@ jobs:
               return STATUS.inreview;
             }
 
+            // core.warning for a condition that would otherwise repeat for every
+            // PR a sweep walks (a misconfigured team is constant for the run), so
+            // the log names it once instead of hundreds of times.
+            const _warned = {};
+            function warnOnce(message) {
+              if (_warned[message]) return;
+              _warned[message] = true;
+              core.warning(message);
+            }
+
+            // A per-run attempt budget for one team read. Only a SUCCESSFUL read is
+            // cached, so that a transient error on one PR does not poison the whole
+            // sweep; this bounds the other side of that choice, since a persistent
+            // failure (deleted team, token permission gap) would otherwise re-issue
+            // the same request for every one of the hundreds of PRs a sweep walks.
+            const MAX_TEAM_READ_ATTEMPTS = 2;
+            const _teamReadAttempts = {};
+            function canAttemptTeamRead(key) {
+              const used = _teamReadAttempts[key] || 0;
+              if (used >= MAX_TEAM_READ_ATTEMPTS) return false;
+              _teamReadAttempts[key] = used + 1;
+              return true;
+            }
+
+            // Every team in the org, as { slug, description }, or null when the
+            // listing could not be read. This is team metadata, not membership, so
+            // it is always safe to cache once read -- which is what keeps the family
+            // rebuild below a pure in-memory pass rather than a re-enumeration.
+            let _orgTeams;
+            async function listOrgTeams(org) {
+              if (_orgTeams) return _orgTeams;
+              if (!canAttemptTeamRead(`teams:${org}`)) return null;
+              try {
+                _orgTeams = await github.paginate(
+                  github.rest.teams.list, { org, per_page: 100 });
+                return _orgTeams;
+              } catch (error) {
+                core.warning(
+                  `could not list teams in ${org} (${error.status}); leaving Source unset`);
+                return null;
+              }
+            }
+
             // Member logins of an org team given as "org/slug", or null when the
             // roster could not be read -- so a caller that must not guess (Source
             // classification) can leave its answer unknown. Empty for a bare slug.
-            // SUCCESSFUL reads are cached per run; failures are not, so a later PR
-            // in the same sweep retries a transient error.
+            // SUCCESSFUL reads are cached per run; a failure is retried up to the
+            // attempt budget above, so a later PR in the same sweep can recover.
             const teamCache = {};
             async function tryListTeamMembers(teamSpec) {
               if (!teamSpec || !teamSpec.includes("/")) return new Set();
               if (teamCache[teamSpec]) return teamCache[teamSpec];
+              if (!canAttemptTeamRead(`members:${teamSpec}`)) return null;
               const slash = teamSpec.indexOf("/");
               const org = teamSpec.slice(0, slash);
               const slug = teamSpec.slice(slash + 1);
@@ -1368,32 +1417,23 @@ jobs:
             // The source-internal team family in this org, as the { repos, members }
             // entries internalMembersForRepo consumes: the base team (repos null,
             // covering every repo) plus each sibling with a parseable Scope:.
-            // null means the org team list itself was unreadable.
+            // null means the family is unusable (see below).
             //
-            // Only a fully-read family is cached, so a sweep that hit a transient
-            // error on one PR retries on the next rather than reusing a roster it
-            // knows is incomplete. An empty family (no team configured) is a
+            // Both API reads this needs are cached by their own helpers -- the org
+            // team listing in listOrgTeams, each roster in tryListTeamMembers -- so
+            // for a sweep this is one enumeration for the whole run and a pure
+            // in-memory rebuild per PR after that. Only a roster that FAILED is
+            // re-requested (within its attempt budget), so a later PR can recover
+            // from a transient error. An empty family (no team configured) is a
             // successful read: every non-bot author is then Community.
-            let _internalTeams;
             async function loadSourceInternalIndex() {
-              if (_internalTeams) return _internalTeams;
               const teamSpec = SOURCE_INTERNAL_TEAM;
-              if (!teamSpec || !teamSpec.includes("/")) {
-                _internalTeams = [];
-                return _internalTeams;
-              }
+              if (!teamSpec || !teamSpec.includes("/")) return [];
               const slash = teamSpec.indexOf("/");
               const org = teamSpec.slice(0, slash);
               const baseSlug = teamSpec.slice(slash + 1);
-              let teams;
-              try {
-                teams = await github.paginate(
-                  github.rest.teams.list, { org, per_page: 100 });
-              } catch (error) {
-                core.warning(
-                  `could not list teams in ${org} (${error.status}); leaving Source unset`);
-                return null;
-              }
+              const teams = await listOrgTeams(org);
+              if (!teams) return null;
               const family = [];
               for (const team of teams) {
                 const slug = team.slug || "";
@@ -1403,18 +1443,22 @@ jobs:
                   family.push({ repos: null, members });
                 } else {
                   const repos = parseTeamScopeRepos(team.description || "");
+                  // A sibling with no parseable Scope: [...] contributes nobody, so
+                  // its members would silently look Community. Name it in the log
+                  // rather than letting the misconfiguration pass as a plausible
+                  // Source.
                   if (repos.length) family.push({ repos, members });
+                  else warnOnce(
+                    `team ${org}/${slug} has no 'Scope: [repo, ...]'; ignoring it`);
                 }
               }
               // A configured base team that is absent from the listing (renamed,
               // deleted, or invisible to this token) would silently make every
               // author Community, so treat it as unreadable instead.
               if (!family.some(t => t.repos === null)) {
-                core.warning(
-                  `team ${teamSpec} not found in ${org}; leaving Source unset`);
+                warnOnce(`team ${teamSpec} not found in ${org}; leaving Source unset`);
                 return null;
               }
-              if (family.every(t => t.members)) _internalTeams = family;
               return family;
             }
 
