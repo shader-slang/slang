@@ -569,8 +569,6 @@ struct __ShapeCube : __ITextureShape
 /// @category misc_types
 __magic_type(TextureShapeBufferType)
 __intrinsic_type($(kIROp_TextureShapeBufferType))
-// `cuda` is excluded: the texture-buffer `Load`/subscript intrinsics have no CUDA
-// lowering, so admitting it produced a silent empty kernel rather than a diagnostic (#12274).
 [require(cpp_glsl_hlsl_metal_spirv)]
 struct __ShapeBuffer : __ITextureShape
 {
