@@ -4021,15 +4021,14 @@ static bool hasAnyGeneric(IRModule* module)
     return false;
 }
 
-// Return true if the module contains anything that resource legalization *may* need to rewrite. The
-// scan keys on the pass's own trigger, `isResourceType`, so it conservatively over-detects (a bare
-// resource global is legal as-is and left alone, for instance) — only a false result guarantees the
-// pass has no resource work, which is all the early-out needs. (The pass also eliminates empty
-// structs incidentally, but that is not this gate's concern: the later unconditional
-// `legalizeEmptyTypes` removes any surviving empty type regardless.) Scanning only global type
-// insts is sound because resource types are hoisted/interned at module global scope (the same
-// argument the matrix pass uses); the generic force-run covers the non-hoisted generic-body case.
-static bool hasResourceLegalizationWork(IRModule* module)
+// Return true if the pass whose per-type trigger is `typeNeedsLegalization` may have work to do in
+// `module`. This is the shared shape of both work-scans: force-run on any surviving generic (see
+// `hasAnyGeneric`), otherwise scan the global type insts for one the pass would care about. Keeping
+// the force-run + globals-scan in one place means the soundness-critical invariant is stated once
+// and the two callers cannot drift apart. Scanning only global type insts is sound because
+// resource, struct, and array types are hoisted/interned at module global scope (the same argument
+// the matrix pass uses).
+static bool moduleHasGlobalTypeMatching(IRModule* module, bool (*typeNeedsLegalization)(IRType*))
 {
     if (hasAnyGeneric(module))
         return true;
@@ -4037,30 +4036,37 @@ static bool hasResourceLegalizationWork(IRModule* module)
     {
         if (auto type = as<IRType>(inst))
         {
-            if (isResourceType(type))
+            if (typeNeedsLegalization(type))
                 return true;
         }
     }
     return false;
 }
 
+// Return true if the module contains anything that resource legalization *may* need to rewrite. The
+// scan keys on the pass's own trigger, `isResourceType`, so it conservatively over-detects (a bare
+// resource global is legal as-is and left alone, for instance) — only a false result guarantees the
+// pass has no resource work, which is all the early-out needs. The pass also eliminates empty
+// structs incidentally (its `isSimpleType` is unconditionally false, so it walks every struct), but
+// that is deliberately not scanned for here: the unconditional `legalizeEmptyTypes` late in
+// `linkAndOptimizeIR` cleans up empty structs on every target regardless of this gate. The one
+// difference is a non-Metal target with a public/export-decorated empty struct on a no-resource
+// path: the empty pass's `isSimpleType` keeps such a struct as an interface type where the resource
+// pass would have stripped it (on Metal, `isSimpleType` is unconditionally false, so the empty pass
+// strips it too, matching the old behavior). That difference is benign — a kept 0-field struct is
+// valid, and preserving a public interface type is the intended behavior.
+static bool hasResourceLegalizationWork(IRModule* module)
+{
+    return moduleHasGlobalTypeMatching(module, isResourceType);
+}
+
 // Return true if the module contains anything that empty-type legalization *may* need to remove.
 // Its only mutation is eliminating empty types, so the scan keys on `isEmptyTypeToLegalize` (a
-// conservative over-detector — see its declaration) plus the generic force-run. Only a false result
-// guarantees the pass has no work.
+// conservative over-detector — see its declaration). Only a false result guarantees the pass has no
+// work.
 static bool hasEmptyTypeLegalizationWork(IRModule* module)
 {
-    if (hasAnyGeneric(module))
-        return true;
-    for (auto inst : module->getGlobalInsts())
-    {
-        if (auto type = as<IRType>(inst))
-        {
-            if (isEmptyTypeToLegalize(type))
-                return true;
-        }
-    }
-    return false;
+    return moduleHasGlobalTypeMatching(module, isEmptyTypeToLegalize);
 }
 
 static void legalizeTypes(IRTypeLegalizationContext* context)

@@ -1,9 +1,10 @@
 // Regression for shader-slang/slang#11917: `legalizeResourceTypes` gained an entry-time early-out
 // that skips the pass when the presence scan (`hasResourceLegalizationWork`) finds no resource type.
 // A struct with a resource field must still be split, so the scan must detect the resource and run
-// the pass. The check asserts the split happened — the texture reaches emission as a standalone
-// `OpTypeImage`. If the scan wrongly skipped, the resource-bearing struct would survive and SPIR-V
-// type translation would fail, so this doubles as a "still compiles" guard.
+// the pass. The primary guard is that compilation *succeeds*: a wrongly-skipped resource pass leaves
+// the opaque handle inside a `struct`, and SPIR-V type translation then aborts with
+// `E56004: opaque type in local variable` before any check runs. The OpTypeImage check below is a
+// secondary assertion that the texture reached emission as a standalone image once the split ran.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain
 
