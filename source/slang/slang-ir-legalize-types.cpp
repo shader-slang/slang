@@ -3996,44 +3996,32 @@ struct IRTypeLegalizationPass
     }
 };
 
-// Return true if the module still contains a generic at global scope. This is the conservative
-// force-run condition for the entry-time early-out below.
+// Return true if the pass whose per-type trigger is `typeNeedsLegalization` may have work to do in
+// `module`. This is the shared shape of both work-scans, and holds the soundness-critical invariant
+// in one place so the two callers cannot drift apart. In a single pass over the global insts it
+// returns true if either:
 //
-// A type that appears only inside a generic body is not hoisted to module global scope (see
-// `addGlobalValue`, which stops hoisting at the enclosing generic), so the globals-scope type scans
-// below cannot see it — yet the shared legalization framework here descends into generic bodies
-// (its worklist has no `IRGeneric` bail, unlike the standalone matrix-legalization pass), so it
-// *would* rewrite such a type. Rather than try to match that blind spot, we force the pass to run
-// whenever a generic is present. This normally does not fire, because generics are specialized away
-// before these passes run; it is reachable under `-disable-specialization`, which is exactly why
-// the force-run is required for soundness rather than merely defensive.
+//  - a global type inst satisfies the pass's own trigger (its potential work), or
+//  - a generic remains at global scope (a conservative force-run).
 //
-// Checking only direct global children suffices: a generic nested inside another generic is still
-// enclosed by an outermost generic that IS a direct global child, so any surviving generic is
-// found.
-static bool hasAnyGeneric(IRModule* module)
+// Scanning only global type insts is sound because resource, struct, and array types are
+// hoisted/interned at module global scope (the same argument the matrix pass uses). The generic
+// force-run covers the one blind spot in that scan: a type appearing only inside a generic body is
+// not hoisted to global scope (see `addGlobalValue`, which stops hoisting at the enclosing
+// generic), so the type scan cannot see it — yet the shared legalization framework here descends
+// into generic bodies (its worklist has no `IRGeneric` bail, unlike the standalone
+// matrix-legalization pass), so it *would* rewrite such a type. Rather than match that blind spot,
+// we force the pass to run whenever a generic is present. This normally does not fire (generics are
+// specialized away before these passes run); it is reachable under `-disable-specialization`, which
+// is why it is required for soundness rather than merely defensive. Testing only direct global
+// children suffices: a generic nested inside another generic is still enclosed by an outermost
+// generic that is itself a direct global child.
+static bool moduleHasGlobalTypeMatching(IRModule* module, bool (*typeNeedsLegalization)(IRType*))
 {
     for (auto inst : module->getGlobalInsts())
     {
         if (as<IRGeneric>(inst))
             return true;
-    }
-    return false;
-}
-
-// Return true if the pass whose per-type trigger is `typeNeedsLegalization` may have work to do in
-// `module`. This is the shared shape of both work-scans: force-run on any surviving generic (see
-// `hasAnyGeneric`), otherwise scan the global type insts for one the pass would care about. Keeping
-// the force-run + globals-scan in one place means the soundness-critical invariant is stated once
-// and the two callers cannot drift apart. Scanning only global type insts is sound because
-// resource, struct, and array types are hoisted/interned at module global scope (the same argument
-// the matrix pass uses).
-static bool moduleHasGlobalTypeMatching(IRModule* module, bool (*typeNeedsLegalization)(IRType*))
-{
-    if (hasAnyGeneric(module))
-        return true;
-    for (auto inst : module->getGlobalInsts())
-    {
         if (auto type = as<IRType>(inst))
         {
             if (typeNeedsLegalization(type))
