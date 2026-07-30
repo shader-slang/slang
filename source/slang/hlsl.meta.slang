@@ -22322,7 +22322,7 @@ $}
     }
 
     /// Gets the world-space direction of the ray.
-    /// @return Normalized direction vector in world space
+    /// @return Direction vector supplied to `TraceRayInline`; it is not necessarily normalized.
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]

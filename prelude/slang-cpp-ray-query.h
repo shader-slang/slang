@@ -67,6 +67,7 @@ struct RayQueryHit
     float barycentrics[2];
     float objectRayOrigin[3];
     float objectRayDirection[3];
+    // Transforms use the DXR instance layout: three row-major rows of four packed floats.
     float objectToWorld[12];
     float worldToObject[12];
     uint32_t instanceIndex;
@@ -80,6 +81,16 @@ struct RayQueryHit
 
 struct RayQueryState
 {
+    // Generated C++ initializes the query, clears an unconsumed candidate before each Proceed,
+    // and applies shader-side commit or abort operations. The CPU RHI's proceed implementation
+    // advances the traversal cursors, writes candidates, and automatically commits opaque
+    // triangles. Traversal starts in TLAS, temporarily enters BLAS for an instance, returns to
+    // TLAS after that BLAS is exhausted, and ends in COMPLETE. Both sides may transition directly
+    // to COMPLETE for Abort or ACCEPT_FIRST_HIT_AND_END_SEARCH.
+    //
+    // Keeping this protocol in the shared prelude makes RayQueryState the single ABI contract
+    // between generated shaders and the CPU RHI; neither side depends on the other's BVH layout.
+
     // TinyBVH uses these same maximum stack depths for its scalar BVH/TLAS traversal. Keeping the
     // cursor in the query object makes Proceed genuinely resumable without allocating or replaying.
     static const uint32_t kTLASStackCapacity = 64;
@@ -95,10 +106,10 @@ struct RayQueryState
 
     uint32_t rayFlags;
     uint32_t instanceInclusionMask;
-    uint32_t traversalPhase;
-    uint32_t candidatePending;
-    uint32_t candidateType;
-    uint32_t committedStatus;
+    uint32_t traversalPhase;   // One of SLANG_RAY_QUERY_TRAVERSAL_*.
+    uint32_t candidatePending; // A 0/1 flag indicating whether Candidate* is valid.
+    uint32_t candidateType;    // One of SLANG_RAY_QUERY_CANDIDATE_*.
+    uint32_t committedStatus;  // One of SLANG_RAY_QUERY_COMMITTED_*.
 
     uint32_t tlasNode;
     uint32_t tlasLeafOffset;
@@ -115,11 +126,13 @@ struct RayQueryState
     RayQueryHit committed;
 };
 
+// Converts a packed ABI vector to the generated C++ vector type.
 SLANG_FORCE_INLINE float3 _slangRayQueryGetFloat3(const float value[3])
 {
     return float3{value[0], value[1], value[2]};
 }
 
+// Converts a packed ABI vector to the generated C++ vector type.
 SLANG_FORCE_INLINE float2 _slangRayQueryGetFloat2(const float value[2])
 {
     return float2{value[0], value[1]};
@@ -130,6 +143,9 @@ SLANG_FORCE_INLINE Matrix<float, ROWS, COLS> _slangRayQueryGetMatrix(
     const float value[12],
     bool transpose)
 {
+    // The ABI always stores a row-major 3x4 matrix with a row stride of four. RayQuery only
+    // instantiates this helper as 3x4 without transposition or 4x3 with transposition, so both
+    // forms address exactly the same twelve packed values.
     Matrix<float, ROWS, COLS> result;
     for (int row = 0; row < ROWS; ++row)
     {
@@ -145,6 +161,21 @@ SLANG_FORCE_INLINE Matrix<float, ROWS, COLS> _slangRayQueryGetMatrix(
 template<uint32_t rayFlagsGeneric>
 struct RayQuery
 {
+    // Generated code uses this object in-place. Consider this example:
+    //
+    //     RayQuery<0> query;
+    //     query.TraceRayInline(scene, flags, mask, ray);
+    //     while (query.Proceed())
+    //     {
+    //         if (query.CandidateType() == SLANG_RAY_QUERY_CANDIDATE_NON_OPAQUE_TRIANGLE)
+    //             query.CommitNonOpaqueTriangleHit();
+    //     }
+    //
+    // TraceRayInline initializes the shared state, each Proceed asks the CPU RHI to resume from
+    // its saved traversal cursors, and a commit copies the current candidate into the committed
+    // hit. This preserves the HLSL RayQuery state machine without exposing the RHI's BVH.
+
+    // Constructs an inactive query with invalid traversal cursors.
     RayQuery()
     {
         state = {};
@@ -152,6 +183,7 @@ struct RayQuery
         state.blasNode = RayQueryState::kInvalidNode;
     }
 
+    // Initializes a new inline traversal and copies the ray parameters into shared ABI state.
     SLANG_FORCE_INLINE void TraceRayInline(
         RaytracingAccelerationStructure accelerationStructure,
         uint32_t rayFlags,
@@ -184,6 +216,7 @@ struct RayQuery
         state.committedStatus = SLANG_RAY_QUERY_COMMITTED_NOTHING;
     }
 
+    // Resumes traversal until a shader-visible candidate is available or traversal completes.
     SLANG_FORCE_INLINE bool Proceed()
     {
         if (!state.accelerationStructure ||
@@ -197,6 +230,7 @@ struct RayQuery
         return state.accelerationStructure->proceed(&state);
     }
 
+    // Completes traversal immediately so subsequent Proceed calls return false.
     SLANG_FORCE_INLINE void Abort()
     {
         state.candidatePending = 0;
@@ -205,6 +239,7 @@ struct RayQuery
         state.blasNode = RayQueryState::kInvalidNode;
     }
 
+    // Commits the current non-opaque triangle when it is closer than the previous committed hit.
     SLANG_FORCE_INLINE void CommitNonOpaqueTriangleHit()
     {
         if (!state.candidatePending ||
@@ -213,15 +248,17 @@ struct RayQuery
             return;
         }
 
+        bool accepted = false;
         if (state.committedStatus == SLANG_RAY_QUERY_COMMITTED_NOTHING ||
             state.candidate.rayT < state.committed.rayT)
         {
             state.committed = state.candidate;
             state.committedStatus = SLANG_RAY_QUERY_COMMITTED_TRIANGLE_HIT;
+            accepted = true;
         }
         state.candidatePending = 0;
 
-        if (state.rayFlags & SLANG_RAY_QUERY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH)
+        if (accepted && (state.rayFlags & SLANG_RAY_QUERY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH))
         {
             state.traversalPhase = SLANG_RAY_QUERY_TRAVERSAL_COMPLETE;
             state.tlasNode = RayQueryState::kInvalidNode;
@@ -229,6 +266,7 @@ struct RayQuery
         }
     }
 
+    // Commits a valid procedural hit when it lies within the ray extent and is the closest hit.
     SLANG_FORCE_INLINE void CommitProceduralPrimitiveHit(float rayT)
     {
         if (!state.candidatePending ||
@@ -257,6 +295,7 @@ struct RayQuery
         }
     }
 
+    // The following accessors expose shader-visible candidate and committed-hit state.
     SLANG_FORCE_INLINE uint32_t CandidateType() const { return state.candidateType; }
     SLANG_FORCE_INLINE uint32_t CommittedStatus() const { return state.committedStatus; }
     SLANG_FORCE_INLINE bool CandidateProceduralPrimitiveNonOpaque() const
@@ -369,6 +408,7 @@ struct RayQuery
         return _slangRayQueryGetMatrix<4, 3>(state.committed.worldToObject, true);
     }
 
+    // The following accessors expose the parameters of the ray being traversed.
     SLANG_FORCE_INLINE uint32_t RayFlags() const { return state.rayFlags; }
     SLANG_FORCE_INLINE float3 WorldRayOrigin() const
     {
