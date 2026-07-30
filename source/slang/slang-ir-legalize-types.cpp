@@ -4031,21 +4031,27 @@ static bool moduleHasGlobalTypeMatching(IRModule* module, bool (*typeNeedsLegali
     return false;
 }
 
-// Return true if the module contains anything that resource legalization *may* need to rewrite. The
-// scan keys on the pass's own trigger, `isResourceType`, so it conservatively over-detects (a bare
-// resource global is legal as-is and left alone, for instance) — only a false result guarantees the
-// pass has no resource work, which is all the early-out needs. The pass also eliminates empty
-// structs incidentally (its `isSimpleType` is unconditionally false, so it walks every struct), but
-// that is deliberately not scanned for here: the unconditional `legalizeEmptyTypes` late in
-// `linkAndOptimizeIR` cleans up empty structs on every target regardless of this gate. The one
-// difference is a non-Metal target with a public/export-decorated empty struct on a no-resource
-// path: the empty pass's `isSimpleType` keeps such a struct as an interface type where the resource
-// pass would have stripped it (on Metal, `isSimpleType` is unconditionally false, so the empty pass
-// strips it too, matching the old behavior). That difference is benign — a kept 0-field struct is
-// valid, and preserving a public interface type is the intended behavior.
+// Predicate for the resource pass's full mutation set: it rewrites both resource types and empty
+// types. Its `isSpecialType` is `isResourceType`, and its `isSimpleType` is unconditionally false
+// so it walks every struct and drops empty ones. Both must be scanned for — see
+// `hasResourceLegalizationWork`.
+static bool isResourceOrEmptyTypeToLegalize(IRType* type)
+{
+    return isResourceType(type) || isEmptyTypeToLegalize(type);
+}
+
+// Return true if the module contains anything that resource legalization *may* need to rewrite —
+// conservatively over-detecting, so only a false result guarantees the pass has no work. The pass
+// mutates two disjoint things and the scan must cover both: resource types (its `isSpecialType`),
+// and empty structs, which it strips because its `isSimpleType` is unconditionally false. Scanning
+// for resources alone would be unsound: a module with a public/export-decorated empty struct and no
+// resource would skip the pass, and the empty struct would survive to emit — the later
+// `legalizeEmptyTypes` does *not* clean it up because its `isSimpleType` keeps public-interface
+// empties. On a source-text target like HLSL/GLSL that surfaces as an illegal empty `struct {}`
+// (glslang rejects it), so the empty term here is load-bearing, not redundant.
 static bool hasResourceLegalizationWork(IRModule* module)
 {
-    return moduleHasGlobalTypeMatching(module, isResourceType);
+    return moduleHasGlobalTypeMatching(module, isResourceOrEmptyTypeToLegalize);
 }
 
 // Return true if the module contains anything that empty-type legalization *may* need to remove.
