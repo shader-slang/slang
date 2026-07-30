@@ -17,9 +17,8 @@
 // The embedded glslang/SPIRV-Tools path is covered separately, by the slangc
 // invocations in release-static.yml.
 
-#include <slang.h>
-
 #include <cstdio>
+#include <slang.h>
 
 int main()
 {
