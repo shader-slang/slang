@@ -235,7 +235,10 @@ jobs:
             // Pure helpers copied VERBATIM from extract-js:classify in the reconcile
             // step (that block is the unit-tested source of truth) -- this is a
             // separate github-script invocation, so it cannot share the functions.
-            // Keep the two byte-identical; see their doc comments there.
+            // pr-classify.test.js extracts this block and asserts every function is
+            // byte-identical to the tested reconcile copy, so either copy drifting
+            // fails CI.
+            // ----- extract-js:classify-onboarding:begin -----
             function repoShortName(repo) {
               if (!repo) return "";
               const slash = String(repo).lastIndexOf("/");
@@ -285,6 +288,7 @@ jobs:
               if (!members) return null;
               return isInternalLogin(login, members) ? sourceInternal : sourceCommunity;
             }
+            // ----- extract-js:classify-onboarding:end -----
 
             // Internal iff the author is on the base source_internal_team or on a
             // sibling source-internal-* team whose Scope: includes this repo. Any
@@ -1346,7 +1350,9 @@ jobs:
             // Parse "Scope: [repo1, repo2]" from a team description into short
             // repo names (lowercased). Bare names and owner/name forms are both
             // accepted. Returns [] when Scope: [...] is absent. The brackets
-            // delimit the list so other description text can follow.
+            // delimit the list so other description text can follow. The label
+            // is case-insensitive; a space before the colon (e.g. "Scope :") is
+            // not accepted — write `Scope: [...]` exactly.
             function parseTeamScopeRepos(description) {
               if (!description) return [];
               const match = String(description).match(/\bScope:\s*\[([^\]]*)\]/i);

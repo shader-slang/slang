@@ -1,9 +1,20 @@
-// Unit tests for Source classification, run against the copy INLINED in
-// pr-board-sync.yml (the single source of truth), extracted at run time.
+// Unit tests for Source classification, run against the reconcile copy INLINED
+// in pr-board-sync.yml and extracted at run time. The opened/reopened copy is
+// extracted separately and required to contain byte-identical functions.
 // No deps; run with: node .github/scripts/pr-classify.test.js
 "use strict";
 
 const assert = require("node:assert");
+const extractor = require("./extract-workflow-js.js");
+const workflow = ".github/workflows/pr-board-sync.yml";
+const reconcile = extractor.load({
+  workflow,
+  block: "classify",
+});
+const onboarding = extractor.load({
+  workflow,
+  block: "classify-onboarding",
+});
 const {
   isInternalLogin,
   classifyAuthorSource,
@@ -11,10 +22,7 @@ const {
   parseTeamScopeRepos,
   isSourceInternalFamilySlug,
   internalMembersForRepo,
-} = require("./extract-workflow-js.js").load({
-  workflow: ".github/workflows/pr-board-sync.yml",
-  block: "classify",
-});
+} = reconcile;
 
 const SRC = {
   sourceBot: "Bot",
@@ -24,6 +32,16 @@ const SRC = {
 
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
+
+test("onboarding and reconcile helpers are byte-identical", () => {
+  assert.deepStrictEqual(Object.keys(onboarding).sort(), Object.keys(reconcile).sort());
+  for (const name of Object.keys(reconcile)) {
+    assert.strictEqual(
+      onboarding[name].toString(),
+      reconcile[name].toString(),
+      `${name} differs between onboarding and reconcile`);
+  }
+});
 
 test("isInternalLogin: exact match", () => {
   assert.ok(isInternalLogin("alice", new Set(["alice", "bob"])));
@@ -69,6 +87,37 @@ test("parseTeamScopeRepos", () => {
     []);
   assert.deepStrictEqual(parseTeamScopeRepos("no scope here"), []);
   assert.deepStrictEqual(parseTeamScopeRepos(""), []);
+});
+
+// Authoritative form is `Scope: [repo, ...]` (no space before the colon).
+// Edges below pin what a team-description author can and cannot write.
+test("parseTeamScopeRepos: case-insensitive label", () => {
+  assert.deepStrictEqual(parseTeamScopeRepos("scope: [slangpy]"), ["slangpy"]);
+  assert.deepStrictEqual(parseTeamScopeRepos("SCOPE: [slangpy]"), ["slangpy"]);
+});
+
+test("parseTeamScopeRepos: empty brackets yield no repos", () => {
+  assert.deepStrictEqual(parseTeamScopeRepos("Scope: []"), []);
+  assert.deepStrictEqual(parseTeamScopeRepos("Scope: [  ]"), []);
+});
+
+test("parseTeamScopeRepos: space before colon is not accepted", () => {
+  // `\bScope:` requires the colon immediately after Scope; a typo like
+  // "Scope : [...]" must not silently match (warn path covers missing Scope).
+  assert.deepStrictEqual(parseTeamScopeRepos("Scope : [slangpy]"), []);
+  assert.deepStrictEqual(parseTeamScopeRepos("Scope :[slangpy]"), []);
+});
+
+test("parseTeamScopeRepos: first Scope: wins", () => {
+  assert.deepStrictEqual(
+    parseTeamScopeRepos("Scope: [slangpy] Scope: [slang-rhi]"),
+    ["slangpy"]);
+});
+
+test("parseTeamScopeRepos: whitespace inside brackets is fine", () => {
+  assert.deepStrictEqual(
+    parseTeamScopeRepos("Scope: [ slangpy , slang-rhi ]"),
+    ["slangpy", "slang-rhi"]);
 });
 
 test("isSourceInternalFamilySlug", () => {
