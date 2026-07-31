@@ -11,6 +11,9 @@
 //TEST:SIMPLE(filecheck=SPIRV_OUT): -target spirv -entry callableOut -stage callable
 //TEST:SIMPLE(filecheck=CUDA_OUT): -target cuda -entry callableOut -stage callable
 
+// CUDA direct callables may also return values.
+//TEST:SIMPLE(filecheck=CUDA_RETURN): -target cuda -entry callableReturn -stage callable
+
 // Compile Callable and compute entry points together. The Callable payload must retain its pointer
 // parameter, while the compute SV_DispatchThreadID parameter must still lower to CUDA built-ins.
 //TEST:SIMPLE(filecheck=CUDA_MIXED): -target cuda
@@ -34,6 +37,12 @@ void callableOut(out Payload payload)
     payload.value = 2;
 }
 
+[shader("callable")]
+float callableReturn()
+{
+    return 1.0;
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -54,6 +63,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
 // CUDA_OUT-LABEL: extern "C" __device__ void __direct_callable__callableOut(
 // CUDA_OUT-SAME: Payload_0 * payload_0)
+
+// CUDA_RETURN-LABEL: extern "C" __device__ float __direct_callable__callableReturn()
 
 // CUDA_MIXED-LABEL: extern "C" __device__ void __direct_callable__callableInOut(
 // CUDA_MIXED-SAME: Payload_0 * payload_0)
