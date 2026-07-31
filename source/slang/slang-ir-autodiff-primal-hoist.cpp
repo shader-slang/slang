@@ -1412,15 +1412,6 @@ void applyToInst(
                 }
                 SLANG_ASSERT(replacement);
 
-                // If the replacement and inst are not the exact same type, use an int-cast
-                // (e.g. uint vs. int)
-                //
-                if (replacement->getDataType() != inst->getDataType())
-                {
-                    setInsertAfterOrdinaryInst(builder, replacement);
-                    replacement = builder->emitCast(inst->getDataType(), replacement);
-                }
-
                 cloneCtx->cloneEnv.mapOldValToNew[inst] = replacement;
                 cloneCtx->registerClonedInst(builder, inst, replacement);
                 return;
