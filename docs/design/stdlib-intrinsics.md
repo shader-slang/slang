@@ -19,7 +19,7 @@ The main place these features are used are within the slang core module. This is
 
 Looking at these files will demonstrate the features in use. 
 
-Most of the intrinsics and attributes have names that indicate that they are not for normal use. This is typically via a `__` prefix.
+Most of the intrinsics and attributes have names that indicate that they are not for normal use. This is typically via a `__` prefix. The same convention applies to result registers named inside a `spirv_asm` block: internal registers must be `__`-prefixed (e.g. `%__result`), because the SPIR-V emitter turns every named `spirv_asm` register into an `OpName` in the output, and the prefix keeps those debug names from being mistaken for user symbols. The parser asserts this for core-module code. See the "Internal `spirv_asm` result registers" section of [coding-conventions.md](coding-conventions.md).
 
 The `.meta.slang` files look largely like Slang source files, but their contents can also be generated programmatically with C++ code. A section of code can drop into `C++` code if it is proceeded by `${{{{`. The C++ section is closed with a closing `}}}}`. This mechanism is typically used to generate different versions of a similar code sequence. Values from the C++ code can be accessed via the `$()`, where the contents of the brackets specifies something that can be calculated from within the C++ code.
 

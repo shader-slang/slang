@@ -1,8 +1,8 @@
 // unit-test-coverage-tracing-metadata.cpp
 
-#include "../../source/compiler-core/slang-json-lexer.h"
-#include "../../source/compiler-core/slang-json-parser.h"
-#include "../../source/compiler-core/slang-json-value.h"
+#include "compiler-core/slang-json-lexer.h"
+#include "compiler-core/slang-json-parser.h"
+#include "compiler-core/slang-json-value.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"

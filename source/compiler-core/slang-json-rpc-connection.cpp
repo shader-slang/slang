@@ -1,9 +1,9 @@
 // slang-json-rpc-connection.cpp
 #include "slang-json-rpc-connection.h"
 
-#include "../core/slang-process-util.h"
-#include "../core/slang-short-list.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-process-util.h"
+#include "core/slang-short-list.h"
+#include "core/slang-string-util.h"
 #include "slang-json-native.h"
 #include "slang-json-rpc.h"
 

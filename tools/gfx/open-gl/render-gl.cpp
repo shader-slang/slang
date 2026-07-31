@@ -1,12 +1,12 @@
 // render-gl.cpp
 #include "render-gl.h"
 
-#include "../immediate-renderer-base.h"
-#include "../mutable-shader-object.h"
-#include "../nvapi/nvapi-util.h"
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 #include "core/slang-secure-crt.h"
+#include "gfx/immediate-renderer-base.h"
+#include "gfx/mutable-shader-object.h"
+#include "gfx/nvapi/nvapi-util.h"
 #include "stb_image_write.h"
 
 #if SLANG_WIN64 || SLANG_WIN64

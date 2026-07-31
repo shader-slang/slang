@@ -1,6 +1,6 @@
 #include "slang-ir-peephole.h"
 
-#include "../core/slang-math.h"
+#include "core/slang-math.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-layout.h"

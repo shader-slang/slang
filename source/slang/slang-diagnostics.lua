@@ -211,6 +211,12 @@ warning(
     "'-separate-debug-info' is not supported for target '~target'"
 )
 
+warning(
+    "debug-info-include-source-unsupported-for-target",
+    21,
+    "'-debug-info-include-source' is not supported for target '~target'; it only affects SPIR-V output"
+)
+
 err(
     "separate-debug-info-requires-output-path",
     109,
@@ -318,6 +324,12 @@ err(
 warning("same-profile-specified-more-than-once", 40, "the '~profile' was specified more than once for target '~target'")
 
 err("conflicting-profiles-specified-for-target", 41, "conflicting profiles have been specified for target '~target'")
+
+err(
+    "conflicting-explicit-capability-and-profile",
+    46,
+    "a requested '-capability' requires a higher target version than the explicitly requested profile '~profile'; specify a higher '-profile' or remove the conflicting '-capability'"
+)
 
 err(
     "profile-specification-ignored-because-no-targets",
@@ -4765,6 +4777,13 @@ err(
     span { loc = "location", message = "the current compilation target does not support 'DescriptorHandle' types." }
 )
 
+err(
+    "target-does-not-support-ray-tracing-parameters",
+    39032,
+    "target does not support ray tracing entry point parameters",
+    span { loc = "location", message = "the current compilation target does not support ray tracing entry point parameters for the '~stage' stage" }
+)
+
 warning(
     "register-modifier-but-no-vk-binding-nor-shift",
     39029,
@@ -5650,6 +5669,12 @@ err(
     span { loc = "location", message = "a resource or other opaque-typed value ('~type:IRInst') cannot be placed in a function-local variable for Khronos targets (SPIR-V/GLSL) or WGSL; this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function" }
 )
 
+warning(
+    "precise-qualifier-unsupported-on-target",
+    56005,
+    "'precise' qualifier is not supported on target '~target' and will be ignored; Slang does not currently preserve it in generated code, so the value may be optimized with fused/contracted arithmetic",
+    span { loc = "location" }
+)
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
@@ -5719,7 +5744,7 @@ err(
     span { loc = "location", message = "SubpassInput cannot be placed inside a ParameterBlock on Metal; framebuffer fetch inputs must be direct entry-point parameters." }
 )
 
--- SPIRV (57001-57005)
+-- SPIRV (57001-57007)
 
 warning(
     "spirv-opt-failed",
@@ -5759,6 +5784,12 @@ err(
     "spirv-conflicting-descriptor-heap-stride-options",
     57006,
     "'-spirv-resource-heap-stride' and '-spirv-unified-descriptor-heap-stride' cannot be used together; an explicit resource heap stride and the unified maximum stride are mutually exclusive."
+)
+
+err(
+    "debug-info-include-source-requires-debug-info",
+    57007,
+    "'-debug-info-include-source' cannot be used with '-g0' or when no debug information is enabled; enable at least '-g1'."
 )
 
 -- GLSL Compatibility (58001-58003)

@@ -1,6 +1,6 @@
 #include "slang-ir-autodiff-primal-hoist.h"
 
-#include "../core/slang-func-ptr.h"
+#include "core/slang-func-ptr.h"
 #include "slang-ast-support-types.h"
 #include "slang-ir-autodiff-loop-analysis.h"
 #include "slang-ir-autodiff-region.h"

@@ -1,9 +1,9 @@
 // slang-ir.cpp
 #include "slang-ir.h"
 
-#include "../core/slang-basic.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-writer.h"
+#include "core/slang-basic.h"
+#include "core/slang-platform.h"
+#include "core/slang-writer.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"

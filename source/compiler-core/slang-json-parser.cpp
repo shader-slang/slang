@@ -1,7 +1,7 @@
 // slang-json-parser.cpp
 #include "slang-json-parser.h"
 
-#include "../core/slang-string-escape-util.h"
+#include "core/slang-string-escape-util.h"
 #include "slang-json-diagnostics.h"
 
 /*

@@ -36,7 +36,7 @@ jobs:
             if echo "$files" | grep -Eqx 'docs/(command-line-slangc-reference.md|user-guide/a4-02-reference-capability-atoms.md)'; then
               echo "Generated reference document changed, running checks"
               shouldRun=true
-            elif echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|\.claude/|[^/]+\.md$|\.coderabbit\.yaml$)'; then
+            elif echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|\.claude/|.*\.md$|\.coderabbit\.yaml$)'; then
               shouldRun=true
             else
               echo "Only documentation files changed, skipping remaining steps"
