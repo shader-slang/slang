@@ -260,6 +260,8 @@ works for any given binary.
 | `SLANG_ENABLE_SLANGI`                 | `TRUE`                        | Enable Slang interpreter target                                                                                                          |
 | `SLANG_ENABLE_SLANGRT`                | `TRUE`                        | Enable runtime target                                                                                                                    |
 | `SLANG_ENABLE_SLANG_GLSLANG`          | `TRUE`                        | Enable glslang dependency and slang-glslang wrapper target                                                                               |
+| `SLANG_EMBED_SLANG_GLSLANG`           | `FALSE`                       | Link the slang-glslang wrapper into slang-compiler instead of runtime loading (see "Static linking")                                     |
+| `SLANG_BUNDLE_STATIC_LIB`             | `FALSE`                       | Merge slang-compiler and all static libraries it links into one archive (requires SLANG_LIB_TYPE=STATIC)                                 |
 | `SLANG_ENABLE_SLANG_PROXY`            | `TRUE`                        | Build the legacy `slang.dll` proxy and `libslang` symlink backward-compatibility outputs for `slang-compiler`                           |
 | `SLANG_ENABLE_TESTS`                  | `TRUE`                        | Enable test targets, requires `SLANG_ENABLE_SLANG_RHI`; some tests require other CMake options                                           |
 | `SLANG_ENABLE_EXAMPLES`               | `TRUE`                        | Enable example targets, requires SLANG_ENABLE_SLANG_RHI                                                                                  |
@@ -524,6 +526,143 @@ ${SLANG_DIR}/build/Release/lib/libcore.a
 ${SLANG_DIR}/build/external/miniz/libminiz.a
 ${SLANG_DIR}/build/external/lz4/build/cmake/liblz4.a
 ```
+
+### Bundling everything into one archive
+
+`SLANG_LIB_TYPE=STATIC` produces `libslang-compiler.a`, but that archive is not usable on
+its own — linking it also requires `core`, `compiler-core`, `slang-glslang-static`,
+`glslang`, the three SPIRV-Tools archives, `miniz`, `lz4` and `cmark-gfm`. That list is an
+internal detail that changes between releases, and the installed package cannot even
+describe it: `slang_add_target` wraps private dependencies in `$<BUILD_LOCAL_INTERFACE:...>`
+to keep them out of the export set, so the installed `slang::slang` target has an empty
+`INTERFACE_LINK_LIBRARIES`.
+
+`SLANG_BUNDLE_STATIC_LIB=ON` merges all of them into a single `libslang-static.a` (or
+`slang-static.lib`), installed next to the other libraries. A consumer then links one
+archive and the C++ runtime:
+
+```bash
+c++ -std=c++17 -DSLANG_STATIC -I<prefix>/include main.cpp \
+    <prefix>/lib/libslang-static.a -lstdc++ -lm -lpthread -ldl
+```
+
+`-DSLANG_STATIC` matters: without it `slang.h` defaults to `SLANG_DYNAMIC`, which on MSVC
+decorates the API with `__declspec(dllimport)` and fails to link. Swap `-lstdc++` for
+`-static-libstdc++ -static-libgcc` if you want the result to depend only on libc.
+
+Notes:
+
+- The option requires `SLANG_LIB_TYPE=STATIC` and fails configuration otherwise.
+- Merging is flat, not nested: the output holds every member object, so the linker resolves
+  symbols across the whole set. Colliding member names are fine (SPIRV-Tools and
+  SPIRV-Tools-opt both contain a `basic_block.cpp.o`); only extraction with `ar x` would
+  clobber one with the other.
+- Archives are merged with `ar -M` (GNU/LLVM), `libtool -static` (Apple) or `lib.exe`
+  (MSVC). Other toolchains fail configuration with an explicit message rather than
+  producing a broken archive.
+- `libslang-compiler.a` is still installed alongside the bundle. A static distribution only
+  needs `libslang-static.a` and can drop the rest.
+- Release builds keep debug info by default, so the bundle is large (over 1 GB) until it is
+  stripped — `strip --strip-debug` brings it down by more than an order of magnitude. Build
+  with `-DSLANG_ENABLE_RELEASE_DEBUG_INFO=OFF` if you never want it.
+- Do not combine this with `SLANG_ENABLE_RELEASE_LTO=ON`. LTO fills the archive with
+  compiler IR instead of object code, which only links with a matching compiler version.
+
+### Removing the runtime dependency on slang-glslang
+
+`SLANG_LIB_TYPE=STATIC` gives you a static `libslang-compiler.a`, but it does not by
+itself give you a self-contained compiler. Slang emits SPIR-V natively, so a plain
+`-O0 -target spirv` compile needs nothing else. Four things do reach for the
+`slang-glslang` module, which is normally loaded from disk at runtime:
+
+- running the SPIRV-Tools optimizer, for any optimization level above `-O0`,
+- linking several SPIR-V modules together, when precompiled/embedded downstream
+  modules are used,
+- SPIR-V validation (`SLANG_RUN_SPIRV_VALIDATION=1`),
+- emitting separate SPIR-V debug info, and disassembly for `-target spirv-asm`.
+
+Set `SLANG_EMBED_SLANG_GLSLANG=ON` to compile that wrapper (and with it glslang and
+SPIRV-Tools) into a `slang-glslang-static` archive that is linked into
+`slang-compiler`. The compiler then resolves those entry points directly instead of
+calling into the OS loader, so no `slang-glslang` shared library needs to be shipped or
+found. Combine it with `SLANG_ENABLE_SLANG_GLSLANG=OFF` so the now-redundant module
+target is not built as well.
+
+A fully static SPIR-V/WGSL compiler configures roughly like this:
+
+```bash
+cmake --preset default \
+  -DSLANG_LIB_TYPE=STATIC \
+  -DSLANG_EMBED_SLANG_GLSLANG=ON \
+  -DSLANG_ENABLE_SLANG_GLSLANG=OFF \
+  -DSLANG_BUNDLE_STATIC_LIB=ON \
+  -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+  -DSLANG_ENABLE_DXIL=OFF \
+  -DSLANG_ENABLE_GFX=OFF \
+  -DSLANG_ENABLE_SLANG_RHI=OFF \
+  -DSLANG_ENABLE_TESTS=OFF \
+  -DSLANG_ENABLE_EXAMPLES=OFF \
+  -DSLANG_ENABLE_REPLAYER=OFF \
+  -DSLANG_EXCLUDE_TINT=ON
+```
+
+On Windows also pass `-DSLANG_EXCLUDE_DAWN=ON` (it defaults to `OFF` there and fetches
+`webgpu_dawn.dll`) and `-DSLANG_ENABLE_SPIRV_TOOLS_MIMALLOC=OFF` (it defaults to `ON`
+there and links a replacement allocator into the archive). Keep
+`CMAKE_MSVC_RUNTIME_LIBRARY` consistent across the whole build, including the glslang
+and SPIRV-Tools subprojects.
+
+Caveats:
+
+- WGSL is emitted natively, but the `wgsl-spirv` target still goes through the
+  `slang-tint` shared library, which is only distributed as a prebuilt binary and
+  cannot be embedded.
+- The GLSL compatibility module (`import glsl;`) is still _preferred_ from the separate
+  `slang-glsl-module` shared library, but it is not required: when that library and the
+  on-disk cache are both unavailable, `slang-api.cpp` falls back to
+  `compileBuiltinModule(GLSL, 0)` and compiles it from embedded source. Omitting it costs
+  startup time on sessions created with `enableGLSL`, not functionality.
+- Statically linked or not, the standard modules under
+  `lib/slang-standard-module-<version>/` are still loaded from disk if a shader imports
+  them (`slang.neural`, `experimental.workgraph`, ...). `getStandardModuleDirPath()` in
+  `slang-session.cpp` locates them next to whichever binary contains
+  `slang_createGlobalSession`, which for a static build is the host executable, so that
+  directory has to be deployed alongside it. See the note below on excluding them.
+- The `slang-glslang` module is built with `-Wl,--exclude-libs,ALL`, which keeps the
+  glslang and SPIRV-Tools symbols private. The static archive cannot do that at link
+  time, so a `SHARED` build that also sets `SLANG_EMBED_SLANG_GLSLANG=ON` may re-export
+  some of them. If your application links its own copy of SPIRV-Tools, expect
+  duplicate-symbol conflicts.
+
+#### The standard modules are excluded from a static distribution
+
+The standard modules are the one part of Slang that a static link cannot absorb. They are
+pre-compiled `.slang-module` data files, not code, and `findStandardModulePath()` resolves
+them by looking for `<dir-of-slang_createGlobalSession>/slang-standard-module-<version>/`
+on disk at import time. Linking Slang into a host binary does not change that; it only
+moves the directory the compiler searches, from next to `libslang-compiler.so` to next to
+the host executable.
+
+For a static distribution whose whole point is a single self-contained binary, shipping a
+5.9 MB sibling directory defeats the exercise, and build systems that consume a static
+library (Cargo, in particular) have no supported way to place data files next to the final
+executable. So a static release built from this branch deliberately ships **only** the
+library and headers, and drops `slang.neural` and `experimental.workgraph`.
+
+The cost is bounded and explicit: a shader that says `import slang.neural;` or
+`import experimental.workgraph;` gets a module-not-found diagnostic instead of compiling.
+Nothing else is affected — `findStandardModulePath()` returns an empty path when the
+directory is missing, and the core module is embedded in the binary
+(`SLANG_EMBED_CORE_MODULE`), so ordinary SPIR-V and WGSL compilation needs no files on
+disk at all.
+
+Both modules are built and installed unconditionally today
+(`add_custom_target(... ALL ...)` plus an unconditional `install()` in
+`source/standard-modules/neural/CMakeLists.txt` and
+`source/standard-modules/experimental/CMakeLists.txt`), so excluding them is currently a
+packaging step: omit `lib/slang-standard-module-<version>/` when assembling the release
+archive. If the build-time cost matters, gating both `add_subdirectory()` calls in
+`source/standard-modules/CMakeLists.txt` behind an option is the natural follow-up.
 
 ## Deprecation of libslang and slang.dll filenames
 

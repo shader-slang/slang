@@ -163,13 +163,9 @@ static void validationMessageConsumer(
 }
 
 // Validate the given SPIRV-ASM instructions.
-extern "C"
-#ifdef _MSC_VER
-    _declspec(dllexport)
-#else
-    __attribute__((__visibility__("default")))
-#endif
-        bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
+extern "C" SLANG_GLSLANG_EXPORT bool glslang_validateSPIRV(
+    const uint32_t* contents,
+    int contentsSize)
 {
     spv_target_env target_env = SPV_ENV_VULKAN_1_4;
 
@@ -185,16 +181,10 @@ extern "C"
 
 // Disassemble the given SPIRV-ASM instructions and return the result as a string.
 // The caller owns *outString and must release it with glslang_freeDisassembly().
-extern "C"
-#ifdef _MSC_VER
-    _declspec(dllexport)
-#else
-    __attribute__((__visibility__("default")))
-#endif
-        bool glslang_disassembleSPIRVWithResult(
-            const uint32_t* contents,
-            int contentsSize,
-            char** outString)
+extern "C" SLANG_GLSLANG_EXPORT bool glslang_disassembleSPIRVWithResult(
+    const uint32_t* contents,
+    int contentsSize,
+    char** outString)
 {
     static const auto kDefaultEnvironment = SPV_ENV_UNIVERSAL_1_5;
     spv_text text;
@@ -232,26 +222,16 @@ extern "C"
 }
 
 // Free a disassembly buffer returned by glslang_disassembleSPIRVWithResult.
-extern "C"
-#ifdef _MSC_VER
-    _declspec(dllexport)
-#else
-    __attribute__((__visibility__("default")))
-#endif
-        void glslang_freeDisassembly(char* disassembly)
+extern "C" SLANG_GLSLANG_EXPORT void glslang_freeDisassembly(char* disassembly)
 {
     delete[] disassembly;
 }
 
 
 // Disassemble the given SPIRV-ASM instructions.
-extern "C"
-#ifdef _MSC_VER
-    _declspec(dllexport)
-#else
-    __attribute__((__visibility__("default")))
-#endif
-        bool glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize)
+extern "C" SLANG_GLSLANG_EXPORT bool glslang_disassembleSPIRV(
+    const uint32_t* contents,
+    int contentsSize)
 {
     char* result = nullptr;
     auto succ = glslang_disassembleSPIRVWithResult(contents, contentsSize, &result);
@@ -970,13 +950,7 @@ static int _compile(const glslang_CompileRequest_1_2& request)
     return result;
 }
 
-extern "C"
-#ifdef _MSC_VER
-    _declspec(dllexport)
-#else
-    __attribute__((__visibility__("default")))
-#endif
-        int glslang_compile_1_2(glslang_CompileRequest_1_2* inRequest)
+extern "C" SLANG_GLSLANG_EXPORT int glslang_compile_1_2(glslang_CompileRequest_1_2* inRequest)
 {
     static ProcessInitializer g_processInitializer;
     if (!g_processInitializer.init())
@@ -1009,13 +983,7 @@ extern "C"
     }
 }
 
-extern "C"
-#ifdef _MSC_VER
-    _declspec(dllexport)
-#else
-    __attribute__((__visibility__("default")))
-#endif
-        int glslang_compile_1_1(glslang_CompileRequest_1_1* inRequest)
+extern "C" SLANG_GLSLANG_EXPORT int glslang_compile_1_1(glslang_CompileRequest_1_1* inRequest)
 {
     glslang_CompileRequest_1_2 request;
     memset(&request, 0, sizeof(request));
@@ -1024,13 +992,7 @@ extern "C"
     return glslang_compile_1_2(&request);
 }
 
-extern "C"
-#ifdef _MSC_VER
-    _declspec(dllexport)
-#else
-    __attribute__((__visibility__("default")))
-#endif
-        int glslang_compile(glslang_CompileRequest_1_0* inRequest)
+extern "C" SLANG_GLSLANG_EXPORT int glslang_compile(glslang_CompileRequest_1_0* inRequest)
 {
     glslang_CompileRequest_1_1 request;
     memset(&request, 0, sizeof(request));
@@ -1039,13 +1001,7 @@ extern "C"
     return glslang_compile_1_1(&request);
 }
 
-extern "C"
-#ifdef _MSC_VER
-    _declspec(dllexport)
-#else
-    __attribute__((__visibility__("default")))
-#endif
-        int glslang_linkSPIRV(glslang_LinkRequest* request)
+extern "C" SLANG_GLSLANG_EXPORT int glslang_linkSPIRV(glslang_LinkRequest* request)
 {
     if (!request || !request->modules || request->linkResult)
         return false;

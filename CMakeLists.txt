@@ -165,6 +165,16 @@ option(
     ON
 )
 option(
+    SLANG_EMBED_SLANG_GLSLANG
+    "Link the slang-glslang wrapper (glslang and SPIRV-Tools) directly into slang-compiler instead of loading it as a runtime module. Required for a fully static build that can still optimize, link, validate and disassemble SPIR-V."
+    OFF
+)
+option(
+    SLANG_BUNDLE_STATIC_LIB
+    "Merge slang-compiler and every static library it links into a single self-contained archive, so consumers link one library instead of a dozen. Requires SLANG_LIB_TYPE=STATIC."
+    OFF
+)
+option(
     SLANG_ENABLE_SLANG_PROXY
     "Build the legacy slang.dll proxy and libslang symlink backward-compatibility outputs for slang-compiler"
     ON
