@@ -4536,6 +4536,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         case hlsl:
             __intrinsic_asm ".Load";
 		case cuda:
+            // The 'tex*fetch_int<T>' prelude templates below are only instantiated for
+            // float/uint/int, so a half texel would fail at NVRTC link time; reject it here.
+            static_assert(!__isHalf<T>(),
+                "'Load' of a half-typed texture is not supported for the 'cuda' target; use a float/uint/int texture. Some RWTexture half widths can be read via the surface software-conversion path instead -- see docs/cuda-target.md.");
             if (isArray != 0)
             {
                 switch(Shape.flavor)
