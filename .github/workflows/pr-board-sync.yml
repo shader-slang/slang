@@ -140,7 +140,7 @@ on:
         type: string
         default: "Bot"
       source_internal_team:
-        description: "Base org/team-slug for Source Internal (default shader-slang/source-internal). Also includes sibling teams whose slug starts with that slug plus '-' (e.g. source-internal-*) when their description has 'Scope: [repo1, repo2]' listing repositories (bare short names or owner/repo; matching is by short name)."
+        description: "Base org/team-slug for Source Internal (default shader-slang/source-internal). Also includes sibling teams whose slug starts with that slug plus '-' (e.g. source-internal-*) when their description has 'Scope: [repo1, repo2]' listing repositories (bare short names or owner/repo; matching is by short name). Scope authoring: label is case-insensitive, first Scope: wins, write 'Scope: [...]' with no space before the colon."
         type: string
         default: "shader-slang/source-internal"
       bot_authors:
@@ -371,9 +371,13 @@ jobs:
             //
             // Returns null -- meaning "membership is unknown for this repo" --
             // when the family is null (the org team list was unreadable) or when
-            // a team that covers this repo has members === null (its roster was
-            // unreadable). Callers must not treat that as "not a member": a
-            // transient API error would then be persisted as Community.
+            // a team that covers this repo has a falsy members (null/undefined;
+            // its roster was unreadable). Relies on loadSourceInternalIndex
+            // always including the base entry (repos === null) in a non-null
+            // family; without that, a repo covered by nothing would look like
+            // Community instead of unknown. Callers must not treat null as
+            // "not a member": a transient API error would then be persisted as
+            // Community.
             function internalMembersForRepo(repo, teams) {
               if (!teams) return null;
               const short = repoShortName(repo);
@@ -394,8 +398,9 @@ jobs:
 
             // Classify Source from bot flag + resolved team membership, or null
             // when membership could not be determined so the caller leaves Source
-            // unset. members === null is that unknown; an EMPTY set is a
-            // successful read of a family nobody is on, hence Community.
+            // unset. Any falsy members (null/undefined) is that unknown; an
+            // EMPTY set is a successful read of a family nobody is on, hence
+            // Community.
             function classifyAuthorSource({ isBot, login, members,
                                            sourceBot, sourceInternal, sourceCommunity }) {
               if (isBot) return sourceBot;
@@ -1550,9 +1555,13 @@ jobs:
             //
             // Returns null -- meaning "membership is unknown for this repo" --
             // when the family is null (the org team list was unreadable) or when
-            // a team that covers this repo has members === null (its roster was
-            // unreadable). Callers must not treat that as "not a member": a
-            // transient API error would then be persisted as Community.
+            // a team that covers this repo has a falsy members (null/undefined;
+            // its roster was unreadable). Relies on loadSourceInternalIndex
+            // always including the base entry (repos === null) in a non-null
+            // family; without that, a repo covered by nothing would look like
+            // Community instead of unknown. Callers must not treat null as
+            // "not a member": a transient API error would then be persisted as
+            // Community.
             function internalMembersForRepo(repo, teams) {
               if (!teams) return null;
               const short = repoShortName(repo);
@@ -1573,8 +1582,9 @@ jobs:
 
             // Classify Source from bot flag + resolved team membership, or null
             // when membership could not be determined so the caller leaves Source
-            // unset. members === null is that unknown; an EMPTY set is a
-            // successful read of a family nobody is on, hence Community.
+            // unset. Any falsy members (null/undefined) is that unknown; an
+            // EMPTY set is a successful read of a family nobody is on, hence
+            // Community.
             function classifyAuthorSource({ isBot, login, members,
                                            sourceBot, sourceInternal, sourceCommunity }) {
               if (isBot) return sourceBot;

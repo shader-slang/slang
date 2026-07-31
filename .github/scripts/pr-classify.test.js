@@ -398,6 +398,21 @@ test("loadSourceInternalIndex: ignores and warns on unscoped sibling", async () 
   assert.ok(s.warnings.some((w) => w.includes("has no 'Scope:")));
 });
 
+test("loadSourceInternalIndex: unreadable base roster keeps null members", async () => {
+  // Listing succeeds but the base roster read fails: the family still includes
+  // the base entry so internalMembersForRepo can poison the result to unknown
+  // instead of treating "no covering members" as Community.
+  const s = sourceIndex({
+    teams: [{ slug: "source-internal", description: "" }],
+    members: { "shader-slang/source-internal": null },
+  });
+  assert.deepStrictEqual(await s.load(), [{ repos: null, members: null }]);
+  assert.strictEqual(
+    internalMembersForRepo("shader-slang/slang", await s.load()),
+    null,
+  );
+});
+
 // --- team-roster cache (fake paginate, like pr-signal countingGh) -----------
 const { createTeamReadCache } = reconcileRoster;
 

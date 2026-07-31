@@ -18,8 +18,10 @@ For each open PR the workflow:
    `shader-slang/source-internal`; direct or nested), plus sibling teams whose
    slug starts with that base plus `-` (e.g. `source-internal-slangpy`) when
    their description includes `Scope: [repo1, repo2]` for this repository
-   (bare short names or `owner/repo`; matching is by short name). Repo
-   write access is **not** used for Source.
+   (bare short names or `owner/repo`; matching is by short name). Write
+   `Scope: [...]` with no space before the colon; the label is
+   case-insensitive and the first `Scope:` wins. Repo write access is **not**
+   used for Source.
 3. Recomputes **Status** from live PR state (`In Review`, `Revising`, `Snagged`,
    `Approved`, `Done`).
 4. Backfills **assignee** and **reviewers** when the PR has no owner yet.

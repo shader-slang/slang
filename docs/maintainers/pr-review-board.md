@@ -30,8 +30,10 @@ How Source is classified today:
   direct or nested membership, org-wide), **or** of a sibling
   `source-internal-*` team whose description includes `Scope:` listing this
   repository (bare short name or `owner/repo` inside brackets; matching is by
-  short name only, e.g. `Scope: [slangpy, slangpy-samples]`). The author is
-  assigned; no reviewer is auto-requested (they are expected to find one).
+  short name only, e.g. `Scope: [slangpy, slangpy-samples]`). Write
+  `Scope: [...]` with no space before the colon; the label is case-insensitive
+  and the first `Scope:` wins if several appear. The author is assigned; no
+  reviewer is auto-requested (they are expected to find one).
 - **Community** — everyone else who is not a bot. A maintainer is assigned to
   shepherd it and arrange review.
 - **Bot** — opened by an automated coworker. A maintainer is assigned to
@@ -51,13 +53,13 @@ same files, or ask in the team channel.
 
 ## What each `Status` means for you
 
-| Status | What it means | Do you act? |
-|---|---|---|
-| **In Review** | The default for an open PR: awaiting review, CI still running, or a fresh commit not yet reviewed. (A **Bot draft** sits here too, so you can see and shepherd it.) | **Yes** — review it, or make sure a real reviewer is requested. |
-| **Revising** | The author is working: a **human draft**, or a reviewer requested changes. (A **Bot** PR's failed CI also lands here — the bot fixes itself.) | **No** — it's on the author/bot until it moves. |
-| **Snagged** | Needs a human's attention: a human PR's **CI failed**, **CI is awaiting your approval to run** (fork PRs from new contributors), or the PR is **approved + green but not in the merge queue** (it fell out, or needs someone to enqueue/merge it). | **Yes** — approve the CI run, help fix CI, or enqueue/merge. |
-| **Approved** | Not a draft, already has an approving review, and is waiting only on CI or the merge queue. | **No** — automated; nothing to do. |
-| **Done** | The PR is closed (merged or otherwise). Terminal. | No. |
+| Status        | What it means                                                                                                                                                                                                                                      | Do you act?                                                     |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| **In Review** | The default for an open PR: awaiting review, CI still running, or a fresh commit not yet reviewed. (A **Bot draft** sits here too, so you can see and shepherd it.)                                                                                | **Yes** — review it, or make sure a real reviewer is requested. |
+| **Revising**  | The author is working: a **human draft**, or a reviewer requested changes. (A **Bot** PR's failed CI also lands here — the bot fixes itself.)                                                                                                      | **No** — it's on the author/bot until it moves.                 |
+| **Snagged**   | Needs a human's attention: a human PR's **CI failed**, **CI is awaiting your approval to run** (fork PRs from new contributors), or the PR is **approved + green but not in the merge queue** (it fell out, or needs someone to enqueue/merge it). | **Yes** — approve the CI run, help fix CI, or enqueue/merge.    |
+| **Approved**  | Not a draft, already has an approving review, and is waiting only on CI or the merge queue.                                                                                                                                                        | **No** — automated; nothing to do.                              |
+| **Done**      | The PR is closed (merged or otherwise). Terminal.                                                                                                                                                                                                  | No.                                                             |
 
 In short: **`In Review` and `Snagged` are the two columns that want you.**
 `Revising`/`Approved` are waiting on someone/something else, and `Done` is finished.
