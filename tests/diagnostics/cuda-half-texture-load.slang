@@ -1,8 +1,8 @@
 // https://github.com/shader-slang/slang/issues/12277
 //
 // A read-only texture Load on CUDA lowers to the prelude `tex*fetch_int<T>`
-// templates, which are instantiated only for float/uint/int, so a half texel
-// must be diagnosed (E41400) rather than emitting an undefined-template call.
+// templates, which have no half implementation (float/uint/int only), so a half
+// texel must be diagnosed (E41400) rather than emitting broken CUDA.
 // The supported controls below and the RWTexture surface path must stay clean.
 // Full half-texel fetch support is tracked by #10024.
 
