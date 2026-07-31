@@ -4,7 +4,7 @@
 // templates, which have no half implementation (float/uint/int only), so a half
 // texel must be diagnosed (E41400) rather than emitting broken CUDA.
 // The supported controls below and the RWTexture surface path must stay clean.
-// Full half-texel fetch support is tracked by #10024.
+// Real half-texel fetch is deferred to the maintainer-linked refactoring (#10024).
 
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=H1): -target cuda -entry eHalf -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=H2): -target cuda -entry eHalf2 -stage compute
