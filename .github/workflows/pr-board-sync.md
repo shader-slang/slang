@@ -60,14 +60,14 @@ flowchart TB
 
 ### Callers in `shader-slang/slang`
 
-| Workflow | Trigger | Mode | Notes |
-| --- | --- | --- | --- |
-| `pr-maintenance.yml` | `pull_request_target`, origin `pull_request_review`, `check_suite` | event | Fork reviews are skipped here and relayed below. |
-| `pr-ci-complete.yml` | `workflow_run` (gating checks completed) | event | Actions CI does not emit usable `check_suite`. |
-| `pr-commit-status.yml` | `status` (non-pending) | event | External statuses (`SlangPy Tests`, `license/cla`, …). |
-| `pr-sweep-nightly.yml` | `schedule`, `workflow_dispatch` | **sweep** | Reconciles every open PR in the repo. |
-| `pr-review-fork-bridge.yml` | fork `pull_request_review` | relay only | No secrets; completes to trigger apply. |
-| `pr-review-fork-apply.yml` | `workflow_run` (bridge completed) | event | Privileged path for fork reviews. |
+| Workflow                    | Trigger                                                            | Mode       | Notes                                                  |
+| --------------------------- | ------------------------------------------------------------------ | ---------- | ------------------------------------------------------ |
+| `pr-maintenance.yml`        | `pull_request_target`, origin `pull_request_review`, `check_suite` | event      | Fork reviews are skipped here and relayed below.       |
+| `pr-ci-complete.yml`        | `workflow_run` (gating checks completed)                           | event      | Actions CI does not emit usable `check_suite`.         |
+| `pr-commit-status.yml`      | `status` (non-pending)                                             | event      | External statuses (`SlangPy Tests`, `license/cla`, …). |
+| `pr-sweep-nightly.yml`      | `schedule`, `workflow_dispatch`                                    | **sweep**  | Reconciles every open PR in the repo.                  |
+| `pr-review-fork-bridge.yml` | fork `pull_request_review`                                         | relay only | No secrets; completes to trigger apply.                |
+| `pr-review-fork-apply.yml`  | `workflow_run` (bridge completed)                                  | event      | Privileged path for fork reviews.                      |
 
 **Event mode** reconciles the single PR (or PRs for a commit SHA) that triggered
 the run. **Sweep mode** lists every open PR in the repo and runs the same per-PR
@@ -88,13 +88,12 @@ In implementation terms:
   yields no Source at all (`classifyAuthorSource` returns null and the write is
   skipped, as is assignment, which needs Source) rather than a guessed
   `Community`.
-- Team reads are cached per run at the API level: the org team listing
-  (`listOrgTeams`) and each roster (`tryListTeamMembers`) are each fetched once
-  on success, so a sweep enumerates teams once and rebuilds the source-internal
-  family in memory per PR. A failed read is not cached — a later PR can recover
-  from a transient error — but each read gets an attempt budget
-  (`MAX_TEAM_READ_ATTEMPTS`) so a persistent failure costs a couple of requests
-  per run instead of one per PR.
+- Team reads use bounded exponential backoff before returning: by default each
+  org-team listing or roster gets three attempts, delayed by 1 then 2 seconds.
+  The settled success or failure is cached in memory for the rest of that
+  workflow run, so a sweep enumerates each team at most once after retries and
+  rebuilds the source-internal family in memory per PR. The next workflow run
+  starts with a fresh cache and retries previously failed reads.
 - `computeTarget()` maps observed PR state to Status for event and sweep mode.
 - `Done` is terminal: once the board Status is `Done`, later events leave it
   unchanged.
@@ -105,9 +104,9 @@ In implementation terms:
 linked-issue sync when already assigned). Skips human drafts (except Bot PRs) and
 merge-queued PRs.
 
-| Source | Assignee | Reviewers |
-| --- | --- | --- |
-| **Internal** | PR author | none |
+| Source              | Assignee             | Reviewers                                                                          |
+| ------------------- | -------------------- | ---------------------------------------------------------------------------------- |
+| **Internal**        | PR author            | none                                                                               |
 | **Community / Bot** | see pick order below | assignee + top collaborator-not-owner, unless a real reviewer is already requested |
 
 **Pick order** (Community/Bot):
@@ -157,11 +156,11 @@ group.
 
 ## Fork PRs on public repos
 
-| Event | Secret for fork PR? | Path |
-| --- | --- | --- |
-| `pull_request_target` | yes | `pr-maintenance.yml` → direct |
-| `pull_request_review` | **no** | `pr-review-fork-bridge.yml` → `pr-review-fork-apply.yml` (`workflow_run`) |
-| `workflow_run`, `status`, `schedule` | yes | respective callers → direct |
+| Event                                | Secret for fork PR? | Path                                                                      |
+| ------------------------------------ | ------------------- | ------------------------------------------------------------------------- |
+| `pull_request_target`                | yes                 | `pr-maintenance.yml` → direct                                             |
+| `pull_request_review`                | **no**              | `pr-review-fork-bridge.yml` → `pr-review-fork-apply.yml` (`workflow_run`) |
+| `workflow_run`, `status`, `schedule` | yes                 | respective callers → direct                                               |
 
 When `SLANG_PR_BOT_TOKEN` is unavailable, privileged steps skip cleanly (`HAS_TOKEN`).
 
