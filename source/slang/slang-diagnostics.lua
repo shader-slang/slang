@@ -5662,6 +5662,12 @@ err(
     span { loc = "location", message = "a resource or other opaque-typed value ('~type:IRInst') cannot be placed in a function-local variable for Khronos targets (SPIR-V/GLSL) or WGSL; this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function" }
 )
 
+warning(
+    "precise-qualifier-unsupported-on-target",
+    56005,
+    "'precise' qualifier is not supported on target '~target' and will be ignored; Slang does not currently preserve it in generated code, so the value may be optimized with fused/contracted arithmetic",
+    span { loc = "location" }
+)
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)

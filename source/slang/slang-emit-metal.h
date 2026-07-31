@@ -54,6 +54,7 @@ protected:
     }
 
     void emitMemoryOrderOperand(IRInst* inst);
+    virtual void emitTempModifiers(IRInst* temp) SLANG_OVERRIDE;
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
         SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(

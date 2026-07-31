@@ -3,10 +3,12 @@
 
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "core/slang-token-reader.h"
+#include "core/slang-type-text-util.h"
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 #include <assert.h>
 
@@ -1298,6 +1300,17 @@ void CPPSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* de
         // This relies on a suitable definition in slang-cpp-prelude.h or defined in C++ compiler
         // invocation.
         m_writer->emit("SLANG_UNROLL\n");
+    }
+}
+
+void CPPSourceEmitter::emitTempModifiers(IRInst* temp)
+{
+    // C/C++ (and, via inheritance, CUDA) has no `precise` keyword; drop it and warn.
+    if (temp->findDecoration<IRPreciseDecoration>())
+    {
+        getSink()->diagnose(Diagnostics::PreciseQualifierUnsupportedOnTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+            .location = temp->sourceLoc});
     }
 }
 
