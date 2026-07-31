@@ -48,6 +48,18 @@ file(MAKE_DIRECTORY "${output_dir}")
 if(SLANG_BUNDLE_TOOL STREQUAL "ar")
     # GNU ar and llvm-ar merge archives through an MRI script, which has to arrive on
     # stdin. `addlib` splices in the members of an existing archive rather than nesting it.
+    #
+    # The MRI format has no quoting or escaping, so a path containing a space cannot be
+    # represented at all -- ar would read it as two tokens and fail somewhere mid-merge
+    # with an unrelated-looking error. Reject such paths up front with a real message.
+    foreach(path "${SLANG_BUNDLE_OUTPUT}" ${libs})
+        if(path MATCHES " ")
+            message(
+                FATAL_ERROR
+                "BundleStaticLibraryImpl: '${path}' contains a space, which ar's MRI script format cannot represent. Build in a directory whose path has no spaces."
+            )
+        endif()
+    endforeach()
     set(mri "${SLANG_BUNDLE_OUTPUT}.mri")
     set(mri_content "create ${SLANG_BUNDLE_OUTPUT}\n")
     foreach(lib ${libs})
