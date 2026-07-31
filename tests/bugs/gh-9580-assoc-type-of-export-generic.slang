@@ -1,7 +1,7 @@
 // Companion to gh-9580-assoc-type-of-export.slang covering a *type-generic* link-time
-// wrapper. `resolveLinkTimeAssociatedType` substitutes the wrapper's stored conformance
+// wrapper. `resolveLinkTimeWrapperMemberType` substitutes the wrapper's stored conformance
 // witness through the inheritance clause (which binds `T = ColorOutput`) before resolving
-// the associated type, so `ShaderMode<ColorOutput>::FragOut` resolves to the concrete
+// the looked-up member, so `ShaderMode<ColorOutput>::FragOut` resolves to the concrete
 // `ColorOutput` rather than the unbound generic parameter `T`. Without that substitution
 // the unbound `T` leaks into layout and the compiler aborts. See shader-slang/slang#9580.
 

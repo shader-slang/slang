@@ -1559,8 +1559,14 @@ struct TypeLayoutContext
     // their linked in definitions during layout generation
     std::optional<Dictionary<String, Type*>> externTypeMap;
 
+    // Resolve any link-time-specialized types reachable from `declRefType` to something concrete
+    // before it is laid out, or return `declRefType` unchanged when nothing is known to resolve.
+    // This is the single policy bottleneck the layout code goes through; see its definition in
+    // slang-type-layout.cpp for the shapes it handles and how nested positions are reached.
+    Type* tryResolveAllLinkTimeTypesInDeclRef(DeclRefType* declRefType);
+
     Type* lookupExternDeclRefType(DeclRefType* declRefType);
-    Type* resolveLinkTimeAssociatedType(DeclRefType* declRefType);
+    Type* resolveLinkTimeWrapperMemberType(DeclRefType* declRefType);
     void buildExternTypeMap();
 
     LayoutRulesImpl* getRules() { return rules; }

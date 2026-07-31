@@ -2,8 +2,8 @@
 // point returning a link-time `export` struct *directly* (rather than an associated
 // type of one) already worked before the #9580 fix and must keep working. This is
 // the "VARIANT 1" from the issue's reproducer, kept as an explicit guard so the
-// associated-type fix in `resolveLinkTimeAssociatedType` cannot regress the
-// direct-export path that flows through `lookupExternDeclRefType`.
+// link-time member resolution in `resolveLinkTimeWrapperMemberType` cannot regress
+// the direct-export path that flows through `lookupExternDeclRefType`.
 
 //TEST:REFLECTION(filecheck=REFL): -target spirv -stage fragment -entry ps_main
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv
