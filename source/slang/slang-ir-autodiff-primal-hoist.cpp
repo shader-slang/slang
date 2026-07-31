@@ -1359,11 +1359,13 @@ void applyToInst(
                     SLANG_ASSERT(indexInfo->getCount() != 0);
                     replacement = indexInfo->getFirst().diffCountParam;
 
-                    // Reconstruct the affine value in the original induction type. The synthetic
-                    // reverse-loop count is an `int`, but the source loop may use another integer
-                    // type or width. Consider `for (int16_t i = -3; ...; ++i)`: adding the `int`
-                    // count directly to the `int16_t` offset creates mismatched operands, while
-                    // converting the count first produces `int16_t(count) + int16_t(-3)`.
+                    // Convert the synthetic reverse-loop count to the original induction type
+                    // before applying the factor and offset. The loop's initial argument
+                    // (`counterOffset`, when present) already has that type, so every following
+                    // affine arithmetic operation is formed in the induction type. Consider
+                    // `for (int16_t i = -3; ...; ++i)`: adding the raw `int` count to the
+                    // `int16_t` offset creates mismatched operands, while converting the count
+                    // first produces `int16_t(count) + int16_t(-3)`.
                     if (replacement->getDataType() != inst->getDataType())
                     {
                         setInsertAfterOrdinaryInst(builder, replacement);
