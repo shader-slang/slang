@@ -4541,7 +4541,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             // so a half texel produces broken CUDA. Reject it here; the shape catch-all
             // below does not.
             static_assert(!__isHalf<T>(),
-                "'Load' of a half-typed texture is not supported for the 'cuda' target; use a float/uint/int texture. Some RWTexture half widths can be read via the surface software-conversion path instead -- see docs/cuda-target.md.");
+                "'Load' of a half-typed texture is not supported for the 'cuda' target. Use a float texture instead -- CUDA widens f16-format data to f32 on read for free; narrow back to half in-shader if you need it. See docs/cuda-target.md.");
             if (isArray != 0)
             {
                 switch(Shape.flavor)
