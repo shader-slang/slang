@@ -14,9 +14,12 @@ name: CI
 # guarded job (test-materialx-windows-release) are left alone; GitHub skips
 # them automatically once their dependency skips.
 #
-# `check-ci` accepts `skipped` as a passing result off upstream so the
-# aggregate gate can still go green here. Upstream semantics are unchanged:
-# on shader-slang/slang nothing is guarded and only `success` passes.
+# `check-ci` accepts `skipped` as a passing result off upstream, but only for
+# an enumerated list of these guarded jobs (plus their dependents), so the
+# aggregate gate can go green here without letting an accidentally skipped job
+# through. Keep that list in the check-ci step in sync with the `# SELF-HOSTED:`
+# guards below. Upstream semantics are unchanged: on shader-slang/slang nothing
+# is guarded and only `success` passes.
 
 on:
   workflow_dispatch:
@@ -760,15 +763,37 @@ jobs:
           #
           # FORK NOTE: off shader-slang/slang the self-hosted jobs are guarded
           # off (see the note at the top of this file) and resolve to
-          # "skipped", so `skipped` is accepted as passing there. Upstream
-          # keeps the strict success-only rule.
+          # "skipped", as does test-materialx-windows-release, which skips
+          # because it depends on one of them. `skipped` is accepted as
+          # passing for exactly those jobs and no others, so a job skipped by
+          # an accidental `if:` regression still fails the gate. Upstream
+          # keeps the strict success-only rule for everything.
           if [[ "$GITHUB_REPOSITORY" == "shader-slang/slang" ]]; then
-            passing='["success"]'
+            allowed_skips='[]'
           else
-            passing='["success", "skipped"]'
+            allowed_skips='[
+              "build-windows-debug-cl-x86_64-gpu",
+              "build-windows-release-cl-x86_64-gpu",
+              "test-windows-debug-cl-x86_64-gpu",
+              "test-windows-debug-cl-x86_64-gpu-rhi",
+              "test-windows-release-cl-x86_64-gpu",
+              "test-windows-release-cl-x86_64-gpu-rhi",
+              "test-linux-debug-gcc-x86_64",
+              "test-linux-debug-gcc-x86_64-rhi",
+              "test-linux-release-gcc-x86_64",
+              "test-linux-release-gcc-x86_64-rhi",
+              "test-linux-release-gcc-x86_64-sm80",
+              "test-materialx-windows-release",
+              "test-falcor",
+              "test-compile-regression",
+              "test-benchmark"
+            ]'
           fi
-          unsuccessful=$(echo "$NEEDS_JSON" | jq -r --argjson passing "$passing" 'to_entries[]
-            | select(.value.result as $r | $passing | index($r) | not)
+          unsuccessful=$(echo "$NEEDS_JSON" | jq -r --argjson allowed_skips "$allowed_skips" 'to_entries[]
+            | select(
+                (.value.result == "success"
+                 or (.value.result == "skipped" and ([.key] | inside($allowed_skips))))
+                | not)
             | "\(.key): \(.value.result)"')
           if [[ -n "$unsuccessful" ]]; then
             echo "These CI jobs did not succeed:"
