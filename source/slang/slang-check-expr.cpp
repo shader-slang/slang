@@ -5879,6 +5879,7 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             return;
         }
         auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
+        resultDiffExpr->hasExplicitThisParameter = thisType.type != nullptr;
         resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, thisType);
         if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
         {
@@ -5920,6 +5921,7 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
             return;
         }
         auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
+        resultDiffExpr->hasExplicitThisParameter = thisType.type != nullptr;
         resultDiffExpr->type = semantics->getBackwardDiffFuncType(baseFuncType, thisType);
         if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
         {
@@ -6081,6 +6083,7 @@ struct ApplyForBwdExprCheckingActions : HigherOrderInvokeExprCheckingActions
         // __apply(fn) takes the same params as fn (not wrapped in DifferentialPair).
         // Give it the base function type so overload resolution works with original args.
         auto thisType = getThisTypeForBaseFunc(semantics, funcExpr);
+        resultExpr->hasExplicitThisParameter = thisType.type != nullptr;
         if (thisType.type)
         {
             List<Type*> paramTypes;

@@ -16269,25 +16269,20 @@ static Expr* _createImaginaryArgForParamType(
 
 /// Creates the imaginary receiver argument exposed by one checked higher-order candidate.
 ///
-/// The checked callable must name its leading parameter `this` and have exactly one more parameter
-/// than the explicit imaginary arguments. That extra parameter is the synthesized receiver.
+/// Higher-order checking records when it makes a member receiver an explicit leading parameter.
+/// Use that parameter's checked type and passing mode instead of reconstructing either from the
+/// operand syntax.
 static Expr* _tryCreateImaginaryThisArgFromHigherOrderCandidate(
     SemanticsVisitor* visitor,
     Expr* candidateExpr,
-    Index explicitArgCount,
     SourceLoc loc)
 {
     auto higherOrderExpr = as<HigherOrderInvokeExpr>(candidateExpr);
-    if (!higherOrderExpr)
-        return nullptr;
-
-    if (higherOrderExpr->newParameterNames.getCount() == 0 ||
-        higherOrderExpr->newParameterNames[0] != visitor->getName("this"))
+    if (!higherOrderExpr || !higherOrderExpr->hasExplicitThisParameter)
         return nullptr;
 
     auto funcType = as<FuncType>(higherOrderExpr->type.type);
-    if (!funcType || funcType->getParamCount() != explicitArgCount + 1)
-        return nullptr;
+    SLANG_ASSERT(funcType && funcType->getParamCount() != 0);
 
     return _createImaginaryArgForParamType(
         visitor->getASTBuilder(),
@@ -16371,7 +16366,6 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
         if (auto thisArg = _tryCreateImaginaryThisArgFromHigherOrderCandidate(
                 &subVisitor,
                 checkedApplyExpr,
-                fakeArgs.getCount(),
                 decl->loc))
         {
             fakeArgs.insert(0, thisArg);
@@ -19029,53 +19023,61 @@ static void checkDerivativeAttribute(
     FunctionDeclBase* funcDecl,
     PrimalSubstituteAttribute* attr);
 
-/// Creates the imaginary receiver shared by all viable higher-order overload candidates.
+/// Returns whether a checked higher-order expression exposes an explicit receiver parameter.
 ///
-/// Member candidates must agree on the receiver type and passing mode. Otherwise the caller leaves
-/// the argument list unchanged so ordinary overload resolution can diagnose the mismatch.
-static Expr* _tryCreateImaginaryThisArgForDerivativeOfAttribute(
-    SemanticsVisitor* visitor,
-    Expr* checkedHigherOrderExpr,
-    Index explicitArgCount,
-    SourceLoc loc)
+/// An overload set needs a receiver when any candidate explicitly exposes one. The caller supplies
+/// its actual receiver type, so ordinary overload resolution still decides which candidates accept
+/// it instead of pre-filtering candidates by parameter count.
+static bool _hasExplicitThisParameter(Expr* checkedHigherOrderExpr)
 {
-    if (auto thisArg = _tryCreateImaginaryThisArgFromHigherOrderCandidate(
-            visitor,
-            checkedHigherOrderExpr,
-            explicitArgCount,
-            loc))
-        return thisArg;
+    if (auto higherOrderExpr = as<HigherOrderInvokeExpr>(checkedHigherOrderExpr))
+        return higherOrderExpr->hasExplicitThisParameter;
 
     if (auto overloadedExpr = as<OverloadedExpr2>(checkedHigherOrderExpr))
     {
-        Expr* result = nullptr;
         for (auto candidateExpr : overloadedExpr->candidateExprs)
-        {
-            auto candidateThisArg = _tryCreateImaginaryThisArgFromHigherOrderCandidate(
-                visitor,
-                candidateExpr,
-                explicitArgCount,
-                loc);
-            if (!candidateThisArg)
-                continue;
-
-            // Viable member candidates must agree on the receiver type. If they do not, leave the
-            // argument list unchanged so overload resolution reports the mismatch.
-            if (result)
-            {
-                if (result->type.isLeftValue != candidateThisArg->type.isLeftValue ||
-                    !result->type.type->equals(candidateThisArg->type.type))
-                    return nullptr;
-            }
-            else
-            {
-                result = candidateThisArg;
-            }
-        }
-        return result;
+            if (_hasExplicitThisParameter(candidateExpr))
+                return true;
     }
 
-    return nullptr;
+    return false;
+}
+
+/// Creates the implicit derivative receiver needed by an explicitly referenced member target.
+///
+/// Consider this example:
+///
+///     struct S
+///     {
+///         [BackwardDerivativeOf(S::f)]
+///         void bwd_f(...);
+///     }
+///
+/// Checking `bwd_diff(S::f)` exposes `S::f`'s receiver as an explicit parameter, while `bwd_f`'s
+/// imaginary argument list contains only its declared parameters. Supply `bwd_f`'s actual implicit
+/// receiver here so overload resolution validates it against the checked target. An unqualified
+/// `[BackwardDerivativeOf(f)]` keeps both receivers implicit and does not need this argument.
+static Expr* _tryCreateImaginaryThisArgForDerivativeOfAttribute(
+    SemanticsVisitor* visitor,
+    FunctionDeclBase* derivativeFuncDecl,
+    Expr* checkedHigherOrderExpr,
+    SourceLoc loc)
+{
+    if (!_hasExplicitThisParameter(checkedHigherOrderExpr))
+        return nullptr;
+
+    if (isEffectivelyStatic(derivativeFuncDecl))
+        return nullptr;
+
+    auto derivativeThisType = getTypeForThisExpr(visitor, derivativeFuncDecl);
+    // Global functions are not "effectively static," but they still have no implicit receiver.
+    if (!derivativeThisType.type)
+        return nullptr;
+
+    auto thisArg = visitor->getASTBuilder()->create<VarExpr>();
+    thisArg->type = derivativeThisType;
+    thisArg->loc = loc;
+    return thisArg;
 }
 
 template<typename TDerivativeAttr, typename TDifferentiateExpr, typename TDerivativeOfAttr>
@@ -19107,8 +19109,8 @@ void checkDerivativeOfAttributeImpl(
         getImaginaryArgsToFunc(astBuilder, funcDecl, derivativeOfAttr->loc).args;
     if (auto thisArg = _tryCreateImaginaryThisArgForDerivativeOfAttribute(
             visitor,
+            funcDecl,
             checkedHigherOrderFuncExpr,
-            imaginaryArgs.getCount(),
             derivativeOfAttr->loc))
     {
         imaginaryArgs.insert(0, thisArg);
