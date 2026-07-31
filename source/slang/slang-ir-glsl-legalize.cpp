@@ -1208,7 +1208,7 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
             context,
             irBuilder,
             arrayType->getElementType());
-        IRArrayTypeLayout::Builder builder(&irBuilder, elementTypeLayout);
+        IRArrayTypeLayout::Builder builder(&irBuilder, elementTypeLayout, 0);
         return builder.build();
     }
     else
@@ -1633,7 +1633,8 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
                 IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(
                     builder,
-                    legalizedParamTypeLayout);
+                    legalizedParamTypeLayout,
+                    0);
                 if (auto resInfo = legalizedParamTypeLayout->findSizeAttr(kind))
                 {
                     // We end up re-building type layout information here, which

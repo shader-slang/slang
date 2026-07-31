@@ -117,7 +117,7 @@ IRTypeLayout* maybeCreateArrayLayout(
         IRIntegerValue elementCount = -1;
         if (auto count = arrayType->getElementCount())
             elementCount = getIntVal(count);
-        IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, newElementTypeLayout);
+        IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, newElementTypeLayout, 0);
         for (auto sizeAttr : newElementTypeLayout->getSizeAttrs())
         {
             arrayTypeLayoutBuilder.addResourceUsage(

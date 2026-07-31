@@ -327,6 +327,13 @@ Slice<ShaderBindingRange> ArtifactPostEmitMetadata::getUsedBindingRanges()
     return Slice<ShaderBindingRange>(m_usedBindings.getBuffer(), m_usedBindings.getCount());
 }
 
+Slice<UniformParamUsage> ArtifactPostEmitMetadata::getUniformParamUsage()
+{
+    return Slice<UniformParamUsage>(
+        m_uniformParamUsage.getBuffer(),
+        m_uniformParamUsage.getCount());
+}
+
 Slice<String> ArtifactPostEmitMetadata::getExportedFunctionMangledNames()
 {
     return Slice<String>(

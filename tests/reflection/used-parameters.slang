@@ -34,6 +34,12 @@ RWStructuredBuffer<uint> UnusedRWStructuredBuffer;
 SamplerState UsedSampler;
 SamplerState UnusedSampler;
 
+// Loose uniforms aggregate into the implicit $Globals constant buffer.
+// Their usage is reported on that container (the $Globals entry in the
+// bindings below) as byte ranges, not as a used flag per uniform, so a
+// consumer intersects each uniform's [offset, size) against the ranges.
+// UsedUniform (offset 0) is read and UnusedUniform (offset 4) is not,
+// so the $Globals record is [{offset 0, size 4}].
 uniform uint UsedUniform;
 uniform uint UnusedUniform;
 
