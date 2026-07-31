@@ -67,6 +67,51 @@ namespace Slang
     return builder.toString();
 }
 
+/// The libraries that must never be unmapped, and why each one is here. See the declaration in
+/// `slang-platform.h` for what this predicate is for.
+///
+/// * `slang-llvm` statically links two allocator runtimes that install a thread-exit destructor:
+///   LLVM's vendored rpmalloc, which the official LLVM Windows packages enable and ship inside
+///   `LLVMSupport.lib`, and Slang's own mimalloc. On Windows both register their destructor with
+///   `FlsAlloc`, and Windows calls FLS destructors from `ntdll!RtlpFlsDataCleanup` inside
+///   `LdrShutdownProcess` -- that is, during process exit, after every module has already been
+///   unloaded. Neither allocator frees its FLS index when the module goes away, so once
+///   `slang-llvm.dll` has been unloaded, process exit jumps into the hole it left behind and
+///   raises an execute access violation (issue #12292). There is no earlier point at which
+///   unloading would be safe, because the destructor is required to remain callable until the very
+///   end of process shutdown.
+/// * `libdxcompiler` invokes undefined behaviour on `dlclose`, see
+///   https://github.com/microsoft/DirectXShaderCompiler/issues/5119.
+/// * `libdxvk_d3d11` and `libdxvk_dxgi` break GDB when closed, see
+///   https://github.com/doitsujin/dxvk/issues/3330.
+/* static */ bool SharedLibrary::isUnclosable(const UnownedStringSlice& platformPath)
+{
+    // These are *platform* file name prefixes, not unadorned library names, so an entry that does
+    // not match how a platform names its libraries simply never fires there. That is what scopes
+    // the `libdxcompiler` and `libdxvk_*` entries to the POSIX platforms they were added for, and
+    // it is why slang-llvm needs one entry per naming convention.
+    static const char* const unclosableLibNames[] = {
+        "slang-llvm",    // Windows
+        "libslang-llvm", // POSIX
+        "libdxcompiler",
+        "libdxvk_d3d11",
+        "libdxvk_dxgi",
+    };
+
+    // Compare against the file name so that a library is recognized whether it was loaded by bare
+    // name or through a path, and compare by prefix so that the extension and any version suffix
+    // (`.dll`, `.dylib`, `.so.3.7`, ...) do not have to be spelled out here.
+    const String fileName = Path::getFileName(platformPath);
+    for (auto name : unclosableLibNames)
+    {
+        if (fileName.getUnownedSlice().startsWith(UnownedStringSlice(name)))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 #ifdef _WIN32
 
 // Make sure SlangResult match for common standard window HRESULT
@@ -169,6 +214,22 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
         // Turn to Result, if not one of the well known errors
         return HRESULT_FROM_WIN32(lastError);
     }
+
+    if (SharedLibrary::isUnclosable(UnownedStringSlice(platformFileName)))
+    {
+        // Pin the module, which raises its reference count to a value the loader never decrements.
+        // A later `FreeLibrary` then still balances our own `LoadLibrary`, but can no longer unmap
+        // the module. This is the Windows counterpart of `RTLD_NODELETE` on the POSIX path.
+        //
+        // Pinning by address rather than by name so that we pin exactly the module we just loaded,
+        // even if another module with the same base name is also loaded.
+        HMODULE pinned = nullptr;
+        ::GetModuleHandleExW(
+            GET_MODULE_HANDLE_EX_FLAG_PIN | GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+            (LPCWSTR)handle,
+            &pinned);
+    }
+
     handleOut = (Handle)handle;
     return SLANG_OK;
 }
@@ -229,21 +290,9 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     Handle& handleOut)
 {
     handleOut = nullptr;
-    // Work around
-    // https://github.com/microsoft/DirectXShaderCompiler/issues/5119 and
-    // https://github.com/doitsujin/dxvk/issues/3330
-    // libdxcompiler.so invokes UB on dlclose, the dxvk libs break GDB when
-    // closed
-    const auto unclosableLibNames = {"libdxcompiler", "libdxvk_d3d11", "libdxvk_dxgi"};
-    bool isUnclosable = false;
-    for (auto n : unclosableLibNames)
-    {
-        if (strncmp(platformFileName, n, strlen(n)) == 0)
-        {
-            isUnclosable = true;
-            break;
-        }
-    }
+    // `RTLD_NODELETE` keeps the library mapped when it is later `dlclose`d, for the libraries
+    // whose callbacks have to outlive their own module. See `SharedLibrary::isUnclosable`.
+    const bool isUnclosable = SharedLibrary::isUnclosable(UnownedStringSlice(platformFileName));
     if (strlen(platformFileName) == 0)
         platformFileName = nullptr;
     const auto mode = RTLD_NOW | RTLD_LOCAL | (isUnclosable ? RTLD_NODELETE : 0);
