@@ -698,7 +698,11 @@ void legalizeExistentialTypeLayout(IRModule* module, TargetProgram* target, Diag
 
 void legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
-void legalizeEmptyTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
+void legalizeEmptyTypes(
+    IRModule* module,
+    TargetProgram* target,
+    DiagnosticSink* sink,
+    bool forceRun);
 
 bool isResourceType(IRType* type);
 

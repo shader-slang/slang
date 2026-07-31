@@ -1,10 +1,10 @@
-// Regression for shader-slang/slang#11917: `legalizeEmptyTypes` gained an entry-time early-out that
-// skips the pass when the presence scan (`hasEmptyTypeLegalizationWork` via `isEmptyTypeToLegalize`)
-// finds no empty type. This module has an empty `struct` the pass must remove (C/C++ backends trip
-// over zero-size aggregates), used both directly (`useEmpty`) and as an array element
-// (`useEmptyArray`). The checks assert the pass ran: each empty parameter is legalized away so the
-// emitted signature keeps only its `int`, and no `struct Empty` survives anywhere. If the scan
-// wrongly skipped, the parameters and their `struct Empty` would reach emit.
+// Regression for shader-slang/slang#11917: `legalizeEmptyTypes` has an entry-time early-out that
+// skips the pass when its presence scan (`hasEmptyTypeLegalizationWork` via
+// `isEmptyTypeShapeToLegalize`) finds no empty-type-shape root. This module has an empty `struct` the
+// pass must remove (C/C++ backends trip over zero-size aggregates), used both directly (`useEmpty`)
+// and as an array element (`useEmptyArray`). The checks assert the pass ran: each empty parameter is
+// legalized away so the emitted signature keeps only its `int`, and no `struct Empty` survives
+// anywhere. If the scan wrongly skipped, the parameters and their `struct Empty` would reach emit.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain
 

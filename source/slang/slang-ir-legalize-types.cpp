@@ -3822,7 +3822,16 @@ struct IRTypeLegalizationPass
             //
             List<IRInst*> workListCopy = _Move(workList);
 
-            resetScratchDataBit(module->getModuleInst(), kHasBeenAddedScratchBitIndex);
+            // Clear the "currently on the work list" bit for this batch so its instructions can be
+            // re-queued in later rounds. `kHasBeenAddedScratchBitIndex` is set only in
+            // `addToWorkList`, in the same step that appends to `workList`, so it is set on exactly
+            // the instructions we just moved into `workListCopy` and nowhere else — clearing it
+            // over the batch is equivalent to (and O(batch) instead of O(module) per round,
+            // avoiding the #12040 quadratic reset) walking the whole module. We clear the entire
+            // batch up front, before processing any item, because processing an earlier item may
+            // re-queue a later one in this same batch.
+            for (auto inst : workListCopy)
+                inst->scratchData &= ~(1ULL << kHasBeenAddedScratchBitIndex);
 
             // Now we simply process each instruction on the copy of
             // the work list, knowing that `processInst` may add additional
@@ -3996,27 +4005,26 @@ struct IRTypeLegalizationPass
     }
 };
 
-// Return true if the pass whose per-type trigger is `typeNeedsLegalization` may have work to do in
-// `module`. This is the shared shape of both work-scans, and holds the soundness-critical invariant
-// in one place so the two callers cannot drift apart. In a single pass over the global insts it
-// returns true if either:
-//
-//  - a global type inst satisfies the pass's own trigger (its potential work), or
-//  - a generic remains at global scope (a conservative force-run).
-//
-// Scanning only global type insts is sound because resource, struct, and array types are
-// hoisted/interned at module global scope (the same argument the matrix pass uses). The generic
-// force-run covers the one blind spot in that scan: a type appearing only inside a generic body is
-// not hoisted to global scope (see `addGlobalValue`, which stops hoisting at the enclosing
-// generic), so the type scan cannot see it — yet the shared legalization framework here descends
-// into generic bodies (its worklist has no `IRGeneric` bail, unlike the standalone
-// matrix-legalization pass), so it *would* rewrite such a type. Rather than match that blind spot,
-// we force the pass to run whenever a generic is present. This normally does not fire (generics are
-// specialized away before these passes run); it is reachable under `-disable-specialization`, which
-// is why it is required for soundness rather than merely defensive. Testing only direct global
-// children suffices: a generic nested inside another generic is still enclosed by an outermost
-// generic that is itself a direct global child.
-static bool moduleHasGlobalTypeMatching(IRModule* module, bool (*typeNeedsLegalization)(IRType*))
+// Return true if `type` is a type-shape the empty-type legalizer would rewrite: an empty type (see
+// `isEmptyTypeToLegalize`) or a `PseudoPtr`, which it collapses to its (legalized) value type. The
+// `PseudoPtr` rewrite is only conditionally non-trivial, so this over-detects — that is fine for an
+// early-out, where over-detection just runs a pass that then no-ops and only *under*-detection
+// would be unsound.
+static bool isEmptyTypeShapeToLegalize(IRType* type)
+{
+    return isEmptyTypeToLegalize(type) || as<IRPseudoPtrType>(unwrapArray(type)) != nullptr;
+}
+
+// Return true if the module has any empty-type-legalization work — a global type inst matching
+// `isEmptyTypeShapeToLegalize`, or a generic still at global scope. The generic case is a
+// conservative force-run: a type appearing only inside a generic body is not hoisted to global
+// scope (see `addGlobalValue`, which stops hoisting at the enclosing generic), so this
+// globals-scope scan cannot see it, yet the shared legalizer descends into generic bodies and
+// *would* rewrite it. This normally does not fire (generics are specialized away before these
+// passes run); it is reachable under `-disable-specialization`. Testing only direct global children
+// suffices: a generic nested in another generic is still enclosed by an outermost generic that is
+// itself a direct global child.
+static bool hasEmptyTypeLegalizationWork(IRModule* module)
 {
     for (auto inst : module->getGlobalInsts())
     {
@@ -4024,50 +4032,21 @@ static bool moduleHasGlobalTypeMatching(IRModule* module, bool (*typeNeedsLegali
             return true;
         if (auto type = as<IRType>(inst))
         {
-            if (typeNeedsLegalization(type))
+            if (isEmptyTypeShapeToLegalize(type))
                 return true;
         }
     }
     return false;
 }
 
-// Predicate for the resource pass's full mutation set: it rewrites both resource types and empty
-// types. Its `isSpecialType` is `isResourceType`, and its `isSimpleType` is unconditionally false
-// so it walks every struct and drops empty ones. Both must be scanned for — see
-// `hasResourceLegalizationWork`.
-static bool isResourceOrEmptyTypeToLegalize(IRType* type)
-{
-    return isResourceType(type) || isEmptyTypeToLegalize(type);
-}
-
-// Return true if the module contains anything that resource legalization *may* need to rewrite —
-// conservatively over-detecting, so only a false result guarantees the pass has no work. The pass
-// mutates two disjoint things and the scan must cover both: resource types (its `isSpecialType`),
-// and empty structs, which it strips because its `isSimpleType` is unconditionally false. Scanning
-// for resources alone would be unsound: a module with a public/export-decorated empty struct and no
-// resource would skip the pass, and the empty struct would survive to emit — the later
-// `legalizeEmptyTypes` does *not* clean it up because its `isSimpleType` keeps public-interface
-// empties. On a source-text target like HLSL/GLSL that surfaces as an illegal empty `struct {}`
-// (glslang rejects it), so the empty term here is load-bearing, not redundant.
-static bool hasResourceLegalizationWork(IRModule* module)
-{
-    return moduleHasGlobalTypeMatching(module, isResourceOrEmptyTypeToLegalize);
-}
-
-// Return true if the module contains anything that empty-type legalization *may* need to remove.
-// Its only mutation is eliminating empty types, so the scan keys on `isEmptyTypeToLegalize` (a
-// conservative over-detector — see its declaration). Only a false result guarantees the pass has no
-// work.
-static bool hasEmptyTypeLegalizationWork(IRModule* module)
-{
-    return moduleHasGlobalTypeMatching(module, isEmptyTypeToLegalize);
-}
-
 static void legalizeTypes(IRTypeLegalizationContext* context)
 {
     // Entry-time early-out: when this pass has nothing to rewrite, the whole-module walk below is a
     // pure no-op, so skip it after a single cheap scan. `hasWorkToLegalize` defaults to true, so
-    // passes that do not override it (e.g. existential-type-layout legalization) are unaffected.
+    // passes that do not override it (resource and existential-type-layout legalization) are
+    // unaffected — those get their speedup from the cheaper per-batch worklist reset in
+    // `processModule`, not from a presence scan (their type changes propagate through function
+    // signatures, calls, returns, and locals, which a globals-scope scan cannot soundly gate on).
     if (!context->hasWorkToLegalize())
         return;
 
@@ -4106,8 +4085,6 @@ struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
     }
 
     bool isSimpleType(IRType*) override { return false; }
-
-    bool hasWorkToLegalize() override { return hasResourceLegalizationWork(module); }
 
     LegalType createLegalUniformBufferType(
         IROp op,
@@ -4169,8 +4146,18 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
 // a public function signature.
 struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 {
-    IREmptyTypeLegalizationContext(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
-        : IRTypeLegalizationContext(target, module, sink)
+    // When true, run the pass even if the type-shape scan finds no root. Set for a module that
+    // contains an `Abort`, whose payload the pass must always revalidate; an `Abort` lives in a
+    // function body, so the globals-scope scan below cannot detect it (see
+    // `calcRequiredLoweringPassSet`).
+    bool forceRun;
+
+    IREmptyTypeLegalizationContext(
+        TargetProgram* target,
+        IRModule* module,
+        DiagnosticSink* sink,
+        bool forceRun)
+        : IRTypeLegalizationContext(target, module, sink), forceRun(forceRun)
     {
     }
 
@@ -4201,7 +4188,7 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
         return false;
     }
 
-    bool hasWorkToLegalize() override { return hasEmptyTypeLegalizationWork(module); }
+    bool hasWorkToLegalize() override { return forceRun || hasEmptyTypeLegalizationWork(module); }
 
     LegalType createLegalUniformBufferType(IROp, LegalType, IRInst*) override
     {
@@ -4235,9 +4222,13 @@ void legalizeExistentialTypeLayout(IRModule* module, TargetProgram* target, Diag
     legalizeTypes(&context);
 }
 
-void legalizeEmptyTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
+void legalizeEmptyTypes(
+    IRModule* module,
+    TargetProgram* target,
+    DiagnosticSink* sink,
+    bool forceRun)
 {
-    IREmptyTypeLegalizationContext context(target, module, sink);
+    IREmptyTypeLegalizationContext context(target, module, sink, forceRun);
     legalizeTypes(&context);
 }
 

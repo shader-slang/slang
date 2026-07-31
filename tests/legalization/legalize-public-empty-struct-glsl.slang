@@ -1,11 +1,11 @@
-// Regression for shader-slang/slang#11917: the `legalizeResourceTypes` early-out must gate on empty
-// types as well as resource types.
+// Regression for shader-slang/slang#11917: a public empty struct must not survive to GLSL emit,
+// where an empty `struct {}` is illegal.
 //
 // On the Khronos/HLSL family, `legalizeResourceTypes` runs and strips empty structs (its
-// `isSimpleType` is unconditionally false). This shader has a public empty `struct` used as a
-// parameter and no resource type, so a scan keyed on resources alone would skip the pass; the later
-// `legalizeEmptyTypes` would not remove the struct either, because its `isSimpleType` keeps
-// public-interface empties. The empty `struct {}` then reaches GLSL emit, which is illegal there.
+// `isSimpleType` is unconditionally false — it does so even for public-interface empties, which the
+// later `legalizeEmptyTypes` would keep). This shader has a public empty `struct` used as a
+// parameter and no resource type, so it exercises that empty-struct stripping in isolation; the test
+// guards that the shared type-legalizer's worklist rework preserves it.
 //
 // Emitting through glslang (`-emit-spirv-via-glsl`) is the guard: glslang rejects an empty
 // `struct {}` with a syntax error, so this compiles at all only if the empty struct was stripped
