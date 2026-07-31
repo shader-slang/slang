@@ -115,6 +115,17 @@ jobs:
               -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL
             )
           fi
+          # macOS needs the deployment target pinned for the same reason Linux
+          # builds inside manylinux_2_28: a static archive moves the platform
+          # floor to the consumer's final link. Left unset, CMake defaults to
+          # the runner's own OS version, and every object in the archive gets
+          # that min-version stamp -- linking on any older macOS then fails
+          # with "object file was built for newer macOS version".
+          if [[ "$SLANG_TARGET_PLATFORM" == macos-* ]]; then
+            flags+=(
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
+            )
+          fi
           # The variable is deliberately not called PLATFORM. Windows
           # environment blocks are case-insensitive, msvc-dev-cmd exports
           # `Platform=x64`, and a step-level `PLATFORM` collides with it --
