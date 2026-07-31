@@ -101,10 +101,19 @@ namespace Slang
     // Compare against the file name so that a library is recognized whether it was loaded by bare
     // name or through a path, and compare by prefix so that the extension and any version suffix
     // (`.dll`, `.dylib`, `.so.3.7`, ...) do not have to be spelled out here.
+    //
+    // The comparison follows the file system's own notion of identity: on Windows
+    // `SLANG-LLVM.DLL` names the very same file as `slang-llvm.dll`, so a case-sensitive
+    // comparison there could let the module be unmapped after all, whereas on the POSIX
+    // platforms those are two different files.
     const String fileName = Path::getFileName(platformPath);
     for (auto name : unclosableLibNames)
     {
+#if SLANG_WINDOWS_FAMILY
+        if (fileName.getUnownedSlice().startsWithCaseInsensitive(UnownedStringSlice(name)))
+#else
         if (fileName.getUnownedSlice().startsWith(UnownedStringSlice(name)))
+#endif
         {
             return true;
         }
@@ -224,10 +233,26 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
         // Pinning by address rather than by name so that we pin exactly the module we just loaded,
         // even if another module with the same base name is also loaded.
         HMODULE pinned = nullptr;
-        ::GetModuleHandleExW(
+        const BOOL isPinned = ::GetModuleHandleExW(
             GET_MODULE_HANDLE_EX_FLAG_PIN | GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
             (LPCWSTR)handle,
             &pinned);
+        // `handle` is a module this function has just loaded successfully, so the loader can
+        // always resolve it and there is no legitimate input that reaches this failing.
+        SLANG_ASSERT(isPinned && pinned == handle);
+        // `pinned` only exists because GetModuleHandleExW requires the out parameter; the pin is
+        // recorded in the loader's own reference count, not in the handle it hands back.
+        SLANG_UNUSED(pinned);
+        if (!isPinned)
+        {
+            // Returning the library anyway would hand the caller a module that `unload` can still
+            // unmap, which is exactly the teardown crash this is here to prevent. Report the
+            // failure instead, so the library is reported as unavailable rather than becoming a
+            // crash at process exit.
+            const DWORD lastError = GetLastError();
+            ::FreeLibrary(handle);
+            return HRESULT_FROM_WIN32(lastError);
+        }
     }
 
     handleOut = (Handle)handle;

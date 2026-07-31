@@ -26,6 +26,15 @@ SLANG_UNIT_TEST(unclosableSharedLibrary)
     SLANG_CHECK(SharedLibrary::isUnclosable(toSlice("C:\\slang\\bin\\slang-llvm.dll")));
     SLANG_CHECK(SharedLibrary::isUnclosable(toSlice("/opt/slang/bin/libslang-llvm.so")));
 
+#if SLANG_WINDOWS_FAMILY
+    // Windows file names are case-insensitive, so these name the same file as `slang-llvm.dll`
+    // and must be recognized as well. The POSIX platforms treat them as different files, so the
+    // matching there stays case-sensitive and these are deliberately not checked.
+    SLANG_CHECK(SharedLibrary::isUnclosable(toSlice("SLANG-LLVM.DLL")));
+    SLANG_CHECK(SharedLibrary::isUnclosable(toSlice("Slang-LLVM.Dll")));
+    SLANG_CHECK(SharedLibrary::isUnclosable(toSlice("C:\\slang\\bin\\SLANG-LLVM.DLL")));
+#endif
+
     // The other entries carry their own workarounds and must stay in the list.
     SLANG_CHECK(SharedLibrary::isUnclosable(toSlice("libdxcompiler.so")));
     SLANG_CHECK(SharedLibrary::isUnclosable(toSlice("libdxvk_d3d11.so")));
