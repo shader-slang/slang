@@ -8,11 +8,11 @@ name: Static Release
 # one ships `libslang-static.a` / `slang-static.lib` and needs no secrets
 # beyond GITHUB_TOKEN.
 #
-# It doubles as CI for the archive-merging code. The macOS (`libtool -static`)
-# and Windows (`lib.exe`) merge paths were written but never executed, so the
-# pull_request trigger below builds all three platforms whenever the static
-# build's inputs change. Nothing is published for a pull request; the archives
-# are uploaded as run artifacts instead.
+# It doubles as CI for the archive-merging code: the pull_request trigger
+# below builds all three platforms whenever the static build's inputs change,
+# keeping the macOS (`libtool -static`) and Windows (`lib.exe`) merge paths
+# exercised alongside the Linux one. Nothing is published for a pull request;
+# the archives are uploaded as run artifacts instead.
 
 on:
   workflow_dispatch:

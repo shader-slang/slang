@@ -9,10 +9,9 @@
 // Creating and releasing a global session is enough to prove the archive is
 // well formed. It resolves symbols across core, compiler-core and the core
 // module, which live in different members of the merged archive, and it runs
-// the static initializers of every bundled library. A malformed merge -- the
-// real risk on the macOS libtool and Windows lib.exe paths, neither of which
-// had been exercised before this workflow existed -- fails here at link time
-// rather than silently shipping.
+// the static initializers of every bundled library. A malformed merge on any
+// of the three per-platform paths -- GNU ar's MRI mode, macOS libtool,
+// Windows lib.exe -- fails here at link time rather than silently shipping.
 //
 // The embedded glslang/SPIRV-Tools path is covered separately, by the slangc
 // invocations in release-static.yml.
