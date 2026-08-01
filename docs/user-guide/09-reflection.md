@@ -1672,6 +1672,69 @@ Non-varying resource types (e.g., `DescriptorTableSlot`, `ShaderResource`) are n
 
 See the [Metal](a2-02-metal-target-specific.md#limitation-isparameterlocationused-for-varying-inputs) and [WGSL](a2-03-wgsl-target-specific.md#limitation-isparameterlocationused-for-varying-inputs) target-specific documentation for details.
 
+JSON Reflection Output
+----------------------
+
+In addition to the programmatic reflection API described above, the command-line compiler can emit reflection information as JSON with the `-reflection-json <path>` option.
+The JSON mirrors the same mental model, so the concepts introduced in this chapter carry over directly.
+
+### Scopes: `globalScope` and per-entry-point `scope`
+
+The most important structural elements are the *scopes*.
+Just as `printScope` (in the [reflection-api](https://github.com/shader-slang/slang/tree/master/examples/reflection-api) example) is invoked uniformly on `getGlobalParamsVarLayout()` for the global scope and on each entry point's `getVarLayout()`, the JSON output describes both scopes with the same shape:
+
+* a top-level `"globalScope"` object, and
+* a `"scope"` object on each entry in `"entryPoints"`.
+
+A scope object has a `"kind"` that names how the scope's parameters were allocated:
+
+* `"none"` — the parameters bind directly, with no automatically-introduced container.
+* `"constantBuffer"` — the scope's ordinary (byte-consuming) parameters were gathered into an automatically-introduced constant buffer (the `$Globals` constant buffer, for the global scope).
+* `"parameterBlock"` — the scope was allocated into a parameter block, which additionally introduces a register space.
+
+When `"kind"` is `"constantBuffer"` or `"parameterBlock"`, the object also carries a `"binding"` — the container's *own* binding, i.e. the register / descriptor slot / space that the automatically-introduced constant buffer or parameter block occupies.
+This is the information that the flat `"parameters"` list (see below) cannot express: it explains, for example, which descriptor slot the `$Globals` constant buffer consumes, so that the indices of the remaining resources no longer appear to have unexplained holes.
+
+The scope's contained parameters appear in a nested `"parameters"` array, using the same parameter objects as elsewhere in the output.
+If a scope were itself wrapped in more than one container, the inner container would be represented as a nested `"scope"` object so that each container level records its own binding — matching how `printScope` recurses.
+
+For example, given loose global uniforms alongside some resources:
+
+```hlsl
+float4       gTint;
+float        gScale;
+Texture2D    gTex;
+SamplerState gSamp;
+```
+
+the `"globalScope"` (for a SPIR-V target) reports the `$Globals` constant buffer's own binding and then its parameters:
+
+```jsonc
+"globalScope": {
+    "kind": "constantBuffer",
+    "binding": { "kind": "descriptorTableSlot", "index": 0 },
+    "parameters": [
+        { "name": "gTint",  "binding": { "kind": "uniform", "offset": 0,  "size": 16 }, "type": { /* ... */ } },
+        { "name": "gScale", "binding": { "kind": "uniform", "offset": 16, "size": 4  }, "type": { /* ... */ } },
+        { "name": "gTex",   "binding": { "kind": "descriptorTableSlot", "index": 1 },   "type": { /* ... */ } },
+        { "name": "gSamp",  "binding": { "kind": "descriptorTableSlot", "index": 2 },   "type": { /* ... */ } }
+    ]
+}
+```
+
+Here the `$Globals` constant buffer occupies `descriptorTableSlot` index 0, which is exactly why `gTex` and `gSamp` land at indices 1 and 2 — a gap the flat `"parameters"` list leaves unexplained.
+
+### The flat `parameters` list is retained
+
+The top-level `"parameters"` array, and each entry point's own `"parameters"` and `"bindings"` arrays, are emitted exactly as before.
+They remain for backwards compatibility, but they do not describe the binding of an automatically-introduced constant buffer or parameter block; the `"globalScope"` / `"scope"` objects are the complete representation and should be preferred by new consumers.
+
+### The `version` field
+
+The output carries a top-level `"version"` field using semantic versioning.
+Output *without* a `"version"` field should be treated as implicitly `"1.0"`.
+The scope objects described above were added in `"1.1"`; because they are strictly additive (every `"1.0"` key is emitted unchanged), a consumer that only understands the older schema can ignore them, while a consumer that requires the scope representation can reject output older than `"1.1"`.
+
 Conclusion
 ----------
 

@@ -1134,6 +1134,84 @@ static void emitReflectionParamJSON(PrettyWriter& writer, slang::VariableLayoutR
     writer << "\n}";
 }
 
+static void emitReflectionScopeParametersJSON(
+    PrettyWriter& writer,
+    slang::TypeLayoutReflection* structTypeLayout)
+{
+    if (structTypeLayout->getKind() != slang::TypeReflection::Kind::Struct)
+        return;
+
+    writer.maybeComma();
+    writer << "\"parameters\": [\n";
+    writer.indent();
+    auto paramCount = structTypeLayout->getFieldCount();
+    for (auto pp : makeRange(paramCount))
+    {
+        if (pp != 0)
+            writer << ",\n";
+        emitReflectionParamJSON(writer, structTypeLayout->getFieldByIndex(pp));
+    }
+    writer.dedent();
+    writer << "\n]";
+}
+
+// Describe a program scope (the global scope, or an entry point's scope) as a JSON object,
+// mirroring `printScope` in `examples/reflection-api/main.cpp`. The key detail the flat
+// `parameters` list cannot express is the binding of the constant buffer / parameter block
+// that a scope's parameters are automatically gathered into: that container occupies a
+// register / descriptor slot / space of its own, reported here as the scope's `binding`.
+static void emitReflectionScopeJSON(
+    PrettyWriter& writer,
+    slang::VariableLayoutReflection* scopeVarLayout)
+{
+    writer << "{\n";
+    writer.indent();
+    CommaTrackerRAII commaTracker(writer);
+
+    auto scopeTypeLayout = scopeVarLayout->getTypeLayout();
+    auto kind = scopeTypeLayout->getKind();
+    switch (kind)
+    {
+    case slang::TypeReflection::Kind::ConstantBuffer:
+    case slang::TypeReflection::Kind::ParameterBlock:
+        {
+            writer.maybeComma();
+            writer << "\"kind\": \"";
+            writer
+                << (kind == slang::TypeReflection::Kind::ParameterBlock ? "parameterBlock"
+                                                                        : "constantBuffer");
+            writer << "\"";
+
+            emitReflectionVarBindingInfoJSON(writer, scopeTypeLayout->getContainerVarLayout());
+
+            auto elementVarLayout = scopeTypeLayout->getElementVarLayout();
+            auto elementKind = elementVarLayout->getTypeLayout()->getKind();
+            if (elementKind == slang::TypeReflection::Kind::ConstantBuffer ||
+                elementKind == slang::TypeReflection::Kind::ParameterBlock)
+            {
+                // A container directly wrapping another container records each level's binding.
+                writer.maybeComma();
+                writer << "\"scope\": ";
+                emitReflectionScopeJSON(writer, elementVarLayout);
+            }
+            else
+            {
+                emitReflectionScopeParametersJSON(writer, elementVarLayout->getTypeLayout());
+            }
+        }
+        break;
+
+    default:
+        writer.maybeComma();
+        writer << "\"kind\": \"none\"";
+        emitReflectionScopeParametersJSON(writer, scopeTypeLayout);
+        break;
+    }
+
+    writer.dedent();
+    writer << "\n}";
+}
+
 
 static void emitEntryPointParamJSON(
     PrettyWriter& writer,
@@ -1232,6 +1310,9 @@ static void emitReflectionEntryPointJSON(
         break;
     }
 
+    writer << ",\n\"scope\": ";
+    emitReflectionScopeJSON(writer, entryPoint->getVarLayout());
+
     auto entryPointParameterCount = entryPoint->getParameterCount();
     if (entryPointParameterCount)
     {
@@ -1308,6 +1389,10 @@ static void emitReflectionJSON(
 {
     writer << "{\n";
     writer.indent();
+
+    // Absence of this field is implicitly version "1.0" (before the scope objects existed).
+    writer << "\"version\": \"1.1\",\n";
+
     writer << "\"parameters\": [\n";
     writer.indent();
 
@@ -1323,6 +1408,9 @@ static void emitReflectionJSON(
 
     writer.dedent();
     writer << "\n]";
+
+    writer << ",\n\"globalScope\": ";
+    emitReflectionScopeJSON(writer, programReflection->getGlobalParamsVarLayout());
 
     auto entryPointCount = programReflection->getEntryPointCount();
     if (entryPointCount)

@@ -3,13 +3,73 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
 
     ],
+    "globalScope": {
+        "kind": "none",
+        "parameters": [
+
+        ]
+    },
     "entryPoints": [
         {
             "name": "main",
             "stage": "fragment",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+                    {
+                        "name": "input",
+                        "stage": "fragment",
+                        "binding": {"kind": "varyingInput", "index": 0, "count": 2},
+                        "type": {
+                            "kind": "struct",
+                            "name": "PSInput",
+                            "fields": [
+                                {
+                                    "name": "extra",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "varyingInput", "value": 1}
+                                        ]
+                                    },
+                                    "stage": "fragment",
+                                    "binding": {"kind": "varyingInput", "index": 0},
+                                    "semanticName": "EXTRA"
+                                },
+                                {
+                                    "name": "color",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "varyingInput", "value": 1}
+                                        ]
+                                    },
+                                    "stage": "fragment",
+                                    "binding": {"kind": "varyingInput", "index": 1},
+                                    "semanticName": "COLOR"
+                                }
+                            ],
+                            "sizes": [
+                                {"kind": "varyingInput", "value": 2}
+                            ]
+                        }
+                    }
+                ]
+            },
             "parameters": [
                 {
                     "name": "input",
