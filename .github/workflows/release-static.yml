@@ -41,10 +41,6 @@ permissions:
 jobs:
   build:
     name: ${{ matrix.platform }}
-    # Write access is needed only by the final publish step, which is gated on
-    # a tag push; pull_request and workflow_dispatch runs never reach it.
-    permissions:
-      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -258,6 +254,8 @@ jobs:
           fi
           version="${GITHUB_REF_NAME#v}"
           version="${version//\//-}"
+          version="${version/-static/}" # v2026.13.1-static       -> 2026.13.1
+                                        # v2026.13.1-static-draft -> 2026.13.1-draft
           base="slang-static-${version}-${SLANG_TARGET_PLATFORM}"
           echo "base=$base" >> "$GITHUB_OUTPUT"
 
@@ -276,6 +274,26 @@ jobs:
           fi
           cp "${archives[@]}" "$base/lib/"
           cp -R install/include/. "$base/include/"
+
+      # Downstream build scripts link exactly one library from lib/ (e.g.
+      # slang-rs emits a single `rustc-link-lib=static=slang-static`). If a
+      # CMake change ever reintroduced libslang-compiler.a into the install
+      # tree and staging picked it up, the failure would surface downstream as
+      # confusing duplicate-symbol errors -- so check the invariant here.
+      - name: Verify staged lib/ holds only the bundled archive
+        env:
+          BASE: ${{ steps.stage.outputs.base }}
+        run: |
+          mapfile -t libs < <(find "$BASE/lib" -type f | sort)
+          printf '  %s\n' "${libs[@]}"
+          if [[ ${#libs[@]} -ne 1 ]]; then
+            echo "::error::expected exactly one library in lib/, found ${#libs[@]}"
+            exit 1
+          fi
+          case "$(basename "${libs[0]}")" in
+            libslang-static.a|slang-static.lib) ;;
+            *) echo "::error::unexpected library $(basename "${libs[0]}")"; exit 1 ;;
+          esac
 
       # The top-level LICENSES/ tree only covers Slang's own annotated files.
       # Everything merged into the archive carries its own terms, so collect
@@ -367,6 +385,8 @@ jobs:
             ./consumer-check
           fi
 
+      # tee'd to the log as well as the step summary so sizes stay recoverable
+      # after the run artifacts expire.
       - name: Report archive size
         env:
           BASE: ${{ steps.stage.outputs.base }}
@@ -379,7 +399,7 @@ jobs:
             for f in "$BASE"/lib/* "${BASE}.tar.gz" "${BASE}.zip"; do
               echo "| $(basename "$f") | $(du -h "$f" | cut -f1) |"
             done
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
@@ -389,14 +409,35 @@ jobs:
             ${{ steps.package.outputs.zip }}
           retention-days: 14
 
-      - name: Publish to release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+  # Publishing runs once, after every platform has built, rather than as a step
+  # in each matrix job: three jobs each calling action-gh-release race to create
+  # the release for the same tag, and can leave a duplicate draft or split the
+  # assets across two releases. Centralizing also gives the checksum step sight
+  # of all six archives, so SHA256SUMS covers the whole release.
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          path: dist
+          merge-multiple: true
+
+      # Checksums are computed over the release assets themselves, not the
+      # artifact zips that wrap them in transit -- the artifact-zip digest
+      # upload-artifact prints cannot verify a downloaded release asset.
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum -- *.tar.gz *.zip | tee SHA256SUMS
+
+      - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           draft: ${{ contains(github.ref, 'draft') }}
           prerelease: ${{ contains(github.ref, 'draft') }}
-          files: |
-            ${{ steps.package.outputs.tarball }}
-            ${{ steps.package.outputs.zip }}
+          files: dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
