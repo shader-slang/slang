@@ -4012,7 +4012,10 @@ struct IRTypeLegalizationPass
 // would be unsound.
 static bool isEmptyTypeShapeToLegalize(IRType* type)
 {
-    return isEmptyTypeToLegalize(type) || as<IRPseudoPtrType>(unwrapArray(type)) != nullptr;
+    // A direct `PseudoPtr` check (no array unwrap) is sufficient: `PseudoPtr` is hoisted/interned,
+    // so an `Array<PseudoPtr>` has the `PseudoPtr` as its own global type inst that this scan
+    // visits directly.
+    return isEmptyTypeToLegalize(type) || as<IRPseudoPtrType>(type) != nullptr;
 }
 
 // Return true if the module has any empty-type-legalization work — a global type inst matching
@@ -4146,18 +4149,8 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
 // a public function signature.
 struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 {
-    // When true, run the pass even if the type-shape scan finds no root. Set for a module that
-    // contains an `Abort`, whose payload the pass must always revalidate; an `Abort` lives in a
-    // function body, so the globals-scope scan below cannot detect it (see
-    // `calcRequiredLoweringPassSet`).
-    bool forceRun;
-
-    IREmptyTypeLegalizationContext(
-        TargetProgram* target,
-        IRModule* module,
-        DiagnosticSink* sink,
-        bool forceRun)
-        : IRTypeLegalizationContext(target, module, sink), forceRun(forceRun)
+    IREmptyTypeLegalizationContext(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+        : IRTypeLegalizationContext(target, module, sink)
     {
     }
 
@@ -4188,7 +4181,7 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
         return false;
     }
 
-    bool hasWorkToLegalize() override { return forceRun || hasEmptyTypeLegalizationWork(module); }
+    bool hasWorkToLegalize() override { return hasEmptyTypeLegalizationWork(module); }
 
     LegalType createLegalUniformBufferType(IROp, LegalType, IRInst*) override
     {
@@ -4222,13 +4215,9 @@ void legalizeExistentialTypeLayout(IRModule* module, TargetProgram* target, Diag
     legalizeTypes(&context);
 }
 
-void legalizeEmptyTypes(
-    IRModule* module,
-    TargetProgram* target,
-    DiagnosticSink* sink,
-    bool forceRun)
+void legalizeEmptyTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
-    IREmptyTypeLegalizationContext context(target, module, sink, forceRun);
+    IREmptyTypeLegalizationContext context(target, module, sink);
     legalizeTypes(&context);
 }
 

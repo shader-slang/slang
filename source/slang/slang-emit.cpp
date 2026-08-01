@@ -624,12 +624,6 @@ void calcRequiredLoweringPassSet(
     case kIROp_LateRequireCapability:
         result.lateRequireCapability = true;
         break;
-    case kIROp_Abort:
-        // `Abort` is always rebuilt by the shared type legalizer to validate its variadic payload,
-        // even when no type-shape (resource/empty/PseudoPtr) root is present. The type-shape
-        // presence scan would not see it, so flag it here to force the applicable legalizer to run.
-        result.abort = true;
-        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -1904,7 +1898,7 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::Metal:
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
-            SLANG_PASS(legalizeEmptyTypes, targetProgram, sink, requiredLoweringPassSet.abort);
+            SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
             break;
         }
         //  Debugging output of legalization
@@ -1914,7 +1908,7 @@ Result linkAndOptimizeIR(
     {
         // On CPU/CUDA targets, we simply elminate any empty types if
         // they are not part of public interface.
-        SLANG_PASS(legalizeEmptyTypes, targetProgram, sink, requiredLoweringPassSet.abort);
+        SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
     }
 
     if (isCPUTargetViaLLVM(targetRequest))
@@ -2545,7 +2539,7 @@ Result linkAndOptimizeIR(
     // TODO: Maybe make this conditional (only touch the optimizable types).
     // to make it more narrowly scoped.
     //
-    SLANG_PASS(legalizeEmptyTypes, targetProgram, sink, requiredLoweringPassSet.abort);
+    SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
 
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and

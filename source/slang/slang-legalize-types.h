@@ -698,22 +698,19 @@ void legalizeExistentialTypeLayout(IRModule* module, TargetProgram* target, Diag
 
 void legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
-void legalizeEmptyTypes(
-    IRModule* module,
-    TargetProgram* target,
-    DiagnosticSink* sink,
-    bool forceRun);
+void legalizeEmptyTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
 bool isResourceType(IRType* type);
 
 /// Return true if `type` has one of the two structural shapes that empty-type legalization can
-/// drop: a `struct` with no fields, or an array whose (array-stripped) element is `void`. This is a
+/// drop: a `struct` with no fields, or an array whose *immediate* element is `void`. This is a
 /// conservative *detector* used by the entry-time early-out scan, not a guarantee that legalization
 /// will eliminate this particular type — e.g. a target-intrinsic type is left alone, and in the
 /// empty-type context a public-interface-decorated empty struct is treated as simple and kept. It
-/// only needs to find the mutation *roots*: a struct that becomes empty after its nested fields
-/// legalize away has, at its core, one of these two shapes as a hoisted global, so finding the root
-/// is sufficient to know the pass has work. Over-detection is harmless (the pass runs and no-ops);
+/// only needs to find the mutation *roots*, and every root is a hoisted/interned global type inst
+/// the scan visits directly, so a one-level test suffices: a struct that becomes empty after its
+/// nested fields legalize away has an inner empty struct that is its own global; a nested array has
+/// its inner array as its own global. Over-detection is harmless (the pass runs and no-ops);
 /// under-detection would wrongly skip a real rewrite.
 bool isEmptyTypeToLegalize(IRType* type);
 

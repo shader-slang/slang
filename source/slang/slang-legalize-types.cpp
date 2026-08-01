@@ -215,16 +215,14 @@ bool isEmptyTypeToLegalize(IRType* type)
     }
 
     // An array whose element is `void` legalizes to nothing (see the array case in
-    // `legalizeTypeImpl`). We must check the element is *array-wrapped* void, not a bare `void`
-    // type: bare `void` appears in every module (e.g. a `void`-returning entry point) and is legal
-    // as-is, so treating it as empty would defeat the early-out entirely.
+    // `legalizeTypeImpl`). We only test the *immediate* element, not the array-stripped leaf: array
+    // types are hoisted/interned, so a nested `T[a][b]` has its inner `T[b]` as its own global type
+    // inst, and this scan visits that inner array directly — one level suffices, and avoids
+    // O(depth^2) work across the array suffixes of every global. Checking the immediate element
+    // also means a bare `void` (ubiquitous, e.g. a `void`-returning entry point) is never treated
+    // as empty, which would otherwise defeat the early-out.
     if (auto arrayType = as<IRArrayTypeBase>(type))
-    {
-        IRType* element = arrayType->getElementType();
-        while (auto innerArray = as<IRArrayTypeBase>(element))
-            element = innerArray->getElementType();
-        return element->getOp() == kIROp_VoidType;
-    }
+        return arrayType->getElementType()->getOp() == kIROp_VoidType;
 
     return false;
 }
