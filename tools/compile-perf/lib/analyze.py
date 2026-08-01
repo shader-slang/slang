@@ -42,6 +42,26 @@ def open_output(path, mode="w"):
     return open(path, mode, encoding="utf-8", newline="\n")
 
 
+def read_json(path):
+    """json.load with explicit UTF-8, the read-side twin of open_output.
+
+    Suite files are WRITTEN as UTF-8 (open_output), but a bare open() READS
+    with the platform default — cp1252 on the Windows runner — so any
+    non-ASCII byte (an em dash in a rendered SVG, a smart quote in a compiler
+    diagnostic captured into results.json) raises UnicodeDecodeError there
+    while passing everywhere else. Every suite read goes through here or
+    read_text so the pair cannot drift."""
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def read_text(path):
+    """Read a suite-owned text file (SVG, HTML fragment) as UTF-8. See
+    read_json for why the encoding must be explicit."""
+    with open(path, encoding="utf-8") as fh:
+        return fh.read()
+
+
 def results_dir_for(results_dir, label):
     """Return the directory that holds `label`'s results.json.
 

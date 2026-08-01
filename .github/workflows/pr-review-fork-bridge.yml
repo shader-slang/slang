@@ -14,7 +14,9 @@ name: PR Review Fork Bridge
 
 on:
   pull_request_review:
-    types: [submitted]
+    # Relay both submitted and dismissed: dismissing a fork PR's CHANGES_REQUESTED
+    # review should recompute its Status, same as a new review.
+    types: [submitted, dismissed]
 
 permissions: {}
 

@@ -287,8 +287,8 @@ bool Test_VectorType()
 
         // CHECK_GLSL-COUNT-4: mod(
         // CHECK_GLSL-NOT: mod(
-        // CHECK_SPIR-COUNT-4: Floor{{ }}
-        // CHECK_SPIR-NOT: Floor{{ }}
+        // CHECK_SPIR-COUNT-4: FMod{{ }}
+        // CHECK_SPIR-NOT: FMod{{ }}
         && genFType(0) == mod(genFType(zero), float(one))
         && genFType(0) == mod(genFType(zero), genFType(one))
         && genDType(0) == mod(genDType(zero), double(one))

@@ -179,6 +179,7 @@ def _GLSL_430 : _GLSL_420;
 def _GLSL_440 : _GLSL_430;
 def _GLSL_450 : _GLSL_440;
 def _GLSL_460 : _GLSL_450;
+alias _GLSL_latest = _GLSL_460;
 
 // Metal versions
 
@@ -198,9 +199,13 @@ def metallib_3_0 : metallib_2_4;
 /// [Version]
 def metallib_3_1 : metallib_3_0;
 
+/// Represents MetalLib 3.2.
+/// [Version]
+def metallib_3_2 : metallib_3_1;
+
 /// Represents MetalLib 4.0.
 /// [Version]
-def metallib_4_0 : metallib_3_1;
+def metallib_4_0 : metallib_3_2;
 
 /// Represents the latest MetalLib version.
 /// [Version]
@@ -223,6 +228,7 @@ def _sm_6_7 : _sm_6_6;
 def _sm_6_8 : _sm_6_7;
 def _sm_6_9 : _sm_6_8;
 def _sm_6_10 : _sm_6_9;
+alias _sm_latest = _sm_6_10;
 
 /// Represents HLSL NVAPI support.
 /// [Version]
@@ -533,6 +539,12 @@ def SPV_EXT_fragment_shader_interlock : _spirv_1_0;
 /// [EXT]
 def SPV_EXT_physical_storage_buffer : _spirv_1_3;
 
+/// Represents the SPIR-V extension for physical storage buffer (the KHR-promoted name for
+/// the same feature as SPV_EXT_physical_storage_buffer; folded into core SPIR-V 1.5). Its
+/// floor mirrors the EXT atom's, so requiring it does not raise the effective version.
+/// [EXT]
+def SPV_KHR_physical_storage_buffer : _spirv_1_3;
+
 /// Represents the SPIR-V extension for SPV_EXT_fragment_fully_covered.
 /// [EXT]
 def SPV_EXT_fragment_fully_covered : _spirv_1_0;
@@ -618,10 +630,12 @@ def SPV_KHR_subgroup_rotate : _spirv_1_3;
 def SPV_NV_ray_tracing_motion_blur : _spirv_1_0;
 
 /// Represents the SPIR-V extension for shader invocation reorder (cross-vendor standard).
-/// Requires SPV_KHR_ray_tracing and SPIR-V 1.5 (which includes physical storage buffer).
-/// Note: Spec allows SPIR-V 1.4 + physical_storage_buffer extension, but we require 1.5 for simplicity.
+/// Per the SER spec it requires SPIR-V 1.4, SPV_KHR_ray_tracing, and a physical-storage-buffer
+/// extension. We model the physical-storage-buffer dependency as SPV_KHR_physical_storage_buffer
+/// (the name the emitter declares); the emitter adds that `OpExtension` on the pre-1.5 path
+/// (it is core from 1.5 on), while this dependency records the relationship in the model.
 /// [EXT]
-def SPV_EXT_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
+def SPV_EXT_shader_invocation_reorder : _spirv_1_4 + SPV_KHR_ray_tracing + SPV_KHR_physical_storage_buffer;
 
 /// Represents the SPIR-V extension for shader invocation reorder (NVIDIA-specific).
 /// Inherits from SPV_EXT_shader_invocation_reorder so NV implies EXT.
@@ -1985,6 +1999,10 @@ alias sm_6_10 = sm_6_10_version
              | sm_6_9
              ;
 
+/// Represents the latest HLSL shader model version.
+/// [Version]
+alias sm_latest = _sm_6_10;
+
 // Profiles
 /// Use `sm_4_0` instead
 /// [Other]
@@ -2188,6 +2206,10 @@ alias GLSL_460 = _GLSL_460
                // previous
                | GLSL_450
                ;
+
+/// Represents the latest GLSL version.
+/// [Version]
+alias GLSL_latest = _GLSL_460;
 
 /// User should not use this capability
 /// [Other]
@@ -2399,6 +2421,10 @@ alias texture_querylod = texture_sm_4_1 | GL_EXT_texture_query_lod;
 /// Capabilities required to query texture level info
 /// [Compound]
 alias texture_querylevels = texture_sm_4_1 | GL_ARB_texture_query_levels;
+/// Capabilities required for plain shadow-comparison texture sampling that takes
+/// no explicit LOD (SampleCmp, SampleCmpLevelZero).
+/// [Compound]
+alias texture_shadow = texture_sm_4_1;
 /// Capabilities required for shadow texture LOD sampling on types
 /// natively supported by GLSL 1.50 (sampler1DShadow, sampler1DArrayShadow,
 /// sampler2DShadow).
@@ -2413,6 +2439,10 @@ alias texture_shadowlod_ext = texture_sm_4_1 | GL_EXT_texture_shadow_lod;
 /// New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 /// [Compound]
 alias texture_shadowgrad = _sm_6_8 | _GLSL_150 | spirv_1_0 | GL_EXT_texture_shadow_lod;
+/// Capabilities required for shadow-comparison texture sampling with an LOD bias
+/// (SampleCmpBias). New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
+/// [Compound]
+alias texture_shadowbias = _sm_6_8 | _GLSL_150 | spirv_1_0 | GL_EXT_texture_shadow_lod;
 
 /// (GLSL/SPIRV) Capabilities required to use GLSL-tier-1 float-atomic operations
 /// [Compound]
@@ -2440,7 +2470,7 @@ alias image_loadstore = GL_EXT_shader_image_load_store + GLSL_420;
 alias nonuniformqualifier = sm_5_1;
 /// Capabilities required to use 'printf'
 /// [Compound]
-alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | cpp | llvm;
+alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | metallib_3_2 | cpp | llvm;
 /// Capabilities required to use 'abort'
 /// [Compound]
 alias abort = GL_EXT_shader_abort;

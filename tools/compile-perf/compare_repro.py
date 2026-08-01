@@ -26,7 +26,7 @@ def load(run_dir):
         jp = analyze.results_path(run_dir, tag)
         if not os.path.isfile(jp):
             continue
-        for r in json.load(open(jp)):
+        for r in analyze.read_json(jp):
             out[(tag, r["workload"], r["size"])] = r
     return out
 
