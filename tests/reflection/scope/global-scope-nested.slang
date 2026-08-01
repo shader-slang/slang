@@ -26,6 +26,8 @@ void main()
 //CHECK: "kind": "none"
 //CHECK: "parameters": [
 //CHECK: "name": "gNested"
-// The parameter's type carries the nested constant-buffer / parameter-block structure.
+// Pin the nesting on gNested's own type: the parameter block is the constant buffer's
+// direct element, so the two `kind` lines must be adjacent through the `elementType` key.
 //CHECK: "kind": "constantBuffer"
-//CHECK: "kind": "parameterBlock"
+//CHECK-NEXT: "elementType"
+//CHECK-NEXT: "kind": "parameterBlock"

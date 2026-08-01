@@ -1134,32 +1134,45 @@ static void emitReflectionParamJSON(PrettyWriter& writer, slang::VariableLayoutR
     writer << "\n}";
 }
 
+// Emit a scope's `"parameters"` array from the fields of `elementTypeLayout` — the type layout
+// holding the scope's contents, passed by callers as either the scope's own layout (an unwrapped
+// scope) or the element layout found inside the scope's container. A scope's contents are modeled
+// as a `struct` (one field per parameter), so for every scope the current front-end produces this
+// is a `Struct`, possibly with zero fields — which correctly yields `"parameters": []`. A
+// non-`Struct` layout (which either call site could pass for an unexpected scope shape) has no
+// fields to iterate and contributes no `"parameters"` key.
 static void emitReflectionScopeParametersJSON(
     PrettyWriter& writer,
-    slang::TypeLayoutReflection* structTypeLayout)
+    slang::TypeLayoutReflection* elementTypeLayout)
 {
-    if (structTypeLayout->getKind() != slang::TypeReflection::Kind::Struct)
+    if (elementTypeLayout->getKind() != slang::TypeReflection::Kind::Struct)
         return;
 
     writer.maybeComma();
     writer << "\"parameters\": [\n";
     writer.indent();
-    auto paramCount = structTypeLayout->getFieldCount();
+    auto paramCount = elementTypeLayout->getFieldCount();
     for (auto pp : makeRange(paramCount))
     {
         if (pp != 0)
             writer << ",\n";
-        emitReflectionParamJSON(writer, structTypeLayout->getFieldByIndex(pp));
+        emitReflectionParamJSON(writer, elementTypeLayout->getFieldByIndex(pp));
     }
     writer.dedent();
     writer << "\n]";
 }
 
 // Describe a program scope (the global scope, or an entry point's scope) as a JSON object,
-// mirroring `printScope` in `examples/reflection-api/main.cpp`. The key detail the flat
-// `parameters` list cannot express is the binding of the constant buffer / parameter block
-// that a scope's parameters are automatically gathered into: that container occupies a
-// register / descriptor slot / space of its own, reported here as the scope's `binding`.
+// following the same kind-based traversal as `printScope` in `examples/reflection-api/main.cpp`.
+// The key detail the flat `parameters` list cannot express is the binding of the constant
+// buffer / parameter block that a scope's parameters are automatically gathered into: that
+// container occupies a register / descriptor slot / space of its own, reported here as the
+// scope's `binding`.
+//
+// Current scope layouts (`ScopeLayoutBuilder::endLayout` in `slang-parameter-binding.cpp`) are a
+// `Struct`, optionally wrapped once in a constant buffer — so in practice `kind` is only `"none"`
+// or `"constantBuffer"`, and the `"parameterBlock"` kind and nested-`"scope"` recursion below are
+// unreachable; they complete the general kind-based traversal.
 static void emitReflectionScopeJSON(
     PrettyWriter& writer,
     slang::VariableLayoutReflection* scopeVarLayout)
