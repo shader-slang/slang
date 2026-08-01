@@ -284,7 +284,12 @@ jobs:
         env:
           BASE: ${{ steps.stage.outputs.base }}
         run: |
-          mapfile -t libs < <(find "$BASE/lib" -type f | sort)
+          # A while-read loop rather than mapfile: on macOS `shell: bash` is
+          # the system /bin/bash 3.2, which predates mapfile.
+          libs=()
+          while IFS= read -r lib; do
+            libs+=("$lib")
+          done < <(find "$BASE/lib" -type f | sort)
           printf '  %s\n' "${libs[@]}"
           if [[ ${#libs[@]} -ne 1 ]]; then
             echo "::error::expected exactly one library in lib/, found ${#libs[@]}"
