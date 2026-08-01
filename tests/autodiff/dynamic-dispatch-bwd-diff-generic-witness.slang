@@ -2,20 +2,9 @@
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly
 
-// Regression test for a type-flow specialization crash:
-//   "createSet called with non-global operands" (slang-ir.cpp).
-//
-// When a *generic* differentiable interface (`ISensor<Real>`) is loaded from a buffer and
-// dispatched dynamically inside a `[Differentiable]` function that is then differentiated
-// (`bwd_diff`), autodiff synthesizes extra witness tables for the interface, some of which live
-// inside function blocks rather than at module scope. `collectExistentialTables` enumerated *all*
-// witness tables of the interface type, including those block-local ones, and fed them to
-// `IRBuilder::getSet` -- whose elements must be global (sets are canonicalized by global unique
-// id). That asserted.
-//
-// The fix restricts `collectExistentialTables` to module-scope (global) witness tables, matching
-// the intent of its caller `findGlobalTables` and the `getSet` invariant. The block-local tables
-// are derivative artifacts, not primal conformances, so excluding them preserves the type set.
+// Regression test for feeding block-local witness tables synthesized by autodiff to
+// `IRBuilder::getSet`, which requires global operands. Existential-table collection must keep only
+// module-scope conformances.
 
 [anyValueSize(16)]
 interface ISensor<Real : IFloat> : IDifferentiable
@@ -29,7 +18,7 @@ struct Perspective<Real : IFloat> : ISensor<Real>, IDifferentiable
     [Differentiable] Real splat(Real p) { return focal * p; }
 }
 
-// A second, never-instantiated conformance keeps the dispatch dynamic (not devirtualized).
+// Keep the dispatch dynamic.
 struct Ortho<Real : IFloat> : ISensor<Real>, IDifferentiable
 {
     Real scale;
@@ -45,8 +34,6 @@ StructuredBuffer<ISensor<float>> sensors;
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<float> outputBuffer;
 
-// A separate `[Differentiable]` function that takes the existential by value and dispatches a
-// differentiable method on it -- this is what drives the interprocedural type-flow analysis.
 [Differentiable]
 float project(ISensor<float> sensor, float p)
 {

@@ -3,23 +3,11 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 
-// Regression test for a type-flow specialization bug.
-//
-// `shapes[0]` is a dynamic existential. `(shapes[0] as Square).value` lowers to an
-// `as`-cast: a `makeOptionalValue` on the true branch and a `makeOptionalNone` on the
-// false branch, merged at a phi whose declared type is `Optional<Square>`.
-//
-// `Square` is *non-concrete* in the type-flow pass because it contains an interface-typed
-// member (`extra`). On that path `analyzeMakeOptionalValue` produced no payload info
-// (null), while `analyzeMakeOptionalNone` produced an `OptionalNoneType` refinement.
-// `unionPropagationInfo` then short-circuited on the null info and adopted the
-// `OptionalNoneType`, retyping the whole phi to a payload-less none. Downstream, the
-// unwrapped `.value` could no longer be projected, so the method receiver (`this`, passed
-// by pointer because `Square` is large) was bound to the whole `Optional<Square>` wrapper
-// instead of the value — emitting target code that referenced a non-existent overload.
-//
-// With the fix the phi keeps its declared `Optional<Square>` type, `.value` projects
-// correctly, and `area()`/`perimeter()` receive a proper `Square*`.
+// Regression test for treating nominal structs as structural types during type-flow. Recursing
+// into `Square.extra` made `Optional<Square>` appear non-concrete, so the none branch retyped the
+// downcast's merge phi to `OptionalNoneType`. Keeping structs nominal preserves the declared
+// `Optional<Square>` and its payload. The `extra.k()` call also checks existential field
+// extraction.
 
 [anyValueSize(16)]
 interface IExtra
@@ -57,17 +45,13 @@ struct Square : IShape
     float e;
     float f;
     float g;
-    // Interface-typed member: makes `Square` non-concrete during type-flow specialization,
-    // which is what exercises the buggy merge path.
     IExtra extra;
 
     float area() { return side * side + a + b + c + d + e + f + g; }
     float perimeter() { return side * 4.0f; }
 }
 
-// A second, never-instantiated `IShape` implementation, for the same reason: it keeps `IShape`
-// dynamic so `shapes[0] as Square` is a genuine runtime type test (driven by the outer witness
-// header) rather than a statically-resolved one.
+// Keep `IShape` dynamic so the downcast performs a runtime type test.
 struct Triangle : IShape
 {
     float base;
@@ -92,6 +76,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     let sq = (shapes[0] as Square).value;
     outputBuffer[tid.x] = sq.area() + sq.perimeter() + sq.extra.k();
-    // area = 3*3 = 9, perimeter = 3*4 = 12, extra.k() = w + 1.0 = 1.0  => 22.0
+    // area = 9, perimeter = 12, extra.k() = 1
     // CHECK: 22.0
 }
