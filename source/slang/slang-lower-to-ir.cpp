@@ -16027,6 +16027,19 @@ static IRTypeLayout* _lowerTypeLayoutCommon(IRTypeLayout::Builder* builder, Type
         builder->addResourceUsage(resInfo.kind, resInfo.count);
     }
 
+    // Preserve the byte alignment the front-end computed (the `uniformAlignment`
+    // field, whose historical name uses "uniform" to mean bytes). We record it
+    // for any layout that occupies the byte unit at all; the builder decides
+    // whether an attribute is actually emitted (it drops the default alignment of
+    // 1 and any unit with zero size), so this side only needs to supply the
+    // value when the byte unit is present.
+    if (typeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
+    {
+        builder->addAlignment(
+            LayoutResourceKind::Uniform,
+            IRIntegerValue(typeLayout->uniformAlignment.getValidValue()));
+    }
+
     return builder->build();
 }
 
