@@ -341,20 +341,42 @@ jobs:
           fi
           ls -la "$BASE/licenses"
 
+      # Three formats ship. The .tar.xz exists for downstreams that vendor the
+      # archive into git -- slang-rs commits one per platform on its release
+      # branches -- where a blob's size is a cost that never goes away, so it
+      # is compressed at -9 rather than the default preset.
+      #
+      # Compressed in a separate step rather than with `tar -cJf`: bsdtar (the
+      # tar on macOS and Windows) drives liblzma directly and ignores XZ_OPT,
+      # so -cJf would silently give preset 6 there and -9 on GNU tar only.
+      # Windows has no xz binary in Git Bash, hence the 7z fallback.
       - name: Package
         id: package
         env:
           BASE: ${{ steps.stage.outputs.base }}
         run: |
           tar -czf "${BASE}.tar.gz" "$BASE"
+
+          tar -cf "${BASE}.tar" "$BASE"
+          if command -v xz >/dev/null 2>&1; then
+            xz -9 -T0 -f "${BASE}.tar"
+          elif command -v 7z >/dev/null 2>&1; then
+            7z a -txz -mx=9 "${BASE}.tar.xz" "${BASE}.tar" >/dev/null
+            rm -f "${BASE}.tar"
+          else
+            echo "::error::neither xz nor 7z is available to produce ${BASE}.tar.xz"
+            exit 1
+          fi
+
           if command -v 7z >/dev/null 2>&1; then
             7z a "${BASE}.zip" "$BASE" >/dev/null
           else
             zip -qr "${BASE}.zip" "$BASE"
           fi
-          ls -la "${BASE}.tar.gz" "${BASE}.zip"
+          ls -la "${BASE}.tar.gz" "${BASE}.tar.xz" "${BASE}.zip"
           {
             echo "tarball=${BASE}.tar.gz"
+            echo "tarball_xz=${BASE}.tar.xz"
             echo "zip=${BASE}.zip"
           } >> "$GITHUB_OUTPUT"
 
@@ -401,7 +423,7 @@ jobs:
             echo
             echo '| item | size |'
             echo '| --- | --- |'
-            for f in "$BASE"/lib/* "${BASE}.tar.gz" "${BASE}.zip"; do
+            for f in "$BASE"/lib/* "${BASE}.tar.gz" "${BASE}.tar.xz" "${BASE}.zip"; do
               echo "| $(basename "$f") | $(du -h "$f" | cut -f1) |"
             done
           } | tee -a "$GITHUB_STEP_SUMMARY"
@@ -411,6 +433,7 @@ jobs:
           name: ${{ steps.stage.outputs.base }}
           path: |
             ${{ steps.package.outputs.tarball }}
+            ${{ steps.package.outputs.tarball_xz }}
             ${{ steps.package.outputs.zip }}
           retention-days: 14
 
@@ -418,7 +441,7 @@ jobs:
   # in each matrix job: three jobs each calling action-gh-release race to create
   # the release for the same tag, and can leave a duplicate draft or split the
   # assets across two releases. Centralizing also gives the checksum step sight
-  # of all six archives, so SHA256SUMS covers the whole release.
+  # of all nine archives, so SHA256SUMS covers the whole release.
   publish:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
@@ -437,7 +460,7 @@ jobs:
       - name: Generate checksums
         run: |
           cd dist
-          sha256sum -- *.tar.gz *.zip | tee SHA256SUMS
+          sha256sum -- *.tar.gz *.tar.xz *.zip | tee SHA256SUMS
 
       - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
