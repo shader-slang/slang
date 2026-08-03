@@ -535,6 +535,22 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                     if (auto inductionInfo = inductionValueInsts.tryGetValue(param))
                     {
                         checkpointInfo->loopInductionInfo.addIfNotExists(param, *inductionInfo);
+
+                        // Reconstructing an affine induction parameter in the reverse loop creates
+                        // a synthetic use of the loop's initial offset. Register that dependency
+                        // now, while checkpoint policy is deciding which primal values to
+                        // recompute or store.
+                        //
+                        // Consider `for (int i = -start; ...; ++i)`. The offset is the `neg(start)`
+                        // instruction in the primal entry block. No reverse instruction uses it
+                        // yet, so without this pseudo-use the policy never makes it available in
+                        // the reverse loop.
+                        auto counterOffset = inductionInfo->counterOffset;
+                        if (counterOffset && !as<IRModuleInst>(counterOffset->getParent()))
+                        {
+                            SLANG_RELEASE_ASSERT(getParentFunc(counterOffset) == func);
+                            workList.add(UseOrPseudoUse(param, counterOffset));
+                        }
                         continue;
                     }
 
@@ -1342,6 +1358,20 @@ void applyToInst(
                     SLANG_ASSERT(indexInfo);
                     SLANG_ASSERT(indexInfo->getCount() != 0);
                     replacement = indexInfo->getFirst().diffCountParam;
+
+                    // Convert the synthetic reverse-loop count to the original induction type
+                    // before applying the factor and offset. The loop's initial argument
+                    // (`counterOffset`, when present) already has that type, so every following
+                    // affine arithmetic operation is formed in the induction type. Consider
+                    // `for (int16_t i = -3; ...; ++i)`: adding the raw `int` count to the
+                    // `int16_t` offset creates mismatched operands, while converting the count
+                    // first produces `int16_t(count) + int16_t(-3)`.
+                    if (replacement->getDataType() != inst->getDataType())
+                    {
+                        setInsertAfterOrdinaryInst(builder, replacement);
+                        replacement = builder->emitCast(inst->getDataType(), replacement);
+                    }
+
                     if (inductionValueInfo.counterFactor != 1)
                     {
                         setInsertAfterOrdinaryInst(builder, replacement);
@@ -1354,23 +1384,35 @@ void applyToInst(
                     }
                     if (inductionValueInfo.counterOffset)
                     {
+                        auto counterOffset = inductionValueInfo.counterOffset;
+                        if (checkpointInfo->recomputeSet.contains(counterOffset))
+                        {
+                            // Checkpoint policy recomputed the runtime offset in the corresponding
+                            // recompute block. Use that clone instead of retaining a reference to
+                            // its primal definition.
+                            auto mappedCounterOffset =
+                                cloneCtx->cloneEnv.mapOldValToNew.tryGetValue(counterOffset);
+                            SLANG_RELEASE_ASSERT(mappedCounterOffset);
+                            counterOffset = *mappedCounterOffset;
+                        }
+                        else
+                        {
+                            // A stored value deliberately remains in this use until
+                            // ensurePrimalAvailability replaces it with a load. Module constants
+                            // need no remapping.
+                            SLANG_RELEASE_ASSERT(
+                                checkpointInfo->storeSet.contains(counterOffset) ||
+                                as<IRModuleInst>(counterOffset->getParent()));
+                        }
+
                         setInsertAfterOrdinaryInst(builder, replacement);
                         replacement = builder->emitAdd(
                             replacement->getDataType(),
                             replacement,
-                            inductionValueInfo.counterOffset);
+                            counterOffset);
                     }
                 }
                 SLANG_ASSERT(replacement);
-
-                // If the replacement and inst are not the exact same type, use an int-cast
-                // (e.g. uint vs. int)
-                //
-                if (replacement->getDataType() != inst->getDataType())
-                {
-                    setInsertAfterOrdinaryInst(builder, replacement);
-                    replacement = builder->emitCast(inst->getDataType(), replacement);
-                }
 
                 cloneCtx->cloneEnv.mapOldValToNew[inst] = replacement;
                 cloneCtx->registerClonedInst(builder, inst, replacement);
