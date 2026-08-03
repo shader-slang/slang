@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=019ec0e5ddac1c14fbad141a3f03d50cf8a5e022
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=701541a00a1b084515168e6adaa766b069355955c8c77e0f8307c0318b34f251
+//META: doc_section_digest=198700d5c1fbb960db4ea54d8eacf861415a0051537fd84a481910acabdfa45d
 //META: purpose=Phase B's checkForOutOfBoundAccess fires before SPIR-V emit when a static array is indexed past its declared bound; the documented diagnostic is reported on the IR pipeline (not the SPIR-V backend).
 //META: intent=negative
 //META: pipeline_stage=ir-pass

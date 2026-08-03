@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#metal
-//META: doc_section_digest=938094df12598f49fb57b26c95761fb987b6d30ef8c264d595a54604c7c10628
+//META: doc_section_digest=cf117988f193f2899946e3ad0814760074ba2e22d1128b07c3e1008d5b374436
 //META: purpose=The Metal backend emits Metal source with metal_stdlib include, the kernel function-qualifier, a thread_position_in_grid input, and buffer(N) markers for buffer arguments.
 //META: intent=functional
 //META: pipeline_stage=emit

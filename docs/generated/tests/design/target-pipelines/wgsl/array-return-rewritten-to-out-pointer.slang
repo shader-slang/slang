@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:46:22Z
 //META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#phase-c-wgsl-legalization-lowering-phi-elimination
-//META: doc_section_digest=a07249d171e8760079dd021f485b191eeba9855fbe96652d35a7e74a16b7586a
+//META: doc_section_digest=eda5f65fdaf66849c226ae86c71a3dd2d4db5ad3899105a4ddc6e7ac2d4447df
 //META: purpose=legalizeArrayReturnType rewrites array-returning functions into out-parameter form on WGSL
 //META: intent=functional
 //META: pipeline_stage=ir-pass

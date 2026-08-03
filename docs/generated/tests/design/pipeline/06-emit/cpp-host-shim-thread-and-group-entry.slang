@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#c
-//META: doc_section_digest=98bae1408ef948818e6d18a391c8a3a89d2f13645057f93200d977f0f093501d
+//META: doc_section_digest=56fb593cc69a3ab3311c7c4481d138ffc0af6f678b9289b2a5e75f9670abbce2
 //META: purpose=Boundary: the C++ backend's entry-point shim emits both the per-thread (`_Thread`) and per-group (`_Group`) flavours so the host runtime can drive either dispatch level.
 //META: intent=boundary
 //META: pipeline_stage=emit

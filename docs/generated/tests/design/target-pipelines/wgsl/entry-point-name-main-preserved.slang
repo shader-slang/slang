@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:46:22Z
 //META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#phase-d-wgsl-emit-and-downstream-tools
-//META: doc_section_digest=287321dc153823860396c030325e4ad4c0f6064005fa37b19c8ba53087dcd3e6
+//META: doc_section_digest=602dd96dd9a5139f2ccd4e3f857107fe47c9705a3ba52eae7e88a90893f9d664
 //META: purpose=WGSL preserves the entry-point name; 'main' emits as 'fn main(...)'
 //META: intent=functional
 //META: pipeline_stage=emit

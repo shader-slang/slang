@@ -1,7 +1,7 @@
 #include "slang-parser.h"
 
-#include "../core/slang-semantic-version.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-semantic-version.h"
+#include "core/slang-string-util.h"
 #include "slang-ast-decl.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
@@ -94,6 +94,7 @@ struct ParserOptions
     bool enableEffectAnnotations = false;
     bool allowGLSLInput = false;
     bool isInLanguageServer = false;
+    bool isCoreModule = false;
     ParsingStage stage = ParsingStage::Body;
     CompilerOptionSet optionSet;
 };
@@ -1492,6 +1493,20 @@ static NameLoc ParseDeclName(Parser* parser, bool* outIsValidOperatorName = null
     }
 }
 
+// Parse a static member name after `::`. When `__subscript` is itself followed by `::`, as in
+// `Type::__subscript::get`, translate the declaration keyword to the `SubscriptDecl`'s internal
+// `operator[]` name. The trailing scope token is required: without it, preserve the literal
+// identifier so expressions such as `Type::__subscript()` keep their ordinary meaning.
+static NameLoc ParseStaticMemberName(Parser* parser)
+{
+    if (parser->LookAheadToken("__subscript") && parser->LookAheadToken(TokenType::Scope, 1))
+    {
+        auto subscriptToken = parser->ReadToken("__subscript");
+        return NameLoc(getSubscriptOperatorName(parser->astBuilder), subscriptToken.loc);
+    }
+    return expectIdentifier(parser);
+}
+
 // A "declarator" as used in C-style languages
 struct Declarator : RefObject
 {
@@ -1511,8 +1526,8 @@ struct NameDeclarator : Declarator
     NameLoc nameAndLoc;
 
     // True if the name came from `operator <op>` syntax. Such a name is only
-    // valid for a function declaration; using it for a variable is diagnosed in
-    // `CompleteVarDecl`.
+    // valid for a function declaration; `UnwrapDeclarator` diagnoses it for any
+    // other declaration kind unless the caller opts in via `allowOperatorName`.
     bool isOperatorName = false;
 };
 
@@ -1544,10 +1559,6 @@ struct DeclaratorInfo
     NameLoc nameAndLoc;
     Modifiers semantics;
     Expr* initializer = nullptr;
-
-    // True if `nameAndLoc` came from `operator <op>` syntax (see
-    // `NameDeclarator::isOperatorName`).
-    bool isOperatorName = false;
 };
 
 // Add a member declaration to its container, and ensure that its
@@ -2457,20 +2468,6 @@ static void CompleteVarDecl(Parser* parser, VarDeclBase* decl, DeclaratorInfo co
 {
     parser->FillPosition(decl);
 
-    // An `operator <op>` name only makes sense for a function declaration. If we
-    // reach here the declarator was completed as a variable (e.g.
-    // `int operator+ = 10;`), which is not valid; without this the malformed
-    // declaration is accepted silently and only surfaces as a confusing error at
-    // a later use site. `CompleteVarDecl` is shared with traditional parameter
-    // parsing, so exclude `ParamDecl` (whose "operator name used as a variable
-    // name" message would be inaccurate); a parameter named with an operator is a
-    // separate, rarer case left to its own handling.
-    if (declaratorInfo.isOperatorName && !as<ParamDecl>(decl))
-    {
-        parser->sink->diagnose(
-            Diagnostics::OperatorNameUsedAsVariableName{.location = declaratorInfo.nameAndLoc.loc});
-    }
-
     if (!declaratorInfo.nameAndLoc.name)
     {
         // HACK(tfoley): we always give a name, even if the declarator didn't include one... :(
@@ -2552,8 +2549,8 @@ static RefPtr<Declarator> parseDirectAbstractDeclarator(
         {
             // A valid `operator <op>` name is only legal when this declarator
             // turns out to be a function. Remember whether `ParseDeclName`
-            // actually parsed a valid operator name so a later variable
-            // completion can reject it (see `CompleteVarDecl`). A malformed
+            // actually parsed a valid operator name so `UnwrapDeclarator` can
+            // reject it for any non-function declaration. A malformed
             // `operator <garbage>` already reports `InvalidOperator`, so it is
             // not flagged again.
             auto nameDeclarator = new NameDeclarator();
@@ -2736,11 +2733,21 @@ static InitDeclarator parseInitDeclarator(Parser* parser, DeclaratorParseOptions
     return result;
 }
 
+// Fold a parsed declarator's pointer/array suffixes onto the base type in `ioInfo->typeSpec` and
+// copy out its name. This is the single point every C-style declarator (variable, parameter,
+// typedef, property, and function) passes through on its way to a declaration, so it is where the
+// `operator <op>` name rule is enforced: an operator name is only legal for a function, so unless
+// `allowOperatorName` is set (only the traditional-function branch opts in), an operator-named
+// declarator is diagnosed here. Enforcing at this one chokepoint means the variable, parameter,
+// typedef, and property cases are all rejected by construction, with no per-kind check to keep in
+// sync.
 static void UnwrapDeclarator(
-    ASTBuilder* astBuilder,
+    Parser* parser,
     RefPtr<Declarator> declarator,
-    DeclaratorInfo* ioInfo)
+    DeclaratorInfo* ioInfo,
+    bool allowOperatorName = false)
 {
+    auto astBuilder = parser->astBuilder;
     while (declarator)
     {
         switch (declarator->flavor)
@@ -2749,7 +2756,11 @@ static void UnwrapDeclarator(
             {
                 auto nameDeclarator = (NameDeclarator*)declarator.Ptr();
                 ioInfo->nameAndLoc = nameDeclarator->nameAndLoc;
-                ioInfo->isOperatorName = nameDeclarator->isOperatorName;
+                if (nameDeclarator->isOperatorName && !allowOperatorName)
+                {
+                    parser->sink->diagnose(Diagnostics::OperatorNameOnNonFunction{
+                        .location = nameDeclarator->nameAndLoc.loc});
+                }
                 return;
             }
             break;
@@ -2790,11 +2801,12 @@ static void UnwrapDeclarator(
 }
 
 static void UnwrapDeclarator(
-    ASTBuilder* astBuilder,
+    Parser* parser,
     InitDeclarator const& initDeclarator,
-    DeclaratorInfo* ioInfo)
+    DeclaratorInfo* ioInfo,
+    bool allowOperatorName = false)
 {
-    UnwrapDeclarator(astBuilder, initDeclarator.declarator, ioInfo);
+    UnwrapDeclarator(parser, initDeclarator.declarator, ioInfo, allowOperatorName);
     ioInfo->semantics = initDeclarator.semantics;
     ioInfo->initializer = initDeclarator.initializer;
 }
@@ -3672,7 +3684,9 @@ static DeclBase* ParseDeclaratorDecl(
         // constructs when parsing the declarator.
         && !initDeclarator.initializer && !initDeclarator.semantics.first)
     {
-        UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
+        // This declarator is followed by a parameter list (or generic `<`), so it declares a
+        // function -- the one context where an `operator <op>` name is legal.
+        UnwrapDeclarator(parser, initDeclarator, &declaratorInfo, /*allowOperatorName*/ true);
 
         // diagnose new type declaration, which is not allowed in function
         // return type expression
@@ -3693,7 +3707,7 @@ static DeclBase* ParseDeclaratorDecl(
     if (AdvanceIf(parser, TokenType::Semicolon))
     {
         // easy case: we only had a single declaration!
-        UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
+        UnwrapDeclarator(parser, initDeclarator, &declaratorInfo);
         VarDeclBase* firstDecl = CreateVarDeclForContext(parser->astBuilder, containerDecl);
         CompleteVarDecl(parser, firstDecl, declaratorInfo);
 
@@ -3715,7 +3729,7 @@ static DeclBase* ParseDeclaratorDecl(
     for (;;)
     {
         declaratorInfo.typeSpec = sharedTypeSpec;
-        UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
+        UnwrapDeclarator(parser, initDeclarator, &declaratorInfo);
 
         VarDeclBase* varDecl = CreateVarDeclForContext(parser->astBuilder, containerDecl);
         CompleteVarDecl(parser, varDecl, declaratorInfo);
@@ -4781,8 +4795,7 @@ static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
             parser->FillPosition(decl);
             parser->PushScope(decl);
 
-            // TODO: the use of this name here is a bit magical...
-            decl->nameAndLoc.name = getName(parser, "operator[]");
+            decl->nameAndLoc.name = getSubscriptOperatorName(parser->astBuilder);
 
             parseParameterList(parser, decl);
 
@@ -4874,7 +4887,7 @@ static NodeBase* parsePropertyDecl(Parser* parser, void* /*userData*/)
         declaratorInfo.typeSpec = parser->ParseType();
 
         auto declarator = parseDeclarator(parser, kDeclaratorParseOptions_None);
-        UnwrapDeclarator(parser->astBuilder, declarator, &declaratorInfo);
+        UnwrapDeclarator(parser, declarator, &declaratorInfo);
 
         // TODO: We might want to handle the case where the
         // resulting declarator is not valid to use for
@@ -5021,7 +5034,7 @@ static void _parseTraditionalParamDeclCommonBase(
     declaratorInfo.typeSpec = parser->ParseType();
 
     InitDeclarator initDeclarator = parseInitDeclarator(parser, options);
-    UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
+    UnwrapDeclarator(parser, initDeclarator, &declaratorInfo);
 
     // Assume it is a variable-like declarator
     CompleteVarDecl(parser, decl, declaratorInfo);
@@ -5135,7 +5148,7 @@ NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
     DeclaratorInfo declaratorInfo;
     declaratorInfo.typeSpec = type.exp;
     auto declarator = parseDeclarator(parser, kDeclaratorParseOptions_None);
-    UnwrapDeclarator(parser->astBuilder, declarator, &declaratorInfo);
+    UnwrapDeclarator(parser, declarator, &declaratorInfo);
 
     typeDefDecl->loc = declaratorInfo.nameAndLoc.loc;
     typeDefDecl->nameAndLoc = declaratorInfo.nameAndLoc;
@@ -8179,213 +8192,6 @@ static NodeBase* parseTreatAsDifferentiableExpr(Parser* parser, void* /*userData
     return noDiffExpr;
 }
 
-enum class FloatFixKind
-{
-    None,            ///< No modification was made
-    Unrepresentable, ///< Unrepresentable
-    Zeroed,          ///< Too close to 0
-    Truncated,       ///< Truncated to a non zero value
-};
-
-// Truncates double to a narrower float type
-//
-// Parameters:
-//
-//   value           - Value to truncate. May be 0, infinity, NaN
-//   minNormalExp    - Minimum normal exponent before subnormal
-//   maxExp          - Maximum exponent. Anything above that is INFINITY or -INFINITY
-//   precisionBits   - Precision in number of bits
-//
-// Note:
-// - float:  -126, +127, 24
-// - half:   -14,  +15,  11
-static double _truncateDouble(double value, int minNormalExp, int maxExp, unsigned precisionBits)
-{
-    // NaNs and INFs are passed as is
-    if (!std::isfinite(value))
-        return value;
-
-    int exp{};
-    double fraction = std::frexp(value, &exp);
-
-    // Note: there is a seeming off-by-one with exponents. This is because frexp() returns
-    // fraction between [0.5, 1). That is, the 1.0 is decomposed as as 0.5 * 2^1.
-    if (exp > (maxExp + 1))
-    {
-        // overflow
-        if (value >= 0.0)
-            return INFINITY;
-        else
-            return -INFINITY;
-    }
-
-    // for subnormals - note the exponent off-by-one comment above.
-    int precisionLoss = std::max(minNormalExp - (exp - 1), 0);
-
-    int exponentShift = static_cast<int>(precisionBits) - precisionLoss;
-
-    // truncate fraction
-    fraction = ldexp(fraction, exponentShift);
-    fraction = trunc(fraction);
-    fraction = ldexp(fraction, -exponentShift);
-
-    // return truncated double
-    return ldexp(fraction, exp);
-}
-
-
-static FloatFixKind _fixFloatLiteralValue(
-    BaseType type,
-    bool truncateToFit, // hex literals are truncated if necessary
-    IRFloatingPointValue value,
-    IRFloatingPointValue& outValue)
-{
-    // Notes:
-    // - Infinite and NaN values don't need fixing. They're infinites and NaNs
-    //   regardless of the precision.
-    // - Double-to-double conversion never loses precision
-    if ((type != BaseType::Double) && std::isfinite(value))
-    {
-        // our logic depends on that IRFloatingPointValue is double
-        static_assert(
-            std::is_same_v<IRFloatingPointValue, double>,
-            "_fixFloatLiteralValue() logic assumption");
-
-        // representable range
-        double positiveMin; // minimum value
-        double nonzeroMin;  // minimum value that we'll still consider rounded to non-zero
-        double positiveMax; // maximum value
-        double finiteMax;   // maximum value that we'll still consider finite
-
-        // truncation control
-        int minNormalExp;
-        int maxExp;
-        unsigned precisionBits;
-
-        switch (type)
-        {
-        case BaseType::Float:
-            positiveMin = std::numeric_limits<float>::denorm_min();
-            nonzeroMin = double{std::numeric_limits<float>::denorm_min()} / 2.0;
-            static_assert(0x1.FFFFFE0p127 == double{std::numeric_limits<float>::max()});
-            positiveMax = 0x1.FFFFFE0p127;
-            finiteMax = 0x1.FFFFFFp127; // this still rounds down to positiveMax
-            minNormalExp = -126;
-            maxExp = 127;
-            precisionBits = 24;
-            break;
-
-        case BaseType::Half:
-            static_assert(0x0.004p-14 == SLANG_HALF_SUB_NORMAL_MIN);
-            positiveMin = 0x0.004p-14;
-            nonzeroMin = 0x0.002p-14;
-            static_assert(0x1.FFC0p15 == SLANG_HALF_MAX);
-            positiveMax = 0x1.FFC0p15;
-            finiteMax = 0x1.FFE0p15; // this still rounds up to positiveMax
-            minNormalExp = -14;
-            maxExp = 15;
-            precisionBits = 11;
-            break;
-
-        default:
-            outValue = value;
-            return FloatFixKind::None;
-        }
-
-        if (!std::signbit(value))
-        {
-            // positive number
-            if (value > finiteMax)
-            {
-                outValue = INFINITY;
-                return FloatFixKind::Unrepresentable;
-            }
-
-            if (value > positiveMax)
-            {
-                outValue = positiveMax;
-                return FloatFixKind::Truncated;
-            }
-
-            if (value >= positiveMin)
-            {
-                if (truncateToFit)
-                {
-                    outValue = _truncateDouble(value, minNormalExp, maxExp, precisionBits);
-                    return value == outValue ? FloatFixKind::None : FloatFixKind::Truncated;
-                }
-                else
-                {
-                    outValue = value;
-                    return FloatFixKind::None;
-                }
-            }
-
-            if (value >= nonzeroMin)
-            {
-                outValue = positiveMin;
-                return FloatFixKind::Truncated;
-            }
-
-            if (value > 0.0)
-            {
-                outValue = 0.0;
-                return FloatFixKind::Zeroed;
-            }
-
-            outValue = value;
-            return FloatFixKind::None;
-        }
-        else
-        {
-            // negative number
-            if (value < -finiteMax)
-            {
-                outValue = -INFINITY;
-                return FloatFixKind::Unrepresentable;
-            }
-
-            if (value < -positiveMax)
-            {
-                outValue = -positiveMax;
-                return FloatFixKind::Truncated;
-            }
-
-            if (value <= -positiveMin)
-            {
-                if (truncateToFit)
-                {
-                    outValue = _truncateDouble(value, minNormalExp, maxExp, precisionBits);
-                    return value == outValue ? FloatFixKind::None : FloatFixKind::Truncated;
-                }
-                else
-                {
-                    outValue = value;
-                    return FloatFixKind::None;
-                }
-            }
-
-            if (value <= -nonzeroMin)
-            {
-                outValue = -positiveMin;
-                return FloatFixKind::Truncated;
-            }
-
-            if (value < 0.0)
-            {
-                outValue = -0.0;
-                return FloatFixKind::Zeroed;
-            }
-
-            outValue = value;
-            return FloatFixKind::None;
-        }
-    }
-
-    outValue = value;
-    return FloatFixKind::None;
-}
-
 static IntegerLiteralValue _fixIntegerLiteral(
     BaseType baseType,
     IntegerLiteralValue value,
@@ -8895,31 +8701,51 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
     auto token = parser->tokenReader.advanceToken();
     constExpr->token = token;
 
-    UnownedStringSlice suffix{};
+    FloatingPointLiteralType literalType{};
     bool isOutOfRange{};
     bool precisionLost{};
-    bool isHexFloat = token.getContent().startsWith("0x") || token.getContent().startsWith("0X");
+    UnownedStringSlice errorContent{};
+
     FloatingPointLiteralValue value =
-        getFloatingPointLiteralValue(token, &suffix, &isOutOfRange, &precisionLost);
+        getFloatingPointLiteralValue(token, literalType, isOutOfRange, precisionLost, errorContent);
 
-    // Look at any suffix on the value, default is Float
     BaseType suffixBaseType = BaseType::Float;
-    if ((suffix == "") || (suffix == "f") || (suffix == "F"))
-        suffixBaseType = BaseType::Float;
-    else if (
-        (suffix == "h") || (suffix == "H") || (suffix == "hf") || (suffix == "HF") ||
-        (suffix == "fh") || (suffix == "FH"))
-        suffixBaseType = BaseType::Half;
-    else if (
-        (suffix == "l") || (suffix == "L") || (suffix == "lf") || (suffix == "LF") ||
-        (suffix == "fl") || (suffix == "FL"))
-        suffixBaseType = BaseType::Double;
-    else
-        parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
-            .suffix = String(suffix),
-            .location = token.loc});
+    bool diagnosed{};
 
-    if (isOutOfRange)
+    switch (literalType)
+    {
+    case FloatingPointLiteralType::Half:
+        suffixBaseType = BaseType::Half;
+        break;
+
+    case FloatingPointLiteralType::Float:
+        suffixBaseType = BaseType::Float;
+        break;
+
+    case FloatingPointLiteralType::Double:
+        suffixBaseType = BaseType::Double;
+        break;
+
+    case FloatingPointLiteralType::BadSignificand:
+        parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralNumber{
+            .number = String(errorContent),
+            .location = token.loc});
+        diagnosed = true;
+        break;
+
+    case FloatingPointLiteralType::BadSuffix:
+        parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
+            .suffix = String(errorContent),
+            .location = token.loc});
+        diagnosed = true;
+        break;
+
+    default:
+        SLANG_UNEXPECTED("Unhandled floating point literal type");
+        break;
+    }
+
+    if (isOutOfRange && !diagnosed)
     {
         if (std::isfinite(value))
         {
@@ -8937,53 +8763,19 @@ static Expr* parseFloatingPointLiteralExpr(Parser* parser)
                 .convertedValue = String(value),
                 .location = token.loc});
         }
+        diagnosed = true;
     }
 
-    // TODO(JS):
-    // It is worth noting here that because of the way that the lexer works, that
-    // literals are always handled as if they are positive (a preceding - is taken as a
-    // negate on a positive value). The code in _fixFloatLiteralValue() is designed to
-    // work with positive and negative values, as this behavior might change in the
-    // future, and is arguably more 'correct'.
-
-    FloatingPointLiteralValue fixedValue = value;
-    auto fixType = _fixFloatLiteralValue(suffixBaseType, isHexFloat, value, fixedValue);
-
-    switch (fixType)
-    {
-    case FloatFixKind::Truncated:
-        precisionLost = true;
-        break;
-
-    case FloatFixKind::None:
-        break;
-
-    case FloatFixKind::Zeroed:
-        parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
-            .literal = String(token.getContent()),
-            .type = String(BaseTypeInfo::asText(suffixBaseType)),
-            .convertedValue = String(fixedValue),
-            .location = token.loc});
-        break;
-
-    case FloatFixKind::Unrepresentable:
-        parser->sink->diagnose(Diagnostics::FloatLiteralUnrepresentable{
-            .type = String(BaseTypeInfo::asText(suffixBaseType)),
-            .literal = String(token.getContent()),
-            .convertedValue = String(fixedValue),
-            .location = token.loc});
-        break;
-    }
-
-    if (precisionLost && isHexFloat)
+    if (precisionLost && !diagnosed)
     {
         parser->sink->diagnose(Diagnostics::FloatHexLiteralPrecisionLost{
             .literal = String(token.getContent()),
-            .truncatedValue = StringUtil::makeMinimalHexFloat(fixedValue),
+            .truncatedValue = StringUtil::makeMinimalHexFloat(value),
             .location = token.loc});
+        diagnosed = true;
     }
 
-    constExpr->value = fixedValue;
+    constExpr->value = value;
     constExpr->suffixType = suffixBaseType;
 
     return constExpr;
@@ -9388,7 +9180,7 @@ static Expr* parsePostfixExpr(Parser* parser)
                 staticMemberExpr->baseExpression = expr;
                 parser->ReadToken(TokenType::Scope);
                 parser->FillPosition(staticMemberExpr);
-                staticMemberExpr->name = expectIdentifier(parser).name;
+                staticMemberExpr->name = ParseStaticMemberName(parser).name;
 
                 if (peekTokenType(parser) == TokenType::OpLess)
                     expr = maybeParseGenericApp(parser, staticMemberExpr);
@@ -9622,7 +9414,14 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
         if (parser->LookAheadToken(TokenType::IntegerLiteral) ||
             parser->LookAheadToken(TokenType::Identifier))
         {
-            return SPIRVAsmOperand{SPIRVAsmOperand::Id, parser->ReadToken()};
+            const auto idToken = parser->ReadToken();
+            // A named `%id` register leaks an `OpName` into the emitted SPIR-V, so core-module
+            // registers must be `__`-prefixed to read as compiler-internal
+            // (shader-slang/slang#12108). Integer ids (`%6`) carry no name.
+            SLANG_ASSERT(
+                !parser->options.isCoreModule || idToken.type != TokenType::Identifier ||
+                idToken.getContent().startsWith("__"));
+            return SPIRVAsmOperand{SPIRVAsmOperand::Id, idToken};
         }
     }
     // A &foo variable reference (for the address of foo)
@@ -10168,6 +9967,7 @@ Stmt* parseUnparsedStmt(
         sourceLanguage == SourceLanguage::GLSL;
     options.isInLanguageServer =
         translationUnit->compileRequest->getLinkage()->isInLanguageServer();
+    options.isCoreModule = translationUnit->compileRequest->m_isCoreModuleCode;
     options.optionSet = translationUnit->compileRequest->optionSet;
 
     Parser parser(astBuilder, tokens, sink, outerScope, options);
@@ -10199,6 +9999,7 @@ void parseSourceFile(
         sourceLanguage == SourceLanguage::GLSL;
     options.isInLanguageServer =
         translationUnit->compileRequest->getLinkage()->isInLanguageServer();
+    options.isCoreModule = translationUnit->compileRequest->m_isCoreModuleCode;
     options.optionSet = translationUnit->compileRequest->optionSet;
 
     Parser parser(astBuilder, tokens, sink, outerScope, options);

@@ -11,9 +11,9 @@
 //
 // * `slang-check-conversion.cpp` is responsible for the logic of handling type conversion/coercion
 
-#include "../core/slang-math.h"
-#include "../core/slang-string-util.h"
 #include "core/slang-char-util.h"
+#include "core/slang-math.h"
+#include "core/slang-string-util.h"
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
 #include "slang-ast-print.h"
@@ -330,6 +330,24 @@ void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, Cont
     destScope->nextSibling = subScope;
 }
 
+bool isOwnModuleOrIncludedFileScope(ContainerDecl* containerDecl, ModuleDecl* moduleDecl)
+{
+    // The module's own scope, or one of its own `__include`d files (a `FileDecl`
+    // whose parent is this module). Everything else on the module's sibling chain is
+    // excluded from re-export: a `using`-spliced namespace (lookup-local, not part of
+    // the imported surface), or a *foreign* module's `FileDecl` that a plain,
+    // non-`__exported` transitive `import` put on the chain (its `parentDecl` is that
+    // other module — `import` is non-transitive; only `__exported import` re-exports).
+    // The `parentDecl == moduleDecl` conjunct is load-bearing: any foreign module's
+    // `FileDecl` that lands on this chain has its `parentDecl` pointing at that other
+    // module, so it is dropped regardless of how it arrived. Dropping the conjunct
+    // would re-export those foreign files and make plain `import` transitive.
+    // See shader-slang/slang#11443.
+    if (containerDecl == moduleDecl)
+        return true;
+    return as<FileDecl>(containerDecl) && containerDecl->parentDecl == moduleDecl;
+}
+
 ContainerDecl* isStaticScopeDecl(Decl* decl)
 {
     if (as<NamespaceDeclBase>(decl) || as<FileDecl>(decl))
@@ -369,10 +387,19 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
     // What we do instead is see if there's already been a declRef
     // constructed for this expression and rest assured that it's already
     // had a diagnostic emitted.
+    //
+    // The already-resolved declRef must refer to the *same* declaration we are
+    // about to diagnose. For a constructor call such as `int4(int2(1,2), 3)` the
+    // invoke's `functionExpr` is a reference to the *type* `int4`, which always
+    // carries a declRef (to the type, not the constructor). Without the
+    // same-decl check we would treat the type reference as "already diagnosed"
+    // and silently skip the constructor's own `[deprecated]` / `[RemovedSince]`
+    // diagnostic.
     auto originalAppExpr = as<AppExprBase>(originalExpr);
     auto originalAppFunDecl =
         originalAppExpr ? as<DeclRefExpr>(originalAppExpr->functionExpr) : nullptr;
-    if (originalAppFunDecl && originalAppFunDecl->declRef)
+    if (originalAppFunDecl && originalAppFunDecl->declRef &&
+        originalAppFunDecl->declRef.getDecl() == declRef.getDecl())
     {
         return;
     }
@@ -1073,20 +1100,37 @@ Expr* SemanticsVisitor::createLookupResultExpr(
     }
 }
 
-DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
+static DeclVisibility _getTypeVisibility(
+    Type* type,
+    Dictionary<Type*, DeclVisibility>& typeVisibilityCache)
 {
+    if (auto cachedVisibility = typeVisibilityCache.tryGetValue(type))
+        return *cachedVisibility;
+
+    DeclVisibility visibility = DeclVisibility::Public;
     if (auto declRefType = as<DeclRefType>(type))
     {
-        auto v = getDeclVisibility(declRefType->getDeclRef().getDecl());
+        visibility = getDeclVisibility(declRefType->getDeclRef().getDecl());
         auto args = findInnerMostGenericArgs(SubstitutionSet(declRefType->getDeclRef()));
         for (auto arg : args)
         {
             if (auto typeArg = as<DeclRefType>(arg))
-                v = Math::Min(v, getTypeVisibility(typeArg));
+                visibility =
+                    Math::Min(visibility, _getTypeVisibility(typeArg, typeVisibilityCache));
         }
-        return v;
     }
-    return DeclVisibility::Public;
+
+    // Cache only completed results. Consider `Pair<T, T>`: both arguments point to the same
+    // canonical type DAG, so the second edge should reuse the visibility collected through the
+    // first instead of traversing the entire DAG again.
+    typeVisibilityCache.add(type, visibility);
+    return visibility;
+}
+
+DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
+{
+    Dictionary<Type*, DeclVisibility> typeVisibilityCache;
+    return _getTypeVisibility(type, typeVisibilityCache);
 }
 
 bool SemanticsVisitor::isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope)
@@ -2164,8 +2208,9 @@ void SemanticsVisitor::maybeCheckMissingNoDiffThis(Expr* expr)
         auto thisExpr = as<ThisExpr>(memberExpr->baseExpression);
         if (thisExpr && isTypeDifferentiable(memberExpr->type.type))
         {
+            auto noDiffThisAttr = this->m_parentFunc->findModifier<NoDiffThisAttribute>();
             if (isTypeDifferentiable(calcThisType(thisExpr->type.type)) ||
-                this->m_parentFunc->findModifier<NoDiffThisAttribute>())
+                (noDiffThisAttr && !noDiffThisAttr->isSynthesized))
             {
                 return;
             }
@@ -3578,7 +3623,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     // Default behavior is to look at all available `__subscript`
     // declarations on the type and try to call one of them.
 
-    auto operatorName = getName("operator[]");
+    auto operatorName = getSubscriptOperatorName(m_astBuilder);
 
     LookupResult lookupResult = lookUpMember(
         m_astBuilder,
@@ -4039,10 +4084,11 @@ static Expr* _peelCastsAndParens(Expr* expr)
 }
 
 // Check whether two expressions refer to the same storage location by
-// comparing their structure in lockstep. Handles bare variable
-// references, member accesses (s.x == s.x, but not s.x == s.y), and
-// subscripts with matching constant indices (arr[0] == arr[0], but not
-// arr[0] == arr[1]). Returns false for anything it can't prove equal.
+// comparing their structure in lockstep. Handles the implicit object
+// (`this` == `this`), bare variable / static-member references, member
+// accesses (s.x == s.x, but not s.x == s.y), and subscripts with matching
+// constant indices (arr[0] == arr[0], but not arr[0] == arr[1]). Returns
+// false for anything it can't prove equal.
 static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
 {
     a = _peelCastsAndParens(a);
@@ -4050,14 +4096,22 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
     if (!a || !b)
         return false;
 
-    // Same declaration reference.
-    if (auto aDeclRef = as<DeclRefExpr>(a))
-    {
-        auto bDeclRef = as<DeclRefExpr>(b);
-        return bDeclRef && aDeclRef->declRef.getDecl() == bDeclRef->declRef.getDecl();
-    }
+    // Same implicit object: `this` vs `this`. There is exactly one `this` in a
+    // given method body, so any two `ThisExpr` nodes necessarily refer to the
+    // same object; that is why this returns true without comparing them further
+    // (there is no per-`this` identity to compare, unlike a named variable).
+    // Inside a method an unqualified member `x` is rewritten to
+    // `MemberExpr(base=ThisExpr, decl=x)`, so the MemberExpr recursion below
+    // bottoms out here on the two `this` bases; this is what still diagnoses
+    // `twoInoutInt(x, x)` (i.e. `this.x` aliasing itself). ThisExpr does not
+    // derive from DeclRefExpr, so it needs its own case.
+    if (as<ThisExpr>(a))
+        return as<ThisExpr>(b) != nullptr;
 
-    // Same member of the same base: s.x vs s.x.
+    // Same member of the same base: s.x vs s.x, but not s.x vs t.x. Checked
+    // before the bare-DeclRefExpr case below because MemberExpr derives from
+    // DeclRefExpr, and that branch would ignore the base object. (DerefMemberExpr
+    // for buffer-element member access derives from MemberExpr, so it lands here.)
     if (auto aMember = as<MemberExpr>(a))
     {
         auto bMember = as<MemberExpr>(b);
@@ -4066,6 +4120,17 @@ static bool _exprsDefinitelyAlias(Expr* a, Expr* b)
         if (aMember->declRef.getDecl() != bMember->declRef.getDecl())
             return false;
         return _exprsDefinitelyAlias(aMember->baseExpression, bMember->baseExpression);
+    }
+
+    // Same bare declaration reference: a bare variable (VarExpr) or static
+    // member (StaticMemberExpr), which have no base object to compare.
+    if (auto aDeclRef = as<DeclRefExpr>(a))
+    {
+        auto bDeclRef = as<DeclRefExpr>(b);
+        // A bare DeclRefExpr is a VarExpr or StaticMemberExpr — any DeclRefExpr
+        // that is not a (non-static) MemberExpr, which was already handled above.
+        bool bIsBareDeclRef = bDeclRef && !as<MemberExpr>(b);
+        return bIsBareDeclRef && aDeclRef->declRef.getDecl() == bDeclRef->declRef.getDecl();
     }
 
     // Same element of the same base: arr[0] vs arr[0].
@@ -7366,13 +7431,10 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
         arg = CheckTerm(arg);
     }
 
-    // LEGACY FEATURE: As a backwards-compatibility feature
-    // for HLSL, we will allow for a cast to a `struct` type
-    // from a literal zero, with the semantics of default
-    // initialization.
-    //
     if (auto declRefType = as<DeclRefType>(typeExp.type))
     {
+        // LEGACY FEATURE: As a backwards-compatibility feature for HLSL, we will allow for a cast
+        // to a `struct` type from a literal zero, with the semantics of default initialization.
         if (const auto structDeclRef = as<StructDecl>(declRefType->getDeclRef()))
         {
             if (expr->arguments.getCount() == 1)
@@ -8537,6 +8599,27 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
                 AddToLookupResult(globalLookupResult, lookupResult);
                 base = baseExpression;
             }
+        }
+        else if (auto subscriptDeclRef = baseDeclRef.as<SubscriptDecl>())
+        {
+            // Accessors are declarations nested in a subscript, so a qualified lookup such as
+            // `Type::__subscript::get` should look directly in the resolved subscript rather than
+            // in its function type.
+            LookupResult lookupResult = lookUpDirectAndTransparentMembers(
+                m_astBuilder,
+                this,
+                expr->name,
+                subscriptDeclRef.getDecl(),
+                subscriptDeclRef,
+                LookupMask::Default,
+                getDeclToExcludeFromLookup());
+
+            AddToLookupResult(globalLookupResult, lookupResult);
+            // `baseExpression` is the checked inner `Type::__subscript` reference, so it must
+            // retain the original type expression as its base. The accessor reference must use
+            // that type as its unbound base instead of the function-valued subscript expression.
+            base = GetBaseExpr(baseExpression);
+            SLANG_RELEASE_ASSERT(base);
         }
         else if (auto callableDecl = as<CallableDecl>(baseDeclRef))
         {

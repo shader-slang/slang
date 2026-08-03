@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:50:55+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#performmandatoryearlyinlining-and-the-surrounding-loop
-//META: doc_section_digest=3e4ecc0dde41d070a716078d43988f337d7fe402d8628557a72dc1a19f293965
+//META: doc_section_digest=6099ea29516a98dd56bbf7555d264386325993f06e86be90c03f65db44f380f5
 //META: purpose=Phase B's prelinkIR (B1) pulls in `[unsafeForceInlineEarly]` core-module bodies; the mandatory-early-inlining loop in Phase C then inlines them, so neither the core operator name nor a forwarding call survives.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

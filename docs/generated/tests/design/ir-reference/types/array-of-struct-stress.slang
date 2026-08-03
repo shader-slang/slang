@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T13:50:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/ir-reference/types.md#arrays
-//META: doc_section_digest=fa1a8caf9cb2dd874328b2b826017621c7f1df8e509df2e908e25b520003a421
+//META: doc_section_digest=a39cfe25465518ad38d31423ca65973ffe6e67b11946248f9af71a03f7cee6df
 //META: purpose=Stress: Array composes with a user-struct element; the element-type operand names the struct IR identity.
 //META: intent=stress
 //META: pipeline_stage=lower

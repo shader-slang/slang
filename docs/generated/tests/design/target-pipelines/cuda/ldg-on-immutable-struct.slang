@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:30:46+00:00
 //META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#lowerimmutablebufferloadforcuda
-//META: doc_section_digest=f99045fe923d667d28ba075f821f8ecea38aaffb44e4d1ea1d4c3d94fce11929
+//META: doc_section_digest=edf8cafc492503002dbc6797ae922eac3db7d8654eb88d3d13889f34d8a9ea52
 //META: purpose=lowerImmutableBufferLoadForCUDA expands a struct-typed immutable load into per-field __ldg(&ptr->field) reads through a generated slang_ldg helper.
 //META: intent=functional
 //META: pipeline_stage=emit

@@ -42,6 +42,62 @@ void twoInoutUint(inout uint a, inout uint b)
 
 void readBoth(int a, int b) {}
 
+// Regression for #11878 review: inside a method an unqualified member `x` is
+// `MemberExpr(base=ThisExpr, decl=x)`. The aliasing check must still diagnose
+// `twoInoutInt(x, x)` (this.x aliasing itself) via the ThisExpr base case,
+// while not flagging `this.x` against a different object's field.
+struct WithMethods
+{
+    int x;
+
+    [mutating]
+    void selfAlias()
+    {
+        // Implicit this.x passed to both inout params: expect the aliasing warning.
+        twoInoutInt(x, x);
+//CHECK:            ^ potentially aliased argument to 'out'/'inout'/'ref' parameter
+//CHECK:            ^ passing the same value to both may produce unexpected results
+    }
+
+    [mutating]
+    void otherObject(inout WithMethods other)
+    {
+        // this.x vs other.x are different objects, so no warning is expected;
+        // exhaustive mode fails the test if a spurious diagnostic is emitted.
+        twoInoutInt(this.x, other.x);
+    }
+}
+
+struct BoundingBox { int4 minBounds; }
+
+RWStructuredBuffer<BoundingBox> boundingBoxes;
+
+// Regression for #11878: the same field of two *different* objects must not
+// be reported as aliasing. Before the fix, MemberExpr (which derives from
+// DeclRefExpr) was caught by the bare-DeclRefExpr case, which compared only
+// the field declaration and ignored the base object, so `dest.minBounds[0]`
+// and `bbox.minBounds[0]` were wrongly flagged.
+void expandBoundingBox(uint index, BoundingBox bbox)
+{
+    int unused;
+    // NOTE: no aliasing warning expected here. This test runs in exhaustive
+    // mode, so any unannotated diagnostic (e.g. a spurious E30051) fails it.
+    InterlockedMin(boundingBoxes[index].minBounds[0], bbox.minBounds[0], unused);
+}
+
+struct WithStatic { static int counter; }
+
+// Regression for #11878: a static member is a StaticMemberExpr, which derives
+// from DeclRefExpr but is not a MemberExpr, so it goes through the bare-DeclRef
+// branch (guarded by `!as<MemberExpr>(b)`). Passing the same static to both
+// inout params refers to the same storage and must still be flagged.
+void staticMemberAlias()
+{
+    twoInoutInt(WithStatic.counter, WithStatic.counter);
+//CHECK:                   ^^^^^^^ potentially aliased argument to 'out'/'inout'/'ref' parameter
+//CHECK:                   ^^^^^^^ argument for 'inout' parameter 'a' may alias argument for 'inout' parameter 'b'; passing the same value to both may produce unexpected results
+}
+
 [numthreads(1,1,1)]
 void computeMain()
 {
@@ -96,6 +152,12 @@ void computeMain()
     // Negative: distinct struct fields — no warning expected.
     twoInoutInt(s.x, s.y);
 //CHECK-NOT: potentially aliased
+
+    // Negative: same field of two *different* struct objects — no warning
+    // expected (regression for #11878). Exhaustive mode fails the test if a
+    // spurious warning is emitted here.
+    S s2;
+    twoInoutInt(s.x, s2.x);
 
     // Negative: distinct array elements — no warning expected.
     twoInoutInt(arr[0], arr[1]);

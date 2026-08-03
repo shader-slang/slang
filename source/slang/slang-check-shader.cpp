@@ -6,8 +6,8 @@
 // enumerating specialization parameters, and validating
 // attempts to specialize shader code.
 
-#include "../core/slang-char-util.h"
-#include "../core/slang-type-text-util.h"
+#include "core/slang-char-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-lookup.h"
 #include "slang-parameter-binding.h"
 #include "slang-profile.h"
@@ -81,24 +81,60 @@ static Type* unwrapConditionalType(Type* type)
     return type;
 }
 
+// Extract the scalar element type and element count from a type.
+// For a scalar BasicExpressionType, returns the type itself with count 1.
+// For a VectorExpressionType, returns the element type and count.
+// Returns nullptr if the type is neither scalar nor vector.
+static BasicExpressionType* getScalarElementType(Type* type, IntegerLiteralValue& outCount)
+{
+    if (auto basicType = as<BasicExpressionType>(type))
+    {
+        outCount = 1;
+        return basicType;
+    }
+    if (auto vecType = as<VectorExpressionType>(type))
+    {
+        if (auto countVal = as<ConstantIntVal>(vecType->getElementCount()))
+        {
+            outCount = countVal->getValue();
+            return as<BasicExpressionType>(vecType->getElementType());
+        }
+    }
+    return nullptr;
+}
+
 // Check if two types are compatible for system value semantics.
-// This is stricter than canCoerce alone, as it requires that both types have
-// the same "shape" (both scalars or both vectors) to prevent scalar-to-vector
-// promotions like uint -> float4.
-static bool isSemanticTypeCompatible(SemanticsVisitor* visitor, Type* expectedType, Type* type)
+// Two types are compatible when they have the same shape (both scalar, or both
+// vectors of the same element count) and their scalar element types belong to
+// the same type category (integer, floating-point, or bool). This allows sign
+// coercions like int3 for a uint3 semantic while rejecting cross-category
+// coercions like float for a uint semantic.
+static bool isSemanticTypeCompatible(Type* expectedType, Type* type)
 {
     // Unwrap Conditional<T, hasValue> to T
     type = unwrapConditionalType(type);
 
-    // Must be coercible
-    if (!visitor->canCoerce(expectedType, type, nullptr))
+    IntegerLiteralValue expectedCount = 0, typeCount = 0;
+    auto expectedElem = getScalarElementType(expectedType, expectedCount);
+    auto typeElem = getScalarElementType(type, typeCount);
+
+    // Both types must be scalar or vector (no matrices, arrays, structs, etc.)
+    if (!expectedElem || !typeElem)
         return false;
 
-    // Both must have the same shape (both scalar or both vector)
-    bool expectedIsVector = as<VectorExpressionType>(expectedType) != nullptr;
-    bool typeIsVector = as<VectorExpressionType>(type) != nullptr;
+    // Shapes must match: same element count (1 for scalar, N for vectorN)
+    if (expectedCount != typeCount)
+        return false;
 
-    return expectedIsVector == typeIsVector;
+    // Scalar element types must be in the same category.
+    // BaseTypeInfo tracks FloatingPoint and Integer flags; bool has neither.
+    // Comparing the masked flags ensures int/uint match each other, float/half/double
+    // match each other, and bool only matches bool.
+    using Flag = BaseTypeInfo::Flag;
+    constexpr BaseTypeInfo::Flags categoryMask = Flag::FloatingPoint | Flag::Integer;
+    const auto& expectedInfo = BaseTypeInfo::getInfo(expectedElem->getBaseType());
+    const auto& typeInfo = BaseTypeInfo::getInfo(typeElem->getBaseType());
+    return (expectedInfo.flags & categoryMask) == (typeInfo.flags & categoryMask);
 }
 
 // Look up a SemanticDecl by name in the given scope.
@@ -231,7 +267,7 @@ static void validateSystemValueSemanticForType(
             continue;
         }
 
-        if (isSemanticTypeCompatible(visitor, accessorType, type))
+        if (isSemanticTypeCompatible(accessorType, type))
         {
             foundMatchingAccessor = true;
             break;
@@ -246,7 +282,6 @@ static void validateSystemValueSemanticForType(
                 if (accessorArrayType->isUnsized())
                 {
                     if (isSemanticTypeCompatible(
-                            visitor,
                             accessorArrayType->getElementType(),
                             typeArrayType->getElementType()))
                     {
@@ -2038,6 +2073,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         numThreads->extents[i] = glslAttr->extents[i];
                         numThreads->specConstExtents[i] = glslAttr->specConstExtents[i];
                     }
+                    // We attribute the location of the new NumThreadsAttribute
+                    // to the location of the first GLSLLayoutLocalSizeAttribute,
+                    // just to have something there (even if multiple
+                    // attributes get merged to this NumThreadsAttribute).
+                    numThreads->loc = glslAttr->loc;
                 }
                 else
                 {
@@ -3387,7 +3427,39 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     auto args = inArgs;
     auto argCount = inArgCount;
 
-    SharedSemanticsContext sharedSemanticsContext(getLinkage(), nullptr, sink);
+    // Validating a specialization argument means checking that the argument
+    // type conforms to the entry point's generic constraints, and that check
+    // needs to see every `extension` that could supply a conformance witness.
+    //
+    // Scope the checking session to the entry point's own module rather than
+    // leaving it module-less. A module-less (`m_module == nullptr`) context
+    // resolves extensions from the linkage's `loadedModulesList`, which never
+    // contains the primary command-line translation unit -- so a conformance
+    // provided by an `extension` in that primary source (e.g. specializing a
+    // `T : IFoo` entry point to a type whose `T : IFoo` witness comes from an
+    // `extension T : IFoo` in the same file) was invisible and failed with
+    // E38029, even though the identical call resolves fine in the module body.
+    //
+    // With `m_module` set, `getCandidateExtensionsForTypeDecl` instead consults
+    // `importedModulesList`, so we seed it from the entry point's module
+    // dependency closure. `getModuleDependencies()` self-includes the owning
+    // module (see `Module::Module`'s `addModuleDependency(this)`), so the
+    // primary module's own extensions come along -- this is the same
+    // point-of-view an in-body generic call has.
+    //
+    // When the entry point has no owning module (`getModule()` is null) we pass
+    // `nullptr` and fall back to the prior module-less behavior.
+    auto entryPointModule = getModule();
+    SharedSemanticsContext sharedSemanticsContext(getLinkage(), entryPointModule, sink);
+    if (entryPointModule)
+    {
+        for (auto module : getModuleDependencies())
+        {
+            auto moduleDecl = module->getModuleDecl();
+            if (sharedSemanticsContext.importedModulesSet.add(moduleDecl))
+                sharedSemanticsContext.importedModulesList.add(moduleDecl);
+        }
+    }
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
     // The last N arguments will be for the implicit existential arguments
@@ -3600,12 +3672,20 @@ Scope* ComponentType::_getOrCreateScopeForLegacyLookup(ASTBuilder* astBuilder)
         for (auto srcScope = module->getModuleDecl()->ownedScope; srcScope;
              srcScope = srcScope->nextSibling)
         {
-            if (srcScope->containerDecl != module->getModuleDecl() &&
-                srcScope->containerDecl->parentDecl != module->getModuleDecl())
-                continue; // Skip scopes that is not part of current module.
+            // Re-export only the module's own scope and its own `__include`d files
+            // into the legacy name-based lookup scope (which backs `getTypeFromString`,
+            // string-specified entry points / type-conformance, and
+            // specialization-argument parsing); drop `using`-spliced namespaces and any
+            // foreign module's files a transitive `import` put on the chain, so `using`
+            // can't leak into reflection/API name lookup. Mirrors
+            // `importModuleIntoScope` (see `isOwnModuleOrIncludedFileScope` /
+            // shader-slang/slang#11443).
+            auto containerDecl = srcScope->containerDecl;
+            if (!isOwnModuleOrIncludedFileScope(containerDecl, module->getModuleDecl()))
+                continue; // Skip scopes that are not part of the current module.
 
             Scope* moduleScope = astBuilder->create<Scope>();
-            moduleScope->containerDecl = srcScope->containerDecl;
+            moduleScope->containerDecl = containerDecl;
 
             moduleScope->nextSibling = scope->nextSibling;
             scope->nextSibling = moduleScope;

@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:50:00Z
 //META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#undoparametercopy-transformparamstoconstref
-//META: doc_section_digest=39802f60e5cbd43729c8f6fcbe4fd592b1c67772402baea64b96c029ed810241
+//META: doc_section_digest=bdb28b3b073204cb31c496d7a9f8bbd681bf8780fa4c772f4520a59c02006f6b
 //META: purpose=moveGlobalVarInitializationToEntryPoints (Metal fallthrough) fires the initializer of a `static` module-scope variable inside the kernel; the global itself appears as a field of the kernel-context struct.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

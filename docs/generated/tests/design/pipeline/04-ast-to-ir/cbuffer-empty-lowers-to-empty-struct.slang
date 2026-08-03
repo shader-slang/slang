@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T10:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#module-level-outputs
-//META: doc_section_digest=9ce4d053661212c26b75e2e5610820fbcc296703c400512972d2afca16087b34
+//META: doc_section_digest=d2d46e039ebd707b280ca397a6adb57c2b8df7a613cf8bf7da56564fc99b5920
 //META: purpose=An empty `cbuffer CB {}` lowers to a `ConstantBuffer(%SLANG_ParameterGroup_CB, ...)` global parameter and a body-less struct type; layout-intent annotation appears later in the pipeline.
 //META: intent=boundary
 //META: pipeline_stage=lower

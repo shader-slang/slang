@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination
-//META: doc_section_digest=de6a2b24718ef9344624fa3cfc660b5e13c913b28787d2b06b2db1085587ae5e
+//META: doc_section_digest=355a74cccddb8eb52d0513615291bc6d928b55d9bdd73146a80f6df81b210ae4
 //META: purpose=collectCooperativeMetadata runs for Metal when targetCaps imply cooperative_matrix: the CoopMat type lowers to MSL's simdgroup_matrix<T, Cols, Rows>, with fill+store rendered into the simdgroup intrinsics.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

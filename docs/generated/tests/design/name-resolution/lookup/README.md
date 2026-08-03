@@ -1,11 +1,11 @@
 ---
 generated: true
-model: claude-opus-4-7
-generated_at: 2026-05-20T13:48:38Z
-source_commit: 1e0d460c1cb410005c4f775ba11fbc803cc8c16d
-watched_paths_digest: 8143fa2272e298238feaa8bd9cff5f3d9a9b312b8c4305f415b3c6577ae77cac
+model: claude-fable-5
+generated_at: 2026-07-08T15:17:43Z
+source_commit: ef4bd0b0d91a213b52e333ce39dfe8b73efca3d2
+watched_paths_digest: 15c93dc3a3b09cbac688d2594caf45280d17b71572e144bd955998803e47e564
 source_doc: docs/generated/design/name-resolution/lookup.md
-source_doc_digest: 6fd4cef36add7d8029dbb7935cd0f95c2b7ed982a931a183f7031439fbcba517
+source_doc_digest: d1129a7104e57d8eee37a931e8a62eb04849373ce10efe7e30c33eeca1f76803
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -71,7 +71,9 @@ text-emit target, and only because the surface (`cbuffer` /
 
 ## Untested claims
 
-NA
+| Claim                                                                                                                                                                                                                                                             | Reason          | Anchor                                                                                                  | Why untested                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| When an overloaded `LookupResult` is re-filtered against a narrower `LookupMask` and only one item matches, `refineLookup` drops every non-matching item silently and returns the single survivor; no diagnostic is raised for the filtered-out candidates.        | needs-unit-test | [#edge-cases-and-failure-modes](../../../design/name-resolution/lookup.md#edge-cases-and-failure-modes) | `refineLookup` is a C++ post-filter entry point; the doc names no user-level construct that issues a narrow-mask re-filter, so no `.slang` input can pin the silent-drop behavior. A C++ unit test building a two-item `LookupResult` and refining it could verify it directly. |
 
 ## Doc gaps observed
 
@@ -84,6 +86,7 @@ NA
 | [#algorithm-member-lookup](../../../design/name-resolution/lookup.md#algorithm-member-lookup)             | undocumented-behavior | The `## Algorithm > Member lookup` section names `EachType` / `FirstPackElementType` / `LastPackElementType` / `PackBranchType` canonicalization in the type-shape dispatch, but these arise only inside variadic-pack contexts (no exposed surface in user `.slang` outside specific generic-pack idioms). A test could be added if the doc highlighted a specific user pattern that takes that path.                                                                                                                                                                                                                                     |                    |
 | [#edge-cases-and-failure-modes](../../../design/name-resolution/lookup.md#edge-cases-and-failure-modes)   | undocumented-behavior | The `## Edge cases and failure modes` section names `ExtensionExternVarModifier` and `ExternModifier` in extensions as filtered at the start of `DeclPassesLookupMask`. Both modifiers are core-module-only; user code cannot apply them to an extension to produce the rejection. A claim that some user-writable form maps to those modifiers would unblock a negative test.                                                                                                                                                                                                                                                             |                    |
 | [#edge-cases-and-failure-modes](../../../design/name-resolution/lookup.md#edge-cases-and-failure-modes)   | undocumented-behavior | The `## Edge cases and failure modes` section says `AndType` reaching the type dispatch is an internal-error (`SLANG_UNEXPECTED`). That is a compiler-developer claim ("constraint-flattening must run before lookup"), not a user- observable claim, so no test anchors here.                                                                                                                                                                                                                                                                                                                                                             |                    |
+| [#edge-cases-and-failure-modes](../../../design/name-resolution/lookup.md#edge-cases-and-failure-modes)   | missing-surface       | The first bullet now describes `refineLookup` silently dropping items that fail a narrower `LookupMask` and returning the single survivor without any diagnostic, but the doc never names which checker/parser path calls `refineLookup` or what user-written Slang code triggers a narrow-mask re-filter of an overloaded result.                                                                                                                                                                                                                                                                                                       | Name at least one caller of `refineLookup` and the user-level input shape (e.g. the syntactic position that asks for a narrower category) that reaches it, so the silent-drop behavior can be pinned by a `.slang` test. |
 
 ## Sibling-bundle overlap
 

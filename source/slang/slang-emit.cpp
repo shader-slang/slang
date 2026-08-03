@@ -1,14 +1,15 @@
 // slang-emit.cpp
 
-#include "../compiler-core/slang-artifact-associated-impl.h"
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../compiler-core/slang-artifact-impl.h"
-#include "../compiler-core/slang-artifact-util.h"
-#include "../compiler-core/slang-name.h"
-#include "../core/slang-castable.h"
-#include "../core/slang-performance-profiler.h"
-#include "../core/slang-type-text-util.h"
-#include "../core/slang-writer.h"
+#include "compiler-core/slang-artifact-associated-impl.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-impl.h"
+#include "compiler-core/slang-artifact-util.h"
+#include "compiler-core/slang-name.h"
+#include "compiler-core/slang-slice-allocator.h"
+#include "core/slang-castable.h"
+#include "core/slang-performance-profiler.h"
+#include "core/slang-type-text-util.h"
+#include "core/slang-writer.h"
 #include "slang-capability.h"
 #include "slang-check-out-of-bound-access.h"
 #include "slang-emit-c-like.h"
@@ -406,8 +407,28 @@ void calcRequiredLoweringPassSet(
     CodeGenContext* codeGenContext,
     IRInst* inst)
 {
-    if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst))
+    // The autodiff finalization passes (finalizeAutoDiffPass / lowerDiffTypeInfoInsts in
+    // linkAndOptimizeIR) lower or strip these constructs. They can appear in modules that
+    // never call fwd_diff/bwd_diff (e.g. direct DifferentialPair use, or a no_diff type),
+    // so mark autodiff here too; otherwise those passes would be skipped and autodiff IR
+    // would survive into emission.
+    //
+    // These stay as base-class checks (not switch cases) because each spans several
+    // concrete opcodes; `as<Base>` keeps matching if a new leaf op is added under the
+    // base later. Single-opcode autodiff insts live in the switch below.
+    if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst) ||
+        as<IRDifferentialPairTypeBase>(inst) || as<IRMakeDifferentialPairBase>(inst) ||
+        as<IRDifferentialPairGetDifferentialBase>(inst) ||
+        as<IRDifferentialPairGetPrimalBase>(inst))
+    {
         result.autodiff = true;
+    }
+    // no_diff is an attribute payload, not a distinct opcode, so it needs findAttr.
+    if (auto attrType = as<IRAttributedType>(inst))
+    {
+        if (attrType->findAttr<IRNoDiffAttr>())
+            result.autodiff = true;
+    }
 
     switch (inst->getOp())
     {
@@ -434,6 +455,21 @@ void calcRequiredLoweringPassSet(
         result.conditionalType = true;
         break;
     case kIROp_EnumType:
+    // The enum-cast ops are lowered by the same `lowerEnumType` pass as the type
+    // itself, so flag `enumType` on them too. Constant folding can eliminate the
+    // last live `IREnumType` while leaving a degenerate cast behind (e.g. an
+    // enum-typed local holding a constant folds to `CastEnumToInt(1 : UInt)`);
+    // flagging only the type would then skip the pass and strand the cast at
+    // emit (#12048). `CastIntToEnum`/`EnumCast` produce an enum-typed result, so a
+    // surviving one keeps its `IREnumType` alive and the `kIROp_EnumType` arm
+    // already covers it; they are listed here for parity with `lowerEnumType`'s
+    // handled set. The `Constexpr*` cast variants are intentionally excluded: they
+    // arise only in constant `IntVal` contexts (`emitConstexprCast`, from
+    // `visitTypeCastIntVal`), never in runtime value flow that reaches emit, and
+    // `lowerEnumType` has no case for them.
+    case kIROp_CastEnumToInt:
+    case kIROp_CastIntToEnum:
+    case kIROp_EnumCast:
         result.enumType = true;
         break;
     case kIROp_TextureType:
@@ -466,8 +502,11 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetRegisterSpace:
         result.bindingQuery = true;
         break;
+    case kIROp_Annotation:
+    case kIROp_DetachDerivative:
     case kIROp_BackwardDifferentiate:
     case kIROp_ForwardDifferentiate:
+    case kIROp_DiffTypeInfo:
         result.autodiff = true;
         break;
     case kIROp_VerticesType:
@@ -533,6 +572,14 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetDynamicResourceHeap:
         result.dynamicResourceHeap = true;
         break;
+    case kIROp_CastUIntToUntypedResourceHandle:
+    case kIROp_CastUntypedResourceHandleToUInt:
+    case kIROp_CastUIntToUntypedSamplerHandle:
+    case kIROp_CastUntypedSamplerHandleToUInt:
+    case kIROp_UntypedResourceHandleType:
+    case kIROp_UntypedSamplerHandleType:
+        result.untypedResourceHandle = true;
+        break;
     case kIROp_ResolveVaryingInputRef:
         result.resolveVaryingInputRef = true;
         break;
@@ -557,6 +604,25 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetEnumBarrierMemoryTypeFlags:
     case kIROp_GetEnumBarrierSemanticFlags:
         result.barrierFlagValidation = true;
+        break;
+    case kIROp_TaggedUnionType:
+    case kIROp_MakeTaggedUnion:
+    case kIROp_GetTagFromTaggedUnion:
+    case kIROp_GetTypeTagFromTaggedUnion:
+    case kIROp_GetValueFromTaggedUnion:
+    case kIROp_CastInterfaceToTaggedUnionPtr:
+        result.taggedUnion = true;
+        break;
+    case kIROp_InOutImplicitCast:
+    case kIROp_OutImplicitCast:
+        result.lValueCast = true;
+        break;
+    case kIROp_SumVectorElements:
+    case kIROp_SumMatrixElements:
+        result.sumVectorMatrix = true;
+        break;
+    case kIROp_LateRequireCapability:
+        result.lateRequireCapability = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1260,7 +1326,16 @@ Result linkAndOptimizeIR(
     }
 
     // Lower all the LValue implict casts (used for out/inout/ref scenarios)
-    SLANG_PASS(lowerLValueCast, targetProgram);
+    //
+    // #11917: Gated on `lValueCast` to skip this whole-module walk when no
+    // out/inout implicit-cast IR is present. `kIROp_InOutImplicitCast` and
+    // `kIROp_OutImplicitCast` are produced only by the front end
+    // (`emitInOutImplicitCast`/`emitOutImplicitCast` in slang-lower-to-ir.cpp),
+    // so any instance is present before the `calcRequiredLoweringPassSet` scan
+    // that governs this call site; no pass in between synthesizes them, so the
+    // flag cannot be a false-negative.
+    if (requiredLoweringPassSet.lValueCast)
+        SLANG_PASS(lowerLValueCast, targetProgram);
 
     // Lower enum types early since enums and enum casts may appear in
     // specialization & not resolving them here would block specialization.
@@ -1355,7 +1430,27 @@ Result linkAndOptimizeIR(
         SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
     }
 
-    SLANG_PASS(finalizeAutoDiffPass, targetProgram);
+    // finalizeAutoDiffPass walks the whole module and builds an AutoDiffSharedContext. It
+    // only has work to do when the module contains autodiff constructs, which
+    // calcRequiredLoweringPassSet records in requiredLoweringPassSet.autodiff (covering
+    // direct DifferentialPair / no_diff use, not just fwd_diff/bwd_diff). Skip it for
+    // modules with none so they don't pay the per-compile cost.
+    //
+    // Even a module with no autodiff constructs still links in the core-module autodiff
+    // builtins (types marked [__AutoDiffBuiltin], e.g. NullDifferential), which carry
+    // Export/HLSLExport/KeepAlive decorations that keep them alive through DCE. Those
+    // must still be stripped so the eliminateDeadCode pass below can drop the unused
+    // builtins. stripAutoDiffDecorations removes those pins (along with the other
+    // autodiff-only transient decorations) and needs no AutoDiffSharedContext, so run it
+    // directly on the skip path.
+    if (requiredLoweringPassSet.autodiff)
+    {
+        SLANG_PASS(finalizeAutoDiffPass, targetProgram);
+    }
+    else
+    {
+        SLANG_PASS(stripAutoDiffDecorations);
+    }
     if (requiredLoweringPassSet.matrixSwizzleStore)
         SLANG_PASS(lowerMatrixSwizzleStores);
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
@@ -1364,7 +1459,11 @@ Result linkAndOptimizeIR(
 
     // Lower DiffTypeInfo instructions to MakeTuple.
     // This must happen after specialization since DiffTypeInfo is hoistable.
-    lowerDiffTypeInfoInsts(irModule);
+    // DiffTypeInfo originates from autodiff (calcRequiredLoweringPassSet marks it in
+    // requiredLoweringPassSet.autodiff), so skip the whole-module walk when the module
+    // contains no autodiff constructs.
+    if (requiredLoweringPassSet.autodiff)
+        lowerDiffTypeInfoInsts(irModule);
 
     if (requiredLoweringPassSet.conditionalType)
         SLANG_PASS(lowerConditionalType, sink);
@@ -1477,7 +1576,15 @@ Result linkAndOptimizeIR(
     //
     SLANG_PASS(unpinWitnessTables);
 
-    SLANG_PASS(lowerSumVectorMatrixInsts);
+    // #11917: Gated on `sumVectorMatrix` to skip this whole-module walk when no
+    // sum-reduction IR is present. `kIROp_SumVectorElements` and
+    // `kIROp_SumMatrixElements` are produced only by the autodiff transpose pass
+    // (slang-ir-autodiff-transpose.cpp), which runs via `finalizeAutoDiffPass`
+    // before the last `calcRequiredLoweringPassSet` scan; no autodiff/transpose
+    // pass runs between that scan and this call site, so the flag cannot be a
+    // false-negative (any sum inst reaching here was seen by that scan).
+    if (requiredLoweringPassSet.sumVectorMatrix)
+        SLANG_PASS(lowerSumVectorMatrixInsts);
 
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
@@ -1489,8 +1596,18 @@ Result linkAndOptimizeIR(
     }
 
     // Tagged union type lowering typically generates more reinterpret instructions.
-    if (SLANG_PASS(lowerTaggedUnionTypes, sink))
-        requiredLoweringPassSet.reinterpret = true;
+    //
+    // Gated on `taggedUnion` to skip this whole-module walk when no tagged-union IR is present.
+    // The tagged-union opcodes are produced only by the typeflow specialization pass, which runs
+    // before the last `calcRequiredLoweringPassSet` scan, so the flag cannot be a false-negative
+    // (any tagged-union inst reaching here was seen by that scan). When the flag is false the pass
+    // would be a no-op and create no reinterpret insts, so leaving `reinterpret` untouched is
+    // correct. (Full producer trace in the PR for issue #11917.)
+    if (requiredLoweringPassSet.taggedUnion)
+    {
+        if (SLANG_PASS(lowerTaggedUnionTypes, sink))
+            requiredLoweringPassSet.reinterpret = true;
+    }
 
     SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
 
@@ -1823,6 +1940,15 @@ Result linkAndOptimizeIR(
     else
         SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
 
+    // Enforce that no untyped descriptor-heap handle (`ResourceDescriptorHeap[i]` /
+    // `SamplerDescriptorHeap[j]`) survives to emit: lower any that peephole did not collapse to its
+    // underlying `uint` index. Gated on `untypedResourceHandle` so the whole-module walk is skipped
+    // when no such handle is present. The producing intrinsics live in `hlsl.meta.slang` and are
+    // lowered at AST->IR time, before the last `calcRequiredLoweringPassSet` scan; no pass between
+    // that scan and here synthesizes these ops, so the flag cannot be a false-negative.
+    if (requiredLoweringPassSet.untypedResourceHandle)
+        SLANG_PASS(lowerUntypedResourceHandleToUInt);
+
     if (requiredLoweringPassSet.dynamicResourceHeap)
         SLANG_PASS(lowerDynamicResourceHeap, targetProgram, sink);
 
@@ -2092,6 +2218,10 @@ Result linkAndOptimizeIR(
                 codeGenContext,
                 glslExtensionTrackerPtr);
 
+            // GLSL and SPIR-V both require an integer `switch` selector; a `switch` on a
+            // `bool` reaches here unchanged, so rewrite it to an integer switch.
+            SLANG_PASS(legalizeBoolSwitchForTargetsRequiringIntSwitch);
+
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }
         break;
@@ -2127,6 +2257,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::WGSLSPIRV:
     case CodeGenTarget::WGSLSPIRVAssembly:
         {
+            // WGSL, like GLSL and SPIR-V, requires an integer `switch` selector.
+            SLANG_PASS(legalizeBoolSwitchForTargetsRequiringIntSwitch);
             SLANG_PASS(legalizeIRForWGSL, targetProgram, sink);
         }
         break;
@@ -2272,7 +2404,16 @@ Result linkAndOptimizeIR(
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
     // Check the remaining LateRequireCapability IR insts
-    SLANG_PASS(processLateRequireCapabilityInsts, codeGenContext, sink);
+    //
+    // #11917: Gated on `lateRequireCapability` to skip this whole-module walk
+    // (and its entry-point reference-graph build) when no
+    // `kIROp_LateRequireCapability` IR is present. That opcode is produced only
+    // by the front end (slang-lower-to-ir.cpp), so it is present before the last
+    // `calcRequiredLoweringPassSet` scan; the flag cannot be a false-negative.
+    // The pass diagnoses only from these insts, so when the flag is false it is a
+    // pure no-op and gating drops no diagnostic.
+    if (requiredLoweringPassSet.lateRequireCapability)
+        SLANG_PASS(processLateRequireCapabilityInsts, codeGenContext, sink);
 
     SLANG_PASS(cleanUpVoidType);
 
@@ -3177,8 +3318,6 @@ static SlangResult createArtifactFromIR(
     }
 #endif
 
-    artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
-
     // Decide whether any downstream (slang-glslang / SPIRV-Tools) work is actually required
     // for this artifact before paying the cost of loading the downstream compiler module.
     //
@@ -3239,13 +3378,23 @@ static SlangResult createArtifactFromIR(
     }
 
     const bool needsLink = downstreamLinkingAllowed && spirvFiles.getCount() > 1;
+    // `-Xspirv-opt <flag>` selects individual optimizer passes explicitly, so it must run the
+    // optimizer even at `-O0` (where the preset is empty). Detecting them here also keeps a plain
+    // `-O0` compile -- with no such flags, and no link/validation/separate-debug-info -- from
+    // loading `slang-glslang` (issue #11662).
+    List<String> spirvOptArgs =
+        codeGenContext->getTargetProgram()->getOptionSet().getDownstreamArgs("spirv-opt");
     const bool needsOptimization =
         codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel() !=
-        OptimizationLevel::None;
+            OptimizationLevel::None ||
+        spirvOptArgs.getCount() != 0;
     const bool needsValidation = shouldRunSPIRVValidation(codeGenContext);
     const bool needsSeparateDebugInfo = targetCompilerOptions.shouldEmitSeparateDebugInfo();
     const bool needsDownstreamCompiler =
         needsLink || needsOptimization || needsValidation || needsSeparateDebugInfo;
+
+    artifact->addRepresentationUnknown(
+        needsDownstreamCompiler ? ListBlob::create(spirv) : ListBlob::moveCreate(spirv));
 
     IDownstreamCompiler* compiler = needsDownstreamCompiler
                                         ? codeGenContext->getSession()->getOrLoadDownstreamCompiler(
@@ -3293,6 +3442,13 @@ static SlangResult createArtifactFromIR(
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
         downstreamOptions.targetType = SLANG_SPIRV;
         downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
+
+        // Forward the `-Xspirv-opt` args (collected above) to the downstream optimizer, where they
+        // register on top of the `-OX` preset -- or as the only passes at `-O0`, whose preset is
+        // empty. The allocator owns the copied arg strings and slice array, so it must outlive the
+        // compile() call below.
+        SliceAllocator allocator;
+        downstreamOptions.compilerSpecificArguments = allocator.allocate(spirvOptArgs);
         switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
         {
         case OptimizationLevel::None:

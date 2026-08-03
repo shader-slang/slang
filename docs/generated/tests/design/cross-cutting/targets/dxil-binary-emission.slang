@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#targets
-//META: doc_section_digest=e324a10260c794d77c45954ccddaf61cf66af2794e97a8289f9655330ee625d4
+//META: doc_section_digest=01592114ee53e6fb4d64d35bfd46e14fb1203ef5ea4792bcbf05944b2edfe91c
 //META: purpose=The Targets table lists `SLANG_DXIL` under the HLSL emit backend with DXIL produced downstream by DXC; `-target dxil -profile cs_6_0` emits a DXIL module whose canonical entry-point declaration `define void @main()` is present in the assembly text.
 //META: intent=expansion
 //META: pipeline_stage=emit

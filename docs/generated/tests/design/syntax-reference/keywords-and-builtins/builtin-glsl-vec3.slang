@@ -2,8 +2,8 @@
 //META: model=claude-opus-4-7
 //META: generated_at=2026-05-20T15:00:00+00:00
 //META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
-//META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#core-module-supplied-vocabulary
-//META: doc_section_digest=a84f2b8e553f246fd0e2611d7bd357de1ceb312fa259d862c4056388b6d6a68a
+//META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#core-module-syntax-declarations
+//META: doc_section_digest=950d7a7efcea5da748ec49fa6499555097f3093abb07ac97945a51be1ce2339c
 //META: purpose=`vec3` is a GLSL-flavored name supplied by `glsl.meta.slang`; it is available when targeting GLSL emit.
 //META: intent=functional
 //META: pipeline_stage=emit

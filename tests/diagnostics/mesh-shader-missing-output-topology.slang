@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -O0
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv
 
 // Regression test for #9444 (`[outputtopology(...)]` missing variant).
 

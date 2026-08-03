@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#inlining-and-call-graph
-//META: doc_section_digest=5916f676576778a4bdb5917c7cf917a7fca962142a97cb9c75be16910e0e08a2
+//META: doc_section_digest=d53bcc40d9eaa7a3ac784fc9773eb4780b72aa50e5c0ba67ff2ca45acd271030
 //META: purpose=The dll-export pass marks exported entry-point functions with an `export` decoration visible in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

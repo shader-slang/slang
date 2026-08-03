@@ -12,8 +12,9 @@
 // Verifies that a conformance constraint is enforced at specialization: a plain
 // struct `NotArith` does not conform to IArithmetic, so calling `addTwo<T>`
 // (which requires `T : IArithmetic`) with two NotArith values cannot specialize.
-// CHECK asserts E39999 "could not specialize generic" fires on the call
-// (non-exhaustive skips the trailing "see declaration" note).
+// CHECK asserts E38029 "type argument doesn't conform to interface" fires on
+// the call, naming NotArith and IArithmetic (non-exhaustive skips the trailing
+// "see declaration" note).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl
 
@@ -35,6 +36,7 @@ void computeMain()
     NotArith p = { 1 };
     NotArith q = { 2 };
     addTwo(p, q);
-    //CHECK: E39999
+//CHECK:  ^ type argument 'NotArith' does not conform to the required interface 'IArithmetic'
+    //CHECK: E38029
     outputBuffer[0] = 0;
 }

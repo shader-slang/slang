@@ -10,8 +10,9 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // The doc's `### Downstream DXC / fxc` section: `CodeGenTarget::DXIL`
-// rides the same Slang IR path but diverges in `createArtifactFromIR`
-// to dispatch DXC. CI's nightly runner has DXC; the produced DXIL
+// rides the same Slang IR path and diverges only in the
+// downstream-compile dispatch (`emitWithDownstreamForEntryPoints`),
+// which invokes DXC. CI's nightly runner has DXC; the produced DXIL
 // disassembly contains the canonical `define void @main` (DXIL uses
 // LLVM-textual entry definitions). This commit ships the test
 // directive; CI executes it.

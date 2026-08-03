@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:14:10Z
 //META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
 //META: doc_ref=docs/generated/design/cross-cutting/serialization.md#riff-container-format
-//META: doc_section_digest=28458173cf644619b7cdf4174e4c18bea97d5fb11457cbbeeca752dd510622c7
+//META: doc_section_digest=bfd9e20f8387a0e2ddadf7446a8bed2df7373cdba7ea1ede802fc7577b3e1f2e
 //META: purpose=Negative control to the -embed-downstream-ir claim: without the flag, the container does not carry a downstream-IR chunk and -dump-module shows no EmbeddedDownstreamIR marker.
 //META: intent=regression
 //META: pipeline_stage=link

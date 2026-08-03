@@ -472,6 +472,8 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
                 {
                     if (auto sizeAttr = originalParamGroupLayout->findSizeAttr(resKind))
                         paramGroupTypeLayoutBuilder.addResourceUsage(sizeAttr);
+                    if (auto alignmentAttr = originalParamGroupLayout->findAlignmentAttr(resKind))
+                        paramGroupTypeLayoutBuilder.addAlignment(alignmentAttr);
                 }
                 auto newElementVarLayout = elementVarLayoutBuilder.build();
                 // The "containerVarLayout" part should remain unchanged from the original layout.
@@ -538,6 +540,14 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             paramStructType,
             UnownedTerminatedStringSlice("EntryPointParams"));
         builder.addBinaryInterfaceTypeDecoration(paramStructType);
+
+        // This struct is synthesized by the compiler to gather the entry point's
+        // `uniform`/resource parameters; the user wrote a flat parameter list, not a
+        // parameter group. Mark it so that type legalization does not warn (E31106/E31107)
+        // when a resource "leaks" out of the constant buffer we wrap it in below — that
+        // regrouping is inherent to how we lower entry-point parameters, not something the
+        // user can restructure.
+        builder.addSynthesizedParameterGroupDecoration(paramStructType);
 
         if (needConstantBuffer)
         {

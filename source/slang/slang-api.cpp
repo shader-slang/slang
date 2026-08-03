@@ -1,17 +1,18 @@
 // slang-api.cpp
 
-#include "../compiler-core/slang-artifact-associated-impl.h"
-#include "../core/slang-performance-profiler.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-rtti-info.h"
-#include "../core/slang-shared-library.h"
-#include "../core/slang-signal.h"
-#include "../slang-record-replay/proxy/proxy-base.h"
-#include "../slang-record-replay/proxy/proxy-macros.h"
-#include "../slang-record-replay/replay-context.h"
+#include "compiler-core/slang-artifact-associated-impl.h"
+#include "core/slang-builtin-module-cache.h"
+#include "core/slang-performance-profiler.h"
+#include "core/slang-platform.h"
+#include "core/slang-rtti-info.h"
+#include "core/slang-shared-library.h"
+#include "core/slang-signal.h"
 #include "slang-capability.h"
 #include "slang-compiler.h"
 #include "slang-internal.h"
+#include "slang-record-replay/proxy/proxy-base.h"
+#include "slang-record-replay/proxy/proxy-macros.h"
+#include "slang-record-replay/replay-context.h"
 #include "slang-repro.h"
 #include "slang-tag-version.h"
 
@@ -53,18 +54,16 @@ SlangResult tryLoadBuiltinModuleFromCache(
         return SLANG_FAIL;
     }
     Slang::ScopedAllocation cacheData;
-    SLANG_RETURN_ON_FAIL(Slang::File::readAllBytes(cacheFileName, cacheData));
-
-    // The first 8 bytes stores the timestamp of the slang dll that created this core module cache.
-    if (cacheData.getSizeInBytes() < sizeof(uint64_t))
-        return SLANG_FAIL;
-    auto cacheTimestamp = *(uint64_t*)(cacheData.getData());
-    if (cacheTimestamp != currentLibTimestamp)
-        return SLANG_FAIL;
-    SLANG_RETURN_ON_FAIL(globalSession->loadBuiltinModule(
-        builtinModuleName,
-        (uint8_t*)cacheData.getData() + sizeof(uint64_t),
-        cacheData.getSizeInBytes() - sizeof(uint64_t)));
+    const void* moduleData = nullptr;
+    size_t moduleSize = 0;
+    SLANG_RETURN_ON_FAIL(Slang::BuiltinModuleCache::read(
+        cacheFileName,
+        currentLibTimestamp,
+        cacheData,
+        moduleData,
+        moduleSize));
+    SLANG_RETURN_ON_FAIL(
+        globalSession->loadBuiltinModule(builtinModuleName, moduleData, moduleSize));
     return SLANG_OK;
 }
 
@@ -144,13 +143,11 @@ SlangResult trySaveBuiltinModuleToCache(
             SLANG_ARCHIVE_TYPE_RIFF_LZ4,
             coreModuleBlobPtr.writeRef()));
 
-        Slang::FileStream fileStream;
-        SLANG_RETURN_ON_FAIL(fileStream.init(cacheFilename, Slang::FileMode::Create));
-
-        SLANG_RETURN_ON_FAIL(fileStream.write(&dllTimestamp, sizeof(dllTimestamp)));
-        SLANG_RETURN_ON_FAIL(fileStream.write(
+        SLANG_RETURN_ON_FAIL(Slang::BuiltinModuleCache::write(
+            cacheFilename,
+            dllTimestamp,
             coreModuleBlobPtr->getBufferPointer(),
-            coreModuleBlobPtr->getBufferSize()))
+            coreModuleBlobPtr->getBufferSize()));
     }
 
     return SLANG_OK;

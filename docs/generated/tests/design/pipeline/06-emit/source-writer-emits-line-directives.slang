@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#source-writer-abstraction
-//META: doc_section_digest=153032ddf0c4d4832addf2be03aae534b965dbfa8ee7958964ccb5dd0fe90941
+//META: doc_section_digest=5ab3f266239be1b6579f1150e2e0f0b0b3f4aacd7432b541f42ae07cd29ad3ca
 //META: purpose=SourceWriter::advanceToSourceLocation emits #line directives so downstream compilers can report errors at the user's source position. The directives appear in the HLSL, GLSL, Metal, CUDA, and C++ emit.
 //META: intent=functional
 //META: pipeline_stage=emit

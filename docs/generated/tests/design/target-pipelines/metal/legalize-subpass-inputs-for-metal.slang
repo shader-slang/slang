@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#legalizeirformetal
-//META: doc_section_digest=ae7166b4e043d6e1a4435c167ea8bdc675ca3080f5f01a62c716172c61bce000
+//META: doc_section_digest=43faa16ce410de3ffb63136a8e3d7ca1d85bcf4dd72e95e139b70b0b674d35a6
 //META: purpose=legalizeSubpassInputsForMetal (inside legalizeIRForMetal) rewrites each `IRGlobalParam` of type `SubpassInput<T>` into a fragment entry-point parameter with a `[[color(N)]]` system-value decoration sourced from the `InputAttachmentIndex` layout decoration; every `kIROp_SubpassLoad` use is rewritten into a direct reference to that new parameter. No `SubpassInput` opcode survives into the Metal emit.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

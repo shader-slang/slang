@@ -1,18 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T19:00:00+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
-//META: doc_ref=docs/generated/design/ir-reference/structure.md#witness-tables-and-witness-facts
-//META: doc_section_digest=6b9b35ba535a49bbbb2b1c4ab4c4b3fe10721e61e528a0e174d085f837d9748a
-//META: purpose=A struct that implements an interface produces a witness_table parent whose type is witness_table_t(interface)(implementing-type).
+//META: model=claude-fable-5
+//META: generated_at=2026-07-08T15:18:00Z
+//META: source_commit=ef4bd0b0d91a213b52e333ce39dfe8b73efca3d2
+//META: doc_ref=docs/generated/design/ir-reference/structure.md#witnesstable
+//META: doc_section_digest=6cb96ac74827fe01b93d1be917c800fb31a6cf7337d31c9a9c4bc1b5a0bf743c
+//META: purpose=A witness_table records one conformance: its operand 0 is the concrete type, and the interface it satisfies is carried in its WitnessTableType result type rather than as an operand.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `struct Doubler : IComputable` should emit a `witness_table` whose
-// type is `witness_table_t(%IComputable)(%Doubler)` — the
-// parenthesised pair is the (interface, implementing-type) for which
-// this table records conformance.
+// Verifies the operand/result-type split on `witness_table`: for
+// `struct Doubler : IComputable`, the dump line
+// `witness_table %t : witness_table_t(%IComputable)(%Doubler)` puts the
+// interface inside the `witness_table_t(...)` result type and the
+// concrete type `%Doubler` in the operand list (operand 0). The CHECK
+// pins that exact header shape, so a change that moved the interface
+// into the operand list — or the concrete type into the type — fails.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

@@ -18,11 +18,11 @@ enum FloatLiteralType
 void main()
 {
     // half float overflows and underflows
-    // max: 65504, epsilon = 32, limit: 65520
-    getType(65519.5hf);
-    getType(65520.5hf);
-//CHECK:    ^^^^^^^^^ floating-point literal unrepresentable
-//CHECK:    ^^^^^^^^^ half literal '65520.5hf' unrepresentable, converted to 'inf'
+    // max: 65504, epsilon = 32, limit: <= 65520 (65520 rounds up to 65536)
+    getType(65519.999999hf);
+    getType(65520.hf);
+//CHECK:    ^^^^^^^^ floating-point literal unrepresentable
+//CHECK:    ^^^^^^^^ half literal '65520.hf' unrepresentable, converted to 'inf'
 
     // min denormal: ~.0000000596046447
     // half of that: ~.0000000298023223, anything below rounds to zero

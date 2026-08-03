@@ -11,7 +11,7 @@
 // of the compiler, and operates as logical transformation from one stream of tokens
 // to another.
 
-#include "../compiler-core/slang-lexer.h"
+#include "compiler-core/slang-lexer.h"
 #include "slang-compiler.h"
 #include "slang-diagnostics.h"
 #include "slang-rich-diagnostics.h"
@@ -1871,6 +1871,10 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                                 .expected = int(paramCount),
                                 .got = int(argCount),
                                 .location = leftParen.loc});
+                        // The invocation was never pushed onto the input stream
+                        // stack (which owns and eventually deletes its streams),
+                        // so it must be freed here.
+                        delete invocation;
                         return;
                     }
                 }
@@ -1889,6 +1893,9 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                                 .expected = int(requiredArgCount),
                                 .got = int(argCount),
                                 .location = leftParen.loc});
+                        // See the non-variadic mismatch above: not pushed, so
+                        // freed here.
+                        delete invocation;
                         return;
                     }
                 }

@@ -17,14 +17,20 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "descriptorTableSlot", "value": 1}
+                ]
             }
         },
         {
             "name": "s",
             "binding": {"kind": "descriptorTableSlot", "index": 1},
             "type": {
-                "kind": "samplerState"
+                "kind": "samplerState",
+                "sizes": [
+                    {"kind": "descriptorTableSlot", "value": 1}
+                ]
             }
         },
         {
@@ -43,10 +49,16 @@ standard output = {
                                 "elementType": {
                                     "kind": "scalar",
                                     "scalarType": "float32"
-                                }
+                                },
+                                "sizes": [
+                                    {"kind": "uniform", "value": 12, "alignment": 16}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "uniform", "value": 16, "alignment": 16}
                     ]
                 },
                 "containerVarLayout": {
@@ -64,14 +76,23 @@ standard output = {
                                     "elementType": {
                                         "kind": "scalar",
                                         "scalarType": "float32"
-                                    }
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 12, "alignment": 16}
+                                    ]
                                 },
                                 "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
                             }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 16, "alignment": 16}
                         ]
                     },
                     "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 0}
-                }
+                },
+                "sizes": [
+                    {"kind": "descriptorTableSlot", "value": 1}
+                ]
             }
         }
     ],
@@ -89,7 +110,10 @@ standard output = {
                     "elementType": {
                         "kind": "scalar",
                         "scalarType": "float32"
-                    }
+                    },
+                    "sizes": [
+                        {"kind": "varyingOutput", "value": 1}
+                    ]
                 }
             }
         }
