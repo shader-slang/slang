@@ -596,7 +596,7 @@ static int spirv_Optimize_1_3(const glslang_CompileRequest_1_3& request)
     return err;
 }
 
-static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(
+static constexpr glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(
     int majorVersion,
     int minorVersion)
 {
@@ -705,7 +705,7 @@ static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion i
 static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_3 request)
 {
     // Check that the encoding matches
-    assert(glslang::EShTargetSpv_1_4 == _makeTargetLanguageVersion(1, 4));
+    SLANG_COMPILE_TIME_ASSERT(glslang::EShTargetSpv_1_4 == _makeTargetLanguageVersion(1, 4));
 
     EShLanguage glslangStage;
     switch (request.slangStage)
