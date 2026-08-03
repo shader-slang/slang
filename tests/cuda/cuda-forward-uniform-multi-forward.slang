@@ -3,7 +3,7 @@
 
 // The same by-value uniform aggregate is forwarded by address into two different borrow-in helpers
 // and also read inline in the kernel. This exercises the two subtlest branches of the forward:
-//   1. idempotency - `big` is retyped to `PhysicalParamStorage<T>` on the first forward; the second
+//   1. idempotency - `big` is retyped to `ConstRef<T, CudaKernelParam>` on the first forward; the second
 //      forward must reuse the pointer (not re-retype or spill a copy), so both call sites emit `&big`.
 //   2. the inline-read redirect - `big.v[0]` is a non-call value use, so the forward inserts a single
 //      load of the parameter and reads the field off that (a missed load would read a pointer as a value).

@@ -120,6 +120,10 @@ bool isPointerOfType(IRInst* ptrType, IROp opCode);
 
 bool isUserPointerType(IRInst* type);
 
+// True if `type` is a `ConstRef<T, CudaKernelParam>` - the CUDA-family address-forwarding
+// representation for a by-value entry-point kernel parameter (emitted as `T p` / `&p`, not `T*`).
+bool isCudaKernelParamType(IRInst* type);
+
 // True if inst produces a derived address from another base address.
 bool isAddressInst(IRInst* inst);
 

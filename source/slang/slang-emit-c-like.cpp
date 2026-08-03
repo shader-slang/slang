@@ -1864,16 +1864,14 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
             m_writer->emit(getName(inst));
             return;
         case kIROp_Param:
-            // A parameter of type `PhysicalParamStorage<T>` is emitted by-value as `T p`, so its
-            // pointer value is `&p`; dereferencing it is just `p` (i.e. *&p ==> p), the same
-            // peephole as for a local variable above. A genuinely pointer-like parameter
-            // (`borrow in`/`ref`/`out`) needs no such peephole and falls through the `break` to the
-            // generic `*operand` emit below.
-            if (as<IRPhysicalParamStorageType>(inst->getDataType()))
+            // Such a param is emitted by-value, so its pointer value is `&p` and `*&p ==> p` - the
+            // same peephole as the local variable above.
+            if (isCudaKernelParamType(inst->getDataType()))
             {
                 m_writer->emit(getName(inst));
                 return;
             }
+            // Any other param is a real pointer; fall out to the generic dereference below.
             break;
         case kIROp_FieldAddress:
             {
