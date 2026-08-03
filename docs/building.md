@@ -71,16 +71,19 @@ debugging. The `vs2022-dev` preset writes to `build/windows-vs2022-dev`.
 
 ### Custom compiler flags
 
-CMake's usual flag-override mechanisms work as expected:
+CMake's usual flag-override mechanisms work as expected. For example:
 
 ```bash
-# Flags for every configuration (CMAKE_C_FLAGS, CMAKE_CXX_FLAGS),
-# and flags for debug configuration (CMAKE_C_FLAGS_DEBUG, CMAKE_CXX_FLAGS_DEBUG)
+# Set base flags for every configuration (CMAKE_C_FLAGS, CMAKE_CXX_FLAGS),
+# extra flags for debug configuration (CMAKE_C_FLAGS_DEBUG, CMAKE_CXX_FLAGS_DEBUG),
+# and extra flags for releaseWithDebugInfo configuration (CMAKE_C_FLAGS_RELWITHDEBINFO, CMAKE_CXX_FLAGS_RELWITHDEBINFO)
 cmake --preset default \
     -DCMAKE_C_FLAGS="-march=native" \
     -DCMAKE_CXX_FLAGS="-march=native" \
     -DCMAKE_C_FLAGS_DEBUG="-O0 -g3" \
-    -DCMAKE_CXX_FLAGS_DEBUG="-O0 -g3"
+    -DCMAKE_CXX_FLAGS_DEBUG="-O0 -g3" \
+    -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O3 -g -DNDEBUG" \
+    -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O3 -g -DNDEBUG"
 ```
 
 Debug builds default to `-Og -g` on GCC/Clang outside Windows, but passing `-DCMAKE_CXX_FLAGS_DEBUG=...`
@@ -88,7 +91,8 @@ replaces that default. For step-by-step debugging, `-O0 -g3` may provide a bette
 default.
 
 Note that the override replaces the default rather than adding to it, so remember to include `-g` when
-necessary to keep debug info in the build. The C and C++ variables are also independent: overriding only
+necessary to keep debug info in the build, and `-DNDEBUG` in a release configuration, which would otherwise
+re-enable `assert()`. The C and C++ variables are also independent: overriding only
 `CMAKE_CXX_FLAGS_DEBUG` leaves the bundled C code (e.g., miniz and lz4) building at `-Og`.
 
 The `CXXFLAGS`, `CFLAGS` and `LDFLAGS` environment variables can also be used, but only when a build directory
