@@ -4655,14 +4655,12 @@ TestResult runTest(
     String const& testName,
     TestOptions const& testOptions)
 {
-    // If we are collecting requirements and it's a diagnostic test, we normally run it
-    // everywhere: a diagnostic test validates front-end diagnostics that slangc emits
-    // before any backend is invoked, so it effectively has no backend requirements. The
-    // exception is a flag that forces a downstream backend before the diagnostic is even
-    // reached — `-emit-cpu-via-llvm` routes codegen through slang-llvm, so still capture
-    // that one hard dependency here (otherwise, on a runner without slang-llvm, slangc
-    // fails with E00028 before emitting the diagnostic the test asserts on and the test
-    // fails instead of being ignored).
+    // Diagnostic tests validate front-end diagnostics that slangc emits before any backend
+    // runs, so they normally need no backend and run everywhere. The exception is a flag that
+    // forces a backend before the diagnostic is reached; capture that one dependency here too
+    // (see `_addForcedBackendRequirements`). A diagnostic test returns below before reaching the
+    // general `_extractSlangCTestRequirements` path, so these two capture sites are disjoint and
+    // never double-count.
     if (context->isCollectingRequirements() && testOptions.type == TestOptions::Diagnostic)
     {
         _addForcedBackendRequirements(testOptions.args, context->getTestRequirements());
