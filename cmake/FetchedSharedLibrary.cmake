@@ -29,12 +29,15 @@ function(download_and_extract archive_name url)
             message(STATUS "Downloading ${archive_name} from ${url} ...")
             # Retry before giving up: transient HTTP failures are common when many CI
             # jobs fetch release assets from behind a single shared egress address.
+            # Any failure is retried, so a genuinely missing asset pays the full backoff.
             set(max_attempts 3)
             # A stalled connection has to fail before the retry below can get control
             # back, so bound it. INACTIVITY_TIMEOUT rather than TIMEOUT: it fires only
             # when no data is arriving, whereas a wall-clock limit would also abort a
             # slow but healthy transfer of an archive this size.
             set(inactivity_timeout_seconds 60)
+            # Linear backoff between attempts: 5s then 10s, with no wait after the last try.
+            set(retry_base_delay_seconds 5)
             foreach(attempt RANGE 1 ${max_attempts})
                 file(
                     DOWNLOAD ${url} ${archive_path}
@@ -55,7 +58,11 @@ function(download_and_extract archive_name url)
                 file(REMOVE ${archive_path})
 
                 if(attempt LESS max_attempts)
-                    math(EXPR retry_delay "5 * ${attempt}")
+                    math(
+                        EXPR
+                        retry_delay
+                        "${retry_base_delay_seconds} * ${attempt}"
+                    )
                     message(
                         STATUS
                         "Download of ${archive_name} failed (${status_string}), retrying in ${retry_delay}s ..."
@@ -66,6 +73,7 @@ function(download_and_extract archive_name url)
                 endif()
             endforeach()
 
+            # status_code is the last attempt's result: nonzero unless the loop broke on success.
             if(NOT status_code EQUAL 0)
                 message(
                     WARNING
