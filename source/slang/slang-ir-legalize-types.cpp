@@ -4005,38 +4005,57 @@ struct IRTypeLegalizationPass
     }
 };
 
-// Return true if `type` is a type-shape the empty-type legalizer would rewrite: an empty type (see
-// `isEmptyTypeToLegalize`) or a `PseudoPtr`, which it collapses to its (legalized) value type. The
-// `PseudoPtr` rewrite is only conditionally non-trivial, so this over-detects — that is fine for an
-// early-out, where over-detection just runs a pass that then no-ops and only *under*-detection
-// would be unsound.
-static bool isEmptyTypeShapeToLegalize(IRType* type)
-{
-    // A direct `PseudoPtr` check (no array unwrap) is sufficient: `PseudoPtr` is hoisted/interned,
-    // so an `Array<PseudoPtr>` has the `PseudoPtr` as its own global type inst that this scan
-    // visits directly.
-    return isEmptyTypeToLegalize(type) || as<IRPseudoPtrType>(type) != nullptr;
-}
-
-// Return true if the module has any empty-type-legalization work — a global type inst matching
-// `isEmptyTypeShapeToLegalize`, or a generic still at global scope. The generic case is a
-// conservative force-run: a type appearing only inside a generic body is not hoisted to global
-// scope (see `addGlobalValue`, which stops hoisting at the enclosing generic), so this
-// globals-scope scan cannot see it, yet the shared legalizer descends into generic bodies and
-// *would* rewrite it. This normally does not fire (generics are specialized away before these
-// passes run); it is reachable under `-disable-specialization`. Testing only direct global children
-// suffices: a generic nested in another generic is still enclosed by an outermost generic that is
-// itself a direct global child.
+// Return true if the module has any work for `legalizeEmptyTypes`, by scanning module-scope globals
+// for a shape the pass rewrites. The scan is deliberately conservative: over-detection just runs a
+// pass that then no-ops, while under-detection would skip a real rewrite.
+//
+// Only the *immediate* element of an array and the *direct* type for `PseudoPtr` are tested, with
+// no walk to an array-stripped leaf. Array element types, `PseudoPtr`, and `void` are all
+// hoisted/interned, so a nested `T[a][b]` has its inner `T[b]` as its own global that this loop
+// visits directly; one level is a sound superset and avoids O(depth^2) work over array suffixes.
+// Testing the immediate element also keeps a bare `void` — ubiquitous, e.g. a `void`-returning
+// entry point — from reading as empty and defeating the early-out.
+//
+// Any global `IRGeneric` forces the pass to run. A type appearing only inside a generic body is not
+// hoisted to global scope (`addGlobalValue` stops hoisting at the enclosing generic), so this scan
+// cannot see it, yet the legalizer descends into generic bodies and *would* rewrite it. That
+// normally does not fire, since generics are specialized away before this pass runs; it is
+// reachable under `-disable-specialization`. Testing only direct global children suffices, because
+// a generic nested in another generic is still enclosed by an outermost one that is a direct global
+// child.
 static bool hasEmptyTypeLegalizationWork(IRModule* module)
 {
     for (auto inst : module->getGlobalInsts())
     {
         if (as<IRGeneric>(inst))
             return true;
-        if (auto type = as<IRType>(inst))
+
+        auto type = as<IRType>(inst);
+        if (!type)
+            continue;
+
+        if (auto structType = as<IRStructType>(type))
         {
-            if (isEmptyTypeShapeToLegalize(type))
+            // A `struct` with no fields legalizes to nothing (see `TupleTypeBuilder::getResult`,
+            // which yields an empty `LegalType` when a struct contributed no parts). Iterating
+            // `getFields()` mirrors that pass, so a struct carrying only non-field children reads
+            // as empty here too. `IRInstListBase::Iterator` defines only `operator!=`, hence the
+            // negated form.
+            auto fields = structType->getFields();
+            if (!(fields.begin() != fields.end()))
                 return true;
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            // An array whose element is `void` legalizes to nothing (see the array case in
+            // `legalizeTypeImpl`).
+            if (arrayType->getElementType()->getOp() == kIROp_VoidType)
+                return true;
+        }
+        else if (as<IRPseudoPtrType>(type))
+        {
+            // `legalizeTypeImpl` collapses `PseudoPtr<T>` to its legalized `T`.
+            return true;
         }
     }
     return false;
@@ -4044,15 +4063,6 @@ static bool hasEmptyTypeLegalizationWork(IRModule* module)
 
 static void legalizeTypes(IRTypeLegalizationContext* context)
 {
-    // Entry-time early-out: when this pass has nothing to rewrite, the whole-module walk below is a
-    // pure no-op, so skip it after a single cheap scan. `hasWorkToLegalize` defaults to true, so
-    // passes that do not override it (resource and existential-type-layout legalization) are
-    // unaffected — those get their speedup from the cheaper per-batch worklist reset in
-    // `processModule`, not from a presence scan (their type changes propagate through function
-    // signatures, calls, returns, and locals, which a globals-scope scan cannot soundly gate on).
-    if (!context->hasWorkToLegalize())
-        return;
-
     IRTypeLegalizationPass pass;
     pass.context = context;
 
@@ -4181,8 +4191,6 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
         return false;
     }
 
-    bool hasWorkToLegalize() override { return hasEmptyTypeLegalizationWork(module); }
-
     LegalType createLegalUniformBufferType(IROp, LegalType, IRInst*) override
     {
         return LegalType();
@@ -4217,6 +4225,14 @@ void legalizeExistentialTypeLayout(IRModule* module, TargetProgram* target, Diag
 
 void legalizeEmptyTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
+    // When the module has no empty-type shape to rewrite, the whole-module walk is a pure no-op, so
+    // skip it after one cheap scan over module-scope globals. The other two entry points above get
+    // their speedup from the per-batch worklist reset in `processModule` instead: their type
+    // changes propagate through function signatures, calls, returns, and locals, so a globals-scope
+    // scan could not soundly gate them.
+    if (!hasEmptyTypeLegalizationWork(module))
+        return;
+
     IREmptyTypeLegalizationContext context(target, module, sink);
     legalizeTypes(&context);
 }

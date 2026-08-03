@@ -199,33 +199,6 @@ bool isResourceType(IRType* type)
     return false;
 }
 
-bool isEmptyTypeToLegalize(IRType* type)
-{
-    // A `struct` with no fields legalizes to nothing (see `TupleTypeBuilder::getResult`, which
-    // returns an empty `LegalType` when a struct contributed no ordinary/special/complex parts).
-    // We mirror that pass's own iteration over `getFields()` so a struct carrying only non-field
-    // children (which contributes no fields, and so is still dropped) reads as empty here too.
-    if (auto structType = as<IRStructType>(type))
-    {
-        // `IRInstListBase::Iterator` defines only `operator!=`, so we spell "no fields" as the
-        // negation of "has a first field" rather than `begin() == end()`.
-        auto fields = structType->getFields();
-        bool hasNoFields = !(fields.begin() != fields.end());
-        return hasNoFields;
-    }
-
-    // An array whose element is `void` legalizes to nothing (see the array case in
-    // `legalizeTypeImpl`). We only test the *immediate* element, not the array-stripped leaf: array
-    // types are hoisted/interned, so a nested `T[a][b]` has its inner `T[b]` as its own global type
-    // inst, and this scan visits that inner array directly — one level suffices, and avoids
-    // O(depth^2) work across the array suffixes of every global. Checking the immediate element
-    // also means a bare `void` (ubiquitous, e.g. a `void`-returning entry point) is never treated
-    // as empty, which would otherwise defeat the early-out.
-    if (auto arrayType = as<IRArrayTypeBase>(type))
-        return arrayType->getElementType()->getOp() == kIROp_VoidType;
-
-    return false;
-}
 
 bool isOpaqueTypeImpl(IRType* type, HashSet<IRType*>& visited, IRType** outLeafOpaqueHandleType)
 {

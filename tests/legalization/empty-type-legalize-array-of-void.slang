@@ -1,6 +1,6 @@
 // Regression for shader-slang/slang#11917: the `legalizeEmptyTypes` entry-time early-out
-// (`hasEmptyTypeLegalizationWork` -> `isEmptyTypeShapeToLegalize` -> `isEmptyTypeToLegalize`) must run
-// the pass when the only empty-type root is an array whose element is `void`. With `int[0][2]` the
+// (`hasEmptyTypeLegalizationWork`) must run the pass when the only empty-type root is an array whose
+// element is `void`. With `int[0][2]` the
 // earlier `legalizeEmptyArray` pass rewrites the zero-length `int[0]` to `void`, leaving
 // `Array(Void, 2)` for `legalizeEmptyTypes` to drop, so that array-of-void reaches this pass's
 // globals-scope presence scan as an input and exercises its array branch directly. The module has no
