@@ -27,10 +27,36 @@ function(download_and_extract archive_name url)
             )
         else()
             message(STATUS "Downloading ${archive_name} from ${url} ...")
-            file(DOWNLOAD ${url} ${archive_path} STATUS status)
+            # Retry before giving up: transient HTTP failures are common when many CI
+            # jobs fetch release assets from behind a single shared egress address.
+            set(max_attempts 3)
+            foreach(attempt RANGE 1 ${max_attempts})
+                file(DOWNLOAD ${url} ${archive_path} STATUS status)
 
-            list(GET status 0 status_code)
-            list(GET status 1 status_string)
+                list(GET status 0 status_code)
+                list(GET status 1 status_string)
+                if(status_code EQUAL 0)
+                    break()
+                endif()
+
+                # A failed download still leaves a file behind, and extracting an empty
+                # archive succeeds silently, so the partial file has to be removed. Left
+                # in place it would be picked up by the "existing archive" branch above
+                # on every subsequent configure, and the fetch would never recover.
+                file(REMOVE ${archive_path})
+
+                if(attempt LESS max_attempts)
+                    math(EXPR retry_delay "5 * ${attempt}")
+                    message(
+                        STATUS
+                        "Download of ${archive_name} failed (${status_string}), retrying in ${retry_delay}s ..."
+                    )
+                    execute_process(
+                        COMMAND ${CMAKE_COMMAND} -E sleep ${retry_delay}
+                    )
+                endif()
+            endforeach()
+
             if(NOT status_code EQUAL 0)
                 message(
                     WARNING
