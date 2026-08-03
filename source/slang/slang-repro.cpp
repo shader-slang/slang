@@ -1519,6 +1519,9 @@ static SlangResult _calcCommandLine(
         case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
             cmd.addArg("-O3");
             break;
+        case SLANG_OPTIMIZATION_LEVEL_SIZE:
+            cmd.addArg("-Os");
+            break;
         default:
             break;
         }

@@ -3465,6 +3465,9 @@ static SlangResult createArtifactFromIR(
             downstreamOptions.optimizationLevel =
                 DownstreamCompileOptions::OptimizationLevel::Maximal;
             break;
+        case OptimizationLevel::Size:
+            downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Size;
+            break;
         default:
             SLANG_ASSERT(!"Unhandled optimization level");
             break;

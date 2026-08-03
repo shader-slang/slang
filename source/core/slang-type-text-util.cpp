@@ -206,6 +206,10 @@ static const NamesDescriptionValue s_optimizationLevels[] = {
      "3,maximal",
      "Enable further optimizations, which might have a significant impact on compile time, or "
      "involve unwanted tradeoffs in terms of code size."},
+    {SLANG_OPTIMIZATION_LEVEL_SIZE,
+     "s,size",
+     "Optimize for the size of the generated code rather than for its runtime speed. This is not "
+     "a further point on the 0..3 scale, it selects a different optimization goal."},
 };
 
 static const NamesDescriptionValue s_debugLevels[] = {
@@ -289,6 +293,11 @@ static const NamesDescriptionValue s_fileSystemTypes[] = {
 /* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getOptimizationLevelInfos()
 {
     return makeConstArrayView(s_optimizationLevels);
+}
+
+/* static */ UnownedStringSlice TypeTextUtil::getOptimizationLevelName(SlangOptimizationLevel level)
+{
+    return NameValueUtil::findName(getOptimizationLevelInfos(), level, toSlice("unknown"));
 }
 
 /* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getDebugLevelInfos()

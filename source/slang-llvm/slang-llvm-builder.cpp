@@ -493,6 +493,12 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
     case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
         optLevel = llvm::CodeGenOptLevel::Aggressive;
         break;
+    case SLANG_OPTIMIZATION_LEVEL_SIZE:
+        // Optimizing for size is expressed in the pass pipeline (see the `llvm::OptimizationLevel`
+        // switch below), not in the codegen level; clang likewise runs `-Os` at the default
+        // codegen level.
+        optLevel = llvm::CodeGenOptLevel::Default;
+        break;
     }
 
     targetMachine = target->createTargetMachine(
@@ -689,6 +695,9 @@ void LLVMBuilder::optimize()
         break;
     case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
         llvmLevel = llvm::OptimizationLevel::O3;
+        break;
+    case SLANG_OPTIMIZATION_LEVEL_SIZE:
+        llvmLevel = llvm::OptimizationLevel::Os;
         break;
     }
 

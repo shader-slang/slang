@@ -938,6 +938,11 @@ typedef uint32_t SlangSizeT;
         SLANG_OPTIMIZATION_LEVEL_MAXIMAL = 3, /**< Include optimizations that may take a very long
                                                    time, or may involve severe space-vs-speed
                                                    tradeoffs */
+        SLANG_OPTIMIZATION_LEVEL_SIZE = 4,    /**< Optimize for the size of the generated code
+                                                   rather than for its runtime speed. Unlike the
+                                                   levels above this is not a further point on the
+                                                   `none`..`maximal` scale; it selects a different
+                                                   optimization goal. */
     };
 
     enum SlangEmitSpirvMethod

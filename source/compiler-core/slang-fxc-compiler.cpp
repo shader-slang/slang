@@ -293,6 +293,11 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     case OptimizationLevel::Maximal:
         flags |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
         break;
+    case OptimizationLevel::Size:
+        // FXC has no optimize-for-size mode; see the same case in slang-dxc-compiler.cpp for why
+        // this maps to the moderate level rather than being rejected.
+        flags |= D3DCOMPILE_OPTIMIZATION_LEVEL1;
+        break;
     }
 
     switch (options.debugInfoType)

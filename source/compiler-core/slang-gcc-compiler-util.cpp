@@ -1022,7 +1022,12 @@ static SlangResult _parseGCCFamilyLine(
         }
     case OptimizationLevel::Default:
         {
-            cmdLine.addArg("-Os");
+            // `Default` asks for a balance of code quality and compilation time, which is what
+            // gcc/clang `-O1` provides. This used to pass `-Os`, but `-Os` is gcc/clang's
+            // optimize-for-size mode and now belongs to `OptimizationLevel::Size` below; leaving
+            // it here would make two distinct Slang levels produce the same flag and would keep
+            // the default trading speed for size without being asked to.
+            cmdLine.addArg("-O1");
             break;
         }
     case OptimizationLevel::High:
@@ -1033,6 +1038,11 @@ static SlangResult _parseGCCFamilyLine(
     case OptimizationLevel::Maximal:
         {
             cmdLine.addArg("-O3");
+            break;
+        }
+    case OptimizationLevel::Size:
+        {
+            cmdLine.addArg("-Os");
             break;
         }
     default:

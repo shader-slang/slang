@@ -166,9 +166,14 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
             }
             break;
         case CompilerOptionName::Optimization:
+            // Write the level's canonical name rather than its raw integer, so that levels whose
+            // spelling is not their number (`-Os` for `SLANG_OPTIMIZATION_LEVEL_SIZE`) round-trip
+            // back through the `-O` parser. The numeric levels are named "0".."3", so their
+            // output is unchanged.
             for (auto v : option.value)
             {
-                sb << " -O" << v.intValue;
+                sb << " -O"
+                   << TypeTextUtil::getOptimizationLevelName(SlangOptimizationLevel(v.intValue));
             }
             break;
         case CompilerOptionName::DownstreamArgs:

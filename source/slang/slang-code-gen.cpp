@@ -822,6 +822,9 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
         case OptimizationLevel::Maximal:
             options.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Maximal;
             break;
+        case OptimizationLevel::Size:
+            options.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Size;
+            break;
         default:
             SLANG_ASSERT(!"Unhandled optimization level");
             break;

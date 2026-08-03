@@ -474,6 +474,10 @@ static int _getOptimizationLevel(DownstreamCompileOptions::OptimizationLevel lev
         return 2;
     case OptimizationLevel::Maximal:
         return 3;
+    case OptimizationLevel::Size:
+        // clang runs `-Os` at optimization level 2 with `OptimizeSize` set; the caller sets
+        // `OptimizeSize` alongside this (see where `opts.OptimizationLevel` is assigned).
+        return 2;
     }
 }
 
@@ -752,6 +756,11 @@ SlangResult LLVMDownstreamCompiler::compile(
 
         // Set to -O optimization level
         opts.OptimizationLevel = _getOptimizationLevel(options.optimizationLevel);
+
+        // `-Os` is level 2 plus the size preference, which clang carries in a separate field.
+        opts.OptimizeSize =
+            (options.optimizationLevel == DownstreamCompileOptions::OptimizationLevel::Size) ? 1
+                                                                                             : 0;
 
         // Copy over the targets CodeModel
         opts.CodeModel = invocation.getTargetOpts().CodeModel;

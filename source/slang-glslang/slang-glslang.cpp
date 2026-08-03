@@ -264,7 +264,6 @@ extern "C"
 // Apply the SPIRV-Tools optimizer to generated SPIR-V: the passes of the requested optimization
 // level preset, plus any passthrough passes from `request.spirvOptimizationFlags` (`-Xspirv-opt`)
 // registered on top. Returns SLANG_FAIL if a passthrough flag is invalid.
-// TODO: add flag for optimizing SPIR-V size as well
 static int glslang_optimizeSPIRV(
     spv_target_env targetEnv,
     const glslang_CompileRequest_1_3& request,
@@ -517,6 +516,22 @@ static int glslang_optimizeSPIRV(
             optimizer.RegisterPass(spvtools::CreateCompactIdsPass());
             compactPassRun = true;
 
+            break;
+        }
+    case SLANG_OPTIMIZATION_LEVEL_SIZE:
+        {
+            // Use the same passes as `spirv-opt -Os`.
+            //
+            // Unlike the levels above, this preset is delegated to SPIRV-Tools instead of being
+            // spelled out here. `-Os` is a preset that upstream maintains and validates, and its
+            // goal -- smallest output -- is exactly what this level asks for, so re-deriving a
+            // local pass list would only risk drifting from the tool that defines what `-Os`
+            // means. Users who want to depart from it can still add or replace passes with
+            // `-Xspirv-opt`, which is registered on top of this preset below.
+            //
+            // Note this preset does not include a CompactIdsPass, so `compactPassRun` stays
+            // false and the id-bound fallback after `optimizer.Run` still applies.
+            optimizer.RegisterSizePasses();
             break;
         }
     }

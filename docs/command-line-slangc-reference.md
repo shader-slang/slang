@@ -1233,6 +1233,7 @@ Optimization Level
 * `1`, `default` : Enable a default level of optimization.This is the default if no [-O](#o-1) options are used. 
 * `2`, `high` : Enable aggressive optimizations for speed. 
 * `3`, `maximal` : Enable further optimizations, which might have a significant impact on compile time, or involve unwanted tradeoffs in terms of code size. 
+* `s`, `size` : Optimize for the size of the generated code rather than for its runtime speed. This is not a further point on the 0..3 scale, it selects a different optimization goal. 
 
 <a id="debug-level"></a>
 ## debug-level

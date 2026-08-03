@@ -202,6 +202,12 @@ static void _addFile(
             cmdLine.addArg("/Ox");
             break;
         }
+    case OptimizationLevel::Size:
+        {
+            // `/O1` is MSVC's "maximum optimizations, favor size".
+            cmdLine.addArg("/O1");
+            break;
+        }
     default:
         break;
     }

@@ -605,6 +605,13 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     case OptimizationLevel::Maximal:
         args.add(L"-O3");
         break;
+    case OptimizationLevel::Size:
+        // DXC has no optimize-for-size mode, so the best it can do for this level is the
+        // moderate `-O1`; the higher levels unroll and inline more aggressively, which is what a
+        // caller asking for small output is trying to avoid. A cross-target build passing `-Os`
+        // should still compile here rather than be rejected for a target that cannot honor it.
+        args.add(L"-O1");
+        break;
     }
 
     switch (options.debugInfoType)

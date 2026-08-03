@@ -429,6 +429,10 @@ When targeting SPIR-V, this option emits [SPIR-V NonSemantic Shader DebugInfo In
 Set the optimization level.
 Under `-O0` option, Slang will not perform extensive inlining for all function calls, instead it will preserve the call graph as much as possible to help with understanding the SPIR-V structure and diagnosing any downstream toolchain issues.
 
+`-O0` through `-O3` select increasingly aggressive optimization for runtime speed. `-Os` is different in kind: rather than being a further point on that scale, it asks for the smallest SPIR-V rather than the fastest, which is what you want when the shader cache footprint or module size matters more than peak runtime performance. It runs the same passes as `spirv-opt -Os`.
+
+Individual SPIR-V optimizer passes can still be added on top of any of these levels with `-Xspirv-opt`.
+
 ### -fvk-{b|s|t|u}-shift <N> <space>
 
 For example '-fvk-b-shift <N> <space>' shifts by N the inferred binding

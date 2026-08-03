@@ -59,6 +59,11 @@ struct TypeTextUtil
     static ConstArrayView<NamesDescriptionValue> getLineDirectiveInfos();
     /// Get the optimization level info
     static ConstArrayView<NamesDescriptionValue> getOptimizationLevelInfos();
+    /// Get the canonical `-O` suffix for an optimization level, such as "0" for
+    /// `SLANG_OPTIMIZATION_LEVEL_NONE` or "s" for `SLANG_OPTIMIZATION_LEVEL_SIZE`. Returns the
+    /// first (canonical) name from `getOptimizationLevelInfos`, so appending `-O` to it produces
+    /// an option that parses back to the same level.
+    static UnownedStringSlice getOptimizationLevelName(SlangOptimizationLevel level);
     /// Get the file system type infos
     static ConstArrayView<NamesDescriptionValue> getFileSystemTypeInfos();
 

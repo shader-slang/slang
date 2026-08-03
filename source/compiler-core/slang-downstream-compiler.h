@@ -176,13 +176,23 @@ struct DownstreamCompileOptions
         };
     };
 
+    /// The optimization goal to ask a downstream compiler for.
+    ///
+    /// The values deliberately mirror the public `SlangOptimizationLevel` numbering, because
+    /// `SLANGGlslangCompiler::compile` (slang-glslang-compiler.cpp) passes the level across the
+    /// `slang-glslang` shared-library boundary as a plain `unsigned` cast from this enum, and
+    /// `glslang_optimizeSPIRV` switches on it as a `SlangOptimizationLevel`. Keep the two in sync.
     enum class OptimizationLevel : uint8_t
     {
-        None,    ///< Don't optimize at all.
-        Default, ///< Default optimization level: balance code quality and compilation time.
-        High,    ///< Optimize aggressively.
-        Maximal, ///< Include optimizations that may take a very long time, or may involve severe
-                 ///< space-vs-speed tradeoffs
+        None = SLANG_OPTIMIZATION_LEVEL_NONE,       ///< Don't optimize at all.
+        Default = SLANG_OPTIMIZATION_LEVEL_DEFAULT, ///< Default optimization level: balance code
+                                                    ///< quality and compilation time.
+        High = SLANG_OPTIMIZATION_LEVEL_HIGH,       ///< Optimize aggressively.
+        Maximal = SLANG_OPTIMIZATION_LEVEL_MAXIMAL, ///< Include optimizations that may take a very
+                                                    ///< long time, or may involve severe
+                                                    ///< space-vs-speed tradeoffs
+        Size = SLANG_OPTIMIZATION_LEVEL_SIZE, ///< Optimize for size of the generated code rather
+                                              ///< than for its runtime speed.
     };
 
     enum class DebugInfoType : uint8_t

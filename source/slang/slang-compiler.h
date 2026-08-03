@@ -134,6 +134,7 @@ enum class OptimizationLevel : SlangOptimizationLevelIntegral
     Default = SLANG_OPTIMIZATION_LEVEL_DEFAULT,
     High = SLANG_OPTIMIZATION_LEVEL_HIGH,
     Maximal = SLANG_OPTIMIZATION_LEVEL_MAXIMAL,
+    Size = SLANG_OPTIMIZATION_LEVEL_SIZE,
 };
 
 struct CodeGenContext;
