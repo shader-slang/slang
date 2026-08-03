@@ -1884,6 +1884,13 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             builder->addNameHintDecoration(legalizedParamPtr, nameHintSB.getUnownedSlice());
         }
 
+        // An immediate `IRStructField` outer parameter means this leaf is a
+        // synthesized per-field interface global, not a variable the user declared.
+        if (outerParamInfo && as<IRStructField>(outerParamInfo->outerParam))
+        {
+            builder->addSimpleDecoration<IRScalarizedInterfaceFieldDecoration>(legalizedParamPtr);
+        }
+
         createVarLayoutForLegalizedGlobalParam(
             context,
             legalizedParamPtr,

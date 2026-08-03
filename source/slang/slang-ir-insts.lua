@@ -2389,6 +2389,14 @@ local insts = {
 					struct_name = "GlobalInputDecoration",
 				},
 			},
+			{
+				scalarizedInterfaceField = {
+					-- Marks a synthesized global representing one scalarized field of a
+					-- `struct`-typed entry-point varying, which has no source-level
+					-- counterpart of its own.
+					struct_name = "ScalarizedInterfaceFieldDecoration",
+				},
+			},
 			{ glslLocation = { struct_name = "GLSLLocationDecoration", operands = { { "location", "IRIntLit" } } } },
 			{ glslOffset = { struct_name = "GLSLOffsetDecoration", operands = { { "offset", "IRIntLit" } } } },
 			{ vkStructOffset = { struct_name = "VkStructOffsetDecoration", operands = { { "offset", "IRIntLit" } } } },

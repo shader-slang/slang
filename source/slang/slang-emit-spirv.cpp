@@ -4739,6 +4739,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (debugLevel <= DebugInfoLevel::Minimal)
             return;
 
+        // Synthesized interface-field globals are not source-level variables.
+        if (globalInst->findDecoration<IRScalarizedInterfaceFieldDecoration>())
+            return;
+
         auto scope = findDebugScope(globalInst->getModule()->getModuleInst());
         if (!scope)
             return;
