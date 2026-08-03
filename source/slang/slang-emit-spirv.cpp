@@ -2950,20 +2950,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_CastUInt64ToDescriptorHandle:
         case kIROp_CastDescriptorHandleToUInt64:
             {
-                // When the operand and result share a representation the cast is transparent and
-                // the operand's constant is forwarded. When they differ we must materialize a new
-                // constant of the result width: at module scope the operand is a compile-time
-                // constant, and a `uint2`<->`uint64` constant `OpBitcast` is not valid SPIR-V
-                // (bitcast must appear in a block; the runtime path below uses one).
-                if (descriptorHandleIntCastNeedsBitcast(inst))
-                {
-                    auto converted = emitConstantDescriptorHandleIntCast(inst);
-                    // A module-scope width mismatch must be a constant we can reinterpret;
-                    // forwarding the operand here would emit a value of the wrong width for the
-                    // result type.
-                    SLANG_RELEASE_ASSERT(converted);
-                    return converted;
-                }
+                // These casts emit no instruction of their own; the operand is forwarded. A cast
+                // whose operand width differs from the handle's representation cannot reach here:
+                // `isInlinableGlobalInst` lists these ops, so such an initializer is inlined into
+                // the function that uses the handle and the widths are reconciled there.
                 auto inner = ensureInst(inst->getOperand(0));
                 registerInst(inst, inner);
                 return inner;
@@ -4825,92 +4815,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         bool intSideIsUInt64 =
             (op == kIROp_CastUInt64ToDescriptorHandle || op == kIROp_CastDescriptorHandleToUInt64);
         return handleIsUInt64 != intSideIsUInt64;
-    }
-
-    // True if the result of one of the four `DescriptorHandle`<->integer casts is represented as
-    // `uint64` (rather than `uint2`) in SPIR-V.
-    bool descriptorHandleIntCastResultIsUInt64(IRInst* inst)
-    {
-        auto op = inst->getOp();
-        if (op == kIROp_CastUInt2ToDescriptorHandle || op == kIROp_CastUInt64ToDescriptorHandle)
-        {
-            bool hasBindlessTextureNV = m_targetProgram->getTargetReq()->getTargetCaps().implies(
-                CapabilityAtom::spvBindlessTextureNV);
-            return isDescriptorHandleRepresentedAsUInt64(inst->getDataType(), hasBindlessTextureNV);
-        }
-        return op == kIROp_CastDescriptorHandleToUInt64;
-    }
-
-    // Read the logical 64-bit value of a compile-time-constant operand of a `DescriptorHandle`
-    // representation cast, following the cast chain and packing a `uint2` as `(hi << 32) | lo` to
-    // match the `__asuint64` contract used elsewhere. Module-scope casts always have constant
-    // operands (a `static const` initializer must be compile-time constant), so this is how the
-    // constant is reinterpreted between widths there — a `uint2` and `uint64` constant `OpBitcast`
-    // is not valid SPIR-V. Returns false for anything not constant-foldable.
-    static bool tryGetConstantDescriptorHandleBits(IRInst* inst, uint64_t& outBits)
-    {
-        switch (inst->getOp())
-        {
-        case kIROp_IntLit:
-            outBits = (uint64_t)as<IRIntLit>(inst)->getValue();
-            return true;
-        case kIROp_MakeVectorFromScalar:
-            {
-                uint64_t scalar;
-                if (!tryGetConstantDescriptorHandleBits(inst->getOperand(0), scalar))
-                    return false;
-                outBits = ((scalar & 0xffffffffull) << 32) | (scalar & 0xffffffffull);
-                return true;
-            }
-        case kIROp_MakeVector:
-            {
-                if (inst->getOperandCount() != 2)
-                    return false;
-                uint64_t lo, hi;
-                if (!tryGetConstantDescriptorHandleBits(inst->getOperand(0), lo) ||
-                    !tryGetConstantDescriptorHandleBits(inst->getOperand(1), hi))
-                    return false;
-                outBits = ((hi & 0xffffffffull) << 32) | (lo & 0xffffffffull);
-                return true;
-            }
-        case kIROp_IntCast:
-        case kIROp_CastUInt2ToDescriptorHandle:
-        case kIROp_CastUInt64ToDescriptorHandle:
-        case kIROp_CastDescriptorHandleToUInt2:
-        case kIROp_CastDescriptorHandleToUInt64:
-            // The integer cast that `uint2(literal)` inserts to convert its `Int` literal to `UInt`
-            // forwards the same low bits, and the handle representation casts are transparent, so
-            // follow the operand through all of these.
-            return tryGetConstantDescriptorHandleBits(inst->getOperand(0), outBits);
-        case kIROp_Select:
-            // A `select` with a constant condition (e.g. from a `?:` in a `constexpr` initializer)
-            // resolves to one branch at compile time; follow the taken one.
-            if (auto cond = as<IRBoolLit>(inst->getOperand(0)))
-                return tryGetConstantDescriptorHandleBits(
-                    inst->getOperand(cond->getValue() ? 1 : 2),
-                    outBits);
-            return false;
-        default:
-            return false;
-        }
-    }
-
-    // Emit the result of a module-scope `DescriptorHandle`<->integer cast whose operand and result
-    // representations differ, as a correctly-typed constant of the result width (see
-    // `tryGetConstantDescriptorHandleBits` for why a constant bitcast cannot be used). Returns null
-    // if the operand is not constant-foldable.
-    SpvInst* emitConstantDescriptorHandleIntCast(IRInst* inst)
-    {
-        uint64_t bits;
-        if (!tryGetConstantDescriptorHandleBits(inst->getOperand(0), bits))
-            return nullptr;
-        IRBuilder builder(inst);
-        auto uintType = builder.getUIntType();
-        if (descriptorHandleIntCastResultIsUInt64(inst))
-            return emitIntConstant((IRIntegerValue)bits, builder.getUInt64Type(), inst);
-        auto lo = emitIntConstant((IRIntegerValue)(uint32_t)bits, uintType);
-        auto hi = emitIntConstant((IRIntegerValue)(uint32_t)(bits >> 32), uintType);
-        return emitOpConstantComposite(inst, builder.getVectorType(uintType, 2), makeArray(lo, hi));
     }
 
     SpvInst* emitMakeUInt64(SpvInstParent* parent, IRInst* inst)
