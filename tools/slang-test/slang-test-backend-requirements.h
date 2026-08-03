@@ -12,7 +12,8 @@ namespace SlangTest
 {
 
 /// Returns the downstream backend that a slangc command line forces regardless of its `-target`,
-/// or `SLANG_PASS_THROUGH_NONE` when it forces none.
+/// or `SLANG_PASS_THROUGH_NONE` when it forces none. At most one flag is expected to force a
+/// backend, so the first one found is returned.
 ///
 /// Some flags select a downstream compiler independently of the target, so a test using one depends
 /// on that backend even when the `-target` alone would not imply it. `-emit-cpu-via-llvm` routes
