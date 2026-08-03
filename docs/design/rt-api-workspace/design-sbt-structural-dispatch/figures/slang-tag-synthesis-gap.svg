@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="470" viewBox="0 0 1180 470" role="img" aria-label="Slang Metal tag synthesis reachability gap">
+  <style>
+    .title { font: 700 22px sans-serif; fill: #202020; }
+    .label { font: 700 14px sans-serif; fill: #202020; }
+    .small { font: 12px sans-serif; fill: #333333; }
+    .code { font: 12px monospace; fill: #202020; }
+    .trace { fill: #f8fbff; stroke: #336699; stroke-width: 1.5; rx: 7; }
+    .stage { fill: #fffaf2; stroke: #a65f00; stroke-width: 1.5; rx: 7; }
+    .compile { fill: #f7f3ff; stroke: #6d4db3; stroke-width: 1.5; rx: 7; }
+    .host { fill: #f3fff6; stroke: #2f7d45; stroke-width: 1.5; rx: 7; }
+    .warn { fill: #ffe4e0; stroke: #b42318; stroke-width: 2.4; rx: 8; }
+    .arrow { stroke: #333333; stroke-width: 1.7; marker-end: url(#arrow); fill: none; }
+    .purpleArrow { stroke: #6d4db3; stroke-width: 1.8; marker-end: url(#arrowPurple); fill: none; }
+    .redArrow { stroke: #b42318; stroke-width: 2.1; marker-end: url(#arrowRed); fill: none; }
+    .dash { stroke: #777777; stroke-width: 1.5; stroke-dasharray: 5 4; marker-end: url(#arrow); fill: none; }
+    .redText { font: 700 14px sans-serif; fill: #8a1f17; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#333333"/>
+    </marker>
+    <marker id="arrowPurple" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#6d4db3"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#b42318"/>
+    </marker>
+  </defs>
+
+  <text x="36" y="38" class="title">Slang: host-owned reachability leaves tag synthesis underdetermined</text>
+  <text x="36" y="62" class="small">Slang can see trace sites and stage entry points, but existing shader source does not contain the host binding edges that connect them.</text>
+
+  <rect x="65" y="105" width="250" height="132" class="trace"/>
+  <text x="88" y="132" class="label">Ray-generation code</text>
+  <text x="88" y="160" class="code">intersector1.intersect(...)</text>
+  <text x="88" y="181" class="small">needs Metal tag set A</text>
+  <text x="88" y="210" class="code">intersector2.intersect(...)</text>
+  <text x="88" y="231" class="small">needs Metal tag set B</text>
+
+  <rect x="365" y="92" width="245" height="160" class="stage"/>
+  <text x="388" y="119" class="label">Independent stage entries</text>
+  <text x="388" y="146" class="code">AnyHit1()</text>
+  <text x="388" y="166" class="code">AnyHit2()</text>
+  <text x="388" y="186" class="code">AnyHit3()</text>
+  <text x="388" y="214" class="code">Intersection1()</text>
+  <text x="388" y="234" class="code">Intersection2()</text>
+
+  <rect x="660" y="98" width="210" height="148" class="compile"/>
+  <text x="691" y="125" class="label">Slang Metal codegen</text>
+  <text x="684" y="155" class="small">must emit:</text>
+  <text x="684" y="181" class="code">[[intersection(?)]]</text>
+  <text x="684" y="203" class="code">generatedAnyHit()</text>
+  <text x="684" y="230" class="redText">Which tag set?</text>
+
+  <rect x="950" y="98" width="185" height="148" class="host"/>
+  <text x="978" y="125" class="label">Host bindings</text>
+  <text x="973" y="155" class="small">slot tables decide:</text>
+  <text x="973" y="180" class="small">A -> Intersection2</text>
+  <text x="973" y="202" class="small">B -> AnyHit1</text>
+  <text x="973" y="227" class="redText">Available later</text>
+
+  <path d="M315 171 L365 171" class="dash"/>
+  <path d="M610 172 L660 172" class="purpleArrow"/>
+  <path d="M950 172 C920 172 900 172 870 172" class="redArrow"/>
+  <text x="880" y="161" class="redText">too late</text>
+
+  <rect x="165" y="305" width="860" height="104" class="warn"/>
+  <text x="190" y="334" class="redText">Core problem:</text>
+  <text x="310" y="334" class="small">Slang must synthesize Metal tags before host binding data reveals reachability.</text>
+  <text x="310" y="358" class="small">Without a source-level reachability contract, it cannot know whether each generated</text>
+  <text x="310" y="378" class="small">AnyHit/Intersection function needs tag set A, tag set B, or another tag set.</text>
+
+  <path d="M488 252 C492 278 520 296 560 305" class="redArrow"/>
+  <path d="M765 246 C760 276 735 296 700 305" class="redArrow"/>
+  <path d="M1042 246 C1015 280 960 298 900 305" class="redArrow"/>
+</svg>
