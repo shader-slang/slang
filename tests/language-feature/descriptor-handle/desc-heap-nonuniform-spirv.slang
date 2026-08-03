@@ -6,16 +6,15 @@
 // index (VUID-RuntimeSpirv-None-10148); without it a driver may assume the index is dynamically
 // uniform and return wrong results.
 //
-// Root cause: SPIR-V legalization lowers the heap subscript into a DescriptorHandle round-trip
-// that buries the `NonUniformResourceIndex` wrapper inside a vector operand --
+// Root cause: the heap subscript lowered into a DescriptorHandle round-trip that buried the
+// `NonUniformResourceIndex` wrapper inside a vector operand --
 // `makeVector(NonUniformResourceIndex(i), 0)` -> `CastUInt2ToDescriptorHandle` ->
-// `CastDescriptorHandleToUInt2` -> `swizzle(_, 0)` -> `getElement(heap, _)`. The float pass in
-// `slang-ir-float-non-uniform-resource-index.cpp` bubbles the wrapper outward through the cast,
-// swizzle, and getElement ops, but had no case for `MakeVector` nor `CastUInt2ToDescriptorHandle`,
-// so the wrapper stalled at the `makeVector` (its only user) and never reached the `getElement`
-// index that the decoration machinery consumes. Adding those two float-pass cases lets the wrapper
-// float to the index, where the existing `getElement`->`getElementPtr` rewrite and
-// `propagateNonUniformDecorations` re-attach `NonUniform`.
+// `CastDescriptorHandleToUInt2` -> `swizzle(_, 0)` -> `getElement(heap, _)` -- so the wrapper
+// stalled at the `makeVector` and never reached the `getElement` index that the decoration
+// machinery consumes. The peephole pass now folds that round-trip away, leaving the plain
+// `getElement(heap, NonUniformResourceIndex(i))` shape whose index the float pass in
+// `slang-ir-float-non-uniform-resource-index.cpp` already floats, and where the existing
+// `getElement`->`getElementPtr` rewrite and `propagateNonUniformDecorations` attach `NonUniform`.
 
 // Default heap lowering (no spvDescriptorHeapEXT): OpCapability RuntimeDescriptorArray + a
 // `__slang_resource_heap` runtime array indexed via OpAccessChain -- this is the path that requires
@@ -30,10 +29,11 @@
 // both spellings (subscript via `main`, DescriptorHandle<T> construction via `mainHandle`).
 //TEST:SIMPLE(filecheck=SPVCAP): -target spirv-asm -stage compute -entry main -capability spvDescriptorHeapEXT
 //TEST:SIMPLE(filecheck=SPVCAPHANDLE): -target spirv-asm -stage compute -entry mainHandle -capability spvDescriptorHeapEXT
-// The MakeVector float-pass case only floats the wrapper out when every non-wrapped lane is a
-// constant; this entry pins the else-branch, where a hand-constructed handle has a non-constant
-// sibling lane, so the wrapper is NOT floated and no NonUniform is emitted (see mainNonConstSibling).
+// A hand-constructed handle whose sibling lane is a runtime value still decorates the heap access
+// (SPVNONCONST), and decorates only the lane that indexes the heap (SPVNONCONSTSIBLING -- a separate
+// prefix so its lone CHECK-NOT scans the whole disassembly; see mainNonConstSibling).
 //TEST:SIMPLE(filecheck=SPVNONCONST): -target spirv-asm -stage compute -entry mainNonConstSibling
+//TEST:SIMPLE(filecheck=SPVNONCONSTSIBLING): -target spirv-asm -stage compute -entry mainNonConstSibling
 
 RWStructuredBuffer<float> outputBuffer;
 SamplerState samp;
@@ -81,15 +81,10 @@ void mainHandle(uint3 tid : SV_DispatchThreadID)
 // SPVCAPHANDLE: OpCapability DescriptorHeapEXT
 // SPVCAPHANDLE-NOT: NonUniform
 
-// Guard test for the MakeVector float-pass case: it only floats the wrapper out of a
-// `makeVector(..., NonUniformResourceIndex(x), ...)` when every other lane is a constant. Here the
-// handle is hand-constructed with a runtime (non-constant) second lane -- `uint2(NUR(tid.x), tid.y)`
-// -- so the else-branch fires and the wrapper is left in place rather than marking the whole vector
-// non-uniform. This is a deliberately conservative under-decoration: only the `.x` lane indexes the
-// heap, but the pass declines to reason per-lane here to avoid over-decorating a genuinely uniform
-// sibling in the general case. The common heap-subscript / `{ uint2(NUR(i), 0) }` forms always have
-// a constant sibling, so they are unaffected (covered by SPV / SPVHANDLE above). If a future change
-// inverts or drops the constant-lane guard, this `CHECK-NOT` fails, flagging the regression.
+// The handle here is hand-constructed with a runtime (non-constant) second lane --
+// `uint2(NUR(tid.x), tid.y)` -- where only the `.x` lane indexes the heap. Since the peephole fold
+// collapses the round-trip, the `.x` lane flows straight into the heap access chain and the vector
+// never survives to emit, so the access is decorated like any other non-uniform index.
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void mainNonConstSibling(uint3 tid : SV_DispatchThreadID)
@@ -99,8 +94,12 @@ void mainNonConstSibling(uint3 tid : SV_DispatchThreadID)
     outputBuffer[0] = tex.SampleLevel(samp, float2(0, 0), 0).x;
 }
 
-// A lone CHECK-NOT scans the whole disassembly, so this asserts NonUniform appears nowhere (no
-// ShaderNonUniform capability, no OpDecorate NonUniform, no inline `; NonUniform`) -- confirming the
-// guard left the wrapper unfloated. slang-test independently fails the test if compilation errors,
-// so a passing run also means the heap access was emitted.
-// SPVNONCONST-NOT: NonUniform
+// The heap access is decorated, and the decoration lands on the `.x` lane feeding the access chain.
+// SPVNONCONST-DAG: OpCapability ShaderNonUniform
+// SPVNONCONST: %[[IDX:[0-9]+]] = OpCompositeExtract %uint %{{.*}} 0 {{.*}}; NonUniform
+// SPVNONCONST: OpAccessChain %{{.*}} %__slang_resource_heap %[[IDX]] {{.*}}; NonUniform
+
+// The uniform sibling lane is never decorated -- only `.x` indexes the heap, so extracting `.y`
+// must not inherit the marker. This lives under its own prefix because a CHECK-NOT is bounded by
+// the surrounding positive CHECKs; alone, it scans the entire disassembly.
+// SPVNONCONSTSIBLING-NOT: OpCompositeExtract %uint %{{.*}} 1 {{.*}}; NonUniform
