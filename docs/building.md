@@ -106,7 +106,7 @@ A frequently used configuration can be added to `CMakeUserPresets.json` at the r
 
 ```json
 {
-  "version": 3,
+  "version": 6,
   "configurePresets": [
     {
       "name": "my-default",
