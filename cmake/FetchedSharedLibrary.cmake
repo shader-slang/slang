@@ -29,7 +29,8 @@ function(download_and_extract archive_name url)
             message(STATUS "Downloading ${archive_name} from ${url} ...")
             # Retry before giving up: transient HTTP failures are common when many CI
             # jobs fetch release assets from behind a single shared egress address.
-            # Any failure is retried, so a genuinely missing asset pays the full backoff.
+            # We retry on any kind of failure (transient or a permanent 404) up to
+            # max_attempts, so a genuinely missing asset pays the full backoff first.
             set(max_attempts 3)
             # A stalled connection has to fail before the retry below can get control
             # back, so bound it. INACTIVITY_TIMEOUT rather than TIMEOUT: it fires only
