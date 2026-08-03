@@ -10,6 +10,7 @@ name: PR Maintenance
 # Pair this with the other example callers in this directory for full coverage:
 #   - example-pr-checks-complete.yml  CI / gating-check results -> board
 #   - example-pr-commit-status.yml    external commit statuses -> board
+#   - example-pr-sweep-nightly.yml    nightly / on-demand sweep of open PRs
 #   - example-pr-review-fork-bridge.yml + example-pr-review-fork-apply.yml
 #                                     real-time fork-PR review handling
 #

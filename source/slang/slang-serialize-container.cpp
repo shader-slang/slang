@@ -1,10 +1,10 @@
 // slang-serialize-container.cpp
 #include "slang-serialize-container.h"
 
-#include "../core/slang-byte-encode-util.h"
-#include "../core/slang-math.h"
-#include "../core/slang-stream.h"
-#include "../core/slang-text-io.h"
+#include "core/slang-byte-encode-util.h"
+#include "core/slang-math.h"
+#include "core/slang-stream.h"
+#include "core/slang-text-io.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-parser.h"

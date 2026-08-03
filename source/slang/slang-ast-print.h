@@ -3,7 +3,7 @@
 #ifndef SLANG_AST_PRINT_H
 #define SLANG_AST_PRINT_H
 
-#include "../core/slang-range.h"
+#include "core/slang-range.h"
 #include "slang-ast-all.h"
 
 namespace Slang

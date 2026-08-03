@@ -2453,6 +2453,24 @@ IRType* dropNormAttributes(IRType* const t)
     return t;
 }
 
+/// Gets a literal thread count, unwrapping a specialization constant's default when needed.
+static IRIntLit* _getDefaultThreadCount(IRInst* threadCount)
+{
+    if (auto intLit = as<IRIntLit>(threadCount))
+        return intLit;
+
+    auto globalParam = as<IRGlobalParam>(threadCount);
+    auto defaultValueDecor =
+        globalParam ? globalParam->findDecoration<IRDefaultValueDecoration>() : nullptr;
+    if (defaultValueDecor)
+        if (auto defaultIntLit = as<IRIntLit>(defaultValueDecor->getOperand(0)))
+            return defaultIntLit;
+
+    IRBuilder builder(globalParam ? (IRInst*)globalParam : threadCount);
+    return cast<IRIntLit>(
+        builder.getIntValue(globalParam ? globalParam->getDataType() : builder.getIntType(), 1));
+}
+
 void verifyComputeDerivativeGroupModifiers(
     DiagnosticSink* sink,
     SourceLoc errorLoc,
@@ -2469,15 +2487,9 @@ void verifyComputeDerivativeGroupModifiers(
             Diagnostics::OnlyOneOfDerivativeGroupLinearOrQuadCanBeSet{.location = errorLoc});
     }
 
-    IRIntegerValue x = 1;
-    IRIntegerValue y = 1;
-    IRIntegerValue z = 1;
-    if (numThreadsDecor->getX())
-        x = numThreadsDecor->getX()->getValue();
-    if (numThreadsDecor->getY())
-        y = numThreadsDecor->getY()->getValue();
-    if (numThreadsDecor->getZ())
-        z = numThreadsDecor->getZ()->getValue();
+    IRIntegerValue x = _getDefaultThreadCount(numThreadsDecor->getOperand(0))->getValue();
+    IRIntegerValue y = _getDefaultThreadCount(numThreadsDecor->getOperand(1))->getValue();
+    IRIntegerValue z = _getDefaultThreadCount(numThreadsDecor->getOperand(2))->getValue();
 
     if (quadAttr)
     {
@@ -3078,8 +3090,39 @@ bool isIROpaqueType(IRType* type)
     }
 }
 
+// True if `addr`'s chain bottoms out at `GetOptiXSbtDataPtr` (the OptiX SBT), peeling every
+// forwarding op, including the `BitCast`/`GetOffsetPtr` that `getRootAddr` does not peel.
+static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
+{
+    for (;;)
+    {
+        switch (addr->getOp())
+        {
+        case kIROp_GetOptiXSbtDataPtr:
+            return true;
+        case kIROp_FieldAddress:
+        case kIROp_GetElementPtr:
+        case kIROp_GetOffsetPtr:
+        case kIROp_BitCast:
+        case kIROp_Reinterpret:
+        case kIROp_PtrCast:
+            addr = addr->getOperand(0);
+            continue;
+        default:
+            return false;
+        }
+    }
+}
+
 bool isPointerToImmutableLocation(IRInst* loc)
 {
+    // The OptiX SBT (`GetOptiXSbtDataPtr`) is typed as a `ConstantBuffer<>` but is mutated
+    // in place by the host between dispatches, so it is not immutable; otherwise CUDA emit
+    // would route its loads through the read-only cache (`__ldg`) and read stale data.
+    // Genuine `ConstantBuffer<>` (not SBT-rooted) is unaffected. See shader-slang/slang#10188.
+    if (isAddressIntoOptiXShaderBindingTable(loc))
+        return false;
+
     switch (loc->getOp())
     {
     case kIROp_GetStructuredBufferPtr:
