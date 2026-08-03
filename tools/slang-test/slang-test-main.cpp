@@ -29,6 +29,7 @@
 #include "options.h"
 #include "parse-diagnostic-util.h"
 #include "render-test/slang-support.h"
+#include "slang-test-backend-requirements.h"
 #include "slang-test-optimization-options.h"
 #include "slangc-tool.h"
 #include "slangi-tool.h"
@@ -1288,20 +1289,18 @@ static bool _hasOption(const List<String>& args, const String& argName)
     return args.indexOf(argName) != Index(-1);
 }
 
-// Records backend dependencies that a command line forces regardless of its `-target`,
-// so the harness can ignore (rather than fail) a test on a runner that lacks the backend.
-// `-emit-cpu-via-llvm` routes CPU/host-callable code generation through the slang-llvm
-// plugin, so a test using it needs the LLVM backend even when `-target` alone would imply
-// only a generic C/C++ compiler (e.g. `host-callable` maps to `Generic_C_CPP`). Without the
-// plugin slangc bails early with "unable to generate code for target '...'", never reaching
-// the passes (such as coverage instrumentation) whose output the test asserts on.
+// Records backend dependencies that a command line forces regardless of its `-target`, so the
+// harness can ignore (rather than fail) a test on a runner that lacks the backend. See
+// `SlangTest::getForcedDownstreamBackend` for why, e.g., `-emit-cpu-via-llvm` implies the LLVM
+// backend even for a target that alone would only imply a generic C/C++ compiler.
 static void _addForcedBackendRequirements(
     const List<String>& args,
     TestRequirements* ioRequirements)
 {
-    if (_hasOption(args, "-emit-cpu-via-llvm"))
+    const SlangPassThrough forcedBackend = SlangTest::getForcedDownstreamBackend(args);
+    if (forcedBackend != SLANG_PASS_THROUGH_NONE)
     {
-        ioRequirements->addUsedBackEnd(SLANG_PASS_THROUGH_LLVM);
+        ioRequirements->addUsedBackEnd(forcedBackend);
     }
 }
 
