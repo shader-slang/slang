@@ -3488,7 +3488,6 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRRefParamType* getRefParamType(IRType* valueType, AddressSpace addrSpace);
     IRBorrowInParamType* getBorrowInParamType(IRType* valueType, AddressSpace addrSpace);
-    IRPhysicalParamStorageType* getPhysicalParamStorageType(IRType* valueType);
     IRPtrType* getPtrType(
         IROp op,
         IRType* valueType,
