@@ -22,7 +22,10 @@ standard output = {
                         "elementType": {
                             "kind": "scalar",
                             "scalarType": "float32"
-                        }
+                        },
+                        "sizes": [
+                            {"kind": "varyingInput", "value": 1}
+                        ]
                     }
                 },
                 {
@@ -42,7 +45,10 @@ standard output = {
                                     "elementType": {
                                         "kind": "scalar",
                                         "scalarType": "int32"
-                                    }
+                                    },
+                                    "sizes": [
+                                        {"kind": "varyingInput", "value": 1}
+                                    ]
                                 },
                                 "stage": "vertex",
                                 "binding": {"kind": "varyingInput", "index": 0},
@@ -62,7 +68,10 @@ standard output = {
                                                 "elementType": {
                                                     "kind": "scalar",
                                                     "scalarType": "float32"
-                                                }
+                                                },
+                                                "sizes": [
+                                                    {"kind": "varyingInput", "value": 1}
+                                                ]
                                             },
                                             "stage": "vertex",
                                             "binding": {"kind": "varyingInput", "index": 0},
@@ -77,13 +86,19 @@ standard output = {
                                                 "elementType": {
                                                     "kind": "scalar",
                                                     "scalarType": "float32"
-                                                }
+                                                },
+                                                "sizes": [
+                                                    {"kind": "varyingInput", "value": 1}
+                                                ]
                                             },
                                             "stage": "vertex",
                                             "binding": {"kind": "varyingInput", "index": 1},
                                             "semanticName": "B",
                                             "semanticIndex": 2
                                         }
+                                    ],
+                                    "sizes": [
+                                        {"kind": "varyingInput", "value": 2}
                                     ]
                                 },
                                 "stage": "vertex",
@@ -91,6 +106,9 @@ standard output = {
                                 "semanticName": "B",
                                 "semanticIndex": 1
                             }
+                        ],
+                        "sizes": [
+                            {"kind": "varyingInput", "value": 3}
                         ]
                     }
                 },
@@ -116,7 +134,10 @@ standard output = {
                                                 "elementType": {
                                                     "kind": "scalar",
                                                     "scalarType": "float32"
-                                                }
+                                                },
+                                                "sizes": [
+                                                    {"kind": "varyingInput", "value": 1}
+                                                ]
                                             },
                                             "stage": "vertex",
                                             "binding": {"kind": "varyingInput", "index": 0},
@@ -130,13 +151,19 @@ standard output = {
                                                 "elementType": {
                                                     "kind": "scalar",
                                                     "scalarType": "float32"
-                                                }
+                                                },
+                                                "sizes": [
+                                                    {"kind": "varyingInput", "value": 1}
+                                                ]
                                             },
                                             "stage": "vertex",
                                             "binding": {"kind": "varyingInput", "index": 1},
                                             "semanticName": "CX",
                                             "semanticIndex": 1
                                         }
+                                    ],
+                                    "sizes": [
+                                        {"kind": "varyingInput", "value": 2}
                                     ]
                                 },
                                 "stage": "vertex",
@@ -151,12 +178,18 @@ standard output = {
                                     "elementType": {
                                         "kind": "scalar",
                                         "scalarType": "int32"
-                                    }
+                                    },
+                                    "sizes": [
+                                        {"kind": "varyingInput", "value": 1}
+                                    ]
                                 },
                                 "stage": "vertex",
                                 "binding": {"kind": "varyingInput", "index": 2},
                                 "semanticName": "CY"
                             }
+                        ],
+                        "sizes": [
+                            {"kind": "varyingInput", "value": 3}
                         ]
                     }
                 }
@@ -169,7 +202,10 @@ standard output = {
                     "elementType": {
                         "kind": "scalar",
                         "scalarType": "float32"
-                    }
+                    },
+                    "sizes": [
+
+                    ]
                 }
             }
         }

@@ -1,11 +1,12 @@
 // slang-ir.cpp
 #include "slang-ir.h"
 
-#include "../core/slang-basic.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-writer.h"
+#include "core/slang-basic.h"
+#include "core/slang-platform.h"
+#include "core/slang-writer.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-mangle.h"
 
@@ -1014,6 +1015,68 @@ IROperandList<IRTypeSizeAttr> IRTypeLayout::getSizeAttrs()
     return findAttrs<IRTypeSizeAttr>();
 }
 
+IRTypeAlignmentAttr* IRTypeLayout::findAlignmentAttr(LayoutResourceKind kind)
+{
+    for (auto alignmentAttr : getAlignmentAttrs())
+    {
+        if (alignmentAttr->getResourceKind() == kind)
+            return alignmentAttr;
+    }
+    return nullptr;
+}
+
+IROperandList<IRTypeAlignmentAttr> IRTypeLayout::getAlignmentAttrs()
+{
+    return findAttrs<IRTypeAlignmentAttr>();
+}
+
+IRIntegerValue IRTypeLayout::getAlignment(LayoutResourceKind kind)
+{
+    if (auto alignmentAttr = findAlignmentAttr(kind))
+        return alignmentAttr->getAlignment();
+    return 1;
+}
+
+LayoutSize IRTypeLayout::getSizeInBytes()
+{
+    if (auto sizeAttr = findSizeAttr(LayoutResourceKind::Uniform))
+        return sizeAttr->getSize();
+    return LayoutSize(0);
+}
+
+IRIntegerValue IRTypeLayout::getAlignmentInBytes()
+{
+    return getAlignment(LayoutResourceKind::Uniform);
+}
+
+// Round a byte size up to a byte alignment, preserving the zero and non-finite
+// cases: a zero size strides by zero regardless of alignment, and a non-finite
+// (unsized/infinite, or invalid) size has no finite stride and is returned
+// unchanged rather than collapsed to zero.
+static LayoutSize _strideInBytes(LayoutSize size, IRIntegerValue alignment)
+{
+    if (!size.isFinite())
+        return size;
+    IRIntegerValue byteSize = IRIntegerValue(size.getFiniteValue().getValidValue());
+    if (byteSize == 0)
+        return LayoutSize(0);
+    return LayoutSize(LayoutSize::RawValue(align(byteSize, int(alignment))));
+}
+
+LayoutSize IRTypeLayout::getStrideInBytes()
+{
+    return _strideInBytes(getSizeInBytes(), getAlignmentInBytes());
+}
+
+LayoutSize IRArrayTypeLayout::getElementStrideInBytes()
+{
+    // The element's in-array alignment is the array's byte alignment, which
+    // already incorporates the layout-rule rounding (e.g. std140 rounds array
+    // elements up to 16). The element type's own alignment does not, so it must
+    // not be used here.
+    return _strideInBytes(getElementTypeLayout()->getSizeInBytes(), getAlignmentInBytes());
+}
+
 IRTypeLayout::Builder::Builder(IRBuilder* irBuilder)
     : m_irBuilder(irBuilder)
 {
@@ -1031,11 +1094,27 @@ void IRTypeLayout::Builder::addResourceUsage(IRTypeSizeAttr* sizeAttr)
     addResourceUsage(sizeAttr->getResourceKind(), sizeAttr->getSize());
 }
 
+void IRTypeLayout::Builder::addAlignment(LayoutResourceKind kind, IRIntegerValue alignment)
+{
+    auto& resInfo = m_resInfos[Int(kind)];
+    resInfo.kind = kind;
+    resInfo.alignment = alignment;
+}
+
+void IRTypeLayout::Builder::addAlignment(IRTypeAlignmentAttr* alignmentAttr)
+{
+    addAlignment(alignmentAttr->getResourceKind(), alignmentAttr->getAlignment());
+}
+
 void IRTypeLayout::Builder::addResourceUsageFrom(IRTypeLayout* typeLayout)
 {
     for (auto sizeAttr : typeLayout->getSizeAttrs())
     {
         addResourceUsage(sizeAttr);
+    }
+    for (auto alignmentAttr : typeLayout->getAlignmentAttrs())
+    {
+        addAlignment(alignmentAttr);
     }
 }
 
@@ -1056,19 +1135,40 @@ void IRTypeLayout::Builder::addOperands(List<IRInst*>& operands)
     addOperandsImpl(operands);
 }
 
+// Whether a unit that occupies `size` should carry an alignment attribute.
+// Alignment is meaningful whenever the unit occupies any bytes, which includes
+// an unsized (infinite) or unknown (invalid) extent; only a definitely-zero
+// size makes alignment irrelevant (and an absent attribute already means 1).
+static bool _occupiesLayoutUnit(LayoutSize size)
+{
+    return !size.isFinite() || size.getFiniteValue().getValidValue() != 0;
+}
+
 void IRTypeLayout::Builder::addAttrs(List<IRInst*>& operands)
 {
     auto irBuilder = getIRBuilder();
+
+    // Emit size and alignment attributes in two separate passes so that each
+    // attribute kind forms one contiguous run. `IRTypeLayout::getSizeAttrs`
+    // (and `getAlignmentAttrs`) rely on `findAttrs`, which stops at the first
+    // operand of a different type, so interleaving the two kinds would truncate
+    // the size-attribute enumeration for any layout that has both.
+    for (auto resInfo : m_resInfos)
+    {
+        if (resInfo.kind == LayoutResourceKind::None)
+            continue;
+        operands.add(irBuilder->getTypeSizeAttr(resInfo.kind, resInfo.size));
+    }
 
     for (auto resInfo : m_resInfos)
     {
         if (resInfo.kind == LayoutResourceKind::None)
             continue;
-
-        IRInst* sizeAttr = irBuilder->getTypeSizeAttr(resInfo.kind, resInfo.size);
-        operands.add(sizeAttr);
+        // An absent attribute already encodes alignment 1, so only a stronger
+        // alignment is worth recording, and only for a unit that occupies space.
+        if (resInfo.alignment > 1 && _occupiesLayoutUnit(resInfo.size))
+            operands.add(irBuilder->getTypeAlignmentAttr(resInfo.alignment, resInfo.kind));
     }
-
 
     addAttrsImpl(operands);
 }
@@ -7317,6 +7417,33 @@ IRTypeSizeAttr* IRBuilder::getTypeSizeAttr(LayoutResourceKind kind, LayoutSize s
         createIntrinsicInst(getVoidType(), kIROp_TypeSizeAttr, SLANG_COUNT_OF(operands), operands));
 }
 
+IRTypeAlignmentAttr* IRBuilder::getTypeAlignmentAttr(
+    IRIntegerValue alignment,
+    LayoutResourceKind kind)
+{
+    auto alignmentInst = getIntValue(getIntType(), alignment);
+
+    // The unit operand is omitted for the `Uniform` default so that the common
+    // byte-alignment case has a single canonical encoding.
+    if (kind == LayoutResourceKind::Uniform)
+    {
+        IRInst* operands[] = {alignmentInst};
+        return cast<IRTypeAlignmentAttr>(createIntrinsicInst(
+            getVoidType(),
+            kIROp_TypeAlignmentAttr,
+            SLANG_COUNT_OF(operands),
+            operands));
+    }
+
+    auto kindInst = getIntValue(getIntType(), IRIntegerValue(kind));
+    IRInst* operands[] = {alignmentInst, kindInst};
+    return cast<IRTypeAlignmentAttr>(createIntrinsicInst(
+        getVoidType(),
+        kIROp_TypeAlignmentAttr,
+        SLANG_COUNT_OF(operands),
+        operands));
+}
+
 IRVarOffsetAttr* IRBuilder::getVarOffsetAttr(LayoutResourceKind kind, UInt offset, UInt space)
 {
     IRInst* operands[3];
@@ -10075,6 +10202,25 @@ bool isMovableInst(IRInst* inst)
             default:
                 break;
             }
+            // A load of a resource *element* from `UniformConstant` memory is movable.
+            // `UniformConstant` is read-only opaque-resource storage that is never written from
+            // within the shader, so two loads of the same address always yield the same result and
+            // redundancy removal may safely CSE (and, when hoisting is enabled, hoist) them. This
+            // lets a descriptor read once from a heap/array and used many times (e.g. a hoisted
+            // `DescriptorHandle<T>` or a `Texture2D t[N]` element sampled in a loop) collapse to a
+            // single load, matching HLSL. Only SPIR-V legalization produces `UniformConstant`
+            // pointers, so this is a no-op on other targets.
+            //
+            // The address must be an element access (`kIROp_GetElementPtr`): the scope is
+            // descriptor-heap / resource-array element reuse. A combined sampler/texture that is
+            // its own scalar global is loaded directly from that global (no element access) and is
+            // deliberately left non-movable -- its per-use loads must stay distinct for the
+            // combined-sampler emit path.
+            if (auto ptrType = as<IRPtrTypeBase>(addrType);
+                ptrType && ptrType->hasAddressSpace() &&
+                ptrType->getAddressSpace() == AddressSpace::UniformConstant &&
+                load->getPtr()->getOp() == kIROp_GetElementPtr)
+                return true;
         }
         return false;
     default:

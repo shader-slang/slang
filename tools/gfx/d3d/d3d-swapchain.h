@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../renderer-shared.h"
 #include "core/slang-basic.h"
 #include "d3d-util.h"
+#include "gfx/renderer-shared.h"
 #include "slang-gfx.h"
 
 #include <dxgi1_4.h>

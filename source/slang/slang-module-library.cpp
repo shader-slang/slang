@@ -1,9 +1,9 @@
 // slang-module-library.cpp
 #include "slang-module-library.h"
 
-#include "../core/slang-blob.h"
-#include "../core/slang-riff.h"
-#include "../core/slang-type-text-util.h"
+#include "core/slang-blob.h"
+#include "core/slang-riff.h"
+#include "core/slang-type-text-util.h"
 
 #include <assert.h>
 

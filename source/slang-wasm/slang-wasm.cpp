@@ -1,8 +1,8 @@
 #include "slang-wasm.h"
 
-#include "../core/slang-blob.h"
-#include "../core/slang-exception.h"
-#include "../slang/slang-language-server.h"
+#include "core/slang-blob.h"
+#include "core/slang-exception.h"
+#include "slang/slang-language-server.h"
 
 #include <slang.h>
 #include <vector>

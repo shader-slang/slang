@@ -1,5 +1,6 @@
 #include "slang-emit-wgsl.h"
 
+#include "core/slang-type-text-util.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
@@ -57,6 +58,17 @@ WGSLSourceEmitter::WGSLSourceEmitter(const Desc& desc)
     m_extensionTracker =
         dynamicCast<ShaderExtensionTracker>(desc.codeGenContext->getExtensionTracker());
     SLANG_ASSERT(m_extensionTracker);
+}
+
+void WGSLSourceEmitter::emitTempModifiers(IRInst* temp)
+{
+    // WGSL has no `precise` keyword; drop it and warn.
+    if (temp->findDecoration<IRPreciseDecoration>())
+    {
+        getSink()->diagnose(Diagnostics::PreciseQualifierUnsupportedOnTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+            .location = temp->sourceLoc});
+    }
 }
 
 void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
@@ -1518,6 +1530,27 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             return true;
         }
+
+    case kIROp_IntCast:
+        {
+            // Emit a bool->int cast with `select`, the emitter's idiom for bool-conditioned
+            // values (cf. the `And`/`Or` case); `select(T(0), T(1), cond)` maps false->0, true->1.
+            auto operand = inst->getOperand(0);
+            if (as<IRBoolType>(getVectorElementType(operand->getDataType())))
+            {
+                auto type = inst->getDataType();
+                m_writer->emit("select(");
+                emitType(type);
+                m_writer->emit("(0), ");
+                emitType(type);
+                m_writer->emit("(1), ");
+                emitOperand(operand, getInfo(EmitOp::General));
+                m_writer->emit(")");
+                return true;
+            }
+            return false;
+        }
+        break;
 
     case kIROp_BitCast:
         {

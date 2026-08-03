@@ -383,22 +383,14 @@ local insts = {
 						},
 					},
 					{
-						PhysicalParamStorage = {
-							-- Semantically a `T*` in the IR (an `IRLoad` is required to read the `T`),
-							-- whose referent is the target's physical by-value parameter storage. Used only
-							-- by the CUDA-family address-forwarding in `transformParamsToConstRef`: an
-							-- entry-point by-value uniform aggregate param is retyped to
-							-- `PhysicalParamStorage<T>` so its address can be forwarded into a `borrow in`
-							-- callee without a per-thread copy, instead of taking `GetAddress` of an SSA
-							-- value. The C++/CUDA backend emits such a param as the plain value `T p` (the
-							-- kernel ABI is unchanged) and emits a reference of `p` as `&p`. It is never
-							-- valid for the SPIR-V/WGSL/Metal backends.
-							--
-							-- The three trailing operands exist only for structural compatibility with
-							-- the `IRPtrTypeBase` accessors (so `getValueType()` etc. work); the builder
-							-- always fixes them to Read / Generic / default-layout and they are not meant
-							-- to vary.
-							struct_name = "PhysicalParamStorageType",
+						SPIRVUntypedPtr = {
+							-- A pointer that keeps its logical pointee type and layout in the IR
+							-- (like `PtrType`) but is emitted as an untyped SPIR-V pointer
+							-- (`OpTypeUntypedPointerKHR`), with field/element addresses lowered to
+							-- `OpUntypedAccessChainKHR`. Used for a `ConstantBuffer<T>` fetched from a
+							-- descriptor heap so its uniform-buffer descriptor kind is preserved while
+							-- nested arrays are addressed logically (no pointer-type `ArrayStride`).
+							struct_name = "SPIRVUntypedPtrType",
 							operands = {
 								{ "valueType", "IRType" },
 								{ "accessQualifierOperand", "IRIntLit", optional = true },
@@ -2958,6 +2950,9 @@ local insts = {
 					{ offset = { struct_name = "VarOffsetAttr", min_operands = 2 } },
 				},
 			},
+			-- Alignment is stored alignment-first (operand 0), unit second and optional,
+			-- so it does not fit the kind-first `LayoutResourceInfoAttr` shape.
+			{ TypeAlignment = { struct_name = "TypeAlignmentAttr", min_operands = 1 } },
 			{ FuncThrowType = { struct_name = "FuncThrowTypeAttr", operands = { { "errorType", "IRType" } } } },
 		},
 	},

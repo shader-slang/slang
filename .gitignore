@@ -154,3 +154,6 @@ replay-capture
 
 # Pre-staged AI-review artifacts (REVIEW.md Step 1)
 /tmp/
+
+# Scaler autoscaler build output (built from source; see extras/scaler/README.md)
+/extras/scaler/scaler-linux

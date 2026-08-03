@@ -1,11 +1,11 @@
 // lower.cpp
 #include "slang-lower-to-ir.h"
 
-#include "../core/slang-char-encode.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-hash.h"
-#include "../core/slang-performance-profiler.h"
-#include "../core/slang-random-generator.h"
+#include "core/slang-char-encode.h"
+#include "core/slang-char-util.h"
+#include "core/slang-hash.h"
+#include "core/slang-performance-profiler.h"
+#include "core/slang-random-generator.h"
 #include "slang-check-impl.h"
 #include "slang-check.h"
 #include "slang-ir-autodiff.h"
@@ -9109,6 +9109,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // Has anything been emitted to the current "active" case block?
         bool anythingEmittedToCurrentCaseBlock = false;
 
+        bool warnedUnreachableBeforeFirstCase = false;
+
         // The collected (value, label) pairs for
         // all the `case` statements.
         List<IRInst*> cases;
@@ -9304,14 +9306,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // emitted to the current case block.
             if (!info->currentCaseLabel)
             {
-                // It possible in full C/C++ to have statements
-                // before the first `case`. Usually these are
-                // unreachable, unless they start with a label.
-                //
-                // We'll ignore them here, figuring they are
-                // dead. If we ever add `LabelStmt` then we'd
-                // need to emit these statements to a dummy
-                // block just in case.
+                // Control can enter a switch body only through the dispatch to a
+                // case/default label (Slang has no `goto` into the body), so
+                // statements before the first label are unreachable. Warn once
+                // for the leading run.
+                if (!info->warnedUnreachableBeforeFirstCase)
+                {
+                    context->getSink()->diagnose(Diagnostics::UnreachableCode{.stmt = stmt});
+                    info->warnedUnreachableBeforeFirstCase = true;
+                }
             }
             else
             {
@@ -9713,8 +9716,12 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
     UnownedStringSlice content;
     bool isIncludedFile = false;
 
-    // Only embed source content for Standard and Maximal debug level.
-    bool embedContent = context->debugInfoLevel >= DebugInfoLevel::Standard;
+    // Embed source content for Standard/Maximal, or at any level when
+    // `-debug-info-include-source` is set. Must match the per-source-file loop in
+    // generateIRForTranslationUnit so a source reached only through this producer still carries
+    // content at `-g1` (otherwise the SPIR-V `OpSource` for it would have an empty Source operand).
+    bool embedContent = context->debugInfoLevel >= DebugInfoLevel::Standard ||
+                        context->getLinkage()->m_optionSet.shouldIncludeSourceInDebugInfo();
     if (source)
     {
         if (embedContent)
@@ -15424,6 +15431,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // This is needed for Minimal level and above (for line number correlation)
     if (context->debugInfoLevel != DebugInfoLevel::None)
     {
+        // Minimal normally keeps only the path, but `-debug-info-include-source` carries the source
+        // text into every `IRDebugSource` so the SPIR-V emitter can embed it via core `OpSource`.
+        const bool includeSource = linkage->m_optionSet.shouldIncludeSourceInDebugInfo();
+
         builder->setInsertInto(module->getModuleInst());
         for (auto source : translationUnit->getSourceFiles())
         {
@@ -15431,8 +15442,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             // path
             auto debugSource = builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
-                (context->debugInfoLevel >= DebugInfoLevel::Standard) ? source->getContent()
-                                                                      : UnownedStringSlice(),
+                (context->debugInfoLevel >= DebugInfoLevel::Standard || includeSource)
+                    ? source->getContent()
+                    : UnownedStringSlice(),
                 source->isIncludedFile());
             context->shared->mapSourceFileToDebugSourceInst[source] = debugSource;
 
@@ -16013,6 +16025,19 @@ static IRTypeLayout* _lowerTypeLayoutCommon(IRTypeLayout::Builder* builder, Type
     for (auto resInfo : typeLayout->resourceInfos)
     {
         builder->addResourceUsage(resInfo.kind, resInfo.count);
+    }
+
+    // Preserve the byte alignment the front-end computed (the `uniformAlignment`
+    // field, whose historical name uses "uniform" to mean bytes). We record it
+    // for any layout that occupies the byte unit at all; the builder decides
+    // whether an attribute is actually emitted (it drops the default alignment of
+    // 1 and any unit with zero size), so this side only needs to supply the
+    // value when the byte unit is present.
+    if (typeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
+    {
+        builder->addAlignment(
+            LayoutResourceKind::Uniform,
+            IRIntegerValue(typeLayout->uniformAlignment.getValidValue()));
     }
 
     return builder->build();

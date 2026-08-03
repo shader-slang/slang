@@ -1,8 +1,8 @@
 
 #include "slang-name-convention-util.h"
 
-#include "../core/slang-char-util.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-char-util.h"
+#include "core/slang-string-util.h"
 
 namespace Slang
 {
