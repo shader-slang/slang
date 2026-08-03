@@ -39,9 +39,26 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Enable placing targets into a hierarchy for IDE generators
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+# Default to `-Og` for Debug builds on GNU-style compilers: it enables the
+# optimizations that do not interfere with debugging, producing noticeably
+# faster Debug binaries while keeping a faithful step-through/inspection
+# experience.
+#
+# The `NOT WIN32` guard excludes MSVC and clang-cl, which expect MSVC-style
+# flags and have no `-Og` equivalent. `CMAKE_CXX_COMPILER_ID` is not yet known
+# at this point (it is set by enable_language() below), so the platform is
+# the closest available proxy. A side effect is that MinGW builds do not get
+# `-Og` by default. Those users can pass `-DCMAKE_CXX_FLAGS_DEBUG="-Og -g"`
+# explicitly.
+if(NOT WIN32)
+    set(CMAKE_C_FLAGS_DEBUG_INIT "-Og")
+    set(CMAKE_CXX_FLAGS_DEBUG_INIT "-Og")
+endif()
+
 #
 # CMake-supplied modules and our utils
 #
+
 enable_language(C CXX)
 
 include(FindPackageHandleStandardArgs)
