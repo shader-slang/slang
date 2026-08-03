@@ -1239,6 +1239,12 @@ struct PeepholeContext : InstPassBase
             break;
         case kIROp_CastDescriptorHandleToUInt2:
             {
+                // Besides removing a redundant representation round-trip, this fold is what
+                // exposes the underlying makeVector to the swizzle(makeVector(a, b), 0) -> a
+                // fold below. Together they reduce a descriptor-heap subscript to a plain
+                // getElement(heap, index), so the NonUniform float pass reaches it through its
+                // existing getElement handling and needs no round-trip-specific logic of its
+                // own (see the note in slang-ir-float-non-uniform-resource-index.cpp).
                 if (auto wrap = as<IRCastUInt2ToDescriptorHandle>(inst->getOperand(0)))
                 {
                     inst->replaceUsesWith(wrap->getValue());
