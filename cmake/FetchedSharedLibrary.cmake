@@ -30,8 +30,17 @@ function(download_and_extract archive_name url)
             # Retry before giving up: transient HTTP failures are common when many CI
             # jobs fetch release assets from behind a single shared egress address.
             set(max_attempts 3)
+            # A stalled connection has to fail before the retry below can get control
+            # back, so bound it. INACTIVITY_TIMEOUT rather than TIMEOUT: it fires only
+            # when no data is arriving, whereas a wall-clock limit would also abort a
+            # slow but healthy transfer of an archive this size.
+            set(inactivity_timeout_seconds 60)
             foreach(attempt RANGE 1 ${max_attempts})
-                file(DOWNLOAD ${url} ${archive_path} STATUS status)
+                file(
+                    DOWNLOAD ${url} ${archive_path}
+                    STATUS status
+                    INACTIVITY_TIMEOUT ${inactivity_timeout_seconds}
+                )
 
                 list(GET status 0 status_code)
                 list(GET status 1 status_string)
