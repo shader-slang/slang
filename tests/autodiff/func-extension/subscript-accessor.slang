@@ -132,9 +132,14 @@ void computeMain()
     // CHECK-NEXT: 8.0
 }
 
-// The checks below match IR dumped before code generation, so without this the test
-// would still pass if the compile later failed. `-g` embeds this file's own source in
-// the dump, so `0` must stay written as `{{0}}` or the pattern matches this very line.
+// slang-test puts the compiler's exit status on the first line of the buffer FileCheck reads, so
+// this must stay the first `DEBUG` directive. The `DEBUG` checks below all match `-dump-ir`
+// output, which is complete before the output artifact is written, so a failure in that write (or
+// any later emit-time diagnostic) would leave every pattern matched and the test green.
+// `0` must stay spelled `{{0}}`: `-g` embeds this file's entire source in the dump, and
+// slang-test's embedded-source stripper only runs on stdout while the dump arrives on stderr
+// unfiltered — so a plain `0` would match the echoed copy of this line and never fail. A regex
+// never contains the literal it would self-match on.
 // DEBUG: result code = {{0}}
 
 // The user-written implementations of custom backward derivatives are intentionally unnamed.

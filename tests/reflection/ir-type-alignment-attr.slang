@@ -9,8 +9,13 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage compute -dump-ir -o -
 
-// The checks below match IR dumped before code generation, so without this the test
-// would still pass if the compile later failed.
+// slang-test puts the compiler's exit status on the first line of the buffer FileCheck reads,
+// ahead of the captured output — so this must stay the first directive of the prefix. The checks
+// below all match `-dump-ir` output, which is complete before the output artifact is written, so
+// a failure in that write (or any later emit-time diagnostic) would leave every pattern matched
+// and the test green. The exit status has to be pinned separately.
+// No `-g` here, so the dump carries no echoed copy of this file and the plain `0` is safe; see
+// subscript-accessor.slang for the spelling required when source is embedded.
 //CHECK: result code = 0
 
 struct S
