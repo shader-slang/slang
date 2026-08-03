@@ -1059,6 +1059,40 @@ struct IRTypeSizeAttr : public IRLayoutResourceInfoAttr
     }
 };
 
+/// An attribute that specifies the alignment of a type in a single layout unit.
+///
+/// The alignment operand comes first; the layout-unit operand is optional and
+/// defaults to `LayoutResourceKind::Uniform` (bytes) when absent. A type layout
+/// carries at most one of these per unit, and only when it occupies that unit
+/// (any size that is not definitely zero — a finite non-zero, infinite, or
+/// unknown extent); an absent attribute means the alignment for that unit is `1`,
+/// which mirrors how an absent `IRTypeSizeAttr` means a size of `0`.
+FIDDLE()
+struct IRTypeAlignmentAttr : public IRAttr
+{
+    FIDDLE(leafInst())
+
+    /// The `IRIntLit` holding the alignment value. The alignment is required, so
+    /// this operand is always present.
+    IRIntLit* getAlignmentInst() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntegerValue getAlignment() { return getIntVal(getAlignmentInst()); }
+
+    /// The `IRIntLit` holding the layout unit, or null when the unit operand is
+    /// omitted (which encodes the `Uniform` default).
+    IRIntLit* getResourceKindInst()
+    {
+        if (getOperandCount() > 1)
+            return cast<IRIntLit>(getOperand(1));
+        return nullptr;
+    }
+    LayoutResourceKind getResourceKind()
+    {
+        if (auto kindInst = getResourceKindInst())
+            return LayoutResourceKind(getIntVal(kindInst));
+        return LayoutResourceKind::Uniform;
+    }
+};
+
 // Layout
 
 /// Base type for instructions that represent layout information.
@@ -1098,6 +1132,36 @@ struct IRTypeLayout : IRLayout
     /// Get all the attributes representing size information.
     IROperandList<IRTypeSizeAttr> getSizeAttrs();
 
+    /// Find the attribute that stores alignment information for `kind`, or null
+    /// if none is present (meaning the alignment for `kind` is `1`).
+    IRTypeAlignmentAttr* findAlignmentAttr(LayoutResourceKind kind);
+
+    /// Get all the attributes representing alignment information.
+    IROperandList<IRTypeAlignmentAttr> getAlignmentAttrs();
+
+    /// Return the alignment for `kind`, or `1` when no alignment attribute is
+    /// present for it (matching the convention that an absent size attribute
+    /// means a size of zero).
+    IRIntegerValue getAlignment(LayoutResourceKind kind);
+
+    // The following are a matched set of convenience queries for the byte
+    // (`Uniform`) layout unit, derived from the size and alignment attributes.
+
+    /// Get the size, in bytes, of this type, or `0` when it consumes no bytes.
+    LayoutSize getSizeInBytes();
+
+    /// Get the alignment, in bytes, of this type, or `1` when no byte alignment
+    /// attribute is present.
+    IRIntegerValue getAlignmentInBytes();
+
+    /// Get the stride, in bytes, of this type: its byte size rounded up to its
+    /// byte alignment. A zero-sized type has a zero stride regardless of its
+    /// alignment; a non-finite size — unsized (infinite) or unknown (invalid) —
+    /// has no finite stride and is returned unchanged. The result is therefore a
+    /// `LayoutSize` rather than a plain integer, so those cases stay distinct
+    /// from a genuine zero stride.
+    LayoutSize getStrideInBytes();
+
     /// Unwrap any layers of array-ness and return the outer-most non-array type.
     IRTypeLayout* unwrapArray();
 
@@ -1118,7 +1182,16 @@ struct IRTypeLayout : IRLayout
         /// Add the resource usage specified by `sizeAttr`.
         void addResourceUsage(IRTypeSizeAttr* sizeAttr);
 
-        /// Add all resource usage from `typeLayout`.
+        /// Record the alignment of this type in the layout unit `kind`. The built
+        /// layout emits an `IRTypeAlignmentAttr` for `kind` only when that unit is
+        /// occupied (its size is not definitely zero) and the alignment is greater
+        /// than the implicit default of 1.
+        void addAlignment(LayoutResourceKind kind, IRIntegerValue alignment);
+
+        /// Record the alignment specified by `alignmentAttr`.
+        void addAlignment(IRTypeAlignmentAttr* alignmentAttr);
+
+        /// Add all resource usage (size and alignment) from `typeLayout`.
         void addResourceUsageFrom(IRTypeLayout* typeLayout);
 
 
@@ -1153,6 +1226,10 @@ struct IRTypeLayout : IRLayout
         {
             LayoutResourceKind kind = LayoutResourceKind::None;
             LayoutSize size = 0;
+            // Defaults to the identity alignment of 1, just as `size` defaults to
+            // 0. An alignment of 1 is exactly what an absent attribute encodes, so
+            // the builder emits an attribute only for alignments greater than 1.
+            IRIntegerValue alignment = 1;
         };
         ResInfo m_resInfos[SLANG_PARAMETER_CATEGORY_COUNT];
     };
@@ -1216,6 +1293,20 @@ struct IRArrayTypeLayout : IRTypeLayout
 
 
     IRTypeLayout* getElementTypeLayout() { return cast<IRTypeLayout>(getOperand(0)); }
+
+    /// Get the stride, in bytes, between consecutive elements.
+    ///
+    /// This is the element's byte size rounded up to the array's byte alignment.
+    /// The array's own alignment — not the element type's context-free alignment —
+    /// is the element's in-array alignment, so under the constant-buffer and
+    /// std140 rules a `float[N]` strides by 16 bytes: the element is 4 bytes but
+    /// the array is aligned to 16, whereas the element type alone reports
+    /// alignment 4.
+    ///
+    /// This equals the front-end's `SequenceTypeLayout::uniformStride`, so it is
+    /// derived from the stored size/alignment rather than requiring that stride
+    /// to be preserved separately into the IR.
+    LayoutSize getElementStrideInBytes();
 
     struct Builder : Super::Builder
     {
@@ -2067,6 +2158,7 @@ struct IRSwitch : IRTerminatorInst
     UInt getCaseCount() { return (getOperandCount() - 3) / 2; }
     IRInst* getCaseValue(UInt index) { return getOperand(3 + index * 2 + 0); }
     IRBlock* getCaseLabel(UInt index) { return (IRBlock*)getOperand(3 + index * 2 + 1); }
+    IRUse* getCaseValueUse(UInt index) { return getOperands() + 3 + index * 2 + 0; }
     IRUse* getCaseLabelUse(UInt index) { return getOperands() + 3 + index * 2 + 1; }
 };
 
@@ -4667,6 +4759,9 @@ $(type_info.return_type) $(type_info.method_name)(
     //    IRLayout* getLayout(Layout* astLayout);
 
     IRTypeSizeAttr* getTypeSizeAttr(LayoutResourceKind kind, LayoutSize size);
+    IRTypeAlignmentAttr* getTypeAlignmentAttr(
+        IRIntegerValue alignment,
+        LayoutResourceKind kind = LayoutResourceKind::Uniform);
     IRVarOffsetAttr* getVarOffsetAttr(LayoutResourceKind kind, UInt offset, UInt space = 0);
     IRStructFieldLayoutAttr* getFieldLayoutAttr(IRInst* key, IRVarLayout* layout);
     IRTupleFieldLayoutAttr* getTupleFieldLayoutAttr(IRTypeLayout* layout);

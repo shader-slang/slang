@@ -1,8 +1,8 @@
 #include "renderer-shared.h"
 
-#include "../../source/core/slang-file-system.h"
-#include "../../source/core/slang-stable-hash.h"
+#include "core/slang-file-system.h"
 #include "core/slang-io.h"
+#include "core/slang-stable-hash.h"
 #include "core/slang-token-reader.h"
 #include "mutable-shader-object.h"
 #include "slang.h"

@@ -2,10 +2,10 @@
 
 #define _CRT_SECURE_NO_WARNINGS 1
 
-#include "../../source/core/slang-test-tool-util.h"
-#include "../source/core/slang-io.h"
-#include "../source/core/slang-std-writers.h"
-#include "../source/core/slang-string-util.h"
+#include "core/slang-io.h"
+#include "core/slang-std-writers.h"
+#include "core/slang-string-util.h"
+#include "core/slang-test-tool-util.h"
 #include "core/slang-token-reader.h"
 #include "options.h"
 #include "png-serialize-util.h"

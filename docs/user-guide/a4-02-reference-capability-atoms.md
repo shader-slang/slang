@@ -155,6 +155,9 @@ Versions
 `GLSL_460`
 > GLSL 460 and related capabilities of other targets.
 
+`GLSL_latest`
+> Represents the latest GLSL version.
+
 `cuda_sm_1_0`
 > cuda 1.0 and related capabilities of other targets.
 
@@ -232,6 +235,9 @@ Versions
 
 `metallib_3_1`
 > Represents MetalLib 3.1.
+
+`metallib_3_2`
+> Represents MetalLib 3.2.
 
 `metallib_4_0`
 > Represents MetalLib 4.0.
@@ -358,6 +364,9 @@ Versions
 `sm_6_9_version`
 > HLSL shader model 6.9 and related capabilities of other targets.
 > Does not include related GLSL/SPIRV extensions.
+
+`sm_latest`
+> Represents the latest HLSL shader model version.
 
 `spirv_1_0`
 > Represents SPIR-V 1.0 version.
@@ -1567,6 +1576,14 @@ Compound Capabilities
 
 `texture_querylod`
 > Capabilities required to query texture LOD info
+
+`texture_shadow`
+> Capabilities required for plain shadow-comparison texture sampling that takes
+> no explicit LOD (SampleCmp, SampleCmpLevelZero).
+
+`texture_shadowbias`
+> Capabilities required for shadow-comparison texture sampling with an LOD bias
+> (SampleCmpBias). New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 
 `texture_shadowgrad`
 > Capabilities required for shadow texture sampling with bias and gradients.

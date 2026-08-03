@@ -250,6 +250,7 @@ set(slang_build_args
     INCLUDE_DIRECTORIES_PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
     ${CMAKE_CURRENT_BINARY_DIR}/../standard-modules/slang-standard-module-config-header
+    ${slang_SOURCE_DIR}/tools
     EXPORT_MACRO_PREFIX
     SLANG
     EXPORT_TYPE_AS
@@ -261,7 +262,10 @@ set(slang_build_args
     generate_standard_module_config_header
     PRECOMPILE_HEADERS
     ${slang_SOURCE_DIR}/source/core/slang-basic.h
-    ${slang_SOURCE_DIR}/source/slang/slang-compiler.h
+    # slang-compiler.h transitively includes generated .fiddle headers whose macros are keyed on
+    # __LINE__. GCC can restore inconsistent FIDDLE macro state from its PCH even in a clean build,
+    # so keep those headers out of the GCC PCH. See #12227.
+    "$<$<NOT:$<CXX_COMPILER_ID:GNU>>:${slang_SOURCE_DIR}/source/slang/slang-compiler.h>"
 )
 set(slang_link_args
     LINK_WITH_PRIVATE
@@ -352,27 +356,6 @@ else()
         LINK_WITH_PRIVATE slang-common-objects
         NO_SOURCE
     )
-endif()
-
-if(SLANG_ENABLE_MIMALLOC)
-    if(NOT TARGET mimalloc-static)
-        message(
-            FATAL_ERROR
-            "SLANG_ENABLE_MIMALLOC requires the mimalloc-static target"
-        )
-    endif()
-
-    # Without the embedded core module, the normal source glob already adds this file to slang.
-    # With the embedded core module, the glob belongs to slang-common-objects, where this file
-    # remains empty, so compile the active override directly in slang.
-    if(SLANG_EMBED_CORE_MODULE)
-        target_sources(slang PRIVATE slang-mimalloc.cpp)
-    endif()
-    target_compile_definitions(
-        slang
-        PRIVATE SLANG_MIMALLOC_OVERRIDE_NEW_DELETE=1
-    )
-    target_link_libraries(slang PRIVATE mimalloc-static)
 endif()
 
 set_target_properties(

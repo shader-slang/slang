@@ -1,10 +1,10 @@
 // main.cpp
 
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-list.h"
-#include "../../source/core/slang-secure-crt.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-string.h"
+#include "core/slang-io.h"
+#include "core/slang-list.h"
+#include "core/slang-secure-crt.h"
+#include "core/slang-string-util.h"
+#include "core/slang-string.h"
 
 #include <stdio.h>
 #include <stdlib.h>
