@@ -14,17 +14,19 @@ Inline ray tracing and ray queries are out of scope for this first design.
 
 ## Source Material
 
-The design was informed by local notes comparing:
+The design was informed by:
 
 - Metal ray tracing intrinsics: `intersector`, `intersection_result`,
   `intersection_function_table`, Metal 4 intersection function buffers, and
-  Metal tag validity rules.
-- Existing Slang/DXR/Vulkan pipeline intrinsics: `TraceRay`, shader table
+  Metal tag validity rules. This background spec is included in this workspace
+  as `docs/design/metal-ray-tracing-intrinsics.md`.
+- Existing Slang/DXR/Vulkan pipeline intrinsic notes: `TraceRay`, shader table
   indexing, payloads, miss/any-hit/intersection/closest-hit stages, and
-  system-value intrinsics.
+  system-value intrinsics. Those comparison notes are not included in this
+  workspace.
 
-Those comparison notes are not part of this PR. This PR keeps only the selected
-candidate API sketch and prototype code.
+The workspace keeps the selected candidate API sketch, prototype code, and the
+Metal background spec needed to evaluate the design.
 
 ## Selected Candidate
 

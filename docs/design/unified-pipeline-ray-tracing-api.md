@@ -21,6 +21,7 @@ The current candidate is **SBT structural dispatch**:
 
 Start here:
 
+- [Metal Ray Tracing Intrinsics](metal-ray-tracing-intrinsics.md)
 - [Structural Dispatch Proposal](
   rt-api-workspace/design-sbt-structural-dispatch/PROPOSAL.md)
 - [Tutorial](
@@ -44,9 +45,9 @@ Prototype source:
 ## PR Scope
 
 This PR intentionally excludes local background notes and alternate experiments,
-including detailed Metal intrinsic notes, current Slang pipeline intrinsic
-notes, static dispatch table sketches, standalone trace-context experiments,
-isolated Metal stage-lowering sketches, and IFB/user-data samples.
+including current Slang pipeline intrinsic notes, static dispatch table
+sketches, standalone trace-context experiments, isolated Metal stage-lowering
+sketches, and IFB/user-data samples.
 
 Those files can remain useful design history, but they are not part of the
 candidate being proposed here.
