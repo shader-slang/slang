@@ -18,7 +18,11 @@
 // operands must come first, contiguously, and the alignment operand must follow
 // them — the exact ordering the interleaving bug violated.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry main -dump-ir -o -
+
+// The checks below match IR dumped before code generation, so without this the test
+// would still pass if the compile later failed.
+//CHECK: result code = 0
 
 interface ILight
 {

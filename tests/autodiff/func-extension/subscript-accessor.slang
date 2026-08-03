@@ -1,5 +1,5 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -xslang -experimental-feature
-//TEST:SIMPLE(filecheck=DEBUG):-target spirv-asm -dump-ir -o /dev/null -entry computeMain -stage compute -g -experimental-feature
+//TEST:SIMPLE(filecheck=DEBUG):-target spirv-asm -dump-ir -o - -entry computeMain -stage compute -g -experimental-feature
 
 // Verify that user code can name multi-index subscript accessors as function-extension targets.
 // The two indices also lock down the parent-then-accessor parameter ordering.
@@ -131,6 +131,11 @@ void computeMain()
     // CHECK-NEXT: 0.0
     // CHECK-NEXT: 8.0
 }
+
+// The checks below match IR dumped before code generation, so without this the test
+// would still pass if the compile later failed. `-g` embeds this file's own source in
+// the dump, so `0` must stay written as `{{0}}` or the pattern matches this very line.
+// DEBUG: result code = {{0}}
 
 // The user-written implementations of custom backward derivatives are intentionally unnamed.
 // Their linkage names must still identify the DebugFunction paired with each DebugLocation.

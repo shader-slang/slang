@@ -7,7 +7,11 @@
 // comes first and the layout-unit operand is omitted for the `Uniform` (bytes)
 // default, so the attribute prints with a single operand.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage compute -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage compute -dump-ir -o -
+
+// The checks below match IR dumped before code generation, so without this the test
+// would still pass if the compile later failed.
+//CHECK: result code = 0
 
 struct S
 {
