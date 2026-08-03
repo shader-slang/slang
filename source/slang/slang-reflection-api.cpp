@@ -11,7 +11,6 @@
 #include "slang-type-layout.h"
 #include "slang.h"
 
-#include <assert.h>
 
 // Don't signal errors for stuff we don't implement here,
 // and instead just try to return things defensively
