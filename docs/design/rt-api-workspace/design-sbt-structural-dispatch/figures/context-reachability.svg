@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="430" viewBox="0 0 1080 430" role="img" aria-label="Context reachability shown through handwritten ray tracing code">
+  <style>
+    .title { font: 700 20px sans-serif; fill: #202020; }
+    .label { font: 700 14px sans-serif; fill: #202020; }
+    .small { font: 12px sans-serif; fill: #333333; }
+    .tiny { font: 11px sans-serif; fill: #333333; }
+    .code { font: 12px monospace; fill: #202020; }
+    .codeSmall { font: 11px monospace; fill: #202020; }
+    .layout { fill: #f3fff6; stroke: #2f7d45; stroke-width: 1.8; rx: 8; }
+    .codeBox { fill: #f8fbff; stroke: #336699; stroke-width: 1.6; rx: 7; }
+    .stage { fill: #fffaf2; stroke: #a65f00; stroke-width: 1.5; rx: 7; }
+    .zoom { fill: #ffffff; stroke: #777777; stroke-width: 1.5; rx: 10; }
+    .note { fill: #fff4f4; stroke: #b42318; stroke-width: 2; rx: 8; }
+    .arrow { stroke: #333333; stroke-width: 1.7; marker-end: url(#arrow); fill: none; }
+    .greenArrow { stroke: #2f7d45; stroke-width: 1.9; marker-end: url(#arrowGreen); fill: none; }
+    .orangeArrow { stroke: #a65f00; stroke-width: 1.8; marker-end: url(#arrowOrange); fill: none; }
+    .redText { font: 700 13px sans-serif; fill: #8a1f17; }
+    .greenText { font: 700 13px sans-serif; fill: #276738; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#333333"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#2f7d45"/>
+    </marker>
+    <marker id="arrowOrange" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#a65f00"/>
+    </marker>
+  </defs>
+
+  <text x="35" y="35" class="title">Context reachability is visible in the code users write</text>
+
+  <rect x="42" y="78" width="260" height="124" class="layout"/>
+  <text x="68" y="106" class="label">PrimaryTraceProgramLayout</text>
+  <text x="66" y="132" class="small">declares one trace context</text>
+  <text x="66" y="154" class="small">and ordered hit/miss groups</text>
+  <text x="66" y="181" class="greenText">source-level grouping contract</text>
+
+  <rect x="42" y="258" width="260" height="82" class="note"/>
+  <text x="66" y="287" class="redText">Do not infer this from host SBT</text>
+  <text x="66" y="312" class="small">The shader source names the layout</text>
+  <text x="66" y="332" class="small">at the trace call and stage inputs.</text>
+
+  <path d="M302 140 L370 140" class="greenArrow"/>
+  <text x="319" y="126" class="tiny">zoom</text>
+
+  <rect x="370" y="58" width="666" height="330" class="zoom"/>
+  <text x="394" y="89" class="label">Handwritten code lines that carry the contract</text>
+
+  <rect x="395" y="112" width="288" height="108" class="codeBox"/>
+  <text x="417" y="139" class="label">Ray-generation code</text>
+  <text x="417" y="164" class="codeSmall">rt::RayTracer&lt;</text>
+  <text x="435" y="183" class="codeSmall">PrimaryTraceProgramLayout&gt; tracer;</text>
+  <text x="417" y="205" class="codeSmall">tracer.trace(desc, scene,</text>
+  <text x="435" y="224" class="codeSmall">gPrimaryDescriptor, payload);</text>
+
+  <rect x="724" y="112" width="286" height="108" class="stage"/>
+  <text x="746" y="139" class="label">Closest-hit code</text>
+  <text x="746" y="162" class="codeSmall">void invoke(rt::ClosestHitInput&lt;</text>
+  <text x="764" y="181" class="codeSmall">PrimaryTriangleContext&gt; input)</text>
+  <text x="746" y="204" class="codeSmall">{ shadeTriangle(input); }</text>
+
+  <rect x="395" y="250" width="288" height="98" class="stage"/>
+  <text x="417" y="277" class="label">Any-hit code</text>
+  <text x="417" y="300" class="codeSmall">void invoke(rt::AnyHitInput&lt;</text>
+  <text x="435" y="319" class="codeSmall">PrimaryTriangleContext&gt; input)</text>
+  <text x="417" y="342" class="codeSmall">{ alphaTest(input); }</text>
+
+  <rect x="724" y="250" width="286" height="98" class="stage"/>
+  <text x="746" y="277" class="label">Intersection code</text>
+  <text x="746" y="300" class="codeSmall">void invoke(rt::IntersectionInput&lt;</text>
+  <text x="764" y="319" class="codeSmall">PrimarySphereContext&gt; input)</text>
+  <text x="746" y="342" class="codeSmall">{ return intersectSphere(input); }</text>
+
+  <path d="M683 166 L724 166" class="arrow"/>
+  <path d="M539 220 L539 250" class="orangeArrow"/>
+  <path d="M683 299 L724 299" class="arrow"/>
+
+  <text x="706" y="237" class="small">These names are what Slang links:</text>
+  <text x="706" y="256" class="small">ProgramLayout -> group -> stage input context.</text>
+</svg>
