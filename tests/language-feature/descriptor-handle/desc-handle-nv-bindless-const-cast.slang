@@ -1,4 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -capability spvBindlessTextureNV -stage compute -entry computeMain
+// The assertions below are about the *folded* form, so this runs at -O1 rather than the suite's
+// -O0 default; `desc-handle-nv-bindless-global-width.slang` covers the unfolded -O0 shape.
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -capability spvBindlessTextureNV -stage compute -entry computeMain -O1
 
 // A module-scope `static const DescriptorHandle` whose stored width differs from the width its
 // element kind uses under `spvBindlessTextureNV`, then read back as an integer of the kind's width,
