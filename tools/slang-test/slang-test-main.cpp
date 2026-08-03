@@ -1288,6 +1288,23 @@ static bool _hasOption(const List<String>& args, const String& argName)
     return args.indexOf(argName) != Index(-1);
 }
 
+// Records backend dependencies that a command line forces regardless of its `-target`,
+// so the harness can ignore (rather than fail) a test on a runner that lacks the backend.
+// `-emit-cpu-via-llvm` routes CPU/host-callable code generation through the slang-llvm
+// plugin, so a test using it needs the LLVM backend even when `-target` alone would imply
+// only a generic C/C++ compiler (e.g. `host-callable` maps to `Generic_C_CPP`). Without the
+// plugin slangc bails early with "unable to generate code for target '...'", never reaching
+// the passes (such as coverage instrumentation) whose output the test asserts on.
+static void _addForcedBackendRequirements(
+    const List<String>& args,
+    TestRequirements* ioRequirements)
+{
+    if (_hasOption(args, "-emit-cpu-via-llvm"))
+    {
+        ioRequirements->addUsedBackEnd(SLANG_PASS_THROUGH_LLVM);
+    }
+}
+
 static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
 {
     switch (target)
@@ -1525,6 +1542,9 @@ static SlangResult _extractSlangCTestRequirements(
             ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
         }
     }
+
+    _addForcedBackendRequirements(cmdLine.m_args, ioRequirements);
+
     return SLANG_OK;
 }
 
@@ -4636,10 +4656,17 @@ TestResult runTest(
     String const& testName,
     TestOptions const& testOptions)
 {
-    // If we are collecting requirements and it's diagnostic test, we always run
-    // (ie no requirements need to be captured - effectively it has 'no requirements')
+    // If we are collecting requirements and it's a diagnostic test, we normally run it
+    // everywhere: a diagnostic test validates front-end diagnostics that slangc emits
+    // before any backend is invoked, so it effectively has no backend requirements. The
+    // exception is a flag that forces a downstream backend before the diagnostic is even
+    // reached — `-emit-cpu-via-llvm` routes codegen through slang-llvm, so still capture
+    // that one hard dependency here (otherwise, on a runner without slang-llvm, slangc
+    // fails with E00028 before emitting the diagnostic the test asserts on and the test
+    // fails instead of being ignored).
     if (context->isCollectingRequirements() && testOptions.type == TestOptions::Diagnostic)
     {
+        _addForcedBackendRequirements(testOptions.args, context->getTestRequirements());
         return TestResult::Pass;
     }
 
