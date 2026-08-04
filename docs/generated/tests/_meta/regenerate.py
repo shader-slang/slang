@@ -133,6 +133,9 @@ _ALLOWED_INTENTS = (
     "negative",  # documented diagnostic / "is rejected" probe
     "expansion",  # added during a Phase E expansion pass
     "regression",  # anchored to a fixed compiler issue
+    "characterization",  # asserts observed current behaviour of gap-selected
+    # code rather than a documented claim; only valid in a `coverage` bundle
+    # (see docs/generated/tests/coverage/METHODOLOGY.md)
 )
 
 _ALLOWED_GAP_KINDS = (
@@ -401,8 +404,12 @@ class _MiniYaml:
 @dataclass
 class BundleSpec:
     key: str
-    source_doc: str  # workspace-relative
+    # Workspace-relative path to the doc this bundle's claims come from, or
+    # None for `coverage` bundles, which are selected by coverage gap rather
+    # than anchored to a document. See `role`.
+    source_doc: str | None
     watched_paths: list[str]
+    role: str = "design"
     depends_on: list[str] = field(default_factory=list)
     coverage_targets: list[str] = field(default_factory=list)
     size_cap_files: int = 30
@@ -411,6 +418,28 @@ class BundleSpec:
     def dir(self) -> str:
         """Workspace-relative bundle directory."""
         return f"docs/generated/tests/{self.key}"
+
+    @property
+    def gap_group(self) -> str:
+        """Label this bundle's doc-gap rows are aggregated under.
+
+        `doc-gaps` groups rows by the document they were observed against; a
+        coverage bundle has no such document, so it groups under its own key.
+        """
+        return self.source_doc or f"{self.key} (no source doc)"
+
+    @property
+    def is_doc_anchored(self) -> bool:
+        """Whether this bundle derives its claims from a `source_doc`.
+
+        True for `conformance/` bundles (anchored to the human-written
+        language reference) and `design/` bundles (anchored to the generated
+        design docs). False for `coverage/` bundles, whose tests are chosen by
+        uncovered compiler code and assert observed current behaviour, so
+        there is no document whose edit should invalidate them — only their
+        `watched_paths` can. See `coverage/METHODOLOGY.md`.
+        """
+        return self.role != "coverage"
 
     @property
     def prompt(self) -> str:
@@ -443,12 +472,30 @@ def load_manifest() -> Manifest:
         watched = entry.get("watched_paths") or []
         if not watched:
             raise SystemExit(f"bundle {key!r} has no watched_paths")
+        role = str(entry.get("role") or key.split("/", 1)[0])
+        if role not in ("conformance", "design", "coverage"):
+            raise SystemExit(f"bundle {key!r} has unknown role {role!r}")
+        if not key.startswith(f"{role}/"):
+            raise SystemExit(
+                f"bundle {key!r} has role {role!r} that does not match its key prefix"
+            )
         source_doc = entry.get("source_doc")
-        if not source_doc:
+        # `coverage` bundles are gap-selected, not doc-anchored, so a
+        # source_doc would be meaningless for them; every other role requires
+        # one, because its tests must cite a claim in that document.
+        if role == "coverage":
+            if source_doc:
+                raise SystemExit(
+                    f"bundle {key!r} has role 'coverage' but declares a source_doc;"
+                    " coverage bundles are selected by coverage gap, not anchored"
+                    " to a document"
+                )
+        elif not source_doc:
             raise SystemExit(f"bundle {key!r} has no source_doc")
         spec = BundleSpec(
             key=key,
-            source_doc=str(source_doc),
+            source_doc=str(source_doc) if source_doc else None,
+            role=role,
             watched_paths=[str(p) for p in watched],
             depends_on=[str(d) for d in entry.get("depends_on") or []],
             coverage_targets=[
@@ -985,6 +1032,8 @@ def compute_watched_digest(spec: BundleSpec) -> str:
 
 
 def compute_source_doc_digest(spec: BundleSpec) -> str | None:
+    if spec.source_doc is None:
+        return None
     p = REPO_ROOT / spec.source_doc
     if not p.exists():
         return None
@@ -1425,7 +1474,16 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
             )
         )
     else:
-        for k in _REQUIRED_BUNDLE_FM_KEYS:
+        required_fm_keys = _REQUIRED_BUNDLE_FM_KEYS
+        if not spec.is_doc_anchored:
+            # A coverage bundle has no source_doc, so its README must not
+            # claim one; provenance rests on watched_paths_digest alone.
+            required_fm_keys = tuple(
+                k
+                for k in required_fm_keys
+                if k not in ("source_doc", "source_doc_digest")
+            )
+        for k in required_fm_keys:
             if k not in fm:
                 issues.append(
                     LintIssue(
@@ -1434,6 +1492,15 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
                         f"front-matter missing key: {k}",
                     )
                 )
+        if not spec.is_doc_anchored and "source_doc" in fm:
+            issues.append(
+                LintIssue(
+                    f"{spec.dir}/README.md",
+                    "error",
+                    "front-matter declares source_doc, but this is a"
+                    " gap-selected coverage bundle with no source document",
+                )
+            )
         if fm.get("generated", "").lower() != "true":
             issues.append(
                 LintIssue(
@@ -1498,7 +1565,7 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
     # with the controlled Kind vocabulary. Free-form bullets are no
     # longer accepted; the migration to the table format is one-shot.
     if "## Doc gaps observed" in text:
-        gap_rows = parse_gap_rows(text, spec.dir, spec.source_doc)
+        gap_rows = parse_gap_rows(text, spec.dir, spec.gap_group)
         if not gap_rows and not _gap_section_explicitly_empty(text):
             issues.append(
                 LintIssue(
@@ -1623,9 +1690,32 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
     if not meta:
         issues.append(LintIssue(rel, "error", "missing //META block"))
         return issues
-    for k in _REQUIRED_TEST_META_KEYS:
+    required_meta_keys = _REQUIRED_TEST_META_KEYS
+    if not spec.is_doc_anchored:
+        # A coverage test is chosen by uncovered code, not by a documented
+        # claim, so it cannot be required to cite one. Most still carry a
+        # doc_ref pointing at the nearest related design section for
+        # orientation, and when they do it is validated below like any other.
+        required_meta_keys = tuple(
+            k
+            for k in required_meta_keys
+            if k not in ("doc_ref", "doc_section_digest")
+        )
+    for k in required_meta_keys:
         if k not in meta:
             issues.append(LintIssue(rel, "error", f"//META missing key: {k}"))
+    # coverage/METHODOLOGY.md § Per-test contract: a coverage test names the
+    # source area it characterizes in place of the doc_ref it does not have,
+    # so `covers=` is what makes it traceable at all.
+    if not spec.is_doc_anchored and not meta.get("covers", "").strip():
+        issues.append(
+            LintIssue(
+                rel,
+                "error",
+                "//META missing key: covers (required for coverage bundles —"
+                " see coverage/METHODOLOGY.md § Per-test contract)",
+            )
+        )
     if meta.get("generated", "").lower() != "true":
         issues.append(LintIssue(rel, "error", "//META generated must be true"))
     intent = meta.get("intent", "")
@@ -1635,6 +1725,19 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
                 rel,
                 "error",
                 f"//META intent={intent!r} not in {list(_ALLOWED_INTENTS)}",
+            )
+        )
+    # `characterization` asserts what the compiler currently does rather than
+    # what a document claims, so it is only answerable inside the gap-selected
+    # coverage tree. Allowing it in a doc-anchored bundle would let a test
+    # escape the requirement that it cite a documented claim.
+    if intent == "characterization" and spec.is_doc_anchored:
+        issues.append(
+            LintIssue(
+                rel,
+                "error",
+                "//META intent='characterization' is only valid in a"
+                f" coverage bundle, but {spec.key!r} is doc-anchored",
             )
         )
     requires_tool = meta.get("requires-tool", "").strip()
@@ -1812,10 +1915,14 @@ def _classify(
     bdir = REPO_ROOT / spec.dir
     if entry is None or not (bdir / "README.md").exists():
         return "missing", "no freshness entry or README.md", cur_watched, cur_doc
-    if cur_doc is None:
-        return "stale", "source_doc missing on disk", cur_watched, cur_doc
-    if entry.get("source_doc_digest") != cur_doc:
-        return "stale", "source_doc changed since last regen", cur_watched, cur_doc
+    # A coverage bundle has no source_doc, so only its watched paths can
+    # invalidate it; skip the document checks rather than reading the absent
+    # doc as "missing on disk".
+    if spec.is_doc_anchored:
+        if cur_doc is None:
+            return "stale", "source_doc missing on disk", cur_watched, cur_doc
+        if entry.get("source_doc_digest") != cur_doc:
+            return "stale", "source_doc changed since last regen", cur_watched, cur_doc
     if entry.get("watched_paths_digest") != cur_watched:
         return "stale", "watched paths changed since last regen", cur_watched, cur_doc
     return "fresh", "", cur_watched, cur_doc
@@ -1856,11 +1963,15 @@ def cmd_show(args: argparse.Namespace) -> int:
     print(f"bundle:          {spec.key}")
     print(f"dir:             {spec.dir}")
     print(f"prompt:          {spec.prompt}")
-    print(f"source_doc:      {spec.source_doc}")
-    doc_path = REPO_ROOT / spec.source_doc
-    print(
-        f"source_doc on disk: {'present' if doc_path.exists() else 'MISSING'}"
-    )
+    print(f"role:            {spec.role}")
+    if spec.source_doc is None:
+        print("source_doc:      (none — gap-selected coverage bundle)")
+    else:
+        print(f"source_doc:      {spec.source_doc}")
+        doc_path = REPO_ROOT / spec.source_doc
+        print(
+            f"source_doc on disk: {'present' if doc_path.exists() else 'MISSING'}"
+        )
     print(f"size_cap_files:  {spec.size_cap_files}")
     print(f"depends_on:")
     for d in spec.depends_on:
@@ -1882,7 +1993,7 @@ def cmd_mark_fresh(args: argparse.Namespace) -> int:
         raise SystemExit(f"unknown bundle: {args.bundle}")
     cur_watched = compute_watched_digest(spec)
     cur_doc = compute_source_doc_digest(spec)
-    if cur_doc is None:
+    if spec.is_doc_anchored and cur_doc is None:
         raise SystemExit(
             f"cannot mark fresh: source_doc {spec.source_doc} not on disk"
         )
@@ -1942,6 +2053,7 @@ def cmd_index(args: argparse.Namespace) -> int:
         "design/name-resolution/": "Name resolution",
         "design/ir-reference/": "IR reference",
         "design/target-pipelines/": "Target pipelines",
+        "coverage/": "Coverage (white-box characterization)",
     }
     section_order = [
         "Conformance (language reference)",
@@ -1952,6 +2064,7 @@ def cmd_index(args: argparse.Namespace) -> int:
         "Name resolution",
         "IR reference",
         "Target pipelines",
+        "Coverage (white-box characterization)",
         "Top-level",
     ]
 
@@ -2002,14 +2115,22 @@ def cmd_index(args: argparse.Namespace) -> int:
         out.append("| --- | ---: | --- |")
         for spec in grouped[section]:
             count = bundle_counts.get(spec.key, 0)
-            # Relative link from INDEX.md (in docs/generated/tests/) to the
-            # source_doc (workspace-relative). Handles both source roots:
-            #   docs/generated/design/<...>  -> ../design/<...>
-            #   docs/language-reference/<...> -> ../../language-reference/<...>
-            doc_link = os.path.relpath(spec.source_doc, "docs/generated/tests")
+            if spec.source_doc is None:
+                # A coverage bundle is gap-selected, so there is no anchoring
+                # document to link; point at the methodology that governs the
+                # whole tree instead.
+                anchor = "[`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md)"
+            else:
+                # Relative link from INDEX.md (in docs/generated/tests/) to the
+                # source_doc (workspace-relative). Handles both source roots:
+                #   docs/generated/design/<...>  -> ../design/<...>
+                #   docs/language-reference/<...> -> ../../language-reference/<...>
+                doc_link = os.path.relpath(
+                    spec.source_doc, "docs/generated/tests"
+                )
+                anchor = f"[`{spec.source_doc}`]({doc_link})"
             out.append(
-                f"| [`{spec.key}`]({spec.key}/README.md) | {count} |"
-                f" [`{spec.source_doc}`]({doc_link}) |"
+                f"| [`{spec.key}`]({spec.key}/README.md) | {count} | {anchor} |"
             )
         out.append("")
     out.append("## Catalog snapshot")
@@ -2550,7 +2671,7 @@ def cmd_lang_ref_coverage(args: argparse.Namespace) -> int:
                 if spec is None:
                     continue
                 bundle_doc = spec.source_doc
-                if bundle_doc.startswith("docs/generated/design/"):
+                if bundle_doc and bundle_doc.startswith("docs/generated/design/"):
                     edge = (ref, bundle_doc)
                     edges[edge] = edges.get(edge, 0) + 1
 
@@ -3036,9 +3157,9 @@ def cmd_doc_gaps(args: argparse.Namespace) -> int:
         if not readme.exists():
             continue
         text = readme.read_text(encoding="utf-8")
-        rows = parse_gap_rows(text, spec.dir, spec.source_doc)
+        rows = parse_gap_rows(text, spec.dir, spec.gap_group)
         if rows:
-            by_doc.setdefault(spec.source_doc, []).extend(rows)
+            by_doc.setdefault(spec.gap_group, []).extend(rows)
 
     if args.format == "json":
         import json
