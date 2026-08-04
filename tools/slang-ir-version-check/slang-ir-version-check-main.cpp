@@ -7,25 +7,26 @@
 // that bump is present.
 //
 // The stable-names table (source/slang/slang-ir-insts-stable-names.lua) is the
-// primary signal: it is machine-generated, append-only by ID, and kept in sync
-// with slang-ir-insts.lua by the separate, required "Check Stable Names Table"
-// CI job. So a key present in the new table but not the base one is a genuinely
-// new (or renamed) IR instruction, and a key present in the base but not the new
-// one is a removed (or renamed) instruction. A reorder or comment-only edit
-// leaves the key set unchanged and is therefore never mistaken for either.
+// signal: it is machine-generated, and the separate required "Check Stable Names
+// Table" CI job fails unless every instruction in slang-ir-insts.lua has an entry
+// here. So a key present in the new table but not the base one is a genuinely new
+// instruction, while a reorder or comment-only edit leaves the key set unchanged
+// and is never mistaken for one.
 //
-// Policy (docs/design/ir-instruction-definition.md):
-//   - Adding an instruction bumps k_maxSupportedModuleVersion; removing one bumps
-//     both k_minSupportedModuleVersion and k_maxSupportedModuleVersion. Since
-//     k_max moves either way, ANY change to the key set is ENFORCED against it:
-//     a changed key set without a k_max increase fails the check (exit 1).
-//   - The additional k_min bump expected of a removal is only RECOMMENDED, not
-//     enforced: k_min is advisory documentation today, as nothing on the module
-//     load path reads it.
+// Policy (docs/design/ir-instruction-definition.md): adding an instruction bumps
+// k_maxSupportedModuleVersion. Since a removal is documented to bump k_max as
+// well, any change to the key set -- including a rename, which drops one key and
+// adds another -- is enforced against k_max; a changed key set with no k_max
+// increase fails the check (exit 1). The additional k_min bump expected of a
+// removal is only RECOMMENDED: k_min is advisory documentation today, as nothing
+// on the module load path reads it.
 //
-// The existing advisory PR comment (posted by check-ir-version.yml) remains the
-// fallback for changes this tool cannot decide from names alone (a pure semantic
-// change with no name delta, some optional-operand cases, etc.).
+// What this tool does NOT see, because the stable-names table is append-only by
+// design (stable IDs are permanent, so a retired instruction keeps its entry as
+// a tolerated "extra"): deleting an instruction from slang-ir-insts.lua produces
+// no key-set delta, so a pure removal is invisible here. Neither is an
+// operand-count/type change to an existing instruction. The advisory PR comment
+// from check-ir-version.yml remains the fallback for both.
 
 #include "../../source/core/slang-dictionary.h"
 #include "../../source/core/slang-io.h"
@@ -59,15 +60,16 @@ void printUsage()
         "         --base-ir-h <file> --new-ir-h <file>\n"
         "\n"
         "Enforces the IR module version-bump policy: any change to the\n"
-        "stable-names instruction set -- an addition, a removal, or a rename --\n"
-        "requires bumping k_maxSupportedModuleVersion in slang-ir.h. A removal is\n"
-        "additionally advised to bump k_minSupportedModuleVersion, which is\n"
-        "reported but not enforced.\n"
+        "stable-names instruction key set -- an addition, or a rename, which drops\n"
+        "one key and adds another -- requires bumping k_maxSupportedModuleVersion\n"
+        "in slang-ir.h. A dropped key is additionally advised to bump\n"
+        "k_minSupportedModuleVersion, which is reported but not enforced.\n"
         "\n"
-        "Known gap: this tool keys on the stable-names key set, so it does not\n"
-        "detect an operand-count/type change to an EXISTING instruction (a\n"
-        "breaking change with no key delta). That case is deferred to a\n"
-        "follow-up; the existing advisory PR comment remains the fallback for it.\n");
+        "Known gaps, both deferred to the advisory PR comment: an\n"
+        "operand-count/type change to an EXISTING instruction has no key delta,\n"
+        "and neither does deleting an instruction, because the stable-names table\n"
+        "is append-only -- a retired instruction keeps its entry so its permanent\n"
+        "ID is never reused.\n");
 }
 
 // Parse the command line into Options, returning false (and printing usage) on
@@ -124,6 +126,10 @@ bool parseArgs(int argc, char const* const* argv, Options& outOptions)
 // it in an embedded interpreter and read back the keys. Returns false on any
 // load/execution/shape error so the caller can fail closed rather than treat an
 // unreadable table as "no instructions".
+//
+// Only the keys are read. The IDs are what the required "Check Stable Names
+// Table" job validates (it rejects duplicates), and a version bump turns on
+// which instructions exist, not on what they are numbered.
 //
 // A missing base file is a valid input (the table did not exist before this
 // change), handled by the caller; this function is only called on files that
@@ -375,10 +381,10 @@ int main(int argc, char const* const* argv)
     if (addedKeys.getCount() == 0 && removedKeys.getCount() == 0)
         return 0;
 
-    // Adding an instruction bumps k_max; removing one bumps k_max and k_min. As
-    // k_max moves either way, any key-set change is enforced against it. Treating
-    // removals as exempt would also let a new instruction ride along unbumped
-    // beside an unrelated removal.
+    // Adding an instruction bumps k_max; dropping a key bumps k_max and k_min. As
+    // k_max moves either way, any key-set change is enforced against it. Exempting
+    // dropped keys would also let a new instruction ride along unbumped beside an
+    // unrelated one, which is how a rename could evade the gate entirely.
     if (!maxBumped)
     {
         StringBuilder message;
@@ -395,13 +401,15 @@ int main(int argc, char const* const* argv)
         return 1;
     }
 
-    // Whether a removal must ALSO bump k_minSupportedModuleVersion is left as a
-    // recommendation rather than enforced: k_min is advisory documentation today,
+    // Whether a dropped key must ALSO bump k_minSupportedModuleVersion is left as
+    // a recommendation rather than enforced: k_min is advisory documentation today,
     // since nothing on the module load path reads it.
     if (removedKeys.getCount() > 0)
     {
         StringBuilder message;
-        message << "note: " << removedKeys.getCount() << " IR instruction(s) removed or renamed:\n";
+        message << "note: " << removedKeys.getCount()
+                << " IR instruction stable name(s) dropped (a rename, or a retired "
+                   "instruction whose entry was deleted):\n";
         for (auto& k : removedKeys)
             message << "  - " << k << "\n";
         message << "Per docs/design/ir-instruction-definition.md this is a breaking change and "
@@ -411,8 +419,8 @@ int main(int argc, char const* const* argv)
 
     fprintf(
         stderr,
-        "note: instruction set changed (%d added, %d removed); k_maxSupportedModuleVersion bumped "
-        "%d -> %d.\n",
+        "note: instruction key set changed (%d added, %d dropped); "
+        "k_maxSupportedModuleVersion bumped %d -> %d.\n",
         (int)addedKeys.getCount(),
         (int)removedKeys.getCount(),
         (int)baseMax,
