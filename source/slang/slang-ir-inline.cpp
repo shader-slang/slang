@@ -1060,7 +1060,17 @@ struct TypeInliningPass : InliningPassBase
         {
         case kIROp_RefParamType:
             {
-                if (callee->findDecoration<IRNoRefInlineDecoration>())
+                // Force-inlining a `__ref` parameter is a preference -- it spares the target from
+                // expressing the reference as a pointer across a call boundary -- so `[noinline]`
+                // may decline it, as the narrower `[noRefInline]` already may. For the referenced
+                // type it can instead be a requirement: this pass is what reduces
+                // `getStringHash(s)` to the hash of a string *literal*, so a `String` must inline
+                // either way. Ask the referenced type first.
+                auto refType = cast<IRRefParamType>(type);
+                if (doesTypeRequireInline(refType->getValueType(), arg, callee))
+                    return true;
+                if (callee->findDecoration<IRNoRefInlineDecoration>() ||
+                    callee->findDecoration<IRNoInlineDecoration>())
                     return false;
                 return true;
             }
